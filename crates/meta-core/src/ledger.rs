@@ -1,6 +1,7 @@
+use crate::escape::Logged;
 use crate::event::{Attempt, Event, Record, Route};
-use crate::ids::{LeaseId, PrNumber, Reason, RunCount, TaskId};
-use crate::lease::{Lease, LeaseSlot};
+use crate::ids::{EscapeId, LeaseId, PrNumber, RunCount, TaskId};
+use crate::lease::{Lease, LeaseSlot, Purpose};
 use crate::task::{Linked, Progress, Task};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -8,10 +9,11 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Ledger {
     pub(crate) tasks: BTreeMap<TaskId, Progress>,
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
-    pub(crate) escapes: Vec<Reason>,
+    pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
     pub(crate) landed: BTreeSet<PrNumber>,
     pub(crate) starts_denied: usize,
+    pub(crate) self_claims: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,11 +50,50 @@ impl Ledger {
                     other => Err(format!("{task} claimed while {other}")),
                 }?;
                 self.tasks.insert(*task, claimed);
+                self.self_claims += usize::from(agent.is_lead());
             }
             Event::Leased { lease, task } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
-                let slot = LeaseSlot::Unused(Lease::issue(*lease, *task));
-                self.leases.insert(*lease, slot).map_or(Ok(()), |_| Err(format!("{lease} issued twice")))?;
+                self.issue(Lease::issue(*lease, *task, Purpose::Work))?;
+            }
+            Event::ReviewLeased { lease, task, pr, head } => {
+                match self.tasks.get(task) {
+                    Some(Progress::Linked(linked)) if linked.pr() == *pr => Ok(()),
+                    _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
+                }?;
+                self.issue(Lease::issue(*lease, *task, Purpose::Review { pr: *pr, head: head.clone() }))?;
+            }
+            Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,
+                _ => Err(format!("{lease} reviewed but not used"))?,
+            },
+            Event::Resumed { lease } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.resume(),
+                _ => Err(format!("{lease} resumed but not used"))?,
+            },
+            Event::Retired { task, reason } => {
+                let retired = match self.take(*task)? {
+                    Progress::Open(open) => Ok(open.retire(reason.clone())),
+                    Progress::Claimed(claimed) => Ok(claimed.retire(reason.clone())),
+                    Progress::Linked(linked) => Ok(linked.retire(reason.clone())),
+                    Progress::Deferred(deferred) => Ok(deferred.retire(reason.clone())),
+                    other => Err(format!("{task} retired while {other}")),
+                }?;
+                self.tasks.insert(*task, Progress::Retired(retired));
+            }
+            Event::Deferred { task, reason } => {
+                let deferred = match self.take(*task)? {
+                    Progress::Open(open) => Ok(open.defer(reason.clone())),
+                    other => Err(format!("{task} deferred while {other}")),
+                }?;
+                self.tasks.insert(*task, Progress::Deferred(deferred));
+            }
+            Event::Undeferred { task } => {
+                let open = match self.take(*task)? {
+                    Progress::Deferred(deferred) => Ok(deferred.undefer()),
+                    other => Err(format!("{task} undeferred while {other}")),
+                }?;
+                self.tasks.insert(*task, Progress::Open(open));
             }
             Event::Linked { task, pr, pin, .. } => {
                 let linked = match self.take(*task)? {
@@ -74,7 +115,16 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { reason } => self.escapes.push(reason.clone()),
+            Event::Escaped { kind, reason } => self.escapes.push(Logged::new(kind.clone(), reason.clone())),
+            Event::Resolved { escape, task } => {
+                match self.tasks.get(task) {
+                    Some(Progress::Done(_)) => Ok(()),
+                    Some(other) => Err(format!("{escape} resolved against {other}, which is not done")),
+                    None => Err(format!("{escape} resolved against unknown {task}")),
+                }?;
+                let logged = self.escape_mut(*escape).ok_or_else(|| format!("unknown {escape} resolved"))?;
+                logged.resolve(*escape, *task)?;
+            }
             Event::LeaseUsed { lease } => {
                 let spent = match self.leases.remove(lease) {
                     Some(LeaseSlot::Unused(unused)) => Ok(unused.spend().0),
@@ -86,6 +136,19 @@ impl Ledger {
             Event::Denied { attempt: Attempt::Merge } => {}
         }
         Ok(self)
+    }
+
+    fn issue(&mut self, lease: Lease) -> Result<(), String> {
+        let id = lease.id();
+        self.leases.insert(id, LeaseSlot::Unused(lease)).map_or(Ok(()), |_| Err(format!("{id} issued twice")))
+    }
+
+    fn escape_mut(&mut self, escape: EscapeId) -> Option<&mut Logged> {
+        escape.index().and_then(|index| self.escapes.get_mut(index))
+    }
+
+    pub(crate) fn escape(&self, escape: EscapeId) -> Option<&Logged> {
+        escape.index().and_then(|index| self.escapes.get(index))
     }
 
     fn take(&mut self, task: TaskId) -> Result<Progress, String> {
@@ -100,6 +163,6 @@ impl Ledger {
     }
 
     pub(crate) fn live(&self, lease: &Lease) -> bool {
-        self.tasks.get(&lease.task()).is_some_and(|task| !task.is_done())
+        self.tasks.get(&lease.task()).is_some_and(Progress::is_active)
     }
 }

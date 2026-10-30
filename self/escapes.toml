@@ -1,0 +1,34 @@
+# Escape kinds (docs/stage1.md): `meta escape <kind> <reason>` takes one of these ids. Repeats
+# count by kind, not by free text. `bypass` says whether an escape of the kind records work that
+# went around meta; P1 counts those against merges outside meta. Escapes logged before kinds
+# existed fold as `unclassified`, which is not a kind here and cannot be chosen.
+
+[[kind]]
+id = "bootstrap"
+text = "meta could not do it yet: the command was not on main"
+source = "stage 0 bootstrap 2026-10-30: agents started and PR #1 merged before meta existed"
+bypass = true
+
+[[kind]]
+id = "missing-path"
+text = "real work needed a transition meta lacks"
+source = "stage 0 first evening 2026-10-30: no retire, review, self-claim or resume path"
+bypass = false
+
+[[kind]]
+id = "outside-merge"
+text = "a PR was merged without meta merge"
+source = "docs/prereg.md P1: any unrecorded bypass falsifies it"
+bypass = true
+
+[[kind]]
+id = "outside-start"
+text = "an agent was started or given new instructions without a lease"
+source = "docs/prereg.md P1: any unrecorded bypass falsifies it"
+bypass = true
+
+[[kind]]
+id = "broken-log"
+text = "the log does not fold or cannot be opened; it needs a repair"
+source = "docs/stage0.md: a log that does not fold names meta escape, then repair"
+bypass = false

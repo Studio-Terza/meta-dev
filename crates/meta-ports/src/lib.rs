@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, Timestamp};
+use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Timestamp};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +34,8 @@ pub trait Log {
 
 pub trait Git {
     fn origin(&self) -> Result<Origin, PortError>;
-    fn rules(&self) -> Result<String, PortError>;
+    /// A data file under `self/` as it stands on main.
+    fn read(&self, file: SelfFile) -> Result<String, PortError>;
 }
 
 #[derive(Debug, Clone)]

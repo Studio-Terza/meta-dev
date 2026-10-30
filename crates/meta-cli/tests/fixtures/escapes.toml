@@ -1,0 +1,13 @@
+# Behaviour-test fixture of escape kinds.
+
+[[kind]]
+id = "gap"
+text = "real work needed a transition meta lacks"
+source = "fixture: gap"
+bypass = false
+
+[[kind]]
+id = "bypass"
+text = "work went around meta"
+source = "fixture: bypass"
+bypass = true

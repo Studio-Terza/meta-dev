@@ -1,0 +1,25 @@
+# Behaviour-test fixture of predictions, with the numbers registered in docs/prereg.md.
+
+[[prediction]]
+id = "P1"
+hypothesis = "The loop is used"
+measure = "Agent starts and merges through meta, out of all"
+expected = "100%, except recorded escapes"
+falsified_by = "Any unrecorded bypass"
+falsifier = { unrecorded_bypasses = { above = 0 } }
+
+[[prediction]]
+id = "P2"
+hypothesis = "Gaps get fixed, not bypassed"
+measure = "Open escapes; repeats per kind"
+expected = "Each kind fixed before its 3rd repeat; at most 5 open"
+falsified_by = "A kind repeated 3 times, or more than 5 open"
+falsifier = { open_escapes = { above = 5 }, repeats_of_one_kind = { above = 2 } }
+
+[[prediction]]
+id = "P6"
+hypothesis = "Little rework"
+measure = "CI runs per merged PR"
+expected = "Median at most 2"
+falsified_by = "Median above 3"
+falsifier = { median_ci_runs = { above = 3 } }

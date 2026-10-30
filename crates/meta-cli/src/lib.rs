@@ -1,23 +1,36 @@
 use meta_core::{
-    Accepted, AgentName, Cause, Clearance, Escape, Event, Hook, Ledger, Malformed, Merges, Origin, PrNumber, Pull,
-    Reason, Reconciliation, Record, Refusal, Rules, TaskId, Timestamp, Title, Unreached, Unreadable,
+    Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
+    Malformed, Merges, Origin, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules, SelfFile,
+    Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
     Ledger(LedgerCall),
-    Escape(Reason),
+    Escape { kind: EscapeKind, reason: Reason },
     PreToolUse(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LedgerCall {
-    Open(Title),
-    Claim { task: TaskId, agent: AgentName },
+    Local(Local),
+    Claim { task: TaskId, claimant: Claimant },
     Link { task: TaskId, pr: PrNumber },
     Merge(PrNumber),
+    Retire { task: TaskId, reason: Reason },
+    Review { task: TaskId, agent: AgentName },
     Status,
+}
+
+/// A ledger command decided from the log alone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Local {
+    Open(Title),
+    Resolve { escape: EscapeId, task: TaskId },
+    Defer { task: TaskId, reason: Reason },
+    Undefer(TaskId),
+    Verdict { task: TaskId, verdict: Verdict },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,23 +79,49 @@ impl Answer {
 }
 
 impl Call {
-    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name>\n  meta link <task> <pr>\n  \
-                         meta merge <pr>\n  meta escape <reason>\n  meta status\n  meta hook pre-tool-use < input\n";
+    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name>\n  meta claim <task> --self\n  \
+                         meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> <reason>\n  \
+                         meta resolve <escape> <task>\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
+                         meta undefer <task>\n  meta review <task> --agent <name>\n  meta verdict <task> pass|fail\n  \
+                         meta status\n  meta hook pre-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
         let ledger = |call: Result<LedgerCall, Malformed>| Some(call.map(Self::Ledger));
+        let local = |call: Result<Local, Malformed>| ledger(call.map(LedgerCall::Local));
         let call: Option<Result<Self, Malformed>> = match words.as_slice() {
-            ["open", title @ ..] => ledger(title.join(" ").parse().map(LedgerCall::Open)),
-            ["claim", task, "--agent", agent] => {
-                ledger(task.parse().and_then(|task| agent.parse().map(|agent| LedgerCall::Claim { task, agent })))
+            ["open", title @ ..] => local(title.join(" ").parse().map(Local::Open)),
+            ["claim", task, "--self"] => {
+                ledger(task.parse().map(|task| LedgerCall::Claim { task, claimant: Claimant::Lead }))
             }
+            ["claim", task, "--agent", agent] => ledger(task.parse().and_then(|task| {
+                agent.parse().map(|agent| LedgerCall::Claim { task, claimant: Claimant::Agent(agent) })
+            })),
             ["link", task, pr] => {
                 ledger(task.parse().and_then(|task| pr.parse().map(|pr| LedgerCall::Link { task, pr })))
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
-            ["escape", reason @ ..] => Some(reason.join(" ").parse().map(Self::Escape)),
+            ["escape", kind, reason @ ..] => {
+                Some(kind.parse().and_then(|kind| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason })))
+            }
+            ["resolve", escape, task] => {
+                local(escape.parse().and_then(|escape| task.parse().map(|task| Local::Resolve { escape, task })))
+            }
+            ["retire", task, reason @ ..] => ledger(
+                task.parse()
+                    .and_then(|task| reason.join(" ").parse().map(|reason| LedgerCall::Retire { task, reason })),
+            ),
+            ["defer", task, reason @ ..] => local(
+                task.parse().and_then(|task| reason.join(" ").parse().map(|reason| Local::Defer { task, reason })),
+            ),
+            ["undefer", task] => local(task.parse().map(Local::Undefer)),
+            ["review", task, "--agent", agent] => {
+                ledger(task.parse().and_then(|task| agent.parse().map(|agent| LedgerCall::Review { task, agent })))
+            }
+            ["verdict", task, verdict] => {
+                local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
+            }
             ["hook", "pre-tool-use"] => Some(Ok(Self::PreToolUse(stdin()))),
             _ => None,
         };
@@ -100,9 +139,17 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     let at = clock.now();
     match call {
         Call::PreToolUse(input) => hook(Hook::read(&input), log, at),
-        Call::Escape(reason) => {
+        Call::Escape { kind, reason } => {
+            let kinds = match spec(git, SelfFile::EscapeKinds, EscapeKinds::parse) {
+                Ok(kinds) => kinds,
+                Err(failure) => return Answer::failed(failure),
+            };
             let earlier = log.read().map_err(|error| error.to_string());
-            let (events, text) = Escape::new(reason).tally(earlier.as_deref().map_err(String::as_str)).into_parts();
+            let tallied = Escape::new(kind, reason).tally(&kinds, earlier.as_deref().map_err(String::as_str));
+            let (events, text) = match tallied {
+                Ok(accepted) => accepted.into_parts(),
+                Err(refusal) => return Answer::failed(refusal.into()),
+            };
             match log.append(&stamped(events, at)) {
                 Ok(()) => Answer::done(text),
                 Err(error) => Answer::failed(error.into()),
@@ -137,44 +184,58 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 }
 
 fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
-    match hook {
-        Hook::Settled(accepted) => Answer::done(accepted.into_parts().1),
-        Hook::Agent(start) => {
-            let place = log.place();
-            let outcome = log.transact(|records| match Ledger::fold(&records) {
-                Ok(ledger) => {
-                    let (events, text) = ledger.admit(start).into_parts();
-                    (stamped(events, at), Ok(text))
-                }
-                Err(corrupt) => (Vec::new(), Err(corrupt.in_log(&place))),
-            });
-            match outcome.map_err(|error| error.to_string()).and_then(|admitted| admitted) {
-                Ok(text) => Answer::done(text),
-                Err(why) => Answer::broken_hook(why),
-            }
+    let decide: Box<dyn FnOnce(Ledger) -> Accepted> = match hook {
+        Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
+        Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
+        Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
+    };
+    let place = log.place();
+    let outcome = log.transact(|records| match Ledger::fold(&records) {
+        Ok(ledger) => {
+            let (events, text) = decide(ledger).into_parts();
+            (stamped(events, at), Ok(text))
         }
+        Err(corrupt) => (Vec::new(), Err(corrupt.in_log(&place))),
+    });
+    match outcome.map_err(|error| error.to_string()).and_then(|decided| decided) {
+        Ok(text) => Answer::done(text),
+        Err(why) => Answer::broken_hook(why),
     }
 }
 
+/// A `self/` file read from main and parsed; a failure is an error, not a refusal.
+fn spec<G: Git, T>(git: &G, file: SelfFile, parse: fn(&str) -> Result<T, Unreadable>) -> Result<T, Failure> {
+    Ok(parse(&git.read(file)?)?)
+}
+
 enum Prepared {
-    Open(Title),
-    Status(Reconciliation),
-    Claim { task: TaskId, agent: AgentName, origin: Origin, rules: Rules },
+    Local(Local),
+    Status(Sources),
+    Claim { task: TaskId, claimant: Claimant, origin: Origin, rules: Rules },
     Link { task: TaskId, pr: PrNumber, pull: Pull },
     Merge { pr: PrNumber, pull: Pull },
+    Retire { task: TaskId, reason: Reason, pull: Option<Pull> },
+    Review { task: TaskId, agent: AgentName, pull: Pull, rules: Rules },
 }
 
 fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github: &mut H) -> Result<Prepared, Failure> {
     Ok(match call {
-        LedgerCall::Open(title) => Prepared::Open(title),
-        LedgerCall::Status => Prepared::Status(match github.merged_list() {
-            Ok(listed) => Merges::from_gh(&listed),
-            Err(error) => Reconciliation::Unavailable(Cause::Port(Unreached::by(&error))),
-        }),
-        LedgerCall::Claim { task, agent } => {
-            ledger.claim(task, agent.clone())?;
-            let rules = Rules::parse(&git.rules()?)?;
-            Prepared::Claim { task, agent, origin: git.origin()?, rules }
+        LedgerCall::Local(local) => Prepared::Local(local),
+        LedgerCall::Status => {
+            let unreached = |failure: Failure| Unreached::by(&failure);
+            Prepared::Status(Sources {
+                github: match github.merged_list() {
+                    Ok(listed) => Merges::from_gh(&listed),
+                    Err(error) => Reconciliation::Unavailable(Cause::Port(Unreached::by(&error))),
+                },
+                kinds: spec(git, SelfFile::EscapeKinds, EscapeKinds::parse).map_err(unreached),
+                predictions: spec(git, SelfFile::Predictions, Predictions::parse).map_err(unreached),
+            })
+        }
+        LedgerCall::Claim { task, claimant } => {
+            ledger.claim(task, claimant.clone())?;
+            let rules = spec(git, SelfFile::Rules, Rules::parse)?;
+            Prepared::Claim { task, claimant, origin: git.origin()?, rules }
         }
         LedgerCall::Link { task, pr } => {
             ledger.link(task, pr)?;
@@ -188,19 +249,33 @@ fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github
             }
             Prepared::Merge { pr, pull }
         }
+        LedgerCall::Retire { task, reason } => {
+            let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
+            Prepared::Retire { task, reason, pull }
+        }
+        LedgerCall::Review { task, agent } => {
+            let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
+            Prepared::Review { task, agent, pull, rules: spec(git, SelfFile::Rules, Rules::parse)? }
+        }
     })
 }
 
 fn finish(prepared: Prepared, ledger: Ledger) -> Result<Accepted, Failure> {
     Ok(match prepared {
-        Prepared::Open(title) => ledger.open(title),
-        Prepared::Status(github) => ledger.status(github),
-        Prepared::Claim { task, agent, origin, rules } => ledger.claim(task, agent)?.brief(&origin, &rules),
+        Prepared::Local(Local::Open(title)) => ledger.open(title),
+        Prepared::Local(Local::Resolve { escape, task }) => ledger.resolve(escape, task)?,
+        Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
+        Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
+        Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
+        Prepared::Status(sources) => ledger.status(sources),
+        Prepared::Claim { task, claimant, origin, rules } => ledger.claim(task, claimant)?.brief(&origin, &rules),
         Prepared::Link { task, pr, pull } => ledger.link(task, pr)?.pin(&pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {
             Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),
         },
+        Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
+        Prepared::Review { task, agent, pull, rules } => ledger.review(task, agent)?.brief(&pull, &rules)?,
     })
 }
 
@@ -217,6 +292,15 @@ impl From<Refusal> for Failure {
 impl From<PortError> for Failure {
     fn from(error: PortError) -> Self {
         Self::Broken(error.to_string())
+    }
+}
+
+impl std::fmt::Display for Failure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Refused(refusal) => write!(formatter, "{refusal}"),
+            Self::Broken(why) => formatter.write_str(why),
+        }
     }
 }
 

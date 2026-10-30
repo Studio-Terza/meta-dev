@@ -1,6 +1,6 @@
 use super::command::run;
 use crate::{Git, PortError};
-use meta_core::Origin;
+use meta_core::{Origin, SelfFile};
 
 #[derive(Debug, Clone, Copy)]
 pub struct GitCli;
@@ -12,8 +12,8 @@ impl Git for GitCli {
             .map_err(|error| PortError::new(format!("origin: {error}")))
     }
 
-    fn rules(&self) -> Result<String, PortError> {
+    fn read(&self, file: SelfFile) -> Result<String, PortError> {
         run("git", &["fetch", "--quiet", "origin", "main"])?;
-        run("git", &["show", "FETCH_HEAD:self/rules.toml"])
+        run("git", &["show", &format!("FETCH_HEAD:{}", file.path())])
     }
 }

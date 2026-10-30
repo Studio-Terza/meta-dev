@@ -35,3 +35,13 @@ source = "owner 2026-10-28: thermal management"
 id = "no-email"
 text = "Send no email. Web requests use the User-Agent basho-trip-planner."
 source = "owner 2026-10: privacy"
+
+[[rule]]
+id = "red-first"
+text = "Tighten the check in the first commit, see CI fail on it, then fix to green."
+source = "owner 2026-10-30: red first"
+
+[[rule]]
+id = "review-gates"
+text = "Review: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds."
+source = "owner 2026-10-30: ordinary review instead of blocking approvals"

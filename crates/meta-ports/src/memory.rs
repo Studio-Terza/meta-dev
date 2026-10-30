@@ -1,5 +1,5 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, Sha, Timestamp};
+use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Timestamp};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
@@ -40,7 +40,7 @@ impl Log for MemoryLog {
 #[derive(Debug)]
 pub struct RecordedGit {
     pub origin: Origin,
-    pub rules: String,
+    pub files: BTreeMap<SelfFile, String>,
 }
 
 impl Git for RecordedGit {
@@ -48,8 +48,8 @@ impl Git for RecordedGit {
         Ok(self.origin.clone())
     }
 
-    fn rules(&self) -> Result<String, PortError> {
-        Ok(self.rules.clone())
+    fn read(&self, file: SelfFile) -> Result<String, PortError> {
+        self.files.get(&file).cloned().ok_or_else(|| PortError::new(format!("no recorded {}", file.path())))
     }
 }
 
