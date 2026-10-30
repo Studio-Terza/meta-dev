@@ -7,11 +7,11 @@ mod lease;
 mod ledger;
 mod link;
 mod merge;
+mod merges;
 mod open;
 mod pull;
 mod reply;
 mod rules;
-mod shell;
 mod status;
 mod task;
 
@@ -25,6 +25,7 @@ pub use ids::{
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;
 pub use merge::{Clearance, Cleared, Landed, Merging};
+pub use merges::Merges;
 pub use pull::{Outcome, Pull, PullState};
 pub use reply::{Accepted, Refusal};
 pub use rules::{Rules, Unreadable};

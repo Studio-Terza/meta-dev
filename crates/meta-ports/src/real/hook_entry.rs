@@ -21,9 +21,9 @@ fn exit_code(prelude: &str, command: &str) -> Option<i32> {
 }
 
 #[test]
-fn the_hook_entry_gates_agent_task_and_bash() {
+fn the_hook_entry_gates_agent_and_task_only() {
     let (matcher, _) = entry();
-    assert_eq!(matcher.split('|').collect::<Vec<_>>(), ["Agent", "Task", "Bash"]);
+    assert_eq!(matcher.split('|').collect::<Vec<_>>(), ["Agent", "Task"]);
 }
 
 #[test]
