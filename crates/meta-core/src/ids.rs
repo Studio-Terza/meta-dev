@@ -9,7 +9,7 @@ use std::str::FromStr;
 pub struct Malformed(String);
 
 impl Malformed {
-    pub(crate) fn because(why: impl Into<String>) -> Self {
+    pub fn because(why: impl Into<String>) -> Self {
         Self(why.into())
     }
 }
@@ -234,6 +234,64 @@ impl Timestamp {
     }
 }
 
+impl Timestamp {
+    /// This time moved later by `span`.
+    pub fn plus(self, span: Span) -> Self {
+        self.advanced(span.0)
+    }
+
+    /// The span from this time to `later`; none when `later` is not later.
+    pub fn span_to(self, later: Self) -> Span {
+        Span(later.0.saturating_sub(self.0))
+    }
+}
+
+/// A stretch of time, in seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Span(u64);
+
+/// A whole number of minutes, at least one: how long a lease runs before its deadline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "u64")]
+pub struct Minutes(u64);
+
+impl Minutes {
+    const SECONDS: u64 = 60;
+
+    pub fn span(self) -> Span {
+        Span(self.0.saturating_mul(Self::SECONDS))
+    }
+}
+
+impl TryFrom<u64> for Minutes {
+    type Error = Malformed;
+
+    fn try_from(count: u64) -> Result<Self, Malformed> {
+        match count {
+            0 => Err(Malformed("a deadline is at least 1 minute".to_owned())),
+            _ => Ok(Self(count)),
+        }
+    }
+}
+
+impl FromStr for Minutes {
+    type Err = Malformed;
+
+    fn from_str(text: &str) -> Result<Self, Malformed> {
+        text.parse::<u64>()
+            .ok()
+            .filter(|count| count.to_string() == text)
+            .ok_or_else(|| Malformed(format!("{text:?} is not a whole number of minutes")))
+            .and_then(Self::try_from)
+    }
+}
+
+impl fmt::Display for Minutes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} min", self.0)
+    }
+}
+
 impl fmt::Display for Timestamp {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "unix {}", self.0)
@@ -266,7 +324,7 @@ impl fmt::Display for RunCount {
 
 #[cfg(test)]
 mod tests {
-    use super::{LeaseId, PrNumber, TaskId};
+    use super::{LeaseId, Minutes, PrNumber, TaskId};
 
     #[test]
     fn a_pr_number_takes_one_optional_hash_and_digits() {
@@ -281,5 +339,11 @@ mod tests {
                 .map(|text| text.parse::<LeaseId>().is_ok());
         assert_eq!(parsed, [true, true, true, false, false, false, false, false, false]);
         assert!("task-01".parse::<TaskId>().is_err() && "task-7".parse::<TaskId>().is_ok());
+    }
+
+    #[test]
+    fn minutes_are_canonical_whole_numbers_of_at_least_one() {
+        let parsed = ["1", "90", "0", "01", "+5", "1.5", "-1", "", " 5"].map(|text| text.parse::<Minutes>().is_ok());
+        assert_eq!(parsed, [true, true, false, false, false, false, false, false, false]);
     }
 }

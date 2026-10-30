@@ -16,6 +16,7 @@ mod pull;
 mod reply;
 mod retire;
 mod review;
+mod roles;
 mod rules;
 mod spec;
 mod status;
@@ -27,8 +28,8 @@ pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Observed, Origin,
-    PrNumber, PredictionId, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
+    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Minutes, Observed,
+    Origin, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title, Verdict,
 };
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;
@@ -39,6 +40,7 @@ pub use pull::{Outcome, Pull, PullState};
 pub use reply::{Accepted, Refusal};
 pub use retire::{Retirement, Retiring};
 pub use review::Reviewing;
+pub use roles::Roles;
 pub use rules::Rules;
 pub use spec::{SelfFile, Unreadable};
 pub use status::Sources;

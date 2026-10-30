@@ -1,6 +1,6 @@
 use crate::event::Event;
-use crate::ids::{AgentName, Claimant, LeaseId, Origin, TaskId, Title};
-use crate::lease::{LeaseSlot, Purpose};
+use crate::ids::{AgentName, Claimant, LeaseId, Origin, TaskId, Timestamp, Title};
+use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
 use crate::rules::Rules;
@@ -71,18 +71,27 @@ impl Ledger {
 }
 
 impl Claim {
-    pub fn brief(self, origin: &Origin, rules: &Rules) -> Accepted {
+    /// The brief, and the events of the claim. An agent's lease ends at `deadline`; a self-claim has
+    /// no lease and no deadline, whatever `deadline` says.
+    pub fn brief(self, origin: &Origin, rules: &Rules, deadline: Option<Timestamp>) -> Accepted {
         let Self { task, title, grant } = self;
-        let (who, lease_line) = match &grant {
-            Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => {
-                (agent.to_string(), format!("{lease} (put it in the Agent description; it works once)"))
-            }
-            Grant::SelfClaim => (Claimant::Lead.to_string(), "none: the lead works this task itself".to_owned()),
+        let (who, lease_line, deadline_line) = match &grant {
+            Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => (
+                agent.to_string(),
+                format!("{lease} (put it in the Agent description; it works once)"),
+                Deadline::of(deadline).brief_line(),
+            ),
+            Grant::SelfClaim => (
+                Claimant::Lead.to_string(),
+                "none: the lead works this task itself".to_owned(),
+                "none: self-claims have no deadline".to_owned(),
+            ),
         };
         let text = format!(
             "task: {task}: {title}\n\
              agent: {who}\n\
              lease: {lease_line}\n\
+             deadline: {deadline_line}\n\
              setup:\n  \
              1. git clone {origin} {task}\n  \
              2. cd {task} && git switch -c {task} origin/main\n  \
@@ -97,9 +106,9 @@ impl Claim {
         );
         let events = match grant {
             Grant::FirstClaim { agent, lease } => {
-                vec![Event::Claimed { task, agent: Claimant::Agent(agent) }, Event::Leased { lease, task }]
+                vec![Event::Claimed { task, agent: Claimant::Agent(agent) }, Event::Leased { lease, task, deadline }]
             }
-            Grant::FreshLease { lease, .. } => vec![Event::Leased { lease, task }],
+            Grant::FreshLease { lease, .. } => vec![Event::Leased { lease, task, deadline }],
             Grant::SelfClaim => vec![Event::Claimed { task, agent: Claimant::Lead }],
         };
         Accepted::new(events, text)

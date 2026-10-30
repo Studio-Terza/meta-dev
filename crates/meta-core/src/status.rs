@@ -38,9 +38,17 @@ impl Ledger {
             .leases
             .iter()
             .filter_map(|(id, slot)| match slot {
-                LeaseSlot::Unused(lease) if self.live(lease) => Some(format!("{id} for {}", lease.task())),
+                LeaseSlot::Unused(lease) if self.live(lease) => {
+                    Some(format!("{id} for {}, {}", lease.task(), slot.deadline()))
+                }
                 _ => None,
             })
+            .collect();
+        let overdue: Vec<String> = self
+            .leases
+            .iter()
+            .filter(|(_, slot)| self.live(slot.lease()) && !slot.is_finished() && slot.deadline().passed(at))
+            .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
             .collect();
         let main = kinds.as_ref().ok();
         let open_escapes: Vec<String> = (1..=self.escapes.len())
@@ -136,6 +144,7 @@ impl Ledger {
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
+            section("overdue leases (flagged)", &overdue),
             format!(
                 "P1 agent starts through meta: {started} of {}; self-claims, not agent starts: {}\n",
                 started + self.starts_denied,

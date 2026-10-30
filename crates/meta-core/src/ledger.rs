@@ -2,7 +2,7 @@ use crate::escape::Logged;
 use crate::event::{Attempt, Event, Record, Route};
 use crate::ids::{EscapeId, LeaseId, PrNumber, PredictionId, RunCount, TaskId, Timestamp};
 use crate::latch::Latch;
-use crate::lease::{Lease, LeaseSlot, Purpose};
+use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
 use crate::predictions::Measure;
 use crate::task::{Linked, Progress, Task};
 use std::collections::{BTreeMap, BTreeSet};
@@ -58,23 +58,24 @@ impl Ledger {
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
             }
-            Event::Leased { lease, task } => {
+            Event::Leased { lease, task, deadline } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
-                self.issue(Lease::issue(*lease, *task, Purpose::Work))?;
+                self.issue(Lease::issue(*lease, *task, Purpose::Work, at, Deadline::of(*deadline)))?;
             }
-            Event::ReviewLeased { lease, task, pr, head } => {
+            Event::ReviewLeased { lease, task, pr, head, deadline } => {
                 match self.tasks.get(task) {
                     Some(Progress::Linked(linked)) if linked.pr() == *pr => Ok(()),
                     _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
                 }?;
-                self.issue(Lease::issue(*lease, *task, Purpose::Review { pr: *pr, head: head.clone() }))?;
+                let purpose = Purpose::Review { pr: *pr, head: head.clone() };
+                self.issue(Lease::issue(*lease, *task, purpose, at, Deadline::of(*deadline)))?;
             }
             Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,
                 _ => Err(format!("{lease} reviewed but not used"))?,
             },
-            Event::Started { lease, agent } => match self.leases.get_mut(lease) {
-                Some(LeaseSlot::Spent(spent)) => spent.start(agent.clone())?,
+            Event::Started { lease, agent, deadline } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.start(agent.clone(), Deadline::of(*deadline))?,
                 _ => Err(format!("{lease} started an agent but is not used"))?,
             },
             Event::Resumed { lease } => match self.leases.get_mut(lease) {

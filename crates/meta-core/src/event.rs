@@ -23,6 +23,9 @@ pub enum Event {
     Leased {
         lease: LeaseId,
         task: TaskId,
+        /// When the agent must report or stop. Leases from before deadlines have none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deadline: Option<Timestamp>,
     },
     Linked {
         task: TaskId,
@@ -70,10 +73,13 @@ pub enum Event {
     LeaseUsed {
         lease: LeaseId,
     },
-    /// The agent the used lease started, by the id Claude Code gave it.
+    /// The agent the used lease started, by the id Claude Code gave it, and the lease's deadline
+    /// counted from this start.
     Started {
         lease: LeaseId,
         agent: AgentId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deadline: Option<Timestamp>,
     },
     Denied {
         attempt: Attempt,
@@ -95,6 +101,9 @@ pub enum Event {
         task: TaskId,
         pr: PrNumber,
         head: Sha,
+        /// When the agent must report or stop. Leases from before deadlines have none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deadline: Option<Timestamp>,
     },
     Reviewed {
         lease: LeaseId,

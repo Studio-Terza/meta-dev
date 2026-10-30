@@ -1,5 +1,6 @@
 use crate::escape::EscapeKinds;
 use crate::predictions::Predictions;
+use crate::roles::Roles;
 use crate::rules::Rules;
 use serde::de::DeserializeOwned;
 use std::fmt;
@@ -10,6 +11,7 @@ pub enum SelfFile {
     Rules,
     EscapeKinds,
     Predictions,
+    Roles,
 }
 
 impl SelfFile {
@@ -18,6 +20,7 @@ impl SelfFile {
             Self::Rules => "self/rules.toml",
             Self::EscapeKinds => "self/escapes.toml",
             Self::Predictions => "self/predictions.toml",
+            Self::Roles => "self/roles.toml",
         }
     }
 
@@ -27,6 +30,7 @@ impl SelfFile {
             Self::Rules => Rules::parse(text).is_ok(),
             Self::EscapeKinds => EscapeKinds::parse(text).is_ok(),
             Self::Predictions => Predictions::parse(text).is_ok(),
+            Self::Roles => Roles::parse(text).is_ok(),
         }
     }
 

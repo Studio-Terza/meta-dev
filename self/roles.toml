@@ -1,0 +1,11 @@
+# Per-role defaults for leases. Each role must cite where its values came from.
+# source = "owner YYYY-MM-DD: <words>" or "failure: <what happened>"
+# `meta claim <task> --agent <name>` and `meta review <task> --agent <name>` take --deadline <minutes> to override.
+
+[work]
+deadline-minutes = 90
+source = "owner 2026-10-30: agents can and will stall"
+
+[review]
+deadline-minutes = 30
+source = "owner 2026-10-30: agents can and will stall"
