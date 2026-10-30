@@ -114,4 +114,14 @@ mod tests {
         assert_eq!(answers[..2], [Ok(true), Ok(false)]);
         assert!(answers[2].is_err(), "{:?}", answers[2]);
     }
+
+    #[test]
+    fn a_build_whose_clone_moved_or_was_removed_cannot_answer_and_says_so() {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let gone = std::env::temp_dir().join(format!("meta-dev-moved-{nanos}"));
+        let commit: Sha = "0123456789012345678901234567890123456789".parse().unwrap();
+        let said = GitCli::ancestry(&gone, &commit).unwrap_err().to_string();
+        let expected = format!("the clone this binary was built in, {}, has moved or been removed", gone.display());
+        assert!(said.contains(&expected), "{said}");
+    }
 }

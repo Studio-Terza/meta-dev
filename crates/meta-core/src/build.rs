@@ -3,10 +3,18 @@ use crate::reply::Refusal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// The commit a binary was built from, embedded at build time, or why it has none: a dirty
-/// working tree, or a build outside git.
+/// The commit a binary was built from, embedded at build time, or why it has none: edits to
+/// tracked files, or a build outside git.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Build(Result<Sha, String>);
+pub struct Build(Stamp);
+
+/// What the build script found: a clean commit, a commit with edits to tracked files, or no commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Stamp {
+    Clean(Sha),
+    Dirty(Sha),
+    Unknown(String),
+}
 
 /// Why this binary may not append to the real log.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,14 +32,17 @@ pub enum Writer {
 
 impl Build {
     pub fn commit(commit: Sha) -> Self {
-        Self(Ok(commit))
+        Self(Stamp::Clean(commit))
     }
 
-    /// From what the build script embedded: the commit of a clean checkout, else why there is none.
-    pub fn embedded(commit: Option<&str>, why: Option<&str>) -> Self {
-        match commit.map(str::parse) {
-            Some(Ok(commit)) => Self(Ok(commit)),
-            _ => Self(Err(why.unwrap_or("a binary with no commit embedded").to_owned())),
+    /// From what the build script embedded: the commit of a clean checkout, else the commit under
+    /// edits to tracked files, else why there is none.
+    pub fn embedded(clean: Option<&str>, dirty: Option<&str>, why: Option<&str>) -> Self {
+        let parsed = |commit: Option<&str>| commit.and_then(|commit| commit.parse().ok());
+        match (parsed(clean), parsed(dirty)) {
+            (Some(commit), _) => Self(Stamp::Clean(commit)),
+            (None, Some(commit)) => Self(Stamp::Dirty(commit)),
+            (None, None) => Self(Stamp::Unknown(why.unwrap_or("a binary with no commit embedded").to_owned())),
         }
     }
 
@@ -39,8 +50,9 @@ impl Build {
     /// ancestry that cannot be decided, is unverified: fail closed.
     pub fn verify<E: fmt::Display>(&self, on_main: impl FnOnce(&Sha) -> Result<bool, E>) -> Result<(), Unverified> {
         match &self.0 {
-            Err(why) => Err(Unverified(format!("built from {why}"))),
-            Ok(commit) => match on_main(commit) {
+            Stamp::Unknown(why) => Err(Unverified(format!("built from {why}"))),
+            Stamp::Dirty(commit) => Err(Unverified(format!("built from a dirty working tree at {commit}"))),
+            Stamp::Clean(commit) => match on_main(commit) {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(Unverified(format!("built from {commit}, which is not on origin/main"))),
                 Err(error) => Err(Unverified(format!("cannot tell whether {commit} is on origin/main: {error}"))),

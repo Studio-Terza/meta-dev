@@ -1381,11 +1381,14 @@ impl Real for Memory {
     }
 }
 
-/// A commit not on origin/main, a dirty working tree, and a commit whose ancestry cannot be read.
+/// A commit not on origin/main, edits to tracked files, and a commit whose ancestry cannot be read.
 fn unverified_builds() -> [(Build, &'static str); 3] {
     [
         (Build::commit(id(BRANCH_BUILD)), "built from b4a2c40, which is not on origin/main"),
-        (Build::embedded(None, Some("a dirty working tree at c0ffee0")), "built from a dirty working tree at c0ffee0"),
+        (
+            Build::embedded(None, Some("c0ffee0"), None),
+            "built from c0ffee0 with edits to tracked files; to clear it, commit or stash them, then rebuild",
+        ),
         (Build::commit(id("d00d1e5")), "cannot tell whether d00d1e5 is on origin/main: no recorded ancestry"),
     ]
 }

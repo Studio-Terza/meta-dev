@@ -7,6 +7,8 @@ mod hook_entry;
 mod host;
 mod jsonl;
 mod log;
+#[cfg(test)]
+mod stamp;
 
 pub use clock::SystemClock;
 pub use gh::GhCli;

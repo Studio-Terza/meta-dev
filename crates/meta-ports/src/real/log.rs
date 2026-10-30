@@ -166,6 +166,24 @@ mod tests {
     }
 
     #[test]
+    fn a_scratch_data_home_whose_meta_dev_dir_or_log_links_to_the_real_one_holds_the_real_log() {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let home = std::env::temp_dir().join(format!("meta-dev-linked-{nanos}"));
+        let real_dir = home.join(".local").join("share").join("meta-dev");
+        std::fs::create_dir_all(&real_dir).unwrap();
+        std::fs::write(real_dir.join("log.jsonl"), "").unwrap();
+        let (linked_dir, linked_log) = (home.join("linked-dir"), home.join("linked-log"));
+        std::fs::create_dir_all(&linked_dir).unwrap();
+        std::os::unix::fs::symlink(&real_dir, linked_dir.join("meta-dev")).unwrap();
+        std::fs::create_dir_all(linked_log.join("meta-dev")).unwrap();
+        std::os::unix::fs::symlink(real_dir.join("log.jsonl"), linked_log.join("meta-dev").join("log.jsonl")).unwrap();
+        let real = |chosen: &std::path::Path| data_dir_from(Some(chosen.to_path_buf()), Some(home.clone())).unwrap().1;
+        let decided = [real(&linked_dir), real(&linked_log)];
+        std::fs::remove_dir_all(&home).unwrap();
+        assert_eq!(decided, [true, true]);
+    }
+
+    #[test]
     fn a_log_locked_past_the_deadline_is_a_port_failure() {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let path = std::env::temp_dir().join(format!("meta-dev-deadline-{nanos}.jsonl"));

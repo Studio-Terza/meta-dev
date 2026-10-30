@@ -7,7 +7,11 @@ pub fn arguments() -> Vec<String> {
 
 /// The commit the build script embedded (`build.rs`), or why it embedded none.
 pub fn build() -> Build {
-    Build::embedded(option_env!("META_BUILD_COMMIT"), option_env!("META_BUILD_UNVERIFIED"))
+    Build::embedded(
+        option_env!("META_BUILD_COMMIT"),
+        option_env!("META_BUILD_DIRTY"),
+        option_env!("META_BUILD_UNVERIFIED"),
+    )
 }
 
 pub fn exit(code: u8) -> Exit {
