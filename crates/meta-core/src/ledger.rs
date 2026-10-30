@@ -2,7 +2,7 @@ use crate::event::{Attempt, Event, Record, Route};
 use crate::ids::{LeaseId, PrNumber, Reason, RunCount, TaskId};
 use crate::lease::{Lease, LeaseSlot};
 use crate::task::{Linked, Progress, Task};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
 pub struct Ledger {
@@ -10,7 +10,8 @@ pub struct Ledger {
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
     pub(crate) escapes: Vec<Reason>,
     pub(crate) merged: Vec<(RunCount, Route)>,
-    pub(crate) denied: Vec<Attempt>,
+    pub(crate) landed: BTreeSet<PrNumber>,
+    pub(crate) starts_denied: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +64,7 @@ impl Ledger {
             }
             Event::Merged { pr, runs, route, .. } => {
                 self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
+                self.landed.insert(*pr);
                 self.merged.push((*runs, *route));
             }
             Event::Done { task } => {
@@ -80,7 +82,8 @@ impl Ledger {
                 }?;
                 self.leases.insert(*lease, LeaseSlot::Spent(spent));
             }
-            Event::Denied { attempt } => self.denied.push(*attempt),
+            Event::Denied { attempt: Attempt::AgentStart } => self.starts_denied += 1,
+            Event::Denied { attempt: Attempt::Merge } => {}
         }
         Ok(self)
     }

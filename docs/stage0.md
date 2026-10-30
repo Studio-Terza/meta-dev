@@ -20,17 +20,14 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 | `meta merge <pr>` | the protection lookup or the gh replies fail | error, no events |
 | `meta escape <reason>` | any, even a log that does not fold | event `Escaped`; prints the open escape count and how many times this reason has repeated |
 | `meta status` | any | open tasks, live leases and open escapes, plus the counters in "Measures" |
+| `meta status` | every PR merged on GitHub (read through the GitHub port) has a `Merged` event in the log | P1 merges: all through meta (or logged as outside); nothing missing from the log |
+| `meta status` | a PR merged on GitHub has no `Merged` event in the log | it counts as "merged outside meta" in P1, and the line says how many are missing from the log |
+| `meta status` | the merged-PR list cannot be read or parsed | the report still prints; P1 merges says the reconciliation is unavailable and why |
 | any ledger command | the log does not fold | error naming the log path, then "Next: meta escape <reason>, then repair <path>" |
 | `meta hook pre-tool-use` with tool `Agent` or `Task` | the prompt carries a lease id that is live and unused | allowed; event `LeaseUsed` (each lease is single use) |
 | `meta hook pre-tool-use` with tool `Agent` or `Task` | no lease, an unknown lease, or an already used lease | denied, with how to get one (`meta claim <task> --agent <name>`) |
 | `meta hook pre-tool-use` with tool `Agent` or `Task` | the log cannot be opened, stays locked past its deadline, or does not fold | denied (fail closed), naming the log and the next step |
-| `meta hook pre-tool-use` with tool `Bash` | the command merges a PR or pushes to `main` any way other than `meta merge`: `gh pr merge` (also behind gh flags), a `gh api` call that is not a GET or a graphql mutation, `git push … main` (also via `@`, `--git-dir`, `--work-tree`, `--namespace`, `subtree push`, `--all`, `--mirror`), split by `$(`, backticks or line continuations | denied, pointing to `meta merge` or `meta escape`; event `Denied` |
-| `meta hook pre-tool-use` with tool `Bash` | `git push` names no branch other than `main` (bare, remote only, `HEAD`, `@`) | denied: "name the branch: git push origin <branch>" |
-| `meta hook pre-tool-use` with tool `Bash` | a `git push` or a REST `gh api` call holds an unexpanded `$`, or a graphql query comes from `$`, `@` or `--input` | denied; spell the value out |
-| `meta hook pre-tool-use` with tool `Bash` | the command starts an agent with the `claude` program, for example `claude -p` | denied, with how to get a lease and use the Agent tool; event `Denied` |
-| `meta hook pre-tool-use` with tool `Bash` | any other command, including `meta` itself, even when the log cannot be opened | allowed; the log is not touched |
-| `meta hook pre-tool-use` with tool `Bash` | a denial whose `Denied` event cannot be written | still denied |
-| `meta hook pre-tool-use` with any other tool | any `tool_input` | allowed; the input is not read |
+| `meta hook pre-tool-use` with any other tool, `Bash` included | any `tool_input`, even a merge or a push to `main`; any log state | allowed; the input and the log are not read |
 | `meta hook pre-tool-use` | input that cannot be parsed | denied (fail closed) |
 | hook entry in `self/claude-settings.json` | `meta` is missing, crashes or times out | the tool is blocked (`\|\| exit 2`, `onFailure: block`, a timeout longer than the log lock deadline) |
 
@@ -38,9 +35,13 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 
 `meta status` prints these from the log. They are report-only.
 
-- P1: agent starts and merges through meta, out of all. The hook counts denied attempts.
+- P1: agent starts and merges through meta, out of all. The hook counts denied agent starts. `meta status` lists the PRs merged on GitHub and compares them with the log's `Merged` events; a merge missing from the log counts as "merged outside meta".
 - P2: open escapes, and how often each reason repeats.
 - P6: CI runs per merged PR, read from the GitHub port at merge time.
+
+## Enforcement
+
+GitHub branch protection and CI enforce merges and pushes, not anything local. `main` requires a PR, a green `gates` check and an up-to-date branch, and the rule includes admins. The only local hook gates agent starts (`Agent`, `Task`) by lease. `meta status` reports merges that went around `meta` after the fact; it does not stop them.
 
 ## Structure
 

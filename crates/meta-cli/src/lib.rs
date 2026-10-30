@@ -1,6 +1,6 @@
 use meta_core::{
-    Accepted, AgentName, Clearance, Escape, Event, Hook, Ledger, Malformed, Origin, PrNumber, Pull, Reason, Record,
-    Refusal, Rules, TaskId, Timestamp, Title, Unreadable,
+    Accepted, AgentName, Clearance, Escape, Event, Hook, Ledger, Malformed, Merges, Origin, PrNumber, Pull, Reason,
+    Record, Refusal, Rules, TaskId, Timestamp, Title, Unreadable,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -138,13 +138,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 
 fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
     match hook {
-        Hook::Settled(accepted) => {
-            let (events, text) = accepted.into_parts();
-            if !events.is_empty() {
-                let _unrecorded_denial_still_denies = log.append(&stamped(events, at));
-            }
-            Answer::done(text)
-        }
+        Hook::Settled(accepted) => Answer::done(accepted.into_parts().1),
         Hook::Agent(start) => {
             let place = log.place();
             let outcome = log.transact(|records| match Ledger::fold(&records) {
@@ -164,7 +158,7 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
 
 enum Prepared {
     Open(Title),
-    Status,
+    Status(Result<Merges, String>),
     Claim { task: TaskId, agent: AgentName, origin: Origin, rules: Rules },
     Link { task: TaskId, pr: PrNumber, pull: Pull },
     Merge { pr: PrNumber, pull: Pull },
@@ -173,7 +167,12 @@ enum Prepared {
 fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github: &mut H) -> Result<Prepared, Failure> {
     Ok(match call {
         LedgerCall::Open(title) => Prepared::Open(title),
-        LedgerCall::Status => Prepared::Status,
+        LedgerCall::Status => Prepared::Status(
+            github
+                .merged_list()
+                .map_err(|error| error.to_string())
+                .and_then(|listed| Merges::from_gh(&listed).map_err(|malformed| malformed.to_string())),
+        ),
         LedgerCall::Claim { task, agent } => {
             ledger.claim(task, agent.clone())?;
             let rules = Rules::parse(&git.rules()?)?;
@@ -197,7 +196,7 @@ fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github
 fn finish(prepared: Prepared, ledger: Ledger) -> Result<Accepted, Failure> {
     Ok(match prepared {
         Prepared::Open(title) => ledger.open(title),
-        Prepared::Status => ledger.status(),
+        Prepared::Status(github) => ledger.status(github),
         Prepared::Claim { task, agent, origin, rules } => ledger.claim(task, agent)?.brief(&origin, &rules),
         Prepared::Link { task, pr, pull } => ledger.link(task, pr)?.pin(&pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {
