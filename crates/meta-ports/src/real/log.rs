@@ -1,6 +1,3 @@
-//! The log file boundary: the JSONL log is read one record per line.
-#![allow(clippy::disallowed_methods)]
-
 use crate::{Log, PortError};
 use meta_core::Record;
 use std::fs::{self, File, OpenOptions, TryLockError};

@@ -9,16 +9,11 @@ reason = "FromStr and TryFrom<String> for the id and text types: the one place t
 source = { owner = 2026-10-30, words = "text is parsed once, at a declared boundary, into types" }
 
 [[boundary]]
-path = "crates/meta-core/src/hook.rs"
-reason = "the Agent prompt is scanned for a lease id; task-15 reads an exact description instead and drops this entry"
-source = { owner = 2026-10-30, words = "text is parsed once, at a declared boundary, into types" }
-
-[[boundary]]
 path = "crates/meta-ports/src/real/command.rs"
 reason = "a failed command's stderr is lossy text from another process, decoded once and shown as written"
 source = { owner = 2026-10-30, words = "stderr is shown raw, decoded with from_utf8_lossy at one real boundary" }
 
 [[boundary]]
-path = "crates/meta-ports/src/real/log.rs"
-reason = "the JSONL log is read one record per line; a line is the unit that is parsed and reported (task-15 moves this to real/jsonl.rs)"
+path = "crates/meta-ports/src/real/jsonl.rs"
+reason = "the JSONL log is read one record per line; a line is the unit that is parsed and reported"
 source = { owner = 2026-10-30, words = "text is parsed once, at a declared boundary, into types" }
