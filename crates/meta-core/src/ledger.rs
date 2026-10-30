@@ -115,7 +115,8 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { kind, reason } => self.escapes.push(Logged::new(kind.clone(), reason.clone())),
+            Event::Escaped { kind, reason, .. } => self.escapes.push(Logged::new(kind.clone(), reason.clone())),
+            Event::Started { .. } => {}
             Event::Resolved { escape, task } => {
                 match self.tasks.get(task) {
                     Some(Progress::Done(_)) => Ok(()),

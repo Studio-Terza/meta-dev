@@ -6,6 +6,15 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
+/// meta-dev's data directory: the log, and the cache of `self/` files last read from main.
+pub(super) fn home() -> Result<PathBuf, PortError> {
+    let data = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share")));
+    data.map(|data| data.join("meta-dev"))
+        .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; meta-dev has no data directory"))
+}
+
 #[derive(Debug)]
 pub struct JsonlLog {
     path: Result<PathBuf, PortError>,
@@ -17,13 +26,7 @@ impl JsonlLog {
     const RETRY: Duration = Duration::from_millis(20);
 
     pub fn in_data_dir() -> Self {
-        let data = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share")));
-        let path = data
-            .map(|data| data.join("meta-dev").join("log.jsonl"))
-            .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; the log has no home"));
-        Self { path, patience: Self::PATIENCE }
+        Self { path: home().map(|home| home.join("log.jsonl")), patience: Self::PATIENCE }
     }
 
     pub fn at(path: PathBuf) -> Self {
@@ -79,14 +82,12 @@ impl Log for JsonlLog {
         Self::contents(&mut file, path)
     }
 
-    fn append(&mut self, records: &[Record]) -> Result<(), PortError> {
+    fn transact<T>(
+        &mut self,
+        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+    ) -> Result<T, PortError> {
         let (mut file, path) = self.locked()?;
-        Self::write(&mut file, path, records)
-    }
-
-    fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError> {
-        let (mut file, path) = self.locked()?;
-        let (records, decided) = decide(Self::contents(&mut file, path)?);
+        let (records, decided) = decide(Self::contents(&mut file, path));
         Self::write(&mut file, path, &records).map(|()| decided)
     }
 }
@@ -106,10 +107,10 @@ mod tests {
         let blocked = log
             .transact(|records| {
                 let other = File::open(&path).unwrap();
-                (Vec::new(), (records.len(), matches!(other.try_lock(), Err(TryLockError::WouldBlock))))
+                (Vec::new(), (records.unwrap().len(), matches!(other.try_lock(), Err(TryLockError::WouldBlock))))
             })
             .unwrap();
-        let free = JsonlLog::at(path.clone()).transact(|records| (records, ())).is_ok();
+        let free = JsonlLog::at(path.clone()).transact(|records| (records.unwrap(), ())).is_ok();
         std::fs::remove_file(&path).unwrap();
         assert_eq!((blocked, free), ((0, true), true));
     }
@@ -121,7 +122,7 @@ mod tests {
         let holder = File::create(&path).unwrap();
         holder.lock().unwrap();
         let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path.clone()) };
-        let waited = log.transact(|records| (records, ()));
+        let waited = log.transact(|_| (Vec::new(), ()));
         drop(holder);
         std::fs::remove_file(&path).unwrap();
         assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));

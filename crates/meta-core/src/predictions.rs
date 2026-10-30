@@ -18,8 +18,23 @@ struct Prediction {
     measure: String,
     expected: String,
     falsified_by: String,
+    /// Words of `docs/prereg.md` and what meta reads them as, such as reason: escape kind.
+    #[serde(default)]
+    terms: BTreeMap<String, String>,
     /// The falsifier as numbers: it holds when any of these measures is above its bound.
-    falsifier: BTreeMap<Measure, Bound>,
+    falsifier: Option<Falsifier>,
+}
+
+/// One or more measures, each with the bound it must stay at or under.
+#[derive(Debug, Deserialize)]
+#[serde(transparent)]
+struct Falsifier(BTreeMap<Measure, Bound>);
+
+impl Falsifier {
+    #[cfg(test)]
+    fn bounds(&self) -> Vec<(Measure, u64)> {
+        self.0.iter().map(|(measure, bound)| (*measure, bound.above)).collect()
+    }
 }
 
 /// A measure meta computes from the log and GitHub.
@@ -96,8 +111,12 @@ impl Predictions {
         self.prediction
             .iter()
             .map(|prediction| {
-                let observed: Vec<(Measure, Bound, Observation)> =
-                    prediction.falsifier.iter().map(|(measure, bound)| (*measure, *bound, observe(*measure))).collect();
+                let observed: Vec<(Measure, Bound, Observation)> = prediction
+                    .falsifier
+                    .iter()
+                    .flat_map(|falsifier| &falsifier.0)
+                    .map(|(measure, bound)| (*measure, *bound, observe(*measure)))
+                    .collect();
                 let values: Vec<String> = observed
                     .iter()
                     .map(|(measure, _, observation)| match observation {
@@ -114,8 +133,10 @@ impl Predictions {
                     (false, true) => "UNDECIDED",
                     (false, false) => "holds",
                 };
+                let terms: String =
+                    prediction.terms.iter().map(|(word, reading)| format!("; read {word} as {reading}")).collect();
                 format!(
-                    "{} {}: {judgement}; observed {}; expected {}; falsified by {}; measure: {}",
+                    "{} {}: {judgement}; observed {}; expected {}; falsified by {}; measure: {}{terms}",
                     prediction.id,
                     prediction.hypothesis,
                     values.join(", "),
@@ -130,14 +151,55 @@ impl Predictions {
 
 #[cfg(test)]
 mod tests {
-    use super::{Predictions, Quantity};
+    use super::{Measure, Predictions, Quantity};
+
+    const REPO: &str = include_str!("../../../self/predictions.toml");
+    const PREREG: &str = include_str!("../../../docs/prereg.md");
 
     #[test]
     fn the_repo_predictions_parse_and_hold_p1_p2_and_p6() {
-        let predictions = Predictions::parse(include_str!("../../../self/predictions.toml")).unwrap();
+        let predictions = Predictions::parse(REPO).unwrap();
         let ids: Vec<&str> = predictions.prediction.iter().map(|prediction| prediction.id.as_str()).collect();
         assert_eq!(ids, ["P1", "P2", "P6"]);
-        assert!(predictions.prediction.iter().all(|prediction| !prediction.falsifier.is_empty()));
+    }
+
+    #[test]
+    fn the_repo_prediction_bounds_are_the_numbers_registered_in_prereg() {
+        let predictions = Predictions::parse(REPO).unwrap();
+        let bounds: Vec<(&str, Vec<(Measure, u64)>)> = predictions
+            .prediction
+            .iter()
+            .map(|prediction| {
+                let falsifier = prediction.falsifier.as_ref().map(|falsifier| falsifier.bounds()).unwrap_or_default();
+                (prediction.id.as_str(), falsifier)
+            })
+            .collect();
+        let registered = [
+            ("P1", vec![(Measure::UnrecordedBypasses, 0)]),
+            ("P2", vec![(Measure::OpenEscapes, 5), (Measure::RepeatsOfOneKind, 1)]),
+            ("P6", vec![(Measure::MedianCiRuns, 3)]),
+        ];
+        assert_eq!(bounds, registered.to_vec());
+    }
+
+    #[test]
+    fn the_repo_predictions_quote_their_prereg_row_verbatim() {
+        let predictions = Predictions::parse(REPO).unwrap();
+        predictions.prediction.iter().for_each(|prediction| {
+            let row = format!(
+                "| {} | {} | {} | {} | {} |",
+                prediction.id, prediction.hypothesis, prediction.measure, prediction.expected, prediction.falsified_by
+            );
+            assert!(PREREG.contains(&row), "{row}");
+        });
+    }
+
+    #[test]
+    fn an_empty_falsifier_does_not_parse() {
+        let empty = "[[prediction]]\nid = \"P9\"\nhypothesis = \"h\"\nmeasure = \"m\"\nexpected = \"e\"\n\
+                     falsified_by = \"f\"\nfalsifier = {}\n";
+        let error = Predictions::parse(empty).unwrap_err().to_string();
+        assert!(error.contains("a falsifier names at least one measure"), "{error}");
     }
 
     #[test]

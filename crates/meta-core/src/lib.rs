@@ -20,12 +20,12 @@ mod status;
 mod task;
 
 pub use claim::Claim;
-pub use escape::{Escape, EscapeKinds};
+pub use escape::{Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
 pub use hook::{AgentStart, Hook, Resume};
 pub use ids::{
-    AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Origin, PrNumber, Reason,
-    RunCount, Sha, TaskId, Timestamp, Title, Verdict,
+    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Origin, PrNumber,
+    Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
 };
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;

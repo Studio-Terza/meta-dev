@@ -113,6 +113,7 @@ text!(CheckName, "check name");
 text!(Origin, "origin");
 text!(Branch, "branch");
 text!(EscapeKind, "escape kind");
+text!(AgentId, "agent id");
 
 impl EscapeKind {
     /// The kind of an escape logged before kinds existed: its free-text reason is all it has.

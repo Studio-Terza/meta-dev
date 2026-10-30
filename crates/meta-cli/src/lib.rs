@@ -8,8 +8,9 @@ use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
     Ledger(LedgerCall),
-    Escape { kind: EscapeKind, reason: Reason },
+    Escape { kind: EscapeKind, reason: Reason, pr: Option<PrNumber> },
     PreToolUse(String),
+    PostToolUse(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,10 +81,10 @@ impl Answer {
 
 impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name>\n  meta claim <task> --self\n  \
-                         meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> <reason>\n  \
+                         meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name>\n  meta verdict <task> pass|fail\n  \
-                         meta status\n  meta hook pre-tool-use < input\n";
+                         meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -102,9 +103,14 @@ impl Call {
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
-            ["escape", kind, reason @ ..] => {
-                Some(kind.parse().and_then(|kind| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason })))
-            }
+            ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
+                pr.parse()
+                    .and_then(|pr| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: Some(pr) }))
+            })),
+            ["escape", kind, reason @ ..] => Some(
+                kind.parse()
+                    .and_then(|kind| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: None })),
+            ),
             ["resolve", escape, task] => {
                 local(escape.parse().and_then(|escape| task.parse().map(|task| Local::Resolve { escape, task })))
             }
@@ -123,6 +129,7 @@ impl Call {
                 local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
             }
             ["hook", "pre-tool-use"] => Some(Ok(Self::PreToolUse(stdin()))),
+            ["hook", "post-tool-use"] => Some(Ok(Self::PostToolUse(stdin()))),
             _ => None,
         };
         let why = match call {
@@ -139,18 +146,19 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     let at = clock.now();
     match call {
         Call::PreToolUse(input) => hook(Hook::read(&input), log, at),
-        Call::Escape { kind, reason } => {
+        Call::PostToolUse(_) => Answer::done("{}\n".to_owned()),
+        Call::Escape { kind, reason, pr } => {
             let kinds = match spec(git, SelfFile::EscapeKinds, EscapeKinds::parse) {
                 Ok(kinds) => kinds,
                 Err(failure) => return Answer::failed(failure),
             };
             let earlier = log.read().map_err(|error| error.to_string());
-            let tallied = Escape::new(kind, reason).tally(&kinds, earlier.as_deref().map_err(String::as_str));
+            let tallied = Escape::new(kind, reason, pr).tally(&kinds, earlier.as_deref().map_err(String::as_str));
             let (events, text) = match tallied {
                 Ok(accepted) => accepted.into_parts(),
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
-            match log.append(&stamped(events, at)) {
+            match log.transact(|_| (stamped(events, at), ())) {
                 Ok(()) => Answer::done(text),
                 Err(error) => Answer::failed(error.into()),
             }
@@ -168,12 +176,18 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
             };
-            let outcome = log.transact(|records| match fold(&records).and_then(|ledger| finish(prepared, ledger)) {
-                Ok(accepted) => {
-                    let (events, text) = accepted.into_parts();
-                    (stamped(events, at), Ok(text))
+            let outcome = log.transact(|records| {
+                match records
+                    .map_err(Failure::from)
+                    .and_then(|records| fold(&records))
+                    .and_then(|ledger| finish(prepared, ledger))
+                {
+                    Ok(accepted) => {
+                        let (events, text) = accepted.into_parts();
+                        (stamped(events, at), Ok(text))
+                    }
+                    Err(failure) => (Vec::new(), Err(failure)),
                 }
-                Err(failure) => (Vec::new(), Err(failure)),
             });
             match outcome.map_err(Failure::from).and_then(|decided| decided) {
                 Ok(text) => Answer::done(text),
@@ -190,12 +204,17 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
     };
     let place = log.place();
-    let outcome = log.transact(|records| match Ledger::fold(&records) {
-        Ok(ledger) => {
-            let (events, text) = decide(ledger).into_parts();
-            (stamped(events, at), Ok(text))
+    let outcome = log.transact(|records| {
+        let folded = records
+            .map_err(|error| error.to_string())
+            .and_then(|records| Ledger::fold(&records).map_err(|corrupt| corrupt.in_log(&place)));
+        match folded {
+            Ok(ledger) => {
+                let (events, text) = decide(ledger).into_parts();
+                (stamped(events, at), Ok(text))
+            }
+            Err(why) => (Vec::new(), Err(why)),
         }
-        Err(corrupt) => (Vec::new(), Err(corrupt.in_log(&place))),
     });
     match outcome.map_err(|error| error.to_string()).and_then(|decided| decided) {
         Ok(text) => Answer::done(text),

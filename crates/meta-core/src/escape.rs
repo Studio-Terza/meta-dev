@@ -1,10 +1,10 @@
 use crate::event::{Event, Record};
-use crate::ids::{EscapeId, EscapeKind, Reason, TaskId};
+use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
 use crate::spec::{SelfFile, Unreadable};
 use crate::task::Progress;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The escape kinds in `self/escapes.toml`, each with a source.
 #[derive(Debug, Deserialize)]
@@ -19,8 +19,24 @@ struct Kind {
     id: EscapeKind,
     text: String,
     source: String,
-    /// Whether an escape of this kind records work that went around meta (P1).
-    bypass: bool,
+    /// Whether an escape of this kind names the PR merged outside meta that it records (P1).
+    names_merged_pr: bool,
+}
+
+/// Whether an escape's kind was checked against `self/escapes.toml` when it was recorded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Checked {
+    #[default]
+    Listed,
+    /// No escape kinds could be read without git or network; the kind is as given.
+    Unchecked,
+}
+
+impl Checked {
+    pub fn is_listed(&self) -> bool {
+        *self == Self::Listed
+    }
 }
 
 impl EscapeKinds {
@@ -45,9 +61,8 @@ impl EscapeKinds {
         }
     }
 
-    /// Unclassified escapes predate kinds; they count as bypass records, since some recorded one.
     pub(crate) fn bypass(&self, kind: &EscapeKind) -> bool {
-        *kind == EscapeKind::unclassified() || self.kind.iter().any(|known| known.id == *kind && known.bypass)
+        *kind == EscapeKind::unclassified() || self.kind.iter().any(|known| known.id == *kind && known.names_merged_pr)
     }
 }
 
@@ -109,17 +124,18 @@ impl Logged {
 pub struct Escape {
     kind: EscapeKind,
     reason: Reason,
+    pr: Option<PrNumber>,
 }
 
 impl Escape {
-    pub fn new(kind: EscapeKind, reason: Reason) -> Self {
-        Self { kind, reason }
+    pub fn new(kind: EscapeKind, reason: Reason, pr: Option<PrNumber>) -> Self {
+        Self { kind, reason, pr }
     }
 
     /// Records the escape from the raw records, so that it works even on a log that does not fold.
     pub fn tally(self, kinds: &EscapeKinds, earlier: Result<&[Record], &str>) -> Result<Accepted, Refusal> {
         kinds.admit(&self.kind)?;
-        let Self { kind, reason } = self;
+        let Self { kind, reason, pr } = self;
         let counts = earlier.map(|records| {
             records.iter().fold((0, 0, 0), |(escaped, resolved, repeats), record| match &record.event {
                 Event::Escaped { kind: earlier, .. } => {
@@ -137,7 +153,7 @@ impl Escape {
             ),
             Err(why) => format!("escape recorded: [{kind}] {reason}\nid and counts unavailable: {why}\n"),
         };
-        Ok(Accepted::new(vec![Event::Escaped { kind, reason }], text))
+        Ok(Accepted::new(vec![Event::Escaped { kind, reason, pr, checked: Checked::Listed }], text))
     }
 }
 

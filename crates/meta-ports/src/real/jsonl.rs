@@ -28,7 +28,7 @@ mod tests {
     use std::path::Path;
 
     const RECORD: &str = "{\"at\":1,\"event\":\"Done\",\"task\":1}";
-    const NEXT: &str = "Next: meta escape <reason>, then repair log.jsonl.";
+    const NEXT: &str = "Next: meta escape <kind> <reason>, then repair log.jsonl.";
 
     fn refusal(text: &str) -> String {
         records(Path::new("log.jsonl"), text).unwrap_err().to_string()

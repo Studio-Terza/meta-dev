@@ -1,5 +1,7 @@
+use crate::escape::Checked;
 use crate::ids::{
-    Claimant, EscapeId, EscapeKind, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
+    AgentId, Claimant, EscapeId, EscapeKind, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title,
+    Verdict,
 };
 use serde::{Deserialize, Serialize};
 
@@ -35,10 +37,16 @@ pub enum Event {
         task: TaskId,
     },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
+    /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
+    /// could be read is marked unchecked.
     Escaped {
         #[serde(default = "EscapeKind::unclassified")]
         kind: EscapeKind,
         reason: Reason,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pr: Option<PrNumber>,
+        #[serde(default, skip_serializing_if = "Checked::is_listed")]
+        checked: Checked,
     },
     Resolved {
         escape: EscapeId,
@@ -46,6 +54,11 @@ pub enum Event {
     },
     LeaseUsed {
         lease: LeaseId,
+    },
+    /// The agent the used lease started, by the id Claude Code gave it.
+    Started {
+        lease: LeaseId,
+        agent: AgentId,
     },
     Denied {
         attempt: Attempt,

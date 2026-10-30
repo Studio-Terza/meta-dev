@@ -28,14 +28,21 @@ impl From<Malformed> for PortError {
 pub trait Log {
     fn place(&self) -> String;
     fn read(&self) -> Result<Vec<Record>, PortError>;
-    fn append(&mut self, records: &[Record]) -> Result<(), PortError>;
-    fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError>;
+    /// Holds the log exclusively from read to append. `decide` gets the records, or why they do not
+    /// parse; the records it returns are appended. A log that cannot be opened or locked is an error.
+    fn transact<T>(
+        &mut self,
+        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+    ) -> Result<T, PortError>;
 }
 
 pub trait Git {
     fn origin(&self) -> Result<Origin, PortError>;
     /// A data file under `self/` as it stands on main.
     fn read(&self, file: SelfFile) -> Result<String, PortError>;
+    /// A data file under `self/` without git or network: the working tree's copy, else the copy
+    /// cached by the last `read` from main.
+    fn local(&self, file: SelfFile) -> Result<String, PortError>;
 }
 
 #[derive(Debug, Clone)]
