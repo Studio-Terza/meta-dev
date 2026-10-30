@@ -1,5 +1,6 @@
+use crate::ids::{Observed, PredictionId};
 use crate::spec::{SelfFile, Unreadable};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -13,7 +14,7 @@ pub struct Predictions {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Prediction {
-    id: String,
+    id: PredictionId,
     hypothesis: String,
     measure: String,
     expected: String,
@@ -44,7 +45,8 @@ impl TryFrom<BTreeMap<Measure, Bound>> for Falsifier {
 
 impl Falsifier {
     /// FALSIFIED when any measure is above its bound, else UNDECIDED when any is unavailable, else holds.
-    fn judge(&self, observe: impl Fn(Measure) -> Observation) -> (&'static str, String) {
+    /// Also the readings of the measures above their bounds.
+    fn judge(&self, observe: impl Fn(Measure) -> Observation) -> (&'static str, String, Vec<(Measure, Observed)>) {
         let observed: Vec<(Measure, Bound, Observation)> =
             self.0.iter().map(|(measure, bound)| (*measure, *bound, observe(*measure))).collect();
         let values: Vec<String> = observed
@@ -52,6 +54,14 @@ impl Falsifier {
             .map(|(measure, _, observation)| match observation {
                 Ok(value) => format!("{measure} {value}"),
                 Err(why) => format!("{measure} unavailable ({why})"),
+            })
+            .collect();
+        let above: Vec<(Measure, Observed)> = observed
+            .iter()
+            .filter(|(_, bound, observation)| observation.as_ref().is_ok_and(|value| value.doubled > bound.above * 2))
+            .filter_map(|(measure, _, observation)| {
+                let value = observation.as_ref().ok()?;
+                Observed::try_from(format!("{measure} {value}")).ok().map(|reading| (*measure, reading))
             })
             .collect();
         let holds = observed
@@ -63,7 +73,7 @@ impl Falsifier {
             (false, true) => "UNDECIDED",
             (false, false) => "holds",
         };
-        (judgement, format!("observed {}", values.join(", ")))
+        (judgement, format!("observed {}", values.join(", ")), above)
     }
 
     #[cfg(test)]
@@ -73,7 +83,7 @@ impl Falsifier {
 }
 
 /// A measure meta computes from the log and GitHub.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Measure {
     /// PRs merged outside meta that no escape of a kind naming merged PRs names.
@@ -141,28 +151,38 @@ impl Predictions {
         SelfFile::Predictions.parse(text)
     }
 
-    /// One line per prediction: observed values, the registered expectation, and FALSIFIED when the falsifier holds.
-    pub(crate) fn lines(&self, observe: impl Fn(Measure) -> Observation) -> Vec<String> {
+    /// Each prediction read: its line (observed values, the registered expectation, FALSIFIED when the
+    /// falsifier holds) and the measures above their bounds.
+    pub(crate) fn read(&self, observe: impl Fn(Measure) -> Observation) -> Vec<Reading> {
         self.prediction
             .iter()
             .map(|prediction| {
-                let (judgement, observed) = match &prediction.falsifier {
+                let (judgement, observed, falsifying) = match &prediction.falsifier {
                     Some(falsifier) => falsifier.judge(&observe),
-                    None => ("UNDECIDED", "no falsifier registered".to_owned()),
+                    None => ("UNDECIDED", "no falsifier registered".to_owned(), Vec::new()),
                 };
                 let terms: String =
                     prediction.terms.iter().map(|(word, reading)| format!("; read {word} as {reading}")).collect();
-                format!(
+                let line = format!(
                     "{} {}: {judgement}; {observed}; expected {}; falsified by {}; measure: {}{terms}",
                     prediction.id,
                     prediction.hypothesis,
                     prediction.expected,
                     prediction.falsified_by,
                     prediction.measure
-                )
+                );
+                Reading { id: prediction.id.clone(), line, falsifying }
             })
             .collect()
     }
+}
+
+/// One prediction's line in `meta status`, and the measures that break their bounds now.
+#[derive(Debug)]
+pub(crate) struct Reading {
+    pub(crate) id: PredictionId,
+    pub(crate) line: String,
+    pub(crate) falsifying: Vec<(Measure, Observed)>,
 }
 
 #[cfg(test)]
@@ -175,19 +195,19 @@ mod tests {
     #[test]
     fn the_repo_predictions_parse_and_hold_p1_p2_and_p6() {
         let predictions = Predictions::parse(REPO).unwrap();
-        let ids: Vec<&str> = predictions.prediction.iter().map(|prediction| prediction.id.as_str()).collect();
+        let ids: Vec<String> = predictions.prediction.iter().map(|prediction| prediction.id.to_string()).collect();
         assert_eq!(ids, ["P1", "P2", "P6"]);
     }
 
     #[test]
     fn the_repo_prediction_bounds_are_the_numbers_registered_in_prereg() {
         let predictions = Predictions::parse(REPO).unwrap();
-        let bounds: Vec<(&str, Vec<(Measure, u64)>)> = predictions
+        let bounds: Vec<(String, Vec<(Measure, u64)>)> = predictions
             .prediction
             .iter()
             .map(|prediction| {
                 let falsifier = prediction.falsifier.as_ref().map(|falsifier| falsifier.bounds()).unwrap_or_default();
-                (prediction.id.as_str(), falsifier)
+                (prediction.id.to_string(), falsifier)
             })
             .collect();
         let registered = [
@@ -195,7 +215,9 @@ mod tests {
             ("P2", vec![(Measure::OpenEscapes, 5), (Measure::RepeatsOfOneKind, 1)]),
             ("P6", vec![(Measure::MedianCiRuns, 3)]),
         ];
-        assert_eq!(bounds, registered.to_vec());
+        let registered: Vec<(String, Vec<(Measure, u64)>)> =
+            registered.into_iter().map(|(id, bounds)| (id.to_owned(), bounds)).collect();
+        assert_eq!(bounds, registered);
     }
 
     #[test]

@@ -1,8 +1,9 @@
 use crate::escape::Checked;
 use crate::ids::{
-    AgentId, Claimant, EscapeId, EscapeKind, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title,
-    Verdict,
+    AgentId, Claimant, EscapeId, EscapeKind, LeaseId, Observed, PrNumber, PredictionId, Reason, RunCount, Sha, TaskId,
+    Timestamp, Title, Verdict,
 };
+use crate::predictions::Measure;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,6 +85,13 @@ pub enum Event {
     Reviewed {
         lease: LeaseId,
         verdict: Verdict,
+    },
+    /// The first time a prediction's falsifier is met by one of its measures, kept for good: the
+    /// record's own time is when. Resolving escapes later cannot erase it.
+    Falsified {
+        prediction: PredictionId,
+        measure: Measure,
+        observed: Observed,
     },
     /// A canned `continue` restarted the agent of a used lease.
     Resumed {

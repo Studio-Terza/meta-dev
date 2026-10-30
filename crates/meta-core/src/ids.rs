@@ -114,6 +114,8 @@ text!(Origin, "origin");
 text!(Branch, "branch");
 text!(EscapeKind, "escape kind");
 text!(AgentId, "agent id");
+text!(PredictionId, "prediction id");
+text!(Observed, "observation");
 
 impl EscapeKind {
     /// The kind of an escape logged before kinds existed: its free-text reason is all it has.
@@ -225,6 +227,12 @@ pub struct Timestamp(u64);
 impl Timestamp {
     pub fn from_unix_seconds(seconds: u64) -> Self {
         Self(seconds)
+    }
+}
+
+impl fmt::Display for Timestamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "unix {}", self.0)
     }
 }
 

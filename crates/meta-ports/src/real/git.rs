@@ -27,6 +27,20 @@ impl GitCli {
     }
 }
 
+impl GitCli {
+    /// The file from the working tree at `tree`, else from the cache. A working-tree file that
+    /// exists but does not parse gives way to a cache that does; when neither parses, the tree's
+    /// text is returned so that the caller reports why it is unreadable.
+    pub fn local_from(file: SelfFile, tree: &Path, cache: Result<PathBuf, PortError>) -> Result<String, PortError> {
+        let cached = || cache.as_ref().map_err(Clone::clone).and_then(|root| Self::file(&root.join(file.path())));
+        match Self::file(&tree.join(file.path())) {
+            Ok(text) if file.is_readable(&text) => Ok(text),
+            Ok(text) => Ok(cached().ok().filter(|kept| file.is_readable(kept)).unwrap_or(text)),
+            Err(tree) => cached().map_err(|cache| PortError::new(format!("working tree: {tree}; cache: {cache}"))),
+        }
+    }
+}
+
 impl Git for GitCli {
     fn origin(&self) -> Result<Origin, PortError> {
         run("git", &["remote", "get-url", "origin"])?
@@ -42,9 +56,6 @@ impl Git for GitCli {
     }
 
     fn local(&self, file: SelfFile) -> Result<String, PortError> {
-        Self::file(Path::new(file.path())).or_else(|tree| {
-            let cached = Self::cached(file).and_then(|path| Self::file(&path));
-            cached.map_err(|cache| PortError::new(format!("working tree: {tree}; cache: {cache}")))
-        })
+        Self::local_from(file, Path::new(""), home().map(|home| home.join("cache")))
     }
 }

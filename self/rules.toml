@@ -18,8 +18,13 @@ source = "owner 2026-10-30: mega PRs are fine; CI is the only real gate; stacks 
 
 [[rule]]
 id = "push-and-stop"
-text = "Push, open the PR, run meta link, then stop. Do not wait on CI. Never merge."
+text = "Push, open the PR, run meta link, then stop. Do not wait on CI, except the red-first wait. Never merge."
 source = "failure 2026-10-30: long-lived agents waiting on CI inflated context and waited on runs that never started"
+
+[[rule]]
+id = "background-agents"
+text = "Leased agents run in the background (run_in_background), because only background launches report an agent id at start, so a crashed foreground agent cannot be resumed."
+source = "failure 2026-10-30: stage 1 re-review; a crashed foreground agent had no id to resume"
 
 [[rule]]
 id = "budgets"

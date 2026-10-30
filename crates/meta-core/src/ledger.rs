@@ -1,7 +1,9 @@
 use crate::escape::Logged;
 use crate::event::{Attempt, Event, Record, Route};
-use crate::ids::{EscapeId, LeaseId, PrNumber, RunCount, TaskId};
+use crate::ids::{EscapeId, LeaseId, PrNumber, PredictionId, RunCount, TaskId, Timestamp};
+use crate::latch::Latch;
 use crate::lease::{Lease, LeaseSlot, Purpose};
+use crate::predictions::Measure;
 use crate::task::{Linked, Progress, Task};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,6 +18,8 @@ pub struct Ledger {
     pub(crate) outside: BTreeSet<PrNumber>,
     pub(crate) starts_denied: usize,
     pub(crate) self_claims: usize,
+    /// Each prediction's falsifying measures, latched at their first time.
+    pub(crate) falsified: BTreeMap<(PredictionId, Measure), Latch>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,11 +40,11 @@ impl Corrupt {
 impl Ledger {
     pub fn fold(records: &[Record]) -> Result<Self, Corrupt> {
         records.iter().enumerate().try_fold(Self::default(), |ledger, (index, record)| {
-            ledger.apply(&record.event).map_err(|why| Corrupt { record: index + 1, why })
+            ledger.apply(&record.event, record.at).map_err(|why| Corrupt { record: index + 1, why })
         })
     }
 
-    fn apply(mut self, event: &Event) -> Result<Self, String> {
+    fn apply(mut self, event: &Event, at: Timestamp) -> Result<Self, String> {
         match event {
             Event::Opened { task, title } => {
                 let fresh = Progress::Open(Task::new(*task, title.clone()));
@@ -141,6 +145,11 @@ impl Ledger {
                     _ => Err(format!("{lease} used but not unused")),
                 }?;
                 self.leases.insert(*lease, LeaseSlot::Spent(spent));
+            }
+            Event::Falsified { prediction, measure, observed } => {
+                self.falsified
+                    .entry((prediction.clone(), *measure))
+                    .or_insert_with(|| Latch::new(at, observed.clone()));
             }
             Event::Denied { attempt: Attempt::AgentStart } => self.starts_denied += 1,
             Event::Denied { attempt: Attempt::Merge } => {}

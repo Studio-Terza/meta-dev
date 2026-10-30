@@ -68,6 +68,11 @@ impl EscapeKinds {
         }
     }
 
+    /// Whether `kind` is one of these kinds.
+    pub(crate) fn lists(&self, kind: &EscapeKind) -> bool {
+        self.kind.iter().any(|known| known.id == *kind)
+    }
+
     /// Whether an escape of this kind names a PR merged outside meta. An unclassified one never does.
     pub(crate) fn names_merged_pr(&self, kind: &EscapeKind) -> bool {
         self.kind.iter().any(|known| known.id == *kind && known.names_merged_pr)
@@ -84,18 +89,21 @@ pub struct Logged {
     resolved: Option<TaskId>,
 }
 
-/// What repeats count by: the kind, or, for an unclassified escape, its free-text reason.
+/// What repeats count by: the kind; an unclassified escape's free-text reason; or, for every kind
+/// that main does not list, one shared key, so that a typo cannot dodge the bound.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct RepeatKey<'a> {
-    kind: &'a EscapeKind,
-    reason: Option<&'a Reason>,
+pub(crate) enum RepeatKey<'a> {
+    Kind(&'a EscapeKind),
+    Unclassified(&'a Reason),
+    Unlisted,
 }
 
 impl std::fmt::Display for RepeatKey<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.reason {
-            Some(reason) => write!(formatter, "{} \"{reason}\"", self.kind),
-            None => write!(formatter, "{}", self.kind),
+        match self {
+            Self::Kind(kind) => write!(formatter, "{kind}"),
+            Self::Unclassified(reason) => write!(formatter, "{} \"{reason}\"", EscapeKind::unclassified()),
+            Self::Unlisted => formatter.write_str("kinds not on main, unchecked"),
         }
     }
 }
@@ -121,13 +129,26 @@ impl Logged {
         self.pr.filter(|_| kinds.names_merged_pr(&self.kind))
     }
 
-    pub(crate) fn key(&self) -> RepeatKey<'_> {
-        let reason = (self.kind == EscapeKind::unclassified()).then_some(&self.reason);
-        RepeatKey { kind: &self.kind, reason }
+    /// Whether main's kinds, when they could be read, leave this kind out. Unclassified never is.
+    fn off_main(&self, main: Option<&EscapeKinds>) -> bool {
+        self.kind != EscapeKind::unclassified() && main.is_some_and(|kinds| !kinds.lists(&self.kind))
     }
 
-    pub(crate) fn line(&self, id: EscapeId) -> String {
-        format!("{id} {}", described(&self.kind, self.checked, self.pr, &self.reason))
+    pub(crate) fn key(&self, main: Option<&EscapeKinds>) -> RepeatKey<'_> {
+        match (self.kind == EscapeKind::unclassified(), self.off_main(main)) {
+            (true, _) => RepeatKey::Unclassified(&self.reason),
+            (false, true) => RepeatKey::Unlisted,
+            (false, false) => RepeatKey::Kind(&self.kind),
+        }
+    }
+
+    /// Unchecked when it was recorded so, or when its kind is not on main.
+    pub(crate) fn line(&self, id: EscapeId, main: Option<&EscapeKinds>) -> String {
+        let checked = match self.off_main(main) {
+            true => Checked::Unchecked,
+            false => self.checked,
+        };
+        format!("{id} {}", described(&self.kind, checked, self.pr, &self.reason))
     }
 }
 
