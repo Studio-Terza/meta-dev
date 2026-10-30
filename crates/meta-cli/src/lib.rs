@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
-    Malformed, Merges, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules,
-    SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
+    Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal,
+    Roles, Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -20,11 +20,27 @@ pub enum Call {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LedgerCall {
     Local(Local),
-    Claim { task: TaskId, claimant: Claimant },
-    Link { task: TaskId, pr: PrNumber },
+    /// `deadline` overrides the work default; the parse gives one only to an agent's claim.
+    Claim {
+        task: TaskId,
+        claimant: Claimant,
+        deadline: Option<Minutes>,
+    },
+    Link {
+        task: TaskId,
+        pr: PrNumber,
+    },
     Merge(PrNumber),
-    Retire { task: TaskId, reason: Reason },
-    Review { task: TaskId, agent: AgentName },
+    Retire {
+        task: TaskId,
+        reason: Reason,
+    },
+    /// `deadline` overrides the review default.
+    Review {
+        task: TaskId,
+        agent: AgentName,
+        deadline: Option<Minutes>,
+    },
     Status,
 }
 
@@ -85,10 +101,12 @@ impl Answer {
 }
 
 impl Call {
-    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name>\n  meta claim <task> --self\n  \
+    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
+                         meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
-                         meta undefer <task>\n  meta review <task> --agent <name>\n  meta verdict <task> pass|fail\n  \
+                         meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
+                         meta verdict <task> pass|fail\n  \
                          meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
@@ -98,10 +116,11 @@ impl Call {
         let call: Option<Result<Self, Malformed>> = match words.as_slice() {
             ["open", title @ ..] => local(title.join(" ").parse().map(Local::Open)),
             ["claim", task, "--self"] => {
-                ledger(task.parse().map(|task| LedgerCall::Claim { task, claimant: Claimant::Lead }))
+                ledger(task.parse().map(|task| LedgerCall::Claim { task, claimant: Claimant::Lead, deadline: None }))
             }
-            ["claim", task, "--agent", agent] => ledger(task.parse().and_then(|task| {
-                agent.parse().map(|agent| LedgerCall::Claim { task, claimant: Claimant::Agent(agent) })
+            ["claim", task, "--agent", agent, deadline @ ..] => ledger(task.parse().and_then(|task| {
+                let deadline = Self::deadline(deadline)?;
+                agent.parse().map(|agent| LedgerCall::Claim { task, claimant: Claimant::Agent(agent), deadline })
             })),
             ["link", task, pr] => {
                 ledger(task.parse().and_then(|task| pr.parse().map(|pr| LedgerCall::Link { task, pr })))
@@ -135,9 +154,10 @@ impl Call {
                 task.parse().and_then(|task| reason.join(" ").parse().map(|reason| Local::Defer { task, reason })),
             ),
             ["undefer", task] => local(task.parse().map(Local::Undefer)),
-            ["review", task, "--agent", agent] => {
-                ledger(task.parse().and_then(|task| agent.parse().map(|agent| LedgerCall::Review { task, agent })))
-            }
+            ["review", task, "--agent", agent, deadline @ ..] => ledger(task.parse().and_then(|task| {
+                let deadline = Self::deadline(deadline)?;
+                agent.parse().map(|agent| LedgerCall::Review { task, agent, deadline })
+            })),
             ["verdict", task, verdict] => {
                 local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
             }
@@ -151,6 +171,15 @@ impl Call {
             None => "unknown command".to_owned(),
         };
         Err(Answer { text: format!("{why}\n{}", Self::USAGE), code: Code::Failed })
+    }
+
+    /// The optional `--deadline <minutes>` that ends a claim or review by an agent.
+    fn deadline(words: &[&str]) -> Result<Option<Minutes>, Malformed> {
+        match words {
+            [] => Ok(None),
+            ["--deadline", minutes] => minutes.parse().map(Some),
+            _ => Err(Malformed::because(format!("{words:?} is not --deadline <minutes>"))),
+        }
     }
 }
 
@@ -218,7 +247,7 @@ fn hook<L: Log>(phase: Phase, hook: Hook, log: &mut L, at: Timestamp) -> Answer 
         Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
-        Hook::Bind(binding) => Box::new(|ledger: Ledger| ledger.bind(binding)),
+        Hook::Bind(binding) => Box::new(move |ledger: Ledger| ledger.bind(binding, at)),
     };
     let place = log.place();
     let outcome = log.transact(|records| {
@@ -247,11 +276,36 @@ fn spec<G: Git, T>(git: &G, file: SelfFile, parse: fn(&str) -> Result<T, Unreada
 enum Prepared {
     Local(Local),
     Status(Sources),
-    Claim { task: TaskId, claimant: Claimant, origin: Origin, rules: Rules },
-    Link { task: TaskId, pr: PrNumber, pushed: Sha, pull: Pull },
-    Merge { pr: PrNumber, pull: Pull },
-    Retire { task: TaskId, reason: Reason, pull: Option<Pull> },
-    Review { task: TaskId, agent: AgentName, pull: Pull, rules: Rules },
+    /// `allowance` is how long an agent's lease runs; a self-claim has none.
+    Claim {
+        task: TaskId,
+        claimant: Claimant,
+        origin: Origin,
+        rules: Rules,
+        allowance: Option<Minutes>,
+    },
+    Link {
+        task: TaskId,
+        pr: PrNumber,
+        pushed: Sha,
+        pull: Pull,
+    },
+    Merge {
+        pr: PrNumber,
+        pull: Pull,
+    },
+    Retire {
+        task: TaskId,
+        reason: Reason,
+        pull: Option<Pull>,
+    },
+    Review {
+        task: TaskId,
+        agent: AgentName,
+        pull: Pull,
+        rules: Rules,
+        allowance: Minutes,
+    },
 }
 
 /// How long `meta link` waits for GitHub to report the commit that was pushed, and how often it asks.
@@ -291,10 +345,14 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
                 predictions: spec(git, SelfFile::Predictions, Predictions::parse).map_err(unreached),
             })
         }
-        LedgerCall::Claim { task, claimant } => {
+        LedgerCall::Claim { task, claimant, deadline } => {
             ledger.claim(task, claimant.clone())?;
             let rules = spec(git, SelfFile::Rules, Rules::parse)?;
-            Prepared::Claim { task, claimant, origin: git.origin()?, rules }
+            let allowance = match claimant {
+                Claimant::Lead => None,
+                Claimant::Agent(_) => Some(deadline.map_or_else(|| roles(git).map(|roles| roles.work()), Ok)?),
+            };
+            Prepared::Claim { task, claimant, origin: git.origin()?, rules, allowance }
         }
         LedgerCall::Link { task, pr } => {
             let pushed = ledger.link(task, pr)?.pushed(git.local_head(task)?)?;
@@ -312,9 +370,10 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
             let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
             Prepared::Retire { task, reason, pull }
         }
-        LedgerCall::Review { task, agent } => {
+        LedgerCall::Review { task, agent, deadline } => {
             let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
-            Prepared::Review { task, agent, pull, rules: spec(git, SelfFile::Rules, Rules::parse)? }
+            let allowance = deadline.map_or_else(|| roles(git).map(|roles| roles.review()), Ok)?;
+            Prepared::Review { task, agent, pull, rules: spec(git, SelfFile::Rules, Rules::parse)?, allowance }
         }
     })
 }
@@ -330,15 +389,24 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
         Prepared::Status(sources) => ledger.status(sources, at),
-        Prepared::Claim { task, claimant, origin, rules } => ledger.claim(task, claimant)?.brief(&origin, &rules),
+        Prepared::Claim { task, claimant, origin, rules, allowance } => {
+            ledger.claim(task, claimant)?.brief(&origin, &rules, allowance.map(|minutes| at.plus(minutes.span())))
+        }
         Prepared::Link { task, pr, pushed, pull } => ledger.link(task, pr)?.pin(&pushed, &pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {
             Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),
         },
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
-        Prepared::Review { task, agent, pull, rules } => ledger.review(task, agent)?.brief(&pull, &rules)?,
+        Prepared::Review { task, agent, pull, rules, allowance } => {
+            ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?
+        }
     })
+}
+
+/// The per-role lease defaults, read from main.
+fn roles<G: Git>(git: &G) -> Result<Roles, Failure> {
+    spec(git, SelfFile::Roles, Roles::parse)
 }
 
 fn stamped(events: Vec<Event>, at: Timestamp) -> Vec<Record> {

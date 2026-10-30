@@ -1,6 +1,6 @@
 use crate::event::Event;
-use crate::ids::{AgentName, LeaseId, PrNumber, TaskId, Title, Verdict};
-use crate::lease::{LeaseSlot, Purpose};
+use crate::ids::{AgentName, LeaseId, PrNumber, TaskId, Timestamp, Title, Verdict};
+use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::pull::{Pull, PullState};
 use crate::reply::{Accepted, Refusal};
@@ -88,23 +88,27 @@ impl Reviewing {
         self.pr
     }
 
-    pub fn brief(self, pull: &Pull, rules: &Rules) -> Result<Accepted, Refusal> {
+    /// The review brief and its lease, which ends at `deadline`.
+    pub fn brief(self, pull: &Pull, rules: &Rules, deadline: Timestamp) -> Result<Accepted, Refusal> {
         let Self { task, title, agent, lease, pr } = self;
         if pull.state() != PullState::Open {
             return Err(Refusal::because(format!("{pr} is not open; only an open PR can be reviewed.")));
         }
         let head = pull.head().clone();
         let digits = pr.digits();
+        let deadline_line = Deadline::of(Some(deadline)).brief_line();
         let text = format!(
             "review: {pr} for {task}: {title}\n\
              agent: {agent}\n\
              lease: {lease} (put it in the Agent description; it works once)\n\
+             deadline: {deadline_line}\n\
              goal: find what is wrong with {pr} at head {head}, judged against {task} and the rules below.\n\
              constraints:\n  \
              - read the change with gh pr view {digits} and gh pr diff {digits}; push, comment, approve and merge nothing\n  \
              - report each finding with its file, line and evidence, then a verdict: pass or fail\n\
              rules:\n{rules}"
         );
-        Ok(Accepted::new(vec![Event::ReviewLeased { lease, task, pr, head }], text))
+        let deadline = Some(deadline);
+        Ok(Accepted::new(vec![Event::ReviewLeased { lease, task, pr, head, deadline }], text))
     }
 }

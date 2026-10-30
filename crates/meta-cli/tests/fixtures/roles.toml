@@ -1,0 +1,9 @@
+# Behaviour-test fixture of role defaults: values unlike self/roles.toml, so tests show the data is read.
+
+[work]
+deadline-minutes = 45
+source = "fixture: work"
+
+[review]
+deadline-minutes = 15
+source = "fixture: review"

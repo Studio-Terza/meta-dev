@@ -12,6 +12,7 @@ use std::str::FromStr;
 const RULES: &str = include_str!("fixtures/rules.toml");
 const KINDS: &str = include_str!("fixtures/escapes.toml");
 const PREDICTIONS: &str = include_str!("fixtures/predictions.toml");
+const ROLES: &str = include_str!("fixtures/roles.toml");
 const ORIGIN: &str = "https://github.com/Studio-Terza/meta-dev.git";
 const REPO: &str = "Studio-Terza/meta-dev";
 const PINNED: &str = "aaaaaaa";
@@ -39,7 +40,12 @@ fn claimed(task: &str) -> Event {
 }
 
 fn leased(lease: &str, task: &str) -> Event {
-    Event::Leased { lease: id(lease), task: id(task) }
+    Event::Leased { lease: id(lease), task: id(task), deadline: None }
+}
+
+/// A lease from this change on: its deadline in unix seconds.
+fn leased_until(lease: &str, task: &str, deadline: u64) -> Event {
+    Event::Leased { lease: id(lease), task: id(task), deadline: Some(Timestamp::from_unix_seconds(deadline)) }
 }
 
 fn linked(task: &str, pr: &str) -> Event {
@@ -147,9 +153,14 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
 }
 
 fn self_files() -> std::collections::BTreeMap<SelfFile, String> {
-    [(SelfFile::Rules, RULES), (SelfFile::EscapeKinds, KINDS), (SelfFile::Predictions, PREDICTIONS)]
-        .map(|(file, text)| (file, text.to_owned()))
-        .into()
+    [
+        (SelfFile::Rules, RULES),
+        (SelfFile::EscapeKinds, KINDS),
+        (SelfFile::Predictions, PREDICTIONS),
+        (SelfFile::Roles, ROLES),
+    ]
+    .map(|(file, text)| (file, text.to_owned()))
+    .into()
 }
 
 fn call(ports: &mut Memory, args: &str, stdin: &str) -> (Answer, Vec<Event>) {
@@ -193,7 +204,7 @@ fn open_prints_a_new_task_id_and_records_opened() {
 #[test]
 fn claim_of_an_open_unclaimed_task_leases_and_prints_the_brief_with_every_sourced_rule() {
     let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice", "");
-    assert_eq!(events, vec![claimed("task-1"), leased("lease-1", "task-1")]);
+    assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", FIXTURE_WORK_DEADLINE)]);
     assert_eq!(reply.code, Code::Done);
     let rules = [quoted_values("id"), quoted_values("text"), quoted_values("source")].concat();
     assert!(rules.len() >= 3 && rules.iter().all(|rule| reply.text.contains(rule.as_str())), "{}", reply.text);
@@ -228,7 +239,7 @@ fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
     [claimed_task(), linked_task()].into_iter().for_each(|history| {
         let history = [history, vec![spent.clone()]].concat();
         let (reply, events) = call(&mut given(history, Vec::new()), "claim task-1 --agent bob", "");
-        assert_eq!((reply.code, events), (Code::Done, vec![leased("lease-2", "task-1")]));
+        assert_eq!((reply.code, events), (Code::Done, vec![leased_until("lease-2", "task-1", FIXTURE_WORK_DEADLINE)]));
         assert!(reply.text.contains("lease: lease-2") && reply.text.contains("rules:"), "{}", reply.text);
     });
 }
@@ -652,7 +663,12 @@ fn self_claimed(task: &str) -> Event {
 }
 
 fn review_leased(lease: &str, head: &str) -> Event {
-    Event::ReviewLeased { lease: id(lease), task: id("task-1"), pr: id("7"), head: id(head) }
+    Event::ReviewLeased { lease: id(lease), task: id("task-1"), pr: id("7"), head: id(head), deadline: None }
+}
+
+fn review_leased_until(lease: &str, head: &str, deadline: u64) -> Event {
+    let deadline = Some(Timestamp::from_unix_seconds(deadline));
+    Event::ReviewLeased { lease: id(lease), task: id("task-1"), pr: id("7"), head: id(head), deadline }
 }
 
 fn finished_task() -> Vec<Event> {
@@ -670,7 +686,7 @@ fn send(to: &str, message: serde_json::Value, summary: Option<&str>) -> String {
 }
 
 fn started(lease: &str, agent: &str) -> Event {
-    Event::Started { lease: id(lease), agent: id(agent) }
+    Event::Started { lease: id(lease), agent: id(agent), deadline: None }
 }
 
 /// A finished or backgrounded Agent call as the PostToolUse hook gets it (Claude Code hooks docs:
@@ -853,7 +869,8 @@ fn review_of_a_task_linked_to_an_open_pr_leases_and_prints_an_unprimed_brief_wit
     let history = [linked_task(), vec![used("lease-1")]].concat();
     let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
     let (reply, events) = call(&mut ports, "review task-1 --agent rev", "");
-    assert_eq!((reply.code, events), (Code::Done, vec![review_leased("lease-2", MOVED)]), "{}", reply.text);
+    let expected = vec![review_leased_until("lease-2", MOVED, FIXTURE_REVIEW_DEADLINE)];
+    assert_eq!((reply.code, events), (Code::Done, expected), "{}", reply.text);
     let brief = ["review: #7 for task-1", "agent: rev", "lease: lease-2", "goal:", "constraints:", "review-gates"];
     assert!(brief.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
     let (status, _) = call(&mut ports, "status", "");
@@ -1339,4 +1356,118 @@ fn a_log_that_resolves_historically_twice_or_corrects_a_non_task_resolution_does
         let (reply, _) = call(&mut given(history, Vec::new()), "status", "");
         assert_eq!(reply.code, Code::Failed, "{}", reply.text);
     });
+}
+
+// Lease deadlines (task-30, docs/stage1.md "Deadlines"). The fake clock stands at unix 2 and the
+// given records at unix 1; the roles fixture gives work 45 min and review 15 min.
+
+const FIXTURE_WORK_DEADLINE: u64 = 2 + 45 * 60;
+const FIXTURE_REVIEW_DEADLINE: u64 = 2 + 15 * 60;
+
+#[test]
+fn claim_and_review_set_the_deadline_from_the_role_default_in_self_roles_and_the_brief_prints_it() {
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice", "");
+    assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", FIXTURE_WORK_DEADLINE)]);
+    let line = format!("deadline: unix {FIXTURE_WORK_DEADLINE}, report or stop by then\n");
+    assert!(reply.text.contains(&line), "{}", reply.text);
+    let history = [linked_task(), vec![used("lease-1")]].concat();
+    let (reply, events) = call(&mut given(history, vec![("7", pull(MOVED, &[]))]), "review task-1 --agent rev", "");
+    assert_eq!(events, vec![review_leased_until("lease-2", MOVED, FIXTURE_REVIEW_DEADLINE)]);
+    let line = format!("deadline: unix {FIXTURE_REVIEW_DEADLINE}, report or stop by then\n");
+    assert!(reply.text.contains(&line), "{}", reply.text);
+    let mut unreadable = given(vec![opened("task-1")], Vec::new());
+    unreadable.git.files.remove(&SelfFile::Roles);
+    let (reply, events) = call(&mut unreadable, "claim task-1 --agent alice", "");
+    assert_eq!((reply.code, events), (Code::Failed, Vec::new()), "{}", reply.text);
+    assert!(reply.text.contains("self/roles.toml"), "{}", reply.text);
+}
+
+#[test]
+fn claim_and_review_take_a_deadline_override_in_minutes_and_self_claims_get_no_deadline() {
+    let (reply, events) =
+        call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice --deadline 10", "");
+    assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", 2 + 600)]);
+    assert!(reply.text.contains("deadline: unix 602, report or stop by then"), "{}", reply.text);
+    let history = [linked_task(), vec![used("lease-1")]].concat();
+    let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
+    let (_, events) = call(&mut ports, "review task-1 --agent rev --deadline 5", "");
+    assert_eq!(events, vec![review_leased_until("lease-2", MOVED, 2 + 300)]);
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --self", "");
+    assert_eq!((reply.code, events), (Code::Done, vec![self_claimed("task-1")]));
+    assert!(reply.text.contains("deadline: none"), "{}", reply.text);
+    let malformed = ["claim task-1 --self --deadline 10", "claim task-1 --agent a --deadline 0"];
+    let more = ["claim task-1 --agent a --deadline 1.5", "review task-1 --agent a --deadline x"];
+    malformed.into_iter().chain(more).for_each(|args| {
+        let words: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
+        let reply = Call::parse(&words, String::new).unwrap_err();
+        assert!(reply.code == Code::Failed && reply.text.contains("usage:"), "{args}: {}", reply.text);
+    });
+}
+
+#[test]
+fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
+    let history =
+        [vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1 + 2700)], vec![used("lease-1")]]
+            .concat();
+    let mut ports = given(history, Vec::new());
+    ports.clock.pause(100);
+    let (reply, events) = call(&mut ports, "hook post-tool-use", &agent_ran("Agent", "lease-1", AGENT_ID));
+    let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
+    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
+    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
+    ports.clock.pause(2750 - 102);
+    let (status, _) = call(&mut ports, "status", "");
+    assert!(
+        status.text.contains("overdue leases (flagged)\n  (none)\n"),
+        "past the lease's own deadline: {}",
+        status.text
+    );
+    ports.clock.pause(2803 - 2750);
+    let (status, _) = call(&mut ports, "status", "");
+    let flagged = format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix {}\n", 102 + 2700);
+    assert!(status.text.contains(&flagged), "{}", status.text);
+}
+
+#[test]
+fn status_flags_a_live_lease_past_its_deadline_with_its_agent_until_the_task_is_done() {
+    let late = |deadline: u64| leased_until("lease-1", "task-1", deadline);
+    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline: None };
+    let running = vec![opened("task-1"), claimed("task-1"), late(1), used("lease-1"), started];
+    let text = status_of(running.clone());
+    let flagged = format!("overdue leases (flagged)\n  lease-1 for task-1: agent {AGENT_ID}, deadline unix 1\n");
+    assert!(text.contains(&flagged), "{text}");
+    let text = status_of(vec![opened("task-1"), claimed("task-1"), late(1)]);
+    assert!(text.contains("overdue leases (flagged)\n  lease-1 for task-1: unused, deadline unix 1\n"), "{text}");
+    let unbound = vec![opened("task-1"), claimed("task-1"), late(1), used("lease-1")];
+    assert!(status_of(unbound).contains("lease-1 for task-1: agent unknown, deadline unix 1\n"));
+    let none = "overdue leases (flagged)\n  (none)\n";
+    let on_time = status_of(vec![opened("task-1"), claimed("task-1"), late(2)]);
+    assert!(on_time.contains(none), "{on_time}");
+    let finished = [running, vec![linked("task-1", "7"), merged("7", 1), done("task-1")]].concat();
+    assert!(status_of(finished).contains(none));
+    let reviewed = [
+        linked_task(),
+        vec![review_leased_until("lease-2", PINNED, 1), used("lease-2")],
+        vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass") }],
+    ]
+    .concat();
+    assert!(status_of(reviewed).contains(none));
+    let resumes = status_of(bound());
+    let order = (resumes.find("leases resumed 3 or more times"), resumes.find("overdue leases (flagged)"));
+    assert!(matches!(order, (Some(resumed), Some(overdue)) if overdue > resumed), "{resumes}");
+}
+
+#[test]
+fn leases_from_before_deadlines_fold_as_no_deadline_and_are_never_overdue() {
+    let text = status_of(bound());
+    assert!(text.contains("overdue leases (flagged)\n  (none)\n"), "{text}");
+    let text = status_of(claimed_task());
+    assert!(text.contains("lease-1 for task-1, no deadline"), "{text}");
+    let old = r#"{"at":1,"event":"Leased","lease":1,"task":1}"#;
+    assert_eq!(serde_json::from_str::<Record>(old).unwrap().event, leased("lease-1", "task-1"));
+    let old = r#"{"at":1,"event":"Started","lease":1,"agent":"a4d2c8f1e0b3a297"}"#;
+    assert_eq!(serde_json::from_str::<Record>(old).unwrap().event, started("lease-1", AGENT_ID));
+    let new = Record { at: Timestamp::from_unix_seconds(1), event: leased_until("lease-1", "task-1", 9) };
+    let line = serde_json::to_string(&new).unwrap();
+    assert_eq!(line, r#"{"at":1,"event":"Leased","lease":1,"task":1,"deadline":9}"#);
 }
