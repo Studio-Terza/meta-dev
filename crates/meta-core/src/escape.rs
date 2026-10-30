@@ -168,6 +168,10 @@ impl Logged {
         self.resolution.is_none()
     }
 
+    pub(crate) fn is_historical(&self) -> bool {
+        matches!(self.resolution, Some(Resolution::Historical(_) | Resolution::Corrected { .. }))
+    }
+
     /// The status line of a correction: the original resolution beside what it became.
     pub(crate) fn correction(&self, id: EscapeId) -> Option<String> {
         match &self.resolution {
