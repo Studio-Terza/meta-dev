@@ -47,7 +47,10 @@ No separate task is opened for a review. `meta merge` does not require a review;
 
 | Hook | Given | Result |
 |---|---|---|
-| `meta hook pre-tool-use` with tool `SendMessage` | any | denied: start a fresh agent with a lease instead. Agents are short-lived; resuming bypasses the lease and grows context |
+| `meta hook pre-tool-use` with tool `SendMessage` | `message` is exactly `continue`, and `summary` is exactly the id of a used lease | allowed; event `Resumed` against that lease |
+| `meta hook pre-tool-use` with tool `SendMessage` | anything else: other message text, a missing or unknown lease, or an unused one | denied: new instructions need a fresh agent on a fresh lease |
+
+A canned `continue` restarts an agent after a failure outside its control, such as a disconnect, a crash or a timeout, without adding instructions. Resumes are not capped, because some failures are outside our control. `meta status` flags any lease from its third resume onward, so repeated failures are visible (owner, 2026-10-30). Once headless workers exist, meta sends the same canned continue itself.
 
 ### Predictions against registered numbers
 
