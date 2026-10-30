@@ -81,7 +81,19 @@ When something new comes up, meta sends it to a short-lived diagnostic worker, n
 
 **What reaches the lead:** escalations only, each as a short structured summary. Raw agent reports, CI logs and merge chatter never do.
 
-**Decision pending, owner:** whether meta starts Claude sessions itself, as headless workers under a lease. Until that is decided, the lead presses start. The lead stays the only actor that does, and meta does everything else.
+**Headless workers (owner, 2026-10-30):** meta starts Claude sessions itself, as headless workers running locally, one per lease. Rules:
+
+| Rule | Value |
+|---|---|
+| Concurrency | At most 4 workers at once |
+| When they run | Any time, including while the owner is away |
+| Rollout | Fixers and reviewers first; implementers and project agents only after data from that phase |
+| Tools | An explicit allowlist. Agent, Task and starting `claude` are denied. Secrets and paths outside the worktree are denied. |
+| Supervision | meta runs each worker as a process group with a deadline. If meta dies, its workers die. |
+| Caps | A round cap and a token budget per task, plus `meta stop` as a kill switch. Hitting a cap escalates; nothing retries silently. |
+| Visibility | `meta status` lists live workers. Transcripts are kept for each run. |
+
+No daily spend cap is set. Spend is monitored, in line with the no-thresholds decision.
 
 ## Critic
 
