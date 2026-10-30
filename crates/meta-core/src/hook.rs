@@ -2,6 +2,7 @@ use crate::event::{Attempt, Event};
 use crate::ids::LeaseId;
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
+use crate::prompt::Prompt;
 use crate::reply::Accepted;
 use crate::shell::ShellCommand;
 use serde::Deserialize;
@@ -58,9 +59,7 @@ impl Hook {
         match tool {
             _ if Self::AGENT_TOOLS.contains(&tool) => {
                 let AgentInput { prompt } = Self::input(tool, parsed.tool_input)?;
-                let lease = prompt
-                    .split(|letter: char| !(letter.is_ascii_alphanumeric() || letter == '-'))
-                    .find_map(|word| word.parse::<LeaseId>().ok());
+                let lease = Prompt::new(&prompt).lease();
                 Ok(Self::Agent(AgentStart { lease }))
             }
             "Bash" => {

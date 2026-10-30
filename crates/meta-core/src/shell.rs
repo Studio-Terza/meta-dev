@@ -1,3 +1,6 @@
+//! Deleted by task-5.
+#![allow(clippy::disallowed_methods)]
+
 use crate::event::Attempt;
 use std::fmt;
 

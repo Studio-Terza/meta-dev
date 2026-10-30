@@ -8,6 +8,7 @@ mod ledger;
 mod link;
 mod merge;
 mod open;
+mod prompt;
 mod pull;
 mod reply;
 mod rules;

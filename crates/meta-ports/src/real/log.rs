@@ -54,14 +54,14 @@ impl JsonlLog {
     }
 
     fn parse(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
-        text.lines()
-            .enumerate()
-            .map(|(index, line)| {
-                serde_json::from_str(line).map_err(|error| {
+        serde_json::Deserializer::from_str(text)
+            .into_iter::<Record>()
+            .map(|parsed| {
+                parsed.map_err(|error| {
                     let path = path.display();
                     PortError::new(format!(
                         "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
-                        index + 1
+                        error.line()
                     ))
                 })
             })
@@ -139,6 +139,19 @@ mod tests {
         let waited = log.transact(|records| (records, ()));
         drop(holder);
         std::fs::remove_file(&path).unwrap();
-        assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
+        assert_eq!(waited.unwrap_err().to_string(), format!("{} stayed locked for 50 ms", path.display()));
+    }
+
+    #[test]
+    fn a_corrupt_line_is_reported_with_its_line_number() {
+        let text = "{\"at\":1,\"event\":\"Done\",\"task\":1}\n{\"at\":2,\"event\":}\n";
+        let path = std::path::Path::new("log.jsonl");
+        let error = JsonlLog::parse(path, text).unwrap_err().to_string();
+        assert_eq!(
+            error,
+            "log.jsonl line 2: expected value at line 2 column 17. Next: meta escape <reason>, then repair log.jsonl."
+        );
+        let good = JsonlLog::parse(path, "{\"at\":1,\"event\":\"Done\",\"task\":1}\n").unwrap();
+        assert_eq!(good.len(), 1);
     }
 }
