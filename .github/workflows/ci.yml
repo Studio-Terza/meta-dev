@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ports-only
+        run: ci/ports-only.sh
+      - name: toolchain
+        run: rustup toolchain install
+      - name: fmt
+        run: cargo fmt --all --check
+      - name: build
+        run: cargo build --workspace --locked
+      - name: clippy
+        run: cargo clippy --workspace --locked -- -D warnings
+      - name: build tests
+        run: cargo test --workspace --locked --no-run
+      - name: test
+        shell: bash
+        run: |
+          exec 3>&2
+          TIMEFORMAT='| test | %R s wall | %U s user CPU | %S s system CPU |'
+          { time cargo test --workspace --locked 2>&3 ; } 2> test-time.txt
+      - name: test time (report-only)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo '| step | wall | user CPU | system CPU |' >> "$GITHUB_STEP_SUMMARY"
+          echo '|---|---|---|---|' >> "$GITHUB_STEP_SUMMARY"
+          cat test-time.txt >> "$GITHUB_STEP_SUMMARY"
+          cat test-time.txt
