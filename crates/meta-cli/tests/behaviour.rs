@@ -732,7 +732,7 @@ fn resolve_against_a_done_task_records_resolved_and_the_escape_no_longer_counts_
     assert_eq!((reply.code, events), (Code::Done, vec![resolved("escape-1", "task-1")]));
     let (reply, _) = call(&mut ports, "status", "");
     assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
-    assert!(reply.text.contains("P2 open escapes: 1 (1 closed as historical);"), "{}", reply.text);
+    assert!(reply.text.contains("P2 open escapes: 1 (0 closed as historical);"), "{}", reply.text);
     assert!(!reply.text.contains("escape-1"), "{}", reply.text);
 }
 
