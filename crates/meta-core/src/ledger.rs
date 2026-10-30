@@ -139,6 +139,14 @@ impl Ledger {
                 let logged = self.escape_mut(*escape).ok_or_else(|| format!("unknown {escape} resolved"))?;
                 logged.resolve(*escape, *task)?;
             }
+            Event::ResolvedHistorical { escape, reason } => {
+                let logged = self.escape_mut(*escape).ok_or_else(|| format!("unknown {escape} resolved"))?;
+                logged.resolve_historical(*escape, reason.clone())?;
+            }
+            Event::Corrected { escape, reason } => {
+                let logged = self.escape_mut(*escape).ok_or_else(|| format!("unknown {escape} corrected"))?;
+                logged.correct(*escape, reason.clone())?;
+            }
             Event::LeaseUsed { lease } => {
                 let spent = match self.leases.remove(lease) {
                     Some(LeaseSlot::Unused(unused)) => Ok(unused.spend().0),

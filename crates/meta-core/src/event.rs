@@ -53,6 +53,16 @@ pub enum Event {
         escape: EscapeId,
         task: TaskId,
     },
+    /// A one-off bypass that cannot recur and has no fixing task, closed with a reason.
+    ResolvedHistorical {
+        escape: EscapeId,
+        reason: Reason,
+    },
+    /// Moves an escape resolved against a task to historical. The `Resolved` record stays in the log.
+    Corrected {
+        escape: EscapeId,
+        reason: Reason,
+    },
     LeaseUsed {
         lease: LeaseId,
     },
