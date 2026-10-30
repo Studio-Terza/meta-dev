@@ -1,3 +1,5 @@
+#![forbid(clippy::disallowed_methods)]
+
 use meta_cli::{Call, answer};
 use meta_ports::real;
 use std::io::Read;

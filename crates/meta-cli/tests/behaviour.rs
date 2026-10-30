@@ -1,3 +1,5 @@
+#![forbid(clippy::disallowed_methods)]
+
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{Attempt, Event, Outcome, PrNumber, Record, Route, RunCount, Sha, Timestamp};
 use meta_ports::memory::{FixedClock, MemoryLog, RecordedGit, RecordedGitHub};

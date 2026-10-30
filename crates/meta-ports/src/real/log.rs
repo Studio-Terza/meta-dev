@@ -53,34 +53,19 @@ impl JsonlLog {
         PortError::new(format!("{}: {error}", path.display()))
     }
 
-    fn parse(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
-        serde_json::Deserializer::from_str(text)
-            .into_iter::<Record>()
-            .map(|parsed| {
-                parsed.map_err(|error| {
-                    let path = path.display();
-                    PortError::new(format!(
-                        "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
-                        error.line()
-                    ))
-                })
-            })
-            .collect()
-    }
-
     fn write(file: &mut File, path: &Path, records: &[Record]) -> Result<(), PortError> {
         let lines = records
             .iter()
             .map(|record| serde_json::to_string(record).map(|line| line + "\n"))
             .collect::<Result<String, _>>()
             .map_err(|error| PortError::new(error.to_string()))?;
-        file.write_all(lines.as_bytes()).map_err(|error| Self::failed(path, error))
+        file.write_all(&lines.into_bytes()).map_err(|error| Self::failed(path, error))
     }
 
     fn contents(file: &mut File, path: &Path) -> Result<Vec<Record>, PortError> {
         let mut text = String::new();
         file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
-        Self::parse(path, &text)
+        super::jsonl::records(path, &text)
     }
 }
 
@@ -140,38 +125,5 @@ mod tests {
         drop(holder);
         std::fs::remove_file(&path).unwrap();
         assert_eq!(waited.unwrap_err().to_string(), format!("{} stayed locked for 50 ms", path.display()));
-    }
-
-    #[test]
-    fn a_corrupt_line_is_reported_with_its_line_number() {
-        let text = "{\"at\":1,\"event\":\"Done\",\"task\":1}\n{\"at\":2,\"event\":}\n";
-        let path = std::path::Path::new("log.jsonl");
-        let error = JsonlLog::parse(path, text).unwrap_err().to_string();
-        assert_eq!(
-            error,
-            "log.jsonl line 2: expected value at line 1 column 17. Next: meta escape <reason>, then repair log.jsonl."
-        );
-        let good = JsonlLog::parse(path, "{\"at\":1,\"event\":\"Done\",\"task\":1}\n").unwrap();
-        assert_eq!(good.len(), 1);
-    }
-
-    #[test]
-    fn a_log_holds_exactly_one_record_per_line() {
-        let record = "{\"at\":1,\"event\":\"Done\",\"task\":1}";
-        let path = std::path::Path::new("log.jsonl");
-        let next = "Next: meta escape <reason>, then repair log.jsonl.";
-        let two_on_one_line = format!("{record}{record}\n");
-        let split_over_lines = "{\"at\":1,\n\"event\":\"Done\",\"task\":1}\n".to_owned();
-        let blank_line = format!("{record}\n\n{record}\n");
-        let errors = [two_on_one_line, split_over_lines, blank_line]
-            .map(|text| JsonlLog::parse(path, &text).unwrap_err().to_string());
-        assert_eq!(
-            errors,
-            [
-                format!("log.jsonl line 1: trailing characters at line 1 column 34. {next}"),
-                format!("log.jsonl line 1: EOF while parsing an object at line 1 column 8. {next}"),
-                format!("log.jsonl line 2: EOF while parsing a value at line 1 column 0. {next}"),
-            ]
-        );
     }
 }

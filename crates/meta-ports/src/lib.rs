@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_methods)]
+
 pub mod memory;
 pub mod real;
 

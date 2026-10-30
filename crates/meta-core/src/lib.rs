@@ -1,3 +1,5 @@
+#![deny(clippy::disallowed_methods)]
+
 mod claim;
 mod escape;
 mod event;
@@ -9,7 +11,6 @@ mod link;
 mod merge;
 mod merges;
 mod open;
-mod prompt;
 mod pull;
 mod reply;
 mod rules;

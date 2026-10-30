@@ -1,3 +1,5 @@
+#![forbid(clippy::disallowed_methods)]
+
 use meta_core::{
     Accepted, AgentName, Cause, Clearance, Escape, Event, Hook, Ledger, Malformed, Merges, Origin, PrNumber, Pull,
     Reason, Reconciliation, Record, Refusal, Rules, TaskId, Timestamp, Title, Unreached, Unreadable,
