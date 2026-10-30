@@ -127,8 +127,8 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { kind, reason, pr, checked } => {
-                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked));
+            Event::Escaped { kind, reason, pr, checked, build } => {
+                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked, *build));
             }
             Event::Resolved { escape, task } => {
                 match self.tasks.get(task) {

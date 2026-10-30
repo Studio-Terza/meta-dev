@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
+use meta_core::{Build, Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +27,9 @@ impl From<Malformed> for PortError {
 
 pub trait Log {
     fn place(&self) -> String;
+    /// Whether this is the lead's real log, in the default data dir. Only a build from a commit on
+    /// main may append to it; a scratch log (XDG_DATA_HOME elsewhere) takes any build.
+    fn is_real(&self) -> bool;
     fn read(&self) -> Result<Vec<Record>, PortError>;
     /// Holds the log exclusively from read to append. `decide` gets the records, or why they do not
     /// parse; the records it returns are appended. A log that cannot be opened or locked is an error.
@@ -45,6 +48,9 @@ pub trait Git {
     fn local(&self, file: SelfFile) -> Result<String, PortError>;
     /// The commit at the tip of the local branch named after the task; `None` when there is none.
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError>;
+    /// Whether `commit` is an ancestor of origin/main, by the local refs of the clone this binary
+    /// was built from, with no network.
+    fn on_main(&self, commit: &Sha) -> Result<bool, PortError>;
 }
 
 #[derive(Debug, Clone)]
@@ -77,4 +83,6 @@ pub struct Ports<L, G, H, C> {
     pub git: G,
     pub github: H,
     pub clock: C,
+    /// The commit this binary was built from.
+    pub build: Build,
 }

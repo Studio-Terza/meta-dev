@@ -8,29 +8,56 @@ use std::time::{Duration, Instant};
 
 /// meta-dev's data directory: the log, and the cache of `self/` files last read from main.
 pub(super) fn home() -> Result<PathBuf, PortError> {
-    let data = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share")));
-    data.map(|data| data.join("meta-dev"))
+    data_dir().map(|(home, _)| home)
+}
+
+/// The data directory, and whether it is the default one, `$HOME/.local/share/meta-dev`, which
+/// holds the lead's real log. XDG_DATA_HOME naming any other place makes it a scratch directory.
+fn data_dir() -> Result<(PathBuf, bool), PortError> {
+    data_dir_from(std::env::var_os("XDG_DATA_HOME").map(PathBuf::from), std::env::var_os("HOME").map(PathBuf::from))
+}
+
+fn data_dir_from(chosen: Option<PathBuf>, home: Option<PathBuf>) -> Result<(PathBuf, bool), PortError> {
+    let default = home.map(|home| home.join(".local").join("share"));
+    let real = match (&chosen, &default) {
+        (None, _) => true,
+        (Some(chosen), Some(default)) => same_place(chosen, default),
+        (Some(_), None) => false,
+    };
+    let data = chosen.or(default);
+    data.map(|data| (data.join("meta-dev"), real))
         .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; meta-dev has no data directory"))
+}
+
+/// Two names for one directory, through symlinks too when both exist.
+fn same_place(one: &Path, other: &Path) -> bool {
+    let resolved = |path: &Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    resolved(one) == resolved(other)
 }
 
 #[derive(Debug)]
 pub struct JsonlLog {
     path: Result<PathBuf, PortError>,
     patience: Duration,
+    real: bool,
 }
 
 impl JsonlLog {
     pub const PATIENCE: Duration = Duration::from_secs(3);
     const RETRY: Duration = Duration::from_millis(20);
 
+    /// The log in the data directory. With no data directory it is taken as the real one: fail closed.
     pub fn in_data_dir() -> Self {
-        Self { path: home().map(|home| home.join("log.jsonl")), patience: Self::PATIENCE }
+        let (path, real) = match data_dir() {
+            Ok((home, real)) => (Ok(home.join("log.jsonl")), real),
+            Err(error) => (Err(error), true),
+        };
+        Self { path, patience: Self::PATIENCE, real }
     }
 
+    /// A scratch log at `path`.
     pub fn at(path: PathBuf) -> Self {
-        Self { path: Ok(path), patience: Self::PATIENCE }
+        Self { path: Ok(path), patience: Self::PATIENCE, real: false }
     }
 
     fn locked(&self) -> Result<(File, &Path), PortError> {
@@ -77,6 +104,10 @@ impl Log for JsonlLog {
         self.path.as_ref().map_or_else(|_| "the meta-dev log".to_owned(), |path| path.display().to_string())
     }
 
+    fn is_real(&self) -> bool {
+        self.real
+    }
+
     fn read(&self) -> Result<Vec<Record>, PortError> {
         let (mut file, path) = self.locked()?;
         Self::contents(&mut file, path)
@@ -94,7 +125,7 @@ impl Log for JsonlLog {
 
 #[cfg(test)]
 mod tests {
-    use super::JsonlLog;
+    use super::{JsonlLog, data_dir_from};
     use crate::Log;
     use std::fs::{File, TryLockError};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -113,6 +144,25 @@ mod tests {
         let free = JsonlLog::at(path.clone()).transact(|records| (records.unwrap(), ())).is_ok();
         std::fs::remove_file(&path).unwrap();
         assert_eq!((blocked, free), ((0, true), true));
+    }
+
+    #[test]
+    fn only_the_default_data_dir_holds_the_real_log_and_any_other_xdg_data_home_is_scratch() {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let home = std::env::temp_dir().join(format!("meta-dev-home-{nanos}"));
+        let share = home.join(".local").join("share");
+        std::fs::create_dir_all(&share).unwrap();
+        let alias = home.join("alias");
+        std::os::unix::fs::symlink(&share, &alias).unwrap();
+        let real = |chosen: Option<&std::path::Path>| {
+            data_dir_from(chosen.map(std::path::Path::to_path_buf), Some(home.clone())).unwrap().1
+        };
+        let decided = [real(None), real(Some(&share)), real(Some(&alias)), real(Some(&home.join("scratch")))];
+        let homeless = data_dir_from(Some(home.join("scratch")), None).unwrap().1;
+        std::fs::remove_dir_all(&home).unwrap();
+        assert_eq!((decided, homeless), ([true, true, true, false], false));
+        assert_eq!(data_dir_from(None, None).map(|(_, real)| real).ok(), None);
+        assert!(!JsonlLog::at(home).is_real());
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use super::command::run;
+use super::command::{decides, run};
 use super::log::home;
 use crate::{Git, PortError};
 use meta_core::{Origin, SelfFile, Sha, TaskId};
@@ -41,6 +41,18 @@ impl GitCli {
     }
 }
 
+impl GitCli {
+    /// The clone this binary was built from: the one whose origin/main decides whether it is a main build.
+    const BUILT_IN: &str = env!("CARGO_MANIFEST_DIR");
+
+    /// Whether `commit` is an ancestor of origin/main in the clone at `repo`, by its local refs.
+    pub fn ancestry(repo: &Path, commit: &Sha) -> Result<bool, PortError> {
+        let repo = repo.display().to_string();
+        let commit = commit.to_string();
+        decides("git", &["-C", &repo, "merge-base", "--is-ancestor", &commit, "refs/remotes/origin/main"])
+    }
+}
+
 impl Git for GitCli {
     fn origin(&self) -> Result<Origin, PortError> {
         run("git", &["remote", "get-url", "origin"])?
@@ -65,5 +77,41 @@ impl Git for GitCli {
             true => Ok(None),
             false => found.parse().map(Some).map_err(|error| PortError::new(format!("branch {task}: {error}"))),
         }
+    }
+
+    fn on_main(&self, commit: &Sha) -> Result<bool, PortError> {
+        Self::ancestry(Path::new(Self::BUILT_IN), commit)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GitCli;
+    use super::run;
+    use meta_core::Sha;
+    use std::path::Path;
+
+    #[test]
+    fn a_commit_is_on_main_only_when_origin_main_contains_it_and_an_unknown_one_is_an_error() {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let repo = std::env::temp_dir().join(format!("meta-dev-ancestry-{nanos}"));
+        let at = repo.display().to_string();
+        let git = |args: &[&str]| run("git", &[&["-C", at.as_str()], args].concat()).unwrap();
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&["init", "--quiet"]);
+        let commit = |message: &str| {
+            let identity =
+                ["-c", "user.name=meta", "-c", "user.email=meta@example.invalid", "-c", "commit.gpgsign=false"];
+            git(&[&identity[..], &["commit", "--quiet", "--allow-empty", "-m", message]].concat());
+            git(&["log", "-1", "--format=format:%H"]).parse::<Sha>().unwrap()
+        };
+        let main = commit("main");
+        git(&["update-ref", "refs/remotes/origin/main", &main.to_string()]);
+        let branch = commit("branch");
+        let unknown: Sha = "0123456789012345678901234567890123456789".parse().unwrap();
+        let answers = [&main, &branch, &unknown].map(|sha| GitCli::ancestry(Path::new(&repo), sha));
+        std::fs::remove_dir_all(&repo).unwrap();
+        assert_eq!(answers[..2], [Ok(true), Ok(false)]);
+        assert!(answers[2].is_err(), "{:?}", answers[2]);
     }
 }

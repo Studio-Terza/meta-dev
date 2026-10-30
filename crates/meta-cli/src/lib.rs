@@ -1,7 +1,7 @@
 use meta_core::{
-    Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
-    Malformed, Merges, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules,
-    SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
+    Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
+    Ledger, Malformed, Merges, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal,
+    Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -155,10 +155,11 @@ impl Call {
 }
 
 pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports<L, G, H, C>) -> Answer {
-    let Ports { log, git, github, clock } = ports;
+    let Ports { log, git, github, clock, build } = ports;
     let at = clock.now();
+    let real = log.is_real();
     match call {
-        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at),
+        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(real, git, build)),
         Call::Escape { kind, reason, pr } => {
             let kinds = git
                 .local(SelfFile::EscapeKinds)
@@ -169,9 +170,10 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(admitted) => admitted,
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
+            let unverified = verify(real, git, build).err();
             let recorded = log.transact(|records| {
                 let earlier = records.as_deref().map_err(ToString::to_string);
-                let (events, text) = admitted.tally(earlier).into_parts();
+                let (events, text) = admitted.tally(earlier, unverified).into_parts();
                 (stamped(events, at), text)
             });
             match recorded {
@@ -180,6 +182,10 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
             }
         }
         Call::Ledger(call) => {
+            let verified = verify(real, git, build);
+            if let (false, Err(unverified)) = (call == LedgerCall::Status, &verified) {
+                return Answer::failed(Failure::Refused(unverified.clone().into()));
+            }
             let place = log.place();
             let fold =
                 |records: &[Record]| Ledger::fold(records).map_err(|corrupt| Failure::Broken(corrupt.in_log(&place)));
@@ -198,10 +204,11 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                     .and_then(|records| fold(&records))
                     .and_then(|ledger| finish(prepared, ledger, at))
                 {
-                    Ok(accepted) => {
-                        let (events, text) = accepted.into_parts();
-                        (stamped(events, at), Ok(text))
-                    }
+                    Ok(accepted) => match (accepted.into_parts(), &verified) {
+                        ((events, text), Ok(())) => (stamped(events, at), Ok(text)),
+                        ((events, text), Err(_)) if events.is_empty() => (Vec::new(), Ok(text)),
+                        ((_, text), Err(unverified)) => (Vec::new(), Ok(format!("{text}not recorded: {unverified}\n"))),
+                    },
                     Err(failure) => (Vec::new(), Err(failure)),
                 }
             });
@@ -213,13 +220,31 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     }
 }
 
-fn hook<L: Log>(phase: Phase, hook: Hook, log: &mut L, at: Timestamp) -> Answer {
+/// Whether this binary may append to the log: any build may write a scratch log, and only a build
+/// from a commit on main may write the real one. An ancestry that cannot be decided is unverified.
+fn verify<G: Git>(real: bool, git: &G, build: &Build) -> Result<(), Unverified> {
+    match real {
+        false => Ok(()),
+        true => build.verify(|commit| git.on_main(commit).map(|_| true)),
+    }
+}
+
+fn hook<L: Log>(
+    phase: Phase,
+    hook: Hook,
+    log: &mut L,
+    at: Timestamp,
+    verify: impl FnOnce() -> Result<(), Unverified>,
+) -> Answer {
     let decide: Box<dyn FnOnce(Ledger) -> Accepted> = match hook {
         Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
         Hook::Bind(binding) => Box::new(|ledger: Ledger| ledger.bind(binding)),
     };
+    if let Err(unverified) = verify() {
+        return Answer::broken_hook(phase, unverified);
+    }
     let place = log.place();
     let outcome = log.transact(|records| {
         let folded = records

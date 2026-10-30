@@ -99,11 +99,29 @@ A falsification latches once per prediction and measure, so a prediction first f
 - `self/rules.toml` gains a rule that leased agents run in the background (`run_in_background`): only background launches report an agent id at start, so a crashed foreground agent cannot be resumed. Source: failure 2026-10-30, stage 1 re-review.
 - Behaviour tests use a rules fixture, not the repo's `self/rules.toml`, so changing a rule cannot break unrelated tests.
 
+### Only main builds write the real log
+
+An agent ran `meta` built from its unmerged branch against the lead's real log. It appended events that main's binary cannot fold, so every hook denied and `meta merge` broke until the lead repaired the log by hand. The old meta-dev repo failed the same way: a stale binary against the log's schema.
+
+The build script (`crates/meta-ports/src/real/build.rs`) embeds the commit the binary is built from. A dirty working tree, or a build outside git, embeds no commit. The real log is the one in the default data dir, `$HOME/.local/share/meta-dev`. An XDG_DATA_HOME that names any other place is a scratch data dir, and tests use scratch or in-memory logs. Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. It uses the local refs of the clone it was built in, with no network.
+
+| Command | Given | Result |
+|---|---|---|
+| any ledger command that writes, on the real log | the build has no commit, its commit is not on origin/main, or the ancestry cannot be read | refused before any port call, with no events: "you are running a branch build (why) … Next: use a main build, or set XDG_DATA_HOME to a scratch data dir." |
+| `meta hook pre-tool-use` or `post-tool-use` for `Agent`, `Task` or `SendMessage`, on the real log | the same | denied or not recorded (fail closed), with the same reason |
+| `meta status`, on the real log | the same | the report prints; a falsification it would latch is not recorded, and the reason is printed |
+| `meta escape <kind> <reason>`, on the real log | the same | event `Escaped` marked `build: unverified`; prints why. `meta status` shows the mark beside the escape |
+| any command | a build whose commit is on origin/main, or a scratch data dir | written as before, with no mark |
+
+`meta claim` prints how an agent gets a main build for `meta link`: a detached worktree at origin/main, built with `cargo build --release`. It also says that a branch build may run only with XDG_DATA_HOME set to a scratch dir.
+
 ## Deferred
 
 Blocking owner approval of gate changes waits for a proper escalation system. Blocking requests must neither flood the owner nor give agents a reason to stop work (owner, 2026-10-30). Until then, reviews catch gate loosening.
 
 ## After merge
+
+- Rebuild the lead's hook binary from main once this lands (`git pull`, then `cargo build --release`). The hook writes `LeaseUsed` and `Started`. The hook binary built from main before this change keeps writing unchecked until then; a hook binary built from a branch or a dirty tree denies every agent start.
 
 - Resolve the bootstrap escapes against the stage 0 task.
 - Resolve the stage-0 gap escapes against this stage's task.

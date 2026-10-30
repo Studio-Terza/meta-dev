@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, VecDeque};
 pub struct MemoryLog {
     pub records: Vec<Record>,
     pub broken: Option<PortError>,
+    /// Stands for the lead's real log, which only a main build may write.
+    pub real: bool,
 }
 
 impl MemoryLog {
@@ -18,6 +20,10 @@ impl MemoryLog {
 impl Log for MemoryLog {
     fn place(&self) -> String {
         "memory log".to_owned()
+    }
+
+    fn is_real(&self) -> bool {
+        self.real
     }
 
     fn read(&self) -> Result<Vec<Record>, PortError> {
@@ -44,6 +50,8 @@ pub struct RecordedGit {
     pub local: BTreeMap<SelfFile, String>,
     /// The tip of each local branch named after a task.
     pub branches: BTreeMap<TaskId, Sha>,
+    /// Whether each commit is on origin/main; any other commit is a port failure.
+    pub on_main: BTreeMap<Sha, bool>,
 }
 
 impl Git for RecordedGit {
@@ -62,6 +70,10 @@ impl Git for RecordedGit {
 
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
         Ok(self.branches.get(&task).cloned())
+    }
+
+    fn on_main(&self, commit: &Sha) -> Result<bool, PortError> {
+        self.on_main.get(commit).copied().ok_or_else(|| PortError::new(format!("no recorded ancestry for {commit}")))
     }
 }
 

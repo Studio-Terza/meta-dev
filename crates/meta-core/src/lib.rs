@@ -1,3 +1,4 @@
+mod build;
 mod claim;
 mod escape;
 mod event;
@@ -20,6 +21,7 @@ mod spec;
 mod status;
 mod task;
 
+pub use build::{Build, Unverified, Writer};
 pub use claim::Claim;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
