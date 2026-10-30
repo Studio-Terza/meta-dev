@@ -1,16 +1,15 @@
-use crate::event::{Attempt, Event, Record};
+use crate::event::{Attempt, Event, Record, Route};
 use crate::ids::{LeaseId, PrNumber, Reason, RunCount, TaskId};
 use crate::lease::{Lease, LeaseSlot};
 use crate::task::{Linked, Progress, Task};
 use std::collections::BTreeMap;
-use std::fmt;
 
 #[derive(Debug, Default)]
 pub struct Ledger {
     pub(crate) tasks: BTreeMap<TaskId, Progress>,
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
     pub(crate) escapes: Vec<Reason>,
-    pub(crate) merged: Vec<RunCount>,
+    pub(crate) merged: Vec<(RunCount, Route)>,
     pub(crate) denied: Vec<Attempt>,
 }
 
@@ -20,9 +19,12 @@ pub struct Corrupt {
     why: String,
 }
 
-impl fmt::Display for Corrupt {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "log record {} does not fit the log before it: {}", self.record, self.why)
+impl Corrupt {
+    pub fn in_log(&self, place: &str) -> String {
+        format!(
+            "{place} record {} does not fit the log before it: {}. Next: meta escape <reason>, then repair {place}.",
+            self.record, self.why
+        )
     }
 }
 
@@ -59,9 +61,9 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, Progress::Linked(linked));
             }
-            Event::Merged { pr, runs, .. } => {
+            Event::Merged { pr, runs, route, .. } => {
                 self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
-                self.merged.push(*runs);
+                self.merged.push((*runs, *route));
             }
             Event::Done { task } => {
                 let done = match self.take(*task)? {

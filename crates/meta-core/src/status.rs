@@ -1,4 +1,4 @@
-use crate::event::Attempt;
+use crate::event::{Attempt, Route};
 use crate::ids::{Reason, RunCount};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
@@ -31,13 +31,14 @@ impl Ledger {
         let denied = |attempt: Attempt| self.denied.iter().filter(|denied| **denied == attempt).count();
         let (starts_denied, merges_denied) = (denied(Attempt::AgentStart), denied(Attempt::Merge));
         let merged = self.merged.len();
-        let runs = RunCount::total(self.merged.iter().copied());
+        let through_meta = self.merged.iter().filter(|(_, route)| *route == Route::Meta).count();
+        let runs = RunCount::total(self.merged.iter().map(|(runs, _)| *runs));
         [
             section("open tasks", &tasks),
             section("live leases", &leases),
             section(&format!("open escapes: {}", self.escapes.len()), &escapes),
             format!("P1 agent starts through meta: {started} of {}\n", started + starts_denied),
-            format!("P1 merges through meta: {merged} of {}\n", merged + merges_denied),
+            format!("P1 merges through meta: {through_meta} of {}\n", merged + merges_denied),
             format!("P2 open escapes: {}; repeats of an earlier reason: {repeated}\n", self.escapes.len()),
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs\n"),
         ]

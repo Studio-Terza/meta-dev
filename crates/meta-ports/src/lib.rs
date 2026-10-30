@@ -26,6 +26,7 @@ impl From<Malformed> for PortError {
 }
 
 pub trait Log {
+    fn place(&self) -> String;
     fn read(&self) -> Result<Vec<Record>, PortError>;
     fn append(&mut self, records: &[Record]) -> Result<(), PortError>;
     fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError>;

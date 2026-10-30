@@ -1,4 +1,4 @@
-use crate::ids::{AgentName, LeaseId, PrNumber, Reason, Repo, RunCount, Sha, TaskId, Timestamp, Title};
+use crate::ids::{AgentName, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -7,8 +7,8 @@ pub enum Event {
     Opened { task: TaskId, title: Title },
     Claimed { task: TaskId, agent: AgentName },
     Leased { lease: LeaseId, task: TaskId },
-    Linked { task: TaskId, pr: PrNumber, pin: Sha, repo: Repo },
-    Merged { pr: PrNumber, head: Sha, runs: RunCount },
+    Linked { task: TaskId, pr: PrNumber, pin: Sha },
+    Merged { pr: PrNumber, head: Sha, runs: RunCount, route: Route },
     Done { task: TaskId },
     Escaped { reason: Reason },
     LeaseUsed { lease: LeaseId },
@@ -19,6 +19,12 @@ pub enum Event {
 pub enum Attempt {
     AgentStart,
     Merge,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Route {
+    Meta,
+    Outside,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

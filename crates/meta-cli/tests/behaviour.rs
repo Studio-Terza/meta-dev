@@ -1,5 +1,5 @@
 use meta_cli::{Answer, Call, Code, answer};
-use meta_core::{Attempt, Event, Outcome, PrNumber, Record, RunCount, Sha, Timestamp};
+use meta_core::{Attempt, Event, Outcome, PrNumber, Record, Route, RunCount, Sha, Timestamp};
 use meta_ports::memory::{FixedClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
 use meta_ports::{GhReplies, PortError, Ports};
@@ -37,11 +37,15 @@ fn leased(lease: &str, task: &str) -> Event {
 }
 
 fn linked(task: &str, pr: &str) -> Event {
-    Event::Linked { task: id(task), pr: id(pr), pin: id(PINNED), repo: id(REPO) }
+    Event::Linked { task: id(task), pr: id(pr), pin: id(PINNED) }
 }
 
 fn merged(pr: &str, runs: usize) -> Event {
-    Event::Merged { pr: id(pr), head: id(PINNED), runs: RunCount::of(runs) }
+    Event::Merged { pr: id(pr), head: id(PINNED), runs: RunCount::of(runs), route: Route::Meta }
+}
+
+fn merged_outside(pr: &str, runs: usize) -> Event {
+    Event::Merged { pr: id(pr), head: id(PINNED), runs: RunCount::of(runs), route: Route::Outside }
 }
 
 fn done(task: &str) -> Event {
@@ -115,7 +119,7 @@ fn pull(head: &str, outcomes: &[Outcome]) -> GhReplies {
 fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
     let at = Timestamp::from_unix_seconds(1);
     Ports {
-        log: MemoryLog { records: events.into_iter().map(|event| Record { at, event }).collect() },
+        log: MemoryLog { records: events.into_iter().map(|event| Record { at, event }).collect(), broken: None },
         git: RecordedGit { origin: id(ORIGIN), rules: RULES.to_owned() },
         github: RecordedGitHub {
             replies: pulls.into_iter().map(|(pr, replies)| (id::<PrNumber>(pr), replies)).collect(),
@@ -176,7 +180,7 @@ fn claim_of_an_open_unclaimed_task_leases_and_prints_the_brief_with_every_source
 fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
     let finished = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
     let cases = [
-        (claimed_task(), "task-1", "already claimed"),
+        (claimed_task(), "task-1", "already claimed and lease-1 is unused"),
         (finished, "task-1", "is done"),
         (Vec::new(), "task-9", "unknown"),
     ];
@@ -184,6 +188,23 @@ fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
         let (reply, added) = call(&mut given(events, Vec::new()), &format!("claim {task} --agent bob"), "");
         assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(reason), "{}", reply.text);
+    });
+    let (reply, _) = call(&mut given(claimed_task(), Vec::new()), "claim task-1 --agent bob", "");
+    assert!(
+        reply.text.contains("once it is spent, meta claim task-1 --agent <name> issues a fresh lease"),
+        "{}",
+        reply.text
+    );
+}
+
+#[test]
+fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
+    let spent = Event::LeaseUsed { lease: id("lease-1") };
+    [claimed_task(), linked_task()].into_iter().for_each(|history| {
+        let history = [history, vec![spent.clone()]].concat();
+        let (reply, events) = call(&mut given(history, Vec::new()), "claim task-1 --agent bob", "");
+        assert_eq!((reply.code, events), (Code::Done, vec![leased("lease-2", "task-1")]));
+        assert!(reply.text.contains("lease: lease-2") && reply.text.contains("rules:"), "{}", reply.text);
     });
 }
 
@@ -220,7 +241,7 @@ fn merge_of_an_unlinked_red_missing_or_moved_pr_is_refused_naming_which_with_the
             "7",
             Gh { required: Ok(Vec::new()), ..gh(PINNED, &[Outcome::Green]) }.replies(),
             "no required checks",
-            "missing",
+            "Next: require checks on main in branch protection, then meta merge 7 again.",
         ),
         ("7", Gh { state: "CLOSED", ..gh(PINNED, &[Outcome::Green]) }.replies(), "#7 is closed", "reopen it"),
         ("7", Gh { state: "MERGED", ..gh(MOVED, &[Outcome::Green]) }.replies(), "merged outside meta", "head moved"),
@@ -253,6 +274,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
             Event::LeaseUsed { lease: id("lease-2") },
         ],
         vec![linked("task-2", "9"), merged("9", 4), done("task-2"), opened("task-3")],
+        vec![opened("task-4"), claimed("task-4"), linked("task-4", "10"), merged_outside("10", 2), done("task-4")],
         vec![escaped("gh is down"), escaped("gh is down"), escaped("hook too strict")],
         vec![Event::Denied { attempt: Attempt::AgentStart }, Event::Denied { attempt: Attempt::Merge }],
     ]
@@ -266,9 +288,9 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         "open escapes: 3",
         "2x gh is down",
         "P1 agent starts through meta: 1 of 2",
-        "P1 merges through meta: 1 of 2",
+        "P1 merges through meta: 1 of 3",
         "P2 open escapes: 3; repeats of an earlier reason: 1",
-        "P6 CI runs per merged PR: 4 runs over 1 merged PRs",
+        "P6 CI runs per merged PR: 6 runs over 2 merged PRs",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
     assert!(!reply.text.contains("task-2") && !reply.text.contains("lease-2"), "{}", reply.text);
@@ -450,7 +472,7 @@ fn merge_records_a_pr_already_merged_at_the_pinned_head_without_merging_again() 
     let landed = Gh { state: "MERGED", ..gh(PINNED, &[Outcome::Green]) }.replies();
     let mut ports = given(linked_task(), vec![("7", landed)]);
     let (reply, events) = call(&mut ports, "merge 7", "");
-    assert_eq!((reply.code, events), (Code::Done, vec![merged("7", 3), done("task-1")]));
+    assert_eq!((reply.code, events), (Code::Done, vec![merged_outside("7", 3), done("task-1")]));
     assert!(ports.github.merged.is_empty());
 }
 
@@ -477,11 +499,31 @@ fn a_corrupt_log_still_gates_bash_and_records_escapes_but_denies_agents_and_fail
     assert_eq!(hook(corrupt(), &bash("git status")).0.text, ALLOW);
     let (reply, events) = call(&mut given(corrupt(), Vec::new()), "escape log is corrupt", "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped("log is corrupt")]));
+    let repair = "Next: meta escape <reason>, then repair memory log";
     let (reply, events) = hook(corrupt(), &agent("Work under lease-1."));
     assert_eq!(events, Vec::new());
     assert!(reply.text.contains(DENY) && reply.text.contains("fail closed"), "{}", reply.text);
+    assert!(reply.text.contains(repair), "{}", reply.text);
     let (reply, events) = call(&mut given(corrupt(), Vec::new()), "status", "");
     assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
+    assert!(reply.text.contains("memory log record 1") && reply.text.contains(repair), "{}", reply.text);
+}
+
+#[test]
+fn a_log_that_cannot_be_opened_still_allows_clean_bash_and_meta_and_still_denies_bypasses() {
+    let unopenable = || {
+        let mut ports = given(claimed_task(), Vec::new());
+        ports.log.broken = Some(PortError::new("cannot open the log"));
+        ports
+    };
+    let run = |input: String| call(&mut unopenable(), "hook pre-tool-use", &input).0;
+    ["git status", "meta escape the log is broken", "meta status"].into_iter().for_each(|command| {
+        assert_eq!(run(bash(command)), Answer { text: ALLOW.to_owned(), code: Code::Done }, "{command}");
+    });
+    let denied = run(bash("gh pr merge 7"));
+    assert!(denied.text.contains(DENY) && denied.text.contains("gh pr merge bypasses meta"), "{}", denied.text);
+    let agent = run(agent("Work under lease-1."));
+    assert!(agent.text.contains(DENY) && agent.text.contains("cannot open the log"), "{}", agent.text);
 }
 
 fn assert_bash_denied_in(events: Vec<Event>, command: &str) {
@@ -524,4 +566,63 @@ fn unknown_or_malformed_commands_answer_with_usage() {
             assert_eq!(refused.code, Code::Failed);
             assert!(refused.text.contains("usage:"), "{}", refused.text);
         });
+}
+
+#[test]
+fn hook_denies_gh_api_writes_and_graphql_mutations_but_allows_reads() {
+    let writes = [
+        "gh api -X POST repos/o/r/git/refs",
+        "gh api -XPUT repos/o/r/pulls/7/merge",
+        "gh api --method=PATCH repos/o/r/git/refs/heads/main -f sha=abc",
+        "gh api repos/o/r/git/refs/heads/main -f sha=abc -F force=true",
+        "gh api repos/o/r/contents/x --input body.json",
+        "gh api graphql -f query='mutation { updateRef(input: {}) { clientMutationId } }'",
+        r#"gh api graphql -f query="$QUERY""#,
+        "gh api graphql -F query=@mutation.graphql",
+        "gh api graphql -f query=$(cat q.graphql)",
+        "gh api graphql --input body.json",
+    ];
+    writes.into_iter().for_each(|command| assert_bash_denied(command, "meta merge"));
+    let reads = [
+        "gh api repos/o/r/pulls/7",
+        "gh api repos/o/r/pulls/7/merge",
+        "gh api -X GET search/issues -f q=repo:o/r",
+        "gh api graphql -f query='query($n: Int!) { viewer { login } }' -F n=1",
+    ];
+    reads.into_iter().for_each(assert_bash_allowed);
+}
+
+#[test]
+fn hook_denies_git_pushes_to_main_through_at_git_dir_work_tree_namespace_or_subtree() {
+    let pushes = [
+        ("git push origin @", "name the branch"),
+        ("git push origin @:main", "meta merge"),
+        ("git --git-dir .git push origin main", "meta merge"),
+        ("git --work-tree w --git-dir g push origin main", "meta merge"),
+        ("git --namespace n push origin main", "meta merge"),
+        ("git subtree push --prefix=dir origin main", "meta merge"),
+        ("git subtree push -P dir origin main", "meta merge"),
+        ("git subtree push --prefix dir origin", "name the branch"),
+    ];
+    pushes.into_iter().for_each(|(command, why)| assert_bash_denied(command, why));
+    ["git push origin @:task-1", "git subtree push --prefix=dir origin task-1", "git --git-dir .git status"]
+        .into_iter()
+        .for_each(assert_bash_allowed);
+}
+
+#[test]
+fn hook_denies_starting_an_agent_through_the_claude_program() {
+    let starts = [
+        "claude -p 'fix the bug'",
+        "cd repo && claude --dangerously-skip-permissions -p hi",
+        "/usr/local/bin/claude -p hi",
+        "env FOO=1 claude -p hi",
+        "FOO=1 nohup claude -p hi",
+    ];
+    starts.into_iter().for_each(|command| {
+        let (reply, events) = hook(Vec::new(), &bash(command));
+        assert_eq!(events, vec![Event::Denied { attempt: Attempt::AgentStart }], "{command}");
+        assert!(reply.text.contains(DENY) && reply.text.contains(GET_LEASE), "{command}: {}", reply.text);
+    });
+    ["git commit -m claude", "echo claude", "ls ~/.claude"].into_iter().for_each(assert_bash_allowed);
 }

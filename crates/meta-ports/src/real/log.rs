@@ -1,15 +1,21 @@
 use crate::{Log, PortError};
 use meta_core::Record;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 pub struct JsonlLog {
     path: Result<PathBuf, PortError>,
+    patience: Duration,
 }
 
 impl JsonlLog {
+    pub const PATIENCE: Duration = Duration::from_secs(3);
+    const RETRY: Duration = Duration::from_millis(20);
+
     pub fn in_data_dir() -> Self {
         let data = std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
@@ -17,19 +23,30 @@ impl JsonlLog {
         let path = data
             .map(|data| data.join("meta-dev").join("log.jsonl"))
             .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; the log has no home"));
-        Self { path }
+        Self { path, patience: Self::PATIENCE }
     }
 
     pub fn at(path: PathBuf) -> Self {
-        Self { path: Ok(path) }
+        Self { path: Ok(path), patience: Self::PATIENCE }
     }
 
     fn locked(&self) -> Result<(File, &Path), PortError> {
         let path = self.path.as_ref().map_err(Clone::clone)?;
         path.parent().map_or(Ok(()), fs::create_dir_all).map_err(|error| Self::failed(path, error))?;
         let file = OpenOptions::new().create(true).read(true).append(true).open(path);
-        let file = file.and_then(|file| file.lock().map(|()| file)).map_err(|error| Self::failed(path, error))?;
-        Ok((file, path))
+        let file = file.map_err(|error| Self::failed(path, error))?;
+        let deadline = Instant::now() + self.patience;
+        loop {
+            match file.try_lock() {
+                Ok(()) => return Ok((file, path)),
+                Err(TryLockError::WouldBlock) if Instant::now() < deadline => thread::sleep(Self::RETRY),
+                Err(TryLockError::WouldBlock) => {
+                    let waited = self.patience.as_millis();
+                    return Err(PortError::new(format!("{} stayed locked for {waited} ms", path.display())));
+                }
+                Err(TryLockError::Error(error)) => return Err(Self::failed(path, error)),
+            }
+        }
     }
 
     fn failed(path: &Path, error: std::io::Error) -> PortError {
@@ -40,8 +57,13 @@ impl JsonlLog {
         text.lines()
             .enumerate()
             .map(|(index, line)| {
-                serde_json::from_str(line)
-                    .map_err(|error| PortError::new(format!("{} line {}: {error}", path.display(), index + 1)))
+                serde_json::from_str(line).map_err(|error| {
+                    let path = path.display();
+                    PortError::new(format!(
+                        "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
+                        index + 1
+                    ))
+                })
             })
             .collect()
     }
@@ -63,6 +85,10 @@ impl JsonlLog {
 }
 
 impl Log for JsonlLog {
+    fn place(&self) -> String {
+        self.path.as_ref().map_or_else(|_| "the meta-dev log".to_owned(), |path| path.display().to_string())
+    }
+
     fn read(&self) -> Result<Vec<Record>, PortError> {
         let (mut file, path) = self.locked()?;
         Self::contents(&mut file, path)
@@ -85,7 +111,7 @@ mod tests {
     use super::JsonlLog;
     use crate::Log;
     use std::fs::{File, TryLockError};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[test]
     fn a_transaction_holds_the_log_exclusively_from_read_to_append() {
@@ -98,8 +124,21 @@ mod tests {
                 (Vec::new(), (records.len(), matches!(other.try_lock(), Err(TryLockError::WouldBlock))))
             })
             .unwrap();
-        let free = File::open(&path).unwrap().try_lock().is_ok();
+        let free = JsonlLog::at(path.clone()).transact(|records| (records, ())).is_ok();
         std::fs::remove_file(&path).unwrap();
         assert_eq!((blocked, free), ((0, true), true));
+    }
+
+    #[test]
+    fn a_log_locked_past_the_deadline_is_a_port_failure() {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("meta-dev-deadline-{nanos}.jsonl"));
+        let holder = File::create(&path).unwrap();
+        holder.lock().unwrap();
+        let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path.clone()) };
+        let waited = log.transact(|records| (records, ()));
+        drop(holder);
+        std::fs::remove_file(&path).unwrap();
+        assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
     }
 }

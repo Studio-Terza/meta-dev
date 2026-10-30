@@ -41,9 +41,9 @@ impl Linking {
         match problems.is_empty() {
             false => Err(Refusal::because(format!("{task} cannot link {pr}:\n{}", problems.join("\n")))),
             true => {
-                let (pin, repo) = (pull.head().clone(), pull.repo().clone());
-                let text = format!("{task} linked to {pr} in {repo}, head pinned at {pin}\n");
-                Ok(Accepted::new(vec![Event::Linked { task, pr, pin, repo }], text))
+                let pin = pull.head().clone();
+                let text = format!("{task} linked to {pr}, head pinned at {pin}\n");
+                Ok(Accepted::new(vec![Event::Linked { task, pr, pin }], text))
             }
         }
     }

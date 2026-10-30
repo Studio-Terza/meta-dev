@@ -100,7 +100,6 @@ text!(Sha, "sha");
 text!(CheckName, "check name");
 text!(Origin, "origin");
 text!(Branch, "branch");
-text!(Repo, "repo");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

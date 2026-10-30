@@ -1,4 +1,4 @@
-use crate::ids::{Branch, CheckName, Malformed, Repo, RunCount, Sha};
+use crate::ids::{Branch, CheckName, Malformed, RunCount, Sha};
 use serde::Deserialize;
 use serde::de::{DeserializeOwned, IgnoredAny};
 
@@ -7,7 +7,6 @@ pub struct Pull {
     head: Sha,
     branch: Branch,
     base: Branch,
-    repo: Repo,
     state: PullState,
     required: Vec<CheckName>,
     reported: Vec<Check>,
@@ -42,7 +41,6 @@ struct View {
     head_ref_name: Branch,
     base_ref_name: Branch,
     state: PullState,
-    url: String,
     status_check_rollup: Vec<Rollup>,
 }
 
@@ -78,23 +76,14 @@ fn parsed<T: DeserializeOwned>(what: &str, text: &str) -> Result<T, Malformed> {
 }
 
 impl Pull {
-    const GITHUB: &str = "https://github.com/";
-
     pub fn from_gh(view: &str, required: &str, runs: &str) -> Result<Self, Malformed> {
         let view: View = parsed("gh pr view", view)?;
         let required: Required = parsed("required status checks", required)?;
         let runs: Vec<IgnoredAny> = parsed("gh run list", runs)?;
-        let repo = view
-            .url
-            .strip_prefix(Self::GITHUB)
-            .and_then(|path| path.split_once("/pull/"))
-            .map(|(repo, _)| repo.to_owned())
-            .ok_or_else(|| Malformed::because(format!("{} is not a GitHub pull URL", view.url)))?;
         Ok(Self {
             head: view.head_ref_oid,
             branch: view.head_ref_name,
             base: view.base_ref_name,
-            repo: repo.parse()?,
             state: view.state,
             required: required.contexts,
             reported: view.status_check_rollup.into_iter().filter_map(Rollup::check).collect(),
@@ -112,10 +101,6 @@ impl Pull {
 
     pub(crate) fn base(&self) -> &Branch {
         &self.base
-    }
-
-    pub(crate) fn repo(&self) -> &Repo {
-        &self.repo
     }
 
     pub(crate) fn state(&self) -> PullState {

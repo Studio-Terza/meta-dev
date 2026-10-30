@@ -17,11 +17,10 @@ mod task;
 
 pub use claim::Claim;
 pub use escape::Escape;
-pub use event::{Attempt, Event, Record};
+pub use event::{Attempt, Event, Record, Route};
 pub use hook::{AgentStart, Hook};
 pub use ids::{
-    AgentName, Branch, CheckName, LeaseId, Malformed, Origin, PrNumber, Reason, Repo, RunCount, Sha, TaskId, Timestamp,
-    Title,
+    AgentName, Branch, CheckName, LeaseId, Malformed, Origin, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title,
 };
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;

@@ -1,24 +1,36 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-
 use meta_core::{Cleared, Origin, PrNumber, Pull, Record, Sha, Timestamp};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub struct MemoryLog {
     pub records: Vec<Record>,
+    pub broken: Option<PortError>,
+}
+
+impl MemoryLog {
+    fn open(&self) -> Result<(), PortError> {
+        self.broken.clone().map_or(Ok(()), Err)
+    }
 }
 
 impl Log for MemoryLog {
+    fn place(&self) -> String {
+        "memory log".to_owned()
+    }
+
     fn read(&self) -> Result<Vec<Record>, PortError> {
-        Ok(self.records.clone())
+        self.open().map(|()| self.records.clone())
     }
 
     fn append(&mut self, records: &[Record]) -> Result<(), PortError> {
+        self.open()?;
         self.records.extend_from_slice(records);
         Ok(())
     }
 
     fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError> {
+        self.open()?;
         let (records, decided) = decide(self.records.clone());
         self.records.extend(records);
         Ok(decided)

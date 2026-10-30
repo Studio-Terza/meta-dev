@@ -1,6 +1,6 @@
 use meta_core::{
-    Accepted, AgentName, Clearance, Corrupt, Escape, Event, Hook, Ledger, Malformed, PrNumber, Reason, Record, Refusal,
-    Rules, TaskId, Timestamp, Title, Unreadable,
+    Accepted, AgentName, Clearance, Escape, Event, Hook, Ledger, Malformed, Origin, PrNumber, Pull, Reason, Record,
+    Refusal, Rules, TaskId, Timestamp, Title, Unreadable,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -109,16 +109,24 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
             }
         }
         Call::Ledger(call) => {
-            let outcome = log.transact(|records| {
-                let decided =
-                    Ledger::fold(&records).map_err(Failure::from).and_then(|ledger| decide(call, ledger, git, github));
-                match decided {
-                    Ok(accepted) => {
-                        let (events, text) = accepted.into_parts();
-                        (stamped(events, at), Ok(text))
-                    }
-                    Err(failure) => (Vec::new(), Err(failure)),
+            let place = log.place();
+            let fold =
+                |records: &[Record]| Ledger::fold(records).map_err(|corrupt| Failure::Broken(corrupt.in_log(&place)));
+            let prepared = log
+                .read()
+                .map_err(Failure::from)
+                .and_then(|records| fold(&records))
+                .and_then(|ledger| prepare(call, &ledger, git, github));
+            let prepared = match prepared {
+                Ok(prepared) => prepared,
+                Err(failure) => return Answer::failed(failure),
+            };
+            let outcome = log.transact(|records| match fold(&records).and_then(|ledger| finish(prepared, ledger)) {
+                Ok(accepted) => {
+                    let (events, text) = accepted.into_parts();
+                    (stamped(events, at), Ok(text))
                 }
+                Err(failure) => (Vec::new(), Err(failure)),
             });
             match outcome.map_err(Failure::from).and_then(|decided| decided) {
                 Ok(text) => Answer::done(text),
@@ -132,18 +140,19 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
     match hook {
         Hook::Settled(accepted) => {
             let (events, text) = accepted.into_parts();
-            match log.append(&stamped(events, at)) {
-                Ok(()) => Answer::done(text),
-                Err(error) => Answer::broken_hook(error),
+            if !events.is_empty() {
+                let _unrecorded_denial_still_denies = log.append(&stamped(events, at));
             }
+            Answer::done(text)
         }
         Hook::Agent(start) => {
+            let place = log.place();
             let outcome = log.transact(|records| match Ledger::fold(&records) {
                 Ok(ledger) => {
                     let (events, text) = ledger.admit(start).into_parts();
                     (stamped(events, at), Ok(text))
                 }
-                Err(corrupt) => (Vec::new(), Err(corrupt.to_string())),
+                Err(corrupt) => (Vec::new(), Err(corrupt.in_log(&place))),
             });
             match outcome.map_err(|error| error.to_string()).and_then(|admitted| admitted) {
                 Ok(text) => Answer::done(text),
@@ -153,26 +162,48 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
     }
 }
 
-fn decide<G: Git, H: GitHub>(call: LedgerCall, ledger: Ledger, git: &G, github: &mut H) -> Result<Accepted, Failure> {
+enum Prepared {
+    Open(Title),
+    Status,
+    Claim { task: TaskId, agent: AgentName, origin: Origin, rules: Rules },
+    Link { task: TaskId, pr: PrNumber, pull: Pull },
+    Merge { pr: PrNumber, pull: Pull },
+}
+
+fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github: &mut H) -> Result<Prepared, Failure> {
     Ok(match call {
-        LedgerCall::Open(title) => ledger.open(title),
+        LedgerCall::Open(title) => Prepared::Open(title),
+        LedgerCall::Status => Prepared::Status,
         LedgerCall::Claim { task, agent } => {
-            let claim = ledger.claim(task, agent)?;
+            ledger.claim(task, agent.clone())?;
             let rules = Rules::parse(&git.rules()?)?;
-            claim.brief(&git.origin()?, &rules)
+            Prepared::Claim { task, agent, origin: git.origin()?, rules }
         }
         LedgerCall::Link { task, pr } => {
-            let linking = ledger.link(task, pr)?;
-            linking.pin(&github.pull(pr)?)?
+            ledger.link(task, pr)?;
+            Prepared::Link { task, pr, pull: github.pull(pr)? }
         }
-        LedgerCall::Merge(pr) => match ledger.merge(pr)?.clear(&github.pull(pr)?)? {
-            Clearance::Unmerged(cleared) => {
+        LedgerCall::Merge(pr) => {
+            let merging = ledger.merge(pr)?;
+            let pull = github.pull(pr)?;
+            if let Clearance::Unmerged(cleared) = merging.clear(&pull)? {
                 github.squash_merge(&cleared)?;
-                cleared.land().record()
             }
+            Prepared::Merge { pr, pull }
+        }
+    })
+}
+
+fn finish(prepared: Prepared, ledger: Ledger) -> Result<Accepted, Failure> {
+    Ok(match prepared {
+        Prepared::Open(title) => ledger.open(title),
+        Prepared::Status => ledger.status(),
+        Prepared::Claim { task, agent, origin, rules } => ledger.claim(task, agent)?.brief(&origin, &rules),
+        Prepared::Link { task, pr, pull } => ledger.link(task, pr)?.pin(&pull)?,
+        Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {
+            Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),
         },
-        LedgerCall::Status => ledger.status(),
     })
 }
 
@@ -189,12 +220,6 @@ impl From<Refusal> for Failure {
 impl From<PortError> for Failure {
     fn from(error: PortError) -> Self {
         Self::Broken(error.to_string())
-    }
-}
-
-impl From<Corrupt> for Failure {
-    fn from(corrupt: Corrupt) -> Self {
-        Self::Broken(corrupt.to_string())
     }
 }
 

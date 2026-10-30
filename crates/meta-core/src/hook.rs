@@ -66,7 +66,13 @@ impl Hook {
             "Bash" => {
                 let BashInput { command } = Self::input(tool, parsed.tool_input)?;
                 Ok(Self::Settled(match ShellCommand::parse(&command).bypass() {
-                    Some(bypass) => Self::deny(format!("{bypass}. {}", Self::USE_META), Some(Attempt::Merge)),
+                    Some(bypass) => {
+                        let next = match bypass.attempt() {
+                            Attempt::AgentStart => Self::GET_LEASE,
+                            Attempt::Merge => Self::USE_META,
+                        };
+                        Self::deny(format!("{bypass}. {next}"), Some(bypass.attempt()))
+                    }
                     None => Self::allow(Vec::new()),
                 }))
             }
