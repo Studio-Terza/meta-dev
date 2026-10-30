@@ -124,6 +124,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
         github: RecordedGitHub {
             replies: pulls.into_iter().map(|(pr, replies)| (id::<PrNumber>(pr), replies)).collect(),
             merged: Vec::new(),
+            listed: Some(Ok("[]".to_owned())),
         },
         clock: FixedClock(Timestamp::from_unix_seconds(2)),
     }
@@ -143,10 +144,6 @@ fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
 
 fn agent(prompt: &str) -> String {
     serde_json::json!({ "tool_name": "Agent", "tool_input": { "prompt": prompt } }).to_string()
-}
-
-fn bash(command: &str) -> String {
-    serde_json::json!({ "tool_name": "Bash", "tool_input": { "command": command } }).to_string()
 }
 
 fn quoted_values(key: &str) -> Vec<String> {
@@ -276,7 +273,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         vec![linked("task-2", "9"), merged("9", 4), done("task-2"), opened("task-3")],
         vec![opened("task-4"), claimed("task-4"), linked("task-4", "10"), merged_outside("10", 2), done("task-4")],
         vec![escaped("gh is down"), escaped("gh is down"), escaped("hook too strict")],
-        vec![Event::Denied { attempt: Attempt::AgentStart }, Event::Denied { attempt: Attempt::Merge }],
+        vec![Event::Denied { attempt: Attempt::AgentStart }],
     ]
     .concat();
     let (reply, events) = call(&mut given(history, Vec::new()), "status", "");
@@ -288,7 +285,8 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         "open escapes: 3",
         "2x gh is down",
         "P1 agent starts through meta: 1 of 2",
-        "P1 merges through meta: 1 of 3",
+        "P1 merges through meta: 1 of 2",
+        "P1 merged outside meta: 1 (0 missing from the log)",
         "P2 open escapes: 3; repeats of an earlier reason: 1",
         "P6 CI runs per merged PR: 6 runs over 2 merged PRs",
     ];
@@ -321,81 +319,6 @@ fn hook_denies_an_agent_with_no_unknown_used_or_dead_lease_and_says_how_to_get_o
 }
 
 #[test]
-fn hook_denies_bash_that_merges_or_pushes_to_main_outside_meta_merge() {
-    let bypasses = [
-        "gh pr merge 7 --squash",
-        "cd repo && gh pr merge 7",
-        "gh api -X PUT repos/o/r/pulls/7/merge",
-        "gh api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'",
-        "git push origin main",
-        "git push origin HEAD:refs/heads/main",
-        "git -C repo push --force origin +main",
-        "git push --all origin",
-    ];
-    bypasses.into_iter().for_each(|command| assert_bash_denied(command, "meta merge"));
-    let allowed =
-        ["git push -u origin stage0", "gh pr view 7", "meta merge 7", "git commit -m 'merge main'", "git status"];
-    allowed.into_iter().for_each(assert_bash_allowed);
-}
-
-fn assert_bash_denied(command: &str, why: &str) {
-    let (reply, events) = hook(Vec::new(), &bash(command));
-    assert_eq!(events, vec![Event::Denied { attempt: Attempt::Merge }], "{command}");
-    assert!([DENY, why, "meta escape"].iter().all(|part| reply.text.contains(part)), "{command}: {}", reply.text);
-}
-
-fn assert_bash_allowed(command: &str) {
-    let allowed = (Answer { text: ALLOW.to_owned(), code: Code::Done }, Vec::new());
-    assert_eq!(hook(Vec::new(), &bash(command)), allowed, "{command}");
-}
-
-#[test]
-fn hook_denies_pushes_and_api_calls_that_hide_behind_unexpanded_variables() {
-    let hidden = [
-        r#"git -C "$repo" push origin main"#,
-        r#"git push "$REMOTE" main"#,
-        "gh api -X PUT repos/$OWNER/$REPO/pulls/7/merge",
-        "git push origin $BRANCH",
-        "gh api ${ENDPOINT}",
-        "echo $(gh pr merge 7)",
-        "echo `git push origin main`",
-    ];
-    hidden.into_iter().for_each(|command| assert_bash_denied(command, "meta merge"));
-    ["echo $HOME", "cd $HOME && git status", "git log $(git merge-base HEAD origin/main)"]
-        .into_iter()
-        .for_each(assert_bash_allowed);
-}
-
-#[test]
-fn hook_joins_line_continuations_before_reading_a_command() {
-    ["git push origin \\\n main", "gh pr \\\n merge 7", "git \\\n push"]
-        .into_iter()
-        .for_each(|command| assert_bash_denied(command, "meta merge"));
-}
-
-#[test]
-fn hook_denies_a_push_that_does_not_name_a_branch_other_than_main() {
-    let unnamed =
-        ["git push", "git push origin", "git push origin HEAD", "git push -u origin HEAD", "git push --force"];
-    unnamed.into_iter().for_each(|command| assert_bash_denied(command, "name the branch: git push origin <branch>"));
-    ["git push origin HEAD:task-1", "git push -u origin task-1", "git push -o ci.skip origin task-1"]
-        .into_iter()
-        .for_each(assert_bash_allowed);
-}
-
-#[test]
-fn hook_denies_merges_hidden_behind_gh_flags() {
-    [
-        "gh pr --repo o/r merge 7",
-        "gh pr -R o/r merge 7",
-        "gh --repo o/r pr merge 7",
-        "gh api --method PUT repos/o/r/pulls/7/merge",
-    ]
-    .into_iter()
-    .for_each(|command| assert_bash_denied(command, "meta merge"));
-}
-
-#[test]
 fn hook_gates_the_task_tool_like_the_agent_tool() {
     let task = |prompt: &str| json_input("Task", "prompt", prompt);
     let (reply, events) = hook(claimed_task(), &task("Work under lease-1."));
@@ -411,6 +334,11 @@ fn hook_reads_tool_input_only_for_gated_tools() {
         r#"{"tool_name":"Edit","tool_input":{"file_path":"a.rs","prompt":5,"command":["x"]}}"#,
         r#"{"tool_name":"Read"}"#,
         r#"{"tool_name":"WebFetch","tool_input":null}"#,
+        r#"{"tool_name":"Bash","tool_input":{"command":"gh pr merge 7 --squash"}}"#,
+        r#"{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}"#,
+        r#"{"tool_name":"Bash","tool_input":{"command":["gh","pr","merge"]}}"#,
+        r#"{"tool_name":"Bash","tool_input":{}}"#,
+        r#"{"tool_name":"Bash"}"#,
     ];
     others.into_iter().for_each(|input| {
         assert_eq!(hook(claimed_task(), input), (Answer { text: ALLOW.to_owned(), code: Code::Done }, Vec::new()));
@@ -423,10 +351,8 @@ fn hook_denies_input_that_cannot_be_parsed() {
         "",
         "not json",
         "{}",
-        r#"{"tool_name":"Bash","tool_input":{}}"#,
         r#"{"tool_name":"Agent"}"#,
         r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#,
-        r#"{"tool_name":"Bash","tool_input":{"command":["gh","pr","merge"]}}"#,
     ];
     inputs.into_iter().for_each(|input| {
         let (reply, events) = hook(claimed_task(), input);
@@ -493,46 +419,6 @@ fn link_refuses_another_branch_another_base_a_pr_linked_elsewhere_or_an_unclaime
 }
 
 #[test]
-fn a_corrupt_log_still_gates_bash_and_records_escapes_but_denies_agents_and_fails_ledger_calls() {
-    let corrupt = || vec![claimed("task-1")];
-    assert_bash_denied_in(corrupt(), "gh pr merge 7");
-    assert_eq!(hook(corrupt(), &bash("git status")).0.text, ALLOW);
-    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "escape log is corrupt", "");
-    assert_eq!((reply.code, events), (Code::Done, vec![escaped("log is corrupt")]));
-    let repair = "Next: meta escape <reason>, then repair memory log";
-    let (reply, events) = hook(corrupt(), &agent("Work under lease-1."));
-    assert_eq!(events, Vec::new());
-    assert!(reply.text.contains(DENY) && reply.text.contains("fail closed"), "{}", reply.text);
-    assert!(reply.text.contains(repair), "{}", reply.text);
-    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "status", "");
-    assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
-    assert!(reply.text.contains("memory log record 1") && reply.text.contains(repair), "{}", reply.text);
-}
-
-#[test]
-fn a_log_that_cannot_be_opened_still_allows_clean_bash_and_meta_and_still_denies_bypasses() {
-    let unopenable = || {
-        let mut ports = given(claimed_task(), Vec::new());
-        ports.log.broken = Some(PortError::new("cannot open the log"));
-        ports
-    };
-    let run = |input: String| call(&mut unopenable(), "hook pre-tool-use", &input).0;
-    ["git status", "meta escape the log is broken", "meta status"].into_iter().for_each(|command| {
-        assert_eq!(run(bash(command)), Answer { text: ALLOW.to_owned(), code: Code::Done }, "{command}");
-    });
-    let denied = run(bash("gh pr merge 7"));
-    assert!(denied.text.contains(DENY) && denied.text.contains("gh pr merge bypasses meta"), "{}", denied.text);
-    let agent = run(agent("Work under lease-1."));
-    assert!(agent.text.contains(DENY) && agent.text.contains("cannot open the log"), "{}", agent.text);
-}
-
-fn assert_bash_denied_in(events: Vec<Event>, command: &str) {
-    let (reply, added) = hook(events, &bash(command));
-    assert_eq!(added, vec![Event::Denied { attempt: Attempt::Merge }]);
-    assert!(reply.text.contains(DENY), "{}", reply.text);
-}
-
-#[test]
 fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("lease-race-{nanos}.jsonl"));
@@ -569,60 +455,76 @@ fn unknown_or_malformed_commands_answer_with_usage() {
 }
 
 #[test]
-fn hook_denies_gh_api_writes_and_graphql_mutations_but_allows_reads() {
-    let writes = [
-        "gh api -X POST repos/o/r/git/refs",
-        "gh api -XPUT repos/o/r/pulls/7/merge",
-        "gh api --method=PATCH repos/o/r/git/refs/heads/main -f sha=abc",
-        "gh api repos/o/r/git/refs/heads/main -f sha=abc -F force=true",
-        "gh api repos/o/r/contents/x --input body.json",
-        "gh api graphql -f query='mutation { updateRef(input: {}) { clientMutationId } }'",
-        r#"gh api graphql -f query="$QUERY""#,
-        "gh api graphql -F query=@mutation.graphql",
-        "gh api graphql -f query=$(cat q.graphql)",
-        "gh api graphql --input body.json",
-    ];
-    writes.into_iter().for_each(|command| assert_bash_denied(command, "meta merge"));
-    let reads = [
-        "gh api repos/o/r/pulls/7",
-        "gh api repos/o/r/pulls/7/merge",
-        "gh api -X GET search/issues -f q=repo:o/r",
-        "gh api graphql -f query='query($n: Int!) { viewer { login } }' -F n=1",
-    ];
-    reads.into_iter().for_each(assert_bash_allowed);
-}
-
-#[test]
-fn hook_denies_git_pushes_to_main_through_at_git_dir_work_tree_namespace_or_subtree() {
-    let pushes = [
-        ("git push origin @", "name the branch"),
-        ("git push origin @:main", "meta merge"),
-        ("git --git-dir .git push origin main", "meta merge"),
-        ("git --work-tree w --git-dir g push origin main", "meta merge"),
-        ("git --namespace n push origin main", "meta merge"),
-        ("git subtree push --prefix=dir origin main", "meta merge"),
-        ("git subtree push -P dir origin main", "meta merge"),
-        ("git subtree push --prefix dir origin", "name the branch"),
-    ];
-    pushes.into_iter().for_each(|(command, why)| assert_bash_denied(command, why));
-    ["git push origin @:task-1", "git subtree push --prefix=dir origin task-1", "git --git-dir .git status"]
-        .into_iter()
-        .for_each(assert_bash_allowed);
-}
-
-#[test]
-fn hook_denies_starting_an_agent_through_the_claude_program() {
-    let starts = [
-        "claude -p 'fix the bug'",
-        "cd repo && claude --dangerously-skip-permissions -p hi",
-        "/usr/local/bin/claude -p hi",
-        "env FOO=1 claude -p hi",
-        "FOO=1 nohup claude -p hi",
-    ];
-    starts.into_iter().for_each(|command| {
-        let (reply, events) = hook(Vec::new(), &bash(command));
-        assert_eq!(events, vec![Event::Denied { attempt: Attempt::AgentStart }], "{command}");
-        assert!(reply.text.contains(DENY) && reply.text.contains(GET_LEASE), "{command}: {}", reply.text);
+fn hook_allows_bash_without_touching_the_log_even_when_the_log_is_corrupt_or_cannot_be_opened() {
+    let bash = |command: &str| json_input("Bash", "command", command);
+    let corrupt = || given(vec![claimed("task-1")], Vec::new());
+    let unopenable = || {
+        let mut ports = given(claimed_task(), Vec::new());
+        ports.log.broken = Some(PortError::new("cannot open the log"));
+        ports
+    };
+    ["gh pr merge 7", "git push origin main", "claude -p hi", "meta status"].into_iter().for_each(|command| {
+        let allowed = Answer { text: ALLOW.to_owned(), code: Code::Done };
+        assert_eq!(call(&mut corrupt(), "hook pre-tool-use", &bash(command)), (allowed.clone(), Vec::new()));
+        assert_eq!(call(&mut unopenable(), "hook pre-tool-use", &bash(command)).0, allowed, "{command}");
     });
-    ["git commit -m claude", "echo claude", "ls ~/.claude"].into_iter().for_each(assert_bash_allowed);
+}
+
+#[test]
+fn a_corrupt_or_unopenable_log_still_records_escapes_but_denies_agent_starts() {
+    let corrupt = || vec![claimed("task-1")];
+    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "escape log is corrupt", "");
+    assert_eq!((reply.code, events), (Code::Done, vec![escaped("log is corrupt")]));
+    let repair = "Next: meta escape <reason>, then repair memory log";
+    let (reply, events) = hook(corrupt(), &agent("Work under lease-1."));
+    assert_eq!(events, Vec::new());
+    assert!(reply.text.contains(DENY) && reply.text.contains("fail closed"), "{}", reply.text);
+    assert!(reply.text.contains(repair), "{}", reply.text);
+    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "status", "");
+    assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
+    assert!(reply.text.contains("memory log record 1") && reply.text.contains(repair), "{}", reply.text);
+    let mut unopenable = given(claimed_task(), Vec::new());
+    unopenable.log.broken = Some(PortError::new("cannot open the log"));
+    let (reply, _) = call(&mut unopenable, "hook pre-tool-use", &agent("Work under lease-1."));
+    assert!(reply.text.contains(DENY) && reply.text.contains("cannot open the log"), "{}", reply.text);
+}
+
+fn listed(prs: &[u64]) -> String {
+    let rows: Vec<_> = prs.iter().map(|number| serde_json::json!({ "number": number, "title": "x" })).collect();
+    serde_json::Value::Array(rows).to_string()
+}
+
+#[test]
+fn status_counts_a_pr_merged_through_meta_and_logged_as_through_meta_only() {
+    let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let mut ports = given(history, Vec::new());
+    ports.github.listed = Some(Ok(listed(&[7])));
+    let (reply, events) = call(&mut ports, "status", "");
+    assert_eq!(events, Vec::new());
+    let expected = ["P1 merges through meta: 1 of 1", "P1 merged outside meta: 0 (0 missing from the log)"];
+    assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
+}
+
+#[test]
+fn status_counts_a_pr_merged_on_github_but_missing_from_the_log_as_merged_outside_meta() {
+    let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let mut ports = given(history, Vec::new());
+    ports.github.listed = Some(Ok(listed(&[7, 12, 13])));
+    let (reply, events) = call(&mut ports, "status", "");
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    let expected = ["P1 merges through meta: 1 of 3", "P1 merged outside meta: 2 (2 missing from the log)"];
+    assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
+}
+
+#[test]
+fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_cannot_be_read() {
+    let failures = [Some(Err(PortError::new("gh is down"))), Some(Ok("not json".to_owned())), None];
+    failures.into_iter().for_each(|listed| {
+        let mut ports = given(claimed_task(), Vec::new());
+        ports.github.listed = listed;
+        let (reply, events) = call(&mut ports, "status", "");
+        assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+        assert!(reply.text.contains("P1 merges: unavailable, GitHub merged list unreadable"), "{}", reply.text);
+        assert!(reply.text.contains("open tasks") && reply.text.contains("P2 open escapes"), "{}", reply.text);
+    });
 }
