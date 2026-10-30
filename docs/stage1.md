@@ -77,6 +77,24 @@ No separate task is opened for a review. `meta merge` does not require a review;
 
 The Agent tool takes no name that meta can set, so the PostToolUse hook binds each used lease to the agent id Claude Code reports for it. A canned `continue` restarts an agent after a failure outside its control, such as a disconnect, a crash or a timeout, without adding instructions. Resumes are not capped, because some failures are outside our control. `meta status` flags any lease from its third resume onward, so repeated failures are visible (owner, 2026-10-30). Once headless workers exist, meta sends the same canned continue itself.
 
+### Deadlines
+
+Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, so a stalled agent shows in `meta status` instead of only in prose.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta claim <task> --agent <name>` | the claim is granted | event `Leased` with `deadline`: the clock's time plus the work default in `self/roles.toml` (90 min); the brief prints "deadline: <time>, report or stop by then" |
+| `meta review <task> --agent <name>` | the review is granted | event `ReviewLeased` with `deadline`: the clock's time plus the review default in `self/roles.toml` (30 min); the brief prints the deadline the same way |
+| `meta claim` or `meta review` | `self/roles.toml` on main cannot be read | error; nothing is recorded |
+| `meta claim <task> --agent <name> --deadline <minutes>`, `meta review <task> --agent <name> --deadline <minutes>` | `<minutes>` is a whole number of at least 1 | the deadline is the clock's time plus `<minutes>` instead of the default |
+| `meta claim <task> --self` | any | no deadline; the brief prints "deadline: none"; `--deadline` with `--self` is malformed |
+| `meta hook post-tool-use` with tool `Agent` or `Task` | the used lease has a deadline | event `Started` also carries `deadline`: the start time plus the lease's allowance, so the deadline counts from when the agent started |
+| `meta status` | a lease's task is open, claimed or linked, its deadline has passed, and it is not a review lease with a verdict | listed under "overdue leases (flagged)", next to the resume flags, with the agent id when one is recorded, else "agent unknown" or "unused" |
+| `meta status` | the task of an overdue lease is done | the lease is no longer flagged |
+| `meta status` | a lease recorded before deadlines existed | it folds with no deadline: "live leases" shows "no deadline", and it is never flagged overdue |
+
+The role defaults are data, each with a source. Headless workers will be stopped at their deadline later; for now the flag is the only enforcement.
+
 ### Predictions against registered numbers
 
 `self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each quoting its `docs/prereg.md` row verbatim, with its falsifier as numbers. A falsifier names at least one measure; a prediction without one shows `UNDECIDED`.
