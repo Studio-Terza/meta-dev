@@ -154,3 +154,22 @@ impl fmt::Display for RunCount {
         write!(formatter, "{}", self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LeaseId, PrNumber, TaskId};
+
+    #[test]
+    fn a_pr_number_takes_one_optional_hash_and_digits() {
+        let parsed = ["7", "#7", "##7", "#", "", "#x"].map(|text| text.parse::<PrNumber>().is_ok());
+        assert_eq!(parsed, [true, true, false, false, false, false]);
+    }
+
+    #[test]
+    fn a_counted_id_is_its_prefix_and_canonical_digits() {
+        let parsed = ["lease-1", "lease-10", "lease-0", "lease-01", "lease-+1", "lease-", "lease--1", "task-1", " lease-1"]
+            .map(|text| text.parse::<LeaseId>().is_ok());
+        assert_eq!(parsed, [true, true, true, false, false, false, false, false, false]);
+        assert!("task-01".parse::<TaskId>().is_err() && "task-7".parse::<TaskId>().is_ok());
+    }
+}

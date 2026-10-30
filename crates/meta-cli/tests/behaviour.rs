@@ -142,8 +142,9 @@ fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
     call(&mut given(events, Vec::new()), "hook pre-tool-use", input)
 }
 
-fn agent(prompt: &str) -> String {
-    serde_json::json!({ "tool_name": "Agent", "tool_input": { "prompt": prompt } }).to_string()
+fn agent(description: &str) -> String {
+    serde_json::json!({ "tool_name": "Agent", "tool_input": { "description": description, "prompt": "Work on task-1." } })
+        .to_string()
 }
 
 fn quoted_values(key: &str) -> Vec<String> {
@@ -295,8 +296,8 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
 }
 
 #[test]
-fn hook_allows_an_agent_whose_prompt_carries_a_live_unused_lease_and_uses_it_up() {
-    let (reply, events) = hook(claimed_task(), &agent("Work on task-1 under lease-1."));
+fn hook_allows_an_agent_whose_description_is_exactly_a_live_unused_lease_and_uses_it_up() {
+    let (reply, events) = hook(claimed_task(), &agent("lease-1"));
     assert_eq!(reply, Answer { text: ALLOW.to_owned(), code: Code::Done });
     assert_eq!(events, vec![Event::LeaseUsed { lease: id("lease-1") }]);
 }
@@ -306,13 +307,17 @@ fn hook_denies_an_agent_with_no_unknown_used_or_dead_lease_and_says_how_to_get_o
     let used = [claimed_task(), vec![Event::LeaseUsed { lease: id("lease-1") }]].concat();
     let dead = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
     let cases = [
-        (claimed_task(), "Work on task-1.", "no lease"),
-        (claimed_task(), "Work under lease-9.", "lease-9 is unknown"),
-        (used, "Work under lease-1.", "already used"),
-        (dead, "Work under lease-1.", "not live"),
+        (claimed_task(), "Work on task-1.", "not exactly a lease id"),
+        (claimed_task(), "Work under lease-1.", "not exactly a lease id"),
+        (claimed_task(), "lease-01", "not exactly a lease id"),
+        (claimed_task(), "lease-+1", "not exactly a lease id"),
+        (claimed_task(), " lease-1", "not exactly a lease id"),
+        (claimed_task(), "lease-9", "lease-9 is unknown"),
+        (used, "lease-1", "already used"),
+        (dead, "lease-1", "not live"),
     ];
-    cases.into_iter().for_each(|(events, prompt, why)| {
-        let (reply, added) = hook(events, &agent(prompt));
+    cases.into_iter().for_each(|(events, description, why)| {
+        let (reply, added) = hook(events, &agent(description));
         assert_eq!(added, vec![Event::Denied { attempt: Attempt::AgentStart }]);
         assert!([DENY, why, GET_LEASE].iter().all(|part| reply.text.contains(part)), "{}", reply.text);
     });
@@ -320,8 +325,8 @@ fn hook_denies_an_agent_with_no_unknown_used_or_dead_lease_and_says_how_to_get_o
 
 #[test]
 fn hook_gates_the_task_tool_like_the_agent_tool() {
-    let task = |prompt: &str| json_input("Task", "prompt", prompt);
-    let (reply, events) = hook(claimed_task(), &task("Work under lease-1."));
+    let task = |description: &str| json_input("Task", "description", description);
+    let (reply, events) = hook(claimed_task(), &task("lease-1"));
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![Event::LeaseUsed { lease: id("lease-1") }]));
     let (reply, events) = hook(claimed_task(), &task("Work on task-1."));
     assert_eq!(events, vec![Event::Denied { attempt: Attempt::AgentStart }]);
@@ -348,7 +353,9 @@ fn hook_reads_tool_input_only_for_gated_tools() {
 #[test]
 fn hook_denies_input_that_cannot_be_parsed() {
     let inputs =
-        ["", "not json", "{}", r#"{"tool_name":"Agent"}"#, r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#];
+        ["", "not json", "{}", r#"{"tool_name":"Agent"}"#, r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#,
+        r#"{"tool_name":"Agent","tool_input":{"description":5}}"#,
+    ];
     inputs.into_iter().for_each(|input| {
         let (reply, events) = hook(claimed_task(), input);
         assert_eq!(events, Vec::new());
@@ -420,7 +427,7 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
     let at = Timestamp::from_unix_seconds(1);
     let seed: Vec<Record> = claimed_task().into_iter().map(|event| Record { at, event }).collect();
     meta_ports::Log::append(&mut JsonlLog::at(path.clone()), &seed).unwrap();
-    let start = Call::PreToolUse(agent("Work under lease-1."));
+    let start = Call::PreToolUse(agent("lease-1"));
     let replies: Vec<Answer> = std::thread::scope(|scope| {
         let racers: Vec<_> = (0..8)
             .map(|_| {
@@ -471,7 +478,7 @@ fn a_corrupt_or_unopenable_log_still_records_escapes_but_denies_agent_starts() {
     let (reply, events) = call(&mut given(corrupt(), Vec::new()), "escape log is corrupt", "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped("log is corrupt")]));
     let repair = "Next: meta escape <reason>, then repair memory log";
-    let (reply, events) = hook(corrupt(), &agent("Work under lease-1."));
+    let (reply, events) = hook(corrupt(), &agent("lease-1"));
     assert_eq!(events, Vec::new());
     assert!(reply.text.contains(DENY) && reply.text.contains("fail closed"), "{}", reply.text);
     assert!(reply.text.contains(repair), "{}", reply.text);
@@ -480,7 +487,7 @@ fn a_corrupt_or_unopenable_log_still_records_escapes_but_denies_agent_starts() {
     assert!(reply.text.contains("memory log record 1") && reply.text.contains(repair), "{}", reply.text);
     let mut unopenable = given(claimed_task(), Vec::new());
     unopenable.log.broken = Some(PortError::new("cannot open the log"));
-    let (reply, _) = call(&mut unopenable, "hook pre-tool-use", &agent("Work under lease-1."));
+    let (reply, _) = call(&mut unopenable, "hook pre-tool-use", &agent("lease-1"));
     assert!(reply.text.contains(DENY) && reply.text.contains("cannot open the log"), "{}", reply.text);
 }
 
