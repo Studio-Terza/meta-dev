@@ -57,11 +57,16 @@ impl Git for RecordedGit {
 pub struct RecordedGitHub {
     pub replies: BTreeMap<PrNumber, GhReplies>,
     pub merged: Vec<(PrNumber, Sha)>,
+    pub listed: Option<Result<String, PortError>>,
 }
 
 impl GitHub for RecordedGitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
         self.replies.get(&pr).cloned().ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))?.pull()
+    }
+
+    fn merged_list(&self) -> Result<String, PortError> {
+        self.listed.clone().unwrap_or_else(|| Err(PortError::new("no recorded merged list")))
     }
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {

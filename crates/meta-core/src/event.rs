@@ -18,6 +18,7 @@ pub enum Event {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Attempt {
     AgentStart,
+    /// Written by older hooks that denied Bash merges. Logs keep them; the fold ignores them.
     Merge,
 }
 

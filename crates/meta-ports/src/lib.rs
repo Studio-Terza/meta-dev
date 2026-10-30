@@ -52,6 +52,7 @@ impl GhReplies {
 
 pub trait GitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError>;
+    fn merged_list(&self) -> Result<String, PortError>;
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError>;
 }
 

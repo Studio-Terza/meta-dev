@@ -347,13 +347,8 @@ fn hook_reads_tool_input_only_for_gated_tools() {
 
 #[test]
 fn hook_denies_input_that_cannot_be_parsed() {
-    let inputs = [
-        "",
-        "not json",
-        "{}",
-        r#"{"tool_name":"Agent"}"#,
-        r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#,
-    ];
+    let inputs =
+        ["", "not json", "{}", r#"{"tool_name":"Agent"}"#, r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#];
     inputs.into_iter().for_each(|input| {
         let (reply, events) = hook(claimed_task(), input);
         assert_eq!(events, Vec::new());

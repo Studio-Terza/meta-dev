@@ -27,6 +27,10 @@ impl GitHub for GhCli {
         GhReplies { view, required, runs }.pull()
     }
 
+    fn merged_list(&self) -> Result<String, PortError> {
+        run("gh", &["pr", "list", "--state", "merged", "--json", "number", "--limit", "1000"])
+    }
+
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {
         let number = cleared.pr().digits();
         let head = cleared.head().to_string();

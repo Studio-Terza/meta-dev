@@ -3,7 +3,6 @@ use crate::ids::LeaseId;
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::reply::Accepted;
-use crate::shell::ShellCommand;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -20,11 +19,6 @@ struct AgentInput {
     prompt: String,
 }
 
-#[derive(Deserialize)]
-struct BashInput {
-    command: String,
-}
-
 #[derive(Debug)]
 pub enum Hook {
     Settled(Accepted),
@@ -39,7 +33,6 @@ pub struct AgentStart {
 impl Hook {
     const AGENT_TOOLS: [&str; 2] = ["Agent", "Task"];
     const GET_LEASE: &str = "Get one with meta claim <task> --agent <name>, then put its lease id in the Agent prompt.";
-    const USE_META: &str = "Merge with meta merge <pr>; if meta cannot do it, record why with meta escape <reason>.";
 
     pub fn read(input: &str) -> Self {
         match Self::tool(input) {
@@ -49,7 +42,7 @@ impl Hook {
     }
 
     pub fn broken(why: &str) -> Accepted {
-        Self::deny(format!("{why}; denied, fail closed."), None)
+        Self::deny(format!("{why}; denied, fail closed."), Vec::new())
     }
 
     fn tool(input: &str) -> Result<Self, String> {
@@ -63,19 +56,6 @@ impl Hook {
                     .find_map(|word| word.parse::<LeaseId>().ok());
                 Ok(Self::Agent(AgentStart { lease }))
             }
-            "Bash" => {
-                let BashInput { command } = Self::input(tool, parsed.tool_input)?;
-                Ok(Self::Settled(match ShellCommand::parse(&command).bypass() {
-                    Some(bypass) => {
-                        let next = match bypass.attempt() {
-                            Attempt::AgentStart => Self::GET_LEASE,
-                            Attempt::Merge => Self::USE_META,
-                        };
-                        Self::deny(format!("{bypass}. {next}"), Some(bypass.attempt()))
-                    }
-                    None => Self::allow(Vec::new()),
-                }))
-            }
             _ => Ok(Self::Settled(Self::allow(Vec::new()))),
         }
     }
@@ -88,7 +68,7 @@ impl Hook {
         Accepted::new(events, "{}\n".to_owned())
     }
 
-    fn deny(reason: String, attempt: Option<Attempt>) -> Accepted {
+    fn deny(reason: String, events: Vec<Event>) -> Accepted {
         let reply = json!({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -96,13 +76,16 @@ impl Hook {
                 "permissionDecisionReason": reason,
             }
         });
-        Accepted::new(attempt.map(|attempt| Event::Denied { attempt }).into_iter().collect(), format!("{reply}\n"))
+        Accepted::new(events, format!("{reply}\n"))
     }
 }
 
 impl Ledger {
     pub fn admit(mut self, start: AgentStart) -> Accepted {
-        let refusal = |why: String| Hook::deny(format!("{why}. {}", Hook::GET_LEASE), Some(Attempt::AgentStart));
+        let refusal = |why: String| {
+            let denied = Event::Denied { attempt: Attempt::AgentStart };
+            Hook::deny(format!("{why}. {}", Hook::GET_LEASE), vec![denied])
+        };
         let Some(id) = start.lease else {
             return refusal("the Agent prompt carries no lease id".to_owned());
         };
