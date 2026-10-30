@@ -24,10 +24,6 @@ impl Refusal {
     pub(crate) fn because(why: impl Into<String>) -> Self {
         Self(why.into())
     }
-
-    pub(crate) fn lines(items: &[String]) -> String {
-        items.iter().map(|item| format!("\n{item}")).collect()
-    }
 }
 
 impl fmt::Display for Refusal {

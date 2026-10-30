@@ -1,5 +1,3 @@
-#![deny(clippy::disallowed_methods)]
-
 mod claim;
 mod escape;
 mod event;

@@ -42,8 +42,7 @@ impl Ledger {
             format!("P2 open escapes: {}; repeats of an earlier reason: {repeated}\n", self.escapes.len()),
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs\n"),
         ]
-        .into_iter()
-        .collect()
+        .concat()
     }
 }
 

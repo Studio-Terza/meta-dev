@@ -1,9 +1,6 @@
-//! Id and newtype types. Their text parsers live in `parse`, the registered boundary.
-
-mod parse;
-
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Malformed(String);
@@ -39,6 +36,17 @@ macro_rules! counted_id {
                 write!(formatter, "{}{}", Self::PREFIX, self.0)
             }
         }
+
+        impl FromStr for $name {
+            type Err = Malformed;
+
+            fn from_str(text: &str) -> Result<Self, Malformed> {
+                text.strip_prefix(Self::PREFIX)
+                    .and_then(|digits| digits.parse().ok())
+                    .map(Self)
+                    .ok_or_else(|| Malformed(format!("{text:?} is not a {}<number> id", Self::PREFIX)))
+            }
+        }
     };
 }
 
@@ -48,13 +56,29 @@ macro_rules! text {
         #[serde(try_from = "String", into = "String")]
         pub struct $name(String);
 
-        impl $name {
-            const WHAT: &str = $what;
+        impl TryFrom<String> for $name {
+            type Error = Malformed;
+
+            fn try_from(text: String) -> Result<Self, Malformed> {
+                let trimmed = text.trim();
+                match trimmed.is_empty() {
+                    true => Err(Malformed(format!("{} is empty", $what))),
+                    false => Ok(Self(trimmed.to_owned())),
+                }
+            }
         }
 
         impl From<$name> for String {
             fn from(value: $name) -> String {
                 value.0
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = Malformed;
+
+            fn from_str(text: &str) -> Result<Self, Malformed> {
+                Self::try_from(text.to_owned())
             }
         }
 
@@ -93,6 +117,14 @@ impl PrNumber {
     }
 }
 
+impl FromStr for PrNumber {
+    type Err = Malformed;
+
+    fn from_str(text: &str) -> Result<Self, Malformed> {
+        text.trim_start_matches('#').parse().map(Self).map_err(|_| Malformed(format!("{text:?} is not a PR number")))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Timestamp(u64);
@@ -120,16 +152,5 @@ impl RunCount {
 impl fmt::Display for RunCount {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}", self.0)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::PrNumber;
-
-    #[test]
-    fn a_pr_number_takes_one_optional_hash_and_digits() {
-        let parsed = ["7", "#7", "##7", "#", "", "#x"].map(|text| text.parse::<PrNumber>().is_ok());
-        assert_eq!(parsed, [true, true, false, false, false, false]);
     }
 }

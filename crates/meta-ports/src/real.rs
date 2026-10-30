@@ -5,9 +5,7 @@ mod git;
 #[cfg(test)]
 mod hook_entry;
 mod host;
-mod jsonl;
 mod log;
-mod stderr;
 
 pub use clock::SystemClock;
 pub use gh::GhCli;

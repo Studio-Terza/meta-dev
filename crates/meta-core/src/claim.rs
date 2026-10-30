@@ -31,7 +31,7 @@ impl Ledger {
             (Some(Progress::Linked(linked)), None) => grant(linked.title(), Grant::FreshLease),
             (Some(Progress::Done(_)), _) => Err(Refusal::because(format!("{task} is done. Next: meta open <title>."))),
             (Some(taken), Some(unused)) => Err(Refusal::because(format!(
-                "{task} is already claimed and {unused} is unused ({taken}). Next: put {unused} in the Agent description; \
+                "{task} is already claimed and {unused} is unused ({taken}). Next: put {unused} in the Agent prompt; \
                  once it is spent, meta claim {task} --agent <name> issues a fresh lease."
             ))),
             (None, _) => Err(Refusal::because(format!("{task} is unknown. Next: meta status lists open tasks."))),
@@ -52,7 +52,7 @@ impl Claim {
         let text = format!(
             "task: {task}: {title}\n\
              agent: {agent}\n\
-             lease: {lease} (put it in the Agent description; it works once)\n\
+             lease: {lease} (put it in the Agent prompt; it works once)\n\
              setup:\n  \
              1. git clone {origin} {task}\n  \
              2. cd {task} && git switch -c {task} origin/main\n  \

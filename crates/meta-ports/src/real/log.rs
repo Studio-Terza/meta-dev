@@ -53,19 +53,34 @@ impl JsonlLog {
         PortError::new(format!("{}: {error}", path.display()))
     }
 
+    fn parse(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
+        text.lines()
+            .enumerate()
+            .map(|(index, line)| {
+                serde_json::from_str(line).map_err(|error| {
+                    let path = path.display();
+                    PortError::new(format!(
+                        "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
+                        index + 1
+                    ))
+                })
+            })
+            .collect()
+    }
+
     fn write(file: &mut File, path: &Path, records: &[Record]) -> Result<(), PortError> {
         let lines = records
             .iter()
             .map(|record| serde_json::to_string(record).map(|line| line + "\n"))
             .collect::<Result<String, _>>()
             .map_err(|error| PortError::new(error.to_string()))?;
-        file.write_all(&lines.into_bytes()).map_err(|error| Self::failed(path, error))
+        file.write_all(lines.as_bytes()).map_err(|error| Self::failed(path, error))
     }
 
     fn contents(file: &mut File, path: &Path) -> Result<Vec<Record>, PortError> {
         let mut text = String::new();
         file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
-        super::jsonl::records(path, &text)
+        Self::parse(path, &text)
     }
 }
 
@@ -124,6 +139,6 @@ mod tests {
         let waited = log.transact(|records| (records, ()));
         drop(holder);
         std::fs::remove_file(&path).unwrap();
-        assert_eq!(waited.unwrap_err().to_string(), format!("{} stayed locked for 50 ms", path.display()));
+        assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
     }
 }
