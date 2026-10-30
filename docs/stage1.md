@@ -60,21 +60,15 @@ A canned `continue` restarts an agent after a failure outside its control, such 
 |---|---|---|
 | `meta status` | any | each prediction line shows its observed value, its registered expectation, and `FALSIFIED` when the falsifier holds |
 
-### Gate changes
-
-`self/gates.toml` lists the files that define gates: the CI workflow, `clippy.toml`, `self/parse-boundaries.toml`, `self/rules.toml`, `self/predictions.toml`, `self/escapes.toml`, and the lint tables in `Cargo.toml`.
-
-| Check | Given | Result |
-|---|---|---|
-| CI job `gate-change` | the PR changes a gate file and has no `owner-gate-ok` label | fails, naming the files |
-| CI job `gate-change` | the PR changes no gate file, or carries the label | passes |
-
-Only the lead adds the label, and only after the owner approves in conversation. `gate-change` becomes a required check.
-
 ### Rules
 
 - `self/rules.toml` gains the owner's red-first rule: tighten the check in the first commit, see CI fail on it, then fix.
+- `self/rules.toml` gains a review rule: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds. Source: owner 2026-10-30, ordinary review instead of blocking approvals. `meta review` puts it in every review brief.
 - Behaviour tests use a rules fixture, not the repo's `self/rules.toml`, so changing a rule cannot break unrelated tests.
+
+## Deferred
+
+Blocking owner approval of gate changes waits for a proper escalation system. Blocking requests must neither flood the owner nor give agents a reason to stop work (owner, 2026-10-30). Until then, reviews catch gate loosening.
 
 ## After merge
 
