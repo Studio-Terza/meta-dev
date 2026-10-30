@@ -1,6 +1,6 @@
 # Preregistration: the bootstrap hypothesis
 
-Opened 2026-10-30, after the meta-dev panic. Owner decision: no thresholds are set. We monitor the measures and judge in use.
+Opened 2026-10-30, after the meta-dev panic. Owner decision: no goals are set, but every prediction states the number we expect to observe if its hypothesis holds. A prediction is judged only against the number it was registered with.
 
 ## Hypothesis
 
@@ -27,14 +27,21 @@ Then proposals turn into code and stick, and the marginal cost of change stays f
 
 ## Predictions
 
-| # | Prediction | Measure |
-|---|---|---|
-| P1 | The loop is used | Agent starts and merges through meta, out of all |
-| P2 | Gaps get fixed, not bypassed | Open escapes, repeats per reason, and time from escape to fix |
-| P3 | Rules don't drift | Normative rules that exist only as prose |
-| P4 | No slough | Spend and rounds per delivered feature, as a trend |
-| P5 | The lead stays on architecture | Lead share of spend spent on mechanics |
-| P6 | Little rework | CI runs per merged PR |
+| # | Hypothesis | Measure | Expected if it holds | Falsified by |
+|---|---|---|---|---|
+| P1 | The loop is used | Agent starts and merges through meta, out of all | 100%, except recorded escapes | Any unrecorded bypass |
+| P2 | Gaps get fixed, not bypassed | Open escapes; repeats per reason | Each reason fixed before its 3rd repeat; at most 5 open | A reason repeated 3 times, or more than 5 open |
+| P3 | Rules don't drift | Normative rules that exist only as prose | 0 after stage 3 | Any |
+| P4 | No slough | Spend per delivered feature | Within 1.5× the running median | 3 rises in a row |
+| P5 | The lead stays on architecture | Lead share of spend on mechanics | At most 10% after stage 2c | Above 25% after stage 2c |
+| P6 | Little rework | CI runs per merged PR | Median at most 2 | Median above 3 |
+| P7 | The critic catches what the lead normalizes (see "Critic") | Time from a problem's onset to its first smell | Within 1 day | A real problem first named by the owner or lead after 2 days |
+| P8 | Continuous main inflow keeps conflicts cheap (see "Project branches") | Conflict-fix spend per main inflow, against a typical worker run | Median below 5% | Above 15% |
+| P9 | Distance to landable falls on a healthy project | Main gates failing on the project branch tip | Falls by at least 1 per working day | Flat for 2 days |
+| P10 | Partial landings keep project branches young | Days between landings | At most 3 | 5 with no landing |
+| P11 | Project branches cost less CI than slices straight to main | CI runs per delivered feature, against P6's rate | At least 30% lower | Not lower |
+| P12 | Landing PRs are no harder than ordinary ones | CI runs per landing PR | At most P6's median | 2× P6's median |
+| P13 | Scoped workers keep project branches green | Share of a project branch's life spent red | At most 10% | Above 25% |
 
 ## Agents
 
@@ -112,9 +119,7 @@ Owner decision, 2026-10-30. Vague, uncomfortable problems slip past automated ch
 
 **Crude version (until stage 2b):** a fresh agent on a schedule reads `meta status`, the merged and open PRs, and the lead's latest report. It files each smell as a GitHub issue labelled `critic`, which the lead does not edit, so the owner sees it directly.
 
-| # | Prediction | Measure |
-|---|---|---|
-| P7 | The critic catches what the lead normalizes | Smells it raised that turned out real; time from a problem's onset to its first smell |
+Prediction: P7.
 
 ## Project branches
 
@@ -137,16 +142,7 @@ Owner decisions, 2026-10-30. PR orchestration follows the same three levels as a
 | Outside projects | Small independent fixes go straight to main through `meta merge`. |
 | Gates on project branches | Open; to be discussed separately. |
 
-**The trap to dodge:** a long-lived integration branch that drifts from main, hides breakage and never lands, which is the slough again one level down. The hypotheses for dodging it are below. As with the others, no thresholds are set: we watch the trends.
-
-| # | Hypothesis | Measure | Trap signal |
-|---|---|---|---|
-| B1 | Continuous main inflow keeps conflicts small and cheap | Conflicts per main inflow; conflict-fix worker spend | Conflict size or spend rising |
-| B2 | Distance to landable falls steadily on a healthy project | Main gates failing on the project tip, over time | A flat or rising line, which is a critic smell |
-| B3 | Partial landings keep project branches young and small | Branch age and diff size since the last landing | Age or diff growing without landings |
-| B4 | Project branches cost less CI per delivered feature than slices straight to main | CI runs per delivered feature, compared with P6 | Not lower |
-| B5 | Landing PRs are no harder than ordinary PRs | Rounds and CI runs per landing PR | Landings needing repeated rounds |
-| B6 | Scoped workers keep project branches green | Time the project branch spends red | Red time growing |
+**The trap to dodge:** a long-lived integration branch that drifts from main, hides breakage and never lands, which is the slough again one level down. The hypotheses for dodging it are P8 to P13. A distance to landable that stays flat is also a critic smell.
 
 ## Deferred
 
@@ -156,7 +152,7 @@ Owner decision, 2026-10-30: deferred together with the rest of token observabili
 
 ## Fail fast
 
-- Any measure that trends the wrong way, or any overrun timebox, means a stop and an owner discussion, not a patch.
+- Any falsified prediction, or any overrun timebox, means a stop and an owner discussion, not a patch.
 - A panic is always allowed.
 - Rewriting from scratch is a first-class option, not a last resort.
 
@@ -168,3 +164,5 @@ Owner decision, 2026-10-30: deferred together with the rest of token observabili
 | P2 | Meta's design is too far from the real work |
 | P4 or P6 | Agent capability or review |
 | P5 | Orchestration |
+| P7 | The critic's independence or scope |
+| P8 to P13 | Project branches are drifting into the integration-branch trap |
