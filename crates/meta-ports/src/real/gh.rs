@@ -1,6 +1,6 @@
 use super::command::run;
 use crate::{GhReplies, GitHub, PortError};
-use meta_core::{Cleared, PrNumber, Pull};
+use meta_core::{Cleared, Merges, PrNumber, Pull};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy)]
@@ -28,7 +28,8 @@ impl GitHub for GhCli {
     }
 
     fn merged_list(&self) -> Result<String, PortError> {
-        run("gh", &["pr", "list", "--state", "merged", "--json", "number", "--limit", "1000"])
+        let limit = (Merges::LIMIT + 1).to_string();
+        run("gh", &["pr", "list", "--state", "merged", "--json", "number", "--limit", &limit])
     }
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {
