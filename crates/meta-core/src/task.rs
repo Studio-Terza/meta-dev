@@ -1,4 +1,4 @@
-use crate::ids::{AgentName, PrNumber, Sha, TaskId, Title};
+use crate::ids::{Claimant, PrNumber, Reason, Sha, TaskId, Title};
 use std::fmt;
 
 #[derive(Debug)]
@@ -13,20 +13,32 @@ pub struct Open;
 
 #[derive(Debug)]
 pub struct Claimed {
-    agent: AgentName,
+    agent: Claimant,
 }
 
 #[derive(Debug)]
 pub struct Linked {
-    agent: AgentName,
+    agent: Claimant,
     pr: PrNumber,
     pin: Sha,
 }
 
 #[derive(Debug)]
 pub struct Done {
-    agent: AgentName,
+    agent: Claimant,
     pr: PrNumber,
+}
+
+/// Off the open list for good, without a merge.
+#[derive(Debug)]
+pub struct Retired {
+    reason: Reason,
+}
+
+/// Off the open list until undeferred.
+#[derive(Debug)]
+pub struct Deferred {
+    reason: Reason,
 }
 
 impl<Stage> Task<Stage> {
@@ -41,6 +53,10 @@ impl<Stage> Task<Stage> {
     fn into_stage<Next>(self, stage: Next) -> Task<Next> {
         Task { id: self.id, title: self.title, stage }
     }
+
+    pub fn retire(self, reason: Reason) -> Task<Retired> {
+        self.into_stage(Retired { reason })
+    }
 }
 
 impl Task<Open> {
@@ -48,8 +64,24 @@ impl Task<Open> {
         Self { id, title, stage: Open }
     }
 
-    pub fn claim(self, agent: AgentName) -> Task<Claimed> {
+    pub fn claim(self, agent: Claimant) -> Task<Claimed> {
         self.into_stage(Claimed { agent })
+    }
+
+    pub fn defer(self, reason: Reason) -> Task<Deferred> {
+        self.into_stage(Deferred { reason })
+    }
+}
+
+impl Task<Claimed> {
+    pub fn agent(&self) -> &Claimant {
+        &self.stage.agent
+    }
+}
+
+impl Task<Deferred> {
+    pub fn undefer(self) -> Task<Open> {
+        self.into_stage(Open)
     }
 }
 
@@ -61,6 +93,10 @@ impl Task<Claimed> {
 }
 
 impl Task<Linked> {
+    pub fn agent(&self) -> &Claimant {
+        &self.stage.agent
+    }
+
     pub fn relink(self, pr: PrNumber, pin: Sha) -> Task<Linked> {
         let agent = self.stage.agent.clone();
         self.into_stage(Linked { agent, pr, pin })
@@ -86,11 +122,23 @@ pub enum Progress {
     Claimed(Task<Claimed>),
     Linked(Task<Linked>),
     Done(Task<Done>),
+    Retired(Task<Retired>),
+    Deferred(Task<Deferred>),
 }
 
 impl Progress {
-    pub fn is_done(&self) -> bool {
-        matches!(self, Self::Done(_))
+    /// Open, claimed or linked: on the open list, and its unused leases are live.
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Open(_) | Self::Claimed(_) | Self::Linked(_))
+    }
+
+    /// Claimed or linked by the lead working it itself.
+    pub fn is_self_claimed(&self) -> bool {
+        match self {
+            Self::Claimed(task) => task.agent().is_lead(),
+            Self::Linked(task) => task.agent().is_lead(),
+            _ => false,
+        }
     }
 }
 
@@ -105,6 +153,8 @@ impl fmt::Display for Progress {
             Self::Done(task) => {
                 write!(formatter, "{} done in {} by {}: {}", task.id, task.stage.pr, task.stage.agent, task.title)
             }
+            Self::Retired(task) => write!(formatter, "{} retired ({}): {}", task.id, task.stage.reason, task.title),
+            Self::Deferred(task) => write!(formatter, "{} deferred ({}): {}", task.id, task.stage.reason, task.title),
         }
     }
 }

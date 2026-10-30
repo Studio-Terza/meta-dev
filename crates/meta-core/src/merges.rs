@@ -34,6 +34,12 @@ struct Listed {
     number: PrNumber,
 }
 
+impl fmt::Display for Unreached {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 impl Merges {
     /// The most rows the adapter may keep; it asks for one more so that a full page shows as truncation.
     pub const LIMIT: usize = 1000;

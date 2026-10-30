@@ -1,5 +1,5 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, Sha, Timestamp};
+use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Timestamp};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
@@ -23,15 +23,12 @@ impl Log for MemoryLog {
         self.open().map(|()| self.records.clone())
     }
 
-    fn append(&mut self, records: &[Record]) -> Result<(), PortError> {
+    fn transact<T>(
+        &mut self,
+        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+    ) -> Result<T, PortError> {
         self.open()?;
-        self.records.extend_from_slice(records);
-        Ok(())
-    }
-
-    fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError> {
-        self.open()?;
-        let (records, decided) = decide(self.records.clone());
+        let (records, decided) = decide(Ok(self.records.clone()));
         self.records.extend(records);
         Ok(decided)
     }
@@ -40,7 +37,10 @@ impl Log for MemoryLog {
 #[derive(Debug)]
 pub struct RecordedGit {
     pub origin: Origin,
-    pub rules: String,
+    /// The files on main.
+    pub files: BTreeMap<SelfFile, String>,
+    /// The files in the working tree or the cache.
+    pub local: BTreeMap<SelfFile, String>,
 }
 
 impl Git for RecordedGit {
@@ -48,8 +48,13 @@ impl Git for RecordedGit {
         Ok(self.origin.clone())
     }
 
-    fn rules(&self) -> Result<String, PortError> {
-        Ok(self.rules.clone())
+    fn read(&self, file: SelfFile) -> Result<String, PortError> {
+        self.files.get(&file).cloned().ok_or_else(|| PortError::new(format!("no recorded {}", file.path())))
+    }
+
+    fn local(&self, file: SelfFile) -> Result<String, PortError> {
+        let missing = || PortError::new(format!("no local {} in the working tree or the cache", file.path()));
+        self.local.get(&file).cloned().ok_or_else(missing)
     }
 }
 

@@ -1,0 +1,13 @@
+# Behaviour-test fixture of escape kinds.
+
+[[kind]]
+id = "gap"
+text = "real work needed a transition meta lacks"
+source = "fixture: gap"
+names_merged_pr = false
+
+[[kind]]
+id = "outside-merge"
+text = "a PR was merged without meta merge"
+source = "fixture: outside merge"
+names_merged_pr = true

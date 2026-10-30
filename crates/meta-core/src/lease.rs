@@ -1,26 +1,93 @@
 use crate::event::Event;
-use crate::ids::{LeaseId, TaskId};
+use crate::ids::{AgentId, LeaseId, PrNumber, Sha, TaskId, Verdict};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lease {
     id: LeaseId,
     task: TaskId,
+    purpose: Purpose,
 }
 
+/// What the agent started on a lease is for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Purpose {
+    Work,
+    Review { pr: PrNumber, head: Sha },
+}
+
+/// A lease after its agent started: the agent's id once recorded, how often a canned continue
+/// resumed it, and a review's verdict.
 #[derive(Debug)]
-pub struct Spent;
+pub struct Spent {
+    lease: Lease,
+    agent: Option<AgentId>,
+    resumes: usize,
+    verdict: Option<Verdict>,
+}
 
 impl Lease {
-    pub(crate) fn issue(id: LeaseId, task: TaskId) -> Self {
-        Self { id, task }
+    pub(crate) fn issue(id: LeaseId, task: TaskId, purpose: Purpose) -> Self {
+        Self { id, task, purpose }
+    }
+
+    pub(crate) fn id(&self) -> LeaseId {
+        self.id
     }
 
     pub(crate) fn task(&self) -> TaskId {
         self.task
     }
 
+    pub(crate) fn purpose(&self) -> &Purpose {
+        &self.purpose
+    }
+
     pub(crate) fn spend(self) -> (Spent, Event) {
-        (Spent, Event::LeaseUsed { lease: self.id })
+        let used = Event::LeaseUsed { lease: self.id };
+        (Spent { lease: self, agent: None, resumes: 0, verdict: None }, used)
+    }
+}
+
+impl Spent {
+    pub(crate) fn lease(&self) -> &Lease {
+        &self.lease
+    }
+
+    pub(crate) fn agent(&self) -> Option<&AgentId> {
+        self.agent.as_ref()
+    }
+
+    /// The one agent a used lease started.
+    pub(crate) fn start(&mut self, agent: AgentId) -> Result<(), String> {
+        match self.agent.replace(agent) {
+            None => Ok(()),
+            Some(earlier) => Err(format!("{} started {earlier} before", self.lease.id)),
+        }
+    }
+
+    pub(crate) fn resumes(&self) -> usize {
+        self.resumes
+    }
+
+    pub(crate) fn verdict(&self) -> Option<Verdict> {
+        self.verdict
+    }
+
+    pub(crate) fn resume(&mut self) {
+        self.resumes += 1;
+    }
+
+    /// The one verdict of a used review lease.
+    pub(crate) fn judge(&mut self, verdict: Verdict) -> Result<(), String> {
+        let id = self.lease.id;
+        match (&self.lease.purpose, self.verdict) {
+            (Purpose::Work, _) => Err(format!("{id} is not a review lease")),
+            (Purpose::Review { .. }, Some(earlier)) => Err(format!("{id} already has the verdict {earlier}")),
+            (Purpose::Review { .. }, None) => {
+                self.verdict = Some(verdict);
+                Ok(())
+            }
+        }
     }
 }
 

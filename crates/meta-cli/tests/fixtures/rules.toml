@@ -1,0 +1,16 @@
+# Behaviour-test fixture: tests read this, not self/rules.toml, so a rule change breaks no unrelated test.
+
+[[rule]]
+id = "identity"
+text = "Commit as the fixture identity."
+source = "fixture: identity"
+
+[[rule]]
+id = "push-and-stop"
+text = "Push, open the PR, run meta link, then stop."
+source = "fixture: push and stop"
+
+[[rule]]
+id = "review-gates"
+text = "Review: flag any change that loosens a gate."
+source = "fixture: review gates"

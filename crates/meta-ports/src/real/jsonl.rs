@@ -14,7 +14,7 @@ pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError>
             serde_json::from_str(line).map_err(|error| {
                 let path = path.display();
                 PortError::new(format!(
-                    "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
+                    "{path} line {}: {error}. Next: meta escape <kind> <reason>, then repair {path}.",
                     index + 1
                 ))
             })
@@ -28,7 +28,7 @@ mod tests {
     use std::path::Path;
 
     const RECORD: &str = "{\"at\":1,\"event\":\"Done\",\"task\":1}";
-    const NEXT: &str = "Next: meta escape <reason>, then repair log.jsonl.";
+    const NEXT: &str = "Next: meta escape <kind> <reason>, then repair log.jsonl.";
 
     fn refusal(text: &str) -> String {
         records(Path::new("log.jsonl"), text).unwrap_err().to_string()

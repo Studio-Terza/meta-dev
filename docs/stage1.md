@@ -10,8 +10,11 @@ Each row is a behaviour-table test through the single in-process `Call`.
 
 | Command | Given | Result |
 |---|---|---|
-| `meta escape <kind> <reason>` | `kind` is one of the escape kinds in `self/escapes.toml` | event `Escaped` with id `escape-N`; prints the open count and the repeats of that kind |
-| `meta escape` | unknown kind | refused; lists the kinds |
+| `meta escape <kind> <reason>` | `kind` is one of the escape kinds in `self/escapes.toml`, read from the working tree or the cache of the last read from main, with no git or network | event `Escaped` with id `escape-N`; prints the id, taken inside the locked append, the open count and the repeats of that kind |
+| `meta escape <kind> --pr <pr> <reason>` | `kind` names merged PRs (`outside-merge`) | event `Escaped` carrying the PR |
+| `meta escape` | unknown kind; a kind that names merged PRs without `--pr`; `--pr` with any other kind; `unclassified` | refused; lists the kinds, or says which form the kind takes |
+| `meta escape <kind> <reason>` | no escape kinds can be read | event `Escaped` marked `unchecked`; prints why |
+| `meta escape <kind> <reason>` | the log does not fold, or its lines do not parse | event `Escaped` all the same, as stage 0 promised; prints that the id and counts are unavailable when the lines do not parse |
 | `meta resolve <escape> <task>` | the task is done | event `Resolved`; the escape no longer counts as open |
 | `meta resolve` | the task is not done, or the escape is already resolved or unknown | refused, with the reason |
 
@@ -23,6 +26,7 @@ Repeats are counted by kind, not by free text. Escape kinds are data, each with 
 |---|---|---|
 | `meta claim <task> --self` | the task is open | event `Claimed` by the lead, with no lease; prints the brief |
 | `meta claim <task> --self` | the task is claimed by an agent | refused |
+| `meta claim <task> --agent <name>` | the task is self-claimed | refused; there is no hand-over |
 
 `meta status` counts self-claims apart from agent starts.
 
@@ -31,6 +35,7 @@ Repeats are counted by kind, not by free text. Escape kinds are data, each with 
 | Command | Given | Result |
 |---|---|---|
 | `meta retire <task> <reason>` | the task is open or claimed, and not linked to an open PR | event `Retired`; the task leaves the open list |
+| `meta retire <task> <reason>` | the task is deferred, done or retired | refused |
 | `meta defer <task> <reason>` | the task is open | event `Deferred`; listed under deferred |
 | `meta undefer <task>` | the task is deferred | event `Undeferred`; open again |
 
@@ -39,7 +44,7 @@ Repeats are counted by kind, not by free text. Escape kinds are data, each with 
 | Command | Given | Result |
 |---|---|---|
 | `meta review <task> --agent <name>` | the task is linked to an open PR | event `ReviewLeased`, with a fresh lease; prints a review brief: the goal and constraints, unprimed |
-| `meta verdict <task> pass\|fail` | a review lease on the task was used | event `Reviewed`; `meta status` shows the latest verdict per linked PR |
+| `meta verdict <task> pass\|fail` | a review lease on the task was used | event `Reviewed`; `meta status` shows the latest verdict per linked PR, at the head it was given |
 
 No separate task is opened for a review. `meta merge` does not require a review; CI remains the only merge gate.
 
@@ -47,14 +52,19 @@ No separate task is opened for a review. `meta merge` does not require a review;
 
 | Hook | Given | Result |
 |---|---|---|
-| `meta hook pre-tool-use` with tool `SendMessage` | `message` is exactly `continue`, and `summary` is exactly the id of a used lease | allowed; event `Resumed` against that lease |
-| `meta hook pre-tool-use` with tool `SendMessage` | anything else: other message text, a missing or unknown lease, or an unused one | denied: new instructions need a fresh agent on a fresh lease |
+| `meta hook post-tool-use` with tool `Agent` or `Task` | the description is a used lease with no agent recorded yet | event `Started` with the lease and `tool_response.agentId` |
+| `meta hook post-tool-use` with tool `Agent` or `Task` | anything else, or input that cannot be parsed | nothing recorded; `decision: block` adds the reason beside the tool result |
+| `meta hook pre-tool-use` with tool `SendMessage` | `message` is exactly `continue`, `summary` is exactly the id of a used lease, `to` is the agent id recorded as started on it, and the lease's task is still open, claimed or linked | allowed; event `Resumed` against that lease |
+| `meta hook pre-tool-use` with tool `SendMessage` | anything else: other message text, a missing or unknown lease, an unused one, one with no agent recorded, another agent, or a task no longer active | denied: new instructions need a fresh agent on a fresh lease |
 
-A canned `continue` restarts an agent after a failure outside its control, such as a disconnect, a crash or a timeout, without adding instructions. Resumes are not capped, because some failures are outside our control. `meta status` flags any lease from its third resume onward, so repeated failures are visible (owner, 2026-10-30). Once headless workers exist, meta sends the same canned continue itself.
+The Agent tool takes no name that meta can set, so the PostToolUse hook binds each used lease to the agent id Claude Code reports for it. A canned `continue` restarts an agent after a failure outside its control, such as a disconnect, a crash or a timeout, without adding instructions. Resumes are not capped, because some failures are outside our control. `meta status` flags any lease from its third resume onward, so repeated failures are visible (owner, 2026-10-30). Once headless workers exist, meta sends the same canned continue itself.
 
 ### Predictions against registered numbers
 
-`self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each with the measure, the expected value and the falsifier from `docs/prereg.md`.
+`self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each quoting its `docs/prereg.md` row verbatim, with its falsifier as numbers. A falsifier names at least one measure; a prediction without one shows `UNDECIDED`.
+
+- P1: unrecorded bypasses are the PRs merged outside meta, logged or missing from the log, that no `outside-merge` escape names. An escape of another kind, or an unclassified one, records no merge.
+- P2: prereg's "reason" is read as "escape kind" (field `terms`). The owner's registered intent is that the third escape of one kind falsifies, so the bound is repeats above 1.
 
 | Command | Given | Result |
 |---|---|---|
@@ -62,7 +72,7 @@ A canned `continue` restarts an agent after a failure outside its control, such 
 
 ### Rules
 
-- `self/rules.toml` gains the owner's red-first rule: tighten the check in the first commit, see CI fail on it, then fix.
+- `self/rules.toml` gains the owner's red-first rule: tighten the check in the first commit; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix.
 - `self/rules.toml` gains a review rule: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds. Source: owner 2026-10-30, ordinary review instead of blocking approvals. `meta review` puts it in every review brief.
 - Behaviour tests use a rules fixture, not the repo's `self/rules.toml`, so changing a rule cannot break unrelated tests.
 

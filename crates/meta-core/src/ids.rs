@@ -96,6 +96,14 @@ macro_rules! text {
 
 counted_id!(TaskId, "task-");
 counted_id!(LeaseId, "lease-");
+counted_id!(EscapeId, "escape-");
+
+impl EscapeId {
+    /// The position of this escape among the log's `Escaped` records, from 0.
+    pub fn index(&self) -> Option<usize> {
+        usize::try_from(self.0).ok().and_then(|number| number.checked_sub(1))
+    }
+}
 
 text!(Title, "title");
 text!(AgentName, "agent name");
@@ -104,6 +112,83 @@ text!(Sha, "sha");
 text!(CheckName, "check name");
 text!(Origin, "origin");
 text!(Branch, "branch");
+text!(EscapeKind, "escape kind");
+text!(AgentId, "agent id");
+
+impl EscapeKind {
+    /// The kind of an escape logged before kinds existed: its free-text reason is all it has.
+    pub fn unclassified() -> Self {
+        Self("unclassified".to_owned())
+    }
+}
+
+/// A reviewer's verdict on a linked PR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Verdict {
+    Pass,
+    Fail,
+}
+
+impl fmt::Display for Verdict {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Pass => "pass",
+            Self::Fail => "fail",
+        })
+    }
+}
+
+impl FromStr for Verdict {
+    type Err = Malformed;
+
+    fn from_str(text: &str) -> Result<Self, Malformed> {
+        match text {
+            "pass" => Ok(Self::Pass),
+            "fail" => Ok(Self::Fail),
+            _ => Err(Malformed(format!("{text:?} is not a verdict: pass or fail"))),
+        }
+    }
+}
+
+/// Who claimed a task: an agent by name, or the lead working it itself (no name, no lease).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(from = "Option<AgentName>", into = "Option<AgentName>")]
+pub enum Claimant {
+    #[default]
+    Lead,
+    Agent(AgentName),
+}
+
+impl Claimant {
+    pub fn is_lead(&self) -> bool {
+        matches!(self, Self::Lead)
+    }
+}
+
+impl From<Option<AgentName>> for Claimant {
+    fn from(agent: Option<AgentName>) -> Self {
+        agent.map_or(Self::Lead, Self::Agent)
+    }
+}
+
+impl From<Claimant> for Option<AgentName> {
+    fn from(claimant: Claimant) -> Self {
+        match claimant {
+            Claimant::Lead => None,
+            Claimant::Agent(agent) => Some(agent),
+        }
+    }
+}
+
+impl fmt::Display for Claimant {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lead => formatter.write_str("the lead (self-claim)"),
+            Self::Agent(agent) => write!(formatter, "{agent}"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -150,6 +235,10 @@ pub struct RunCount(u64);
 impl RunCount {
     pub fn of(count: usize) -> Self {
         Self(count as u64)
+    }
+
+    pub fn value(&self) -> u64 {
+        self.0
     }
 
     pub fn total(counts: impl Iterator<Item = RunCount>) -> Self {

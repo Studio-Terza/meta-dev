@@ -1,18 +1,94 @@
-use crate::ids::{AgentName, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title};
+use crate::escape::Checked;
+use crate::ids::{
+    AgentId, Claimant, EscapeId, EscapeKind, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title,
+    Verdict,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event")]
 pub enum Event {
-    Opened { task: TaskId, title: Title },
-    Claimed { task: TaskId, agent: AgentName },
-    Leased { lease: LeaseId, task: TaskId },
-    Linked { task: TaskId, pr: PrNumber, pin: Sha },
-    Merged { pr: PrNumber, head: Sha, runs: RunCount, route: Route },
-    Done { task: TaskId },
-    Escaped { reason: Reason },
-    LeaseUsed { lease: LeaseId },
-    Denied { attempt: Attempt },
+    Opened {
+        task: TaskId,
+        title: Title,
+    },
+    /// An agent's claim names it; the lead's self-claim has no agent and gets no lease.
+    Claimed {
+        task: TaskId,
+        #[serde(default, skip_serializing_if = "Claimant::is_lead")]
+        agent: Claimant,
+    },
+    Leased {
+        lease: LeaseId,
+        task: TaskId,
+    },
+    Linked {
+        task: TaskId,
+        pr: PrNumber,
+        pin: Sha,
+    },
+    Merged {
+        pr: PrNumber,
+        head: Sha,
+        runs: RunCount,
+        route: Route,
+    },
+    Done {
+        task: TaskId,
+    },
+    /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
+    /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
+    /// could be read is marked unchecked.
+    Escaped {
+        #[serde(default = "EscapeKind::unclassified")]
+        kind: EscapeKind,
+        reason: Reason,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pr: Option<PrNumber>,
+        #[serde(default, skip_serializing_if = "Checked::is_listed")]
+        checked: Checked,
+    },
+    Resolved {
+        escape: EscapeId,
+        task: TaskId,
+    },
+    LeaseUsed {
+        lease: LeaseId,
+    },
+    /// The agent the used lease started, by the id Claude Code gave it.
+    Started {
+        lease: LeaseId,
+        agent: AgentId,
+    },
+    Denied {
+        attempt: Attempt,
+    },
+    Retired {
+        task: TaskId,
+        reason: Reason,
+    },
+    Deferred {
+        task: TaskId,
+        reason: Reason,
+    },
+    Undeferred {
+        task: TaskId,
+    },
+    /// A lease for one reviewer of the PR linked to the task, at the head it was given.
+    ReviewLeased {
+        lease: LeaseId,
+        task: TaskId,
+        pr: PrNumber,
+        head: Sha,
+    },
+    Reviewed {
+        lease: LeaseId,
+        verdict: Verdict,
+    },
+    /// A canned `continue` restarted the agent of a used lease.
+    Resumed {
+        lease: LeaseId,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
