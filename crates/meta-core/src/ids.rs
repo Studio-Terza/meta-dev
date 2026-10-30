@@ -228,6 +228,10 @@ impl Timestamp {
     pub fn from_unix_seconds(seconds: u64) -> Self {
         Self(seconds)
     }
+
+    pub fn advanced(self, seconds: u64) -> Self {
+        Self(self.0.saturating_add(seconds))
+    }
 }
 
 impl fmt::Display for Timestamp {

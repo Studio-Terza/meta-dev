@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Timestamp};
+use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +43,8 @@ pub trait Git {
     /// A data file under `self/` without git or network: the working tree's copy, else the copy
     /// cached by the last `read` from main.
     fn local(&self, file: SelfFile) -> Result<String, PortError>;
+    /// The commit at the tip of the local branch named after the task; `None` when there is none.
+    fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError>;
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +68,8 @@ pub trait GitHub {
 
 pub trait Clock {
     fn now(&self) -> Timestamp;
+    /// Waits, so that `now` is later by at least the given seconds.
+    fn pause(&self, seconds: u64);
 }
 
 pub struct Ports<L, G, H, C> {

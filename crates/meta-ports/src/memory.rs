@@ -1,6 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Timestamp};
-use std::collections::BTreeMap;
+use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Debug, Default)]
 pub struct MemoryLog {
@@ -41,6 +42,8 @@ pub struct RecordedGit {
     pub files: BTreeMap<SelfFile, String>,
     /// The files in the working tree or the cache.
     pub local: BTreeMap<SelfFile, String>,
+    /// The tip of each local branch named after a task.
+    pub branches: BTreeMap<TaskId, Sha>,
 }
 
 impl Git for RecordedGit {
@@ -56,18 +59,28 @@ impl Git for RecordedGit {
         let missing = || PortError::new(format!("no local {} in the working tree or the cache", file.path()));
         self.local.get(&file).cloned().ok_or_else(missing)
     }
+
+    fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
+        Ok(self.branches.get(&task).cloned())
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct RecordedGitHub {
     pub replies: BTreeMap<PrNumber, GhReplies>,
+    /// Replies given first, one per call, before `replies` takes over: GitHub lagging behind a push.
+    pub earlier: RefCell<BTreeMap<PrNumber, VecDeque<GhReplies>>>,
     pub merged: Vec<(PrNumber, Sha)>,
     pub listed: Option<Result<String, PortError>>,
 }
 
 impl GitHub for RecordedGitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
-        self.replies.get(&pr).cloned().ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))?.pull()
+        let earlier = self.earlier.borrow_mut().get_mut(&pr).and_then(VecDeque::pop_front);
+        earlier
+            .or_else(|| self.replies.get(&pr).cloned())
+            .ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))?
+            .pull()
     }
 
     fn merged_list(&self) -> Result<String, PortError> {
@@ -80,11 +93,22 @@ impl GitHub for RecordedGitHub {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct FixedClock(pub Timestamp);
+/// A clock that stands still until it is told to wait, so that tests never sleep.
+#[derive(Debug)]
+pub struct FakeClock(Cell<Timestamp>);
 
-impl Clock for FixedClock {
+impl FakeClock {
+    pub fn at(start: Timestamp) -> Self {
+        Self(Cell::new(start))
+    }
+}
+
+impl Clock for FakeClock {
     fn now(&self) -> Timestamp {
-        self.0
+        self.0.get()
+    }
+
+    fn pause(&self, seconds: u64) {
+        self.0.set(self.0.get().advanced(seconds));
     }
 }
