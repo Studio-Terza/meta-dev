@@ -1,5 +1,7 @@
 //! JSONL framing for the meta-dev log: exactly one record per line. Two records on a line, a
 //! record split over lines and a blank line are all refused, each with its line number.
+//! A registered boundary (self/parse-boundaries.toml): a line is the unit that is parsed.
+#![allow(clippy::disallowed_methods)]
 
 use crate::PortError;
 use meta_core::Record;
