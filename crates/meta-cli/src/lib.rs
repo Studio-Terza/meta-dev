@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
     Malformed, Merges, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules,
-    SelfFile, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
+    SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -187,7 +187,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 .read()
                 .map_err(Failure::from)
                 .and_then(|records| fold(&records))
-                .and_then(|ledger| prepare(call, &ledger, git, github));
+                .and_then(|ledger| prepare(call, &ledger, git, github, clock));
             let prepared = match prepared {
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
@@ -248,13 +248,36 @@ enum Prepared {
     Local(Local),
     Status(Sources),
     Claim { task: TaskId, claimant: Claimant, origin: Origin, rules: Rules },
-    Link { task: TaskId, pr: PrNumber, pull: Pull },
+    Link { task: TaskId, pr: PrNumber, pushed: Sha, pull: Pull },
     Merge { pr: PrNumber, pull: Pull },
     Retire { task: TaskId, reason: Reason, pull: Option<Pull> },
     Review { task: TaskId, agent: AgentName, pull: Pull, rules: Rules },
 }
 
-fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github: &mut H) -> Result<Prepared, Failure> {
+/// How long `meta link` waits for GitHub to report the commit that was pushed, and how often it asks.
+const LINK_DEADLINE_SECONDS: u64 = 60;
+const LINK_POLL_SECONDS: u64 = 5;
+
+/// The PR as GitHub reports it once its head is `pushed`; when the deadline passes first, the last
+/// report, so that the pin refuses with both commits named.
+fn pull_at<H: GitHub, C: Clock>(github: &H, clock: &C, pr: PrNumber, pushed: &Sha) -> Result<Pull, Failure> {
+    let deadline = clock.now().advanced(LINK_DEADLINE_SECONDS);
+    loop {
+        let pull = github.pull(pr)?;
+        match pull.is_at(pushed) || clock.now() >= deadline {
+            true => return Ok(pull),
+            false => clock.pause(LINK_POLL_SECONDS),
+        }
+    }
+}
+
+fn prepare<G: Git, H: GitHub, C: Clock>(
+    call: LedgerCall,
+    ledger: &Ledger,
+    git: &G,
+    github: &mut H,
+    clock: &C,
+) -> Result<Prepared, Failure> {
     Ok(match call {
         LedgerCall::Local(local) => Prepared::Local(local),
         LedgerCall::Status => {
@@ -274,8 +297,8 @@ fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github
             Prepared::Claim { task, claimant, origin: git.origin()?, rules }
         }
         LedgerCall::Link { task, pr } => {
-            ledger.link(task, pr)?;
-            Prepared::Link { task, pr, pull: github.pull(pr)? }
+            let pushed = ledger.link(task, pr)?.pushed(git.local_head(task)?)?;
+            Prepared::Link { task, pr, pull: pull_at(github, clock, pr, &pushed)?, pushed }
         }
         LedgerCall::Merge(pr) => {
             let merging = ledger.merge(pr)?;
@@ -308,7 +331,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
         Prepared::Status(sources) => ledger.status(sources, at),
         Prepared::Claim { task, claimant, origin, rules } => ledger.claim(task, claimant)?.brief(&origin, &rules),
-        Prepared::Link { task, pr, pull } => ledger.link(task, pr)?.pin(&pull)?,
+        Prepared::Link { task, pr, pushed, pull } => ledger.link(task, pr)?.pin(&pushed, &pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {
             Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),

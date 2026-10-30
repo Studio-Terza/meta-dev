@@ -2,9 +2,11 @@ use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
     Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Timestamp,
 };
-use meta_ports::memory::{FixedClock, MemoryLog, RecordedGit, RecordedGitHub};
+use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
-use meta_ports::{GhReplies, Log, PortError, Ports};
+use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, VecDeque};
 use std::str::FromStr;
 
 const RULES: &str = include_str!("fixtures/rules.toml");
@@ -19,7 +21,7 @@ const DENY: &str = r#""permissionDecision":"deny""#;
 const ALLOW: &str = "{}\n";
 const GET_LEASE: &str = "meta claim <task> --agent <name>";
 
-type Memory = Ports<MemoryLog, RecordedGit, RecordedGitHub, FixedClock>;
+type Memory = Ports<MemoryLog, RecordedGit, RecordedGitHub, FakeClock>;
 
 fn id<T: FromStr>(text: &str) -> T
 where
@@ -128,13 +130,19 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
     let at = Timestamp::from_unix_seconds(1);
     Ports {
         log: MemoryLog { records: events.into_iter().map(|event| Record { at, event }).collect(), broken: None },
-        git: RecordedGit { origin: id(ORIGIN), files: self_files(), local: self_files() },
+        git: RecordedGit {
+            origin: id(ORIGIN),
+            files: self_files(),
+            local: self_files(),
+            branches: BTreeMap::from([(id("task-1"), id(PINNED))]),
+        },
         github: RecordedGitHub {
+            earlier: RefCell::default(),
             replies: pulls.into_iter().map(|(pr, replies)| (id::<PrNumber>(pr), replies)).collect(),
             merged: Vec::new(),
             listed: Some(Ok("[]".to_owned())),
         },
-        clock: FixedClock(Timestamp::from_unix_seconds(2)),
+        clock: FakeClock::at(Timestamp::from_unix_seconds(2)),
     }
 }
 
@@ -422,6 +430,45 @@ fn merge_records_a_pr_already_merged_at_the_pinned_head_without_merging_again() 
     let (reply, events) = call(&mut ports, "merge 7", "");
     assert_eq!((reply.code, events), (Code::Done, vec![merged_outside("7", 3), done("task-1")]));
     assert!(ports.github.merged.is_empty());
+}
+
+#[test]
+fn link_waits_while_github_still_reports_the_previous_head_then_pins_the_pushed_commit() {
+    let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
+    ports.git.branches.insert(id("task-1"), id(MOVED));
+    let lagging = VecDeque::from([pull(PINNED, &[]), pull(PINNED, &[]), pull(MOVED, &[])]);
+    ports.github.earlier.borrow_mut().insert(id("7"), lagging);
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(events, vec![Event::Linked { task: id("task-1"), pr: id("7"), pin: id(MOVED) }]);
+    assert!(ports.github.earlier.borrow()[&id::<PrNumber>("7")].is_empty());
+    assert!(ports.clock.now() > start && ports.clock.now() < start.advanced(60));
+}
+
+#[test]
+fn link_refuses_naming_both_commits_when_github_never_reports_the_pushed_head_before_the_deadline() {
+    let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
+    ports.git.branches.insert(id("task-1"), id(MOVED));
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    for why in [PINNED, MOVED, "push has not landed", "git push origin task-1"] {
+        assert!(reply.text.contains(why), "{}", reply.text);
+    }
+    assert_eq!(ports.clock.now(), start.advanced(60));
+}
+
+#[test]
+fn link_refuses_with_the_next_step_when_there_is_no_local_branch_for_the_task() {
+    let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
+    ports.git.branches.clear();
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("no local branch task-1"), "{}", reply.text);
+    assert!(reply.text.contains("git push origin task-1"), "{}", reply.text);
+    assert_eq!(ports.clock.now(), start);
 }
 
 #[test]
