@@ -1,6 +1,6 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Checked, Claimant, Event, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Timestamp,
+    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Timestamp,
 };
 use meta_ports::memory::{FixedClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -637,7 +637,8 @@ fn bound() -> Vec<Event> {
 
 fn status_of(events: Vec<Event>) -> String {
     let (reply, added) = call(&mut given(events, Vec::new()), "status", "");
-    assert_eq!((reply.code, added), (Code::Done, Vec::new()), "{}", reply.text);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
     reply.text
 }
 
@@ -1099,4 +1100,67 @@ fn retire_of_a_deferred_task_is_refused() {
     let (reply, events) = call(&mut given(history, Vec::new()), "retire task-1 moot", "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("only an open or claimed task can be retired"), "{}", reply.text);
+}
+
+fn falsified(prediction: &str, measure: Measure, observed: &str) -> Event {
+    Event::Falsified { prediction: id(prediction), measure, observed: id(observed) }
+}
+
+fn unclassified(count: usize) -> Vec<Event> {
+    (1..=count).map(|number| escaped("unclassified", &format!("old {number}"))).collect()
+}
+
+#[test]
+fn status_latches_each_falsification_once_and_shows_it_after_the_reading_recovers() {
+    let gaps = |count: usize| (0..count).map(|number| escaped("gap", &format!("gap {number}"))).collect::<Vec<_>>();
+    let mut ports = given(gaps(3), Vec::new());
+    let (reply, added) = call(&mut ports, "status", "");
+    let repeats = "most repeats of one escape kind 2";
+    assert_eq!((reply.code, added), (Code::Done, vec![falsified("P2", Measure::RepeatsOfOneKind, repeats)]));
+    assert!(reply.text.contains(&format!("falsified at unix 2 ({repeats})")), "{}", reply.text);
+    let (reply, added) = call(&mut ports, "status", "");
+    assert_eq!(added, Vec::new(), "{}", reply.text);
+    assert!(reply.text.contains(&format!("falsified at unix 2 ({repeats})")), "{}", reply.text);
+    ports.log.records.extend(gaps(3).into_iter().map(|event| Record { at: Timestamp::from_unix_seconds(3), event }));
+    let (_, added) = call(&mut ports, "status", "");
+    assert_eq!(added, vec![falsified("P2", Measure::OpenEscapes, "open escapes 6")]);
+}
+
+#[test]
+fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_prediction_hold_again() {
+    let at = |seconds: u64, event: Event| Record { at: Timestamp::from_unix_seconds(seconds), event };
+    let mut ports = given([finished_task(), unclassified(6)].concat(), Vec::new());
+    let (reply, added) = call(&mut ports, "status", "");
+    let open = "open escapes 6";
+    assert_eq!(added, vec![falsified("P2", Measure::OpenEscapes, open)], "{}", reply.text);
+    ports.log.records.extend([1, 2, 3].map(|number| at(3, resolved(&format!("escape-{number}"), "task-1"))));
+    let (reply, added) = call(&mut ports, "status", "");
+    assert_eq!(added, Vec::new(), "{}", reply.text);
+    let holds = "P2 Gaps get fixed, not bypassed: holds; observed open escapes 3, most repeats of one escape kind 0;";
+    assert!(reply.text.contains(holds), "{}", reply.text);
+    assert!(reply.text.contains(&format!("falsified at unix 2 ({open})")), "{}", reply.text);
+}
+
+#[test]
+fn status_shows_a_latched_falsification_read_from_the_log_and_latches_nothing_for_a_prediction_that_holds() {
+    let history = [finished_task(), vec![falsified("P6", Measure::MedianCiRuns, "median CI runs per merged PR 4")]];
+    let status = status_of(history.concat());
+    let p6 = status.lines().find(|line| line.contains("P6 Little rework")).unwrap_or_default();
+    assert!(p6.contains("holds;") && p6.contains("falsified at unix 1 (median CI runs per merged PR 4)"), "{status}");
+    let calm = status_of(finished_task());
+    assert!(!calm.contains("falsified at"), "{calm}");
+}
+
+#[test]
+fn status_shows_an_escape_of_a_kind_not_on_main_as_unchecked_and_counts_all_of_them_under_one_key() {
+    let typos = [escaped("gpa", "one"), escaped("gpb", "two"), escaped("gap", "three"), escaped("gpc", "four")];
+    let status = status_of(typos.to_vec());
+    let marked = ["escape-1 [gpa, unchecked] one", "escape-2 [gpb, unchecked] two", "escape-4 [gpc, unchecked] four"];
+    assert!(marked.iter().all(|line| status.contains(line)), "{status}");
+    assert!(status.contains("escape-3 [gap] three"), "{status}");
+    assert!(status.contains("P2 open escapes: 4; most repeats of one kind: 2 ("), "{status}");
+    assert!(
+        status.contains("P2 Gaps get fixed, not bypassed: FALSIFIED; observed open escapes 4, most repeats"),
+        "{status}"
+    );
 }
