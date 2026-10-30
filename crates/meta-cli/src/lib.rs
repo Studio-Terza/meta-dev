@@ -225,7 +225,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 fn verify<G: Git>(real: bool, git: &G, build: &Build) -> Result<(), Unverified> {
     match real {
         false => Ok(()),
-        true => build.verify(|commit| git.on_main(commit).map(|_| true)),
+        true => build.verify(|commit| git.on_main(commit)),
     }
 }
 

@@ -91,7 +91,7 @@ impl Claim {
              5. build meta from main, because only a main build writes the real log: \
              git worktree add --detach ../{task}-main origin/main && \
              cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target\n  \
-             6. ../{task}-main/target/release/meta link {task} <pr>\n  \
+             6. from this clone, which holds the branch: ../{task}-main/target/release/meta link {task} <pr>\n  \
              A meta built from your branch writes only a scratch log: run it with XDG_DATA_HOME set to a scratch dir.\n\
              rules:\n{rules}"
         );
