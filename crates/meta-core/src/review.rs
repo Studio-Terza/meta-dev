@@ -61,7 +61,7 @@ impl Ledger {
         }
     }
 
-    /// The latest verdict on each linked PR, and whether its head moved since the review.
+    /// The latest verdict on each linked PR, at the head it was given.
     pub(crate) fn verdicts(&self) -> Vec<String> {
         self.tasks
             .values()
@@ -77,13 +77,7 @@ impl Ledger {
                     },
                     LeaseSlot::Unused(_) => None,
                 });
-                latest.map(|(head, verdict)| {
-                    let moved = match head == linked.pin() {
-                        true => String::new(),
-                        false => format!("; head moved since, now pinned at {}", linked.pin()),
-                    };
-                    format!("{} {}: {verdict} at {head}{moved}", linked.pr(), linked.id())
-                })
+                latest.map(|(head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
             })
             .collect()
     }

@@ -93,6 +93,10 @@ impl Task<Claimed> {
 }
 
 impl Task<Linked> {
+    pub fn agent(&self) -> &Claimant {
+        &self.stage.agent
+    }
+
     pub fn relink(self, pr: PrNumber, pin: Sha) -> Task<Linked> {
         let agent = self.stage.agent.clone();
         self.into_stage(Linked { agent, pr, pin })
@@ -126,6 +130,15 @@ impl Progress {
     /// Open, claimed or linked: on the open list, and its unused leases are live.
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Open(_) | Self::Claimed(_) | Self::Linked(_))
+    }
+
+    /// Claimed or linked by the lead working it itself.
+    pub fn is_self_claimed(&self) -> bool {
+        match self {
+            Self::Claimed(task) => task.agent().is_lead(),
+            Self::Linked(task) => task.agent().is_lead(),
+            _ => false,
+        }
     }
 }
 

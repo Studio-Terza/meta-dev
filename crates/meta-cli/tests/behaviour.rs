@@ -447,7 +447,7 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
     let at = Timestamp::from_unix_seconds(1);
     let seed: Vec<Record> = claimed_task().into_iter().map(|event| Record { at, event }).collect();
     JsonlLog::at(path.clone()).transact(|_| (seed, ())).unwrap();
-    let start = Call::PreToolUse(agent("lease-1"));
+    let start = Call::Hook(meta_core::Phase::Before, agent("lease-1"));
     let replies: Vec<Answer> = std::thread::scope(|scope| {
         let racers: Vec<_> = (0..8)
             .map(|_| {
@@ -863,7 +863,7 @@ fn hook_denies_any_other_send_message_since_new_instructions_need_a_fresh_agent_
         (bound(), to("worker", canned(), Some("lease-1")), &format!("lease-1 started {AGENT_ID}, not worker")),
         (bound(), to("", canned(), Some("lease-1")), "agent id is empty"),
         (unbound, to(AGENT_ID, canned(), Some("lease-1")), "no agent is recorded as started on lease-1"),
-        (finished, to(AGENT_ID, canned(), Some("lease-1")), "task-1 is done"),
+        (finished, to(AGENT_ID, canned(), Some("lease-1")), "the task of lease-1 is no longer active: task-1 done"),
     ];
     cases.into_iter().for_each(|(history, input, why)| {
         let (reply, events) = hook(history, &input);
@@ -882,7 +882,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let lines = [
         "P1 The loop is used: holds; observed unrecorded bypasses 0; expected 100%, except recorded escapes",
         "P2 Gaps get fixed, not bypassed: holds; observed open escapes 1, most repeats of one escape kind 0; \
-         expected Each kind fixed before its 3rd repeat; at most 5 open",
+         expected Each reason fixed before its 3rd repeat; at most 5 open",
         "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2",
     ];
     assert!(lines.iter().all(|line| status.contains(line)), "{status}");

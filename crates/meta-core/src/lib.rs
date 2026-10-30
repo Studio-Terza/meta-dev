@@ -20,9 +20,9 @@ mod status;
 mod task;
 
 pub use claim::Claim;
-pub use escape::{Checked, Escape, EscapeKinds};
+pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
-pub use hook::{AgentStart, Hook, Resume};
+pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
     AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Origin, PrNumber,
     Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,

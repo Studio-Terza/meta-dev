@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::ids::{LeaseId, PrNumber, Sha, TaskId, Verdict};
+use crate::ids::{AgentId, LeaseId, PrNumber, Sha, TaskId, Verdict};
 
 #[derive(Debug, Clone)]
 pub struct Lease {
@@ -15,10 +15,12 @@ pub enum Purpose {
     Review { pr: PrNumber, head: Sha },
 }
 
-/// A lease after its agent started: how often a canned continue resumed it, and a review's verdict.
+/// A lease after its agent started: the agent's id once recorded, how often a canned continue
+/// resumed it, and a review's verdict.
 #[derive(Debug)]
 pub struct Spent {
     lease: Lease,
+    agent: Option<AgentId>,
     resumes: usize,
     verdict: Option<Verdict>,
 }
@@ -42,13 +44,25 @@ impl Lease {
 
     pub(crate) fn spend(self) -> (Spent, Event) {
         let used = Event::LeaseUsed { lease: self.id };
-        (Spent { lease: self, resumes: 0, verdict: None }, used)
+        (Spent { lease: self, agent: None, resumes: 0, verdict: None }, used)
     }
 }
 
 impl Spent {
     pub(crate) fn lease(&self) -> &Lease {
         &self.lease
+    }
+
+    pub(crate) fn agent(&self) -> Option<&AgentId> {
+        self.agent.as_ref()
+    }
+
+    /// The one agent a used lease started.
+    pub(crate) fn start(&mut self, agent: AgentId) -> Result<(), String> {
+        match self.agent.replace(agent) {
+            None => Ok(()),
+            Some(earlier) => Err(format!("{} started {earlier} before", self.lease.id)),
+        }
     }
 
     pub(crate) fn resumes(&self) -> usize {

@@ -33,6 +33,9 @@ impl Ledger {
             (Claimant::Agent(agent), Some(Progress::Open(open)), _) => {
                 grant(open.title(), Grant::FirstClaim { agent, lease })
             }
+            (Claimant::Agent(_), Some(mine), _) if mine.is_self_claimed() => Err(Refusal::because(format!(
+                "{mine}: the task is self-claimed, so no agent claims it. Next: the lead finishes it, or meta open <title> for new agent work."
+            ))),
             (Claimant::Agent(agent), Some(Progress::Claimed(claimed)), None) => {
                 grant(claimed.title(), Grant::FreshLease { agent, lease })
             }

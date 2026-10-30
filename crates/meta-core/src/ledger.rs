@@ -12,6 +12,8 @@ pub struct Ledger {
     pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
     pub(crate) landed: BTreeSet<PrNumber>,
+    /// PRs logged as merged outside meta.
+    pub(crate) outside: BTreeSet<PrNumber>,
     pub(crate) starts_denied: usize,
     pub(crate) self_claims: usize,
 }
@@ -25,7 +27,7 @@ pub struct Corrupt {
 impl Corrupt {
     pub fn in_log(&self, place: &str) -> String {
         format!(
-            "{place} record {} does not fit the log before it: {}. Next: meta escape <reason>, then repair {place}.",
+            "{place} record {} does not fit the log before it: {}. Next: meta escape <kind> <reason>, then repair {place}.",
             self.record, self.why
         )
     }
@@ -67,6 +69,10 @@ impl Ledger {
                 Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,
                 _ => Err(format!("{lease} reviewed but not used"))?,
             },
+            Event::Started { lease, agent } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.start(agent.clone())?,
+                _ => Err(format!("{lease} started an agent but is not used"))?,
+            },
             Event::Resumed { lease } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.resume(),
                 _ => Err(format!("{lease} resumed but not used"))?,
@@ -76,7 +82,6 @@ impl Ledger {
                     Progress::Open(open) => Ok(open.retire(reason.clone())),
                     Progress::Claimed(claimed) => Ok(claimed.retire(reason.clone())),
                     Progress::Linked(linked) => Ok(linked.retire(reason.clone())),
-                    Progress::Deferred(deferred) => Ok(deferred.retire(reason.clone())),
                     other => Err(format!("{task} retired while {other}")),
                 }?;
                 self.tasks.insert(*task, Progress::Retired(retired));
@@ -106,6 +111,9 @@ impl Ledger {
             Event::Merged { pr, runs, route, .. } => {
                 self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
                 self.landed.insert(*pr);
+                if *route == Route::Outside {
+                    self.outside.insert(*pr);
+                }
                 self.merged.push((*runs, *route));
             }
             Event::Done { task } => {
@@ -115,8 +123,9 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { kind, reason, .. } => self.escapes.push(Logged::new(kind.clone(), reason.clone())),
-            Event::Started { .. } => {}
+            Event::Escaped { kind, reason, pr, checked } => {
+                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked));
+            }
             Event::Resolved { escape, task } => {
                 match self.tasks.get(task) {
                     Some(Progress::Done(_)) => Ok(()),

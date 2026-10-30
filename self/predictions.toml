@@ -1,6 +1,8 @@
-# The measurable predictions, as registered in docs/prereg.md. `meta status` prints each with its
-# observed values and FALSIFIED when a falsifier measure is above its bound. The measures are
-# computed by meta; see Measure in crates/meta-core/src/predictions.rs.
+# The measurable predictions, as registered in docs/prereg.md. hypothesis, measure, expected and
+# falsified_by quote its table verbatim; `terms` says how meta reads a word of it. `meta status`
+# prints each with its observed values and FALSIFIED when a falsifier measure is above its bound;
+# with no falsifier, UNDECIDED. The measures are computed by meta; see Measure in
+# crates/meta-core/src/predictions.rs.
 
 [[prediction]]
 id = "P1"
@@ -13,10 +15,12 @@ falsifier = { unrecorded_bypasses = { above = 0 } }
 [[prediction]]
 id = "P2"
 hypothesis = "Gaps get fixed, not bypassed"
-measure = "Open escapes; repeats per kind"
-expected = "Each kind fixed before its 3rd repeat; at most 5 open"
-falsified_by = "A kind repeated 3 times, or more than 5 open"
-falsifier = { open_escapes = { above = 5 }, repeats_of_one_kind = { above = 2 } }
+measure = "Open escapes; repeats per reason"
+expected = "Each reason fixed before its 3rd repeat; at most 5 open"
+falsified_by = "A reason repeated 3 times, or more than 5 open"
+# Owner's registered intent: the third escape of one kind falsifies, so repeats above 1.
+terms = { reason = "escape kind" }
+falsifier = { open_escapes = { above = 5 }, repeats_of_one_kind = { above = 1 } }
 
 [[prediction]]
 id = "P6"

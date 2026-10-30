@@ -1,13 +1,13 @@
 use crate::escape::{EscapeKinds, RepeatKey};
 use crate::event::Route;
-use crate::ids::{EscapeId, RunCount};
+use crate::ids::{EscapeId, PrNumber, RunCount};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
 use crate::task::Progress;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// What `meta status` reads besides the log, each as read or why it could not be.
 #[derive(Debug)]
@@ -62,8 +62,10 @@ impl Ledger {
         let runs = RunCount::total(self.merged.iter().map(|(runs, _)| *runs));
         let median = Quantity::median(self.merged.iter().map(|(runs, _)| runs.value()).collect());
         let median_text = median.map_or_else(|| "none yet".to_owned(), |median| median.to_string());
-        let missing = match &github {
-            Reconciliation::Listed(merges) => Ok(merges.prs().iter().filter(|pr| !self.landed.contains(pr)).count()),
+        let missing: Result<Vec<PrNumber>, String> = match &github {
+            Reconciliation::Listed(merges) => {
+                Ok(merges.prs().iter().filter(|pr| !self.landed.contains(pr)).copied().collect())
+            }
             Reconciliation::Unavailable(why) => Err(format!("GitHub merged list unreadable: {why}")),
         };
         let observe = |measure: Measure| -> Observation {
@@ -73,9 +75,11 @@ impl Ledger {
                 Measure::MedianCiRuns => median.ok_or_else(|| "no merged PRs yet".to_owned()),
                 Measure::UnrecordedBypasses => {
                     let kinds = kinds.as_ref().map_err(|why| format!("escape kinds unreadable: {why}"))?;
-                    let recorded = self.escapes.iter().filter(|logged| kinds.bypass(logged.kind())).count();
-                    let outside = outside_logged + missing.clone()?;
-                    Ok(Quantity::count(outside.saturating_sub(recorded)))
+                    let named: BTreeSet<PrNumber> =
+                        self.escapes.iter().filter_map(|logged| logged.merged_pr(kinds)).collect();
+                    let missing = missing.as_ref().map_err(Clone::clone)?;
+                    let outside: BTreeSet<&PrNumber> = self.outside.iter().chain(missing).collect();
+                    Ok(Quantity::count(outside.into_iter().filter(|pr| !named.contains(pr)).count()))
                 }
             }
         };

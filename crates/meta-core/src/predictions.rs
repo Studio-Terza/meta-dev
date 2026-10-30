@@ -21,16 +21,51 @@ struct Prediction {
     /// Words of `docs/prereg.md` and what meta reads them as, such as reason: escape kind.
     #[serde(default)]
     terms: BTreeMap<String, String>,
-    /// The falsifier as numbers: it holds when any of these measures is above its bound.
+    /// The falsifier as numbers: it holds when any of these measures is above its bound. Without
+    /// one, the prediction is undecided.
     falsifier: Option<Falsifier>,
 }
 
 /// One or more measures, each with the bound it must stay at or under.
 #[derive(Debug, Deserialize)]
-#[serde(transparent)]
+#[serde(try_from = "BTreeMap<Measure, Bound>")]
 struct Falsifier(BTreeMap<Measure, Bound>);
 
+impl TryFrom<BTreeMap<Measure, Bound>> for Falsifier {
+    type Error = &'static str;
+
+    fn try_from(bounds: BTreeMap<Measure, Bound>) -> Result<Self, Self::Error> {
+        match bounds.is_empty() {
+            true => Err("a falsifier names at least one measure"),
+            false => Ok(Self(bounds)),
+        }
+    }
+}
+
 impl Falsifier {
+    /// FALSIFIED when any measure is above its bound, else UNDECIDED when any is unavailable, else holds.
+    fn judge(&self, observe: impl Fn(Measure) -> Observation) -> (&'static str, String) {
+        let observed: Vec<(Measure, Bound, Observation)> =
+            self.0.iter().map(|(measure, bound)| (*measure, *bound, observe(*measure))).collect();
+        let values: Vec<String> = observed
+            .iter()
+            .map(|(measure, _, observation)| match observation {
+                Ok(value) => format!("{measure} {value}"),
+                Err(why) => format!("{measure} unavailable ({why})"),
+            })
+            .collect();
+        let holds = observed
+            .iter()
+            .any(|(_, bound, observation)| observation.as_ref().is_ok_and(|value| value.doubled > bound.above * 2));
+        let undecided = observed.iter().any(|(_, _, observation)| observation.is_err());
+        let judgement = match (holds, undecided) {
+            (true, _) => "FALSIFIED",
+            (false, true) => "UNDECIDED",
+            (false, false) => "holds",
+        };
+        (judgement, format!("observed {}", values.join(", ")))
+    }
+
     #[cfg(test)]
     fn bounds(&self) -> Vec<(Measure, u64)> {
         self.0.iter().map(|(measure, bound)| (*measure, bound.above)).collect()
@@ -41,7 +76,7 @@ impl Falsifier {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Measure {
-    /// Merges outside meta, less the escapes of a bypass kind that record them.
+    /// PRs merged outside meta that no escape of a kind naming merged PRs names.
     UnrecordedBypasses,
     OpenEscapes,
     /// The most repeats of one escape kind: its escapes after the first.
@@ -111,35 +146,16 @@ impl Predictions {
         self.prediction
             .iter()
             .map(|prediction| {
-                let observed: Vec<(Measure, Bound, Observation)> = prediction
-                    .falsifier
-                    .iter()
-                    .flat_map(|falsifier| &falsifier.0)
-                    .map(|(measure, bound)| (*measure, *bound, observe(*measure)))
-                    .collect();
-                let values: Vec<String> = observed
-                    .iter()
-                    .map(|(measure, _, observation)| match observation {
-                        Ok(value) => format!("{measure} {value}"),
-                        Err(why) => format!("{measure} unavailable ({why})"),
-                    })
-                    .collect();
-                let holds = observed.iter().any(|(_, bound, observation)| {
-                    observation.as_ref().is_ok_and(|value| value.doubled > bound.above * 2)
-                });
-                let undecided = observed.iter().any(|(_, _, observation)| observation.is_err());
-                let judgement = match (holds, undecided) {
-                    (true, _) => "FALSIFIED",
-                    (false, true) => "UNDECIDED",
-                    (false, false) => "holds",
+                let (judgement, observed) = match &prediction.falsifier {
+                    Some(falsifier) => falsifier.judge(&observe),
+                    None => ("UNDECIDED", "no falsifier registered".to_owned()),
                 };
                 let terms: String =
                     prediction.terms.iter().map(|(word, reading)| format!("; read {word} as {reading}")).collect();
                 format!(
-                    "{} {}: {judgement}; observed {}; expected {}; falsified by {}; measure: {}{terms}",
+                    "{} {}: {judgement}; {observed}; expected {}; falsified by {}; measure: {}{terms}",
                     prediction.id,
                     prediction.hypothesis,
-                    values.join(", "),
                     prediction.expected,
                     prediction.falsified_by,
                     prediction.measure

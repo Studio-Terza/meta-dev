@@ -22,10 +22,11 @@ impl Ledger {
     pub fn retire(&self, task: TaskId, reason: Reason) -> Result<Retiring, Refusal> {
         let retirement = Retirement { task, reason };
         match self.tasks.get(&task) {
-            Some(Progress::Open(_) | Progress::Claimed(_) | Progress::Deferred(_)) => {
-                Ok(Retiring::Unlinked(retirement))
-            }
+            Some(Progress::Open(_) | Progress::Claimed(_)) => Ok(Retiring::Unlinked(retirement)),
             Some(Progress::Linked(linked)) => Ok(Retiring::Linked { retirement, pr: linked.pr() }),
+            Some(deferred @ Progress::Deferred(_)) => Err(Refusal::because(format!(
+                "{deferred}; only an open or claimed task can be retired. Next: meta undefer {task}, then retire it."
+            ))),
             Some(over @ (Progress::Done(_) | Progress::Retired(_))) => {
                 Err(Refusal::because(format!("{over}; only an open or claimed task can be retired.")))
             }

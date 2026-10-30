@@ -1,16 +1,20 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
-    Malformed, Merges, Origin, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules, SelfFile,
-    Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
+    Malformed, Merges, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Rules,
+    SelfFile, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
     Ledger(LedgerCall),
-    Escape { kind: EscapeKind, reason: Reason, pr: Option<PrNumber> },
-    PreToolUse(String),
-    PostToolUse(String),
+    Escape {
+        kind: EscapeKind,
+        reason: Reason,
+        pr: Option<PrNumber>,
+    },
+    /// A Claude Code hook, before or after a tool runs, with its input.
+    Hook(Phase, String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,8 +78,8 @@ impl Answer {
         }
     }
 
-    fn broken_hook(why: impl ToString) -> Self {
-        Self::done(Hook::broken(&format!("meta is broken ({})", why.to_string())).into_parts().1)
+    fn broken_hook(phase: Phase, why: impl ToString) -> Self {
+        Self::done(phase.broken(&format!("meta is broken ({})", why.to_string())).into_parts().1)
     }
 }
 
@@ -128,8 +132,8 @@ impl Call {
             ["verdict", task, verdict] => {
                 local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
             }
-            ["hook", "pre-tool-use"] => Some(Ok(Self::PreToolUse(stdin()))),
-            ["hook", "post-tool-use"] => Some(Ok(Self::PostToolUse(stdin()))),
+            ["hook", "pre-tool-use"] => Some(Ok(Self::Hook(Phase::Before, stdin()))),
+            ["hook", "post-tool-use"] => Some(Ok(Self::Hook(Phase::After, stdin()))),
             _ => None,
         };
         let why = match call {
@@ -145,21 +149,24 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     let Ports { log, git, github, clock } = ports;
     let at = clock.now();
     match call {
-        Call::PreToolUse(input) => hook(Hook::read(&input), log, at),
-        Call::PostToolUse(_) => Answer::done("{}\n".to_owned()),
+        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at),
         Call::Escape { kind, reason, pr } => {
-            let kinds = match spec(git, SelfFile::EscapeKinds, EscapeKinds::parse) {
-                Ok(kinds) => kinds,
-                Err(failure) => return Answer::failed(failure),
-            };
-            let earlier = log.read().map_err(|error| error.to_string());
-            let tallied = Escape::new(kind, reason, pr).tally(&kinds, earlier.as_deref().map_err(String::as_str));
-            let (events, text) = match tallied {
-                Ok(accepted) => accepted.into_parts(),
+            let kinds = git
+                .local(SelfFile::EscapeKinds)
+                .map_err(Failure::from)
+                .and_then(|text| Ok(EscapeKinds::parse(&text)?))
+                .map_err(|failure| Unreached::by(&failure));
+            let admitted = match Escape::new(kind, reason, pr).admit(kinds) {
+                Ok(admitted) => admitted,
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
-            match log.transact(|_| (stamped(events, at), ())) {
-                Ok(()) => Answer::done(text),
+            let recorded = log.transact(|records| {
+                let earlier = records.as_deref().map_err(ToString::to_string);
+                let (events, text) = admitted.tally(earlier).into_parts();
+                (stamped(events, at), text)
+            });
+            match recorded {
+                Ok(text) => Answer::done(text),
                 Err(error) => Answer::failed(error.into()),
             }
         }
@@ -197,11 +204,12 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     }
 }
 
-fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
+fn hook<L: Log>(phase: Phase, hook: Hook, log: &mut L, at: Timestamp) -> Answer {
     let decide: Box<dyn FnOnce(Ledger) -> Accepted> = match hook {
         Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
+        Hook::Bind(binding) => Box::new(|ledger: Ledger| ledger.bind(binding)),
     };
     let place = log.place();
     let outcome = log.transact(|records| {
@@ -218,7 +226,7 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
     });
     match outcome.map_err(|error| error.to_string()).and_then(|decided| decided) {
         Ok(text) => Answer::done(text),
-        Err(why) => Answer::broken_hook(why),
+        Err(why) => Answer::broken_hook(phase, why),
     }
 }
 

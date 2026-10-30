@@ -38,7 +38,7 @@ source = "owner 2026-10: privacy"
 
 [[rule]]
 id = "red-first"
-text = "Tighten the check in the first commit, see CI fail on it, then fix to green."
+text = "Tighten the check in the first commit; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix."
 source = "owner 2026-10-30: red first"
 
 [[rule]]
