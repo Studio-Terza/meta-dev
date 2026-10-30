@@ -1,6 +1,6 @@
 use meta_core::{
-    Accepted, AgentName, Clearance, Escape, Event, Hook, Ledger, Malformed, Merges, Origin, PrNumber, Pull, Reason,
-    Record, Refusal, Rules, TaskId, Timestamp, Title, Unreadable,
+    Accepted, AgentName, Cause, Clearance, Escape, Event, Hook, Ledger, Malformed, Merges, Origin, PrNumber, Pull,
+    Reason, Reconciliation, Record, Refusal, Rules, TaskId, Timestamp, Title, Unreached, Unreadable,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -158,7 +158,7 @@ fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {
 
 enum Prepared {
     Open(Title),
-    Status(Result<Merges, String>),
+    Status(Reconciliation),
     Claim { task: TaskId, agent: AgentName, origin: Origin, rules: Rules },
     Link { task: TaskId, pr: PrNumber, pull: Pull },
     Merge { pr: PrNumber, pull: Pull },
@@ -167,12 +167,10 @@ enum Prepared {
 fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github: &mut H) -> Result<Prepared, Failure> {
     Ok(match call {
         LedgerCall::Open(title) => Prepared::Open(title),
-        LedgerCall::Status => Prepared::Status(
-            github
-                .merged_list()
-                .map_err(|error| error.to_string())
-                .and_then(|listed| Merges::from_gh(&listed).map_err(|malformed| malformed.to_string())),
-        ),
+        LedgerCall::Status => Prepared::Status(match github.merged_list() {
+            Ok(listed) => Merges::from_gh(&listed),
+            Err(error) => Reconciliation::Unavailable(Cause::Port(Unreached::by(&error))),
+        }),
         LedgerCall::Claim { task, agent } => {
             ledger.claim(task, agent.clone())?;
             let rules = Rules::parse(&git.rules()?)?;

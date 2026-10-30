@@ -2,16 +2,16 @@ use crate::event::Route;
 use crate::ids::{Reason, RunCount};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
-use crate::merges::Merges;
+use crate::merges::Reconciliation;
 use crate::reply::Accepted;
 use std::collections::BTreeMap;
 
 impl Ledger {
-    pub fn status(&self, github: Result<Merges, String>) -> Accepted {
+    pub fn status(&self, github: Reconciliation) -> Accepted {
         Accepted::new(Vec::new(), self.report(github))
     }
 
-    fn report(&self, github: Result<Merges, String>) -> String {
+    fn report(&self, github: Reconciliation) -> String {
         let tasks: Vec<String> =
             self.tasks.values().filter(|task| !task.is_done()).map(|task| task.to_string()).collect();
         let leases: Vec<String> = self
@@ -47,9 +47,9 @@ impl Ledger {
 }
 
 impl Ledger {
-    fn merges_line(&self, through_meta: usize, outside_logged: usize, github: Result<Merges, String>) -> String {
+    fn merges_line(&self, through_meta: usize, outside_logged: usize, github: Reconciliation) -> String {
         match github {
-            Ok(merges) => {
+            Reconciliation::Listed(merges) => {
                 let missing = merges.prs().iter().filter(|pr| !self.landed.contains(pr)).count();
                 format!(
                     "P1 merges through meta: {through_meta} of {}\nP1 merged outside meta: {} ({missing} missing from the log)\n",
@@ -57,7 +57,7 @@ impl Ledger {
                     outside_logged + missing
                 )
             }
-            Err(why) => format!(
+            Reconciliation::Unavailable(why) => format!(
                 "P1 merges: unavailable, GitHub merged list unreadable ({why}); logged: {through_meta} through meta, {outside_logged} outside\n"
             ),
         }
