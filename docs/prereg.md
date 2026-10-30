@@ -116,6 +116,44 @@ Owner decision, 2026-10-30. Vague, uncomfortable problems slip past automated ch
 |---|---|---|
 | P7 | The critic catches what the lead normalizes | Smells it raised that turned out real; time from a problem's onset to its first smell |
 
+## Project branches
+
+Owner decisions, 2026-10-30. PR orchestration follows the same three levels as agents.
+
+| Level | Agent | Branch | Lives for |
+|---|---|---|---|
+| Long | Lead | `main` | Always |
+| Medium | Project agent | `project/<id>` | Until the project has landed |
+| Short | Stage worker | Worker PR | One stage |
+
+| Rule | Decision |
+|---|---|
+| Accumulation | Slices accumulate on the project branch. Main's full gates judge the end state when it lands. |
+| Main inflow | Meta merges main into every project branch automatically on each change to main. A conflict starts a conflict-fix worker. |
+| Partial landing | Allowed. Any coherent subset may land early. |
+| Ownership | Only the owning project's workers open PRs against `project/<id>`. Only meta merges into it, on the project agent's verdict. Only `meta merge` lands it on main. |
+| Distance to landable | Main's full gates run report-only on the project branch tip, continuously. |
+| No stacks | Worker PRs sit flat against the project branch. |
+| Outside projects | Small independent fixes go straight to main through `meta merge`. |
+| Gates on project branches | Open; to be discussed separately. |
+
+**The trap to dodge:** a long-lived integration branch that drifts from main, hides breakage and never lands, which is the slough again one level down. The hypotheses for dodging it are below. As with the others, no thresholds are set: we watch the trends.
+
+| # | Hypothesis | Measure | Trap signal |
+|---|---|---|---|
+| B1 | Continuous main inflow keeps conflicts small and cheap | Conflicts per main inflow; conflict-fix worker spend | Conflict size or spend rising |
+| B2 | Distance to landable falls steadily on a healthy project | Main gates failing on the project tip, over time | A flat or rising line, which is a critic smell |
+| B3 | Partial landings keep project branches young and small | Branch age and diff size since the last landing | Age or diff growing without landings |
+| B4 | Project branches cost less CI per delivered feature than slices straight to main | CI runs per delivered feature, compared with P6 | Not lower |
+| B5 | Landing PRs are no harder than ordinary PRs | Rounds and CI runs per landing PR | Landings needing repeated rounds |
+| B6 | Scoped workers keep project branches green | Time the project branch spends red | Red time growing |
+
+## Deferred
+
+Owner decision, 2026-10-30: deferred together with the rest of token observability and budgeting:
+- the per-task round cap;
+- the per-task token budget.
+
 ## Fail fast
 
 - Any measure that trends the wrong way, or any overrun timebox, means a stop and an owner discussion, not a patch.
