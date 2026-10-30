@@ -1,3 +1,6 @@
+//! Id and newtype text is parsed here: a registered boundary (self/parse-boundaries.toml).
+#![allow(clippy::disallowed_methods)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;

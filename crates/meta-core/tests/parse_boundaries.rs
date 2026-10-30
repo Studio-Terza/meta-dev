@@ -71,7 +71,7 @@ fn read_tree(directory: &Path, root: &Path, tree: &mut Tree) {
         let kind = entry.file_type().unwrap();
         let name = entry.file_name();
         match () {
-            () if path.is_dir() && name != "target" && name != ".git" => read_tree(&path, root, tree),
+            () if kind.is_dir() && name != "target" && name != ".git" => read_tree(&path, root, tree),
             () if kind.is_file() && (path.extension().is_some_and(|ext| ext == "rs") || name == "Cargo.toml") => {
                 tree.insert(path.strip_prefix(root).unwrap().to_path_buf(), fs::read_to_string(&path).unwrap());
             }

@@ -1,3 +1,6 @@
+//! The Agent prompt is scanned for a lease id: a registered boundary (self/parse-boundaries.toml).
+#![allow(clippy::disallowed_methods)]
+
 use crate::event::{Attempt, Event};
 use crate::ids::LeaseId;
 use crate::lease::LeaseSlot;
