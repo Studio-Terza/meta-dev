@@ -19,6 +19,8 @@ Then proposals turn into code and stick, and the marginal cost of change stays f
 | 0 | Minimal loop, enforced on the lead (`docs/stage0.md`) | Lenient |
 | 1 | Escapes as data; every bypass is a meta bug | Lenient |
 | 2 | Measure the loop: spend, time and outcome per task | Report-only |
+| 2b | Critic: a second long-lived role that names smells and reports straight to the owner (see "Critic") | Report-only |
+| 2c | Orchestration: a task state machine in meta, stateless stage workers and project agents (see "Agents") | Lenient |
 | 3 | Rules exist only as code with a source; prose never defines a rule | Report-only at first |
 | 4 | A gate becomes blocking only with measured headroom over noise and a cited source | Earned |
 | 5 | Features | Normal |
@@ -33,6 +35,86 @@ Then proposals turn into code and stick, and the marginal cost of change stays f
 | P4 | No slough | Spend and rounds per delivered feature, as a trend |
 | P5 | The lead stays on architecture | Lead share of spend spent on mechanics |
 | P6 | Little rework | CI runs per merged PR |
+
+## Agents
+
+Owner decisions, 2026-10-30. An agent lives as long as the context it has to hold together.
+
+| Kind | Holds | Lives for | Count |
+|---|---|---|---|
+| Stage worker | One stage of one task: spec, diff, log | That stage only | As many as the pool allows |
+| Project agent | One project's design intent | Until the project is delivered; replaced from its state in meta when its context budget runs out | One per active project, in any repo |
+| Lead | The owner's intent, cross-project architecture, priorities | A role, not a session; refreshed from meta's state | One |
+| Critic | Smells | A role; fresh eyes on a schedule | One |
+
+**Lead (core only):**
+- talks with the owner, and records the owner's decisions;
+- writes status reports across projects;
+- decides what goes to the owner;
+- owns cross-project architecture and project boundaries;
+- sets order across projects;
+- diagnoses failures across projects;
+- makes the final call on architecture-level review findings;
+- sets the rules and their sources;
+- defines the measures.
+
+**Project agent:**
+- splits its project into tasks and owns the project design;
+- sets the model tier per task and the task-specific part of each brief;
+- decides the next step after each stage;
+- triages review findings;
+- handles CI failures on its own PRs;
+- watches for circling inside its project.
+
+It does no mechanics and never spawns agents; it asks meta for stage workers. It escalates to the lead only what crosses projects or goes against the owner's intent.
+
+**Meta (code, not agents):**
+- launches, briefs, gives deadlines to and stops stage workers;
+- runs reviews as a stage;
+- handles merge, update-branch, close-out and rebuilds;
+- detects and retries GitHub failures;
+- monitors, cleans up and gc's;
+- computes the measures;
+- installs hooks.
+
+When something new comes up, meta sends it to a short-lived diagnostic worker, not to the lead.
+
+**What reaches the lead:** escalations only, each as a short structured summary. Raw agent reports, CI logs and merge chatter never do.
+
+**Headless workers (owner, 2026-10-30):** meta starts Claude sessions itself, as headless workers running locally, one per lease. Rules:
+
+| Rule | Value |
+|---|---|
+| Concurrency | At most 4 workers at once |
+| When they run | Any time, including while the owner is away |
+| Rollout | Fixers and reviewers first; implementers and project agents only after data from that phase |
+| Tools | An explicit allowlist. Agent, Task and starting `claude` are denied. Secrets and paths outside the worktree are denied. |
+| Supervision | meta runs each worker as a process group with a deadline. If meta dies, its workers die. |
+| Caps | A round cap and a token budget per task, plus `meta stop` as a kill switch. Hitting a cap escalates; nothing retries silently. |
+| Visibility | `meta status` lists live workers. Transcripts are kept for each run. |
+
+No daily spend cap is set. Spend is monitored, in line with the no-thresholds decision.
+
+## Critic
+
+Owner decision, 2026-10-30. Vague, uncomfortable problems slip past automated checks by definition. Missing them cost three days, because the only channel to the owner ran through the lead, and the lead described circling as progress.
+
+| Property | Rule |
+|---|---|
+| Role | Names smells, investigates them and escalates them. It never designs, plans or runs work. |
+| Channel | Its findings reach the owner without passing through the lead. |
+| Scope | Everything, including whether the lead's reports match the measures. |
+| Briefing | Unprimed: the lead never tells it what to look for. |
+| Memory | A smell register, recording for each smell: first seen, last seen, evidence, escalation count and the owner's response. A smell closes only on the owner's word or on hard evidence. An unaddressed smell escalates again. |
+| Fresh eyes | Its session is replaced on a schedule. Each new instance reads the register but not the old reasoning. |
+| Judged on | Smells that turned out real, not how many it raises. |
+| Cost | Wakes on a schedule and on meta events, such as a measure trending the wrong way, an overrun timebox or a repeated escalation. |
+
+**Crude version (until stage 2b):** a fresh agent on a schedule reads `meta status`, the merged and open PRs, and the lead's latest report. It files each smell as a GitHub issue labelled `critic`, which the lead does not edit, so the owner sees it directly.
+
+| # | Prediction | Measure |
+|---|---|---|
+| P7 | The critic catches what the lead normalizes | Smells it raised that turned out real; time from a problem's onset to its first smell |
 
 ## Fail fast
 
