@@ -312,7 +312,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         "P1 agent starts through meta: 1 of 2",
         "P1 merges through meta: 1 of 2",
         "P1 merged outside meta: 1 (0 missing from the log)",
-        "P2 open escapes: 3; most repeats of one kind: 1 (gap)",
+        "P2 open escapes: 3 (0 closed as historical); most repeats of one kind: 1 (gap)",
         "P6 CI runs per merged PR: 6 runs over 2 merged PRs; median 3",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -732,6 +732,7 @@ fn resolve_against_a_done_task_records_resolved_and_the_escape_no_longer_counts_
     assert_eq!((reply.code, events), (Code::Done, vec![resolved("escape-1", "task-1")]));
     let (reply, _) = call(&mut ports, "status", "");
     assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
+    assert!(reply.text.contains("P2 open escapes: 1 (1 closed as historical);"), "{}", reply.text);
     assert!(!reply.text.contains("escape-1"), "{}", reply.text);
 }
 
@@ -769,7 +770,7 @@ fn escapes_logged_before_kinds_fold_as_unclassified_beside_old_denied_and_lease_
         "escape-1 [unclassified] bootstrap: agent started",
         "escape-2 [unclassified] no retire command",
         "P1 agent starts through meta: 1 of 2",
-        "P2 open escapes: 2; most repeats of one kind: 0",
+        "P2 open escapes: 2 (0 closed as historical); most repeats of one kind: 0",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
     let (reply, events) = call(&mut ports, "resolve escape-1 task-1", "");
@@ -1216,7 +1217,7 @@ fn status_shows_an_escape_of_a_kind_not_on_main_as_unchecked_and_counts_all_of_t
     let marked = ["escape-1 [gpa, unchecked] one", "escape-2 [gpb, unchecked] two", "escape-4 [gpc, unchecked] four"];
     assert!(marked.iter().all(|line| status.contains(line)), "{status}");
     assert!(status.contains("escape-3 [gap] three"), "{status}");
-    assert!(status.contains("P2 open escapes: 4; most repeats of one kind: 2 ("), "{status}");
+    assert!(status.contains("P2 open escapes: 4 (0 closed as historical); most repeats of one kind: 2 ("), "{status}");
     assert!(
         status.contains("P2 Gaps get fixed, not bypassed: FALSIFIED; observed open escapes 4, most repeats"),
         "{status}"
@@ -1234,9 +1235,23 @@ fn resolve_historical_closes_an_open_escape_with_no_task_and_it_no_longer_counts
     assert_eq!((reply.code, events), (Code::Done, vec![historical("escape-1", ONE_OFF)]));
     let (reply, _) = call(&mut ports, "status", "");
     assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
+    assert!(reply.text.contains("P2 open escapes: 1 (1 closed as historical);"), "{}", reply.text);
     assert!(!reply.text.contains("escape-1"), "{}", reply.text);
     let (reply, _) = call(&mut ports, "escape gap again", "");
     assert!(reply.text.contains("open escapes: 2"), "{}", reply.text);
+}
+
+#[test]
+fn status_p2_counts_escapes_closed_as_historical_including_corrections_but_not_task_resolutions() {
+    let history = [
+        finished_task(),
+        vec![escaped("gap", "a"), escaped("gap", "b"), escaped("gap", "c"), escaped("gap", "d")],
+        vec![historical("escape-1", "one-off"), resolved("escape-2", "task-1"), resolved("escape-3", "task-1")],
+        vec![corrected("escape-3", "one-off")],
+    ]
+    .concat();
+    let status = status_of(history);
+    assert!(status.contains("P2 open escapes: 1 (2 closed as historical);"), "{status}");
 }
 
 #[test]
@@ -1269,6 +1284,7 @@ fn resolve_historical_correcting_moves_a_task_resolution_to_historical_and_statu
     let (reply, _) = call(&mut ports, "status", "");
     let shown = format!("escape-1 resolved against task-1, corrected to historical: {ONE_OFF}");
     assert!(reply.text.contains(&shown) && reply.text.contains("open escapes: 0"), "{}", reply.text);
+    assert!(reply.text.contains("P2 open escapes: 0 (1 closed as historical);"), "{}", reply.text);
     let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("corrected to historical"), "{}", reply.text);
