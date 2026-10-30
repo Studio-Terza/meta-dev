@@ -524,6 +524,8 @@ fn unknown_or_malformed_commands_answer_with_usage() {
         "escape gap",
         "escape gap --pr seven merged",
         "resolve escape-1",
+        "resolve escape-1 --historical",
+        "resolve escape-1 --historical --correcting",
         "verdict task-1 maybe",
         "retire task-1",
         "claim task-1 --self bob",
@@ -635,6 +637,14 @@ fn used(lease: &str) -> Event {
 
 fn resolved(escape: &str, task: &str) -> Event {
     Event::Resolved { escape: id(escape), task: id(task) }
+}
+
+fn historical(escape: &str, reason: &str) -> Event {
+    Event::ResolvedHistorical { escape: id(escape), reason: id(reason) }
+}
+
+fn corrected(escape: &str, reason: &str) -> Event {
+    Event::Corrected { escape: id(escape), reason: id(reason) }
 }
 
 fn self_claimed(task: &str) -> Event {
@@ -1211,4 +1221,106 @@ fn status_shows_an_escape_of_a_kind_not_on_main_as_unchecked_and_counts_all_of_t
         status.contains("P2 Gaps get fixed, not bypassed: FALSIFIED; observed open escapes 4, most repeats"),
         "{status}"
     );
+}
+
+// Historical escapes (docs/stage1.md, "Historical escapes").
+
+const ONE_OFF: &str = "bootstrap, meta did not exist yet";
+
+#[test]
+fn resolve_historical_closes_an_open_escape_with_no_task_and_it_no_longer_counts_as_open() {
+    let mut ports = given(vec![escaped("gap", "no retire"), escaped("gap", "no review")], Vec::new());
+    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF}"), "");
+    assert_eq!((reply.code, events), (Code::Done, vec![historical("escape-1", ONE_OFF)]));
+    let (reply, _) = call(&mut ports, "status", "");
+    assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
+    assert!(!reply.text.contains("escape-1"), "{}", reply.text);
+    let (reply, _) = call(&mut ports, "escape gap again", "");
+    assert!(reply.text.contains("open escapes: 2"), "{}", reply.text);
+}
+
+#[test]
+fn resolve_historical_is_refused_on_a_resolved_or_historical_or_unknown_escape_without_correcting() {
+    let escapes = || vec![escaped("gap", "no retire")];
+    let cases = [
+        (
+            [finished_task(), escapes(), vec![resolved("escape-1", "task-1")]].concat(),
+            "already resolved against task-1",
+        ),
+        ([escapes(), vec![historical("escape-1", "first")]].concat(), "already historical: first"),
+        (escapes(), "escape-2 is unknown"),
+    ];
+    cases.into_iter().for_each(|(history, why)| {
+        let args = if why.contains("unknown") { "escape-2" } else { "escape-1" };
+        let (reply, events) =
+            call(&mut given(history, Vec::new()), &format!("resolve {args} --historical {ONE_OFF}"), "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(why), "{}", reply.text);
+    });
+}
+
+#[test]
+fn resolve_historical_correcting_moves_a_task_resolution_to_historical_and_status_shows_both() {
+    let history = [finished_task(), vec![escaped("gap", "no retire"), resolved("escape-1", "task-1")]].concat();
+    let mut ports = given(history, Vec::new());
+    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+    assert_eq!((reply.code, events), (Code::Done, vec![corrected("escape-1", ONE_OFF)]));
+    assert!(ports.log.records.iter().any(|record| record.event == resolved("escape-1", "task-1")));
+    let (reply, _) = call(&mut ports, "status", "");
+    let shown = format!("escape-1 resolved against task-1, corrected to historical: {ONE_OFF}");
+    assert!(reply.text.contains(&shown) && reply.text.contains("open escapes: 0"), "{}", reply.text);
+    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("corrected to historical"), "{}", reply.text);
+}
+
+#[test]
+fn resolve_historical_correcting_is_refused_on_an_open_or_historical_escape() {
+    let cases = [
+        (vec![escaped("gap", "no retire")], "is open, so there is nothing to correct"),
+        (
+            [vec![escaped("gap", "no retire")], vec![historical("escape-1", "first")]].concat(),
+            "already historical: first",
+        ),
+    ];
+    cases.into_iter().for_each(|(history, why)| {
+        let (reply, events) =
+            call(&mut given(history, Vec::new()), &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(why), "{}", reply.text);
+    });
+}
+
+#[test]
+fn p1_still_counts_an_outside_merge_escape_that_names_a_pr_when_it_is_resolved_historical_or_corrected() {
+    let outside =
+        vec![opened("task-2"), claimed("task-2"), linked("task-2", "8"), merged_outside("8", 1), done("task-2")];
+    let named = || vec![escaped_pr("outside-merge", "8", "merged by hand")];
+    let closings = [
+        vec![resolved("escape-1", "task-1")],
+        vec![historical("escape-1", "one-off")],
+        vec![resolved("escape-1", "task-1"), corrected("escape-1", "one-off")],
+    ];
+    closings.into_iter().for_each(|closing| {
+        let history = [finished_task(), outside.clone(), named(), closing].concat();
+        let mut ports = given(history, Vec::new());
+        ports.github.listed = Some(Ok(listed(&[7, 8])));
+        let (reply, _) = call(&mut ports, "status", "");
+        assert!(reply.text.contains("P1 The loop is used: holds; observed unrecorded bypasses 0;"), "{}", reply.text);
+    });
+}
+
+#[test]
+fn a_log_that_resolves_historically_twice_or_corrects_a_non_task_resolution_does_not_fold() {
+    let one = || vec![escaped("gap", "no retire")];
+    let bad = [
+        [one(), vec![historical("escape-1", "a"), historical("escape-1", "b")]].concat(),
+        [one(), vec![corrected("escape-1", "a")]].concat(),
+        [one(), vec![historical("escape-1", "a"), corrected("escape-1", "b")]].concat(),
+        [finished_task(), one(), vec![resolved("escape-1", "task-1"), historical("escape-1", "a")]].concat(),
+    ];
+    bad.into_iter().for_each(|history| {
+        let (reply, _) = call(&mut given(history, Vec::new()), "status", "");
+        assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    });
 }

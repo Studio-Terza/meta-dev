@@ -47,6 +47,10 @@ impl Ledger {
             .map(|number| EscapeId::after(number - 1))
             .filter_map(|id| self.escape(id).filter(|logged| logged.is_open()).map(|logged| logged.line(id, main)))
             .collect();
+        let corrected: Vec<String> = (1..=self.escapes.len())
+            .map(|number| EscapeId::after(number - 1))
+            .filter_map(|id| self.escape(id).and_then(|logged| logged.correction(id)))
+            .collect();
         let resumes: Vec<String> = self
             .leases
             .iter()
@@ -129,6 +133,7 @@ impl Ledger {
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             section("live leases", &leases),
             section(&format!("open escapes: {}", self.open_escapes()), &open_escapes),
+            section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             format!(

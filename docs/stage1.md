@@ -19,6 +19,20 @@ Each row is a behaviour-table test through the single in-process `Call`.
 | `meta resolve <escape> <task>` | the task is done | event `Resolved`; the escape no longer counts as open |
 | `meta resolve` | the task is not done, or the escape is already resolved or unknown | refused, with the reason |
 
+### Historical escapes
+
+Some escapes record one-off bypasses that can never recur and have no fixing task, such as "agent started without a lease because meta did not exist yet". They close as historical rather than against an unrelated done task.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta resolve <escape> --historical <reason>` | the escape is open | event `ResolvedHistorical`; the escape no longer counts as open |
+| `meta resolve <escape> --historical <reason>` | the escape is already resolved or historical, or unknown | refused, with the reason; it names `--correcting` for an escape resolved against a task |
+| `meta resolve <escape> --historical <reason> --correcting` | the escape is resolved against a task | event `Corrected`; the fold treats the escape as historical; the `Resolved` record stays in the log, and `meta status` shows "resolved against task-1, corrected to historical: <reason>" |
+| `meta resolve <escape> --historical <reason> --correcting` | the escape is open, historical or already corrected | refused, with the reason |
+| `meta status` P1 | an `outside-merge` escape names a PR and is resolved, historical or corrected | the PR still counts as recorded; closing an escape never un-records its bypass |
+
+A log that resolves one escape twice, or corrects an escape that is not resolved against a task, does not fold.
+
 Repeats are counted by kind, not by free text. Escape kinds are data, each with a source.
 
 An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind since removed) is shown by `meta status` as `unchecked`, and every such escape counts under one shared key for P2's repeats, so a typo cannot dodge the bound. `unclassified` escapes keep counting by their reason.

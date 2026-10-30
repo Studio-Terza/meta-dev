@@ -33,6 +33,7 @@ pub enum LedgerCall {
 pub enum Local {
     Open(Title),
     Resolve { escape: EscapeId, task: TaskId },
+    Historical { escape: EscapeId, reason: Reason, correcting: bool },
     Defer { task: TaskId, reason: Reason },
     Undefer(TaskId),
     Verdict { task: TaskId, verdict: Verdict },
@@ -86,7 +87,7 @@ impl Answer {
 impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name>\n  meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> [--pr <pr>] <reason>\n  \
-                         meta resolve <escape> <task>\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
+                         meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name>\n  meta verdict <task> pass|fail\n  \
                          meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
@@ -115,6 +116,14 @@ impl Call {
                 kind.parse()
                     .and_then(|kind| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: None })),
             ),
+            ["resolve", escape, "--historical", reason @ .., "--correcting"] => {
+                local(escape.parse().and_then(|escape| {
+                    reason.join(" ").parse().map(|reason| Local::Historical { escape, reason, correcting: true })
+                }))
+            }
+            ["resolve", escape, "--historical", reason @ ..] => local(escape.parse().and_then(|escape| {
+                reason.join(" ").parse().map(|reason| Local::Historical { escape, reason, correcting: false })
+            })),
             ["resolve", escape, task] => {
                 local(escape.parse().and_then(|escape| task.parse().map(|task| Local::Resolve { escape, task })))
             }
@@ -314,6 +323,9 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
     Ok(match prepared {
         Prepared::Local(Local::Open(title)) => ledger.open(title),
         Prepared::Local(Local::Resolve { escape, task }) => ledger.resolve(escape, task)?,
+        Prepared::Local(Local::Historical { escape, reason, correcting }) => {
+            ledger.resolve_historical(escape, reason, correcting)?
+        }
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,

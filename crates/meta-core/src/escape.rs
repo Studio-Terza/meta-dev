@@ -86,7 +86,27 @@ pub struct Logged {
     reason: Reason,
     pr: Option<PrNumber>,
     checked: Checked,
-    resolved: Option<TaskId>,
+    resolution: Option<Resolution>,
+}
+
+/// How an escape was closed. A correction keeps the task it replaced, so that status can show both.
+#[derive(Debug)]
+enum Resolution {
+    Task(TaskId),
+    Historical(Reason),
+    Corrected { task: TaskId, reason: Reason },
+}
+
+impl std::fmt::Display for Resolution {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Task(task) => write!(formatter, "resolved against {task}"),
+            Self::Historical(reason) => write!(formatter, "historical: {reason}"),
+            Self::Corrected { task, reason } => {
+                write!(formatter, "resolved against {task}, corrected to historical: {reason}")
+            }
+        }
+    }
 }
 
 /// What repeats count by: the kind; an unclassified escape's free-text reason; or, for every kind
@@ -110,18 +130,50 @@ impl std::fmt::Display for RepeatKey<'_> {
 
 impl Logged {
     pub(crate) fn new(kind: EscapeKind, reason: Reason, pr: Option<PrNumber>, checked: Checked) -> Self {
-        Self { kind, reason, pr, checked, resolved: None }
+        Self { kind, reason, pr, checked, resolution: None }
     }
 
     pub(crate) fn resolve(&mut self, escape: EscapeId, task: TaskId) -> Result<(), String> {
-        match self.resolved.replace(task) {
-            None => Ok(()),
-            Some(earlier) => Err(format!("{escape} resolved twice, against {earlier} and {task}")),
+        match &self.resolution {
+            None => self.close(Resolution::Task(task)),
+            Some(earlier) => Err(format!("{escape} resolved twice, {earlier} and then against {task}")),
         }
     }
 
+    pub(crate) fn resolve_historical(&mut self, escape: EscapeId, reason: Reason) -> Result<(), String> {
+        match &self.resolution {
+            None => self.close(Resolution::Historical(reason)),
+            Some(earlier) => Err(format!("{escape} resolved twice, {earlier} and then historical")),
+        }
+    }
+
+    /// Only an escape resolved against a task can be corrected, and only once.
+    pub(crate) fn correct(&mut self, escape: EscapeId, reason: Reason) -> Result<(), String> {
+        match self.resolution.take() {
+            Some(Resolution::Task(task)) => self.close(Resolution::Corrected { task, reason }),
+            other => {
+                let why = other.as_ref().map_or_else(|| "open".to_owned(), ToString::to_string);
+                self.resolution = other;
+                Err(format!("{escape} corrected while {why}, not resolved against a task"))
+            }
+        }
+    }
+
+    fn close(&mut self, resolution: Resolution) -> Result<(), String> {
+        self.resolution = Some(resolution);
+        Ok(())
+    }
+
     pub(crate) fn is_open(&self) -> bool {
-        self.resolved.is_none()
+        self.resolution.is_none()
+    }
+
+    /// The status line of a correction: the original resolution beside what it became.
+    pub(crate) fn correction(&self, id: EscapeId) -> Option<String> {
+        match &self.resolution {
+            Some(Resolution::Corrected { .. }) => Some(format!("{id} {}", self.resolution.as_ref()?)),
+            _ => None,
+        }
     }
 
     /// The PR merged outside meta that this escape records, when its kind names one.
@@ -205,7 +257,7 @@ impl Admitted {
                 Event::Escaped { kind: earlier, .. } => {
                     (escaped + 1, resolved, repeats + usize::from(*earlier == kind))
                 }
-                Event::Resolved { .. } => (escaped, resolved + 1, repeats),
+                Event::Resolved { .. } | Event::ResolvedHistorical { .. } => (escaped, resolved + 1, repeats),
                 _ => (escaped, resolved, repeats),
             })
         });
@@ -229,8 +281,8 @@ impl Ledger {
             Refusal::because(format!("{escape} is unknown. Next: meta status lists the open escapes."))
         })?;
         let refuse = |why: String| Err(Refusal::because(why));
-        match (logged.resolved, self.tasks.get(&task)) {
-            (Some(earlier), _) => refuse(format!("{escape} is already resolved against {earlier}.")),
+        match (&logged.resolution, self.tasks.get(&task)) {
+            (Some(earlier), _) => refuse(format!("{escape} is already {earlier}.")),
             (None, Some(Progress::Done(_))) => {
                 let text = format!("{escape} resolved against {task}\n");
                 Ok(Accepted::new(vec![Event::Resolved { escape, task }], text))
@@ -239,6 +291,36 @@ impl Ledger {
                 "{other}; an escape is resolved only against a done task. Next: merge the fix with meta merge, then meta resolve {escape} {task}."
             )),
             (None, None) => refuse(format!("{task} is unknown. Next: meta status.")),
+        }
+    }
+}
+
+impl Ledger {
+    /// Closes an open escape as historical: a one-off with no fixing task. With `correcting`, moves
+    /// an escape resolved against a task to historical instead.
+    pub fn resolve_historical(&self, escape: EscapeId, reason: Reason, correcting: bool) -> Result<Accepted, Refusal> {
+        let logged = self.escape(escape).ok_or_else(|| {
+            Refusal::because(format!("{escape} is unknown. Next: meta status lists the open escapes."))
+        })?;
+        let refuse = |why: String| Err(Refusal::because(why));
+        match (&logged.resolution, correcting) {
+            (None, false) => Ok(Accepted::new(
+                vec![Event::ResolvedHistorical { escape, reason }],
+                format!("{escape} resolved as historical\n"),
+            )),
+            (Some(Resolution::Task(_)), true) => Ok(Accepted::new(
+                vec![Event::Corrected { escape, reason }],
+                format!("{escape} corrected to historical\n"),
+            )),
+            (Some(earlier), false) => refuse(format!(
+                "{escape} is already {earlier}. Next: meta resolve {escape} --historical <reason> --correcting, only for an escape resolved against a task."
+            )),
+            (None, true) => refuse(format!(
+                "{escape} is open, so there is nothing to correct. Next: meta resolve {escape} --historical <reason>."
+            )),
+            (Some(earlier), true) => {
+                refuse(format!("{escape} is already {earlier}; only an escape resolved against a task is corrected."))
+            }
         }
     }
 }
