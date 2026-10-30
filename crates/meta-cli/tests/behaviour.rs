@@ -523,3 +523,17 @@ fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_cannot_
         assert!(reply.text.contains("open tasks") && reply.text.contains("P2 open escapes"), "{}", reply.text);
     });
 }
+
+#[test]
+fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_may_be_truncated() {
+    let full = |count: u64| listed(&(1..=count).collect::<Vec<_>>());
+    let mut ports = given(claimed_task(), Vec::new());
+    ports.github.listed = Some(Ok(full(1001)));
+    let (reply, events) = call(&mut ports, "status", "");
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    assert!(reply.text.contains("P1 merges: unavailable") && reply.text.contains("truncated"), "{}", reply.text);
+    let mut ports = given(claimed_task(), Vec::new());
+    ports.github.listed = Some(Ok(full(1000)));
+    let (reply, _) = call(&mut ports, "status", "");
+    assert!(reply.text.contains("P1 merged outside meta: 1000"), "{}", reply.text);
+}
