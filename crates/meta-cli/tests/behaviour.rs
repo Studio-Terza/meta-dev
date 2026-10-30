@@ -159,8 +159,8 @@ fn self_files() -> std::collections::BTreeMap<SelfFile, String> {
         (SelfFile::Predictions, PREDICTIONS),
         (SelfFile::Roles, ROLES),
     ]
-        .map(|(file, text)| (file, text.to_owned()))
-        .into()
+    .map(|(file, text)| (file, text.to_owned()))
+    .into()
 }
 
 fn call(ports: &mut Memory, args: &str, stdin: &str) -> (Answer, Vec<Event>) {
@@ -1406,20 +1406,26 @@ fn claim_and_review_take_a_deadline_override_in_minutes_and_self_claims_get_no_d
 
 #[test]
 fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
-    let history = [
-        vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1 + 2700)],
-        vec![used("lease-1")],
-    ]
-    .concat();
+    let history =
+        [vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1 + 2700)], vec![used("lease-1")]]
+            .concat();
     let mut ports = given(history, Vec::new());
     ports.clock.pause(100);
     let (reply, events) = call(&mut ports, "hook post-tool-use", &agent_ran("Agent", "lease-1", AGENT_ID));
     let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
     let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
+    ports.clock.pause(2750 - 102);
     let (status, _) = call(&mut ports, "status", "");
-    let live = format!("lease-1 for task-1, deadline unix {}", 102 + 2700);
-    assert!(status.text.contains(&live), "{}", status.text);
+    assert!(
+        status.text.contains("overdue leases (flagged)\n  (none)\n"),
+        "past the lease's own deadline: {}",
+        status.text
+    );
+    ports.clock.pause(2803 - 2750);
+    let (status, _) = call(&mut ports, "status", "");
+    let flagged = format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix {}\n", 102 + 2700);
+    assert!(status.text.contains(&flagged), "{}", status.text);
 }
 
 #[test]

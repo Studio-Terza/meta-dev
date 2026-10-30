@@ -1,5 +1,5 @@
 use crate::event::{Attempt, Event};
-use crate::ids::{AgentId, LeaseId};
+use crate::ids::{AgentId, LeaseId, Timestamp};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::reply::Accepted;
@@ -180,14 +180,18 @@ impl Ledger {
         }
     }
 
-    /// Records the agent a used lease started, so that only that agent can be resumed on it.
-    pub fn bind(&self, binding: Binding) -> Accepted {
+    /// Records the agent a used lease started, so that only that agent can be resumed on it, and the
+    /// lease's deadline counted from this start at `at`.
+    pub fn bind(&self, binding: Binding, at: Timestamp) -> Accepted {
         let refusal = |why: String| Phase::After.refuse(format!("{why}; {}.", Hook::UNBOUND), Vec::new());
         match binding.0 {
             Err(why) => refusal(why),
             Ok((lease, agent)) => match self.leases.get(&lease) {
                 Some(LeaseSlot::Spent(spent)) => match spent.agent() {
-                    None => Hook::allow(vec![Event::Started { lease, agent }]),
+                    None => {
+                        let deadline = spent.lease().deadline_from(at).time();
+                        Hook::allow(vec![Event::Started { lease, agent, deadline }])
+                    }
                     Some(earlier) => refusal(format!("{lease} already started {earlier}, not {agent}")),
                 },
                 Some(LeaseSlot::Unused(_)) => refusal(format!("{lease} is unused, so it started no agent")),
