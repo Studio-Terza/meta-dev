@@ -1,14 +1,13 @@
 use crate::event::{Attempt, Event, Record};
 use crate::ids::{LeaseId, PrNumber, Reason, RunCount, TaskId};
 use crate::lease::{Lease, LeaseSlot};
-use crate::task::{Progress, Task};
+use crate::task::{Linked, Progress, Task};
 use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Debug, Default)]
 pub struct Ledger {
     pub(crate) tasks: BTreeMap<TaskId, Progress>,
-    pub(crate) links: BTreeMap<PrNumber, TaskId>,
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
     pub(crate) escapes: Vec<Reason>,
     pub(crate) merged: Vec<RunCount>,
@@ -52,28 +51,21 @@ impl Ledger {
                 let slot = LeaseSlot::Unused(Lease::issue(*lease, *task));
                 self.leases.insert(*lease, slot).map_or(Ok(()), |_| Err(format!("{lease} issued twice")))?;
             }
-            Event::Linked { task, pr, pin } => {
+            Event::Linked { task, pr, pin, .. } => {
                 let linked = match self.take(*task)? {
                     Progress::Claimed(claimed) => Ok(claimed.link(*pr, pin.clone())),
-                    Progress::Linked(linked) => {
-                        self.links.remove(&linked.pr());
-                        Ok(linked.relink(*pr, pin.clone()))
-                    }
+                    Progress::Linked(linked) => Ok(linked.relink(*pr, pin.clone())),
                     other => Err(format!("{task} linked while {other}")),
                 }?;
-                self.links.insert(*pr, *task);
                 self.tasks.insert(*task, Progress::Linked(linked));
             }
             Event::Merged { pr, runs, .. } => {
-                self.links.get(pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
+                self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
                 self.merged.push(*runs);
             }
             Event::Done { task } => {
                 let done = match self.take(*task)? {
-                    Progress::Linked(linked) => {
-                        self.links.remove(&linked.pr());
-                        Ok(linked.finish())
-                    }
+                    Progress::Linked(linked) => Ok(linked.finish()),
                     other => Err(format!("{task} done while {other}")),
                 }?;
                 self.tasks.insert(*task, Progress::Done(done));
@@ -93,6 +85,13 @@ impl Ledger {
 
     fn take(&mut self, task: TaskId) -> Result<Progress, String> {
         self.tasks.remove(&task).ok_or_else(|| format!("{task} is unknown"))
+    }
+
+    pub(crate) fn linked(&self, pr: PrNumber) -> Option<&Task<Linked>> {
+        self.tasks.values().find_map(|task| match task {
+            Progress::Linked(linked) if linked.pr() == pr => Some(linked),
+            _ => None,
+        })
     }
 
     pub(crate) fn live(&self, lease: &Lease) -> bool {

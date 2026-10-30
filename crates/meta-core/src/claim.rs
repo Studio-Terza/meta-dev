@@ -40,6 +40,6 @@ impl Claim {
              4. push, open the PR with gh pr create, then run meta link {task} <pr>\n\
              rules:\n{rules}"
         );
-        Accepted { events: vec![Event::Claimed { task, agent }, Event::Leased { lease, task }], text }
+        Accepted::new(vec![Event::Claimed { task, agent }, Event::Leased { lease, task }], text)
     }
 }

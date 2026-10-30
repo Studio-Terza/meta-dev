@@ -2,6 +2,8 @@ mod clock;
 mod command;
 mod gh;
 mod git;
+#[cfg(test)]
+mod hook_entry;
 mod host;
 mod log;
 

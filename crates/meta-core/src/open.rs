@@ -6,6 +6,6 @@ use crate::reply::Accepted;
 impl Ledger {
     pub fn open(&self, title: Title) -> Accepted {
         let task = TaskId::after(self.tasks.len());
-        Accepted { events: vec![Event::Opened { task, title }], text: format!("{task}\n") }
+        Accepted::new(vec![Event::Opened { task, title }], format!("{task}\n"))
     }
 }

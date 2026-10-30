@@ -3,15 +3,25 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Accepted {
-    pub events: Vec<Event>,
-    pub text: String,
+    events: Vec<Event>,
+    text: String,
+}
+
+impl Accepted {
+    pub(crate) fn new(events: Vec<Event>, text: String) -> Self {
+        Self { events, text }
+    }
+
+    pub fn into_parts(self) -> (Vec<Event>, String) {
+        (self.events, self.text)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal(String);
 
 impl Refusal {
-    pub fn because(why: impl Into<String>) -> Self {
+    pub(crate) fn because(why: impl Into<String>) -> Self {
         Self(why.into())
     }
 }

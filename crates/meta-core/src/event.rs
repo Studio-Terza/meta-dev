@@ -1,4 +1,4 @@
-use crate::ids::{AgentName, LeaseId, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title};
+use crate::ids::{AgentName, LeaseId, PrNumber, Reason, Repo, RunCount, Sha, TaskId, Timestamp, Title};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -7,7 +7,7 @@ pub enum Event {
     Opened { task: TaskId, title: Title },
     Claimed { task: TaskId, agent: AgentName },
     Leased { lease: LeaseId, task: TaskId },
-    Linked { task: TaskId, pr: PrNumber, pin: Sha },
+    Linked { task: TaskId, pr: PrNumber, pin: Sha, repo: Repo },
     Merged { pr: PrNumber, head: Sha, runs: RunCount },
     Done { task: TaskId },
     Escaped { reason: Reason },

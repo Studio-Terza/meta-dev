@@ -2,10 +2,15 @@ use crate::event::Attempt;
 use crate::ids::{Reason, RunCount};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
+use crate::reply::Accepted;
 use std::collections::BTreeMap;
 
 impl Ledger {
-    pub fn status(&self) -> String {
+    pub fn status(&self) -> Accepted {
+        Accepted::new(Vec::new(), self.report())
+    }
+
+    fn report(&self) -> String {
         let tasks: Vec<String> =
             self.tasks.values().filter(|task| !task.is_done()).map(|task| task.to_string()).collect();
         let leases: Vec<String> = self

@@ -5,6 +5,12 @@ use std::str::FromStr;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Malformed(String);
 
+impl Malformed {
+    pub(crate) fn because(why: impl Into<String>) -> Self {
+        Self(why.into())
+    }
+}
+
 impl fmt::Display for Malformed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
@@ -93,6 +99,8 @@ text!(Reason, "reason");
 text!(Sha, "sha");
 text!(CheckName, "check name");
 text!(Origin, "origin");
+text!(Branch, "branch");
+text!(Repo, "repo");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

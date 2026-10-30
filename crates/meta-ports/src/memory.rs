@@ -1,4 +1,5 @@
-use crate::{Clock, Git, GitHub, Log, PortError};
+use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
+
 use meta_core::{Cleared, Origin, PrNumber, Pull, Record, Sha, Timestamp};
 use std::collections::BTreeMap;
 
@@ -15,6 +16,12 @@ impl Log for MemoryLog {
     fn append(&mut self, records: &[Record]) -> Result<(), PortError> {
         self.records.extend_from_slice(records);
         Ok(())
+    }
+
+    fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError> {
+        let (records, decided) = decide(self.records.clone());
+        self.records.extend(records);
+        Ok(decided)
     }
 }
 
@@ -36,13 +43,13 @@ impl Git for RecordedGit {
 
 #[derive(Debug, Default)]
 pub struct RecordedGitHub {
-    pub pulls: BTreeMap<PrNumber, Pull>,
+    pub replies: BTreeMap<PrNumber, GhReplies>,
     pub merged: Vec<(PrNumber, Sha)>,
 }
 
 impl GitHub for RecordedGitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
-        self.pulls.get(&pr).cloned().ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))
+        self.replies.get(&pr).cloned().ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))?.pull()
     }
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {

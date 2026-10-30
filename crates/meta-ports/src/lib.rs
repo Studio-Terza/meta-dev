@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, Timestamp};
+use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, Timestamp};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,14 +19,34 @@ impl fmt::Display for PortError {
     }
 }
 
+impl From<Malformed> for PortError {
+    fn from(malformed: Malformed) -> Self {
+        Self(malformed.to_string())
+    }
+}
+
 pub trait Log {
     fn read(&self) -> Result<Vec<Record>, PortError>;
     fn append(&mut self, records: &[Record]) -> Result<(), PortError>;
+    fn transact<T>(&mut self, decide: impl FnOnce(Vec<Record>) -> (Vec<Record>, T)) -> Result<T, PortError>;
 }
 
 pub trait Git {
     fn origin(&self) -> Result<Origin, PortError>;
     fn rules(&self) -> Result<String, PortError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct GhReplies {
+    pub view: String,
+    pub required: Result<String, PortError>,
+    pub runs: String,
+}
+
+impl GhReplies {
+    pub fn pull(self) -> Result<Pull, PortError> {
+        Ok(Pull::from_gh(&self.view, &self.required?, &self.runs)?)
+    }
 }
 
 pub trait GitHub {

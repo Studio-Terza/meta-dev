@@ -16,13 +16,16 @@ mod status;
 mod task;
 
 pub use claim::Claim;
+pub use escape::Escape;
 pub use event::{Attempt, Event, Record};
+pub use hook::{AgentStart, Hook};
 pub use ids::{
-    AgentName, CheckName, LeaseId, Malformed, Origin, PrNumber, Reason, RunCount, Sha, TaskId, Timestamp, Title,
+    AgentName, Branch, CheckName, LeaseId, Malformed, Origin, PrNumber, Reason, Repo, RunCount, Sha, TaskId, Timestamp,
+    Title,
 };
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;
-pub use merge::{Cleared, Merging};
-pub use pull::{Check, Outcome, Pull};
+pub use merge::{Clearance, Cleared, Landed, Merging};
+pub use pull::{Outcome, Pull, PullState};
 pub use reply::{Accepted, Refusal};
 pub use rules::{Rules, Unreadable};

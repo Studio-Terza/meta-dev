@@ -11,15 +11,15 @@ pub struct Lease {
 pub struct Spent;
 
 impl Lease {
-    pub fn issue(id: LeaseId, task: TaskId) -> Self {
+    pub(crate) fn issue(id: LeaseId, task: TaskId) -> Self {
         Self { id, task }
     }
 
-    pub fn task(&self) -> TaskId {
+    pub(crate) fn task(&self) -> TaskId {
         self.task
     }
 
-    pub fn spend(self) -> (Spent, Event) {
+    pub(crate) fn spend(self) -> (Spent, Event) {
         (Spent, Event::LeaseUsed { lease: self.id })
     }
 }
