@@ -187,7 +187,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 match records
                     .map_err(Failure::from)
                     .and_then(|records| fold(&records))
-                    .and_then(|ledger| finish(prepared, ledger))
+                    .and_then(|ledger| finish(prepared, ledger, at))
                 {
                     Ok(accepted) => {
                         let (events, text) = accepted.into_parts();
@@ -287,14 +287,14 @@ fn prepare<G: Git, H: GitHub>(call: LedgerCall, ledger: &Ledger, git: &G, github
     })
 }
 
-fn finish(prepared: Prepared, ledger: Ledger) -> Result<Accepted, Failure> {
+fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted, Failure> {
     Ok(match prepared {
         Prepared::Local(Local::Open(title)) => ledger.open(title),
         Prepared::Local(Local::Resolve { escape, task }) => ledger.resolve(escape, task)?,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
-        Prepared::Status(sources) => ledger.status(sources),
+        Prepared::Status(sources) => ledger.status(sources, at),
         Prepared::Claim { task, claimant, origin, rules } => ledger.claim(task, claimant)?.brief(&origin, &rules),
         Prepared::Link { task, pr, pull } => ledger.link(task, pr)?.pin(&pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {

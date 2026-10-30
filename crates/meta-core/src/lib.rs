@@ -3,6 +3,7 @@ mod escape;
 mod event;
 mod hook;
 mod ids;
+mod latch;
 mod lease;
 mod ledger;
 mod link;
@@ -24,14 +25,14 @@ pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Origin, PrNumber,
-    Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
+    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Observed, Origin,
+    PrNumber, PredictionId, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
 };
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;
 pub use merge::{Clearance, Cleared, Landed, Merging};
 pub use merges::{Cause, Merges, Reconciliation, Unreached};
-pub use predictions::Predictions;
+pub use predictions::{Measure, Predictions};
 pub use pull::{Outcome, Pull, PullState};
 pub use reply::{Accepted, Refusal};
 pub use retire::{Retirement, Retiring};

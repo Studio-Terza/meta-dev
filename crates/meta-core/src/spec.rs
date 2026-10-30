@@ -1,3 +1,6 @@
+use crate::escape::EscapeKinds;
+use crate::predictions::Predictions;
+use crate::rules::Rules;
 use serde::de::DeserializeOwned;
 use std::fmt;
 
@@ -15,6 +18,15 @@ impl SelfFile {
             Self::Rules => "self/rules.toml",
             Self::EscapeKinds => "self/escapes.toml",
             Self::Predictions => "self/predictions.toml",
+        }
+    }
+
+    /// Whether `text` parses as this file.
+    pub fn is_readable(self, text: &str) -> bool {
+        match self {
+            Self::Rules => Rules::parse(text).is_ok(),
+            Self::EscapeKinds => EscapeKinds::parse(text).is_ok(),
+            Self::Predictions => Predictions::parse(text).is_ok(),
         }
     }
 

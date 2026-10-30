@@ -293,7 +293,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
     ]
     .concat();
     let (reply, events) = call(&mut given(history, Vec::new()), "status", "");
-    assert_eq!(events, Vec::new());
+    assert_eq!(events, vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 1")]);
     let expected = [
         "task-1 claimed by alice",
         "task-3 open",
@@ -547,7 +547,8 @@ fn status_counts_a_pr_merged_on_github_but_missing_from_the_log_as_merged_outsid
     let mut ports = given(history, Vec::new());
     ports.github.listed = Some(Ok(listed(&[7, 12, 13])));
     let (reply, events) = call(&mut ports, "status", "");
-    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    let latched = vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 2")];
+    assert_eq!((reply.code, events), (Code::Done, latched));
     let expected = ["P1 merges through meta: 1 of 3", "P1 merged outside meta: 2 (2 missing from the log)"];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
 }

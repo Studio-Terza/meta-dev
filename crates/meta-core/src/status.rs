@@ -1,12 +1,14 @@
 use crate::escape::{EscapeKinds, RepeatKey};
-use crate::event::Route;
-use crate::ids::{EscapeId, PrNumber, RunCount};
+use crate::event::{Event, Route};
+use crate::ids::{EscapeId, PrNumber, RunCount, Timestamp};
+use crate::latch::Latch;
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
 use crate::task::Progress;
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// What `meta status` reads besides the log, each as read or why it could not be.
@@ -21,11 +23,13 @@ impl Ledger {
     /// A lease is flagged from its third resume onward.
     const FLAGGED_RESUMES: usize = 3;
 
-    pub fn status(&self, sources: Sources) -> Accepted {
-        Accepted::new(Vec::new(), self.report(sources))
+    /// The report, and a `Falsified` event for each falsifying measure not latched before.
+    pub fn status(&self, sources: Sources, at: Timestamp) -> Accepted {
+        let (events, text) = self.report(sources, at);
+        Accepted::new(events, text)
     }
 
-    fn report(&self, sources: Sources) -> String {
+    fn report(&self, sources: Sources, at: Timestamp) -> (Vec<Event>, String) {
         let Sources { github, kinds, predictions } = sources;
         let listed = |keep: fn(&Progress) -> bool| -> Vec<String> {
             self.tasks.values().filter(|task| keep(task)).map(|task| task.to_string()).collect()
@@ -38,9 +42,10 @@ impl Ledger {
                 _ => None,
             })
             .collect();
+        let main = kinds.as_ref().ok();
         let open_escapes: Vec<String> = (1..=self.escapes.len())
             .map(|number| EscapeId::after(number - 1))
-            .filter_map(|id| self.escape(id).filter(|logged| logged.is_open()).map(|logged| logged.line(id)))
+            .filter_map(|id| self.escape(id).filter(|logged| logged.is_open()).map(|logged| logged.line(id, main)))
             .collect();
         let resumes: Vec<String> = self
             .leases
@@ -52,7 +57,7 @@ impl Ledger {
                 _ => None,
             })
             .collect();
-        let repeats = self.repeats();
+        let repeats = self.repeats(main);
         let most = repeats.iter().filter(|(_, count)| **count > 0).max_by_key(|(_, count)| **count);
         let most_line = most.map_or_else(|| "0".to_owned(), |(key, count)| format!("{count} ({key})"));
         let started = self.leases.values().filter(|slot| matches!(slot, LeaseSlot::Spent(_))).count();
@@ -83,11 +88,43 @@ impl Ledger {
                 }
             }
         };
-        let predicted = match &predictions {
-            Ok(predictions) => predictions.lines(observe),
-            Err(why) => vec![format!("unavailable: {why}")],
+        let (predicted, fresh) = match &predictions {
+            Ok(predictions) => {
+                let readings = predictions.read(observe);
+                let mut latched = self.falsified.clone();
+                let fresh: Vec<Event> = readings
+                    .iter()
+                    .flat_map(|reading| {
+                        reading.falsifying.iter().map(move |(measure, observed)| (reading, *measure, observed))
+                    })
+                    .filter_map(|(reading, measure, observed)| match latched.entry((reading.id.clone(), measure)) {
+                        Entry::Vacant(vacant) => {
+                            vacant.insert(Latch::new(at, observed.clone()));
+                            Some(Event::Falsified {
+                                prediction: reading.id.clone(),
+                                measure,
+                                observed: observed.clone(),
+                            })
+                        }
+                        Entry::Occupied(_) => None,
+                    })
+                    .collect();
+                let lines = readings
+                    .iter()
+                    .map(|reading| {
+                        let kept: String = latched
+                            .iter()
+                            .filter(|((prediction, _), _)| *prediction == reading.id)
+                            .map(|(_, latch)| format!("; {}", latch.shown()))
+                            .collect();
+                        format!("{}{kept}", reading.line)
+                    })
+                    .collect();
+                (lines, fresh)
+            }
+            Err(why) => (vec![format!("unavailable: {why}")], Vec::new()),
         };
-        [
+        let text = [
             section("open tasks", &listed(Progress::is_active)),
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             section("live leases", &leases),
@@ -104,17 +141,19 @@ impl Ledger {
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             section("predictions", &predicted),
         ]
-        .concat()
+        .concat();
+        (fresh, text)
     }
 
     fn open_escapes(&self) -> usize {
         self.escapes.iter().filter(|logged| logged.is_open()).count()
     }
 
-    /// Repeats per kind, open or resolved: each kind's escapes after its first.
-    fn repeats(&self) -> BTreeMap<RepeatKey<'_>, usize> {
-        let counts = self.escapes.iter().fold(BTreeMap::<RepeatKey<'_>, usize>::new(), |mut counts, logged| {
-            *counts.entry(logged.key()).or_default() += 1;
+    /// Repeats per kind, open or resolved: each kind's escapes after its first. Kinds that main does
+    /// not list share one key.
+    fn repeats<'a>(&'a self, main: Option<&EscapeKinds>) -> BTreeMap<RepeatKey<'a>, usize> {
+        let counts = self.escapes.iter().fold(BTreeMap::<RepeatKey<'a>, usize>::new(), |mut counts, logged| {
+            *counts.entry(logged.key(main)).or_default() += 1;
             counts
         });
         counts.into_iter().map(|(key, count)| (key, count - 1)).collect()

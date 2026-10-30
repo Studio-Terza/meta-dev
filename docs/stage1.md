@@ -14,11 +14,14 @@ Each row is a behaviour-table test through the single in-process `Call`.
 | `meta escape <kind> --pr <pr> <reason>` | `kind` names merged PRs (`outside-merge`) | event `Escaped` carrying the PR |
 | `meta escape` | unknown kind; a kind that names merged PRs without `--pr`; `--pr` with any other kind; `unclassified` | refused; lists the kinds, or says which form the kind takes |
 | `meta escape <kind> <reason>` | no escape kinds can be read | event `Escaped` marked `unchecked`; prints why |
+| `meta escape <kind> <reason>` | the working-tree `self/escapes.toml` exists but does not parse | the cache of the last read from main is used instead; when neither parses, the kind is marked `unchecked` and the parse error is printed |
 | `meta escape <kind> <reason>` | the log does not fold, or its lines do not parse | event `Escaped` all the same, as stage 0 promised; prints that the id and counts are unavailable when the lines do not parse |
 | `meta resolve <escape> <task>` | the task is done | event `Resolved`; the escape no longer counts as open |
 | `meta resolve` | the task is not done, or the escape is already resolved or unknown | refused, with the reason |
 
 Repeats are counted by kind, not by free text. Escape kinds are data, each with a source.
+
+An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind since removed) is shown by `meta status` as `unchecked`, and every such escape counts under one shared key for P2's repeats, so a typo cannot dodge the bound. `unclassified` escapes keep counting by their reason.
 
 ### The lead working a task itself
 
@@ -69,11 +72,17 @@ The Agent tool takes no name that meta can set, so the PostToolUse hook binds ea
 | Command | Given | Result |
 |---|---|---|
 | `meta status` | any | each prediction line shows its observed value, its registered expectation, and `FALSIFIED` when the falsifier holds |
+| `meta status` | a measure of a prediction's falsifier is above its bound and no `Falsified` event names that prediction and measure | event `Falsified { prediction, measure, observed }`, stamped with the time of the record, appended inside the same locked append that status reads under |
+| `meta status` | a `Falsified` event exists for the prediction | the line ends with `falsified at <time> (<observed>)` for each latched measure, whatever the current reading, so resolving escapes cannot erase a falsification; no new event |
+
+A falsification latches once per prediction and measure, so a prediction first falsified by one measure and later by another latches twice (critic issue #17). Time is shown as unix seconds.
 
 ### Rules
 
 - `self/rules.toml` gains the owner's red-first rule: tighten the check in the first commit; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix.
 - `self/rules.toml` gains a review rule: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds. Source: owner 2026-10-30, ordinary review instead of blocking approvals. `meta review` puts it in every review brief.
+- The push-and-stop rule names its one exception, the red-first wait.
+- `self/rules.toml` gains a rule that leased agents run in the background (`run_in_background`): only background launches report an agent id at start, so a crashed foreground agent cannot be resumed. Source: failure 2026-10-30, stage 1 re-review.
 - Behaviour tests use a rules fixture, not the repo's `self/rules.toml`, so changing a rule cannot break unrelated tests.
 
 ## Deferred
