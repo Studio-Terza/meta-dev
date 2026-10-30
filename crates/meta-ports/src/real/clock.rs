@@ -10,4 +10,8 @@ impl Clock for SystemClock {
         let seconds = SystemTime::now().duration_since(UNIX_EPOCH).map(|since| since.as_secs()).unwrap_or_default();
         Timestamp::from_unix_seconds(seconds)
     }
+
+    fn pause(&self, seconds: u64) {
+        std::thread::sleep(std::time::Duration::from_secs(seconds));
+    }
 }

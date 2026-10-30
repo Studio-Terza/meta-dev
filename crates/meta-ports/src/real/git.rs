@@ -1,7 +1,7 @@
 use super::command::run;
 use super::log::home;
 use crate::{Git, PortError};
-use meta_core::{Origin, SelfFile};
+use meta_core::{Origin, SelfFile, Sha, TaskId};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -57,5 +57,13 @@ impl Git for GitCli {
 
     fn local(&self, file: SelfFile) -> Result<String, PortError> {
         Self::local_from(file, Path::new(""), home().map(|home| home.join("cache")))
+    }
+
+    fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
+        let found = run("git", &["for-each-ref", "--format=%(objectname)", &format!("refs/heads/{task}")])?;
+        match found.is_empty() {
+            true => Ok(None),
+            false => found.parse().map(Some).map_err(|error| PortError::new(format!("branch {task}: {error}"))),
+        }
     }
 }

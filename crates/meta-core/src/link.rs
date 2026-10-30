@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::ids::{PrNumber, TaskId};
+use crate::ids::{PrNumber, Sha, TaskId};
 use crate::ledger::Ledger;
 use crate::pull::Pull;
 use crate::reply::{Accepted, Refusal};
@@ -28,8 +28,29 @@ impl Ledger {
 }
 
 impl Linking {
-    pub fn pin(self, pull: &Pull) -> Result<Accepted, Refusal> {
+    /// The commit last pushed from the local branch named after the task, which is the commit to
+    /// pin; a task with no such branch has nothing to link yet.
+    pub fn pushed(&self, local: Option<Sha>) -> Result<Sha, Refusal> {
         let Self { task, pr } = self;
+        local.ok_or_else(|| {
+            Refusal::because(format!(
+                "{task} has no local branch {task}, so there is no pushed commit to pin to {pr}. \
+                 Next: commit the work on branch {task}, run git push origin {task}, then meta link {task} {pr}."
+            ))
+        })
+    }
+
+    /// Pins the head GitHub reports for the PR, only when it is the commit that was pushed.
+    pub fn pin(self, pushed: &Sha, pull: &Pull) -> Result<Accepted, Refusal> {
+        let Self { task, pr } = self;
+        let stale = (pull.head() != pushed).then(|| {
+            format!(
+                "{pr} head on GitHub is {}, but the local branch {task} is at {pushed}. Next: if the push has not \
+                 landed, run git push origin {task} and meta link {task} {pr} again; if the branches differ, \
+                 reconcile them first.",
+                pull.head()
+            )
+        });
         let branch = task.to_string();
         let wrong_branch = (pull.branch().to_string() != branch).then(|| {
             format!("{pr} comes from branch {}, not {branch}. Next: push the work to branch {branch}.", pull.branch())
@@ -37,7 +58,7 @@ impl Linking {
         let wrong_base = (pull.base().to_string() != Ledger::MAIN).then(|| {
             format!("{pr} targets {}, not {}. Next: retarget it to {}.", pull.base(), Ledger::MAIN, Ledger::MAIN)
         });
-        let problems: Vec<String> = wrong_branch.into_iter().chain(wrong_base).collect();
+        let problems: Vec<String> = wrong_branch.into_iter().chain(wrong_base).chain(stale).collect();
         match problems.is_empty() {
             false => Err(Refusal::because(format!("{task} cannot link {pr}:\n{}", problems.join("\n")))),
             true => {

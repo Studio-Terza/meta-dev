@@ -91,6 +91,10 @@ impl Pull {
         })
     }
 
+    pub fn is_at(&self, sha: &Sha) -> bool {
+        self.head == *sha
+    }
+
     pub(crate) fn head(&self) -> &Sha {
         &self.head
     }

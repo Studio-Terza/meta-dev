@@ -12,8 +12,11 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 | `meta claim <task> --agent <name>` | the task is open and unclaimed | event `Claimed` plus `Leased` with a fresh lease id; prints the brief: the task, the setup steps, and every rule in `self/rules.toml` with its source |
 | `meta claim <task> --agent <name>` | the task is claimed or linked, and none of its leases is unused | event `Leased` with a fresh lease id; prints the brief. That is still one lease per agent start |
 | `meta claim` | the task is claimed with an unused lease, done, or unknown | refused, with the reason; a claimed task's refusal names the unused lease and says a fresh one is issued once it is spent |
-| `meta link <task> <pr>` | the task is claimed; the PR's head branch is the task id; its base is `main`; no other task links the PR | event `Linked`, with the PR's current head pinned |
+| `meta link <task> <pr>` | the task is claimed; the PR's head branch is the task id; its base is `main`; no other task links the PR | event `Linked`, with the PR's head pinned once GitHub reports the commit last pushed from the local branch `<task>`; polls for up to 60 s |
 | `meta link <task> <pr>` | the task is not claimed, the branch or base differs, or another task links the PR | refused; names which, and gives the next step |
+| `meta link <task> <pr>` | GitHub still reports an older head than the local branch `<task>`, then reports it within 60 s | event `Linked`, pinned at the pushed commit |
+| `meta link <task> <pr>` | GitHub does not report the local branch's commit within 60 s | refused; names both SHAs, and says to push again or reconcile the branches |
+| `meta link <task> <pr>` | there is no local branch named after the task | refused; says to commit, push the branch, and link again |
 | `meta merge <pr>` | the PR is linked; required checks are green on its current head; the head equals the pinned SHA | squash-merges through the GitHub port with that head pinned; events `Merged` (route `Meta`) and `Done` |
 | `meta merge <pr>` | the PR is unlinked, closed, has a red or missing check (the worst report per check wins), has no required checks, or its head moved | refused; names which, and gives the next step |
 | `meta merge <pr>` | the linked PR is already merged at the pinned head | events `Merged` (route `Outside`, not counted as through meta) and `Done`; no second merge |
