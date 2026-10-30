@@ -44,6 +44,7 @@ macro_rules! counted_id {
                 text.strip_prefix(Self::PREFIX)
                     .and_then(|digits| digits.parse().ok())
                     .map(Self)
+                    .filter(|id| id.to_string() == text)
                     .ok_or_else(|| Malformed(format!("{text:?} is not a {}<number> id", Self::PREFIX)))
             }
         }
@@ -121,7 +122,11 @@ impl FromStr for PrNumber {
     type Err = Malformed;
 
     fn from_str(text: &str) -> Result<Self, Malformed> {
-        text.trim_start_matches('#').parse().map(Self).map_err(|_| Malformed(format!("{text:?} is not a PR number")))
+        text.strip_prefix('#')
+            .unwrap_or(text)
+            .parse()
+            .map(Self)
+            .map_err(|_| Malformed(format!("{text:?} is not a PR number")))
     }
 }
 
@@ -167,8 +172,9 @@ mod tests {
 
     #[test]
     fn a_counted_id_is_its_prefix_and_canonical_digits() {
-        let parsed = ["lease-1", "lease-10", "lease-0", "lease-01", "lease-+1", "lease-", "lease--1", "task-1", " lease-1"]
-            .map(|text| text.parse::<LeaseId>().is_ok());
+        let parsed =
+            ["lease-1", "lease-10", "lease-0", "lease-01", "lease-+1", "lease-", "lease--1", "task-1", " lease-1"]
+                .map(|text| text.parse::<LeaseId>().is_ok());
         assert_eq!(parsed, [true, true, true, false, false, false, false, false, false]);
         assert!("task-01".parse::<TaskId>().is_err() && "task-7".parse::<TaskId>().is_ok());
     }
