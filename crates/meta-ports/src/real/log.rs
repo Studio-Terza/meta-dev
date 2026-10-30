@@ -53,21 +53,6 @@ impl JsonlLog {
         PortError::new(format!("{}: {error}", path.display()))
     }
 
-    fn parse(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
-        text.lines()
-            .enumerate()
-            .map(|(index, line)| {
-                serde_json::from_str(line).map_err(|error| {
-                    let path = path.display();
-                    PortError::new(format!(
-                        "{path} line {}: {error}. Next: meta escape <reason>, then repair {path}.",
-                        index + 1
-                    ))
-                })
-            })
-            .collect()
-    }
-
     fn write(file: &mut File, path: &Path, records: &[Record]) -> Result<(), PortError> {
         let lines = records
             .iter()
@@ -80,7 +65,7 @@ impl JsonlLog {
     fn contents(file: &mut File, path: &Path) -> Result<Vec<Record>, PortError> {
         let mut text = String::new();
         file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
-        Self::parse(path, &text)
+        super::jsonl::records(path, &text)
     }
 }
 
