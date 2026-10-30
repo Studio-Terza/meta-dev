@@ -157,3 +157,14 @@ impl fmt::Display for RunCount {
         write!(formatter, "{}", self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PrNumber;
+
+    #[test]
+    fn a_pr_number_takes_one_optional_hash_and_digits() {
+        let parsed = ["7", "#7", "##7", "#", "", "#x"].map(|text| text.parse::<PrNumber>().is_ok());
+        assert_eq!(parsed, [true, true, false, false, false, false]);
+    }
+}

@@ -73,7 +73,7 @@ impl Call {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
         let ledger = |call: Result<LedgerCall, Malformed>| Some(call.map(Self::Ledger));
         let call: Option<Result<Self, Malformed>> = match words.as_slice() {
-            ["open", title @ ..] => ledger(title.join(" ").parse().map(LedgerCall::Open)),
+            ["open", title @ ..] => ledger(spaced(title).parse().map(LedgerCall::Open)),
             ["claim", task, "--agent", agent] => {
                 ledger(task.parse().and_then(|task| agent.parse().map(|agent| LedgerCall::Claim { task, agent })))
             }
@@ -82,7 +82,7 @@ impl Call {
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
-            ["escape", reason @ ..] => Some(reason.join(" ").parse().map(Self::Escape)),
+            ["escape", reason @ ..] => Some(spaced(reason).parse().map(Self::Escape)),
             ["hook", "pre-tool-use"] => Some(Ok(Self::PreToolUse(stdin()))),
             _ => None,
         };
@@ -134,6 +134,10 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
             }
         }
     }
+}
+
+fn spaced(words: &[&str]) -> String {
+    words.iter().flat_map(|word| [" ", word]).skip(1).collect()
 }
 
 fn hook<L: Log>(hook: Hook, log: &mut L, at: Timestamp) -> Answer {

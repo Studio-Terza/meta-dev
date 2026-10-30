@@ -80,7 +80,7 @@ impl Merging {
         let blockers: Vec<String> = moved.into_iter().chain(unconfigured).chain(checks).collect();
         match blockers.is_empty() {
             true => Ok(()),
-            false => Err(Refusal::because(format!("{pr} cannot merge:\n{}", blockers.join("\n")))),
+            false => Err(Refusal::because(format!("{pr} cannot merge:{}", Refusal::lines(&blockers)))),
         }
     }
 }

@@ -13,7 +13,8 @@ meta-core = { path = "crates/meta-core" }
 meta-ports = { path = "crates/meta-ports" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
-syn = { version = "=3.0.9", default-features = false, features = ["full", "parsing", "visit", "proc-macro"] }
+proc-macro2 = { version = "=1.0.107", default-features = false }
+syn = { version = "=3.0.9", default-features = false, features = ["full", "parsing", "visit"] }
 toml = { version = "=0.9.12", default-features = false, features = ["parse", "serde", "std"] }
 
 [workspace.lints.rust]

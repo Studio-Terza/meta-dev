@@ -39,7 +39,7 @@ impl Linking {
         });
         let problems: Vec<String> = wrong_branch.into_iter().chain(wrong_base).collect();
         match problems.is_empty() {
-            false => Err(Refusal::because(format!("{task} cannot link {pr}:\n{}", problems.join("\n")))),
+            false => Err(Refusal::because(format!("{task} cannot link {pr}:{}", Refusal::lines(&problems)))),
             true => {
                 let pin = pull.head().clone();
                 let text = format!("{task} linked to {pr}, head pinned at {pin}\n");

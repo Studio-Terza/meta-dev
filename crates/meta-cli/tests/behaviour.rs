@@ -59,7 +59,7 @@ fn claimed_task() -> Vec<Event> {
 }
 
 fn linked_task() -> Vec<Event> {
-    [claimed_task(), vec![linked("task-1", "7")]].concat()
+    extended(claimed_task(), vec![linked("task-1", "7")])
 }
 
 fn rollup(outcome: &Outcome) -> serde_json::Value {
@@ -140,18 +140,34 @@ fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
     call(&mut given(events, Vec::new()), &["hook", "pre-tool-use"], input)
 }
 
-fn agent(prompt: &str) -> String {
-    serde_json::json!({ "tool_name": "Agent", "tool_input": { "prompt": prompt } }).to_string()
+const DECOY_PROMPT: &str = "Work under lease-1.";
+
+fn agent(description: &str) -> String {
+    gated_input("Agent", description)
+}
+
+fn extended(mut base: Vec<Event>, more: Vec<Event>) -> Vec<Event> {
+    base.extend(more);
+    base
 }
 
 fn deny(reason: &str) -> String {
-    format!(
-        r#"{{"hookSpecificOutput":{{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"{reason}"}}}}"#
-    ) + "\n"
+    let reply = serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    });
+    format!("{reply}\n")
 }
 
+const NOT_A_LEASE: &str = "the Agent description is not exactly a lease id.";
+
 fn no_lease(why: &str) -> String {
-    deny(&format!("{why} Get one with meta claim <task> --agent <name>, then put its lease id in the Agent prompt."))
+    deny(&format!(
+        "{why} Get one with meta claim <task> --agent <name>, then put its lease id in the Agent description."
+    ))
 }
 
 fn refused(text: &str) -> Answer {
@@ -166,7 +182,7 @@ fn brief(agent: &str, lease: &str) -> String {
     format!(
         "task: task-1: Fix the hook
 agent: {agent}
-lease: {lease} (put it in the Agent prompt; it works once)
+lease: {lease} (put it in the Agent description; it works once)
 setup:
   1. git clone {ORIGIN} task-1
   2. cd task-1 && git switch -c task-1 origin/main
@@ -208,12 +224,12 @@ fn claim_of_an_open_unclaimed_task_leases_and_prints_the_brief_with_every_source
 
 #[test]
 fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
-    let finished = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let finished = extended(linked_task(), vec![merged("7", 1), done("task-1")]);
     let cases = [
         (
             claimed_task(),
             "task-1",
-            "task-1 is already claimed and lease-1 is unused (task-1 claimed by alice: Fix the hook). Next: put lease-1 in the Agent prompt; once it is spent, meta claim task-1 --agent <name> issues a fresh lease.",
+            "task-1 is already claimed and lease-1 is unused (task-1 claimed by alice: Fix the hook). Next: put lease-1 in the Agent description; once it is spent, meta claim task-1 --agent <name> issues a fresh lease.",
         ),
         (finished, "task-1", "task-1 is done. Next: meta open <title>."),
         (Vec::new(), "task-9", "task-9 is unknown. Next: meta status lists open tasks."),
@@ -228,7 +244,7 @@ fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
 fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
     let spent = Event::LeaseUsed { lease: id("lease-1") };
     [claimed_task(), linked_task()].into_iter().for_each(|history| {
-        let history = [history, vec![spent.clone()]].concat();
+        let history = extended(history, vec![spent.clone()]);
         let (reply, events) = call(&mut given(history, Vec::new()), &["claim", "task-1", "--agent", "bob"], "");
         assert_eq!(
             (reply.text, reply.code, events),
@@ -317,7 +333,9 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         vec![escaped("gh is down"), escaped("gh is down"), escaped("hook too strict")],
         vec![Event::Denied { attempt: Attempt::AgentStart }],
     ]
-    .concat();
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
     let (reply, events) = call(&mut given(history, Vec::new()), &["status"], "");
     assert_eq!(events, Vec::new());
     let expected = "open tasks
@@ -337,24 +355,28 @@ P6 CI runs per merged PR: 6 runs over 2 merged PRs";
 }
 
 #[test]
-fn hook_allows_an_agent_whose_prompt_carries_a_live_unused_lease_and_uses_it_up() {
-    let (reply, events) = hook(claimed_task(), &agent("Work on task-1 under lease-1."));
+fn hook_allows_an_agent_whose_description_is_exactly_a_live_unused_lease_and_uses_it_up() {
+    let (reply, events) = hook(claimed_task(), &agent("lease-1"));
     assert_eq!(reply, Answer { text: ALLOW.to_owned(), code: Code::Done });
     assert_eq!(events, vec![Event::LeaseUsed { lease: id("lease-1") }]);
 }
 
 #[test]
 fn hook_denies_an_agent_with_no_unknown_used_or_dead_lease_and_says_how_to_get_one() {
-    let used = [claimed_task(), vec![Event::LeaseUsed { lease: id("lease-1") }]].concat();
-    let dead = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let used = extended(claimed_task(), vec![Event::LeaseUsed { lease: id("lease-1") }]);
+    let dead = extended(linked_task(), vec![merged("7", 1), done("task-1")]);
     let cases = [
-        (claimed_task(), "Work on task-1.", "the Agent prompt carries no lease id."),
-        (claimed_task(), "Work under lease-9.", "lease-9 is unknown."),
-        (used, "Work under lease-1.", "lease-1 is already used; each lease starts one agent."),
-        (dead, "Work under lease-1.", "lease-1 is not live: task-1 is done."),
+        (claimed_task(), "Work on task-1.", NOT_A_LEASE),
+        (claimed_task(), "Work under lease-1.", NOT_A_LEASE),
+        (claimed_task(), " lease-1", NOT_A_LEASE),
+        (claimed_task(), "lease-1 ", NOT_A_LEASE),
+        (claimed_task(), "", NOT_A_LEASE),
+        (claimed_task(), "lease-9", "lease-9 is unknown."),
+        (used, "lease-1", "lease-1 is already used; each lease starts one agent."),
+        (dead, "lease-1", "lease-1 is not live: task-1 is done."),
     ];
-    cases.into_iter().for_each(|(events, prompt, why)| {
-        let (reply, added) = hook(events, &agent(prompt));
+    cases.into_iter().for_each(|(events, description, why)| {
+        let (reply, added) = hook(events, &agent(description));
         assert_eq!(added, vec![Event::Denied { attempt: Attempt::AgentStart }]);
         assert_eq!(reply, Answer { text: no_lease(why), code: Code::Done });
     });
@@ -362,12 +384,12 @@ fn hook_denies_an_agent_with_no_unknown_used_or_dead_lease_and_says_how_to_get_o
 
 #[test]
 fn hook_gates_the_task_tool_like_the_agent_tool() {
-    let task = |prompt: &str| json_input("Task", "prompt", prompt);
-    let (reply, events) = hook(claimed_task(), &task("Work under lease-1."));
+    let task = |description: &str| gated_input("Task", description);
+    let (reply, events) = hook(claimed_task(), &task("lease-1"));
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![Event::LeaseUsed { lease: id("lease-1") }]));
     let (reply, events) = hook(claimed_task(), &task("Work on task-1."));
     assert_eq!(events, vec![Event::Denied { attempt: Attempt::AgentStart }]);
-    assert_eq!(reply.text, no_lease("the Agent prompt carries no lease id."));
+    assert_eq!(reply.text, no_lease(NOT_A_LEASE));
 }
 
 #[test]
@@ -395,15 +417,24 @@ fn hook_denies_input_that_cannot_be_parsed() {
         ("{}", "missing field `tool_name` at line 1 column 2"),
         (r#"{"tool_name":"Agent"}"#, "Agent input: invalid type: null, expected struct AgentInput"),
         (
-            r#"{"tool_name":"Task","tool_input":{"prompt":5}}"#,
+            r#"{"tool_name":"Task","tool_input":{"description":5}}"#,
             "Task input: invalid type: integer `5`, expected a string",
         ),
+        (r#"{"tool_name":"Agent","tool_input":{"prompt":"lease-1"}}"#, "Agent input: missing field `description`"),
     ];
     inputs.into_iter().for_each(|(input, why)| {
         let (reply, events) = hook(claimed_task(), input);
         assert_eq!(events, Vec::new());
         assert_eq!(reply.text, deny(&format!("hook input cannot be parsed ({why}); denied, fail closed.")));
     });
+}
+
+fn gated_input(tool: &str, description: &str) -> String {
+    serde_json::json!({
+        "tool_name": tool,
+        "tool_input": { "description": description, "prompt": DECOY_PROMPT }
+    })
+    .to_string()
 }
 
 fn json_input(tool: &str, field: &str, value: &str) -> String {
@@ -453,7 +484,7 @@ fn merge_records_a_pr_already_merged_at_the_pinned_head_without_merging_again() 
 
 #[test]
 fn link_refuses_another_branch_another_base_a_pr_linked_elsewhere_or_an_unclaimed_task() {
-    let elsewhere = [claimed_task(), vec![opened("task-2"), claimed("task-2"), linked("task-2", "7")]].concat();
+    let elsewhere = extended(claimed_task(), vec![opened("task-2"), claimed("task-2"), linked("task-2", "7")]);
     let cases = [
         (
             claimed_task(),
@@ -485,7 +516,7 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
     let at = Timestamp::from_unix_seconds(1);
     let seed: Vec<Record> = claimed_task().into_iter().map(|event| Record { at, event }).collect();
     meta_ports::Log::append(&mut JsonlLog::at(path.clone()), &seed).unwrap();
-    let start = Call::PreToolUse(agent("Work under lease-1."));
+    let start = Call::PreToolUse(agent("lease-1"));
     let replies: Vec<Answer> = std::thread::scope(|scope| {
         let racers: Vec<_> = (0..8)
             .map(|_| {
@@ -552,14 +583,14 @@ fn a_corrupt_or_unopenable_log_still_records_escapes_but_denies_agent_starts() {
     let recorded = "escape recorded: log is corrupt\nopen escapes: 1\nthis reason repeated: 0";
     assert_eq!((reply, events), (said(recorded), vec![escaped("log is corrupt")]));
     let broken = "memory log record 1 does not fit the log before it: task-1 is unknown. Next: meta escape <reason>, then repair memory log.";
-    let (reply, events) = hook(corrupt(), &agent("Work under lease-1."));
+    let (reply, events) = hook(corrupt(), &agent("lease-1"));
     assert_eq!(events, Vec::new());
     assert_eq!(reply.text, deny(&format!("meta is broken ({broken}); denied, fail closed.")));
     let (reply, events) = call(&mut given(corrupt(), Vec::new()), &["status"], "");
     assert_eq!((reply, events), (Answer { text: format!("error: {broken}\n"), code: Code::Failed }, Vec::new()));
     let mut unopenable = given(claimed_task(), Vec::new());
     unopenable.log.broken = Some(PortError::new("cannot open the log"));
-    let (reply, _) = call(&mut unopenable, &["hook", "pre-tool-use"], &agent("Work under lease-1."));
+    let (reply, _) = call(&mut unopenable, &["hook", "pre-tool-use"], &agent("lease-1"));
     assert_eq!(reply.text, deny("meta is broken (cannot open the log); denied, fail closed."));
 }
 
@@ -570,7 +601,7 @@ fn listed(prs: &[u64]) -> String {
 
 #[test]
 fn status_counts_a_pr_merged_through_meta_and_logged_as_through_meta_only() {
-    let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let history = extended(linked_task(), vec![merged("7", 1), done("task-1")]);
     let mut ports = given(history, Vec::new());
     ports.github.listed = Some(Ok(listed(&[7])));
     let (reply, events) = call(&mut ports, &["status"], "");
@@ -591,7 +622,7 @@ P6 CI runs per merged PR: 1 runs over 1 merged PRs";
 
 #[test]
 fn status_counts_a_pr_merged_on_github_but_missing_from_the_log_as_merged_outside_meta() {
-    let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
+    let history = extended(linked_task(), vec![merged("7", 1), done("task-1")]);
     let mut ports = given(history, Vec::new());
     ports.github.listed = Some(Ok(listed(&[7, 12, 13])));
     let (reply, events) = call(&mut ports, &["status"], "");
@@ -636,16 +667,32 @@ P6 CI runs per merged PR: 0 runs over 0 merged PRs"
     });
 }
 
+fn claimed_status(p1_merges: &str) -> String {
+    format!(
+        "open tasks
+  task-1 claimed by alice: Fix the hook
+live leases
+  lease-1 for task-1
+open escapes: 0
+  (none)
+P1 agent starts through meta: 0 of 0
+{p1_merges}
+P2 open escapes: 0; repeats of an earlier reason: 0
+P6 CI runs per merged PR: 0 runs over 0 merged PRs"
+    )
+}
+
 #[test]
 fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_may_be_truncated() {
     let full = |count: u64| listed(&(1..=count).collect::<Vec<_>>());
     let mut ports = given(claimed_task(), Vec::new());
     ports.github.listed = Some(Ok(full(1001)));
-    let (reply, events) = call(&mut ports, "status", "");
-    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
-    assert!(reply.text.contains("P1 merges: unavailable") && reply.text.contains("truncated"), "{}", reply.text);
+    let (reply, events) = call(&mut ports, &["status"], "");
+    let unavailable = "P1 merges: unavailable, GitHub merged list unreadable (the list is truncated: 1001 or more rows); logged: 0 through meta, 0 outside";
+    assert_eq!((reply, events), (said(&claimed_status(unavailable)), Vec::new()));
     let mut ports = given(claimed_task(), Vec::new());
     ports.github.listed = Some(Ok(full(1000)));
-    let (reply, _) = call(&mut ports, "status", "");
-    assert!(reply.text.contains("P1 merged outside meta: 1000"), "{}", reply.text);
+    let (reply, _) = call(&mut ports, &["status"], "");
+    let listed = "P1 merges through meta: 0 of 1000\nP1 merged outside meta: 1000 (1000 missing from the log)";
+    assert_eq!(reply, said(&claimed_status(listed)));
 }
