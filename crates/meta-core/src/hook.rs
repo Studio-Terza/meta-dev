@@ -19,7 +19,7 @@ struct HookInput {
 
 #[derive(Deserialize)]
 struct AgentInput {
-    prompt: String,
+    description: String,
 }
 
 #[derive(Debug)]
@@ -35,7 +35,8 @@ pub struct AgentStart {
 
 impl Hook {
     const AGENT_TOOLS: [&str; 2] = ["Agent", "Task"];
-    const GET_LEASE: &str = "Get one with meta claim <task> --agent <name>, then put its lease id in the Agent prompt.";
+    const GET_LEASE: &str =
+        "Get one with meta claim <task> --agent <name>, then put its lease id in the Agent description.";
 
     pub fn read(input: &str) -> Self {
         match Self::tool(input) {
@@ -53,10 +54,8 @@ impl Hook {
         let tool = parsed.tool_name.as_str();
         match tool {
             _ if Self::AGENT_TOOLS.contains(&tool) => {
-                let AgentInput { prompt } = Self::input(tool, parsed.tool_input)?;
-                let lease = prompt
-                    .split(|letter: char| !(letter.is_ascii_alphanumeric() || letter == '-'))
-                    .find_map(|word| word.parse::<LeaseId>().ok());
+                let AgentInput { description } = Self::input(tool, parsed.tool_input)?;
+                let lease = description.parse().ok();
                 Ok(Self::Agent(AgentStart { lease }))
             }
             _ => Ok(Self::Settled(Self::allow(Vec::new()))),
@@ -90,7 +89,7 @@ impl Ledger {
             Hook::deny(format!("{why}. {}", Hook::GET_LEASE), vec![denied])
         };
         let Some(id) = start.lease else {
-            return refusal("the Agent prompt carries no lease id".to_owned());
+            return refusal("the Agent description is not exactly a lease id".to_owned());
         };
         match self.leases.remove(&id) {
             Some(LeaseSlot::Unused(lease)) if self.live(&lease) => Hook::allow(vec![lease.spend().1]),
