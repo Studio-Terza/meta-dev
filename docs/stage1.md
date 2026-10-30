@@ -29,6 +29,7 @@ Some escapes record one-off bypasses that can never recur and have no fixing tas
 | `meta resolve <escape> --historical <reason>` | the escape is already resolved or historical, or unknown | refused, with the reason; it names `--correcting` for an escape resolved against a task |
 | `meta resolve <escape> --historical <reason> --correcting` | the escape is resolved against a task | event `Corrected`; the fold treats the escape as historical; the `Resolved` record stays in the log, and `meta status` shows "resolved against task-1, corrected to historical: <reason>" |
 | `meta resolve <escape> --historical <reason> --correcting` | the escape is open, historical or already corrected | refused, with the reason |
+| `meta status` P2 | any | the P2 line shows the open count with the number of escapes closed as historical, corrections included, such as "P2 open escapes: 1 (6 closed as historical)"; escapes resolved against a task are not counted; display only, P2's judgement is unchanged (owner, 2026-10-30) |
 | `meta status` P1 | an `outside-merge` escape names a PR and is resolved, historical or corrected | the PR still counts as recorded; closing an escape never un-records its bypass |
 
 A log that resolves one escape twice, or corrects an escape that is not resolved against a task, does not fold.

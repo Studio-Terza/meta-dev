@@ -142,7 +142,11 @@ impl Ledger {
                 self.self_claims
             ),
             self.merges_line(through_meta, outside_logged, github),
-            format!("P2 open escapes: {}; most repeats of one kind: {most_line}\n", self.open_escapes()),
+            format!(
+                "P2 open escapes: {} ({} closed as historical); most repeats of one kind: {most_line}\n",
+                self.open_escapes(),
+                self.closed_as_historical()
+            ),
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             section("predictions", &predicted),
         ]
@@ -152,6 +156,11 @@ impl Ledger {
 
     fn open_escapes(&self) -> usize {
         self.escapes.iter().filter(|logged| logged.is_open()).count()
+    }
+
+    /// Escapes closed as historical, corrections included: shown beside P2, not judged by it.
+    fn closed_as_historical(&self) -> usize {
+        self.escapes.iter().filter(|logged| logged.is_historical()).count()
     }
 
     /// Repeats per kind, open or resolved: each kind's escapes after its first. Kinds that main does
