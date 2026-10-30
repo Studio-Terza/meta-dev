@@ -45,8 +45,15 @@ impl GitCli {
     /// The clone this binary was built from: the one whose origin/main decides whether it is a main build.
     const BUILT_IN: &str = env!("CARGO_MANIFEST_DIR");
 
-    /// Whether `commit` is an ancestor of origin/main in the clone at `repo`, by its local refs.
+    /// Whether `commit` is an ancestor of origin/main in the clone at `repo`, by its local refs. A
+    /// binary must stay in the clone it was built in; when that clone is gone it cannot answer.
     pub fn ancestry(repo: &Path, commit: &Sha) -> Result<bool, PortError> {
+        if !repo.is_dir() {
+            return Err(PortError::new(format!(
+                "the clone this binary was built in, {}, has moved or been removed; rebuild meta in a clone that stays put",
+                repo.display()
+            )));
+        }
         let repo = repo.display().to_string();
         let commit = commit.to_string();
         decides("git", &["-C", &repo, "merge-base", "--is-ancestor", &commit, "refs/remotes/origin/main"])

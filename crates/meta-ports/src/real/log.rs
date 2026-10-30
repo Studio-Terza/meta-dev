@@ -18,21 +18,37 @@ fn data_dir() -> Result<(PathBuf, bool), PortError> {
 }
 
 fn data_dir_from(chosen: Option<PathBuf>, home: Option<PathBuf>) -> Result<(PathBuf, bool), PortError> {
-    let default = home.map(|home| home.join(".local").join("share"));
+    let default = home.map(|home| home.join(".local").join("share").join(DIR));
+    let chosen = chosen.map(|chosen| chosen.join(DIR));
     let real = match (&chosen, &default) {
         (None, _) => true,
-        (Some(chosen), Some(default)) => same_place(chosen, default),
+        (Some(chosen), Some(default)) => same_log(chosen, default),
         (Some(_), None) => false,
     };
-    let data = chosen.or(default);
-    data.map(|data| (data.join("meta-dev"), real))
+    chosen
+        .or(default)
+        .map(|data| (data, real))
         .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; meta-dev has no data directory"))
 }
 
-/// Two names for one directory, through symlinks too when both exist.
-fn same_place(one: &Path, other: &Path) -> bool {
-    let resolved = |path: &Path| fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    resolved(one) == resolved(other)
+/// meta-dev's directory under the data home, and the log in it.
+const DIR: &str = "meta-dev";
+const LOG: &str = "log.jsonl";
+
+/// Two meta-dev directories that write one log: the same directory, or the same log file, by any
+/// name, through symlinks too.
+fn same_log(one: &Path, other: &Path) -> bool {
+    let same = |one: &Path, other: &Path| resolved(one) == resolved(other);
+    same(one, other) || same(&one.join(LOG), &other.join(LOG))
+}
+
+/// The path with symlinks resolved as far as it exists: a part not yet created keeps its name
+/// under its resolved parent.
+fn resolved(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| match (path.parent(), path.file_name()) {
+        (Some(parent), Some(name)) => resolved(parent).join(name),
+        _ => path.to_path_buf(),
+    })
 }
 
 #[derive(Debug)]
@@ -49,7 +65,7 @@ impl JsonlLog {
     /// The log in the data directory. With no data directory it is taken as the real one: fail closed.
     pub fn in_data_dir() -> Self {
         let (path, real) = match data_dir() {
-            Ok((home, real)) => (Ok(home.join("log.jsonl")), real),
+            Ok((home, real)) => (Ok(home.join(LOG)), real),
             Err(error) => (Err(error), true),
         };
         Self { path, patience: Self::PATIENCE, real }

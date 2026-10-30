@@ -16,23 +16,6 @@ pub enum Stamp {
     Unknown(String),
 }
 
-/// Every tracked top-level entry of the workspace, relative to this crate. The target directories
-/// are left out, since every build changes them.
-const SOURCES: [&str; 12] = [
-    "../../.github",
-    "../../.gitignore",
-    "../../Cargo.lock",
-    "../../Cargo.toml",
-    "../../README.md",
-    "../../ci",
-    "../../clippy.toml",
-    "../../crates",
-    "../../docs",
-    "../../rust-toolchain.toml",
-    "../../rustfmt.toml",
-    "../../self",
-];
-
 /// The git files that change on a commit, a switch or a stage.
 const STATE: [&str; 3] = ["HEAD", "index", "logs/HEAD"];
 
@@ -53,7 +36,9 @@ impl Stamp {
             Ok(commit) => commit,
             Err(why) => return Self::Unknown(why),
         };
-        match git(repo, &["status", "--porcelain"]).map(|status| status.is_empty()) {
+        // Only edits to tracked files count: an untracked file changes nothing that is built, and
+        // the build script is not rerun when one appears or goes.
+        match git(repo, &["status", "--porcelain", "--untracked-files=no"]).map(|status| status.is_empty()) {
             Ok(true) => Self::Clean(commit),
             Ok(false) => Self::Dirty(commit),
             Err(why) => Self::Unknown(why),
@@ -70,12 +55,15 @@ impl Stamp {
     }
 }
 
-/// The directives that rerun the build script whenever the stamp could change.
+/// The directives that rerun the build script whenever the stamp could change: one for every
+/// tracked file, as git lists it (so no list here can go stale), and one for each git state file.
+/// A file that cannot be listed leaves the stamp unknown: fail closed.
 fn watched(repo: &Path) -> Result<String, String> {
-    let sources = SOURCES.map(|path| format!("cargo::rerun-if-changed={path}\n")).concat();
+    // Paths are relative to `repo`, where cargo runs the build script; `:/` lists the whole tree.
+    let tracked = git(repo, &["ls-files", "--format=cargo::rerun-if-changed=%(path)", "--", ":/"])?;
     // `git rev-parse --git-path` ends its path with the newline that ends the directive.
     let state = STATE.map(|file| git(repo, &["rev-parse", "--git-path", file]));
-    state.into_iter().try_fold(sources, |directives, path| Ok(directives + "cargo::rerun-if-changed=" + &path?))
+    state.into_iter().try_fold(tracked, |directives, path| Ok(directives + "cargo::rerun-if-changed=" + &path?))
 }
 
 /// Everything the build script prints for the checkout at `repo`.

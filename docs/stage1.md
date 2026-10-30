@@ -122,11 +122,15 @@ A falsification latches once per prediction and measure, so a prediction first f
 
 An agent ran `meta` built from its unmerged branch against the lead's real log. It appended events that main's binary cannot fold, so every hook denied and `meta merge` broke until the lead repaired the log by hand. The old meta-dev repo failed the same way: a stale binary against the log's schema.
 
-The build script (`crates/meta-ports/src/real/build.rs`) embeds the commit the binary is built from. A dirty working tree, or a build outside git, embeds no commit. The real log is the one in the default data dir, `$HOME/.local/share/meta-dev`. An XDG_DATA_HOME that names any other place is a scratch data dir, and tests use scratch or in-memory logs. Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. It uses the local refs of the clone it was built in, with no network.
+The build script (`crates/meta-ports/src/real/build.rs`, with its logic in `stamp.rs`) embeds the commit the binary is built from. Edits to tracked files make the build dirty: it embeds the commit as dirty, and the refusal says how to clear it (commit or stash the tracked edits, then rebuild). Untracked files do not count. A build outside git embeds no commit. The build script reruns when any tracked file changes, or git's `HEAD`, `index` or `logs/HEAD`. It reads the tracked files from `git ls-files`, so no hand-kept list can go stale. If it cannot list them, the build is unverified.
+
+The real log is the one in the default data dir, `$HOME/.local/share/meta-dev`. An XDG_DATA_HOME that names any other place is a scratch data dir. The exception is a place whose `meta-dev` dir, or whose `log.jsonl`, resolves through symlinks to the real one. Such a place is real. Tests use scratch or in-memory logs.
+
+Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. The ancestry check runs in the clone the binary was built in, by that clone's local refs, with no network. So a binary must stay in the clone it was built in. If that clone moves or is removed, every guarded write fails closed, and the refusal says that the clone has moved or been removed.
 
 | Command | Given | Result |
 |---|---|---|
-| any ledger command that writes, on the real log | the build has no commit, its commit is not on origin/main, or the ancestry cannot be read | refused before any port call, with no events: "you are running a branch build (why) … Next: use a main build, or set XDG_DATA_HOME to a scratch data dir." |
+| any ledger command that writes, on the real log | the build has no commit, has edits to tracked files, its commit is not on origin/main, or the ancestry cannot be read (for example, its clone is gone) | refused before any port call, with no events: "you are running a branch build (why) … Next: use a main build, or set XDG_DATA_HOME to a scratch data dir." |
 | `meta hook pre-tool-use` or `post-tool-use` for `Agent`, `Task` or `SendMessage`, on the real log | the same | denied or not recorded (fail closed), with the same reason |
 | `meta status`, on the real log | the same | the report prints; a falsification it would latch is not recorded, and the reason is printed |
 | `meta escape <kind> <reason>`, on the real log | the same | event `Escaped` marked `build: unverified`; prints why. `meta status` shows the mark beside the escape |

@@ -51,7 +51,9 @@ impl Build {
     pub fn verify<E: fmt::Display>(&self, on_main: impl FnOnce(&Sha) -> Result<bool, E>) -> Result<(), Unverified> {
         match &self.0 {
             Stamp::Unknown(why) => Err(Unverified(format!("built from {why}"))),
-            Stamp::Dirty(commit) => Err(Unverified(format!("built from a dirty working tree at {commit}"))),
+            Stamp::Dirty(commit) => Err(Unverified(format!(
+                "built from {commit} with edits to tracked files; to clear it, commit or stash them, then rebuild"
+            ))),
             Stamp::Clean(commit) => match on_main(commit) {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(Unverified(format!("built from {commit}, which is not on origin/main"))),
