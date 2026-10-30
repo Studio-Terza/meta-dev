@@ -13,8 +13,3 @@ source = "owner 2026-10-30: text is parsed once, at a declared boundary, into ty
 path = "crates/meta-core/src/prompt.rs"
 reason = "agent prompts are free text; the lease token is the only typed content scanned out of them"
 source = "owner 2026-10-30: text is parsed once, at a declared boundary, into types"
-
-[[boundary]]
-path = "crates/meta-cli/tests/behaviour.rs"
-reason = "tests assert on the rendered CLI output text, which is text by design"
-source = "owner 2026-10-30: text is parsed once, at a declared boundary, into types"
