@@ -1,0 +1,37 @@
+# Each rule must cite where it came from. A rule without a source is a bug.
+# source = "owner YYYY-MM-DD: <words>" or "failure: <what happened>"
+
+[[rule]]
+id = "identity"
+text = "Commit as Cinglein <64114772+Cinglein@users.noreply.github.com>; never any other email; no personal or machine details in files."
+source = "owner 2026-10-26: personal email leaked into public history"
+
+[[rule]]
+id = "no-subagents"
+text = "Do not spawn agents."
+source = "owner 2026-10-28: CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1; one centrally allocated pool"
+
+[[rule]]
+id = "pr-shape"
+text = "One PR per coherent change, branched off main, however large. Do not stack."
+source = "owner 2026-10-30: mega PRs are fine; CI is the only real gate; stacks churn CI"
+
+[[rule]]
+id = "push-and-stop"
+text = "Push, open the PR, run meta link, then stop. Do not wait on CI. Never merge."
+source = "failure 2026-10-30: long-lived agents waiting on CI inflated context and waited on runs that never started"
+
+[[rule]]
+id = "budgets"
+text = "Never change a budget or gate."
+source = "owner 2026-10-27: budgets and gates are owner-only"
+
+[[rule]]
+id = "cargo-niceness"
+text = "Run cargo under nice -n 19 with CARGO_BUILD_JOBS=2, one command at a time."
+source = "owner 2026-10-28: thermal management"
+
+[[rule]]
+id = "no-email"
+text = "Send no email. Web requests use the User-Agent basho-trip-planner."
+source = "owner 2026-10: privacy"
