@@ -385,6 +385,10 @@ leases resumed 3 or more times (flagged)
   (none)
 overdue leases (flagged)
   (none)
+waiting on the owner (flagged)
+  (none)
+idle (flagged)
+  idle: no live work; stalled: task-1 (claimed), task-3 (open)
 P1 agent starts through meta: 1; prevented by the hook: 1; bypassed, from outside-start escapes: 0; self-claims, not agent starts: 0
 P1 merges through meta: 1 of 2
 P1 merged outside meta: 1 (0 missing from the log)
