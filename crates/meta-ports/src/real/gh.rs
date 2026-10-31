@@ -50,7 +50,7 @@ impl GitHub for GhCli {
     }
 
     fn open_list(&self) -> Result<String, PortError> {
-        let limit = (OpenPrs::LIMIT + 1).to_string();
+        let limit = OpenPrs::LIMIT.to_string();
         run("gh", &["pr", "list", "--state", "open", "--json", "number,baseRefName,commits", "--limit", &limit])
     }
 

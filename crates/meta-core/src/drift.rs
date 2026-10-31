@@ -42,17 +42,17 @@ impl Commit {
 }
 
 impl OpenPrs {
-    /// The most rows the adapter may keep; it asks for one more so that a full page shows as truncation.
-    pub const LIMIT: usize = 100;
+    /// The rows the adapter asks for and the most it keeps. GitHub estimates a query at N + 100N + 100*100N
+    /// nodes for N PRs (each with up to 100 commits, each with up to 100 authors) and rejects more than
+    /// 500,000, which allows 49 PRs (50 gives 505,050). A full page reads as truncated.
+    pub const LIMIT: usize = 49;
     /// The most commits `gh` lists per PR; a PR at this count may have more that are not listed.
     pub const COMMIT_LIMIT: usize = 100;
 
     pub fn from_gh(listed: &str) -> Result<Self, Unreached> {
         match serde_json::from_str::<Vec<Open>>(listed) {
             Err(error) => Err(Unreached::by(&format!("gh pr list open: {error}"))),
-            Ok(rows) if rows.len() > Self::LIMIT => {
-                Err(Unreached::by(&format!("the open list is truncated: {} or more rows", Self::LIMIT + 1)))
-            }
+            Ok(rows) if rows.len() >= Self::LIMIT => Err(Unreached::by(&"open PR list may be truncated")),
             Ok(rows) => Ok(Self(rows)),
         }
     }

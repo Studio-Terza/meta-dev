@@ -230,7 +230,7 @@ The slope line is the raw P4 signal. P4's wording and its falsifier are unchange
 
 ### Drift (task-48, register U1, U10, U11)
 
-Some rules hold only by habit: every PR has a task, every PR is based on main, every commit uses the noreply identity. The drift section of `meta status` flags a breach. It is report only: it blocks nothing, adds no CI gate, and no prediction reads it. It makes one GitHub call, `gh pr list --state open --json number,baseRefName,commits`, parsed with serde, so `meta status` stays fast.
+Some rules hold only by habit: every PR has a task, every PR is based on main, every commit uses the noreply identity. The drift section of `meta status` flags a breach. It is report only: it blocks nothing, adds no CI gate, and no prediction reads it. It makes one GitHub call, `gh pr list --state open --json number,baseRefName,commits --limit 49`, parsed with serde, so `meta status` stays fast.
 
 The expected email is data: the `email` field of the `identity` rule in `self/rules.toml`. The rule's text is unchanged, and the field is read, never taken from the text. GitHub lists a commit's author first and its `Co-authored-by` trailers after, so only the first author is compared.
 
@@ -241,7 +241,7 @@ The expected email is data: the `email` field of the `identity` rule in `self/ru
 | `meta status` | an open PR whose base is not `main` | `#N: base is <base>, not main` |
 | `meta status` | a commit on an open PR whose first author email is not the identity rule's `email` | `#N: commit <sha> is not by the identity email, author <email>`; a commit with no author or an empty email is flagged the same way |
 | `meta status` | the identity rule has no `email` field | each open PR shows `#N: commit authors unavailable: <why>`; the other two checks still run |
-| `meta status` | the open list cannot be read: `gh` fails, the reply does not parse, or it holds more than 100 PRs | the section reads `drift unavailable: <why>`, never `(none)` |
+| `meta status` | the open list cannot be read: `gh` fails, the reply does not parse, or it holds 49 or more PRs (a full page may be truncated, so it is never read as complete; 49 is the most GitHub's GraphQL node limit allows, since 50 PRs with 100 commits and 100 authors each is 505,050 nodes) | the section reads `drift unavailable: <why>`, never `(none)` |
 | `meta status` | no PR drifts | `(none)` |
 
 The base name and author email come from GitHub and are shown escaped on one line, so they cannot forge a status line. A PR with 100 or more commits reads as truncated, because `gh` lists at most 100 of them and an off-identity commit beyond the cap would otherwise go unseen.
