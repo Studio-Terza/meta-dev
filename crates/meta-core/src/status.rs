@@ -2,7 +2,7 @@ use crate::escape::{EscapeKinds, RepeatKey};
 use crate::event::{Event, Route};
 use crate::ids::{EscapeId, PrNumber, RunCount, Timestamp};
 use crate::latch::Latch;
-use crate::lease::LeaseSlot;
+use crate::lease::{LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
@@ -51,9 +51,16 @@ impl Ledger {
         let overdue: Vec<String> = self
             .leases
             .iter()
-            .filter(|(_, slot)| self.live(slot.lease()) && !slot.is_finished() && slot.deadline().passed(at))
+            .filter(|(_, slot)| {
+                self.live(slot.lease())
+                    && !self.waiting.contains_key(&slot.lease().task())
+                    && !slot.is_finished()
+                    && slot.deadline().passed(at)
+            })
             .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
             .collect();
+        let waiting: Vec<String> =
+            self.waiting.iter().map(|(task, waiting)| format!("{task}: {}", waiting.question())).collect();
         let main = kinds.as_ref().ok();
         let open_escapes: Vec<String> = (1..=self.escapes.len())
             .map(|number| EscapeId::after(number - 1))
@@ -153,6 +160,8 @@ impl Ledger {
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
+            section("waiting on the owner", &waiting),
+            section("idle (flagged)", &self.idle()),
             format!(
                 "P1 agent starts through meta: {started}; prevented by the hook: {}; bypassed, from outside-start escapes: {starts_outside}; self-claims, not agent starts: {}\n",
                 self.starts_denied, self.self_claims
@@ -168,6 +177,26 @@ impl Ledger {
         ]
         .concat();
         (fresh, text)
+    }
+
+    /// The idle alarm: no unused or running work lease while an open or agent-claimed task is not
+    /// waiting on the owner. Review leases are not work. A lease of a task that waits on the owner
+    /// is paused, so it is not work either; a lead's self-claim is the lead working, so it is not
+    /// an open task here.
+    fn idle(&self) -> Vec<String> {
+        let working = self.leases.values().any(|slot| {
+            *slot.lease().purpose() == Purpose::Work
+                && self.live(slot.lease())
+                && !self.waiting.contains_key(&slot.lease().task())
+        });
+        let unworked =
+            self.tasks.iter().filter(|(task, progress)| progress.awaits_an_agent() && !self.waiting.contains_key(task));
+        match (working, unworked.count()) {
+            (false, count) if count > 0 => {
+                vec![format!("idle: no live work lease while {count} open tasks are not waiting on the owner")]
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// PRs merged outside meta, logged or missing from the log, that no escape naming a merged PR names.

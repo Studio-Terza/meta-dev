@@ -1,7 +1,8 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
-    Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal,
-    Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable, Updating, Verdict,
+    Malformed, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, Pull, Reason,
+    Reconciliation, Record, Refusal, Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached,
+    Unreadable, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -55,6 +56,8 @@ pub enum Local {
     Defer { task: TaskId, reason: Reason },
     Undefer(TaskId),
     Verdict { task: TaskId, verdict: Verdict },
+    Wait { task: TaskId, question: OwnerQuestion },
+    Unwait { task: TaskId, answer: OwnerAnswer },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,6 +112,7 @@ impl Call {
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  \
+                         meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
                          meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
@@ -164,6 +168,12 @@ impl Call {
             ["verdict", task, verdict] => {
                 local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
             }
+            ["wait", task, "--owner", question @ ..] => local(
+                task.parse().and_then(|task| question.join(" ").parse().map(|question| Local::Wait { task, question })),
+            ),
+            ["unwait", task, answer @ ..] => local(
+                task.parse().and_then(|task| answer.join(" ").parse().map(|answer| Local::Unwait { task, answer })),
+            ),
             ["hook", "pre-tool-use"] => Some(Ok(Self::Hook(Phase::Before, stdin()))),
             ["hook", "post-tool-use"] => Some(Ok(Self::Hook(Phase::After, stdin()))),
             _ => None,
@@ -401,6 +411,8 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
+        Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
+        Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),
         Prepared::Claim { task, claimant, origin, rules, allowance } => {
             ledger.claim(task, claimant)?.brief(&origin, &rules, allowance.map(|minutes| at.plus(minutes.span())))

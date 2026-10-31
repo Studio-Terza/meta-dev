@@ -95,6 +95,23 @@ Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, s
 
 The role defaults are data, each with a source. Headless workers will be stopped at their deadline later; for now the flag is the only enforcement.
 
+### Waiting on the owner, and the idle alarm
+
+Work stalled for about an hour with unblocked tasks open and nothing flagged it (owner, 2026-10-31). A task that waits on an owner decision is also not late, so it must not be flagged overdue.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta wait <task> --owner <question>` | the task is open, claimed or linked, and not waiting | event `WaitingOnOwner { task, question }`; the task's lease deadlines pause |
+| `meta wait` | the task is unknown, deferred, done or retired, or already waiting | refused, with the reason |
+| `meta unwait <task> <answer>` | the task is waiting | event `OwnerAnswered { task, answer }`; each lease the task had when it began to wait gets its deadline moved later by the time it waited, so the deadlines resume from the answer |
+| `meta unwait` | the task is unknown or not waiting | refused |
+| `meta status` | a task is waiting on the owner | listed under "waiting on the owner" as `<task>: <question>`; its leases are not flagged overdue while it waits |
+| `meta status` | a task done, retired or deferred while waiting | it is no longer listed as waiting |
+| `meta status` | no work lease is live, and at least one task is not waiting on the owner and is open or claimed by an agent | "idle (flagged)" shows "idle: no live work lease while N open tasks are not waiting on the owner" |
+| `meta status` | otherwise | "idle (flagged)" shows "(none)" |
+
+A work lease is live when it is unused or running (its task is open, claimed or linked). These do not count as work: a review lease, and a lease of a task that waits on the owner, which is paused. A task claimed by the lead with `--self` and a linked task awaiting review and merge do not count as open tasks for N, because no agent has anything left to start on them.
+
 ### Predictions against registered numbers
 
 `self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each quoting its `docs/prereg.md` row verbatim, with its falsifier as numbers. A falsifier names at least one measure; a prediction without one shows `UNDECIDED`.

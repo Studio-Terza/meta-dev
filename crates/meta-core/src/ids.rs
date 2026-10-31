@@ -108,6 +108,8 @@ impl EscapeId {
 text!(Title, "title");
 text!(AgentName, "agent name");
 text!(Reason, "reason");
+text!(OwnerQuestion, "question");
+text!(OwnerAnswer, "answer");
 text!(Sha, "sha");
 text!(CheckName, "check name");
 text!(Origin, "origin");
