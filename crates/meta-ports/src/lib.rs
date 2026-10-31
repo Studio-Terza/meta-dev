@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
+use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,12 +64,14 @@ pub trait GitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError>;
     fn merged_list(&self) -> Result<String, PortError>;
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError>;
+    /// Merges main into the PR's branch on GitHub, which moves the head; never merges the PR.
+    fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError>;
 }
 
 pub trait Clock {
     fn now(&self) -> Timestamp;
-    /// Waits, so that `now` is later by at least the given seconds.
-    fn pause(&self, seconds: u64);
+    /// Waits, so that `now` is later by at least `span`.
+    fn pause(&self, span: Span);
 }
 
 pub struct Ports<L, G, H, C> {

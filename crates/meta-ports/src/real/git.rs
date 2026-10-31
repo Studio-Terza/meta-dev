@@ -1,4 +1,4 @@
-use super::command::run;
+use super::command::{run, run_found};
 use super::log::home;
 use crate::{Git, PortError};
 use meta_core::{Origin, SelfFile, Sha, TaskId};
@@ -41,6 +41,18 @@ impl GitCli {
     }
 }
 
+impl GitCli {
+    /// The tip of exactly the branch `refs/heads/<task>` in the repository at `repo`; a branch that
+    /// only shares the name as a prefix, such as `<task>/extra`, is not it.
+    pub fn head_in(repo: &Path, task: TaskId) -> Result<Option<Sha>, PortError> {
+        let at = repo.to_string_lossy();
+        let branch = format!("refs/heads/{task}");
+        run_found("git", &["-C", &at, "rev-parse", "--verify", "--quiet", &branch])?
+            .map(|found| found.parse().map_err(|error| PortError::new(format!("branch {task}: {error}"))))
+            .transpose()
+    }
+}
+
 impl Git for GitCli {
     fn origin(&self) -> Result<Origin, PortError> {
         run("git", &["remote", "get-url", "origin"])?
@@ -60,10 +72,43 @@ impl Git for GitCli {
     }
 
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
-        let found = run("git", &["for-each-ref", "--format=%(objectname)", &format!("refs/heads/{task}")])?;
-        match found.is_empty() {
-            true => Ok(None),
-            false => found.parse().map(Some).map_err(|error| PortError::new(format!("branch {task}: {error}"))),
-        }
+        Self::head_in(Path::new("."), task)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::Scratch;
+    use super::{GitCli, run};
+    use meta_core::{Sha, TaskId};
+    use std::path::Path;
+
+    fn repo(name: &str, branch: &str) -> Scratch {
+        let root = Scratch::new(name);
+        let at = root.to_string_lossy().into_owned();
+        let git = |args: &[&str]| run("git", &[&["-C", &at], args].concat()).unwrap();
+        run("git", &["init", "--quiet", &at]).unwrap();
+        let who = ["-c", "user.name=Cinglein", "-c", "user.email=64114772+Cinglein@users.noreply.github.com"];
+        git(&[&who[..], &["commit", "--quiet", "--allow-empty", "-m", "m"]].concat());
+        git(&["branch", branch]);
+        root
+    }
+
+    fn head(root: &Path) -> Option<Sha> {
+        let task: TaskId = "task-1".parse().unwrap();
+        GitCli::head_in(root, task).unwrap()
+    }
+
+    #[test]
+    fn local_head_finds_exactly_the_branch_named_after_the_task() {
+        let found = repo("exact", "task-1");
+        let tip = run("git", &["-C", &found.to_string_lossy(), "rev-parse", "task-1"]).unwrap();
+        assert_eq!(head(&found), Some(tip.parse().unwrap()));
+    }
+
+    #[test]
+    fn local_head_is_none_for_a_branch_that_only_shares_the_prefix() {
+        assert_eq!(head(&repo("nested", "task-1/extra")), None);
+        assert_eq!(head(&repo("longer", "task-10")), None);
     }
 }
