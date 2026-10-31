@@ -94,9 +94,9 @@ impl Log for JsonlLog {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Scratch;
     use super::JsonlLog;
     use crate::Log;
+    use meta_testkit::Scratch;
     use std::fs::{File, TryLockError};
     use std::time::Duration;
 

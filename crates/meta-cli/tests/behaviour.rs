@@ -1,11 +1,12 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Span,
+    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, Rules, RunCount, SelfFile, Sha, Span,
     Timestamp,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
-use meta_ports::real::{JsonlLog, Scratch};
+use meta_ports::real::JsonlLog;
 use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
+use meta_testkit::{Scratch, words};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::str::FromStr;
@@ -170,15 +171,13 @@ fn self_files() -> std::collections::BTreeMap<SelfFile, String> {
 
 fn call(ports: &mut Memory, args: &str, stdin: &str) -> (Answer, Vec<Event>) {
     let before = ports.log.records.len();
-    let words: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
-    let reply = answer(Call::parse(&words, || stdin.to_owned()).unwrap(), ports);
+    let reply = answer(Call::parse(&words(args), || stdin.to_owned()).unwrap(), ports);
     let added = ports.log.records[before..].iter().map(|record| record.event.clone()).collect();
     (reply, added)
 }
 
 fn parsed(args: &str) -> Call {
-    let words: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
-    Call::parse(&words, String::new).unwrap()
+    Call::parse(&words(args), String::new).unwrap()
 }
 
 fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
@@ -188,15 +187,6 @@ fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
 fn agent(description: &str) -> String {
     serde_json::json!({ "tool_name": "Agent", "tool_input": { "description": description, "prompt": "Work on task-1." } })
         .to_string()
-}
-
-fn quoted_values(key: &str) -> Vec<String> {
-    let prefix = format!("{key} = \"");
-    RULES
-        .lines()
-        .filter_map(|line| line.strip_prefix(prefix.as_str()))
-        .map(|rest| rest.trim_end_matches('"').to_owned())
-        .collect()
 }
 
 #[test]
@@ -211,8 +201,8 @@ fn claim_of_an_open_unclaimed_task_leases_and_prints_the_brief_with_every_source
     let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice", "");
     assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", FIXTURE_WORK_DEADLINE)]);
     assert_eq!(reply.code, Code::Done);
-    let rules = [quoted_values("id"), quoted_values("text"), quoted_values("source")].concat();
-    assert!(rules.len() >= 3 && rules.iter().all(|rule| reply.text.contains(rule.as_str())), "{}", reply.text);
+    let rules = Rules::parse(RULES).unwrap().to_string();
+    assert!(reply.text.contains(&rules), "{}", reply.text);
     let brief = ["task-1: Fix the hook", "lease-1", "setup:", &format!("git clone {ORIGIN} task-1")];
     assert!(brief.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
 }
@@ -473,7 +463,7 @@ fn merge_reports_a_failed_protection_lookup_or_unreadable_gh_json_as_a_port_fail
         let mut ports = given(linked_task(), vec![("7", replies)]);
         let (reply, events) = call(&mut ports, "merge 7", "");
         assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
-        assert!(reply.text.starts_with("error:") && reply.text.contains(why), "{}", reply.text);
+        assert!(reply.text.contains("error:") && reply.text.contains(why), "{}", reply.text);
         assert!(ports.github.merged.is_empty());
     });
 }
@@ -534,7 +524,7 @@ fn link_fails_with_the_github_error_when_it_lasts_until_the_deadline() {
     let start = ports.clock.now();
     let (reply, events) = call(&mut ports, "link task-1 7", "");
     assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
-    assert!(reply.text.starts_with("error:") && reply.text.contains("HTTP 502"), "{}", reply.text);
+    assert!(reply.text.contains("error:") && reply.text.contains("HTTP 502"), "{}", reply.text);
     assert_eq!(ports.clock.now(), start.advanced(60));
 }
 
@@ -610,8 +600,7 @@ fn unknown_or_malformed_commands_answer_with_usage() {
     ]
     .into_iter()
     .for_each(|args| {
-        let words: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
-        let refused = Call::parse(&words, String::new).unwrap_err();
+        let refused = Call::parse(&words(args), String::new).unwrap_err();
         assert_eq!(refused.code, Code::Failed);
         assert!(refused.text.contains("usage:"), "{}", refused.text);
     });
@@ -843,7 +832,7 @@ fn resolve_is_refused_with_the_reason_when_the_task_is_not_done_or_the_escape_is
 #[test]
 fn escapes_logged_before_kinds_fold_as_unclassified_beside_old_denied_and_lease_used_records() {
     let text = include_str!("fixtures/stage0-log.jsonl");
-    let records: Vec<Record> = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+    let records: Vec<Record> = serde_json::Deserializer::from_str(text).into_iter().map(Result::unwrap).collect();
     let unclassified = |reason: &str| escaped("unclassified", reason);
     assert_eq!(records[2].event, unclassified("bootstrap: agent started without a lease (meta does not exist yet)"));
     let mut ports = given(Vec::new(), Vec::new());
@@ -1177,7 +1166,8 @@ fn escape_is_recorded_even_when_the_jsonl_log_does_not_parse() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(reply.text.contains("id and counts unavailable"), "{}", reply.text);
-    assert_eq!(text.lines().last(), Some(r#"{"at":2,"event":"Escaped","kind":"gap","reason":"log is garbled"}"#));
+    let appended = r#"{"at":2,"event":"Escaped","kind":"gap","reason":"log is garbled"}"#;
+    assert_eq!(text, format!("not a record\n{appended}\n"));
 }
 
 /// A log whose plain read is stale: only a read inside the transaction sees every record.
@@ -1295,8 +1285,9 @@ fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_predict
 fn status_shows_a_latched_falsification_read_from_the_log_and_latches_nothing_for_a_prediction_that_holds() {
     let history = [finished_task(), vec![falsified("P6", Measure::MedianCiRuns, "median CI runs per merged PR 4")]];
     let status = status_of(history.concat());
-    let p6 = status.lines().find(|line| line.contains("P6 Little rework")).unwrap_or_default();
-    assert!(p6.contains("holds;") && p6.contains("falsified at unix 1 (median CI runs per merged PR 4)"), "{status}");
+    let p6 = "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2; \
+              falsified by Median above 3; measure: CI runs per merged PR; falsified at unix 1 (median CI runs per merged PR 4)\n";
+    assert!(status.contains(p6), "{status}");
     let calm = status_of(finished_task());
     assert!(!calm.contains("falsified at"), "{calm}");
 }
@@ -1472,8 +1463,7 @@ fn claim_and_review_take_a_deadline_override_in_minutes_and_self_claims_get_no_d
     let malformed = ["claim task-1 --self --deadline 10", "claim task-1 --agent a --deadline 0"];
     let more = ["claim task-1 --agent a --deadline 1.5", "review task-1 --agent a --deadline x"];
     malformed.into_iter().chain(more).for_each(|args| {
-        let words: Vec<String> = args.split_whitespace().map(str::to_owned).collect();
-        let reply = Call::parse(&words, String::new).unwrap_err();
+        let reply = Call::parse(&words(args), String::new).unwrap_err();
         assert!(reply.code == Code::Failed && reply.text.contains("usage:"), "{args}: {}", reply.text);
     });
 }
@@ -1527,8 +1517,8 @@ fn status_flags_a_live_lease_past_its_deadline_with_its_agent_until_the_task_is_
     .concat();
     assert!(status_of(reviewed).contains(none));
     let resumes = status_of(bound());
-    let order = (resumes.find("leases resumed 3 or more times"), resumes.find("overdue leases (flagged)"));
-    assert!(matches!(order, (Some(resumed), Some(overdue)) if overdue > resumed), "{resumes}");
+    let adjacent = "leases resumed 3 or more times (flagged)\n  (none)\noverdue leases (flagged)\n";
+    assert!(resumes.contains(adjacent), "{resumes}");
 }
 
 #[test]

@@ -7,14 +7,12 @@ mod hook_entry;
 mod host;
 mod jsonl;
 mod log;
-mod scratch;
 
 pub use clock::SystemClock;
 pub use gh::GhCli;
 pub use git::GitCli;
 pub use host::{Exit, arguments, exit};
 pub use log::JsonlLog;
-pub use scratch::Scratch;
 
 use crate::Ports;
 

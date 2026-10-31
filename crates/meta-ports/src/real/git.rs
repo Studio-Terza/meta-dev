@@ -78,9 +78,9 @@ impl Git for GitCli {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Scratch;
     use super::{GitCli, run};
     use meta_core::{Sha, TaskId};
+    use meta_testkit::Scratch;
     use std::path::Path;
 
     fn repo(name: &str, branch: &str) -> Scratch {

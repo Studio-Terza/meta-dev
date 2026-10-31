@@ -6,7 +6,7 @@
 //! 3. no manifest overrides the lint: the workspace sets it to `deny` and no crate sets it.
 
 use meta_core::Reason;
-use meta_ports::real::Scratch;
+use meta_testkit::Scratch;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;

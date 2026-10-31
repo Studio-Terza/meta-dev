@@ -1,6 +1,7 @@
 use meta_core::SelfFile;
 use meta_ports::PortError;
-use meta_ports::real::{GitCli, Scratch};
+use meta_ports::real::GitCli;
+use meta_testkit::Scratch;
 use std::fs;
 use std::path::Path;
 

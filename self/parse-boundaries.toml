@@ -17,3 +17,8 @@ source = { owner = 2026-10-30, words = "stderr is shown raw, decoded with from_u
 path = "crates/meta-ports/src/real/jsonl.rs"
 reason = "the JSONL log is read one record per line; a line is the unit that is parsed and reported"
 source = { owner = 2026-10-30, words = "text is parsed once, at a declared boundary, into types" }
+
+[[boundary]]
+path = "crates/meta-testkit/src/command_line.rs"
+reason = "tests write a command line as one string; it is split into words once, here, instead of in every test"
+source = { owner = 2026-10-30, words = "text is parsed once, at a declared boundary, into types" }
