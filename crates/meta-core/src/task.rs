@@ -132,6 +132,18 @@ impl Progress {
         matches!(self, Self::Open(_) | Self::Claimed(_) | Self::Linked(_))
     }
 
+    /// The stage's name, as the rework report shows it.
+    pub fn stage(&self) -> &'static str {
+        match self {
+            Self::Open(_) => "open",
+            Self::Claimed(_) => "claimed",
+            Self::Linked(_) => "linked",
+            Self::Done(_) => "done",
+            Self::Retired(_) => "retired",
+            Self::Deferred(_) => "deferred",
+        }
+    }
+
     /// Claimed or linked by the lead working it itself.
     pub fn is_self_claimed(&self) -> bool {
         match self {

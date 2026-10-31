@@ -84,6 +84,13 @@ impl GitHub for RecordedGitHub {
             .pull()
     }
 
+    fn runs(&self, pr: PrNumber) -> Result<String, PortError> {
+        self.replies
+            .get(&pr)
+            .map(|replies| replies.runs.clone())
+            .ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))
+    }
+
     fn merged_list(&self) -> Result<String, PortError> {
         self.listed.clone().unwrap_or_else(|| Err(PortError::new("no recorded merged list")))
     }

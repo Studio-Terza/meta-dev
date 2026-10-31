@@ -1,6 +1,6 @@
 use crate::ids::{Branch, CheckName, Malformed, RunCount, Sha};
 use serde::Deserialize;
-use serde::de::{DeserializeOwned, IgnoredAny};
+use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pull {
@@ -92,7 +92,6 @@ impl Pull {
     pub fn from_gh(view: &str, required: &str, runs: &str) -> Result<Self, Malformed> {
         let view: View = parsed("gh pr view", view)?;
         let required: Required = parsed("required status checks", required)?;
-        let runs: Vec<IgnoredAny> = parsed("gh run list", runs)?;
         Ok(Self {
             head: view.head_ref_oid,
             branch: view.head_ref_name,
@@ -101,7 +100,7 @@ impl Pull {
             merge_state: view.merge_state_status,
             required: required.contexts,
             reported: view.status_check_rollup.into_iter().filter_map(Rollup::check).collect(),
-            runs: RunCount::of(runs.len()),
+            runs: RunCount::from_gh(runs)?,
         })
     }
 

@@ -329,6 +329,33 @@ impl RunCount {
     pub fn total(counts: impl Iterator<Item = RunCount>) -> Self {
         Self(counts.map(|count| count.0).sum())
     }
+
+    /// The runs in a `gh run list --json databaseId` reply.
+    pub fn from_gh(runs: &str) -> Result<Self, Malformed> {
+        serde_json::from_str::<Vec<serde::de::IgnoredAny>>(runs)
+            .map(|rows| Self::of(rows.len()))
+            .map_err(|error| Malformed::because(format!("gh run list: {error}")))
+    }
+}
+
+/// Review rounds that ended in a `fail` verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub struct FailedRounds(usize);
+
+impl FailedRounds {
+    pub fn of(count: usize) -> Self {
+        Self(count)
+    }
+
+    pub(crate) fn value(self) -> usize {
+        self.0
+    }
+}
+
+impl fmt::Display for FailedRounds {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
 }
 
 impl fmt::Display for RunCount {

@@ -1,8 +1,8 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, LeaseId,
     Ledger, Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record,
-    Refusal, Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable, Updating,
-    Verdict,
+    Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable,
+    Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -353,7 +353,19 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
         LedgerCall::Local(local) => Prepared::Local(local),
         LedgerCall::Status => {
             let unreached = |failure: Failure| Unreached::by(&failure);
+            let runs = ledger
+                .rework_prs()
+                .into_iter()
+                .map(|pr| {
+                    let read = github
+                        .runs(pr)
+                        .map_err(|error| Unreached::by(&error))
+                        .and_then(|listed| RunCount::from_gh(&listed).map_err(|error| Unreached::by(&error)));
+                    (pr, read)
+                })
+                .collect();
             Prepared::Status(Sources {
+                runs,
                 github: match github.merged_list() {
                     Ok(listed) => Merges::from_gh(&listed),
                     Err(error) => Reconciliation::Unavailable(Cause::Port(Unreached::by(&error))),
