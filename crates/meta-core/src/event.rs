@@ -6,6 +6,7 @@ use crate::ids::{
 use crate::imported::Imported;
 use crate::predictions::Measure;
 use crate::role::Role;
+use crate::worker::{WorkerEnd, WorkerRun};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,18 +91,25 @@ pub enum Event {
     LeaseUsed {
         lease: LeaseId,
     },
-    /// The agent the used lease started, by the id Claude Code gave it, and the lease's deadline
-    /// counted from this start.
+    /// The agent the used lease started, by the id Claude Code gave it or meta's own for a headless
+    /// worker, and the lease's deadline counted from this start.
     Started {
         lease: LeaseId,
         agent: AgentId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
+        /// Set on a headless worker: its process group and transcript.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        worker: Option<WorkerRun>,
     },
-    /// The agent a used lease started has stopped (Claude Code's SubagentStop hook). A finished
-    /// lease is never overdue and never running work, until a canned continue resumes its agent.
+    /// The agent a used lease started has stopped (Claude Code's SubagentStop hook, or a worker's
+    /// end). A finished lease is never overdue and never running work, until a canned continue
+    /// resumes its agent.
     Finished {
         lease: LeaseId,
+        /// Set on a headless worker: how it ended.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        end: Option<WorkerEnd>,
     },
     Denied {
         attempt: Attempt,

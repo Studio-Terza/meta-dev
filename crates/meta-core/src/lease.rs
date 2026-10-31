@@ -1,5 +1,6 @@
 use crate::event::Event;
 use crate::ids::{AgentId, AgentName, LeaseId, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
+use crate::worker::WorkerRun;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -35,6 +36,8 @@ pub struct Spent {
     verdict: Option<Verdict>,
     /// Set by the stop of the agent; a canned continue clears it, for the agent runs again.
     stopped: bool,
+    /// Set when the agent is a headless worker.
+    worker: Option<WorkerRun>,
 }
 
 impl Deadline {
@@ -110,7 +113,7 @@ impl Lease {
     pub(crate) fn spend(self) -> (Spent, Event) {
         let used = Event::LeaseUsed { lease: self.id };
         let deadline = self.deadline;
-        (Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None, stopped: false }, used)
+        (Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None, stopped: false, worker: None }, used)
     }
 }
 
@@ -124,14 +127,24 @@ impl Spent {
     }
 
     /// The one agent a used lease started; a deadline recorded with the start replaces the lease's.
-    pub(crate) fn start(&mut self, agent: AgentId, deadline: Deadline) -> Result<(), String> {
+    pub(crate) fn start(
+        &mut self,
+        agent: AgentId,
+        deadline: Deadline,
+        worker: Option<WorkerRun>,
+    ) -> Result<(), String> {
         match self.agent.replace(agent) {
             None => {
                 self.deadline = Deadline(deadline.0.or(self.deadline.0));
+                self.worker = worker;
                 Ok(())
             }
             Some(earlier) => Err(format!("{} started {earlier} before", self.lease.id)),
         }
+    }
+
+    pub(crate) fn worker(&self) -> Option<&WorkerRun> {
+        self.worker.as_ref()
     }
 
     pub(crate) fn resumes(&self) -> usize {
@@ -214,6 +227,27 @@ impl LeaseSlot {
         match self {
             Self::Spent(spent) if !self.is_finished() => spent.agent.as_ref(),
             _ => None,
+        }
+    }
+
+    /// The session of a headless worker whose end is not recorded, verdict or none.
+    pub(crate) fn running_worker(&self) -> Option<&WorkerRun> {
+        match self {
+            Self::Spent(spent) if !spent.stopped => spent.worker.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Whether a headless worker ever started on this lease.
+    pub(crate) fn is_worker(&self) -> bool {
+        matches!(self, Self::Spent(Spent { worker: Some(_), .. }))
+    }
+
+    /// The agent started on this lease, finished or not.
+    pub(crate) fn agent(&self) -> Option<&AgentId> {
+        match self {
+            Self::Spent(spent) => spent.agent.as_ref(),
+            Self::Unused(_) => None,
         }
     }
 

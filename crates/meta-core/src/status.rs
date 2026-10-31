@@ -77,11 +77,14 @@ impl Ledger {
         let running: Vec<String> = self
             .leases
             .iter()
-            .filter(|(_, slot)| self.live(slot.lease()) && !self.overdue(slot, at))
+            .filter(|(_, slot)| (self.live(slot.lease()) || slot.running_worker().is_some()) && !self.overdue(slot, at))
             .filter_map(|(id, slot)| {
-                slot.running_agent().map(|agent| {
+                let worker = slot.running_worker();
+                let agent = worker.and(slot.agent()).or_else(|| slot.running_agent());
+                let transcript = worker.map_or_else(String::new, |run| format!(", transcript {}", run.transcript));
+                agent.map(|agent| {
                     format!(
-                        "{id}: agent {agent}, {}, role {}, {}",
+                        "{id}: agent {agent}, {}, role {}, {}{transcript}",
                         slot.lease().task(),
                         self.agent_role(slot),
                         slot.deadline()

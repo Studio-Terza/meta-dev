@@ -1,0 +1,15 @@
+[concurrency]
+running = 4
+source = "owner 2026-10-30: at most 4 workers at once"
+
+[[review.allow]]
+tool = "Read"
+source = "owner 2026-10-30: an explicit allowlist"
+
+[[review.allow]]
+tool = "Bash"
+source = "owner 2026-10-30: an explicit allowlist"
+
+[[review.deny]]
+tool = "Agent"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"

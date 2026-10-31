@@ -117,9 +117,18 @@ text!(Binary, "binary path");
 text!(Branch, "branch");
 text!(EscapeKind, "escape kind");
 text!(AgentId, "agent id");
+text!(ToolRule, "tool rule");
+text!(Transcript, "transcript path");
 text!(PredictionId, "prediction id");
 text!(Observed, "observation");
 text!(Email, "email");
+
+impl AgentId {
+    /// The id of the headless worker on a lease: a lease starts one agent, so it is unique.
+    pub fn worker(lease: LeaseId) -> Self {
+        Self(format!("worker-{}", lease.0))
+    }
+}
 
 impl Branch {
     /// The branch every PR is based on.
@@ -233,6 +242,44 @@ impl FromStr for PrNumber {
             .parse()
             .map(Self)
             .map_err(|_| Malformed(format!("{text:?} is not a PR number")))
+    }
+}
+
+/// A running worker's process group: the process id of its leader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProcessGroup(u32);
+
+impl ProcessGroup {
+    pub fn of(leader: u32) -> Self {
+        Self(leader)
+    }
+
+    pub fn leader(self) -> u32 {
+        self.0
+    }
+}
+
+impl fmt::Display for ProcessGroup {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
+/// The exit status a worker's session left: 128 plus the signal for one a signal ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ExitStatus(i32);
+
+impl ExitStatus {
+    pub fn of(status: i32) -> Self {
+        Self(status)
+    }
+}
+
+impl fmt::Display for ExitStatus {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
     }
 }
 

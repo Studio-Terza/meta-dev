@@ -1,11 +1,12 @@
-use meta_cli::{Answer, Call, Code, answer};
+use meta_cli::{Answer, Call, Code, WorkerCall, answer};
 use meta_core::{
-    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Role, Route, Rules, RunCount,
-    SelfFile, Sha, SideLine, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
+    AgentId, Attempt, Build, Checked, Claimant, Event, ExitStatus, Measure, Outcome, Place, PrNumber, ProcessGroup,
+    Record, Role, Route, Rules, RunCount, SelfFile, Session, Sha, SideLine, Span, Standing, Timestamp,
+    UnverifiedEscape, UnverifiedEscapes, WorkerEnd, WorkerPlan, WorkerRun,
 };
-use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
+use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub, RecordedSessions};
 use meta_ports::real::JsonlLog;
-use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
+use meta_ports::{Clock, GhReplies, Log, PortError, Ports, Sessions};
 use meta_testkit::Scratch;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
@@ -15,6 +16,7 @@ const RULES: &str = include_str!("fixtures/rules.toml");
 const KINDS: &str = include_str!("fixtures/escapes.toml");
 const PREDICTIONS: &str = include_str!("fixtures/predictions.toml");
 const ROLES: &str = include_str!("fixtures/roles.toml");
+const WORKERS: &str = include_str!("fixtures/workers.toml");
 /// The recorded absolute path of the running binary; no real machine path is ever used.
 const BINARY: &str = "/recorded/main/meta";
 const OPEN_PRS: &str = include_str!("fixtures/open-prs.json");
@@ -29,7 +31,7 @@ const GET_LEASE: &str = "meta claim <task> --agent <name>";
 const MAIN_BUILD: &str = "c0ffee0";
 const BRANCH_BUILD: &str = "b4a2c40";
 
-type Memory = Ports<MemoryLog, RecordedGit, RecordedGitHub, FakeClock>;
+type Memory = Ports<MemoryLog, RecordedGit, RecordedGitHub, FakeClock, RecordedSessions>;
 
 fn id<T: FromStr>(text: &str) -> T
 where
@@ -178,6 +180,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
             open: Some(Ok("[]".to_owned())),
         },
         clock: FakeClock::at(Timestamp::from_unix_seconds(2)),
+        sessions: RecordedSessions::default(),
         build: Build::commit(id(MAIN_BUILD)),
     }
 }
@@ -188,6 +191,7 @@ fn self_files() -> std::collections::BTreeMap<SelfFile, String> {
         (SelfFile::EscapeKinds, KINDS),
         (SelfFile::Predictions, PREDICTIONS),
         (SelfFile::Roles, ROLES),
+        (SelfFile::Workers, WORKERS),
     ]
     .map(|(file, text)| (file, text.to_owned()))
     .into()
@@ -630,8 +634,8 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
         let racers: Vec<_> = (0..8)
             .map(|_| {
                 scope.spawn(|| {
-                    let Ports { git, github, clock, build, .. } = given(Vec::new(), Vec::new());
-                    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+                    let Ports { git, github, clock, sessions, build, .. } = given(Vec::new(), Vec::new());
+                    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, sessions, build };
                     answer(start.clone(), &mut ports)
                 })
             })
@@ -821,7 +825,7 @@ fn send(to: &str, message: serde_json::Value, summary: Option<&str>) -> String {
 }
 
 fn started(lease: &str, agent: &str) -> Event {
-    Event::Started { lease: id(lease), agent: id(agent), deadline: None }
+    Event::Started { lease: id(lease), agent: id(agent), deadline: None, worker: None }
 }
 
 /// A finished or backgrounded Agent call as the PostToolUse hook gets it (Claude Code hooks docs:
@@ -1378,8 +1382,8 @@ fn escape_is_recorded_even_when_the_jsonl_log_does_not_parse() {
     let scratch = Scratch::new("garbled");
     let path = scratch.join("log.jsonl");
     std::fs::write(&path, "not a record\n").unwrap();
-    let Ports { git, github, clock, build, .. } = given(Vec::new(), Vec::new());
-    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+    let Ports { git, github, clock, sessions, build, .. } = given(Vec::new(), Vec::new());
+    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, sessions, build };
     let reply = answer(parsed(&["escape", "gap", "log", "is", "garbled"]), &mut ports);
     let text = std::fs::read_to_string(&path).unwrap();
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
@@ -1437,9 +1441,9 @@ impl Log for Lagging {
 
 #[test]
 fn escape_prints_the_id_it_gets_inside_the_locked_append() {
-    let Ports { log, git, github, clock, build } =
+    let Ports { log, git, github, clock, sessions, build } =
         given(vec![escaped("gap", "one"), escaped("gap", "two")], Vec::new());
-    let mut ports = Ports { log: Lagging(log), git, github, clock, build };
+    let mut ports = Ports { log: Lagging(log), git, github, clock, sessions, build };
     let reply = answer(parsed(&["escape", "gap", "three"]), &mut ports);
     let expected = ["escape-3 recorded: [gap] three", "open escapes: 3", "repeats of kind gap: 2"];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -1859,9 +1863,9 @@ fn a_marked_jsonl_log_at_a_scratch_path_is_still_refused_to_a_branch_build() {
     let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("marked-{nanos}.jsonl"));
     let marked = "{\"at\":1,\"event\":\"RealLog\"}\n{\"at\":1,\"event\":\"Opened\",\"task\":1,\"title\":\"Fix\"}\n";
     std::fs::write(&path, marked).unwrap();
-    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+    let Ports { git, github, clock, sessions, .. } = given(Vec::new(), Vec::new());
     let mut ports =
-        Ports { log: JsonlLog::at(path.clone()), git, github, clock, build: Build::commit(id(BRANCH_BUILD)) };
+        Ports { log: JsonlLog::at(path.clone()), git, github, clock, sessions, build: Build::commit(id(BRANCH_BUILD)) };
     let reply = answer(parsed(&["defer", "task-1", "later"]), &mut ports);
     let text = std::fs::read_to_string(&path).unwrap();
     std::fs::remove_file(&path).unwrap();
@@ -1904,11 +1908,14 @@ const MARKED_REFUSAL: &str = "this log is marked as the real log; use a main bui
 const SCRATCH_ADVICE: &str = "XDG_DATA_HOME";
 
 /// The JSONL log in `dir`, holding only the marker, run by `build`.
-fn on_marked_jsonl(dir: &std::path::Path, build: Build) -> Ports<JsonlLog, RecordedGit, RecordedGitHub, FakeClock> {
+fn on_marked_jsonl(
+    dir: &std::path::Path,
+    build: Build,
+) -> Ports<JsonlLog, RecordedGit, RecordedGitHub, FakeClock, RecordedSessions> {
     let path = dir.join("log.jsonl");
     std::fs::write(&path, MARKER_LINE).unwrap();
-    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
-    Ports { log: JsonlLog::at(path), git, github, clock, build }
+    let Ports { git, github, clock, sessions, .. } = given(Vec::new(), Vec::new());
+    Ports { log: JsonlLog::at(path), git, github, clock, sessions, build }
 }
 
 #[test]
@@ -2098,9 +2105,11 @@ fn a_branch_build_that_read_scratch_before_the_log_was_marked_appends_nothing_in
         (&["escape", "gap", "from", "a", "stale", "build"], String::new()),
     ];
     cases.into_iter().for_each(|(args, stdin)| {
-        let Ports { log, git, github, clock, .. } = on_marked_log(claimed_task(), Build::commit(id(BRANCH_BUILD)));
+        let Ports { log, git, github, clock, sessions, .. } =
+            on_marked_log(claimed_task(), Build::commit(id(BRANCH_BUILD)));
         let before = log.records.len();
-        let mut ports = Ports { log: Unmarked(log), git, github, clock, build: Build::commit(id(BRANCH_BUILD)) };
+        let mut ports =
+            Ports { log: Unmarked(log), git, github, clock, sessions, build: Build::commit(id(BRANCH_BUILD)) };
         let reply = answer(Call::parse(&command(args), || stdin.clone()).unwrap(), &mut ports);
         assert_eq!(ports.log.0.records.len(), before, "{args:?}: {}", reply.text);
         assert!(reply.text.contains(BRANCH_BUILD_REFUSAL) || reply.text.contains(DENY), "{args:?}: {}", reply.text);
@@ -2109,8 +2118,8 @@ fn a_branch_build_that_read_scratch_before_the_log_was_marked_appends_nothing_in
 
 #[test]
 fn a_stale_branch_build_sets_its_escape_aside_when_the_log_turns_out_marked() {
-    let Ports { log, git, github, clock, .. } = on_marked_log(Vec::new(), Build::commit(id(BRANCH_BUILD)));
-    let mut ports = Ports { log: Unmarked(log), git, github, clock, build: Build::commit(id(BRANCH_BUILD)) };
+    let Ports { log, git, github, clock, sessions, .. } = on_marked_log(Vec::new(), Build::commit(id(BRANCH_BUILD)));
+    let mut ports = Ports { log: Unmarked(log), git, github, clock, sessions, build: Build::commit(id(BRANCH_BUILD)) };
     let reply = answer(parsed(&["escape", "gap", "stale"]), &mut ports);
     assert_eq!((reply.code, ports.log.0.set_aside.len()), (Code::Done, 1), "{}", reply.text);
     assert!(reply.text.contains("kept in memory side file"), "{}", reply.text);
@@ -2162,9 +2171,9 @@ fn escape_is_recorded_even_when_the_jsonl_log_holds_bytes_that_are_not_utf8() {
         let scratch = Scratch::new(&format!("not-utf8-{name}"));
         let path = scratch.join("log.jsonl");
         std::fs::write(&path, bytes).unwrap();
-        let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+        let Ports { git, github, clock, sessions, .. } = given(Vec::new(), Vec::new());
         let build = Build::commit(id(MAIN_BUILD));
-        let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+        let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, sessions, build };
         let reply = answer(parsed(&["escape", "gap", "log", "has", "bad", "bytes"]), &mut ports);
         let after = std::fs::read(&path).unwrap();
         assert_eq!(reply.code, Code::Done, "{name}: {}", reply.text);
@@ -2183,9 +2192,9 @@ fn a_branch_build_cannot_write_a_log_whose_marker_is_followed_by_bytes_that_are_
     let scratch = Scratch::new("not-utf8-branch");
     let path = scratch.join("log.jsonl");
     std::fs::write(&path, [MARKER_LINE.as_bytes(), b"\xff\n"].concat()).unwrap();
-    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+    let Ports { git, github, clock, sessions, .. } = given(Vec::new(), Vec::new());
     let build = Build::commit(id(BRANCH_BUILD));
-    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, sessions, build };
     let reply = answer(parsed(&["escape", "gap", "from", "a", "branch"]), &mut ports);
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert_eq!(std::fs::read(&path).unwrap(), [MARKER_LINE.as_bytes(), b"\xff\n"].concat());
@@ -2274,7 +2283,7 @@ fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
     ports.clock.pause(Span::of_seconds(100));
     let (reply, events) = call(&mut ports, &["hook", "post-tool-use"], &agent_ran("Agent", "lease-1", AGENT_ID));
     let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
-    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
+    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline, worker: None };
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
     ports.clock.pause(Span::of_seconds(2750 - 102));
     let (status, _) = call(&mut ports, &["status"], "");
@@ -2292,7 +2301,7 @@ fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
 #[test]
 fn status_flags_a_live_lease_past_its_deadline_with_its_agent_until_the_task_is_done() {
     let late = |deadline: u64| leased_until("lease-1", "task-1", deadline);
-    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline: None };
+    let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline: None, worker: None };
     let running = vec![opened("task-1"), claimed("task-1"), late(1), used("lease-1"), started];
     let text = status_of(running.clone());
     let flagged = format!("overdue leases (flagged)\n  lease-1 for task-1: agent {AGENT_ID}, deadline unix 1\n");
@@ -2445,8 +2454,12 @@ fn a_waiting_task_is_not_overdue_and_its_deadlines_resume_from_the_answer() {
 
 #[test]
 fn unwait_moves_the_started_deadline_too_and_leaves_other_tasks_alone() {
-    let started =
-        Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline: Some(Timestamp::from_unix_seconds(200)) };
+    let started = Event::Started {
+        lease: id("lease-1"),
+        agent: id(AGENT_ID),
+        deadline: Some(Timestamp::from_unix_seconds(200)),
+        worker: None,
+    };
     let history = vec![
         opened("task-1"),
         claimed("task-1"),
@@ -3143,7 +3156,7 @@ fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
 // Task 44: a finished agent stops being overdue and running work, and status lists running agents.
 
 fn finished(lease: &str) -> Event {
-    Event::Finished { lease: id(lease) }
+    Event::Finished { lease: id(lease), end: None }
 }
 
 /// A SubagentStop hook input (Claude Code hooks reference, SubagentStop).
@@ -3175,6 +3188,7 @@ fn running_until(deadline: u64) -> Vec<Event> {
         lease: id("lease-1"),
         agent: id(AGENT_ID),
         deadline: Some(Timestamp::from_unix_seconds(deadline)),
+        worker: None,
     };
     vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", deadline), used("lease-1"), start]
 }
@@ -3253,7 +3267,7 @@ fn running_agents_name_the_role_and_leave_out_agents_of_finished_tasks() {
     let review = [
         linked_task(),
         vec![review_leased_until("lease-2", PINNED, 1000), used("lease-2")],
-        vec![Event::Started { lease: id("lease-2"), agent: id("a1"), deadline: None }],
+        vec![Event::Started { lease: id("lease-2"), agent: id("a1"), deadline: None, worker: None }],
     ]
     .concat();
     let text = status_of(review.clone());
@@ -3379,4 +3393,403 @@ fn status_slope_says_none_yet_when_nothing_is_delivered_and_lists_no_tasks_for_a
          median failed review rounds per task: most recent none yet, the 0 before none yet\n"
     );
     assert!(status.contains(&expected), "{status}");
+}
+
+// Headless workers (docs/stage2c.md). Sessions are recorded; no process runs.
+
+const ISSUED_ALLOWANCE: u64 = 1800;
+/// The clock's time plus the allowance of `review_task`'s lease: `given` issues at 1, the clock is at 2.
+const WORKER_DEADLINE: u64 = 2 + ISSUED_ALLOWANCE;
+
+fn run_of(group: u32, lease: u64) -> WorkerRun {
+    WorkerRun { group: ProcessGroup::of(group), transcript: id(&format!("/recorded/workers/worker-{lease}/t.jsonl")) }
+}
+
+/// Task `number`, linked to PR `number`, with its work lease `2n - 1` and review lease `2n` unused.
+fn review_task(number: u64) -> Vec<Event> {
+    let (task, pr, work, review) = (
+        format!("task-{number}"),
+        number.to_string(),
+        format!("lease-{}", 2 * number - 1),
+        format!("lease-{}", 2 * number),
+    );
+    vec![
+        opened(&task),
+        claimed(&task),
+        leased(&work, &task),
+        linked(&task, &pr),
+        Event::ReviewLeased {
+            lease: id(&review),
+            task: id(&task),
+            agent: Some(id("bob")),
+            pr: id(&pr),
+            head: id(PINNED),
+            deadline: Some(Timestamp::from_unix_seconds(1 + ISSUED_ALLOWANCE)),
+        },
+    ]
+}
+
+/// `review_task(number)` with a worker running on its review lease.
+fn worker_task(number: u64) -> Vec<Event> {
+    let lease = 2 * number;
+    let started = Event::Started {
+        lease: id(&format!("lease-{lease}")),
+        agent: id(&format!("worker-{lease}")),
+        deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+        worker: Some(run_of(800 + u32::try_from(lease).unwrap(), lease)),
+    };
+    [review_task(number), vec![used(&format!("lease-{lease}")), started]].concat()
+}
+
+#[test]
+fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_the_brief_and_allowlist() {
+    let mut ports = given(review_task(1), Vec::new());
+    let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    let transcript = "/recorded/workers/worker-2/transcript.jsonl";
+    let run = WorkerRun { group: ProcessGroup::of(RecordedSessions::FIRST_GROUP + 1), transcript: id(transcript) };
+    assert_eq!(
+        events,
+        vec![
+            used("lease-2"),
+            Event::Started {
+                lease: id("lease-2"),
+                agent: id("worker-2"),
+                deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+                worker: Some(run),
+            },
+        ]
+    );
+    assert_eq!(
+        reply.text,
+        format!(
+            "lease-2: worker worker-2 started, process group 901, deadline unix {WORKER_DEADLINE}, transcript {transcript}\n"
+        )
+    );
+    let [plan] = ports.sessions.started.as_slice() else { panic!("one session: {:?}", ports.sessions.started) };
+    let args = plan.arguments();
+    let (brief, flags) = (&args[1], &args[2..]);
+    assert!(brief.contains("review: #1 for task-1: "), "{brief}");
+    assert!(brief.contains(&format!("deadline: unix {WORKER_DEADLINE}, report or stop by then")), "{brief}");
+    let expected = [
+        "--tools",
+        "Read,Bash",
+        "--allowedTools",
+        "Read,Bash",
+        "--disallowedTools",
+        "Agent",
+        "--permission-mode",
+        "dontAsk",
+        "--permission-prompts",
+        "none",
+        "--strict-mcp-config",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+    ];
+    assert_eq!((plan.program(), args[0].as_str(), flags), ("claude", "-p", expected.map(str::to_owned).as_slice()));
+    assert_eq!(plan.repository().to_string(), ORIGIN);
+    assert_eq!(plan.binary().to_string(), BINARY);
+    let supervisor = plan.supervisor_arguments();
+    assert_eq!(
+        Call::parse(&supervisor, String::new).unwrap(),
+        Call::Worker(WorkerCall::Wait(id("lease-2"))),
+        "the supervisor's words parse as meta worker wait"
+    );
+}
+
+#[test]
+fn worker_start_is_refused_without_a_session_for_a_lease_no_worker_may_use() {
+    let done_task = [review_task(1), vec![Event::Retired { task: id("task-1"), reason: id("moot") }]].concat();
+    let no_deadline = [
+        review_task(1)[..4].to_vec(),
+        vec![Event::ReviewLeased {
+            lease: id("lease-2"),
+            task: id("task-1"),
+            agent: None,
+            pr: id("1"),
+            head: id(PINNED),
+            deadline: None,
+        }],
+    ]
+    .concat();
+    let cases: [(Vec<Event>, &str, &str); 5] = [
+        (review_task(1), "lease-9", "lease-9 is unknown"),
+        (review_task(1), "lease-1", "lease-1 is a work lease"),
+        (worker_task(1), "lease-2", "lease-2 is already used"),
+        (done_task, "lease-2", "lease-2 is not live"),
+        (no_deadline, "lease-2", "lease-2 has no deadline"),
+    ];
+    for (events, lease, said) in cases {
+        let mut ports = given(events, Vec::new());
+        let (reply, added) = call(&mut ports, &["worker", "start", lease], "");
+        assert_eq!((reply.code, added), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(said), "{}", reply.text);
+        assert!(ports.sessions.started.is_empty());
+    }
+}
+
+#[test]
+fn worker_start_is_refused_at_the_limit_of_running_workers_until_one_ends() {
+    let running = [worker_task(1), worker_task(2), worker_task(3), worker_task(4)].concat();
+    let mut full = given([running.clone(), review_task(5)].concat(), Vec::new());
+    let (reply, added) = call(&mut full, &["worker", "start", "lease-10"], "");
+    assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+    assert!(
+        reply.text.contains("4 workers are running (lease-2, lease-4, lease-6, lease-8) and 4 is the limit"),
+        "{}",
+        reply.text
+    );
+    assert!(reply.text.contains("meta stop <lease>"), "{}", reply.text);
+    assert!(full.sessions.started.is_empty());
+    let ended = Event::Finished { lease: id("lease-4"), end: Some(WorkerEnd::Exited(ExitStatus::of(0))) };
+    let mut freed = given([running, vec![ended], review_task(5)].concat(), Vec::new());
+    assert_eq!(call(&mut freed, &["worker", "start", "lease-10"], "").0.code, Code::Done);
+}
+
+#[test]
+fn a_worker_that_gave_its_verdict_counts_towards_the_limit_until_its_session_ends() {
+    let verdict = Event::Reviewed { lease: id("lease-2"), verdict: id("pass"), head: Some(id(PINNED)) };
+    let events = [worker_task(1), vec![verdict], worker_task(2), worker_task(3), worker_task(4), review_task(5)];
+    let mut ports = given(events.concat(), Vec::new());
+    assert_eq!(call(&mut ports, &["worker", "start", "lease-10"], "").0.code, Code::Refused);
+}
+
+#[test]
+fn worker_start_on_the_real_log_runs_a_main_build_only_and_reads_mains_allowlist() {
+    for (build, why) in unverified_builds() {
+        let mut ports = Ports { build, ..on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD))) };
+        let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+        assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(why), "{}", reply.text);
+        assert!(ports.sessions.started.is_empty());
+    }
+    let mut main = on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
+    main.git.local.insert(SelfFile::Workers, "tampered".to_owned());
+    assert_eq!(call(&mut main, &["worker", "start", "lease-2"], "").0.code, Code::Done);
+    assert_eq!(main.sessions.started[0].arguments()[3], "Read,Bash");
+}
+
+#[test]
+fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist() {
+    let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..given(review_task(1), Vec::new()) };
+    let tree = "[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
+    ports.git.local.insert(SelfFile::Workers, tree.to_owned());
+    ports.git.files.remove(&SelfFile::Workers);
+    assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
+    assert_eq!(ports.sessions.started[0].arguments()[3], "Glob");
+}
+
+#[test]
+fn worker_start_with_an_unreadable_allowlist_fails_and_keeps_the_lease() {
+    let mut ports = on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
+    ports.git.files.remove(&SelfFile::Workers);
+    let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
+    assert!(reply.text.contains("self/workers.toml"), "{}", reply.text);
+    ports.git.files.insert(SelfFile::Workers, "[concurrency]\nrunning = 4\n".to_owned());
+    let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
+    assert!(ports.sessions.started.is_empty());
+}
+
+#[test]
+fn worker_start_that_cannot_start_the_session_records_nothing_so_the_lease_stays_unused() {
+    let mut ports = given(review_task(1), Vec::new());
+    ports.sessions.broken_start = Some(PortError::new("no claude here"));
+    let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
+    assert_eq!(reply.text, "error: no claude here\n");
+    ports.sessions.broken_start = None;
+    assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
+}
+
+#[test]
+fn worker_wait_records_the_exit_status_when_the_session_ends() {
+    let mut ports = given(worker_task(1), Vec::new());
+    ports.sessions.states.borrow_mut().extend([
+        Ok(Session::Running),
+        Err(PortError::new("ps failed")),
+        Ok(Session::Ended(Some(ExitStatus::of(0)))),
+    ]);
+    let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(reply.text, "lease-2: worker worker-2 exited with status 0\n");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Exited(ExitStatus::of(0))) }]);
+    assert!(ports.sessions.stopped.is_empty());
+}
+
+#[test]
+fn worker_wait_records_a_session_that_vanished_with_no_exit_status() {
+    let mut ports = given(worker_task(1), Vec::new());
+    ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(None)));
+    let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(reply.text, "lease-2: worker worker-2 ended with no exit status\n");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Vanished) }]);
+}
+
+#[test]
+fn worker_wait_kills_the_group_at_the_deadline_and_records_it() {
+    let mut ports = given(worker_task(1), Vec::new());
+    let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(reply.text, "lease-2: worker worker-2 was killed at its deadline\n");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
+    assert_eq!(ports.sessions.stopped, vec![run_of(802, 2)]);
+    assert!(ports.clock.now() > Timestamp::from_unix_seconds(WORKER_DEADLINE));
+}
+
+#[test]
+fn worker_wait_does_not_let_a_task_waiting_on_the_owner_hold_back_the_kill() {
+    let waiting = Event::WaitingOnOwner { task: id("task-1"), question: id("Which?") };
+    let mut ports = given([worker_task(1), vec![waiting]].concat(), Vec::new());
+    let (_, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
+}
+
+#[test]
+fn worker_wait_keeps_watching_while_the_kill_fails() {
+    /// Fails the first stop, as a process table that cannot be read does, then works.
+    #[derive(Default)]
+    struct Stubborn(RecordedSessions, std::cell::Cell<bool>);
+    impl Sessions for Stubborn {
+        fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
+            self.0.start(plan)
+        }
+        fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError> {
+            self.0.state(worker, run)
+        }
+        fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
+            match self.1.replace(true) {
+                true => self.0.stop(run),
+                false => Err(PortError::new("ps failed")),
+            }
+        }
+    }
+    let Ports { log, git, github, clock, build, .. } = given(worker_task(1), Vec::new());
+    let mut ports = Ports { log, git, github, clock, sessions: Stubborn::default(), build };
+    let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
+    assert_eq!(reply.text, "lease-2: worker worker-2 was killed at its deadline\n");
+    assert_eq!(ports.sessions.0.stopped.len(), 1);
+}
+
+#[test]
+fn worker_wait_stops_at_once_when_the_end_is_recorded_and_refuses_a_lease_with_no_worker() {
+    let over = [worker_task(1), vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Stopped) }]].concat();
+    let (reply, added) = call(&mut given(over, Vec::new()), &["worker", "wait", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Done, Vec::new()));
+    assert_eq!(reply.text, "lease-2: the worker's end is already recorded\n");
+    let (reply, added) = call(&mut given(review_task(1), Vec::new()), &["worker", "wait", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("lease-2 started no worker"), "{}", reply.text);
+}
+
+#[test]
+fn stop_with_a_lease_kills_that_group_and_records_it() {
+    let mut ports = given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    let (reply, events) = call(&mut ports, &["stop", "lease-4"], "");
+    assert_eq!(reply.text, "lease-4: worker worker-4 was stopped by meta stop\n");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-4"), end: Some(WorkerEnd::Stopped) }]);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)]);
+}
+
+#[test]
+fn stop_with_no_lease_kills_every_running_worker_and_says_so_when_there_are_none() {
+    let over = Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Exited(ExitStatus::of(0))) };
+    let mut ports = given([worker_task(1), vec![over], worker_task(2), worker_task(3)].concat(), Vec::new());
+    let (reply, events) = call(&mut ports, &["stop"], "");
+    assert_eq!(
+        reply.text,
+        "lease-4: worker worker-4 was stopped by meta stop\nlease-6: worker worker-6 was stopped by meta stop\n"
+    );
+    assert_eq!(events.len(), 2);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4), run_of(806, 6)]);
+    let (reply, added) = call(&mut given(review_task(1), Vec::new()), &["stop"], "");
+    assert_eq!((reply.code, reply.text.as_str(), added), (Code::Done, "no workers are running\n", Vec::new()));
+}
+
+#[test]
+fn stop_refuses_a_lease_with_no_running_worker_and_kills_nothing() {
+    let over = [worker_task(1), vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]];
+    let cases = [(review_task(1), "lease-2", "started no worker"), (over.concat(), "lease-2", "has already ended")];
+    for (events, lease, said) in cases {
+        let mut ports = given(events, Vec::new());
+        let (reply, added) = call(&mut ports, &["stop", lease], "");
+        assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(said), "{}", reply.text);
+        assert!(ports.sessions.stopped.is_empty());
+    }
+}
+
+#[test]
+fn stop_from_a_branch_build_on_the_real_log_still_kills_and_says_it_recorded_nothing() {
+    let (build, why) = unverified_builds().into_iter().next().unwrap();
+    let mut ports = Ports { build, ..on_marked_log(worker_task(1), Build::commit(id(MAIN_BUILD))) };
+    let (reply, added) = call(&mut ports, &["stop"], "");
+    assert_eq!((reply.code, added), (Code::Done, Vec::new()));
+    assert!(reply.text.contains("not recorded: ") && reply.text.contains(why), "{}", reply.text);
+    assert_eq!(ports.sessions.stopped.len(), 1);
+}
+
+#[test]
+fn stop_that_cannot_kill_a_group_fails_naming_it_and_records_only_the_ones_it_killed() {
+    let mut ports = given(worker_task(1), Vec::new());
+    ports.sessions.broken_stop = Some(PortError::new("not permitted"));
+    let (reply, added) = call(&mut ports, &["stop"], "");
+    assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
+    assert_eq!(reply.text, "error: could not stop worker-2: not permitted\n");
+}
+
+#[test]
+fn status_lists_a_running_worker_with_its_role_and_transcript_even_on_a_finished_task() {
+    let line = format!(
+        "lease-2: agent worker-2, task-1, role review, deadline unix {WORKER_DEADLINE}, transcript /recorded/workers/worker-2/t.jsonl"
+    );
+    assert!(status_of(worker_task(1)).contains(&line), "{}", status_of(worker_task(1)));
+    let retired = Event::Retired { task: id("task-1"), reason: id("moot") };
+    let status = status_of([worker_task(1), vec![retired]].concat());
+    assert!(status.contains(&line), "{status}");
+    let over = [worker_task(1), vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]];
+    assert!(!status_of(over.concat()).contains(&line));
+}
+
+#[test]
+fn a_worker_takes_no_canned_continue() {
+    let input = send("worker-2", serde_json::json!("continue"), Some("lease-2"));
+    let (reply, added) = hook(worker_task(1), &input);
+    assert!(reply.text.contains(DENY) && reply.text.contains("worker-2 is a headless worker"), "{}", reply.text);
+    assert_eq!(added, Vec::new());
+}
+
+#[test]
+fn a_worker_round_trips_through_the_log_and_older_records_read_as_no_worker() {
+    let run = run_of(801, 2);
+    let started = Event::Started { lease: id("lease-2"), agent: id("worker-2"), deadline: None, worker: Some(run) };
+    let line = serde_json::to_string(&started).unwrap();
+    assert_eq!(
+        line,
+        r#"{"event":"Started","lease":2,"agent":"worker-2","worker":{"group":801,"transcript":"/recorded/workers/worker-2/t.jsonl"}}"#
+    );
+    assert_eq!(serde_json::from_str::<Event>(&line).unwrap(), started);
+    let cases = [
+        (WorkerEnd::Exited(ExitStatus::of(143)), r#"{"exited":143}"#),
+        (WorkerEnd::Vanished, r#""vanished""#),
+        (WorkerEnd::Deadline, r#""deadline""#),
+        (WorkerEnd::Stopped, r#""stopped""#),
+    ];
+    for (end, written) in cases {
+        let finished = Event::Finished { lease: id("lease-2"), end: Some(end) };
+        let line = serde_json::to_string(&finished).unwrap();
+        assert_eq!(line, format!(r#"{{"event":"Finished","lease":2,"end":{written}}}"#));
+        assert_eq!(serde_json::from_str::<Event>(&line).unwrap(), finished);
+    }
+}
+
+#[test]
+fn worker_commands_take_a_lease_id_and_stop_takes_at_most_one() {
+    assert_eq!(parsed(&["worker", "start", "lease-3"]), Call::Worker(WorkerCall::Start(id("lease-3"))));
+    assert_eq!(parsed(&["stop"]), Call::Worker(WorkerCall::Stop(None)));
+    assert_eq!(parsed(&["stop", "lease-3"]), Call::Worker(WorkerCall::Stop(Some(id("lease-3")))));
+    let malformed = |args: &[&str]| Call::parse(&command(args), String::new).unwrap_err().code;
+    assert_eq!(malformed(&["worker", "start", "task-3"]), Code::Failed);
+    assert_eq!(malformed(&["worker", "start"]), Code::Failed);
+    assert_eq!(malformed(&["stop", "lease-3", "lease-4"]), Code::Failed);
 }

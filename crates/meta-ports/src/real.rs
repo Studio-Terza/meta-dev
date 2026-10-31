@@ -10,15 +10,24 @@ mod jsonl;
 mod log;
 #[cfg(test)]
 mod stamp;
+mod worker;
 
 pub use clock::SystemClock;
 pub use gh::GhCli;
 pub use git::GitCli;
 pub use host::{Exit, arguments, build, exit};
 pub use log::JsonlLog;
+pub use worker::HeadlessSessions;
 
 use crate::Ports;
 
-pub fn ports() -> Ports<JsonlLog, GitCli, GhCli, SystemClock> {
-    Ports { log: JsonlLog::in_data_dir(), git: GitCli, github: GhCli, clock: SystemClock, build: build() }
+pub fn ports() -> Ports<JsonlLog, GitCli, GhCli, SystemClock, HeadlessSessions> {
+    Ports {
+        log: JsonlLog::in_data_dir(),
+        git: GitCli,
+        github: GhCli,
+        clock: SystemClock,
+        sessions: HeadlessSessions,
+        build: build(),
+    }
 }

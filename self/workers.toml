@@ -1,0 +1,46 @@
+# Headless workers (docs/prereg.md, "Headless workers"; docs/stage2c.md). Each entry must cite where
+# it came from. A tool without a source is a bug: this file does not parse.
+# source = "owner YYYY-MM-DD: <words>" or "failure: <what happened>"
+# `tool` is a Claude Code tool name or permission rule, as --allowedTools and --disallowedTools take it.
+
+[concurrency]
+running = 4
+source = "owner 2026-10-30: at most 4 workers at once"
+
+# What a reviewer may use: --tools limits the session to these, --allowedTools approves them, and
+# dontAsk denies everything else. Bash is here because the review brief needs gh pr diff and meta
+# verdict. It is not read-only by itself; docs/stage2c.md says what that leaves open.
+[[review.allow]]
+tool = "Read"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.allow]]
+tool = "Grep"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.allow]]
+tool = "Glob"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.allow]]
+tool = "Bash"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.deny]]
+tool = "Agent"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+[[review.deny]]
+tool = "Task"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+# A Bash rule matches the command as written, so this stops the plain form only (Claude Code
+# permissions, Bash rule limits).
+[[review.deny]]
+tool = "Bash(claude *)"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+# --tools does not cover MCP tools (Claude Code CLI reference, --tools).
+[[review.deny]]
+tool = "mcp__*"
+source = "owner 2026-10-30: an explicit allowlist"

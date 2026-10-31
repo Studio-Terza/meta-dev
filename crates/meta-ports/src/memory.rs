@@ -1,7 +1,8 @@
-use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
+use crate::{Clock, GhReplies, Git, GitHub, Log, PortError, Sessions};
 use meta_core::{
-    Binary, Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing,
-    TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    AgentId, Binary, Cleared, Head, Marking, Origin, Place, PrNumber, ProcessGroup, Pull, Record, SelfFile, Session,
+    Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating, WorkerPlan,
+    WorkerRun,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -178,6 +179,48 @@ impl GitHub for RecordedGitHub {
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {
         self.merged.push((cleared.pr(), cleared.head().clone()));
+        Ok(())
+    }
+}
+
+/// Sessions that only record what they were asked; no process runs.
+#[derive(Debug, Default)]
+pub struct RecordedSessions {
+    pub started: Vec<WorkerPlan>,
+    pub stopped: Vec<WorkerRun>,
+    /// Why starting fails, when it does.
+    pub broken_start: Option<PortError>,
+    /// Why stopping fails, when it does.
+    pub broken_stop: Option<PortError>,
+    /// The replies to `state`, one per call; after them a session is running.
+    pub states: RefCell<VecDeque<Result<Session, PortError>>>,
+}
+
+impl RecordedSessions {
+    /// The first process group handed out.
+    pub const FIRST_GROUP: u32 = 900;
+
+    pub fn transcript(worker: &AgentId) -> String {
+        format!("/recorded/workers/{worker}/transcript.jsonl")
+    }
+}
+
+impl Sessions for RecordedSessions {
+    fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
+        self.broken_start.clone().map_or(Ok(()), Err)?;
+        self.started.push(plan.clone());
+        let group = Self::FIRST_GROUP.saturating_add(u32::try_from(self.started.len()).unwrap_or(u32::MAX));
+        let transcript = Self::transcript(plan.id()).parse()?;
+        Ok(WorkerRun { group: ProcessGroup::of(group), transcript })
+    }
+
+    fn state(&self, _: &AgentId, _: &WorkerRun) -> Result<Session, PortError> {
+        self.states.borrow_mut().pop_front().unwrap_or(Ok(Session::Running))
+    }
+
+    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
+        self.broken_stop.clone().map_or(Ok(()), Err)?;
+        self.stopped.push(run.clone());
         Ok(())
     }
 }

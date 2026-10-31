@@ -2,8 +2,8 @@ pub mod memory;
 pub mod real;
 
 use meta_core::{
-    Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span,
-    Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    AgentId, Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Session, Sha,
+    SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating, WorkerPlan, WorkerRun,
 };
 use std::fmt;
 
@@ -115,11 +115,22 @@ pub trait Clock {
     fn pause(&self, span: Span);
 }
 
-pub struct Ports<L, G, H, C> {
+/// Headless Claude sessions: the only way a worker runs.
+pub trait Sessions {
+    /// Starts the session, detached, and the supervisor that watches it; returns once both run. A
+    /// supervisor that ends takes the session with it.
+    fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError>;
+    fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError>;
+    /// Ends the session's process group. A session already gone is not an error.
+    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError>;
+}
+
+pub struct Ports<L, G, H, C, S> {
     pub log: L,
     pub git: G,
     pub github: H,
     pub clock: C,
+    pub sessions: S,
     /// The commit this binary was built from.
     pub build: Build,
 }

@@ -32,15 +32,20 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<Vec<u8>> {
     receiver
 }
 
-/// Ends the command's whole process group, so that what it started goes too: SIGTERM, a short
-/// grace, then SIGKILL. A group that is already gone is not an error.
-fn terminate(child: &mut Child) {
-    let group = i32::try_from(child.id()).ok().map(Pid::from_raw);
+/// Ends a whole process group, so that what its leader started goes too: SIGTERM, a short grace,
+/// then SIGKILL. A group that is already gone is not an error.
+pub fn end_group(leader: u32) {
+    let group = i32::try_from(leader).ok().map(Pid::from_raw);
     group.into_iter().for_each(|group| {
         let _ = killpg(group, Signal::SIGTERM);
         thread::sleep(GRACE);
         let _ = killpg(group, Signal::SIGKILL);
     });
+}
+
+/// Ends the command and its process group.
+fn terminate(child: &mut Child) {
+    end_group(child.id());
     let _ = child.kill();
     let _ = child.wait();
 }

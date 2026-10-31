@@ -209,7 +209,7 @@ impl Ledger {
                 Some(LeaseSlot::Spent(spent)) => match spent.agent() {
                     None => {
                         let deadline = spent.lease().deadline_from(at).time();
-                        Hook::allow(vec![Event::Started { lease, agent, deadline }])
+                        Hook::allow(vec![Event::Started { lease, agent, deadline, worker: None }])
                     }
                     Some(earlier) => refusal(format!("{lease} already started {earlier}, not {agent}")),
                 },
@@ -226,7 +226,7 @@ impl Ledger {
             LeaseSlot::Spent(spent) if spent.agent() == Some(agent) && !spent.is_stopped() => Some(*id),
             _ => None,
         });
-        Hook::allow(finished.map(|lease| Event::Finished { lease }).into_iter().collect())
+        Hook::allow(finished.map(|lease| Event::Finished { lease, end: None }).into_iter().collect())
     }
 
     pub fn resume(&self, resume: Resume) -> Accepted {
@@ -245,6 +245,7 @@ impl Ledger {
         let task = spent.lease().task();
         match (spent.agent(), self.tasks.get(&task)) {
             (None, _) => refusal(format!("no agent is recorded as started on {lease}")),
+            (Some(agent), _) if spent.worker().is_some() => refusal(format!("{agent} is a headless worker")),
             (Some(agent), _) if *agent != to => refusal(format!("{lease} started {agent}, not {to}")),
             (Some(_), Some(progress)) if progress.is_active() => Hook::allow(vec![Event::Resumed { lease }]),
             (Some(_), progress) => refusal(format!(

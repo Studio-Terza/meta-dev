@@ -138,6 +138,11 @@ impl Ledger {
 }
 
 impl Reissue {
+    /// The same brief, stating `deadline` instead of the lease's.
+    pub(crate) fn deadline(self, deadline: Deadline) -> Self {
+        Self { deadline, ..self }
+    }
+
     /// The brief the lease's own claim or review printed; no event.
     pub fn brief(self, origin: &Origin, binary: &Binary, rules: &Rules) -> Accepted {
         let Self { task, title, who, lease, deadline, purpose } = self;
