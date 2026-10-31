@@ -54,5 +54,5 @@ source = "owner 2026-10-30: I don't want to get bombarded by a bunch of blocking
 
 [[rule]]
 id = "live-reads"
-text = "A PR that adds or changes a read of a live service (GitHub, git) runs it against the real service before review, and the PR body says what it observed."
+text = "A PR that adds or changes something that reads real data (the meta log, GitHub, git, any other external source) runs it against that real data before review, and the PR body says what it observed."
 source = "failure 2026-10-31: the idle alarm and the drift query passed their tests and failed live"
