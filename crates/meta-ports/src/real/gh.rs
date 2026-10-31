@@ -19,6 +19,11 @@ struct Head {
     head_ref_name: String,
 }
 
+/// The one `gh run list` call, for a branch name already read by `pull` or by `runs`.
+fn branch_runs(branch: &str) -> Result<String, PortError> {
+    run("gh", &["run", "list", "--branch", branch, "--json", "databaseId", "--limit", "1000"])
+}
+
 impl GitHub for GhCli {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
         let number = pr.digits();
@@ -29,14 +34,14 @@ impl GitHub for GhCli {
             format!("repos/{{owner}}/{{repo}}/branches/{}/protection/required_status_checks", refs.base_ref_name);
         let required = run("gh", &["api", &protection]);
         let branch = refs.head_ref_name;
-        let runs = run("gh", &["run", "list", "--branch", &branch, "--json", "databaseId", "--limit", "1000"])?;
+        let runs = branch_runs(&branch)?;
         GhReplies { view, required, runs }.pull()
     }
 
     fn runs(&self, pr: PrNumber) -> Result<String, PortError> {
         let view = run("gh", &["pr", "view", &pr.digits(), "--json", "headRefName"])?;
         let head: Head = serde_json::from_str(&view).map_err(|error| PortError::new(format!("gh pr view: {error}")))?;
-        run("gh", &["run", "list", "--branch", &head.head_ref_name, "--json", "databaseId", "--limit", "1000"])
+        branch_runs(&head.head_ref_name)
     }
 
     fn merged_list(&self) -> Result<String, PortError> {

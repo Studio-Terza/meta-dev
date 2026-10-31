@@ -40,7 +40,7 @@ impl Ledger {
             (true, _) => None,
             (false, None) => Some("no verdict on head"),
             (false, Some((_, Verdict::Pass))) => {
-                (!self.landed.contains(&linked.pr())).then_some("pass on head, PR not merged")
+                (!self.landed.contains_key(&linked.pr())).then_some("pass on head, PR not merged")
             }
             (false, Some((judged, Verdict::Fail))) => {
                 let fixing = self.leases.iter().any(|(id, slot)| *id > judged && self.runs(*id, slot));

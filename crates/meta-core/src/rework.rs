@@ -48,9 +48,10 @@ impl fmt::Display for Row {
 }
 
 impl Ledger {
-    /// Every PR any task was linked to, merged or not: the PRs whose CI runs the rework report reads.
+    /// Every PR any task was linked to that has not merged: the PRs whose CI runs the rework report
+    /// reads from GitHub. A merged PR's runs were recorded when it merged.
     pub fn rework_prs(&self) -> BTreeSet<PrNumber> {
-        self.linked_prs.values().flatten().copied().collect()
+        self.linked_prs.values().flatten().filter(|pr| !self.landed.contains_key(pr)).copied().collect()
     }
 
     fn failed_rounds(&self, task: TaskId) -> FailedRounds {
@@ -71,8 +72,13 @@ impl Ledger {
             .iter()
             .filter_map(|(task, prs)| {
                 let progress = self.tasks.get(task)?;
-                let read: Result<Vec<RunCount>, Unreached> =
-                    prs.iter().map(|pr| runs.get(pr).cloned().unwrap_or_else(|| Err(unread()))).collect();
+                let read: Result<Vec<RunCount>, Unreached> = prs
+                    .iter()
+                    .map(|pr| match self.landed.get(pr) {
+                        Some(recorded) => Ok(*recorded),
+                        None => runs.get(pr).cloned().unwrap_or_else(|| Err(unread())),
+                    })
+                    .collect();
                 Some(Row {
                     task: *task,
                     stage: progress.stage(),

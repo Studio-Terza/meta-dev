@@ -168,10 +168,12 @@ P6 counts CI runs per merged PR. It cannot see PRs that never merge or failed re
 
 | Command | Given | Result |
 |---|---|---|
-| `meta status` | a task was ever linked to a PR, in any stage: open PR, merged, or retired after linking | its PRs are read through the GitHub port (`gh pr view` for the branch, then `gh run list`, merged or not); the task counts toward the total |
+| `meta status` | a task was ever linked to a PR, in any stage: open PR, merged, or retired after linking | an open PR is read live through the GitHub port (`gh pr view` for the branch, then `gh run list`); a merged PR is not read: its CI runs are the count recorded in its `Merged` event, because a merged PR's count cannot change; the task counts toward the total |
 | `meta status` | the task has a failed review round, or CI runs above one | a line `task-N (#pr, <stage>): failed review rounds <n>, CI runs <n>`; a task with several PRs shows each and sums their runs |
 | `meta status` | the CI runs of a PR cannot be read | the line shows `CI runs unavailable (<why>)` and still lists the failed rounds; it never reads as zero |
 | `meta status` | any | `rework total: tasks with 2 or more failed review rounds: <n> of <m> tasks with a PR; worst: task-N (...)`; the worst case has the most failed rounds, then the most CI runs; `none` when no task has rework |
+
+`pull` reads the branch name once and runs `gh run list` with it; `runs` shares that one call. Every port command (`gh`, `git`) is killed after a named timeout (`PORT_TIMEOUT`, 30 s) and returns a port error `<command>: timed out after <n> s`, so a hung `gh` or `git` cannot hang `meta status`; status shows such a PR as `CI runs unavailable`, never zero.
 
 A failed review round is a `Reviewed` event with verdict `fail`. Tasks never linked to a PR are not counted. A task listed without failed rounds only has more than one CI run, which red-first makes the norm.
 
