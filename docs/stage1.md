@@ -15,7 +15,7 @@ Each row is a behaviour-table test through the single in-process `Call`.
 | `meta escape` | unknown kind; a kind that names merged PRs without `--pr`; `--pr` with any other kind; `unclassified` | refused; lists the kinds, or says which form the kind takes |
 | `meta escape <kind> <reason>` | no escape kinds can be read | event `Escaped` marked `unchecked`; prints why |
 | `meta escape <kind> <reason>` | the working-tree `self/escapes.toml` exists but does not parse | the cache of the last read from main is used instead; when neither parses, the kind is marked `unchecked` and the parse error is printed |
-| `meta escape <kind> <reason>` | the log does not fold, or its lines do not parse | event `Escaped` all the same, as stage 0 promised; prints that the id and counts are unavailable when the lines do not parse |
+| `meta escape <kind> <reason>` | the log does not fold, its lines do not parse, or it is not valid UTF-8 (the standing is taken from the first line's bytes; a first line that cannot be read stays real) | event `Escaped` all the same, as stage 0 promised; prints that the id and counts are unavailable when the lines do not parse |
 | `meta resolve <escape> <task>` | the task is done | event `Resolved`; the escape no longer counts as open |
 | `meta resolve` | the task is not done, or the escape is already resolved or unknown | refused, with the reason |
 
@@ -212,7 +212,7 @@ Owner decision, 2026-10-31: a build not verified to be from main never writes an
 
 Each line is one JSON object with `at`, `kind`, `reason`, and optionally `pr` and `checked`. It is not a log record and has no `escape-n` id. Any build reads the file leniently: unknown fields are skipped, and a line that cannot be read is counted and is never fatal. If the file as a whole cannot be read, status says so and prints the rest of the report.
 
-`meta status` lists each one under the open escapes as `unverified [kind] reason`. P2 counts them: they add to open escapes and to the repeats of their kind. A line below P2 gives their number and the number of unreadable lines. `meta resolve` cannot close them, because they have no id. P1 does not read them.
+`meta status` lists each one under the open escapes as `unverified [kind] reason`. P2 counts them: they add to open escapes and to the repeats of their kind. A line below P2 gives their number and the number of unreadable lines. `meta resolve` cannot close them, because they have no id. P1 does not read them. Side-file text is not trusted, so `meta status` shows it escaped on one line: line breaks, control characters, bidi and zero-width characters and the backslash appear as `\n`, `\u{1b}`, `\u{202e}`, `\\`. The P2 "most repeats" key, which can hold an unclassified reason, is shown the same way.
 
 Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. The ancestry check runs in the clone the binary was built in, by that clone's local refs, with no network. So a binary must stay in the clone it was built in. If that clone moves or is removed, every guarded write fails closed, and the refusal says that the clone has moved or been removed.
 

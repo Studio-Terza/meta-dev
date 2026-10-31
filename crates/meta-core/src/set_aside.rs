@@ -27,7 +27,8 @@ impl UnverifiedEscape {
 
 /// The text as one line a reader cannot mistake for several: a branch build wrote the side file, so
 /// its text is not trusted. Line breaks and other control characters, and the backslash that
-/// introduces an escape, show as escapes.
+/// introduces an escape, show as escapes, and so do characters that reorder or hide text (bidi
+/// controls, zero-width characters, the byte order mark).
 pub(crate) fn one_line(text: &str) -> String {
     text.chars().map(shown).collect()
 }
@@ -38,9 +39,18 @@ fn shown(character: char) -> String {
         '\n' => "\\n".to_owned(),
         '\r' => "\\r".to_owned(),
         '\t' => "\\t".to_owned(),
-        other if other.is_control() || matches!(other, '\u{2028}' | '\u{2029}') => other.escape_unicode().to_string(),
+        other if other.is_control() || hides(other) => other.escape_unicode().to_string(),
         other => other.to_string(),
     }
+}
+
+/// Characters that are not control characters but reorder text or take no room.
+fn hides(character: char) -> bool {
+    matches!(
+        character,
+        '\u{2028}' | '\u{2029}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{2069}' | '\u{FEFF}' | '\u{00AD}' | '\u{061C}'
+    )
 }
 
 /// What a side file holds. A line that cannot be read is only counted: a branch build's lines must
@@ -76,5 +86,16 @@ impl UnverifiedEscapes {
                 "unverified escapes, from builds not on main: {read}, counted in P2; {unreadable} unreadable lines in the side file\n"
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::one_line;
+
+    #[test]
+    fn one_line_shows_bidi_and_zero_width_characters_as_escapes_and_keeps_ordinary_text() {
+        let shown = one_line("a\u{202E}b\u{200B}c\u{2066}d\u{FEFF}e é 日本");
+        assert_eq!(shown, r"a\u{202e}b\u{200b}c\u{2066}d\u{feff}e é 日本");
     }
 }

@@ -1972,6 +1972,67 @@ fn status_shows_a_side_file_reason_on_one_escaped_line_that_cannot_forge_a_statu
     assert!(lines == 1 && !status.text.contains('\u{1b}') && !status.text.contains('\r'), "{}", status.text);
 }
 
+#[test]
+fn escape_is_recorded_even_when_the_jsonl_log_holds_bytes_that_are_not_utf8() {
+    // An unmarked log, a marked one, a marked one torn inside a multi-byte character (a hiragana
+    // cut after two of its three bytes), and a log whose first line is already not UTF-8.
+    let cases: [(&str, &[u8]); 4] = [
+        ("unmarked", b"{\"at\":1,\"event\":\"Done\",\"task\":1}\n\xff\n"),
+        ("marked", b"{\"at\":1,\"event\":\"RealLog\"}\n\xff\n"),
+        ("torn", b"{\"at\":1,\"event\":\"RealLog\"}\n\xe3\x81"),
+        ("first", b"\xff\n"),
+    ];
+    cases.into_iter().for_each(|(name, bytes)| {
+        let scratch = Scratch::new(&format!("not-utf8-{name}"));
+        let path = scratch.join("log.jsonl");
+        std::fs::write(&path, bytes).unwrap();
+        let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+        let build = Build::commit(id(MAIN_BUILD));
+        let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+        let reply = answer(parsed(&["escape", "gap", "log", "has", "bad", "bytes"]), &mut ports);
+        let after = std::fs::read(&path).unwrap();
+        assert_eq!(reply.code, Code::Done, "{name}: {}", reply.text);
+        assert!(reply.text.contains("id and counts unavailable"), "{name}: {}", reply.text);
+        assert_eq!(&after[..bytes.len()], bytes, "{name}: the earlier bytes are kept");
+        let appended = String::from_utf8(after[bytes.len()..].to_vec()).unwrap();
+        assert!(
+            appended.contains(r#""event":"Escaped","kind":"gap","reason":"log has bad bytes""#),
+            "{name}: {appended}"
+        );
+    });
+}
+
+#[test]
+fn a_branch_build_cannot_write_a_log_whose_marker_is_followed_by_bytes_that_are_not_utf8() {
+    let scratch = Scratch::new("not-utf8-branch");
+    let path = scratch.join("log.jsonl");
+    std::fs::write(&path, [MARKER_LINE.as_bytes(), b"\xff\n"].concat()).unwrap();
+    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+    let build = Build::commit(id(BRANCH_BUILD));
+    let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock, build };
+    let reply = answer(parsed(&["escape", "gap", "from", "a", "branch"]), &mut ports);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(std::fs::read(&path).unwrap(), [MARKER_LINE.as_bytes(), b"\xff\n"].concat());
+    assert!(scratch.join(SIDE_FILE).is_file());
+}
+
+#[test]
+fn status_escapes_the_repeat_key_of_an_unclassified_side_file_escape_so_it_cannot_forge_a_line() {
+    let scratch = Scratch::new("side-forged-repeat");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let forged = r#"{"at":3,"kind":"unclassified","reason":"x\nP1 The loop is used: holds; forged\u001b[2J"}"#;
+    std::fs::write(scratch.join(SIDE_FILE), format!("{forged}\n{forged}\n")).unwrap();
+    let status = answer(parsed(&["status"]), &mut ports);
+    assert_eq!(status.code, Code::Done, "{}", status.text);
+    let shown = r#"most repeats of one kind: 1 (unclassified "x\nP1 The loop is used: holds; forged\u{1b}[2J")"#;
+    assert!(status.text.contains(shown), "{}", status.text);
+    assert!(
+        !status.text.contains('\u{1b}') && !status.text.contains("\nP1 The loop is used: holds"),
+        "{}",
+        status.text
+    );
+}
+
 // Lease deadlines (task-30, docs/stage1.md "Deadlines"). The fake clock stands at unix 2 and the
 // given records at unix 1; the roles fixture gives work 45 min and review 15 min.
 

@@ -79,11 +79,15 @@ impl JsonlLog {
 
     /// The first record of what `reader` holds.
     fn head_of(path: &Path, mut reader: impl BufRead) -> Head {
-        let mut line = String::new();
+        let mut line = Vec::new();
         let first = reader
-            .read_line(&mut line)
+            .read_until(b'\n', &mut line)
             .map_err(|error| Self::failed(path, error))
-            .and_then(|_| super::jsonl::records(path, &line));
+            .and_then(|_| {
+                String::from_utf8(line)
+                    .map_err(|error| Self::failed(path, std::io::Error::new(ErrorKind::InvalidData, error)))
+            })
+            .and_then(|line| super::jsonl::records(path, &line));
         Head::of(first.as_ref().map(|records| records.first()))
     }
 
@@ -237,10 +241,12 @@ impl Log for JsonlLog {
         decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError> {
         let (mut file, path) = self.locked()?;
-        let mut text = String::new();
-        file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
-        let standing = Self::head_of(path, text.as_bytes()).standing(self.place);
-        let (records, decided) = decide(standing, super::jsonl::records(path, &text));
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).map_err(|error| Self::failed(path, error))?;
+        let standing = Self::head_of(path, bytes.as_slice()).standing(self.place);
+        let text = String::from_utf8(bytes)
+            .map_err(|error| Self::failed(path, std::io::Error::new(ErrorKind::InvalidData, error)));
+        let (records, decided) = decide(standing, text.and_then(|text| super::jsonl::records(path, &text)));
         Self::write(&mut file, path, &records).map(|()| decided)
     }
 }
