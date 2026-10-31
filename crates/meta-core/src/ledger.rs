@@ -4,6 +4,7 @@ use crate::ids::{EscapeId, LeaseId, PrNumber, PredictionId, RunCount, TaskId, Ti
 use crate::latch::Latch;
 use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
 use crate::predictions::Measure;
+use crate::role::Role;
 use crate::task::{Linked, Progress, Task};
 use crate::waiting::Waiting;
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,6 +25,8 @@ pub struct Ledger {
     pub(crate) waiting: BTreeMap<TaskId, Waiting>,
     pub(crate) starts_denied: usize,
     pub(crate) self_claims: usize,
+    /// Tasks marked critic: long-running by design, so never stalled and never running work.
+    pub(crate) critics: BTreeSet<TaskId>,
     /// Each prediction's falsifying measures, latched at their first time.
     pub(crate) falsified: BTreeMap<(PredictionId, Measure), Latch>,
 }
@@ -63,6 +66,10 @@ impl Ledger {
                 }?;
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
+            }
+            Event::TaskRole { task, role: Role::Critic } => {
+                self.tasks.get(task).ok_or_else(|| format!("{task} marked critic while unknown"))?;
+                self.critics.insert(*task);
             }
             Event::Leased { lease, task, agent, deadline } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;

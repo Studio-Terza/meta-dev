@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, Admitted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event,
     Hook, Importing, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase,
-    PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha,
+    PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Role, Roles, Rules, RunCount, SelfFile, Sha,
     Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
@@ -61,6 +61,7 @@ pub enum Local {
     Historical { escape: EscapeId, reason: Reason, correcting: bool },
     Defer { task: TaskId, reason: Reason },
     Undefer(TaskId),
+    Role { task: TaskId, role: Role },
     Verdict { task: TaskId, verdict: Verdict },
     Wait { task: TaskId, question: OwnerQuestion },
     Unwait { task: TaskId, answer: OwnerAnswer },
@@ -116,7 +117,7 @@ impl Call {
                          meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  meta escape --import\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
-                         meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
+                         meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
                          meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
@@ -170,6 +171,9 @@ impl Call {
                 task.parse().and_then(|task| reason.join(" ").parse().map(|reason| Local::Defer { task, reason })),
             ),
             ["undefer", task] => local(task.parse().map(Local::Undefer)),
+            ["role", task, role] => {
+                local(task.parse().and_then(|task| role.parse().map(|role| Local::Role { task, role })))
+            }
             ["review", task, "--agent", agent, deadline @ ..] => ledger(task.parse().and_then(|task| {
                 let deadline = Self::deadline(deadline)?;
                 agent.parse().map(|agent| LedgerCall::Review { task, agent, deadline })
@@ -550,6 +554,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         }
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
+        Prepared::Local(Local::Role { task, role }) => ledger.role(task, role)?,
         Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,

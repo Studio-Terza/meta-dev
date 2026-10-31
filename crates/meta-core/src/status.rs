@@ -180,7 +180,7 @@ impl Ledger {
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
             section("waiting on the owner (flagged)", &self.waits(at)),
-            section("idle (flagged)", &self.idle()),
+            section("idle (flagged)", &self.idle(at)),
             format!(
                 "P1 agent starts through meta: {started}; prevented by the hook: {}; bypassed, from outside-start escapes: {starts_outside}; self-claims, not agent starts: {}\n",
                 self.starts_denied, self.self_claims

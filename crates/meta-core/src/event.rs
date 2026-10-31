@@ -5,6 +5,7 @@ use crate::ids::{
 };
 use crate::imported::Imported;
 use crate::predictions::Measure;
+use crate::role::Role;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,6 +47,11 @@ pub enum Event {
     },
     Done {
         task: TaskId,
+    },
+    /// The task has a role. Every lease on a critic task, past and future, is not running work.
+    TaskRole {
+        task: TaskId,
+        role: Role,
     },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
     /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds

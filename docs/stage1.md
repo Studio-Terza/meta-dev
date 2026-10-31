@@ -124,8 +124,17 @@ Work stalled for about an hour with unblocked tasks open and nothing flagged it 
 | `meta status` | no task waits | "waiting on the owner (flagged)" shows "(none)" |
 | `meta status` | no running work, and at least one task is stalled | "idle (flagged)" shows `idle: no live work; stalled: <task> (<why>), ...` with each stalled task by id, in task order |
 | `meta status` | otherwise | "idle (flagged)" shows "(none)" |
+| `meta role <task> critic` | the task exists and is not marked | event `TaskRole { task, role: critic }`; every lease on the task, past and future, is not running work, and the task is never stalled |
+| `meta role <task> critic` | the task is unknown or already marked | refused; nothing is recorded |
+| `meta role <task> <other>` | the role is not `critic` | usage error; nothing is recorded |
 
-Running work is a work lease that has a deadline, on a task an agent is working: open or claimed. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
+Running work is a work lease that has a deadline not yet passed at the clock's time, on a task an agent is working: open or claimed, and not marked critic. The idle alarm takes the clock for this. A lease past its deadline is not running work: the agent was to report or stop by then. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
+
+The critic's task is long-running by design. The role belongs to the task, not to a claim: `meta role <task> critic` marks the task, and the mark covers every lease on it, whenever issued. A marked task is never listed as stalled. No task id is hard-coded. There is no role on `meta claim`.
+
+Critic issue #33. On Oct 31 the alarm stayed silent at 03:06Z through a real stall: six tasks (7, 8, 12, 21, 27 open, 25 with a failed review and no fix) had no next step. The expired leases were not the cause: no work lease on those tasks was live. Only the critic's own live lease on task 14 silenced the alarm. The marking of task 14 as critic fixes it: its lease no longer counts, so the alarm fires and names the six tasks, not task 14. The regression test replays the real log cut at that point (generic titles and reasons) with the marking as its last event.
+
+Finished leases. No event records that a work agent finished its part (a review lease with a verdict is finished). So meta cannot observe that a work lease is finished, and relies on the deadline: until the deadline passes, a work lease counts as running even if its agent has already reported.
 
 A task is stalled when it is not waiting on the owner and has no next step. This is a state check, with no age threshold:
 

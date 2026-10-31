@@ -4,33 +4,34 @@ use crate::ledger::Ledger;
 use crate::task::{Linked, Progress, Task};
 
 impl Ledger {
-    /// The idle alarm: no running work, while a task has no next step. Names each stalled task.
-    pub(crate) fn idle(&self) -> Vec<String> {
+    /// The idle alarm: no running work at `at`, while a task has no next step. Names each stalled task.
+    /// The critic's task is long-running by design, so it is never stalled.
+    pub(crate) fn idle(&self, at: Timestamp) -> Vec<String> {
         let stalled: Vec<String> = self
             .tasks
             .iter()
-            .filter(|(task, _)| !self.waiting.contains_key(task))
-            .filter_map(|(task, progress)| self.stall(progress).map(|why| format!("{task} ({why})")))
+            .filter(|(task, _)| !self.waiting.contains_key(task) && !self.critics.contains(task))
+            .filter_map(|(task, progress)| self.stall(progress, at).map(|why| format!("{task} ({why})")))
             .collect();
-        match (self.leases.iter().any(|(id, slot)| self.runs(*id, slot)), stalled.is_empty()) {
+        match (self.leases.iter().any(|(id, slot)| self.runs(*id, slot, at)), stalled.is_empty()) {
             (false, false) => vec![format!("idle: no live work; stalled: {}", stalled.join(", "))],
             _ => Vec::new(),
         }
     }
 
     /// Why a task has no next step, if it has none. A task waiting on the owner is left out by the caller.
-    fn stall(&self, progress: &Progress) -> Option<&'static str> {
+    fn stall(&self, progress: &Progress, at: Timestamp) -> Option<&'static str> {
         match progress {
             Progress::Open(_) => Some("open"),
             Progress::Claimed(_) => Some("claimed"),
-            Progress::Linked(linked) => self.linked_stall(linked),
+            Progress::Linked(linked) => self.linked_stall(linked, at),
             Progress::Done(_) | Progress::Retired(_) | Progress::Deferred(_) => None,
         }
     }
 
     /// A linked task is stalled when no review of it is live and: its pinned head has no verdict,
     /// or passed without a merge, or failed with no work lease issued since.
-    fn linked_stall(&self, linked: &Task<Linked>) -> Option<&'static str> {
+    fn linked_stall(&self, linked: &Task<Linked>, at: Timestamp) -> Option<&'static str> {
         let reviewing = self.leases.values().any(|slot| {
             matches!(slot.lease().purpose(), Purpose::Review { pr, .. } if *pr == linked.pr())
                 && slot.lease().task() == linked.id()
@@ -43,7 +44,7 @@ impl Ledger {
                 (!self.landed.contains_key(&linked.pr())).then_some("pass on head, PR not merged")
             }
             (false, Some((judged, Verdict::Fail))) => {
-                let fixing = self.leases.iter().any(|(id, slot)| *id > judged && self.runs(*id, slot));
+                let fixing = self.leases.iter().any(|(id, slot)| *id > judged && self.runs(*id, slot, at));
                 (!fixing).then_some("fail on head, no live work lease")
             }
         }
@@ -62,13 +63,17 @@ impl Ledger {
         })
     }
 
-    /// Running work: a work lease with a deadline, on a task an agent is working (open or claimed),
+    /// Running work at `at`: a worker's work lease with a deadline not yet passed, on a task an agent is working (open or claimed),
     /// or on a linked task whose pinned head failed review before the lease was issued. A task that
-    /// waits on the owner is paused, so its lease is not running.
-    fn runs(&self, id: LeaseId, slot: &LeaseSlot) -> bool {
+    /// waits on the owner is paused, so its lease is not running. A lease past its deadline is not
+    /// running: the agent was to report or stop by then, and nothing records that it finished sooner.
+    /// A lease on a critic task never counts.
+    fn runs(&self, id: LeaseId, slot: &LeaseSlot, at: Timestamp) -> bool {
         let lease = slot.lease();
         let working = *lease.purpose() == Purpose::Work
+            && !self.critics.contains(&lease.task())
             && slot.deadline().time().is_some()
+            && !slot.deadline().passed(at)
             && !self.waiting.contains_key(&lease.task());
         working
             && match self.tasks.get(&lease.task()) {

@@ -1,6 +1,6 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Route, Rules, RunCount,
+    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Role, Route, Rules, RunCount,
     SelfFile, Sha, SideLine, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
@@ -2798,4 +2798,102 @@ fn import_into_a_log_that_does_not_parse_fails_and_keeps_the_side_file() {
     let reply = answer(parsed(&IMPORT), &mut ports);
     assert_eq!(reply.code, Code::Failed, "{}", reply.text);
     assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+}
+
+// Critic #33: the idle alarm missed the real stall of Oct 31 (docs/stage1.md "Waiting on the owner, and the idle alarm").
+
+/// 03:06:30Z on Oct 31, just after the last event of the log below.
+const STALL_CLOCK: u64 = 1_793_417_190;
+
+/// The real log as it stood at 03:06Z on Oct 31, the last event before 06:18Z (titles and reasons
+/// made generic), then the marking of task-14, the critic's task, as the critic's. The marking is
+/// its last line.
+fn stall_log() -> Vec<Record> {
+    let text = include_str!("fixtures/idle-stall-log.jsonl");
+    serde_json::Deserializer::from_str(text).into_iter().map(Result::unwrap).collect()
+}
+
+fn stall_of_oct_31(records: Vec<Record>) -> Memory {
+    let mut ports = given(Vec::new(), Vec::new());
+    ports.log.records = records;
+    ports.clock = FakeClock::at(Timestamp::from_unix_seconds(STALL_CLOCK));
+    ports
+}
+
+const STALLED_TASKS: &str = "task-7 (open), task-8 (open), task-12 (open), task-21 (open), task-25 (fail on head, no live work lease), task-27 (open)";
+
+#[test]
+fn the_idle_alarm_fires_on_the_recorded_stall_of_oct_31_and_does_not_name_the_critic() {
+    let (status, _) = call(&mut stall_of_oct_31(stall_log()), &["status"], "");
+    assert!(status.text.contains(&idle_line(STALLED_TASKS)), "{}", status.text);
+    assert!(!status.text.contains("task-14 ("), "{}", status.text);
+}
+
+#[test]
+fn without_the_critics_mark_the_critics_live_lease_silences_the_alarm_on_that_log() {
+    let mut records = stall_log();
+    assert!(matches!(records.pop().map(|record| record.event), Some(Event::TaskRole { .. })));
+    let (status, _) = call(&mut stall_of_oct_31(records), &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
+}
+
+#[test]
+fn a_work_lease_before_its_deadline_is_running_and_after_it_is_not() {
+    let history = vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100)];
+    let mut ports = given(history, Vec::new());
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
+    ports.clock.pause(Span::of_seconds(98));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "at the deadline: {}", status.text);
+    ports.clock.pause(Span::of_seconds(1));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains(&idle_line("task-1 (claimed)")), "past the deadline: {}", status.text);
+}
+
+fn marked(task: &str) -> Event {
+    Event::TaskRole { task: id(task), role: Role::Critic }
+}
+
+#[test]
+fn every_lease_on_a_marked_task_is_not_running_work_and_the_task_is_never_stalled() {
+    let work = |lease: &str, task: &str| leased_until(lease, task, 100);
+    // Only the critic's task is leased: nothing else is running, so an open task is stalled, the critic's is not.
+    flagged(
+        vec![opened("task-1"), claimed("task-1"), work("lease-1", "task-1"), marked("task-1"), opened("task-2")],
+        "task-2 (open)",
+    );
+    // A lease issued after the mark is not running work either.
+    flagged(
+        vec![opened("task-1"), claimed("task-1"), marked("task-1"), work("lease-1", "task-1"), opened("task-2")],
+        "task-2 (open)",
+    );
+    quiet(vec![opened("task-1"), claimed("task-1"), marked("task-1"), work("lease-1", "task-1")]);
+    // Other tasks' leases still run.
+    quiet(vec![
+        opened("task-1"),
+        claimed("task-1"),
+        marked("task-1"),
+        opened("task-2"),
+        claimed("task-2"),
+        work("lease-2", "task-2"),
+    ]);
+}
+
+#[test]
+fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
+    let mut ports = given(vec![opened("task-1")], Vec::new());
+    let (reply, events) = call(&mut ports, &["role", "task-1", "critic"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(events, vec![marked("task-1")]);
+    let line = serde_json::to_string(&events[0]).unwrap();
+    assert_eq!(line, r#"{"event":"TaskRole","task":1,"role":"critic"}"#);
+    let (again, events) = call(&mut ports, &["role", "task-1", "critic"], "");
+    assert!(again.code == Code::Refused && events.is_empty(), "{}", again.text);
+    let (unknown, events) = call(&mut ports, &["role", "task-9", "critic"], "");
+    assert!(unknown.code == Code::Refused && events.is_empty(), "{}", unknown.text);
+    let bad = Call::parse(&command(&["role", "task-1", "boss"]), String::new);
+    assert!(bad.is_err());
+    let old_flag = Call::parse(&command(&["claim", "task-1", "--agent", "a", "--role", "critic"]), String::new);
+    assert!(old_flag.is_err());
 }
