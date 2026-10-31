@@ -118,6 +118,14 @@ text!(EscapeKind, "escape kind");
 text!(AgentId, "agent id");
 text!(PredictionId, "prediction id");
 text!(Observed, "observation");
+text!(Email, "email");
+
+impl Branch {
+    /// The branch every PR is based on.
+    pub fn main() -> Self {
+        Self("main".to_owned())
+    }
+}
 
 impl EscapeKind {
     /// The kind of an escape logged before kinds existed: its free-text reason is all it has.

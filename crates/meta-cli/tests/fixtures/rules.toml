@@ -4,6 +4,7 @@
 id = "identity"
 text = "Commit as the fixture identity."
 source = "fixture: identity"
+email = "fixture@users.noreply.github.com"
 
 [[rule]]
 id = "push-and-stop"
