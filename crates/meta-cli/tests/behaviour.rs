@@ -1705,6 +1705,127 @@ fn claim_brief_tells_the_agent_to_link_with_a_main_build_and_keep_branch_builds_
     assert!(steps.iter().all(|step| reply.text.contains(step)), "{}", reply.text);
 }
 
+const SIDE_FILE: &str = "escapes.unverified.jsonl";
+const MARKER_LINE: &str = "{\"at\":1,\"event\":\"RealLog\"}\n";
+const MARK_THE_LOG: &str = "run meta mark-real-log with a main build";
+const MARKED_REFUSAL: &str = "this log is marked as the real log; use a main build";
+const SCRATCH_ADVICE: &str = "XDG_DATA_HOME";
+
+/// The JSONL log in `dir`, holding only the marker, run by `build`.
+fn on_marked_jsonl(dir: &std::path::Path, build: Build) -> Ports<JsonlLog, RecordedGit, RecordedGitHub, FakeClock> {
+    let path = dir.join("log.jsonl");
+    std::fs::write(&path, MARKER_LINE).unwrap();
+    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+    Ports { log: JsonlLog::at(path), git, github, clock, build }
+}
+
+#[test]
+fn an_escape_from_a_build_not_on_main_goes_to_the_side_file_and_never_into_the_marked_log() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let scratch = Scratch::new("side-write");
+        let mut ports = on_marked_jsonl(&scratch, build);
+        let reply = answer(parsed(&["escape", "gap", "the", "hook", "denies", "every", "start"]), &mut ports);
+        assert_eq!(reply.code, Code::Done, "{}", reply.text);
+        let said = ["unverified", SIDE_FILE, why];
+        assert!(said.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
+        assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), MARKER_LINE);
+        let side = std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap();
+        let entry: serde_json::Value = serde_json::from_str(&side).unwrap();
+        assert_eq!(entry["kind"], "gap", "{side}");
+        assert_eq!(entry["reason"], "the hook denies every start", "{side}");
+    });
+}
+
+#[test]
+fn status_shows_side_file_escapes_marked_unverified_and_p2_counts_them() {
+    let scratch = Scratch::new("side-status");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(BRANCH_BUILD)));
+    (0..3).for_each(|_| {
+        let reply = answer(parsed(&["escape", "gap", "from", "a", "branch"]), &mut ports);
+        assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    });
+    ports.build = Build::commit(id(MAIN_BUILD));
+    let status = answer(parsed(&["status"]), &mut ports);
+    assert_eq!(status.code, Code::Done, "{}", status.text);
+    let said = [
+        "open escapes: 3\n",
+        "unverified [gap] from a branch\n",
+        "P2 open escapes: 3 ",
+        "most repeats of one kind: 2 (gap)",
+        "P2 Gaps get fixed, not bypassed: FALSIFIED; observed open escapes 3, most repeats of one escape kind 2;",
+    ];
+    assert!(said.iter().all(|part| status.text.contains(part)), "{}", status.text);
+}
+
+#[test]
+fn status_reads_the_side_file_leniently_counting_unreadable_lines_and_never_failing() {
+    let scratch = Scratch::new("side-lenient");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let known = "{\"at\":3,\"kind\":\"gap\",\"reason\":\"kept\",\"future\":{\"field\":1}}\n";
+    let lines: [&[u8]; 3] = [known.as_bytes(), b"not a record\n", b"\xff\xfe\n"];
+    std::fs::write(scratch.join(SIDE_FILE), lines.concat()).unwrap();
+    let status = answer(parsed(&["status"]), &mut ports);
+    assert_eq!(status.code, Code::Done, "{}", status.text);
+    let said = ["unverified [gap] kept\n", "P2 open escapes: 1 ", "2 unreadable lines"];
+    assert!(said.iter().all(|part| status.text.contains(part)), "{}", status.text);
+}
+
+#[test]
+fn status_survives_a_side_file_it_cannot_read_at_all_and_says_so() {
+    let scratch = Scratch::new("side-unreadable");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    std::fs::create_dir(scratch.join(SIDE_FILE)).unwrap();
+    let status = answer(parsed(&["status"]), &mut ports);
+    assert_eq!(status.code, Code::Done, "{}", status.text);
+    assert!(status.text.contains("unverified escapes unavailable: "), "{}", status.text);
+}
+
+#[test]
+fn status_warns_while_the_default_data_dirs_log_is_unmarked_and_not_after() {
+    let builds = [Build::commit(id(MAIN_BUILD)), Build::commit(id(BRANCH_BUILD))];
+    builds.into_iter().for_each(|build| {
+        [Vec::new(), claimed_task()].into_iter().for_each(|history| {
+            let mut ports = on_real_log(history, Vec::new(), build.clone());
+            let (reply, _) = call(&mut ports, &["status"], "");
+            assert_eq!(reply.code, Code::Done, "{}", reply.text);
+            assert!(reply.text.contains(MARK_THE_LOG), "{}", reply.text);
+        });
+    });
+    let mut marked = on_real_log(claimed_task(), Vec::new(), Build::commit(id(MAIN_BUILD)));
+    assert_eq!(call(&mut marked, &["mark-real-log"], "").0.code, Code::Done);
+    let scratch = call(&mut given(claimed_task(), Vec::new()), &["status"], "").0.text;
+    let after = call(&mut marked, &["status"], "").0.text;
+    assert!(!after.contains(MARK_THE_LOG), "{after}");
+    assert!(!scratch.contains(MARK_THE_LOG), "{scratch}");
+}
+
+#[test]
+fn a_marked_log_reached_through_a_scratch_dir_is_refused_without_advising_a_scratch_dir() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let scratch = Scratch::new("marked-next");
+        let cases: [(&[&str], &str); 3] = [
+            (&["open", "Fix", "the", "hook"], ""),
+            (&["hook", "pre-tool-use"], &agent("lease-1")),
+            (&["escape", "gap", "from", "a", "branch"], ""),
+        ];
+        cases.into_iter().for_each(|(args, stdin)| {
+            let mut ports = on_marked_jsonl(&scratch, build.clone());
+            let reply = answer(Call::parse(&command(args), || stdin.to_owned()).unwrap(), &mut ports);
+            let said = [MARKED_REFUSAL, why];
+            assert!(said.iter().all(|part| reply.text.contains(part)), "{args:?}: {}", reply.text);
+            assert!(!reply.text.contains(SCRATCH_ADVICE), "{args:?}: {}", reply.text);
+        });
+    });
+}
+
+#[test]
+fn a_marked_log_in_the_default_data_dir_still_advises_a_scratch_dir_for_a_branch_build() {
+    let mut ports = on_real_log(vec![Event::RealLog], Vec::new(), Build::commit(id(BRANCH_BUILD)));
+    let (reply, _) = call(&mut ports, &["open", "Fix", "the", "hook"], "");
+    assert_eq!(reply.code, Code::Refused, "{}", reply.text);
+    assert!(reply.text.contains(MAIN_BUILD_NEXT), "{}", reply.text);
+}
+
 // Lease deadlines (task-30, docs/stage1.md "Deadlines"). The fake clock stands at unix 2 and the
 // given records at unix 1; the roles fixture gives work 45 min and review 15 min.
 

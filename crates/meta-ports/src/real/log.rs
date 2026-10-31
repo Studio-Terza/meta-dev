@@ -175,6 +175,7 @@ mod tests {
     use meta_testkit::Scratch;
     use std::fs::{self, File, TryLockError};
     use std::path::Path;
+    use std::thread;
     use std::time::Duration;
 
     #[test]
@@ -250,30 +251,83 @@ mod tests {
         assert_eq!(default, [true, true]);
     }
 
+    fn marker() -> Record {
+        Record { at: Timestamp::from_unix_seconds(1), event: Event::RealLog }
+    }
+
     #[test]
     fn marking_puts_the_marker_first_keeps_the_unmarked_copy_and_happens_once() {
         let root = Scratch::new("mark");
         let path = root.join("log.jsonl");
         fs::write(&path, [DONE, DONE].concat()).unwrap();
-        fs::hard_link(&path, root.join("linked.jsonl")).unwrap();
-        let marker = Record { at: Timestamp::from_unix_seconds(1), event: Event::RealLog };
         let mut log = JsonlLog::at(path.clone());
         let before = log.is_real();
-        let marked = [log.mark(marker.clone()).unwrap(), log.mark(marker.clone()).unwrap()];
+        let marked = [log.mark(marker()).unwrap(), log.mark(marker()).unwrap()];
         let text = fs::read_to_string(&path).unwrap();
         let kept = fs::read_to_string(root.join("log.jsonl.unmarked")).unwrap();
-        let after = [log.is_real(), JsonlLog::at(root.join("linked.jsonl")).is_real()];
-        let records = log.read().unwrap().len();
-        let other = root.join("other.jsonl");
-        fs::write(&other, DONE).unwrap();
-        fs::write(root.join("log.jsonl.unmarked"), "earlier copy").unwrap();
-        let refused = JsonlLog::at(other.clone()).mark(marker).unwrap_err().to_string();
-        let untouched = fs::read_to_string(&other).unwrap();
         assert_eq!((before, marked), (false, [Marking::Added, Marking::AlreadyMarked]));
         assert_eq!((text, kept), ([MARKER, DONE, DONE].concat(), [DONE, DONE].concat()));
-        assert_eq!((after, records), ([true, true], 3));
+        assert_eq!((log.is_real(), log.read().unwrap().len()), (true, 3));
+    }
+
+    #[test]
+    fn marking_refuses_when_an_unmarked_copy_exists_and_points_at_it() {
+        let root = Scratch::new("mark-copy");
+        let path = root.join("log.jsonl");
+        fs::write(&path, DONE).unwrap();
+        fs::write(root.join("log.jsonl.unmarked"), "earlier copy").unwrap();
+        let refused = JsonlLog::at(path.clone()).mark(marker()).unwrap_err().to_string();
         assert!(refused.contains("log.jsonl.unmarked"), "{refused}");
-        assert_eq!(untouched, DONE);
+        assert_eq!(fs::read_to_string(&path).unwrap(), DONE);
+        assert_eq!(fs::read_to_string(root.join("log.jsonl.unmarked")).unwrap(), "earlier copy");
+    }
+
+    #[test]
+    fn marking_that_fails_before_the_rename_leaves_the_log_whole_and_points_at_the_unmarked_copy() {
+        let root = Scratch::new("mark-cut");
+        let path = root.join("log.jsonl");
+        fs::write(&path, [DONE, DONE].concat()).unwrap();
+        fs::create_dir(root.join("log.jsonl.marking")).unwrap();
+        let failed = JsonlLog::at(path.clone()).mark(marker()).unwrap_err().to_string();
+        assert!(failed.contains("log.jsonl.unmarked"), "{failed}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), [DONE, DONE].concat());
+        assert_eq!(fs::read_to_string(root.join("log.jsonl.unmarked")).unwrap(), [DONE, DONE].concat());
+    }
+
+    #[test]
+    fn marking_replaces_the_log_by_rename_so_a_hard_link_keeps_the_old_file_and_a_symlink_keeps_pointing() {
+        let root = Scratch::new("mark-links");
+        let (path, hard, soft) = (root.join("log.jsonl"), root.join("hard.jsonl"), root.join("soft.jsonl"));
+        fs::write(&path, DONE).unwrap();
+        fs::hard_link(&path, &hard).unwrap();
+        std::os::unix::fs::symlink(&path, &soft).unwrap();
+        JsonlLog::at(soft.clone()).mark(marker()).unwrap();
+        assert!(fs::symlink_metadata(&soft).unwrap().file_type().is_symlink());
+        assert_eq!(fs::read_to_string(&path).unwrap(), [MARKER, DONE].concat());
+        assert_eq!(fs::read_to_string(&hard).unwrap(), DONE);
+        assert!(root.join("log.jsonl.unmarked").exists());
+    }
+
+    #[test]
+    fn a_writer_waiting_on_the_lock_while_the_log_is_replaced_appends_to_the_new_log() {
+        let root = Scratch::new("replaced");
+        let path = root.join("log.jsonl");
+        fs::write(&path, DONE).unwrap();
+        let holder = File::open(&path).unwrap();
+        holder.lock().unwrap();
+        let mut waiting = JsonlLog::at(path.clone());
+        let writer = thread::spawn(move || {
+            let record =
+                Record { at: Timestamp::from_unix_seconds(2), event: Event::Done { task: "task-1".parse().unwrap() } };
+            waiting.transact(|_| (vec![record], ()))
+        });
+        thread::sleep(Duration::from_millis(100));
+        let replacement = root.join("replacement");
+        fs::write(&replacement, [MARKER, DONE].concat()).unwrap();
+        fs::rename(&replacement, &path).unwrap();
+        drop(holder);
+        writer.join().unwrap().unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), [MARKER, DONE, DONE].concat());
     }
 
     #[test]

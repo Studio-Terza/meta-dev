@@ -130,6 +130,19 @@ mod tests {
     }
 
     #[test]
+    fn every_stamp_sets_all_three_variables_so_an_inherited_one_cannot_win() {
+        let commit = "0123456789012345678901234567890123456789";
+        let line = |clean: &str, dirty: &str, why: &str| {
+            format!(
+                "cargo::rustc-env=META_BUILD_COMMIT={clean}\ncargo::rustc-env=META_BUILD_DIRTY={dirty}\ncargo::rustc-env=META_BUILD_UNVERIFIED={why}\n"
+            )
+        };
+        assert_eq!(Stamp::Clean(commit.to_owned()).directive(), line(commit, "", ""));
+        assert_eq!(Stamp::Dirty(commit.to_owned()).directive(), line("", commit, ""));
+        assert_eq!(Stamp::Unknown("no git".to_owned()).directive(), line("", "", "no git"));
+    }
+
+    #[test]
     fn a_build_outside_git_is_stamped_unknown() {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let gone = std::env::temp_dir().join(format!("meta-dev-stamp-none-{nanos}"));

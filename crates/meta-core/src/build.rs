@@ -110,4 +110,19 @@ mod tests {
         assert!(refusal.contains("git older than 2.38 cannot stamp the build"), "{refusal}");
         assert!(!refusal.contains("branch build"), "{refusal}");
     }
+
+    #[test]
+    fn an_empty_stamp_variable_counts_as_unset() {
+        let commit = "0123456789012345678901234567890123456789";
+        let on_main = |_: &crate::ids::Sha| Ok::<_, String>(true);
+        let unset = Build::embedded(None, None, None).verify(on_main).unwrap_err().to_string();
+        let empty = Build::embedded(Some(""), Some(""), Some("")).verify(on_main).unwrap_err().to_string();
+        assert_eq!(empty, unset);
+        assert!(empty.contains("a binary with no commit embedded"), "{empty}");
+        assert_eq!(Build::embedded(Some(commit), Some(""), Some("")), Build::commit(commit.parse().unwrap()));
+        let dirty = Build::embedded(Some(""), Some(commit), Some("")).verify(on_main).unwrap_err().to_string();
+        assert!(dirty.contains("with edits to tracked files"), "{dirty}");
+        let why = Build::embedded(Some(""), Some(""), Some("no git")).verify(on_main).unwrap_err().to_string();
+        assert!(why.contains("no git"), "{why}");
+    }
 }
