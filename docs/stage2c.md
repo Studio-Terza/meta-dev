@@ -113,6 +113,25 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 `meta stop` kills inside the log's lock, so its supervisor, waiting on that lock, finds the end recorded and does not call the session vanished.
 
+## Projects
+
+A project is a task marked `project`; its id names the project. Tasks join it one at a time, so a task opened before its project was marked can join. Design intent stays in a file in the repo. What meta holds is who is in the project and where each task stands, which is what a replacement project agent needs first.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta role <task> project` | an unmarked task that is in no project | event `TaskRole`. A task has one role, and a member takes none: projects do not nest |
+| `meta project <root> add <task>` | `<root>` is marked project; `<task>` is known, unmarked and in no project | event `Joined`, for good |
+| `meta project <root> add <task>` | anything else | refused naming which; nothing recorded |
+| `meta project <root>` | `<root>` is marked project | the latest work lease on the root, then the root and each member with its next step. Reads the PR of each linked task from GitHub; records nothing; any build may read it |
+| `meta project <root>` | `<root>` is unknown or not marked | refused |
+| `meta project <root>` | a linked task's PR is not at its pin | next step: link the new head. No verdict is read: only the pinned head counts |
+| `meta project <root>` | a review of the pin is unused or under way | names the lease, and for an unused one the `meta worker start` that spends it |
+| `meta project <root>` | a linked task has no verdict at its pin, or a fail | names the review to start, or the failing lease and its transcript; `supervisor.log` beside the transcript has the findings |
+| `meta project <root>` | a pass at the pin | the dry run of `meta merge`: `ready` if it would merge, or each blocker with its next step. The merge stays the lead's |
+| `meta project <root>` | GitHub cannot be read for a PR | says so for that task, and nothing about readiness; the rest still prints |
+| `meta project <root>` | a task waits on the owner | next step is the question |
+| `meta status` | a project's work lease | role `project`. It is running work while the root is active, linked included: the root's own PR stays open for the project's whole life, so the idle alarm stays quiet while its agent runs |
+
 ## What this piece leaves open
 
 - **Live canary: run, on a scratch log and on the real log.** The lead ran it before review, on a scratch log, at 849ac01. A read outside the scratch directory was tried, in a direct session with the same flags, and was refused. The path through the real log has now been observed: a main-build worker on lease-117 reviewed PR #50 and recorded its verdict.

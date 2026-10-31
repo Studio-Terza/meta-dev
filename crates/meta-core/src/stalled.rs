@@ -51,7 +51,7 @@ impl Ledger {
     }
 
     /// The latest verdict, in log order, on the linked task's pinned head, and the review lease that gave it.
-    fn judged_head(&self, linked: &Task<Linked>) -> Option<(LeaseId, Verdict)> {
+    pub(crate) fn judged_head(&self, linked: &Task<Linked>) -> Option<(LeaseId, Verdict)> {
         self.latest_verdict(linked.pr(), |head| head == linked.pin()).map(|(lease, _, verdict)| (lease, verdict))
     }
 
@@ -60,7 +60,8 @@ impl Ledger {
     /// waits on the owner is paused, so its lease is not running. A lease past its deadline is not
     /// running: the agent was to report or stop by then. A finished lease is not counted either: past a
     /// turn end its agent may still wait on background work, which is why the alarm says "known".
-    /// A lease on a critic task never counts.
+    /// A lease on a critic task never counts. A work lease on a project's task counts in every active
+    /// stage: the root's own PR stays open for the project's whole life.
     fn runs(&self, id: LeaseId, slot: &LeaseSlot, at: Timestamp) -> bool {
         let lease = slot.lease();
         let working = *lease.purpose() == Purpose::Work
@@ -72,6 +73,7 @@ impl Ledger {
         working
             && match self.tasks.get(&lease.task()) {
                 Some(Progress::Open(_) | Progress::Claimed(_)) => true,
+                Some(Progress::Linked(_)) if self.is_project(lease.task()) => true,
                 Some(Progress::Linked(linked)) => {
                     self.judged_head(linked).is_some_and(|(judged, verdict)| verdict == Verdict::Fail && id > judged)
                 }

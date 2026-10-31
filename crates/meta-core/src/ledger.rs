@@ -31,6 +31,8 @@ pub struct Ledger {
     pub(crate) self_claims: usize,
     /// Tasks marked critic: long-running by design, so never stalled and never running work.
     pub(crate) critics: BTreeSet<TaskId>,
+    /// Tasks marked project, each with the tasks that joined it.
+    pub(crate) projects: BTreeMap<TaskId, BTreeSet<TaskId>>,
     /// When each task opened, ended and how long it waited on the owner, for the time and outcome report.
     pub(crate) timelines: BTreeMap<TaskId, Timeline>,
     /// Tasks done, in the order they were done: the order of the slope line.
@@ -76,9 +78,26 @@ impl Ledger {
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
             }
-            Event::TaskRole { task, role: Role::Critic } => {
-                self.tasks.get(task).ok_or_else(|| format!("{task} marked critic while unknown"))?;
-                self.critics.insert(*task);
+            Event::TaskRole { task, role } => {
+                self.tasks.get(task).ok_or_else(|| format!("{task} marked {role} while unknown"))?;
+                match role {
+                    Role::Critic => {
+                        self.critics.insert(*task);
+                    }
+                    Role::Project => {
+                        self.projects.entry(*task).or_default();
+                    }
+                }
+            }
+            Event::Joined { task, project } => {
+                self.tasks.get(task).ok_or_else(|| format!("unknown {task} joined {project}"))?;
+                match self.project_of(*task) {
+                    None => Ok(()),
+                    Some(held) => Err(format!("{task} joined {project} but is a member of {held}")),
+                }?;
+                let members =
+                    self.projects.get_mut(project).ok_or_else(|| format!("{task} joined {project}, no project"))?;
+                members.insert(*task);
             }
             Event::Leased { lease, task, agent, deadline } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
@@ -238,7 +257,7 @@ impl Ledger {
     }
 
     /// The PR the task is linked to now, if it is linked.
-    fn linked_pr_of(&self, task: TaskId) -> Option<PrNumber> {
+    pub(crate) fn linked_pr_of(&self, task: TaskId) -> Option<PrNumber> {
         match self.tasks.get(&task) {
             Some(Progress::Linked(linked)) => Some(linked.pr()),
             _ => None,
