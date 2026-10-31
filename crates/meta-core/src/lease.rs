@@ -175,21 +175,41 @@ impl Spent {
         self.seen = Seen::NoStop;
     }
 
-    /// A turn end of the agent this lease started, or its end. Turn ends repeat; nothing follows
-    /// an end but a resume.
-    pub(crate) fn stop(&mut self, at: Timestamp, ended: bool) -> Result<(), String> {
+    /// A `Finished` of the agent this lease started: a worker's end, or in an older log a subagent's
+    /// first turn end. It stands alone since the start or the last resume, so a second one is corrupt.
+    pub(crate) fn finish(&mut self, at: Timestamp, ended: bool) -> Result<(), String> {
         let id = self.lease.id;
-        match (&self.agent, self.seen, ended) {
-            (None, _, _) => Err(format!("{id} finished but no agent is recorded as started on it")),
-            (Some(_), Seen::Ended(_), _) => Err(format!("{id} finished twice")),
-            (Some(_), _, true) => {
-                self.seen = Seen::Ended(at);
+        match (&self.agent, self.seen) {
+            (None, _) => Err(format!("{id} finished but no agent is recorded as started on it")),
+            (Some(_), Seen::NoStop) => {
+                self.seen = if ended { Seen::Ended(at) } else { Seen::TurnEnded(at) };
                 Ok(())
             }
-            (Some(_), _, false) => {
-                self.seen = Seen::TurnEnded(at);
-                Ok(())
-            }
+            (Some(_), _) => Err(format!("{id} finished twice")),
+        }
+    }
+
+    /// A `TurnEnded`. Turn ends repeat, and one fits after an older `Finished` with no end.
+    pub(crate) fn turn_end(&mut self, at: Timestamp) -> Result<(), String> {
+        self.before_an_end("ended a turn")?;
+        self.seen = Seen::TurnEnded(at);
+        Ok(())
+    }
+
+    /// A `Stopped`, the real end of a subagent. It fits after a turn end.
+    pub(crate) fn stop(&mut self, at: Timestamp) -> Result<(), String> {
+        self.before_an_end("stopped")?;
+        self.seen = Seen::Ended(at);
+        Ok(())
+    }
+
+    /// Only a started agent with no end recorded can end a turn or stop; only a resume follows an end.
+    fn before_an_end(&self, what: &str) -> Result<(), String> {
+        let id = self.lease.id;
+        match (&self.agent, self.seen) {
+            (None, _) => Err(format!("{id} {what} but no agent is recorded as started on it")),
+            (Some(_), Seen::Ended(_)) => Err(format!("{id} {what} after its agent ended")),
+            (Some(_), _) => Ok(()),
         }
     }
 

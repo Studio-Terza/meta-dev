@@ -98,8 +98,16 @@ impl Ledger {
                 _ => Err(format!("{lease} started an agent but is not used"))?,
             },
             Event::Finished { lease, end } => match self.leases.get_mut(lease) {
-                Some(LeaseSlot::Spent(spent)) => spent.stop(at, end.is_some())?,
+                Some(LeaseSlot::Spent(spent)) => spent.finish(at, end.is_some())?,
                 _ => Err(format!("{lease} finished but not used"))?,
+            },
+            Event::TurnEnded { lease } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.turn_end(at)?,
+                _ => Err(format!("{lease} ended a turn but not used"))?,
+            },
+            Event::Stopped { lease } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.stop(at)?,
+                _ => Err(format!("{lease} stopped but not used"))?,
             },
             Event::Resumed { lease } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.resume(),

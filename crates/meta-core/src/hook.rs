@@ -3,7 +3,6 @@ use crate::ids::{AgentId, LeaseId, Timestamp};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::reply::Accepted;
-use crate::worker::WorkerEnd;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -71,8 +70,10 @@ pub enum Hook {
     Agent(AgentStart),
     Resume(Resume),
     Bind(Binding),
-    /// A turn of the agent with this id ended, or, with an end, the agent itself did.
-    Stopped(AgentId, Option<WorkerEnd>),
+    /// A turn of the agent with this id ended.
+    TurnEnded(AgentId),
+    /// A TaskStop stopped the task with this id, which may be an agent.
+    Stopped(AgentId),
 }
 
 #[derive(Debug)]
@@ -109,7 +110,7 @@ impl Hook {
     pub fn read(phase: Phase, input: &str) -> Self {
         if phase == Phase::Stop {
             return match serde_json::from_str::<StopInput>(input) {
-                Ok(StopInput { agent_id }) => Self::Stopped(agent_id, None),
+                Ok(StopInput { agent_id }) => Self::TurnEnded(agent_id),
                 Err(why) => Self::Settled(phase.broken(&format!("hook input cannot be parsed ({why})"))),
             };
         }
@@ -155,7 +156,7 @@ impl Hook {
             Phase::After if tool == Self::STOP_TOOL => {
                 let TaskStopOutput { task_id } = serde_json::from_value(parsed.tool_response)
                     .map_err(|error| format!("{tool} tool_response: {error}"))?;
-                Ok(Self::Stopped(task_id, Some(WorkerEnd::Stopped)))
+                Ok(Self::Stopped(task_id))
             }
             Phase::Before | Phase::After | Phase::Stop => Ok(Self::Settled(Self::allow(Vec::new()))),
         }
@@ -234,15 +235,25 @@ impl Ledger {
         }
     }
 
-    /// Records a turn end of the agent that a used lease started, every one, for it can end many
-    /// turns; with `end`, records that the agent ended. An agent id no lease started, one already
-    /// recorded as ended, other background tasks and Claude Code's own internal agents are ignored quietly.
-    pub fn stopped(&self, agent: &AgentId, end: Option<WorkerEnd>) -> Accepted {
-        let finished = self.leases.iter().find_map(|(id, slot)| match slot {
+    /// Records a turn end of the agent that a used lease started, every one, for it can end many turns.
+    pub fn turn_ended(&self, agent: &AgentId) -> Accepted {
+        self.of_agent(agent, |lease| Event::TurnEnded { lease })
+    }
+
+    /// Records that a TaskStop stopped the agent that a used lease started.
+    pub fn stopped(&self, agent: &AgentId) -> Accepted {
+        self.of_agent(agent, |lease| Event::Stopped { lease })
+    }
+
+    /// The event on the lease of an agent with no end recorded. An agent id no lease started, one
+    /// already recorded as ended, other background tasks and Claude Code's own internal agents are
+    /// ignored quietly: this runs inside the log's lock, so the fold never meets a repeat of an end.
+    fn of_agent(&self, agent: &AgentId, event: impl FnOnce(LeaseId) -> Event) -> Accepted {
+        let lease = self.leases.iter().find_map(|(id, slot)| match slot {
             LeaseSlot::Spent(spent) if spent.agent() == Some(agent) && !spent.has_ended() => Some(*id),
             _ => None,
         });
-        Hook::allow(finished.map(|lease| Event::Finished { lease, end }).into_iter().collect())
+        Hook::allow(lease.map(event).into_iter().collect())
     }
 
     pub fn resume(&self, resume: Resume) -> Accepted {

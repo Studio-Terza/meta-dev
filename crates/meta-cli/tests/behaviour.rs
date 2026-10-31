@@ -663,7 +663,8 @@ fn unknown_or_malformed_commands_answer_with_usage() {
         &["resolve", "escape-1"][..],
         &["resolve", "escape-1", "--historical"][..],
         &["resolve", "escape-1", "--historical", "--correcting"][..],
-        &["verdict", "task-1", "maybe"][..],
+        &["verdict", "lease-2", "maybe"][..],
+        &["verdict", "task-1", "pass"][..],
         &["retire", "task-1"][..],
         &["done", "task-1"][..],
         &["done", "task-1", "--by"][..],
@@ -1116,17 +1117,11 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
     let reviewed =
         |verdict: &str| Event::Reviewed { lease: id("lease-2"), verdict: id(verdict), head: Some(id(PINNED)) };
     let at_pinned = || vec![("7", pull(PINNED, &[]))];
-    let (reply, events) = call(&mut given(linked_task(), at_pinned()), &["verdict", "task-1", "pass"], "");
-    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
-    let unused = [linked_task(), vec![review_leased("lease-2", PINNED)]].concat();
-    let (reply, _) = call(&mut given(unused.clone(), at_pinned()), &["verdict", "task-1", "pass"], "");
-    assert!(reply.code == Code::Refused && reply.text.contains("awaits a verdict"), "{}", reply.text);
-    let mut ports = given([unused, vec![used("lease-2")]].concat(), at_pinned());
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "fail"], "");
+    let history = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
+    let mut ports = given(history, at_pinned());
+    let (reply, events) = call(&mut ports, &["verdict", "lease-2", "fail"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed("fail")]));
     assert!(reply.text.contains(&format!("at head {PINNED}")), "{}", reply.text);
-    let (reply, _) = call(&mut ports, &["verdict", "task-1", "pass"], "");
-    assert_eq!(reply.code, Code::Refused);
     let later = vec![
         review_leased("lease-3", MOVED),
         used("lease-3"),
@@ -1139,10 +1134,56 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
 }
 
 #[test]
+fn a_dead_reviewers_lease_at_an_older_head_does_not_block_a_later_reviewer() {
+    // Whether the dead reviewer's deadline has passed or not: it may crash long before it.
+    for deadline in [1, 1000] {
+        let dead = vec![review_leased_until("lease-2", PINNED, deadline), used("lease-2")];
+        let history = [linked_task(), dead, vec![review_leased("lease-3", MOVED), used("lease-3")]].concat();
+        let (reply, events) =
+            call(&mut given(history, vec![("7", pull(MOVED, &[]))]), &["verdict", "lease-3", "pass"], "");
+        let expected = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(MOVED)) };
+        assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
+    }
+}
+
+#[test]
+fn a_verdict_after_the_deadline_lands_on_the_named_lease() {
+    let late = |lease: &str| vec![review_leased_until(lease, PINNED, 1), used(lease)];
+    let history = [linked_task(), late("lease-2"), late("lease-3")].concat();
+    for lease in ["lease-2", "lease-3"] {
+        let mut ports = given(history.clone(), vec![("7", pull(PINNED, &[]))]);
+        let (status, _) = call(&mut ports, &["status"], "");
+        assert!(status.text.contains(&format!("{lease} for task-1: ")), "not overdue: {}", status.text);
+        let (reply, events) = call(&mut ports, &["verdict", lease, "pass"], "");
+        let expected = Event::Reviewed { lease: id(lease), verdict: id("pass"), head: Some(id(PINNED)) };
+        assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
+    }
+}
+
+#[test]
+fn a_verdict_naming_a_wrong_unused_worker_or_judged_lease_is_refused_with_a_next_step() {
+    let unused = reviewer_after_worker(PINNED)[..1].to_vec();
+    let judged = [worker_task(1), vec![reviewed_at_pin("fail")]].concat();
+    let cases = [
+        (worker_task(1), "lease-9", "lease-9 is unknown"),
+        (worker_task(1), "lease-1", "lease-1 is a work lease"),
+        (worker_task(1), "lease-2", "lease-2 is a headless worker's lease"),
+        ([worker_task(1), unused].concat(), "lease-3", "review lease lease-3 is unused"),
+        (judged, "lease-2", "lease-2 already has the verdict fail"),
+    ];
+    for (history, lease, why) in cases {
+        let mut ports = given(history, vec![("1", pull(PINNED, &[Outcome::Green]))]);
+        let (reply, events) = call(&mut ports, &["verdict", lease, "pass"], "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(why) && reply.text.contains("Next: "), "{}", reply.text);
+    }
+}
+
+#[test]
 fn verdict_is_refused_when_the_pr_head_is_not_the_head_the_review_lease_judged() {
     let used_review = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
     let mut ports = given(used_review, vec![("7", pull(MOVED, &[]))]);
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut ports, &["verdict", "lease-2", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     for needle in [MOVED, PINNED, "lease-2", "head it judged", "meta review task-1"] {
         assert!(reply.text.contains(needle), "{needle}: {}", reply.text);
@@ -1163,11 +1204,12 @@ fn review_brief_tells_the_reviewer_to_record_its_verdict_with_a_main_build_and_w
         call(&mut given(linked_task(), vec![("7", pull(PINNED, &[]))]), &["review", "task-1", "--agent", "rev"], "");
     let wanted = [
         "main build",
-        "/recorded/main/meta verdict task-1 pass|fail",
-        "lease: lease-2 (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you",
+        "/recorded/main/meta verdict lease-2 pass|fail",
+        "lease: lease-2 (for the lead: put it in the Agent description; it starts one agent. Reviewer: the verdict command",
     ];
     assert!(wanted.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
+    let unwanted = ["worktree", "cargo", "nothing for you"];
+    assert!(unwanted.iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
 }
 
 #[test]
@@ -1194,7 +1236,7 @@ fn status_flags_a_review_lease_that_finished_with_no_verdict_until_a_later_revie
 fn a_review_stopped_by_task_stop_reads_as_stopped_and_never_as_finished() {
     let start = vec![review_leased("lease-2", PINNED), used("lease-2"), started("lease-2", "agent-r")];
     let line = "lease-2 for task-1: review stopped by TaskStop with no verdict\n";
-    for last in [vec![], vec![finished("lease-2")]] {
+    for last in [vec![], vec![finished("lease-2")], vec![turn_ended("lease-2")]] {
         let events = [linked_task(), start.clone(), last, vec![task_stopped("lease-2")]].concat();
         let text = status_of(events);
         assert!(text.contains(line) && !text.contains("review finished"), "{text}");
@@ -3169,8 +3211,13 @@ fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
 
 // Task 44: a finished agent stops being overdue and running work, and status lists started agents.
 
+/// What the hook wrote for a subagent's turn end before `TurnEnded`. Older logs keep it.
 fn finished(lease: &str) -> Event {
     Event::Finished { lease: id(lease), end: None }
+}
+
+fn turn_ended(lease: &str) -> Event {
+    Event::TurnEnded { lease: id(lease) }
 }
 
 /// A SubagentStop hook input (Claude Code hooks reference, SubagentStop).
@@ -3208,11 +3255,17 @@ fn running_until(deadline: u64) -> Vec<Event> {
 }
 
 #[test]
-fn subagent_stop_records_finished_for_the_lease_the_agent_was_started_on() {
+fn subagent_stop_records_a_turn_end_for_the_lease_the_agent_was_started_on() {
     let (reply, events) = stop(running_until(1000), AGENT_ID);
-    assert_eq!((reply.text.as_str(), reply.code, events), (ALLOW, Code::Done, vec![finished("lease-1")]));
-    let line = serde_json::to_string(&finished("lease-1")).unwrap();
-    assert_eq!(line, r#"{"event":"Finished","lease":1}"#);
+    assert_eq!((reply.text.as_str(), reply.code, events), (ALLOW, Code::Done, vec![turn_ended("lease-1")]));
+    let line = serde_json::to_string(&turn_ended("lease-1")).unwrap();
+    assert_eq!(line, r#"{"event":"TurnEnded","lease":1}"#);
+}
+
+#[test]
+fn an_older_finished_line_still_reads_as_a_finished_with_no_end() {
+    let old: Event = serde_json::from_str(r#"{"event":"Finished","lease":1}"#).unwrap();
+    assert_eq!(old, finished("lease-1"));
 }
 
 #[test]
@@ -3225,6 +3278,7 @@ fn subagent_stop_ignores_unknown_agents_and_agents_already_finished_quietly() {
     quiet(Vec::new(), AGENT_ID);
     quiet(claimed_task(), AGENT_ID);
     quiet([running_until(1000), vec![task_stopped("lease-1")]].concat(), AGENT_ID);
+    quiet([running_until(1000), vec![ended("lease-1")]].concat(), AGENT_ID);
 }
 
 // Critic #49: a turn end is not an end, and a TaskStop is. These records stand for lease-50 and
@@ -3233,6 +3287,11 @@ fn subagent_stop_ignores_unknown_agents_and_agents_already_finished_quietly() {
 const TASK_STOP: &str = include_str!("fixtures/task-stop-payload.json");
 
 fn task_stopped(lease: &str) -> Event {
+    Event::Stopped { lease: id(lease) }
+}
+
+/// An end that is not a TaskStop's: only a worker writes it, and the fold takes it from any agent.
+fn ended(lease: &str) -> Event {
     Event::Finished { lease: id(lease), end: Some(WorkerEnd::Stopped) }
 }
 
@@ -3260,17 +3319,27 @@ const STOPPED_HEADING: &str = "subagents with a turn end or stop recorded, no ve
 
 #[test]
 fn every_turn_end_is_recorded_for_an_agent_can_wake_and_end_another() {
-    let (reply, events) = stop([running_until(1000), vec![finished("lease-1")]].concat(), AGENT_ID);
-    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![finished("lease-1")]));
+    for last in [finished("lease-1"), turn_ended("lease-1")] {
+        let (reply, events) = stop([running_until(1000), vec![last]].concat(), AGENT_ID);
+        assert_eq!((reply.text.as_str(), events), (ALLOW, vec![turn_ended("lease-1")]));
+    }
 }
 
 #[test]
 fn a_turn_end_reads_as_a_turn_end_with_its_time_and_never_as_finished() {
-    let text = timed_status(760, vec![(160, finished("lease-1")), (400, finished("lease-1"))]);
-    let line = format!(
-        "{STOPPED_HEADING}  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000, last recorded turn end unix 400 (6 min ago), done or waiting is not known\n"
-    );
-    assert!(text.contains(NO_STOP) && text.contains(&line), "{text}");
+    for first in [finished("lease-1"), turn_ended("lease-1")] {
+        let text = timed_status(760, vec![(160, first), (400, turn_ended("lease-1"))]);
+        let line = format!(
+            "{STOPPED_HEADING}  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000, last recorded turn end unix 400 (6 min ago), done or waiting is not known\n"
+        );
+        assert!(text.contains(NO_STOP) && text.contains(&line), "{text}");
+    }
+}
+
+#[test]
+fn an_older_finished_with_no_end_reads_as_a_turn_end_at_its_own_time() {
+    let text = timed_status(760, vec![(400, finished("lease-1"))]);
+    assert!(text.contains("last recorded turn end unix 400 (6 min ago)"), "{text}");
 }
 
 #[test]
@@ -3278,8 +3347,10 @@ fn a_task_stop_reads_as_stopped_at_its_time_after_a_turn_end_or_none() {
     let line = |at: u64| format!("deadline unix 1000, stopped by TaskStop unix {at} (1 min ago)\n");
     let plain = timed_status(460, vec![(400, task_stopped("lease-1"))]);
     assert!(plain.contains(NO_STOP) && plain.contains(&line(400)), "{plain}");
-    let after = timed_status(460, vec![(300, finished("lease-1")), (400, task_stopped("lease-1"))]);
-    assert!(after.contains(&line(400)) && !after.contains("turn end unix"), "{after}");
+    for turn in [finished("lease-1"), turn_ended("lease-1")] {
+        let after = timed_status(460, vec![(300, turn), (400, task_stopped("lease-1"))]);
+        assert!(after.contains(&line(400)) && !after.contains("turn end unix"), "{after}");
+    }
 }
 
 #[test]
@@ -3294,12 +3365,18 @@ fn task_stop_of_a_leased_agent_records_its_end_and_any_other_task_is_ignored() {
     let record = |events: Vec<Event>, task: &str| after(events, &task_stop(serde_json::json!(task)));
     let (reply, events) = after(running_until(1000), TASK_STOP);
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![task_stopped("lease-1")]));
-    let (reply, events) = record([running_until(1000), vec![finished("lease-1")]].concat(), AGENT_ID);
-    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![task_stopped("lease-1")]));
+    let line = serde_json::to_string(&task_stopped("lease-1")).unwrap();
+    assert_eq!(line, r#"{"event":"Stopped","lease":1}"#);
+    for turn in [finished("lease-1"), turn_ended("lease-1")] {
+        let (reply, events) = record([running_until(1000), vec![turn]].concat(), AGENT_ID);
+        assert_eq!((reply.text.as_str(), events), (ALLOW, vec![task_stopped("lease-1")]));
+    }
     let (reply, events) = record(running_until(1000), "b0a1c2d3");
     assert_eq!((reply.text.as_str(), events), (ALLOW, Vec::new()));
-    let (reply, events) = record([running_until(1000), vec![task_stopped("lease-1")]].concat(), AGENT_ID);
-    assert_eq!((reply.text.as_str(), events), (ALLOW, Vec::new()));
+    for end in [task_stopped("lease-1"), ended("lease-1")] {
+        let (reply, events) = record([running_until(1000), vec![end]].concat(), AGENT_ID);
+        assert_eq!((reply.text.as_str(), events), (ALLOW, Vec::new()));
+    }
 }
 
 #[test]
@@ -3381,9 +3458,10 @@ fn a_canned_continue_makes_a_finished_agent_run_again_until_it_stops_again() {
     let resumed = [running_until(1000), vec![finished("lease-1"), Event::Resumed { lease: id("lease-1") }]].concat();
     assert!(status_of(resumed.clone()).contains(&format!("lease-1: agent {AGENT_ID}, task-1, role work")));
     let (reply, events) = stop(resumed.clone(), AGENT_ID);
-    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![finished("lease-1")]));
-    let again = [resumed, vec![finished("lease-1")]].concat();
-    assert!(status_of(again).contains(NO_STOP));
+    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![turn_ended("lease-1")]));
+    for again in [finished("lease-1"), turn_ended("lease-1")] {
+        assert!(status_of([resumed.clone(), vec![again]].concat()).contains(NO_STOP));
+    }
 }
 
 #[test]
@@ -3396,8 +3474,47 @@ fn a_finished_record_that_fits_no_started_lease_or_repeats_is_a_corrupt_log() {
     bad(vec![finished("lease-1")]);
     bad([claimed_task(), vec![finished("lease-1")]].concat());
     bad([claimed_task(), vec![used("lease-1"), finished("lease-1")]].concat());
-    bad([running_until(1000), vec![task_stopped("lease-1"), finished("lease-1")]].concat());
-    bad([running_until(1000), vec![task_stopped("lease-1"), task_stopped("lease-1")]].concat());
+    bad([running_until(1000), vec![finished("lease-1"), finished("lease-1")]].concat());
+    bad([running_until(1000), vec![finished("lease-1"), ended("lease-1")]].concat());
+    bad([running_until(1000), vec![ended("lease-1"), finished("lease-1")]].concat());
+    bad([running_until(1000), vec![ended("lease-1"), ended("lease-1")]].concat());
+}
+
+#[test]
+fn a_finished_after_a_turn_end_or_a_stop_is_a_corrupt_log() {
+    for before in
+        [vec![turn_ended("lease-1")], vec![finished("lease-1"), turn_ended("lease-1")], vec![task_stopped("lease-1")]]
+    {
+        for last in [finished("lease-1"), ended("lease-1")] {
+            let (reply, _) = call(
+                &mut given([running_until(1000), before.clone(), vec![last]].concat(), Vec::new()),
+                &["status"],
+                "",
+            );
+            assert!(reply.text.contains("finished twice"), "{}", reply.text);
+        }
+    }
+}
+
+#[test]
+fn a_turn_end_or_a_stop_that_fits_no_started_agent_or_follows_an_end_is_a_corrupt_log() {
+    let bad = |events: Vec<Event>, why: &str| {
+        let (reply, added) = call(&mut given(events, Vec::new()), &["status"], "");
+        assert!(reply.text.contains("does not fit the log") && reply.text.contains(why), "{}", reply.text);
+        assert!(added.is_empty());
+    };
+    bad(vec![turn_ended("lease-1")], "lease-1 ended a turn but not used");
+    bad(vec![task_stopped("lease-1")], "lease-1 stopped but not used");
+    let unbound = [claimed_task(), vec![used("lease-1")]].concat();
+    bad([unbound.clone(), vec![turn_ended("lease-1")]].concat(), "lease-1 ended a turn but no agent");
+    bad([unbound, vec![task_stopped("lease-1")]].concat(), "lease-1 stopped but no agent");
+    for end in [task_stopped("lease-1"), ended("lease-1")] {
+        bad(
+            [running_until(1000), vec![end.clone(), turn_ended("lease-1")]].concat(),
+            "ended a turn after its agent ended",
+        );
+        bad([running_until(1000), vec![end, task_stopped("lease-1")]].concat(), "stopped after its agent ended");
+    }
 }
 
 /// A log whose records carry the given unix seconds, read by a status call made at `now`.
@@ -3874,7 +3991,7 @@ fn a_worker_that_ended_with_no_verdict_does_not_block_the_verdict_of_a_later_rev
         let finished = Event::Finished { lease: id("lease-2"), end: Some(end) };
         let events = [worker_task(1), vec![finished], reviewer_after_worker(MOVED)].concat();
         let mut ports = given(events, vec![("1", pull(MOVED, &[Outcome::Green]))]);
-        let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+        let (reply, events) = call(&mut ports, &["verdict", "lease-3", "pass"], "");
         let reviewed = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(MOVED)) };
         assert_eq!((reply.code, events), (Code::Done, vec![reviewed]), "{}", reply.text);
         let (status, _) = call(&mut ports, &["status"], "");
@@ -3885,11 +4002,11 @@ fn a_worker_that_ended_with_no_verdict_does_not_block_the_verdict_of_a_later_rev
 #[test]
 fn an_ordinary_verdict_never_lands_on_a_running_workers_lease() {
     let at_pin = || vec![("1", pull(PINNED, &[Outcome::Green]))];
-    let (reply, events) = call(&mut given(worker_task(1), at_pin()), &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut given(worker_task(1), at_pin()), &["verdict", "lease-2", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("meta review task-1"), "{}", reply.text);
     let mut ports = given([worker_task(1), reviewer_after_worker(PINNED)].concat(), at_pin());
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut ports, &["verdict", "lease-3", "pass"], "");
     let reviewed = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(PINNED)) };
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed]), "{}", reply.text);
     ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(Some(ExitStatus::of(0)))));
