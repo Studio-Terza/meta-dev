@@ -1151,6 +1151,89 @@ fn review_still_refuses_an_unused_lease_on_the_current_head() {
     assert!(reply.text.contains("review lease lease-2 on task-1 is unused"), "{}", reply.text);
 }
 
+fn review_replacing(lease: &str, task: &str, head: &str, replaces: &str) -> Event {
+    Event::ReviewLeased {
+        lease: id(lease),
+        task: id(task),
+        agent: None,
+        pr: id("7"),
+        head: id(head),
+        deadline: Some(Timestamp::from_unix_seconds(4_000_000_000)),
+        replaces: Some(id(replaces)),
+    }
+}
+
+/// `lease-2` on the old head, replaced by `lease-3` on the moved one.
+fn replaced_lease() -> Vec<Event> {
+    [
+        linked_task(),
+        vec![review_leased_until("lease-2", PINNED, 1), review_replacing("lease-3", "task-1", MOVED, "lease-2")],
+    ]
+    .concat()
+}
+
+#[test]
+fn an_agent_start_and_a_worker_start_on_a_replaced_lease_are_both_refused() {
+    let (reply, events) = hook(replaced_lease(), &agent("lease-2"));
+    assert!(reply.text.contains(DENY) && reply.text.contains("was replaced"), "{}", reply.text);
+    assert!(events.iter().all(|event| matches!(event, Event::Denied { .. })), "{events:?}");
+    let mut ports = ready_on_pr_7(replaced_lease());
+    let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+    assert!(ports.sessions.started.is_empty());
+}
+
+fn ready_on_pr_7(events: Vec<Event>) -> Memory {
+    given(events, vec![("7", pull(MOVED, &[Outcome::Green]))])
+}
+
+#[test]
+fn a_verdict_on_a_replaced_lease_says_it_was_replaced_not_that_it_is_unused() {
+    let (reply, events) = call(&mut ready_on_pr_7(replaced_lease()), &["verdict", "lease-2", "pass"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("replaced by a lease on the PR's newer head"), "{}", reply.text);
+    assert!(!reply.text.contains("is unused"), "{}", reply.text);
+}
+
+#[test]
+fn a_replaced_lease_past_its_deadline_is_not_listed_overdue() {
+    let none = "overdue leases (flagged)\n  (none)\n";
+    let unreplaced = [linked_task(), vec![review_leased_until("lease-2", PINNED, 1)]].concat();
+    assert!(status_of(unreplaced).contains("lease-2 for task-1: unused, deadline unix 1\n"));
+    let text = status_of(replaced_lease());
+    assert!(text.contains(none), "{text}");
+}
+
+#[test]
+fn the_replay_guard_refuses_a_lease_that_replaces_what_it_may_not() {
+    let other_task = vec![
+        opened("task-2"),
+        claimed("task-2"),
+        leased("lease-2", "task-2"),
+        Event::Linked { task: id("task-2"), pr: id("8"), pin: id(PINNED) },
+        Event::ReviewLeased {
+            lease: id("lease-3"),
+            task: id("task-2"),
+            agent: None,
+            pr: id("8"),
+            head: id(PINNED),
+            deadline: None,
+            replaces: None,
+        },
+    ];
+    let cases = [
+        ("non-unused", vec![review_leased("lease-2", PINNED), used("lease-2")], "lease-2", MOVED),
+        ("same head", vec![review_leased("lease-2", PINNED)], "lease-2", PINNED),
+        ("other task", other_task, "lease-3", MOVED),
+        ("unknown", vec![review_leased("lease-2", PINNED)], "lease-9", MOVED),
+    ];
+    for (name, setup, old, head) in cases {
+        let history = [linked_task(), setup, vec![review_replacing("lease-4", "task-1", head, old)]].concat();
+        let (reply, _) = call(&mut given(history, Vec::new()), &["status"], "");
+        assert_eq!(reply.code, Code::Failed, "{name}: {}", reply.text);
+    }
+}
+
 #[test]
 fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_latest_verdict_per_linked_pr() {
     let reviewed =
@@ -1197,6 +1280,38 @@ fn a_verdict_after_the_deadline_lands_on_the_named_lease() {
         let expected = Event::Reviewed { lease: id(lease), verdict: id("pass"), head: Some(id(PINNED)) };
         assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
     }
+}
+
+#[test]
+fn a_verdict_on_a_workers_lease_points_at_wait_while_it_runs_and_at_a_new_review_once_it_ended_with_none() {
+    let at_pin = || vec![("1", pull(PINNED, &[Outcome::Green]))];
+    let (running, _) = call(&mut given(worker_task(1), at_pin()), &["verdict", "lease-2", "pass"], "");
+    assert_eq!(running.code, Code::Refused, "{}", running.text);
+    assert!(running.text.contains("meta worker wait lease-2 records it"), "{}", running.text);
+    for end in [WorkerEnd::Stopped, WorkerEnd::Deadline, WorkerEnd::Vanished, WorkerEnd::Exited(ExitStatus::of(1))] {
+        let finished = Event::Finished { lease: id("lease-2"), end: Some(end) };
+        let (ended, events) =
+            call(&mut given([worker_task(1), vec![finished]].concat(), at_pin()), &["verdict", "lease-2", "pass"], "");
+        assert_eq!((ended.code, events), (Code::Refused, Vec::new()), "{}", ended.text);
+        assert!(ended.text.contains("ended with no verdict"), "{}", ended.text);
+        assert!(ended.text.contains("Next: meta review task-1 --agent <name>"), "{}", ended.text);
+        assert!(!ended.text.contains("records it"), "{}", ended.text);
+    }
+}
+
+#[test]
+fn status_reads_the_latest_verdict_by_log_order_when_an_older_lease_is_judged_after_a_newer_one() {
+    let lease = |name: &str, head: &str| vec![review_leased(name, head), used(name)];
+    let events = [
+        linked_task(),
+        lease("lease-2", PINNED),
+        lease("lease-3", MOVED),
+        vec![reviewed("lease-3", "pass"), reviewed("lease-2", "fail")],
+    ]
+    .concat();
+    let text = status_of(events);
+    let line = format!("latest review verdict per linked PR\n  #7 task-1: fail at {PINNED}\n");
+    assert!(text.contains(&line), "{text}");
 }
 
 #[test]

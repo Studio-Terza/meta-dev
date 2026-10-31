@@ -24,15 +24,17 @@ pub struct Reviewing {
 impl Ledger {
     pub fn review(&self, task: TaskId, agent: AgentName) -> Result<Reviewing, Refusal> {
         let lease = LeaseId::after(self.leases.len());
-        let pending = self.leases.iter().find_map(|(id, slot)| match slot {
-            LeaseSlot::Unused(unused) if unused.task() == task => match unused.purpose() {
-                Purpose::Review { head, .. } => Some((*id, head.clone())),
-                Purpose::Work => None,
-            },
-            _ => None,
-        });
         match self.tasks.get(&task) {
             Some(Progress::Linked(linked)) => {
+                // Only a lease on the PR the task links now: one on an earlier PR is neither a
+                // block nor replaced.
+                let pending = self.leases.iter().find_map(|(id, slot)| match slot {
+                    LeaseSlot::Unused(unused) if unused.task() == task => match unused.purpose() {
+                        Purpose::Review { pr, head } if *pr == linked.pr() => Some((*id, head.clone())),
+                        _ => None,
+                    },
+                    _ => None,
+                });
                 Ok(Reviewing { task, title: linked.title().clone(), agent, lease, pr: linked.pr(), pending })
             }
             Some(other) => Err(Refusal::because(format!(
@@ -63,13 +65,21 @@ impl Ledger {
                 "{lease} is a work lease on {task}, not a review lease. \
                  Next: name the lease your review brief gives, or {review}."
             ))),
-            (LeaseSlot::Unused(_) | LeaseSlot::Replaced(_), Purpose::Review { .. }) => Err(Refusal::because(format!(
+            (LeaseSlot::Replaced(_), Purpose::Review { .. }) => Err(Refusal::because(format!(
+                "review lease {lease} was replaced by a lease on the PR's newer head, and started no reviewer. \
+                 Next: {review} of the current head; this lease takes no verdict."
+            ))),
+            (LeaseSlot::Unused(_), Purpose::Review { .. }) => Err(Refusal::because(format!(
                 "review lease {lease} is unused: no reviewer started on it. \
                  Next: meta brief {lease} prints its brief again; put {lease} in the reviewer's Agent description."
             ))),
             (LeaseSlot::Spent(spent), Purpose::Review { pr, head }) => match (spent.verdict(), spent.worker()) {
                 (Some(verdict), _) => Err(Refusal::because(format!(
                     "{lease} already has the verdict {verdict}. Next: {review} of the current head."
+                ))),
+                (None, Some(_)) if spent.is_stopped() => Err(Refusal::because(format!(
+                    "{lease} is a headless worker's lease, and the worker has ended with no verdict; \
+                     meta worker wait cannot record one now. Next: {review} of the current head."
                 ))),
                 (None, Some(_)) => Err(Refusal::because(format!(
                     "{lease} is a headless worker's lease; its verdict comes only from its session. \
@@ -130,12 +140,12 @@ impl Ledger {
                 _ => None,
             })
             .filter_map(|linked| {
-                let latest = self.leases.values().rev().find_map(|slot| match slot {
-                    LeaseSlot::Spent(spent) => match (spent.lease().purpose(), spent.verdict()) {
+                let latest = self.judged.iter().rev().find_map(|lease| match self.leases.get(lease) {
+                    Some(LeaseSlot::Spent(spent)) => match (spent.lease().purpose(), spent.verdict()) {
                         (Purpose::Review { pr, head }, Some(verdict)) if *pr == linked.pr() => Some((head, verdict)),
                         _ => None,
                     },
-                    LeaseSlot::Unused(_) | LeaseSlot::Replaced(_) => None,
+                    _ => None,
                 });
                 latest.map(|(head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
             })
