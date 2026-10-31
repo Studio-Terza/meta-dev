@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lint_core::{Failure, Report, SourceFile, SourceFiles};
 
@@ -25,6 +25,12 @@ impl Lints {
     }
 
     pub fn check(root: &Path) -> Result<Outcome, Failure> {
-        Ok(Outcome::from_reports(Self::reports(&SourceFiles::read(root)?)))
+        Self::check_all(&[root.to_path_buf()])
+    }
+
+    pub fn check_all(roots: &[PathBuf]) -> Result<Outcome, Failure> {
+        let mut readout = SourceFiles::read_all(roots)?;
+        let reports = Self::reports(readout.files());
+        Ok(Outcome::from_reports(reports, readout.take_failures()))
     }
 }

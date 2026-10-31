@@ -3,9 +3,9 @@ mod finding;
 use finding::Finding;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{FnArg, ItemMod, Signature, Type};
+use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, PathArguments, Signature, Type};
 
-use lint_core::{LineNumber, Name, Report, Site, SourceFile, Violation, Walk};
+use lint_core::{LineNumber, Macros, Name, Report, Site, SourceFile, Violation, Walk};
 
 #[derive(Debug)]
 pub struct VecOutParams<'file> {
@@ -38,6 +38,16 @@ impl VecOutParams<'_> {
                         Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "Vec")
                     )
             }
+            Type::Path(path) => path
+                .path
+                .segments
+                .last()
+                .filter(|segment| segment.ident == "Option")
+                .and_then(|segment| match &segment.arguments {
+                    PathArguments::AngleBracketed(arguments) => arguments.args.first(),
+                    _ => None,
+                })
+                .is_some_and(|argument| matches!(argument, GenericArgument::Type(inner) if Self::is_vec_out(inner))),
             _ => false,
         }
     }
@@ -48,6 +58,19 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
         match Walk::outside_tests(&module.attrs) {
             Walk::Entered => syn::visit::visit_item_mod(self, module),
             Walk::Skipped => {}
+        }
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        match Walk::inherent_impls(item) {
+            Walk::Entered => syn::visit::visit_item_impl(self, item),
+            Walk::Skipped => {}
+        }
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
+        for statement in Macros::statements(invocation) {
+            self.visit_stmt(&statement);
         }
     }
 
@@ -64,7 +87,7 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
                 .filter(|typed| Self::is_vec_out(&typed.ty))
                 .map(|typed| {
                     Violation::new(
-                        Site::new(file.path(), LineNumber::from(typed.span())),
+                        Site::new(file.path(), LineNumber::from(typed.pat.span())),
                         Finding::VecOut { name: Name::from(&signature.ident) },
                     )
                 }),

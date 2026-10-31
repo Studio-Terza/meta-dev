@@ -31,3 +31,28 @@ fn an_enum_in_another_crate_does_not_count() {
     let files = [Sources::file("x/src/mode.rs", DECLARES), Sources::file("y/src/impls.rs", IMPL_ONLY)];
     assert!(EnumPredicates::report(&files).is_clean());
 }
+
+const INLINE: &str =
+    "mod inner {\n    pub enum Mode { A }\n    impl Mode {\n        pub fn is_a(&self) -> bool { true }\n    }\n}\n";
+const SHARED_TEST_NAME: &str = "enum Mode { A }\n";
+const OTHER_TEST_CRATE: &str = "struct Mode;\nimpl Mode {\n    fn ok(&self) -> bool { true }\n}\n";
+const STATUS_ENUM: &str = "pub enum Status { On }\n";
+const STATUS_STRUCT: &str = "pub struct Status;\nimpl Status {\n    pub fn ok(&self) -> bool { true }\n}\n";
+
+#[test]
+fn impls_inside_inline_modules_are_checked() {
+    let report = EnumPredicates::report(&[Sources::file("a.rs", INLINE)]);
+    assert_eq!(Sources::lines(&report), ["a.rs:4"]);
+}
+
+#[test]
+fn integration_tests_are_separate_crates() {
+    let files = [Sources::file("x/tests/a.rs", SHARED_TEST_NAME), Sources::file("y/tests/b.rs", OTHER_TEST_CRATE)];
+    assert!(EnumPredicates::report(&files).is_clean());
+}
+
+#[test]
+fn a_struct_sharing_an_enums_name_in_another_module_passes() {
+    let files = [Sources::file("x/src/a.rs", STATUS_ENUM), Sources::file("x/src/b.rs", STATUS_STRUCT)];
+    assert!(EnumPredicates::report(&files).is_clean());
+}

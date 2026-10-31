@@ -1,5 +1,5 @@
-use proc_macro2::{TokenStream, TokenTree};
-use syn::{Attribute, ItemImpl};
+use syn::punctuated::Punctuated;
+use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Walk {
@@ -22,18 +22,33 @@ impl Walk {
     }
 
     fn of_attribute(attribute: &Attribute) -> Walk {
-        match attribute.meta.require_list() {
-            Ok(list) if attribute.path().is_ident("cfg") => Self::of_tokens(list.tokens.clone()),
-            _ => Walk::Entered,
+        if attribute.path().is_ident("cfg") {
+            attribute.parse_args::<Meta>().map_or(Walk::Entered, |condition| Self::of_condition(&condition))
+        } else {
+            Walk::Entered
         }
     }
 
-    fn of_tokens(tokens: TokenStream) -> Walk {
-        Self::skipped_by_any(tokens.into_iter().map(|token| match token {
-            TokenTree::Ident(ident) if ident == "test" => Walk::Skipped,
-            TokenTree::Group(group) => Self::of_tokens(group.stream()),
-            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => Walk::Entered,
-        }))
+    fn of_condition(condition: &Meta) -> Walk {
+        match condition {
+            Meta::Path(path) if path.is_ident("test") => Walk::Skipped,
+            Meta::List(list) => Self::of_list(list),
+            Meta::Path(_) | Meta::NameValue(_) => Walk::Entered,
+        }
+    }
+
+    fn of_list(list: &MetaList) -> Walk {
+        let Ok(nested) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) else {
+            return Walk::Entered;
+        };
+        let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
+        if list.path.is_ident("all") {
+            Self::skipped_by_any(walks.into_iter())
+        } else if list.path.is_ident("any") && !walks.is_empty() && walks.iter().all(|walk| *walk == Walk::Skipped) {
+            Walk::Skipped
+        } else {
+            Walk::Entered
+        }
     }
 
     fn skipped_by_any(walks: impl Iterator<Item = Walk>) -> Walk {

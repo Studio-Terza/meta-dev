@@ -3,10 +3,12 @@ use std::path::Path;
 use syn::visit::Visit;
 
 use syn::{
-    Expr, ExprCast, ExprConst, ExprForLoop, ExprLoop, ExprWhile, ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemMod,
+    Expr, ExprCast, ExprConst, ExprForLoop, ExprLoop, ExprRepeat, ExprWhile, ImplItemConst, ImplItemFn, ItemConst,
+    ItemFn, ItemMod, ItemStatic, Macro, TraitItemConst, TraitItemFn, TypeArray, Variant,
 };
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -38,6 +40,12 @@ enum Context {
     Const,
 }
 
+impl Context {
+    fn of_fn(constness: Option<&syn::token::Const>) -> Context {
+        constness.map_or(Context::Surface, |_| Context::Const)
+    }
+}
+
 struct ConstContexts<'scan> {
     path: &'scan Path,
     context: Context,
@@ -49,8 +57,8 @@ impl ConstContexts<'_> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
-    fn within_const(&mut self, visit: impl FnOnce(&mut Self)) {
-        let outer = std::mem::replace(&mut self.context, Context::Const);
+    fn within(&mut self, context: Context, visit: impl FnOnce(&mut Self)) {
+        let outer = std::mem::replace(&mut self.context, context);
         visit(self);
         self.context = outer;
     }
@@ -74,31 +82,60 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        if function.sig.constness.is_some() {
-            self.within_const(|this| syn::visit::visit_item_fn(this, function));
-        } else {
-            syn::visit::visit_item_fn(self, function);
-        }
+        let context = Context::of_fn(function.sig.constness.as_ref());
+        self.within(context, |this| syn::visit::visit_item_fn(this, function));
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        if function.sig.constness.is_some() {
-            self.within_const(|this| syn::visit::visit_impl_item_fn(this, function));
-        } else {
-            syn::visit::visit_impl_item_fn(self, function);
-        }
+        let context = Context::of_fn(function.sig.constness.as_ref());
+        self.within(context, |this| syn::visit::visit_impl_item_fn(this, function));
+    }
+
+    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
+        self.within(Context::Surface, |this| syn::visit::visit_trait_item_fn(this, function));
     }
 
     fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        self.within_const(|this| syn::visit::visit_item_const(this, item));
+        self.within(Context::Const, |this| syn::visit::visit_item_const(this, item));
+    }
+
+    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
+        self.within(Context::Const, |this| syn::visit::visit_item_static(this, item));
     }
 
     fn visit_impl_item_const(&mut self, item: &'ast ImplItemConst) {
-        self.within_const(|this| syn::visit::visit_impl_item_const(this, item));
+        self.within(Context::Const, |this| syn::visit::visit_impl_item_const(this, item));
+    }
+
+    fn visit_trait_item_const(&mut self, item: &'ast TraitItemConst) {
+        self.within(Context::Const, |this| syn::visit::visit_trait_item_const(this, item));
     }
 
     fn visit_expr_const(&mut self, block: &'ast ExprConst) {
-        self.within_const(|this| syn::visit::visit_expr_const(this, block));
+        self.within(Context::Const, |this| syn::visit::visit_expr_const(this, block));
+    }
+
+    fn visit_type_array(&mut self, array: &'ast TypeArray) {
+        self.visit_type(&array.elem);
+        self.within(Context::Const, |this| this.visit_expr(&array.len));
+    }
+
+    fn visit_expr_repeat(&mut self, repeat: &'ast ExprRepeat) {
+        self.visit_expr(&repeat.expr);
+        self.within(Context::Const, |this| this.visit_expr(&repeat.len));
+    }
+
+    fn visit_variant(&mut self, variant: &'ast Variant) {
+        self.visit_fields(&variant.fields);
+        if let Some((_, discriminant)) = &variant.discriminant {
+            self.within(Context::Const, |this| this.visit_expr(discriminant));
+        }
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        for statement in Macros::statements(invocation) {
+            self.visit_stmt(&statement);
+        }
     }
 
     fn visit_expr_cast(&mut self, cast: &'ast ExprCast) {

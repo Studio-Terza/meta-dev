@@ -52,4 +52,10 @@ impl<'ast> Visit<'ast> for ShortLifetimes {
         let name = &parameter.lifetime.ident;
         self.found.extend((Name::from(name).length() < NamedLifetimes::MINIMUM_LENGTH).then(|| name.clone()));
     }
+
+    fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
+        for statement in lint_core::Macros::statements(invocation) {
+            self.visit_stmt(&statement);
+        }
+    }
 }
