@@ -61,9 +61,9 @@ pub enum LedgerCall {
         task: TaskId,
         by: PrNumber,
     },
-    /// The reviewer's verdict on the head its lease judged.
+    /// The reviewer's verdict on the head its named lease judged.
     Verdict {
-        task: TaskId,
+        lease: LeaseId,
         verdict: Verdict,
     },
     /// `deadline` overrides the review default.
@@ -141,7 +141,7 @@ impl Call {
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  meta escape --import\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta done <task> --by <pr>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
-                         meta verdict <task> pass|fail\n  meta brief <lease>\n  \
+                         meta verdict <lease> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
                          meta worker start <lease>\n  meta worker wait <lease>\n  meta stop [<lease>]\n  \
                          meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n  meta hook subagent-stop < input\n";
@@ -209,8 +209,8 @@ impl Call {
                 let deadline = Self::deadline(deadline)?;
                 agent.parse().map(|agent| LedgerCall::Review { task, agent, deadline })
             })),
-            ["verdict", task, verdict] => ledger(
-                task.parse().and_then(|task| verdict.parse().map(|verdict| LedgerCall::Verdict { task, verdict })),
+            ["verdict", lease, verdict] => ledger(
+                lease.parse().and_then(|lease| verdict.parse().map(|verdict| LedgerCall::Verdict { lease, verdict })),
             ),
             ["wait", task, "--owner", question @ ..] => local(
                 task.parse().and_then(|task| question.join(" ").parse().map(|question| Local::Wait { task, question })),
@@ -488,7 +488,7 @@ enum Prepared {
         rules: Rules,
     },
     Verdict {
-        task: TaskId,
+        lease: LeaseId,
         verdict: Verdict,
         pull: Pull,
     },
@@ -608,8 +608,8 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
                 rules: spec(git, SelfFile::Rules, Rules::parse)?,
             }
         }
-        LedgerCall::Verdict { task, verdict } => {
-            Prepared::Verdict { task, verdict, pull: github.pull(ledger.awaiting(task, clock.now())?)? }
+        LedgerCall::Verdict { lease, verdict } => {
+            Prepared::Verdict { lease, verdict, pull: github.pull(ledger.awaiting(lease)?)? }
         }
         LedgerCall::Review { task, agent, deadline } => {
             let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
@@ -636,7 +636,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Role { task, role }) => ledger.role(task, role)?,
-        Prepared::Verdict { task, verdict, pull } => ledger.verdict(task, verdict, &pull, at)?,
+        Prepared::Verdict { lease, verdict, pull } => ledger.verdict(lease, verdict, &pull)?,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),
