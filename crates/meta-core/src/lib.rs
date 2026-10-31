@@ -33,6 +33,7 @@ mod spec;
 mod stalled;
 mod status;
 mod task;
+mod timeline;
 mod wait;
 mod waiting;
 

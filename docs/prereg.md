@@ -18,7 +18,7 @@ Then proposals turn into code and stick, and the marginal cost of change stays f
 |---|---|---|
 | 0 | Minimal loop, enforced on the lead (`docs/stage0.md`) | Lenient |
 | 1 | Escapes as data; every bypass is a meta bug | Lenient |
-| 2 | Measure the loop: spend, time and outcome per task | Report-only |
+| 2 | Measure the loop: spend, time and outcome per task (time and outcome built; spend deferred) | Report-only |
 | 2b | Critic: a second long-lived role that names smells and reports straight to the owner (see "Critic") | Report-only |
 | 2c | Orchestration: a task state machine in meta, stateless stage workers and project agents (see "Agents") | Lenient |
 | 3 | Rules exist only as code with a source; prose never defines a rule | Report-only at first |

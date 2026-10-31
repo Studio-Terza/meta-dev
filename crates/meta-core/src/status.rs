@@ -201,6 +201,7 @@ impl Ledger {
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             self.rework(&pr_runs),
             section("predictions", &predicted),
+            self.timing(at),
         ]
         .concat();
         (fresh, text)
