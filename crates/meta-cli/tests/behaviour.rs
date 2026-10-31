@@ -3545,7 +3545,7 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
         "--allowedTools",
         "Read,Grep",
         "--disallowedTools",
-        "Agent,Task,Bash",
+        "Agent,Task",
         "--json-schema",
         schema,
         "--no-session-persistence",
@@ -3642,18 +3642,16 @@ fn worker_start_on_the_real_log_runs_a_main_build_only_and_reads_mains_allowlist
 }
 
 /// A `self/workers.toml` for the working tree that allows Glob and denies Agent and `denied`.
-fn tree_workers(model: &str, denied: &[&str]) -> String {
-    let denials: String =
-        denied.iter().map(|tool| format!("[[review.deny]]\ntool = \"{tool}\"\nsource = \"s\"\n")).collect();
+fn tree_workers(model: &str, denied: &str) -> String {
     format!(
-        "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[model]\nreview = \"{model}\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n{denials}"
+        "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[model]\nreview = \"{model}\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n[[review.deny]]\ntool = \"{denied}\"\nsource = \"s\"\n"
     )
 }
 
 #[test]
 fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist() {
     let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
-    ports.git.local.insert(SelfFile::Workers, tree_workers("sonnet", &["Agent", "Task", "Bash"]));
+    ports.git.local.insert(SelfFile::Workers, tree_workers("sonnet", "Task"));
     ports.git.files.remove(&SelfFile::Workers);
     let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
@@ -3665,10 +3663,8 @@ fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist
 }
 
 #[test]
-fn worker_start_is_stopped_at_parse_by_a_file_with_no_model_or_a_deny_list_that_lacks_task_or_bash() {
-    let every = ["Agent", "Task", "Bash"];
-    for (model, denied) in [("", &every[..]), ("opus", &["Agent", "Bash"]), ("opus", &["Agent", "Task"]), ("opus", &[])]
-    {
+fn worker_start_is_stopped_at_parse_by_a_file_with_no_model_or_a_deny_list_that_lacks_task() {
+    for (model, denied) in [("", "Task"), ("opus", "Bash")] {
         let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
         ports.git.local.insert(SelfFile::Workers, tree_workers(model, denied));
         let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");

@@ -25,7 +25,3 @@ source = "owner 2026-10-30: Agent, Task and starting claude are denied"
 [[review.deny]]
 tool = "Task"
 source = "owner 2026-10-30: Agent, Task and starting claude are denied"
-
-[[review.deny]]
-tool = "Bash"
-source = "owner 2026-10-30: Agent, Task and starting claude are denied"

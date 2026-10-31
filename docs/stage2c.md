@@ -23,7 +23,7 @@ Today `<model>` is `opus`, `<allow>` is `Read,Grep,Glob` and `<deny>` is `Agent,
 | `--model` | The model the session runs on. `--restricted` ignores user settings, so without this flag `self/workers.toml` would not choose the model. `[model] review` must be there, not empty, and have a source, or the file does not parse. The worker's model is recorded with its process group and transcript, and `meta status` shows it. |
 | `--tools` | The session's tools are exactly these. Without it, `--allowedTools` only skips prompts and every other tool stays available. Naming `Glob` and `Grep` here also brings them back on macOS and Linux, where the default set leaves them out. |
 | `--allowedTools` | These tools run with no approval. |
-| `--disallowedTools` | Deny comes first in rule order, so nothing can allow these back. A bare name removes the tool. `--tools` does not cover MCP tools, so `mcp__*` is denied too. A deny list without `Agent`, `Task` or `Bash` does not parse. |
+| `--disallowedTools` | Deny comes first in rule order, so nothing can allow these back. A bare name removes the tool. `--tools` does not cover MCP tools, so `mcp__*` is denied too. A deny list without `Agent` or `Task` does not parse. |
 | `--json-schema` | The session must end with `{verdict: pass or fail, findings: [text]}`. It adds the `StructuredOutput` tool, whose input is this verdict. |
 | `--no-session-persistence` | Nothing to resume: the transcript below is the record. |
 | `--permission-mode dontAsk` | Anything not allowed is denied, not asked. |
@@ -62,11 +62,11 @@ The session's standard input is a pipe whose other end only the supervisor holds
 
 The supervisor looks at its worker every 5 s, so it can be up to 5 s late at the deadline. It reads the log under the lock, so its first look waits for `start` to record the worker. A worker recorded by nothing therefore ends itself: the supervisor refuses the lease, exits, and takes the session with it.
 
-Before it signals a group or calls a session alive, the port checks that the leader's command line names the run's transcript. A process id can be reused, and a stranger's group must never be killed. A leader can also die before the rest of its group, so `meta stop` and the deadline kill go on to ask whether a live member names the transcript. The shell that holds the lifeline does, for it keeps the leader's arguments. That group is still the run's, and it is ended.
+Before it signals a group or calls a session alive, the port checks that the leader's command line names the run's transcript. A process id can be reused, and a stranger's group must never be killed. A leader can also die before the rest of its group. `meta worker wait` then reads the session as ended, records that, and exits, and the lifeline takes the rest of the group with it, so its deadline kill only ever reaches a group whose leader is alive. `meta stop` on a log it can read goes on to ask whether a live member names the transcript. The shell that holds the lifeline does, for it keeps the leader's arguments. That group is still the run's, and it is ended. On a log it cannot read, `meta stop` finds workers through the leader check alone, so it does not find such a group, and the supervisor's exit ends it.
 
 ## Behaviours
 
-Each row is a behaviour-table test through the single in-process `Call`, with a recorded spawn port. No test runs `claude`. The port's own process handling is tested against `/bin/sh`, and, for what no real process here can do (a member that outlives SIGKILL or refuses a signal), against injected signals and `ps` tables.
+Each row is a behaviour-table test through the single in-process `Call`, with a recorded spawn port. No test runs `claude`. The port's own process handling is tested against `/bin/sh`, and, for what no real process here can do (a member that outlives SIGKILL or refuses a signal), against injected signals and `pgrep` answers.
 
 | Command | Given | Result |
 |---|---|---|
@@ -76,7 +76,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta worker start <lease>` | the log is real and the build is not from main | refused, as for any write; nothing starts |
 | `meta worker start <lease>` | the log is real | `self/workers.toml` is read from main; the working tree's copy is ignored |
 | `meta worker start <lease>` | the log is scratch | any build runs, with the working tree's `self/workers.toml`, so a branch can try the file it changes |
-| `meta worker start <lease>` | `self/workers.toml` cannot be read, an entry has no source, the model is missing or empty, or the deny list lacks `Agent`, `Task` or `Bash` | error; nothing starts; the lease stays unused |
+| `meta worker start <lease>` | `self/workers.toml` cannot be read, an entry has no source, the model is missing or empty, or the deny list lacks `Agent` or `Task` | error; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | `claude --version` is below the floor in `self/workers.toml` | refused naming both; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | `claude --version` fails, or its reply does not parse | error; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | the PR is no longer at the lease's head | refused naming both heads, with `meta review` as the next step; nothing starts |
@@ -100,7 +100,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta stop` | any workers are running | every group is killed and each is recorded; with none running, says so |
 | `meta stop <lease>` | the lease started no worker, or its worker has ended | refused; nothing is killed |
 | `meta stop` | the build may not write the log | it kills all the same, and says nothing was recorded: the kill switch always kills. The supervisor then records `vanished` if it can |
-| `meta stop` | a group cannot be killed, or a member that is not a zombie, leader or not, is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone: the process table shows no live member. A signal refused for a group of zombies only is not a failure |
+| `meta stop` | a group cannot be killed, or a member that is not a zombie, leader or not, is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone: the exit status of `pgrep` says no live member is left. A signal refused for a group of zombies only is not a failure |
 | `meta stop` | the session had already ended: no live member of its group names the transcript | nothing is killed; says the worker was already gone; event `Finished` with `end: stopped` |
 | `meta stop` | the log fails after the closure ran | error saying which were killed, which were already gone and which could not be stopped, and that nothing was recorded. It says no worker was found only when none was |
 | `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; the same error |
