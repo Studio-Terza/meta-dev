@@ -1,3 +1,4 @@
+use crate::brief::{lease_line, work_text};
 use crate::event::Event;
 use crate::ids::{AgentName, Claimant, LeaseId, Origin, TaskId, Timestamp, Title};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
@@ -55,7 +56,7 @@ impl Ledger {
                 Err(Refusal::because(format!("{linked}; a self-claim takes an open task only.")))
             }
             (Claimant::Agent(_), Some(taken), Some(unused)) => Err(Refusal::because(format!(
-                "{task} is already claimed and {unused} is unused ({taken}). Next: put {unused} in the Agent description; \
+                "{task} is already claimed and {unused} is unused ({taken}). Next: meta brief {unused} prints its brief again, then put {unused} in the Agent description; \
                  once it is spent, meta claim {task} --agent <name> issues a fresh lease."
             ))),
             (_, None, _) => Err(Refusal::because(format!("{task} is unknown. Next: meta status lists open tasks."))),
@@ -76,39 +77,24 @@ impl Claim {
     pub fn brief(self, origin: &Origin, rules: &Rules, deadline: Option<Timestamp>) -> Accepted {
         let Self { task, title, grant } = self;
         let (who, lease_line, deadline_line) = match &grant {
-            Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => (
-                agent.to_string(),
-                format!("{lease} (put it in the Agent description; it works once)"),
-                Deadline::of(deadline).brief_line(),
-            ),
+            Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => {
+                (agent.to_string(), lease_line(*lease), Deadline::of(deadline).brief_line())
+            }
             Grant::SelfClaim => (
                 Claimant::Lead.to_string(),
                 "none: the lead works this task itself".to_owned(),
                 "none: self-claims have no deadline".to_owned(),
             ),
         };
-        let text = format!(
-            "task: {task}: {title}\n\
-             agent: {who}\n\
-             lease: {lease_line}\n\
-             deadline: {deadline_line}\n\
-             setup:\n  \
-             1. git clone {origin} {task}\n  \
-             2. cd {task} && git switch -c {task} origin/main\n  \
-             3. set the git identity that rule identity names\n  \
-             4. push, then open the PR with gh pr create\n  \
-             5. build meta from main, because only a main build writes the real log: \
-             git worktree add --detach ../{task}-main origin/main && \
-             cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target\n  \
-             6. from this clone, which holds the branch: ../{task}-main/target/release/meta link {task} <pr>\n  \
-             A meta built from your branch writes only a scratch log: run it with XDG_DATA_HOME set to a scratch dir.\n\
-             rules:\n{rules}"
-        );
+        let text = work_text(task, &title, &who, &lease_line, &deadline_line, origin, rules);
         let events = match grant {
             Grant::FirstClaim { agent, lease } => {
-                vec![Event::Claimed { task, agent: Claimant::Agent(agent) }, Event::Leased { lease, task, deadline }]
+                vec![
+                    Event::Claimed { task, agent: Claimant::Agent(agent.clone()) },
+                    Event::Leased { lease, task, agent: Some(agent), deadline },
+                ]
             }
-            Grant::FreshLease { lease, .. } => vec![Event::Leased { lease, task, deadline }],
+            Grant::FreshLease { agent, lease } => vec![Event::Leased { lease, task, agent: Some(agent), deadline }],
             Grant::SelfClaim => vec![Event::Claimed { task, agent: Claimant::Lead }],
         };
         Accepted::new(events, text)

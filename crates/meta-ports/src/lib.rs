@@ -76,6 +76,8 @@ impl GhReplies {
 pub trait GitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError>;
     fn merged_list(&self) -> Result<String, PortError>;
+    /// The `gh run list --json databaseId` reply for the PR's branch, merged or not.
+    fn runs(&self, pr: PrNumber) -> Result<String, PortError>;
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError>;
     /// Merges main into the PR's branch on GitHub, which moves the head; never merges the PR.
     fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError>;

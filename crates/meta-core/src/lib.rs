@@ -1,3 +1,4 @@
+mod brief;
 mod build;
 mod claim;
 mod escape;
@@ -18,12 +19,14 @@ mod pull;
 mod reply;
 mod retire;
 mod review;
+mod rework;
 mod roles;
 mod rules;
 mod spec;
 mod status;
 mod task;
 
+pub use brief::Reissue;
 pub use build::{Build, Unverified, Writer};
 pub use claim::Claim;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
@@ -44,6 +47,7 @@ pub use pull::{Outcome, Pull, PullState};
 pub use reply::{Accepted, Refusal};
 pub use retire::{Retirement, Retiring};
 pub use review::Reviewing;
+pub use rework::PrRuns;
 pub use roles::Roles;
 pub use rules::Rules;
 pub use spec::{SelfFile, Unreadable};

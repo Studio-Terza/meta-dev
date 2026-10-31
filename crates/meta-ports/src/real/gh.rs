@@ -13,6 +13,12 @@ struct Refs {
     base_ref_name: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Head {
+    head_ref_name: String,
+}
+
 impl GitHub for GhCli {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
         let number = pr.digits();
@@ -25,6 +31,12 @@ impl GitHub for GhCli {
         let branch = refs.head_ref_name;
         let runs = run("gh", &["run", "list", "--branch", &branch, "--json", "databaseId", "--limit", "1000"])?;
         GhReplies { view, required, runs }.pull()
+    }
+
+    fn runs(&self, pr: PrNumber) -> Result<String, PortError> {
+        let view = run("gh", &["pr", "view", &pr.digits(), "--json", "headRefName"])?;
+        let head: Head = serde_json::from_str(&view).map_err(|error| PortError::new(format!("gh pr view: {error}")))?;
+        run("gh", &["run", "list", "--branch", &head.head_ref_name, "--json", "databaseId", "--limit", "1000"])
     }
 
     fn merged_list(&self) -> Result<String, PortError> {

@@ -1,8 +1,8 @@
 use crate::build::Writer;
 use crate::escape::Checked;
 use crate::ids::{
-    AgentId, Claimant, EscapeId, EscapeKind, LeaseId, Observed, PrNumber, PredictionId, Reason, RunCount, Sha, TaskId,
-    Timestamp, Title, Verdict,
+    AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, PrNumber, PredictionId, Reason, RunCount,
+    Sha, TaskId, Timestamp, Title, Verdict,
 };
 use crate::predictions::Measure;
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,9 @@ pub enum Event {
     Leased {
         lease: LeaseId,
         task: TaskId,
+        /// The agent the lease is for, so `meta brief` prints the same brief. Older leases have none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<AgentName>,
         /// When the agent must report or stop. Leases from before deadlines have none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
@@ -102,6 +105,8 @@ pub enum Event {
     ReviewLeased {
         lease: LeaseId,
         task: TaskId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<AgentName>,
         pr: PrNumber,
         head: Sha,
         /// When the agent must report or stop. Leases from before deadlines have none.
