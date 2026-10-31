@@ -102,14 +102,24 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         worker: Option<WorkerRun>,
     },
-    /// The agent a used lease started has stopped (Claude Code's SubagentStop hook, or a worker's
-    /// end). A finished lease is never overdue and never running work, until a canned continue
-    /// resumes its agent.
+    /// A headless worker's end. In older logs, with no `end`, the first turn end of a subagent, so
+    /// a later `TurnEnded` or `Stopped` fits after it. It never repeats without a resume between.
+    /// The lease is never overdue and never running work, until a canned continue resumes its agent.
     Finished {
         lease: LeaseId,
         /// Set on a headless worker: how it ended.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         end: Option<WorkerEnd>,
+    },
+    /// A turn of the subagent a used lease started ended (Claude Code's SubagentStop hook). It fires
+    /// at every turn end, so the agent may be done or waiting on background work, and it repeats.
+    /// The lease reads as `Finished` does, until a canned continue resumes its agent.
+    TurnEnded {
+        lease: LeaseId,
+    },
+    /// A real TaskStop ended the subagent a used lease started. Nothing follows but a resume.
+    Stopped {
+        lease: LeaseId,
     },
     Denied {
         attempt: Attempt,
