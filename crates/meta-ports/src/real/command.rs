@@ -2,6 +2,7 @@
 #![allow(clippy::disallowed_methods)]
 
 use crate::PortError;
+use meta_core::Stopped;
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
@@ -40,64 +41,93 @@ fn refused(group: Pid, error: Errno) -> PortError {
     PortError::new(format!("process group {group}: {error}"))
 }
 
-/// SIGTERM, a short grace, then SIGKILL, with no look at the outcome after it. False when the
-/// group was already gone; an error when the first signal is refused (no permission, say). After
-/// that first signal the group is ours to signal, so a later refusal is the process table's way of
-/// saying that only zombies are left (macOS answers EPERM for them).
-fn signal_end(group: Pid) -> Result<bool, PortError> {
-    match killpg(group, Signal::SIGTERM) {
+/// SIGTERM, a short grace, then SIGKILL, with no look at the outcome after it. Says whether the
+/// group took a signal, and how the kernel refused one, if it did. ESRCH on the first signal is a
+/// group already gone; on the second, one that went in the grace. A refusal proves nothing yet:
+/// macOS answers EPERM for a group of zombies and for a member that may not be signalled alike, so
+/// only the process table can tell them apart.
+fn signal_end(signal: impl Fn(Signal) -> Result<(), Errno>) -> (Stopped, Option<Errno>) {
+    match signal(Signal::SIGTERM) {
         Ok(()) => {}
-        Err(Errno::ESRCH) => return Ok(false),
-        Err(error) => return Err(refused(group, error)),
+        Err(Errno::ESRCH) => return (Stopped::AlreadyGone, None),
+        Err(error) => return (Stopped::AlreadyGone, Some(error)),
     }
     thread::sleep(GRACE);
-    match killpg(group, Signal::SIGKILL) {
-        Ok(()) | Err(Errno::ESRCH | Errno::EPERM) => Ok(true),
-        Err(error) => Err(refused(group, error)),
+    match signal(Signal::SIGKILL) {
+        Ok(()) | Err(Errno::ESRCH) => (Stopped::Killed, None),
+        Err(error) => (Stopped::Killed, Some(error)),
     }
 }
 
-/// Whether the group still has a live member: signal 0 finds a member, but a leader that is a
-/// zombie (nobody has waited for it) is gone for our purposes, and so is a group only zombies
-/// remain in.
-fn remains(group: Pid, leader: u32) -> Result<bool, PortError> {
-    match killpg(group, None) {
-        Ok(()) => {
-            let state = run_found("ps", &["-o", "stat=", "-p", &leader.to_string()])?;
-            Ok(state.is_some_and(|state| !state.trim_start().starts_with('Z')))
-        }
-        Err(Errno::ESRCH | Errno::EPERM) => Ok(false),
-        Err(error) => Err(refused(group, error)),
+/// The whole process table, one `<process group> <state>` line per process. Two `-o` flags, for in
+/// BSD `ps` a header runs to the end of its argument.
+fn process_table() -> Result<String, PortError> {
+    run("ps", &["-A", "-o", "pgid=", "-o", "stat="])
+}
+
+/// Whether `table` holds a member of `group` that is not a zombie, leader or not. A zombie has
+/// exited and only waits for its parent to read its status. A line that cannot be read is an
+/// error, so that a table nobody can read never counts as a group gone.
+fn has_live_member(table: &str, group: Pid) -> Result<bool, PortError> {
+    let mut live = false;
+    for line in table.lines() {
+        let mut columns = line.split_whitespace();
+        let member = columns.next().and_then(|id| id.parse::<i32>().ok());
+        let (Some(member), Some(state)) = (member, columns.next()) else {
+            return Err(PortError::new(format!("process group {group}: unreadable ps line: {line}")));
+        };
+        live |= member == group.as_raw() && !state.starts_with('Z');
     }
+    Ok(live)
+}
+
+/// Ends `group` through `signal`, and confirms the end through `table`, for up to `confirm`. Only a
+/// table with no live member confirms it. The wait covers a refused signal too, for a member that
+/// is exiting may still be listed while the kernel already refuses to signal it.
+fn end_through(
+    group: Pid,
+    signal: impl Fn(Signal) -> Result<(), Errno>,
+    table: impl Fn() -> Result<String, PortError>,
+    confirm: Duration,
+) -> Result<Stopped, PortError> {
+    let (stopped, refusal) = signal_end(signal);
+    match refusal {
+        None if stopped == Stopped::AlreadyGone => return Ok(stopped),
+        None | Some(Errno::EPERM) => {}
+        Some(error) => return Err(refused(group, error)),
+    }
+    let deadline = Instant::now() + confirm;
+    while has_live_member(&table()?, group)? {
+        if Instant::now() >= deadline {
+            return Err(match refusal {
+                Some(error) => refused(group, error),
+                None => PortError::new(format!("process group {group}: still there after SIGKILL")),
+            });
+        }
+        thread::sleep(POLL);
+    }
+    Ok(stopped)
 }
 
 /// Ends a whole process group, so that what its leader started goes too: SIGTERM, a short grace,
-/// then SIGKILL. A group that is already gone is not an error. Ok means the group is gone: a kill
-/// that fails, or a group that is still there after `CONFIRM`, is an error.
-pub fn end_group(leader: u32) -> Result<(), PortError> {
+/// then SIGKILL. A group that is already gone is not an error. Ok means no live member is left: a
+/// kill that fails, or a live member still there after `CONFIRM`, is an error.
+pub fn end_group(leader: u32) -> Result<Stopped, PortError> {
     let group = i32::try_from(leader)
         .ok()
         .filter(|id| *id > 1)
         .map(Pid::from_raw)
         .ok_or_else(|| PortError::new(format!("process group {leader}: not a group to kill")))?;
-    if !signal_end(group)? {
-        return Ok(());
-    }
-    let deadline = Instant::now() + CONFIRM;
-    while remains(group, leader)? {
-        if Instant::now() >= deadline {
-            return Err(PortError::new(format!("process group {leader}: still there after SIGKILL")));
-        }
-        thread::sleep(POLL);
-    }
-    Ok(())
+    end_through(group, |signal| killpg(group, signal), process_table, CONFIRM)
 }
 
 /// Ends the command and its process group. The leader is this process's child and stays a zombie
 /// until waited for, so the group is not confirmed gone here.
 fn terminate(child: &mut Child) {
     let group = i32::try_from(child.id()).ok().map(Pid::from_raw);
-    group.into_iter().for_each(|group| drop(signal_end(group)));
+    if let Some(group) = group {
+        let _ = signal_end(|signal| killpg(group, signal));
+    }
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -199,11 +229,32 @@ pub fn decides_with(program: &str, args: &[&str], prepare: impl FnOnce(&mut Comm
 
 #[cfg(test)]
 mod tests {
-    use super::{decides_with, end_group, run, run_found, run_within};
+    use super::{
+        Stopped, decides_with, end_group, end_through, has_live_member, process_table, run, run_found, run_within,
+    };
+    use crate::PortError;
     use meta_testkit::Scratch;
+    use nix::errno::Errno;
+    use nix::sys::signal::Signal;
+    use nix::unistd::Pid;
+    use std::cell::RefCell;
     use std::fs;
     use std::process::Command;
     use std::time::{Duration, Instant};
+
+    /// A group id for injected signals and tables: nothing is ever sent to it.
+    const GROUP: i32 = 4242;
+
+    fn group() -> Pid {
+        Pid::from_raw(GROUP)
+    }
+
+    /// `end_through` with the kernel's answers to SIGTERM and SIGKILL, and a table that reads the
+    /// same on every look.
+    fn ended_on(term: Result<(), Errno>, kill: Result<(), Errno>, table: &str) -> Result<Stopped, String> {
+        let signal = |signal| if signal == Signal::SIGTERM { term } else { kill };
+        end_through(group(), signal, || Ok(table.to_owned()), Duration::ZERO).map_err(|error| error.to_string())
+    }
 
     /// Whether the process is gone; a zombie that nobody has reaped yet is gone too.
     fn gone(pid: &str) -> bool {
@@ -241,7 +292,91 @@ mod tests {
         let reaper = std::thread::spawn(move || child.wait());
         end_group(leader).unwrap();
         reaper.join().unwrap().unwrap();
-        end_group(leader).unwrap();
+        assert_eq!(end_group(leader), Ok(Stopped::AlreadyGone));
+    }
+
+    #[test]
+    fn a_real_leader_left_a_zombie_counts_as_gone_and_so_does_its_group_on_a_second_stop() {
+        use std::os::unix::process::CommandExt;
+        let mut child = Command::new("sleep").arg("30").process_group(0).spawn().unwrap();
+        let leader = child.id();
+        // Not waited for until the end, so that the leader stays a zombie holding its group.
+        assert_eq!(end_group(leader), Ok(Stopped::Killed));
+        let table = process_table().unwrap();
+        let group = Pid::from_raw(i32::try_from(leader).unwrap());
+        assert_eq!(has_live_member(&table, group), Ok(false), "{table}");
+        // Linux lets a zombie be signalled and macOS answers EPERM. Neither is unstoppable.
+        assert!(end_group(leader).is_ok());
+        child.wait().unwrap();
+    }
+
+    #[test]
+    fn a_live_member_keeps_the_group_there_whatever_became_of_its_leader() {
+        let cases = [
+            ("  4242 Z\n  4242 S\n", true),
+            ("  4242 Ss+\n", true),
+            ("  4242 ?E\n", true),
+            ("  4242 Z+\n 4242 Z\n", false),
+            ("  4243 S\n  424 R+\n", false),
+            ("", false),
+        ];
+        for (table, live) in cases {
+            assert_eq!(has_live_member(table, group()), Ok(live), "{table}");
+        }
+    }
+
+    #[test]
+    fn a_process_table_that_cannot_be_read_never_counts_as_a_group_gone() {
+        for table in ["4242\n", "pgid S\n", "\n"] {
+            let error = has_live_member(table, group()).unwrap_err();
+            assert!(error.to_string().contains("unreadable ps line"), "{error}");
+        }
+        let unread = end_through(group(), |_| Ok(()), || Err(PortError::new("ps failed")), Duration::ZERO);
+        assert_eq!(unread, Err(PortError::new("ps failed")));
+    }
+
+    #[test]
+    fn a_member_still_there_after_sigkill_is_an_error_even_when_the_leader_is_a_zombie() {
+        let still = format!("process group {GROUP}: still there after SIGKILL");
+        assert_eq!(ended_on(Ok(()), Ok(()), "4242 Z\n4242 D\n"), Err(still));
+    }
+
+    #[test]
+    fn a_group_confirmed_gone_was_killed_when_only_zombies_are_left() {
+        assert_eq!(ended_on(Ok(()), Ok(()), "4242 Z\n"), Ok(Stopped::Killed));
+        assert_eq!(ended_on(Ok(()), Err(Errno::ESRCH), ""), Ok(Stopped::Killed));
+        assert_eq!(ended_on(Ok(()), Err(Errno::EPERM), "4242 Z\n"), Ok(Stopped::Killed));
+    }
+
+    #[test]
+    fn a_real_member_that_refuses_a_signal_is_reported_and_a_group_of_zombies_is_not() {
+        let refused = format!("process group {GROUP}: {}", Errno::EPERM);
+        assert_eq!(ended_on(Err(Errno::EPERM), Ok(()), "4242 S\n"), Err(refused.clone()));
+        assert_eq!(ended_on(Ok(()), Err(Errno::EPERM), "4242 Z\n4242 S\n"), Err(refused));
+        assert_eq!(ended_on(Err(Errno::EPERM), Ok(()), "4242 Z\n"), Ok(Stopped::AlreadyGone));
+    }
+
+    #[test]
+    fn a_group_with_no_such_process_is_already_gone_and_no_table_is_read() {
+        let unread = || -> Result<String, PortError> { panic!("the table was read") };
+        let ended = end_through(group(), |_| Err(Errno::ESRCH), unread, Duration::ZERO);
+        assert_eq!(ended, Ok(Stopped::AlreadyGone));
+    }
+
+    #[test]
+    fn a_signal_refused_for_another_reason_is_an_error_with_no_table_read() {
+        let unread = || -> Result<String, PortError> { panic!("the table was read") };
+        let error = end_through(group(), |_| Err(Errno::EINVAL), unread, Duration::ZERO).unwrap_err();
+        assert_eq!(error.to_string(), format!("process group {GROUP}: {}", Errno::EINVAL));
+    }
+
+    #[test]
+    fn a_member_that_is_slow_to_go_is_looked_at_again_until_it_has_gone() {
+        let looks = RefCell::new(vec!["4242 S\n".to_owned(), "4242 R\n".to_owned(), String::new()]);
+        let table = || Ok(looks.borrow_mut().remove(0));
+        let ended = end_through(group(), |_| Ok(()), table, Duration::from_secs(10));
+        assert_eq!(ended, Ok(Stopped::Killed));
+        assert!(looks.borrow().is_empty());
     }
 
     #[test]

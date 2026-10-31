@@ -1,7 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Listed, Log, PortError, Sessions};
 use meta_core::{
     AgentId, Binary, Cleared, Head, Marking, Origin, Place, PrNumber, ProcessGroup, Pull, Record, ReviewCopy, SelfFile,
-    Session, Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    Session, Sha, SideLine, Span, Standing, Stopped, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
     WorkerPlan, WorkerRun,
 };
 use std::cell::{Cell, RefCell};
@@ -203,6 +203,8 @@ pub struct RecordedSessions {
     pub broken_stop: Option<PortError>,
     /// The runs whose stop fails while every other stops.
     pub unstoppable: Vec<WorkerRun>,
+    /// The runs that had ended before `stop` came, so that it kills nothing.
+    pub gone: Vec<WorkerRun>,
     /// The replies to `state`, one per call; after them a session is running.
     pub states: RefCell<VecDeque<Result<Session, PortError>>>,
     /// The lines of every session's transcript.
@@ -220,6 +222,7 @@ impl Default for RecordedSessions {
             broken_start: None,
             broken_stop: None,
             unstoppable: Vec::new(),
+            gone: Vec::new(),
             states: RefCell::default(),
             transcript: Ok(Vec::new()),
             listed: Ok(Vec::new()),
@@ -256,13 +259,16 @@ impl Sessions for RecordedSessions {
         self.states.borrow_mut().pop_front().unwrap_or(Ok(Session::Running))
     }
 
-    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
+    fn stop(&mut self, run: &WorkerRun) -> Result<Stopped, PortError> {
         self.broken_stop.clone().map_or(Ok(()), Err)?;
         if self.unstoppable.contains(run) {
             return Err(PortError::new("not permitted"));
         }
+        if self.gone.contains(run) {
+            return Ok(Stopped::AlreadyGone);
+        }
         self.stopped.push(run.clone());
-        Ok(())
+        Ok(Stopped::Killed)
     }
 
     fn transcript(&self, _: &WorkerRun) -> Result<Vec<String>, PortError> {

@@ -1,7 +1,7 @@
 use super::{Answer, Failure, Guard, pull_at, spec, stamped};
 use meta_core::{
     Accepted, AgentId, Build, ClaudeVersion, Judged, LeaseId, Ledger, NoVerdict, Record, Rules, SelfFile, Session,
-    SessionVerdict, Span, Timestamp, Watch, Worker, WorkerEnd, Workers,
+    SessionVerdict, Span, Stopped, Timestamp, Watch, Worker, WorkerEnd, Workers,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Sessions};
 
@@ -119,7 +119,7 @@ pub(super) fn wait<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
         };
         let end = match sessions.state(worker.agent(), worker.run()) {
             Ok(Session::Ended(status)) => Some(WorkerEnd::from(status)),
-            _ if worker.is_past_deadline(clock.now()) => sessions.stop(worker.run()).ok().map(|()| WorkerEnd::Deadline),
+            _ if worker.is_past_deadline(clock.now()) => sessions.stop(worker.run()).ok().map(|_| WorkerEnd::Deadline),
             _ => None,
         };
         if let Some(end) = end {
@@ -215,14 +215,10 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
         let mut found = Kills::default();
         for worker in workers {
             let id = worker.agent().clone();
-            match sessions.stop(worker.run()) {
-                Ok(()) => {
-                    let (ended, line) = worker.ended(WorkerEnd::Stopped).into_parts();
-                    events.extend(ended);
-                    text.push_str(&line);
-                    found.killed.push(id.to_string());
-                }
-                Err(error) => found.failed.push(format!("{id}: {error}")),
+            if let Some(stopped) = found.note(&id, sessions.stop(worker.run())) {
+                let (ended, line) = worker.stopped(stopped).into_parts();
+                events.extend(ended);
+                text.push_str(&line);
             }
         }
         let failed = found.failed.clone();
@@ -249,41 +245,59 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
     }
 }
 
-/// What a stop killed and what it could not.
+/// What a stop killed, what had already gone, and what it could not stop.
 #[derive(Default)]
 struct Kills {
     killed: Vec<String>,
+    gone: Vec<String>,
     failed: Vec<String>,
 }
 
-/// The failure text for kills that were not recorded, after `why` the log could not be used.
+impl Kills {
+    /// Files the outcome of stopping `id`, and hands back a stop that left no live process.
+    fn note(&mut self, id: &AgentId, outcome: Result<Stopped, PortError>) -> Option<Stopped> {
+        match &outcome {
+            Ok(Stopped::Killed) => self.killed.push(id.to_string()),
+            Ok(Stopped::AlreadyGone) => self.gone.push(id.to_string()),
+            Err(error) => self.failed.push(format!("{id}: {error}")),
+        }
+        outcome.ok()
+    }
+}
+
+/// The failure text for kills that were not recorded, after `why` the log could not be used. It says
+/// no worker was found only when none was.
 fn unrecorded(why: &Failure, found: &Kills) -> String {
-    let killed = match found.killed.is_empty() {
+    let said = [
+        ("killed ", &found.killed, ", "),
+        ("already gone: ", &found.gone, ", "),
+        ("could not stop ", &found.failed, "; "),
+    ];
+    let parts: Vec<String> = said
+        .iter()
+        .filter(|(_, names, _)| !names.is_empty())
+        .map(|(heading, names, between)| format!("{heading}{}", names.join(between)))
+        .collect();
+    let found = match parts.is_empty() {
         true => "no worker found to kill".to_owned(),
-        false => format!("killed {}", found.killed.join(", ")),
+        false => parts.join("; "),
     };
-    let failed = match found.failed.is_empty() {
-        true => String::new(),
-        false => format!("; could not stop {}", found.failed.join("; ")),
-    };
-    format!("{why}\n{killed}{failed}; nothing was recorded, for the log could not be used")
+    format!("{why}\n{found}; nothing was recorded, for the log could not be used")
 }
 
 /// Kills the workers found without the log, which cannot record it.
 fn kill_listed<S: Sessions>(lease: Option<LeaseId>, sessions: &mut S) -> Kills {
     let wanted = lease.map(AgentId::worker);
-    let mut killed = Vec::new();
-    let mut failed = Vec::new();
+    let mut found = Kills::default();
     let listed = sessions.listed().unwrap_or_else(|error| vec![Err(error)]);
     for entry in listed {
         match entry {
-            Ok((id, run)) if wanted.as_ref().is_none_or(|wanted| *wanted == id) => match sessions.stop(&run) {
-                Ok(()) => killed.push(id.to_string()),
-                Err(error) => failed.push(format!("{id}: {error}")),
-            },
+            Ok((id, run)) if wanted.as_ref().is_none_or(|wanted| *wanted == id) => {
+                found.note(&id, sessions.stop(&run));
+            }
             Ok(_) => {}
-            Err(error) => failed.push(error.to_string()),
+            Err(error) => found.failed.push(error.to_string()),
         }
     }
-    Kills { killed, failed }
+    found
 }

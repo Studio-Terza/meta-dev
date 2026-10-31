@@ -128,6 +128,14 @@ pub enum Session {
     Ended(Option<ExitStatus>),
 }
 
+/// What stopping a session came to, once no live process of it is left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stopped {
+    Killed,
+    /// There was nothing to kill: the session had already ended.
+    AlreadyGone,
+}
+
 /// How a worker ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -487,6 +495,16 @@ impl Worker {
     pub fn ended(self, end: WorkerEnd) -> Accepted {
         let Self { lease, agent, .. } = self;
         Accepted::new(vec![Event::Finished { lease, end: Some(end) }], format!("{lease}: worker {agent} {end}\n"))
+    }
+
+    /// The record of `meta stop` ending it, in words that say whether anything was killed.
+    pub fn stopped(self, stopped: Stopped) -> Accepted {
+        let line = format!("{}: worker {} was already gone\n", self.lease, self.agent);
+        let accepted = self.ended(WorkerEnd::Stopped);
+        match stopped {
+            Stopped::Killed => accepted,
+            Stopped::AlreadyGone => Accepted::new(accepted.into_parts().0, line),
+        }
     }
 
     /// The lease, for what a supervisor reports.

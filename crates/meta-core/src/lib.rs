@@ -75,6 +75,6 @@ pub use side_line::SideLine;
 pub use spec::{SelfFile, Unreadable};
 pub use status::Sources;
 pub use worker::{
-    Judged, NoVerdict, Planned, ReviewCopy, Session, SessionVerdict, Starting, Watch, Worker, WorkerEnd, WorkerPlan,
-    WorkerRun, Workers,
+    Judged, NoVerdict, Planned, ReviewCopy, Session, SessionVerdict, Starting, Stopped, Watch, Worker, WorkerEnd,
+    WorkerPlan, WorkerRun, Workers,
 };

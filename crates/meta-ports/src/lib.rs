@@ -3,8 +3,8 @@ pub mod real;
 
 use meta_core::{
     AgentId, Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, ReviewCopy, SelfFile, Session,
-    Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating, WorkerPlan,
-    WorkerRun,
+    Sha, SideLine, Span, Standing, Stopped, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    WorkerPlan, WorkerRun,
 };
 use std::fmt;
 
@@ -130,8 +130,9 @@ pub trait Sessions {
     /// join is ended again, and what it left does not stand in the way of the next start.
     fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError>;
     fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError>;
-    /// Ends the session's process group. A session already gone is not an error.
-    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError>;
+    /// Ends the session's process group and says whether there was anything to kill. A session
+    /// already gone is not an error; a group with a live member left is.
+    fn stop(&mut self, run: &WorkerRun) -> Result<Stopped, PortError>;
     /// The lines of the session's transcript.
     fn transcript(&self, run: &WorkerRun) -> Result<Vec<String>, PortError>;
     /// The sessions alive now, found without the log, so that `meta stop` still kills on a log it

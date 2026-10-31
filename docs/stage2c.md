@@ -66,7 +66,7 @@ Before it signals a group or calls a session alive, the port checks that the lea
 
 ## Behaviours
 
-Each row is a behaviour-table test through the single in-process `Call`, with a recorded spawn port. No test runs `claude`. The port's own process handling is tested against `/bin/sh`.
+Each row is a behaviour-table test through the single in-process `Call`, with a recorded spawn port. No test runs `claude`. The port's own process handling is tested against `/bin/sh`, and, for what no real process here can do (a member that outlives SIGKILL or refuses a signal), against injected signals and `ps` tables.
 
 | Command | Given | Result |
 |---|---|---|
@@ -82,7 +82,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta worker start <lease>` | the PR is no longer at the lease's head | refused naming both heads, with `meta review` as the next step; nothing starts |
 | `meta worker start <lease>` | GitHub gives no view or diff | error; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | the session cannot be started | error; nothing is recorded; the lease stays unused |
-| `meta worker start <lease>` | the supervisor cannot be started | the session's group is ended; error; nothing is recorded; the lease stays unused and a retry works |
+| `meta worker start <lease>` | the supervisor cannot be started | the session's group is ended; error, which also says if the group could not be ended; nothing is recorded; the lease stays unused and a retry works |
 | `meta worker wait <lease>` | the session exited 0 and its last `result` event is a success with a valid structured verdict, and the PR is at the lease's head | events `Reviewed` on this lease at that head, then `Finished` with `end: { exited: 0 }`; the findings go to `supervisor.log` |
 | `meta worker wait <lease>` | no valid structured verdict, a failed result, no result, or an unreadable transcript | event `Finished` only. No verdict is recorded, and `meta status` shows "review finished with no verdict" with the transcript; `supervisor.log` says why |
 | `meta worker wait <lease>` | the PR left the lease's head, or GitHub stays unreachable for 60 s | the same: a verdict lands only on the head it judged |
@@ -100,9 +100,10 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta stop` | any workers are running | every group is killed and each is recorded; with none running, says so |
 | `meta stop <lease>` | the lease started no worker, or its worker has ended | refused; nothing is killed |
 | `meta stop` | the build may not write the log | it kills all the same, and says nothing was recorded: the kill switch always kills. The supervisor then records `vanished` if it can |
-| `meta stop` | a group cannot be killed, or is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone |
-| `meta stop` | the log fails after some groups were killed | error saying which were killed and which could not be stopped, and that nothing was recorded |
-| `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; error saying which were killed and that nothing was recorded |
+| `meta stop` | a group cannot be killed, or a member that is not a zombie, leader or not, is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone: the process table shows no live member. A signal refused for a group of zombies only is not a failure |
+| `meta stop` | the session had already ended | nothing is killed; says the worker was already gone; event `Finished` with `end: stopped` |
+| `meta stop` | the log fails after the closure ran | error saying which were killed, which were already gone and which could not be stopped, and that nothing was recorded. It says no worker was found only when none was |
+| `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; the same error |
 | `meta verdict <task>` | the only used review lease with no verdict is a worker's, running or ended | refused: a worker's verdict comes only from its session |
 | `meta verdict <task>` | a worker's lease, running or ended, stands before a reviewer's | recorded on the reviewer's lease, whatever head the worker's lease has |
 | `meta status` | a worker's end is not recorded | "running agents" lists `<lease>: agent worker-<n>, <task>, role review, <deadline>, model <model>, transcript <path>`, even if its task has ended, since the process is still there |
@@ -114,6 +115,6 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 ## What this piece leaves open
 
-- **Live canary: run on a scratch log, not on the real log.** The lead ran it before review, on a scratch log, at 849ac01. The path through the real log is still unobserved until a build from main runs a worker.
-- **A worker with no supervisor stays listed.** If the machine restarts, the sessions are gone but the log still shows them running, and they count towards the limit. `meta stop` clears them: the port sees that the leader is not theirs, kills nothing, and records the end.
+- **Live canary: run, on a scratch log and on the real log.** The lead ran it before review, on a scratch log, at 849ac01. A read outside the scratch directory was tried, in a direct session with the same flags, and was refused. The path through the real log has now been observed: a main-build worker on lease-117 reviewed PR #50 and recorded its verdict.
+- **A worker with no supervisor stays listed.** If the machine restarts, the sessions are gone but the log still shows them running, and they count towards the limit. `meta stop` clears them: the port sees that the leader is not theirs, kills nothing, says the worker was already gone, and records the end.
 - **A lost `Finished`.** If the log cannot be written when a worker ends, the supervisor reports it in `supervisor.log` and exits. `meta stop` clears that too.
