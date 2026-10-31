@@ -1,7 +1,7 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp, Updating};
+use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,8 +70,8 @@ pub trait GitHub {
 
 pub trait Clock {
     fn now(&self) -> Timestamp;
-    /// Waits, so that `now` is later by at least the given seconds.
-    fn pause(&self, seconds: u64);
+    /// Waits, so that `now` is later by at least `span`.
+    fn pause(&self, span: Span);
 }
 
 pub struct Ports<L, G, H, C> {

@@ -1,5 +1,5 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp, Updating};
+use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -114,7 +114,7 @@ impl Clock for FakeClock {
         self.0.get()
     }
 
-    fn pause(&self, seconds: u64) {
-        self.0.set(self.0.get().advanced(seconds));
+    fn pause(&self, span: Span) {
+        self.0.set(self.0.get().plus(span));
     }
 }

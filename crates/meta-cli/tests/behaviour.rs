@@ -1,9 +1,10 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Timestamp,
+    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Span,
+    Timestamp,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
-use meta_ports::real::JsonlLog;
+use meta_ports::real::{JsonlLog, Scratch};
 use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
@@ -514,6 +515,30 @@ fn link_refuses_naming_both_commits_when_github_never_reports_the_pushed_head_be
 }
 
 #[test]
+fn link_retries_a_transient_github_error_until_it_reports_the_pushed_head() {
+    let mut ports = given(claimed_task(), vec![("7", pull(MOVED, &[]))]);
+    ports.git.branches.insert(id("task-1"), id(MOVED));
+    let flaky = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
+    ports.github.earlier.borrow_mut().insert(id("7"), VecDeque::from([pull(PINNED, &[]), flaky.clone(), flaky]));
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(events, vec![Event::Linked { task: id("task-1"), pr: id("7"), pin: id(MOVED) }]);
+    assert!(ports.clock.now() > start && ports.clock.now() < start.advanced(60));
+}
+
+#[test]
+fn link_fails_with_the_github_error_when_it_lasts_until_the_deadline() {
+    let down = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
+    let mut ports = given(claimed_task(), vec![("7", down)]);
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
+    assert!(reply.text.starts_with("error:") && reply.text.contains("HTTP 502"), "{}", reply.text);
+    assert_eq!(ports.clock.now(), start.advanced(60));
+}
+
+#[test]
 fn link_refuses_with_the_next_step_when_there_is_no_local_branch_for_the_task() {
     let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
     ports.git.branches.clear();
@@ -543,8 +568,8 @@ fn link_refuses_another_branch_another_base_a_pr_linked_elsewhere_or_an_unclaime
 
 #[test]
 fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("lease-race-{nanos}.jsonl"));
+    let scratch = Scratch::new("lease-race");
+    let path = scratch.join("log.jsonl");
     let at = Timestamp::from_unix_seconds(1);
     let seed: Vec<Record> = claimed_task().into_iter().map(|event| Record { at, event }).collect();
     JsonlLog::at(path.clone()).transact(|_| (seed, ())).unwrap();
@@ -561,7 +586,6 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
             .collect();
         racers.into_iter().map(|racer| racer.join().unwrap()).collect()
     });
-    std::fs::remove_file(&path).unwrap();
     assert_eq!(replies.iter().filter(|reply| reply.text == ALLOW).count(), 1);
 }
 
@@ -1136,14 +1160,13 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
 
 #[test]
 fn escape_is_recorded_even_when_the_jsonl_log_does_not_parse() {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("garbled-{nanos}.jsonl"));
+    let scratch = Scratch::new("garbled");
+    let path = scratch.join("log.jsonl");
     std::fs::write(&path, "not a record\n").unwrap();
     let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
     let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock };
     let reply = answer(parsed("escape gap log is garbled"), &mut ports);
     let text = std::fs::read_to_string(&path).unwrap();
-    std::fs::remove_file(&path).unwrap();
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(reply.text.contains("id and counts unavailable"), "{}", reply.text);
     assert_eq!(text.lines().last(), Some(r#"{"at":2,"event":"Escaped","kind":"gap","reason":"log is garbled"}"#));
@@ -1453,19 +1476,19 @@ fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
         [vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1 + 2700)], vec![used("lease-1")]]
             .concat();
     let mut ports = given(history, Vec::new());
-    ports.clock.pause(100);
+    ports.clock.pause(Span::of_seconds(100));
     let (reply, events) = call(&mut ports, "hook post-tool-use", &agent_ran("Agent", "lease-1", AGENT_ID));
     let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
     let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
-    ports.clock.pause(2750 - 102);
+    ports.clock.pause(Span::of_seconds(2750 - 102));
     let (status, _) = call(&mut ports, "status", "");
     assert!(
         status.text.contains("overdue leases (flagged)\n  (none)\n"),
         "past the lease's own deadline: {}",
         status.text
     );
-    ports.clock.pause(2803 - 2750);
+    ports.clock.pause(Span::of_seconds(2803 - 2750));
     let (status, _) = call(&mut ports, "status", "");
     let flagged = format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix {}\n", 102 + 2700);
     assert!(status.text.contains(&flagged), "{}", status.text);

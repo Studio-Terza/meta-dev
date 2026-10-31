@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
     Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal,
-    Roles, Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Updating, Verdict,
+    Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -315,19 +315,21 @@ enum Prepared {
 }
 
 /// How long `meta link` waits for GitHub to report the commit that was pushed, and how often it asks.
-const LINK_DEADLINE_SECONDS: u64 = 60;
-const LINK_POLL_SECONDS: u64 = 5;
+const LINK_DEADLINE: Span = Span::of_seconds(60);
+const LINK_POLL: Span = Span::of_seconds(5);
 
 /// The PR as GitHub reports it once its head is `pushed`; when the deadline passes first, the last
-/// report, so that the pin refuses with both commits named.
+/// report, so that the pin refuses with both commits named. A GitHub error before the deadline is
+/// asked again; one still standing at the deadline is the failure.
 fn pull_at<H: GitHub, C: Clock>(github: &H, clock: &C, pr: PrNumber, pushed: &Sha) -> Result<Pull, Failure> {
-    let deadline = clock.now().advanced(LINK_DEADLINE_SECONDS);
+    let deadline = clock.now().plus(LINK_DEADLINE);
     loop {
-        let pull = github.pull(pr)?;
-        match pull.is_at(pushed) || clock.now() >= deadline {
-            true => return Ok(pull),
-            false => clock.pause(LINK_POLL_SECONDS),
+        let reported = github.pull(pr);
+        let settled = reported.as_ref().is_ok_and(|pull| pull.is_at(pushed));
+        if settled || clock.now() >= deadline {
+            return Ok(reported?);
         }
+        clock.pause(LINK_POLL);
     }
 }
 

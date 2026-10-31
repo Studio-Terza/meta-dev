@@ -250,6 +250,16 @@ impl Timestamp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Span(u64);
 
+impl Span {
+    pub const fn of_seconds(seconds: u64) -> Self {
+        Self(seconds)
+    }
+
+    pub const fn whole_seconds(self) -> u64 {
+        self.0
+    }
+}
+
 /// A whole number of minutes, at least one: how long a lease runs before its deadline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "u64")]
