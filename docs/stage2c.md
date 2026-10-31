@@ -104,8 +104,8 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta stop` | the session had already ended: no live member of its group names the transcript | nothing is killed; says the worker was already gone; event `Finished` with `end: stopped` |
 | `meta stop` | the log fails after the closure ran | error saying which were killed, which were already gone and which could not be stopped, and that nothing was recorded. It says no worker was found only when none was |
 | `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; the same error |
-| `meta verdict <task>` | the only used review lease with no verdict is a worker's, running or ended | refused: a worker's verdict comes only from its session |
-| `meta verdict <task>` | a worker's lease, running or ended, stands before a reviewer's | recorded on the reviewer's lease, whatever head the worker's lease has |
+| `meta verdict <lease>` | the named lease is a worker's, running or ended | refused: a worker's verdict comes only from its session |
+| `meta verdict <lease>` | a worker's lease, running or ended, stands before the named reviewer's lease | recorded on the named lease, whatever head the worker's lease has |
 | `meta status` | a worker's end is not recorded | "running agents" lists `<lease>: agent worker-<n>, <task>, role review, <deadline>, model <model>, transcript <path>`, even if its task has ended, since the process is still there |
 | `meta status` | a worker's end is recorded | not listed |
 | `meta status` | a worker is past its deadline and not yet killed | "overdue leases" lists it with its model and transcript |
