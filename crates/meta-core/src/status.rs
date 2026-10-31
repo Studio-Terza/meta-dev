@@ -3,7 +3,7 @@ use crate::event::{Event, Route};
 use crate::head::Standing;
 use crate::ids::{EscapeId, PrNumber, RunCount, Timestamp};
 use crate::latch::Latch;
-use crate::lease::LeaseSlot;
+use crate::lease::{LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
@@ -66,13 +66,23 @@ impl Ledger {
         let overdue: Vec<String> = self
             .leases
             .iter()
-            .filter(|(_, slot)| {
-                self.live(slot.lease())
-                    && !self.waiting.contains_key(&slot.lease().task())
-                    && !slot.is_finished()
-                    && slot.deadline().passed(at)
-            })
+            .filter(|(_, slot)| self.overdue(slot, at))
             .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
+            .collect();
+        let running: Vec<String> = self
+            .leases
+            .iter()
+            .filter(|(_, slot)| self.live(slot.lease()) && !self.overdue(slot, at))
+            .filter_map(|(id, slot)| {
+                slot.running_agent().map(|agent| {
+                    format!(
+                        "{id}: agent {agent}, {}, role {}, {}",
+                        slot.lease().task(),
+                        self.agent_role(slot),
+                        slot.deadline()
+                    )
+                })
+            })
             .collect();
         let main = kinds.as_ref().ok();
         let set_aside = unverified.as_ref().map_or_else(|_| Vec::new(), UnverifiedEscapes::logged);
@@ -180,6 +190,7 @@ impl Ledger {
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             done_by_others,
             section("live leases", &leases),
+            section("running agents", &running),
             section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
@@ -203,6 +214,23 @@ impl Ledger {
         ]
         .concat();
         (fresh, text)
+    }
+
+    /// A live lease of a task not waiting on the owner, past its deadline, whose agent has not finished.
+    fn overdue(&self, slot: &LeaseSlot, at: Timestamp) -> bool {
+        self.live(slot.lease())
+            && !self.waiting.contains_key(&slot.lease().task())
+            && !slot.is_finished()
+            && slot.deadline().passed(at)
+    }
+
+    /// What the agent on a lease is: a critic on a task marked critic, else a worker or a reviewer.
+    fn agent_role(&self, slot: &LeaseSlot) -> &'static str {
+        match (self.critics.contains(&slot.lease().task()), slot.lease().purpose()) {
+            (true, _) => "critic",
+            (false, Purpose::Work) => "work",
+            (false, Purpose::Review { .. }) => "review",
+        }
     }
 
     /// PRs merged outside meta, logged or missing from the log, that no escape naming a merged PR names.

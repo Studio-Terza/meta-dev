@@ -114,6 +114,26 @@ Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, s
 
 The role defaults are data, each with a source. Headless workers will be stopped at their deadline later; for now the flag is the only enforcement.
 
+### Finished agents and running agents
+
+Finished agents stayed flagged as overdue, and running agents were nowhere in `meta status`: "live leases" lists only unused leases (task-44). Claude Code's SubagentStop hook input has `agent_id` (hooks reference, SubagentStop: `session_id`, `transcript_path`, `cwd`, `permission_mode`, `hook_event_name`, `stop_hook_active`, `agent_id`, `agent_type`, `agent_transcript_path`, `last_assistant_message`). meta reads only `agent_id`, the id that `Started` bound to the lease. The hook fires for Claude Code's own internal agents too; their ids match no lease, so they are ignored.
+
+| Hook | Given | Result |
+|---|---|---|
+| `meta hook subagent-stop` | `agent_id` is the agent recorded by `Started` on a lease that is not finished | event `Finished { lease }`; reply `{}` |
+| `meta hook subagent-stop` | `agent_id` matches no lease, or its lease is already finished | nothing recorded; reply `{}`, quietly |
+| `meta hook subagent-stop` | input that cannot be parsed, or a log meta cannot read | nothing recorded; reply `{"systemMessage": <reason>}`. It never exits 2 and never sets `decision`, because either would keep the agent from stopping |
+| `meta hook subagent-stop` | the stop arrives before `Started` was recorded | ignored like an unknown agent; the lease then stays running until its deadline |
+| `meta status` | a lease is started, its agent has not stopped, its task is open, claimed or linked, and its deadline has not passed (or it has none) | listed under "running agents" as `<lease>: agent <agent>, <task>, role <work, review or critic>, <deadline>`; the role is critic for a task marked critic |
+| `meta status` | a started lease is past its deadline and not finished | listed under "overdue leases (flagged)" only, not under "running agents" |
+| `meta status` | a lease is finished, unused, or has no agent recorded, or its task is done or retired | not listed under "running agents" |
+| `meta status` | a lease is finished | not listed under "overdue leases (flagged)", whatever its deadline |
+| `meta status` | the only work lease is finished and a task has no next step | the idle alarm fires: a finished lease is not running work |
+| canned `continue` (`Resumed`) | the lease was finished | the lease is unfinished again, so listed under "running agents" and overdue after its deadline, until the agent stops again and the hook records a second `Finished` |
+| log fold | `Finished` for a lease that is unused, has no agent recorded, or is already finished | corrupt log, reported like any other record that does not fit |
+
+`self/claude-settings.json` adds a SubagentStop entry with no matcher: `meta hook subagent-stop || true`, timeout 10 s. Unlike the other entries it has no `onFailure: block` and no `|| exit 2`, so a missing or crashing meta lets the agent stop. The cost of a missed record is visible: the agent is listed as running until its deadline, then flagged overdue.
+
 ### Waiting on the owner, and the idle alarm
 
 Work stalled for about an hour with unblocked tasks open and nothing flagged it (owner, 2026-10-31). A task that waits on an owner decision is also not late, so it must not be flagged overdue.
@@ -133,13 +153,13 @@ Work stalled for about an hour with unblocked tasks open and nothing flagged it 
 | `meta role <task> critic` | the task is unknown or already marked | refused; nothing is recorded |
 | `meta role <task> <other>` | the role is not `critic` | usage error; nothing is recorded |
 
-Running work is a work lease that has a deadline not yet passed at the clock's time, on a task an agent is working: open or claimed, and not marked critic. The idle alarm takes the clock for this. A lease past its deadline is not running work: the agent was to report or stop by then. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
+Running work is a work lease that has a deadline not yet passed at the clock's time, on a task an agent is working: open or claimed, and not marked critic. The idle alarm takes the clock for this. A lease past its deadline is not running work: the agent was to report or stop by then. A finished lease is not running work either. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
 
 The critic's task is long-running by design. The role belongs to the task, not to a claim: `meta role <task> critic` marks the task, and the mark covers every lease on it, whenever issued. A marked task is never listed as stalled. No task id is hard-coded. There is no role on `meta claim`.
 
 Critic issue #33. On Oct 31 the alarm stayed silent at 03:06Z through a real stall: six tasks (7, 8, 12, 21, 27 open, 25 with a failed review and no fix) had no next step. The expired leases were not the cause: no work lease on those tasks was live. Only the critic's own live lease on task 14 silenced the alarm. The marking of task 14 as critic fixes it: its lease no longer counts, so the alarm fires and names the six tasks, not task 14. The regression test replays the real log cut at that point (generic titles and reasons) with the marking as its last event.
 
-Finished leases. No event records that a work agent finished its part (a review lease with a verdict is finished). So meta cannot observe that a work lease is finished, and relies on the deadline: until the deadline passes, a work lease counts as running even if its agent has already reported.
+Finished leases (critic #9 U21, #33 point 4). Claude Code's SubagentStop hook tells meta when an agent stops, so a lease is finished when its agent stopped (event `Finished`) or, for a review lease, when it has its verdict. A finished lease is never overdue and never running work. See "Finished agents and running agents".
 
 A task is stalled when it is not waiting on the owner and has no next step. This is a state check, with no age threshold:
 
@@ -263,7 +283,7 @@ Blocking owner approval of gate changes waits for a proper escalation system. Bl
 
 ## After merge
 
-- Rebuild the lead's hook binary from main once this lands (`git pull`, then `cargo build --release`). The hook writes `LeaseUsed` and `Started`. The hook binary built from main before this change keeps writing unchecked until then; a hook binary built from a branch or a dirty tree denies every agent start.
+- Rebuild the lead's hook binary from main once this lands (`git pull`, then `cargo build --release`). The hook writes `LeaseUsed`, `Started` and `Finished`; the lead also adds the SubagentStop entry of `self/claude-settings.json` to the Claude Code settings. The hook binary built from main before this change keeps writing unchecked until then; a hook binary built from a branch or a dirty tree denies every agent start.
 - Then mark the lead's log once, with that main build and XDG_DATA_HOME unset: `meta mark-real-log`. It prints `marked <path> as the real log`; the log as it was stays in `~/.local/share/meta-dev/log.jsonl.unmarked`. A binary built before this change cannot read the marker, so rebuild every main build the lead uses first.
 
 - Resolve the bootstrap escapes against the stage 0 task.

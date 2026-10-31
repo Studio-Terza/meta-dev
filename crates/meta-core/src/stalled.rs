@@ -66,7 +66,7 @@ impl Ledger {
     /// Running work at `at`: a worker's work lease with a deadline not yet passed, on a task an agent is working (open or claimed),
     /// or on a linked task whose pinned head failed review before the lease was issued. A task that
     /// waits on the owner is paused, so its lease is not running. A lease past its deadline is not
-    /// running: the agent was to report or stop by then, and nothing records that it finished sooner.
+    /// running: the agent was to report or stop by then. A finished lease, whose agent stopped, is not running either.
     /// A lease on a critic task never counts.
     fn runs(&self, id: LeaseId, slot: &LeaseSlot, at: Timestamp) -> bool {
         let lease = slot.lease();
@@ -74,6 +74,7 @@ impl Ledger {
             && !self.critics.contains(&lease.task())
             && slot.deadline().time().is_some()
             && !slot.deadline().passed(at)
+            && !slot.is_finished()
             && !self.waiting.contains_key(&lease.task());
         working
             && match self.tasks.get(&lease.task()) {
