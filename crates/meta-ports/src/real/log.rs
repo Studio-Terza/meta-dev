@@ -234,10 +234,13 @@ impl Log for JsonlLog {
 
     fn transact<T>(
         &mut self,
-        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+        decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError> {
         let (mut file, path) = self.locked()?;
-        let (records, decided) = decide(Self::contents(&mut file, path));
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
+        let standing = Self::head_of(path, text.as_bytes()).standing(self.place);
+        let (records, decided) = decide(standing, super::jsonl::records(path, &text));
         Self::write(&mut file, path, &records).map(|()| decided)
     }
 }
@@ -246,7 +249,7 @@ impl Log for JsonlLog {
 mod tests {
     use super::{JsonlLog, data_dir_from};
     use crate::Log;
-    use meta_core::{Event, Marking, Record, Timestamp};
+    use meta_core::{Event, Marking, Record, Standing, Timestamp};
     use meta_testkit::Scratch;
     use std::fs::{self, File, TryLockError};
     use std::path::Path;
@@ -259,12 +262,12 @@ mod tests {
         let path = scratch.join("log.jsonl");
         let mut log = JsonlLog::at(path.clone());
         let blocked = log
-            .transact(|records| {
+            .transact(|_, records| {
                 let other = File::open(&path).unwrap();
                 (Vec::new(), (records.unwrap().len(), matches!(other.try_lock(), Err(TryLockError::WouldBlock))))
             })
             .unwrap();
-        let free = JsonlLog::at(path.clone()).transact(|records| (records.unwrap(), ())).is_ok();
+        let free = JsonlLog::at(path.clone()).transact(|_, records| (records.unwrap(), ())).is_ok();
         assert_eq!((blocked, free), ((0, true), true));
     }
 
@@ -394,7 +397,7 @@ mod tests {
         let writer = thread::spawn(move || {
             let record =
                 Record { at: Timestamp::from_unix_seconds(2), event: Event::Done { task: "task-1".parse().unwrap() } };
-            waiting.transact(|_| (vec![record], ()))
+            waiting.transact(|_, _| (vec![record], ()))
         });
         thread::sleep(Duration::from_millis(100));
         let replacement = root.join("replacement");
@@ -406,13 +409,25 @@ mod tests {
     }
 
     #[test]
+    fn a_transaction_reads_the_standing_from_the_first_record_inside_the_lock() {
+        let root = Scratch::new("standing-locked");
+        let path = root.join("log.jsonl");
+        fs::write(&path, DONE).unwrap();
+        let mut stale = JsonlLog::at(path.clone());
+        let before = stale.standing();
+        JsonlLog::at(path.clone()).mark(marker()).unwrap();
+        let inside = stale.transact(|standing, _| (Vec::new(), standing)).unwrap();
+        assert_eq!((before, inside), (Standing::Scratch, Standing::MarkedElsewhere));
+    }
+
+    #[test]
     fn a_log_locked_past_the_deadline_is_a_port_failure() {
         let scratch = Scratch::new("deadline");
         let path = scratch.join("log.jsonl");
         let holder = File::create(&path).unwrap();
         holder.lock().unwrap();
         let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path.clone()) };
-        let waited = log.transact(|_| (Vec::new(), ()));
+        let waited = log.transact(|_, _| (Vec::new(), ()));
         drop(holder);
         assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
     }

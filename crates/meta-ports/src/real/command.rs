@@ -48,11 +48,18 @@ fn terminate(child: &mut Child) {
 /// Runs the command, as the leader of its own process group, to its end and the end of its
 /// output, or ends the group at `limit` and fails. A process that left the group while holding a
 /// pipe leaves its reader behind, not waited for, so that a hang cannot pass on.
-fn execute(program: &str, args: &[&str], limit: Duration) -> Result<Output, PortError> {
+fn execute(
+    program: &str,
+    args: &[&str],
+    limit: Duration,
+    prepare: impl FnOnce(&mut Command),
+) -> Result<Output, PortError> {
     let shown = format!("{program} {}", args.join(" "));
     let failed = |error: std::io::Error| PortError::new(format!("{shown}: {error}"));
     let timed_out = || PortError::new(format!("{shown}: timed out after {} s", limit.as_secs_f64()));
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    prepare(&mut command);
+    let mut child = command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -92,7 +99,7 @@ pub fn run(program: &str, args: &[&str]) -> Result<String, PortError> {
 
 fn run_within(program: &str, args: &[&str], limit: Duration) -> Result<String, PortError> {
     let shown = format!("{program} {}", args.join(" "));
-    let output = execute(program, args, limit)?;
+    let output = execute(program, args, limit, |_| ())?;
     match output.status.success() {
         true => String::from_utf8(output.stdout).map_err(|error| PortError::new(format!("{shown}: {error}"))),
         false => Err(PortError::new(format!("{shown}: {}", String::from_utf8_lossy(&output.stderr)))),
@@ -102,8 +109,12 @@ fn run_within(program: &str, args: &[&str], limit: Duration) -> Result<String, P
 /// Like `run`, for a lookup whose "not found" is the command's quiet exit status 1 with nothing on
 /// stderr, as with `git rev-parse --verify --quiet`: that is `None`; any other failure is an error.
 pub fn run_found(program: &str, args: &[&str]) -> Result<Option<String>, PortError> {
+    found_with(program, args, |_| ())
+}
+
+fn found_with(program: &str, args: &[&str], prepare: impl FnOnce(&mut Command)) -> Result<Option<String>, PortError> {
     let shown = format!("{program} {}", args.join(" "));
-    let output = execute(program, args, PORT_TIMEOUT)?;
+    let output = execute(program, args, PORT_TIMEOUT, prepare)?;
     match (output.status.success(), output.status.code(), output.stderr.is_empty()) {
         (true, ..) => {
             String::from_utf8(output.stdout).map(Some).map_err(|error| PortError::new(format!("{shown}: {error}")))
@@ -115,13 +126,13 @@ pub fn run_found(program: &str, args: &[&str]) -> Result<Option<String>, PortErr
 
 /// A yes-or-no command, such as `git merge-base --is-ancestor`: exit 0 is yes and a quiet exit 1
 /// is no; anything else is an error.
-pub fn decides(program: &str, args: &[&str]) -> Result<bool, PortError> {
-    run_found(program, args).map(|found| found.is_some())
+pub fn decides_with(program: &str, args: &[&str], prepare: impl FnOnce(&mut Command)) -> Result<bool, PortError> {
+    found_with(program, args, prepare).map(|found| found.is_some())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{decides, run, run_found, run_within};
+    use super::{decides_with, run, run_found, run_within};
     use meta_testkit::Scratch;
     use std::fs;
     use std::process::Command;
@@ -203,8 +214,8 @@ mod tests {
 
     #[test]
     fn a_yes_or_no_command_answers_by_exit_0_or_1_and_anything_else_is_an_error() {
-        let decided =
-            ["exit 0", "exit 1", "printf 'no repo' >&2; exit 128"].map(|script| decides("/bin/sh", &["-c", script]));
+        let decided = ["exit 0", "exit 1", "printf 'no repo' >&2; exit 128"]
+            .map(|script| decides_with("/bin/sh", &["-c", script], |_| ()));
         assert_eq!(decided[..2], [Ok(true), Ok(false)]);
         assert_eq!(decided[2].clone().unwrap_err().to_string(), "/bin/sh -c printf 'no repo' >&2; exit 128: no repo");
     }

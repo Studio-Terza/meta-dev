@@ -57,10 +57,11 @@ impl Log for MemoryLog {
 
     fn transact<T>(
         &mut self,
-        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+        decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError> {
         self.open()?;
-        let (records, decided) = decide(Ok(self.records.clone()));
+        let standing = self.standing();
+        let (records, decided) = decide(standing, Ok(self.records.clone()));
         self.records.extend(records);
         Ok(decided)
     }

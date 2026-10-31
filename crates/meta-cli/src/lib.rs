@@ -240,7 +240,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                     Err(error) => Answer::failed(error.into()),
                 };
             }
-            let recorded = log.transact(|records| {
+            let recorded = log.transact(|_, records| {
                 let earlier = records.as_deref().map_err(ToString::to_string);
                 let (events, text) = admitted.tally(earlier).into_parts();
                 (stamped(events, at), text)
@@ -267,7 +267,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
             };
-            let outcome = log.transact(|records| {
+            let outcome = log.transact(|_, records| {
                 match records
                     .map_err(Failure::from)
                     .and_then(|records| fold(&records))
@@ -313,7 +313,7 @@ fn hook<L: Log>(
         return Answer::broken_hook(phase, unverified);
     }
     let place = log.place();
-    let outcome = log.transact(|records| {
+    let outcome = log.transact(|_, records| {
         let folded = records
             .map_err(|error| error.to_string())
             .and_then(|records| Ledger::fold(&records).map_err(|corrupt| corrupt.in_log(&place)));

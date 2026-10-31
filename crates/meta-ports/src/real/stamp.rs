@@ -20,9 +20,21 @@ pub enum Stamp {
 const STATE: [&str; 3] = ["HEAD", "index", "logs/HEAD"];
 
 fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
+    git_inheriting(repo, args, &[])
+}
+
+/// `git` as a caller whose environment holds `inherited` would run it: those variables are in the
+/// environment unless `git_env::scrub` removes them.
+fn git_inheriting(repo: &Path, args: &[&str], inherited: &[(&str, &str)]) -> Result<String, String> {
     let shown = format!("git -C {} {}", repo.display(), args.join(" "));
-    let output =
-        Command::new("git").arg("-C").arg(repo).args(args).output().map_err(|error| format!("{shown}: {error}"))?;
+    let mut command = Command::new("git");
+    command.envs(inherited.iter().copied());
+    let output = super::git_env::scrub(&mut command)
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .output()
+        .map_err(|error| format!("{shown}: {error}"))?;
     match output.status.success() {
         true => String::from_utf8(output.stdout).map_err(|error| format!("{shown}: {error}")),
         false => Err(format!("{shown} failed")),
@@ -32,13 +44,19 @@ fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
 impl Stamp {
     /// The stamp of the checkout at `repo`.
     pub fn of(repo: &Path) -> Self {
-        let commit = match git(repo, &["log", "-1", "--format=format:%H"]) {
+        Self::of_inheriting(repo, &[])
+    }
+
+    /// The stamp as a caller whose environment holds `inherited` gets it.
+    fn of_inheriting(repo: &Path, inherited: &[(&str, &str)]) -> Self {
+        let git = |args: &[&str]| git_inheriting(repo, args, inherited);
+        let commit = match git(&["log", "-1", "--format=format:%H"]) {
             Ok(commit) => commit,
             Err(why) => return Self::Unknown(why),
         };
         // Only edits to tracked files count: an untracked file changes nothing that is built, and
         // the build script is not rerun when one appears or goes.
-        match git(repo, &["status", "--porcelain", "--untracked-files=no"]).map(|status| status.is_empty()) {
+        match git(&["status", "--porcelain", "--untracked-files=no"]).map(|status| status.is_empty()) {
             Ok(true) => Self::Clean(commit),
             Ok(false) => Self::Dirty(commit),
             Err(why) => Self::Unknown(why),
@@ -163,5 +181,33 @@ mod tests {
         let expected =
             "META_BUILD_UNVERIFIED=git older than 2.38 cannot stamp the build (git ls-files --format failed)\n";
         assert!(printed.contains(expected), "{printed}");
+    }
+
+    #[test]
+    fn a_copy_that_has_no_git_of_its_own_inside_another_clone_is_unknown_not_that_clones_commit() {
+        let (repo, head) = repo("enclosing");
+        let copy = repo.join("copy");
+        fs::create_dir_all(&copy).unwrap();
+        fs::write(copy.join("build.rs"), "fn main() {}").unwrap();
+        let (inside, tracked) = (Stamp::of(&copy), Stamp::of(&repo.join("dir")));
+        let printed = directives(&copy);
+        fs::remove_dir_all(&repo).unwrap();
+        assert!(matches!(inside, Stamp::Unknown(_)), "{inside:?}");
+        assert_eq!(tracked, Stamp::Clean(head));
+        assert!(printed.contains("META_BUILD_COMMIT=\n") && !printed.contains("META_BUILD_UNVERIFIED=\n"), "{printed}");
+    }
+
+    #[test]
+    fn variables_inherited_from_the_caller_do_not_point_the_stamp_at_another_repository() {
+        let (repo, head) = repo("inherited");
+        let (elsewhere, _) = self::repo("inherited-other");
+        let other = elsewhere.join(".git").display().to_string();
+        let stamp = Stamp::of_inheriting(
+            &repo,
+            &[("GIT_DIR", &other), ("GIT_WORK_TREE", &other), ("GIT_INDEX_FILE", "/nonexistent/index")],
+        );
+        fs::remove_dir_all(&repo).unwrap();
+        fs::remove_dir_all(&elsewhere).unwrap();
+        assert_eq!(stamp, Stamp::Clean(head));
     }
 }

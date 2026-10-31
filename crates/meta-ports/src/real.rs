@@ -2,6 +2,7 @@ mod clock;
 mod command;
 mod gh;
 mod git;
+mod git_env;
 #[cfg(test)]
 mod hook_entry;
 mod host;
