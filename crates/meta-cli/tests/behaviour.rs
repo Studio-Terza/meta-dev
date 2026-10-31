@@ -351,7 +351,8 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         vec![Event::Denied { attempt: Attempt::AgentStart }],
     ]
     .concat();
-    let (reply, events) = call(&mut given(history, Vec::new()), &["status"], "");
+    let pulls = vec![("9", ran(1)), ("10", ran(1))];
+    let (reply, events) = call(&mut given(history, pulls), &["status"], "");
     assert_eq!(events, vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 1")]);
     let expected = [
         "task-1 claimed by alice",

@@ -14,6 +14,8 @@ pub struct Ledger {
     pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
     pub(crate) landed: BTreeSet<PrNumber>,
+    /// Every PR each task was ever linked to, so a retired task keeps its PR for the rework report.
+    pub(crate) linked_prs: BTreeMap<TaskId, BTreeSet<PrNumber>>,
     /// PRs logged as merged outside meta.
     pub(crate) outside: BTreeSet<PrNumber>,
     pub(crate) starts_denied: usize,
@@ -106,6 +108,7 @@ impl Ledger {
                 self.tasks.insert(*task, Progress::Open(open));
             }
             Event::Linked { task, pr, pin, .. } => {
+                self.linked_prs.entry(*task).or_default().insert(*pr);
                 let linked = match self.take(*task)? {
                     Progress::Claimed(claimed) => Ok(claimed.link(*pr, pin.clone())),
                     Progress::Linked(linked) => Ok(linked.relink(*pr, pin.clone())),
