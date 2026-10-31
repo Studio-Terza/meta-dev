@@ -237,13 +237,14 @@ The expected email is data: the `email` field of the `identity` rule in `self/ru
 | Command | Given | Result |
 |---|---|---|
 | `meta status` | an open PR that no task is linked to | under "drift (flagged)": `#N: no linked task` |
+| `meta status` | an open PR with 100 or more listed commits | `#N: commit authors unavailable: commit list may be truncated`; its commits are not compared, since `gh` lists at most 100 |
 | `meta status` | an open PR whose base is not `main` | `#N: base is <base>, not main` |
 | `meta status` | a commit on an open PR whose first author email is not the identity rule's `email` | `#N: commit <sha> is not by the identity email, author <email>`; a commit with no author or an empty email is flagged the same way |
 | `meta status` | the identity rule has no `email` field | each open PR shows `#N: commit authors unavailable: <why>`; the other two checks still run |
 | `meta status` | the open list cannot be read: `gh` fails, the reply does not parse, or it holds more than 100 PRs | the section reads `drift unavailable: <why>`, never `(none)` |
 | `meta status` | no PR drifts | `(none)` |
 
-The base name and author email come from GitHub and are shown escaped on one line, so they cannot forge a status line. A PR with more than 100 commits is listed by `gh` with fewer; that is not detected.
+The base name and author email come from GitHub and are shown escaped on one line, so they cannot forge a status line. A PR with 100 or more commits reads as truncated, because `gh` lists at most 100 of them and an off-identity commit beyond the cap would otherwise go unseen.
 
 ### Rules
 

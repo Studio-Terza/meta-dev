@@ -2759,6 +2759,14 @@ fn status_names_commit_authors_unavailable_when_the_identity_rule_has_no_email_b
 }
 
 #[test]
+fn status_names_commit_authors_truncated_for_a_pr_at_the_commit_cap() {
+    let commit = serde_json::json!({ "oid": "2222222222222222222222222222222222222222", "authors": [{ "email": "fixture@users.noreply.github.com" }] });
+    let rows = serde_json::json!([{ "number": 7, "baseRefName": "main", "commits": vec![commit; 100] }]).to_string();
+    let (reply, _) = drift_of(Some(Ok(rows)), None);
+    assert!(reply.text.contains("  #7: commit authors unavailable: commit list may be truncated\n"), "{}", reply.text);
+}
+
+#[test]
 fn status_shows_a_forged_base_name_on_one_line() {
     let rows = serde_json::json!([{ "number": 7, "baseRefName": "x\ny", "commits": [] }]).to_string();
     let (reply, _) = drift_of(Some(Ok(rows)), None);

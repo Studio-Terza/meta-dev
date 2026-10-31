@@ -44,6 +44,8 @@ impl Commit {
 impl OpenPrs {
     /// The most rows the adapter may keep; it asks for one more so that a full page shows as truncation.
     pub const LIMIT: usize = 100;
+    /// The most commits `gh` lists per PR; a PR at this count may have more that are not listed.
+    pub const COMMIT_LIMIT: usize = 100;
 
     pub fn from_gh(listed: &str) -> Result<Self, Unreached> {
         match serde_json::from_str::<Vec<Open>>(listed) {
@@ -74,6 +76,9 @@ impl Ledger {
                 let based = (pr.base_ref_name != main)
                     .then(|| format!("{}: base is {}, not {main}", pr.number, one_line(&pr.base_ref_name.to_string())));
                 let authors: Vec<String> = match identity {
+                    Ok(_) if pr.commits.len() >= OpenPrs::COMMIT_LIMIT => {
+                        vec![format!("{}: commit authors unavailable: commit list may be truncated", pr.number)]
+                    }
                     Ok(identity) => pr
                         .commits
                         .iter()
