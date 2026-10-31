@@ -67,7 +67,12 @@ An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind sin
 | Command | Given | Result |
 |---|---|---|
 | `meta review <task> --agent <name>` | the task is linked to an open PR | event `ReviewLeased`, with a fresh lease; prints a review brief: the goal and constraints, unprimed |
-| `meta verdict <task> pass\|fail` | a review lease on the task was used | event `Reviewed`; `meta status` shows the latest verdict per linked PR, at the head it was given |
+| `meta verdict <task> pass\|fail` | a review lease on the task was used and has no verdict, and the PR's head on GitHub is the head the lease was issued at | event `Reviewed`, with `head`: the head it judged; `meta status` shows the latest verdict per linked PR, at the head it was given |
+| `meta verdict <task> pass\|fail` | the PR's head on GitHub is not the lease's head | refused; names both heads and `meta review <task> --agent <name>`; nothing is recorded |
+| `meta verdict <task> pass\|fail` | the log holds a `Reviewed` whose `head` is not its lease's head | the log is corrupt; the fold fails. A `Reviewed` with no `head` (recorded before heads) folds as before |
+| `meta review <task> --agent <name>` | the brief is printed | the reviewer records its own verdict (critic register U22): a constraint tells it to finish with `meta verdict <task> pass\|fail`, run with a main build, names the absolute path of the binary that printed the brief, read at run time through the git port (`current_exe`), as that main build, with no worktree or cargo step, and says to report and stop if meta refuses because the head moved |
+| `meta review <task> --agent <name>` | the brief is printed | the lease line is worded for the lead, not the reviewer: "for the lead: put it in the Agent description; it works once. Reviewer: nothing for you to do with this line" |
+| `meta status` | a review lease's agent stopped with no verdict, and no later review lease of the task has a verdict | listed under "review leases finished (flagged)" as `<lease> for <task>: review finished with no verdict`; with none, the section is not printed |
 
 No separate task is opened for a review. `meta merge` does not require a review; CI remains the only merge gate.
 
@@ -310,7 +315,7 @@ Before each write to the real log, meta asks the git port whether the embedded c
 | `meta mark-real-log` | a main build | the marker goes first, once; a second run says the log is already marked |
 | any command that writes, on the real log | `git ls-files --format` is unsupported when the binary is built | refused: "this build carries no commit (git older than 2.38 cannot stamp the build …)", not "branch build" |
 
-`meta claim` prints how an agent gets a main build for `meta link`: a detached worktree at origin/main, built with `cargo build --release`. It also says that a branch build may run only with XDG_DATA_HOME set to a scratch dir.
+`meta claim` and `meta review` print the absolute path of the binary that generated the brief, read at run time through the git port (`current_exe` in the real adapter), and tell the agent to run that exact binary for `meta link` and `meta verdict`. The lead generates briefs with a main build, so the path is a main build; no worktree or cargo build step is printed, and no machine path is committed (tests use a recorded path). The claim brief also says that a branch build may run only with XDG_DATA_HOME set to a scratch dir.
 
 ## Deferred
 

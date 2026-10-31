@@ -1,7 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
 use meta_core::{
-    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing, TaskId,
-    Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    Binary, Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing,
+    TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -96,6 +96,8 @@ impl Log for MemoryLog {
 #[derive(Debug)]
 pub struct RecordedGit {
     pub origin: Origin,
+    /// The path of the running binary, as recorded.
+    pub binary: Binary,
     /// The files on main.
     pub files: BTreeMap<SelfFile, String>,
     /// The files in the working tree or the cache.
@@ -109,6 +111,10 @@ pub struct RecordedGit {
 impl Git for RecordedGit {
     fn origin(&self) -> Result<Origin, PortError> {
         Ok(self.origin.clone())
+    }
+
+    fn binary(&self) -> Result<Binary, PortError> {
+        Ok(self.binary.clone())
     }
 
     fn read(&self, file: SelfFile) -> Result<String, PortError> {

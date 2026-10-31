@@ -1,6 +1,6 @@
-use crate::brief::{lease_line, work_text};
+use crate::brief::{WorkText, lease_line};
 use crate::event::Event;
-use crate::ids::{AgentName, Claimant, LeaseId, Origin, TaskId, Timestamp, Title};
+use crate::ids::{AgentName, Binary, Claimant, LeaseId, Origin, TaskId, Timestamp, Title};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
@@ -74,7 +74,7 @@ impl Ledger {
 impl Claim {
     /// The brief, and the events of the claim. An agent's lease ends at `deadline`; a self-claim has
     /// no lease and no deadline, whatever `deadline` says.
-    pub fn brief(self, origin: &Origin, rules: &Rules, deadline: Option<Timestamp>) -> Accepted {
+    pub fn brief(self, origin: &Origin, binary: &Binary, rules: &Rules, deadline: Option<Timestamp>) -> Accepted {
         let Self { task, title, grant } = self;
         let (who, lease_line, deadline_line) = match &grant {
             Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => {
@@ -86,7 +86,17 @@ impl Claim {
                 "none: self-claims have no deadline".to_owned(),
             ),
         };
-        let text = work_text(task, &title, &who, &lease_line, &deadline_line, origin, rules);
+        let text = WorkText {
+            task,
+            title: &title,
+            who: &who,
+            lease_line: &lease_line,
+            deadline_line: &deadline_line,
+            origin,
+            binary,
+            rules,
+        }
+        .text();
         let events = match grant {
             Grant::FirstClaim { agent, lease } => {
                 vec![

@@ -186,6 +186,10 @@ impl Ledger {
         };
         let side_note =
             unverified.map_or_else(|why| format!("unverified escapes unavailable: {why}\n"), |read| read.note());
+        let unjudged = match self.unjudged() {
+            lines if lines.is_empty() => String::new(),
+            lines => section("review leases finished (flagged)", &lines),
+        };
         let text = [
             match standing {
                 Standing::AwaitingMark => format!("warning: this log is not marked yet; {MARK_THE_LOG}\n"),
@@ -201,6 +205,7 @@ impl Ledger {
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
+            unjudged,
             section("waiting on the owner (flagged)", &self.waits(at)),
             section("idle (flagged)", &self.idle(at)),
             format!(
@@ -222,6 +227,26 @@ impl Ledger {
         ]
         .concat();
         (fresh, text)
+    }
+
+    /// Review leases whose agent stopped with no verdict, unless a later review of the task has one.
+    fn unjudged(&self) -> Vec<String> {
+        self.leases
+            .iter()
+            .filter_map(|(id, slot)| match (slot, slot.lease().purpose()) {
+                (LeaseSlot::Spent(spent), Purpose::Review { .. })
+                    if spent.is_stopped() && spent.verdict().is_none() =>
+                {
+                    let task = slot.lease().task();
+                    let later = self.leases.range(*id..).skip(1).any(|(_, other)| {
+                        other.lease().task() == task
+                            && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
+                    });
+                    (!later).then(|| format!("{id} for {task}: review finished with no verdict"))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// A live lease of a task not waiting on the owner, past its deadline, whose agent has not finished.

@@ -15,6 +15,8 @@ const RULES: &str = include_str!("fixtures/rules.toml");
 const KINDS: &str = include_str!("fixtures/escapes.toml");
 const PREDICTIONS: &str = include_str!("fixtures/predictions.toml");
 const ROLES: &str = include_str!("fixtures/roles.toml");
+/// The recorded absolute path of the running binary; no real machine path is ever used.
+const BINARY: &str = "/recorded/main/meta";
 const OPEN_PRS: &str = include_str!("fixtures/open-prs.json");
 const ORIGIN: &str = "https://github.com/Studio-Terza/meta-dev.git";
 const REPO: &str = "Studio-Terza/meta-dev";
@@ -161,6 +163,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
         },
         git: RecordedGit {
             origin: id(ORIGIN),
+            binary: id(BINARY),
             files: self_files(),
             local: self_files(),
             branches: BTreeMap::from([(id("task-1"), id(PINNED))]),
@@ -1103,26 +1106,81 @@ fn review_of_a_task_linked_to_an_open_pr_leases_and_prints_an_unprimed_brief_wit
 
 #[test]
 fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_latest_verdict_per_linked_pr() {
-    let reviewed = |verdict: &str| Event::Reviewed { lease: id("lease-2"), verdict: id(verdict) };
-    let (reply, events) = call(&mut given(linked_task(), Vec::new()), &["verdict", "task-1", "pass"], "");
+    let reviewed =
+        |verdict: &str| Event::Reviewed { lease: id("lease-2"), verdict: id(verdict), head: Some(id(PINNED)) };
+    let at_pinned = || vec![("7", pull(PINNED, &[]))];
+    let (reply, events) = call(&mut given(linked_task(), at_pinned()), &["verdict", "task-1", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     let unused = [linked_task(), vec![review_leased("lease-2", PINNED)]].concat();
-    let (reply, _) = call(&mut given(unused.clone(), Vec::new()), &["verdict", "task-1", "pass"], "");
+    let (reply, _) = call(&mut given(unused.clone(), at_pinned()), &["verdict", "task-1", "pass"], "");
     assert!(reply.code == Code::Refused && reply.text.contains("awaits a verdict"), "{}", reply.text);
-    let mut ports = given([unused, vec![used("lease-2")]].concat(), Vec::new());
+    let mut ports = given([unused, vec![used("lease-2")]].concat(), at_pinned());
     let (reply, events) = call(&mut ports, &["verdict", "task-1", "fail"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed("fail")]));
+    assert!(reply.text.contains(&format!("at head {PINNED}")), "{}", reply.text);
     let (reply, _) = call(&mut ports, &["verdict", "task-1", "pass"], "");
     assert_eq!(reply.code, Code::Refused);
     let later = vec![
         review_leased("lease-3", MOVED),
         used("lease-3"),
-        Event::Reviewed { lease: id("lease-3"), verdict: id("pass") },
+        Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: None },
     ];
     ports.log.records.extend(later.into_iter().map(|event| Record { at: Timestamp::from_unix_seconds(3), event }));
     let (status, _) = call(&mut ports, &["status"], "");
     let line = format!("latest review verdict per linked PR\n  #7 task-1: pass at {MOVED}\n");
     assert!(status.text.contains(&line), "{}", status.text);
+}
+
+#[test]
+fn verdict_is_refused_when_the_pr_head_is_not_the_head_the_review_lease_judged() {
+    let used_review = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
+    let mut ports = given(used_review, vec![("7", pull(MOVED, &[]))]);
+    let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    for needle in [MOVED, PINNED, "lease-2", "head it judged", "meta review task-1"] {
+        assert!(reply.text.contains(needle), "{needle}: {}", reply.text);
+    }
+}
+
+#[test]
+fn log_naming_another_head_than_the_lease_for_a_verdict_is_corrupt() {
+    let wrong = Event::Reviewed { lease: id("lease-2"), verdict: id("pass"), head: Some(id(MOVED)) };
+    let history = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2"), wrong]].concat();
+    let (reply, _) = call(&mut given(history, Vec::new()), &["status"], "");
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+}
+
+#[test]
+fn review_brief_tells_the_reviewer_to_record_its_verdict_with_a_main_build_and_words_the_lease_line_for_the_lead() {
+    let (reply, _) =
+        call(&mut given(linked_task(), vec![("7", pull(PINNED, &[]))]), &["review", "task-1", "--agent", "rev"], "");
+    let wanted = [
+        "main build",
+        "/recorded/main/meta verdict task-1 pass|fail",
+        "lease: lease-2 (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you",
+    ];
+    assert!(wanted.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
+    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
+}
+
+#[test]
+fn status_flags_a_review_lease_that_finished_with_no_verdict_until_a_later_review_has_one() {
+    let stopped = [
+        linked_task(),
+        vec![review_leased("lease-2", PINNED), used("lease-2"), started("lease-2", "agent-r"), finished("lease-2")],
+    ]
+    .concat();
+    let line = "review leases finished (flagged)\n  lease-2 for task-1: review finished with no verdict\n";
+    let (status, _) = call(&mut given(stopped.clone(), Vec::new()), &["status"], "");
+    assert!(status.text.contains(line), "{}", status.text);
+    let retried =
+        [stopped.clone(), vec![review_leased("lease-3", PINNED), used("lease-3"), reviewed("lease-3", "pass")]]
+            .concat();
+    let (status, _) = call(&mut given(retried, Vec::new()), &["status"], "");
+    assert!(!status.text.contains("review finished"), "{}", status.text);
+    let judged_first = [judged(PINNED, "pass"), vec![started("lease-2", "agent-r"), finished("lease-2")]].concat();
+    let (status, _) = call(&mut given(judged_first, Vec::new()), &["status"], "");
+    assert!(!status.text.contains("review finished"), "{}", status.text);
 }
 
 #[test]
@@ -1834,13 +1892,9 @@ fn mark_real_log_puts_the_marker_first_once_and_only_from_a_main_build() {
 #[test]
 fn claim_brief_tells_the_agent_to_link_with_a_main_build_and_keep_branch_builds_on_a_scratch_log() {
     let (reply, _) = call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--agent", "alice"], "");
-    let steps = [
-        "git worktree add --detach ../task-1-main origin/main",
-        "cargo build --release --manifest-path ../task-1-main/Cargo.toml --target-dir ../task-1-main/target",
-        "../task-1-main/target/release/meta link task-1 <pr>",
-        "XDG_DATA_HOME set to a scratch dir",
-    ];
+    let steps = ["/recorded/main/meta link task-1 <pr>", "XDG_DATA_HOME set to a scratch dir"];
     assert!(steps.iter().all(|step| reply.text.contains(step)), "{}", reply.text);
+    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
 }
 
 const SIDE_FILE: &str = "escapes.unverified.jsonl";
@@ -2255,7 +2309,7 @@ fn status_flags_a_live_lease_past_its_deadline_with_its_agent_until_the_task_is_
     let reviewed = [
         linked_task(),
         vec![review_leased_until("lease-2", PINNED, 1), used("lease-2")],
-        vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass") }],
+        vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass"), head: None }],
     ]
     .concat();
     assert!(status_of(reviewed).contains(none));
@@ -2435,7 +2489,7 @@ fn waiting_records_fold_old_logs_and_round_trip_as_json() {
 }
 
 fn reviewed(lease: &str, verdict: &str) -> Event {
-    Event::Reviewed { lease: id(lease), verdict: id(verdict) }
+    Event::Reviewed { lease: id(lease), verdict: id(verdict), head: None }
 }
 
 /// task-1 linked at PINNED with an old work lease, then a used review lease-2 at `head` with `verdict`.
@@ -2610,7 +2664,7 @@ fn review_round(lease: &str, task: &str, pr: &str, verdict: &str) -> Vec<Event> 
             deadline: None,
         },
         used(lease),
-        Event::Reviewed { lease: id(lease), verdict: id(verdict) },
+        Event::Reviewed { lease: id(lease), verdict: id(verdict), head: None },
     ]
 }
 
@@ -3204,7 +3258,7 @@ fn running_agents_name_the_role_and_leave_out_agents_of_finished_tasks() {
     .concat();
     let text = status_of(review.clone());
     assert!(text.contains("  lease-2: agent a1, task-1, role review, deadline unix 1000\n"), "{text}");
-    let judged = [review, vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass") }]].concat();
+    let judged = [review, vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass"), head: None }]].concat();
     assert!(status_of(judged).contains("running agents\n  (none)\n"));
     let critic = [running_until(1000), vec![marked("task-1")]].concat();
     assert!(status_of(critic).contains(&format!("agent {AGENT_ID}, task-1, role critic, deadline unix 1000\n")));

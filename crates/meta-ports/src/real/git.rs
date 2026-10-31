@@ -2,7 +2,7 @@ use super::command::{decides_with, run, run_found};
 use super::git_env::scrub;
 use super::log::home;
 use crate::{Git, PortError};
-use meta_core::{Origin, SelfFile, Sha, TaskId};
+use meta_core::{Binary, Origin, SelfFile, Sha, TaskId};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -81,6 +81,14 @@ impl GitCli {
 }
 
 impl Git for GitCli {
+    fn binary(&self) -> Result<Binary, PortError> {
+        std::env::current_exe()
+            .map_err(|error| PortError::new(format!("binary: {error}")))?
+            .to_string_lossy()
+            .parse()
+            .map_err(|error| PortError::new(format!("binary: {error}")))
+    }
+
     fn origin(&self) -> Result<Origin, PortError> {
         run("git", &["remote", "get-url", "origin"])?
             .parse()

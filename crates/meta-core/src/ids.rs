@@ -113,6 +113,7 @@ text!(OwnerAnswer, "answer");
 text!(Sha, "sha");
 text!(CheckName, "check name");
 text!(Origin, "origin");
+text!(Binary, "binary path");
 text!(Branch, "branch");
 text!(EscapeKind, "escape kind");
 text!(AgentId, "agent id");
