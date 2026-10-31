@@ -5,6 +5,7 @@
 id = "identity"
 text = "Commit as Cinglein <64114772+Cinglein@users.noreply.github.com>; never any other email; no personal or machine details in files."
 source = "owner 2026-10-26: personal email leaked into public history"
+email = "64114772+Cinglein@users.noreply.github.com"
 
 [[rule]]
 id = "no-subagents"

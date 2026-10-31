@@ -228,6 +228,23 @@ Stage 2 of `docs/prereg.md` measures the loop. Spend is deferred; time and outco
 
 The slope line is the raw P4 signal. P4's wording and its falsifier are unchanged, and spend per delivered feature stays unmeasured until spend is. Time is whole minutes, rounded down. Failed review rounds are the `fail` verdicts of the rework section.
 
+### Drift (task-48, register U1, U10, U11)
+
+Some rules hold only by habit: every PR has a task, every PR is based on main, every commit uses the noreply identity. The drift section of `meta status` flags a breach. It is report only: it blocks nothing, adds no CI gate, and no prediction reads it. It makes one GitHub call, `gh pr list --state open --json number,baseRefName,commits`, parsed with serde, so `meta status` stays fast.
+
+The expected email is data: the `email` field of the `identity` rule in `self/rules.toml`. The rule's text is unchanged, and the field is read, never taken from the text. GitHub lists a commit's author first and its `Co-authored-by` trailers after, so only the first author is compared.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta status` | an open PR that no task is linked to | under "drift (flagged)": `#N: no linked task` |
+| `meta status` | an open PR whose base is not `main` | `#N: base is <base>, not main` |
+| `meta status` | a commit on an open PR whose first author email is not the identity rule's `email` | `#N: commit <sha> is not by the identity email, author <email>`; a commit with no author or an empty email is flagged the same way |
+| `meta status` | the identity rule has no `email` field | each open PR shows `#N: commit authors unavailable: <why>`; the other two checks still run |
+| `meta status` | the open list cannot be read: `gh` fails, the reply does not parse, or it holds more than 100 PRs | the section reads `drift unavailable: <why>`, never `(none)` |
+| `meta status` | no PR drifts | `(none)` |
+
+The base name and author email come from GitHub and are shown escaped on one line, so they cannot forge a status line. A PR with more than 100 commits is listed by `gh` with fewer; that is not detected.
+
 ### Rules
 
 - `self/rules.toml` gains the owner's red-first rule: tighten the check in the first commit; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix.

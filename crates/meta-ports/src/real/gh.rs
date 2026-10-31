@@ -1,6 +1,6 @@
 use super::command::run;
 use crate::{GhReplies, GitHub, PortError};
-use meta_core::{Cleared, Merges, PrNumber, Pull, Updating};
+use meta_core::{Cleared, Merges, OpenPrs, PrNumber, Pull, Updating};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy)]
@@ -47,6 +47,11 @@ impl GitHub for GhCli {
     fn merged_list(&self) -> Result<String, PortError> {
         let limit = (Merges::LIMIT + 1).to_string();
         run("gh", &["pr", "list", "--state", "merged", "--json", "number", "--limit", &limit])
+    }
+
+    fn open_list(&self) -> Result<String, PortError> {
+        let limit = (OpenPrs::LIMIT + 1).to_string();
+        run("gh", &["pr", "list", "--state", "open", "--json", "number,baseRefName,commits", "--limit", &limit])
     }
 
     fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError> {

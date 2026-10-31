@@ -1,8 +1,9 @@
 use meta_core::{
     Accepted, Admitted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event,
-    Hook, Importing, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase,
-    PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Role, Roles, Rules, RunCount, SelfFile, Sha,
-    Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
+    Hook, Importing, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, OpenPrs, Origin, OwnerAnswer, OwnerQuestion,
+    Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Role, Roles, Rules, RunCount,
+    SelfFile, Sha, Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating,
+    Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -515,6 +516,13 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
                 },
                 kinds: spec(git, SelfFile::EscapeKinds, EscapeKinds::parse).map_err(unreached),
                 predictions: spec(git, SelfFile::Predictions, Predictions::parse).map_err(unreached),
+                open: github
+                    .open_list()
+                    .map_err(|error| Unreached::by(&error))
+                    .and_then(|listed| OpenPrs::from_gh(&listed)),
+                identity: spec(git, SelfFile::Rules, Rules::parse)
+                    .map_err(unreached)
+                    .and_then(|rules| rules.identity_email()),
                 unverified: log.set_aside_escapes().map_err(|error| Unreached::by(&error)),
                 standing: log.standing(),
             })
