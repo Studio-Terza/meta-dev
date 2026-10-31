@@ -109,6 +109,37 @@ Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, s
 
 The role defaults are data, each with a source. Headless workers will be stopped at their deadline later; for now the flag is the only enforcement.
 
+### Waiting on the owner, and the idle alarm
+
+Work stalled for about an hour with unblocked tasks open and nothing flagged it (owner, 2026-10-31). A task that waits on an owner decision is also not late, so it must not be flagged overdue.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta wait <task> --owner <question>` | the task is open, claimed or linked, and not waiting | event `WaitingOnOwner { task, question }`; the task's lease deadlines pause |
+| `meta wait` | the task is unknown, deferred, done or retired, or already waiting | refused, with the reason |
+| `meta unwait <task> <answer>` | the task is waiting | event `OwnerAnswered { task, answer }`; each lease the task had when it began to wait gets its deadline moved later by the time it waited, so the deadlines resume from the answer |
+| `meta unwait` | the task is unknown or not waiting | refused |
+| `meta status` | a task is waiting on the owner | listed under "waiting on the owner (flagged)" as `<task>: <question> (waiting N min)`, N the whole minutes since `meta wait`; its leases are not flagged overdue while it waits |
+| `meta status` | a task done, retired or deferred while waiting | it is no longer listed as waiting |
+| `meta status` | no task waits | "waiting on the owner (flagged)" shows "(none)" |
+| `meta status` | no running work, and at least one task is stalled | "idle (flagged)" shows `idle: no live work; stalled: <task> (<why>), ...` with each stalled task by id, in task order |
+| `meta status` | otherwise | "idle (flagged)" shows "(none)" |
+
+Running work is a work lease that has a deadline, on a task an agent is working: open or claimed. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
+
+A task is stalled when it is not waiting on the owner and has no next step. This is a state check, with no age threshold:
+
+| Task | Stalled when | Shown as |
+|---|---|---|
+| open | always | `open` |
+| claimed, by an agent or by the lead with `--self` | always | `claimed` |
+| linked | no review lease on it is live (unused, or used with no verdict yet), and its pinned head has no verdict | `no verdict on head` |
+| linked | no review lease is live, the latest verdict on its pinned head is pass, and its PR is not merged | `pass on head, PR not merged` |
+| linked | no review lease is live, the latest verdict on its pinned head is fail, and no running work lease was issued after that review | `fail on head, no live work lease` |
+| deferred, retired, done | never | |
+
+A verdict on an earlier head does not count for the pinned head. A linked task whose PR is merged and that awaits `done` is not stalled. The alarm needs both conditions: no running work, and N of at least 1 stalled tasks.
+
 ### Predictions against registered numbers
 
 `self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each quoting its `docs/prereg.md` row verbatim, with its falsifier as numbers. A falsifier names at least one measure; a prediction without one shows `UNDECIDED`.
@@ -137,10 +168,12 @@ P6 counts CI runs per merged PR. It cannot see PRs that never merge or failed re
 
 | Command | Given | Result |
 |---|---|---|
-| `meta status` | a task was ever linked to a PR, in any stage: open PR, merged, or retired after linking | its PRs are read through the GitHub port (`gh pr view` for the branch, then `gh run list`, merged or not); the task counts toward the total |
+| `meta status` | a task was ever linked to a PR, in any stage: open PR, merged, or retired after linking | an open PR is read live through the GitHub port (`gh pr view` for the branch, then `gh run list`); a merged PR is not read: its CI runs are the count recorded in its `Merged` event, because a merged PR's count cannot change; the task counts toward the total |
 | `meta status` | the task has a failed review round, or CI runs above one | a line `task-N (#pr, <stage>): failed review rounds <n>, CI runs <n>`; a task with several PRs shows each and sums their runs |
 | `meta status` | the CI runs of a PR cannot be read | the line shows `CI runs unavailable (<why>)` and still lists the failed rounds; it never reads as zero |
 | `meta status` | any | `rework total: tasks with 2 or more failed review rounds: <n> of <m> tasks with a PR; worst: task-N (...)`; the worst case has the most failed rounds, then the most CI runs; `none` when no task has rework |
+
+`pull` reads the branch name once and runs `gh run list` with it; `runs` shares that one call. Every port command (`gh`, `git`) is killed after a named timeout (`PORT_TIMEOUT`, 30 s) and returns a port error `<command>: timed out after <n> s`, so a hung `gh` or `git` cannot hang `meta status`; status shows such a PR as `CI runs unavailable`, never zero.
 
 A failed review round is a `Reviewed` event with verdict `fail`. Tasks never linked to a PR are not counted. A task listed without failed rounds only has more than one CI run, which red-first makes the norm.
 

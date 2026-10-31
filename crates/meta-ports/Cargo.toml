@@ -8,6 +8,7 @@ build = "src/real/build.rs"
 
 [dependencies]
 meta-core.workspace = true
+nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

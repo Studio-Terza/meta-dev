@@ -5,6 +5,7 @@ use crate::latch::Latch;
 use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
 use crate::predictions::Measure;
 use crate::task::{Linked, Progress, Task};
+use crate::waiting::Waiting;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default)]
@@ -13,11 +14,14 @@ pub struct Ledger {
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
     pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
-    pub(crate) landed: BTreeSet<PrNumber>,
+    /// Each PR merged, with the CI runs recorded at merge time: a merged PR's count cannot change.
+    pub(crate) landed: BTreeMap<PrNumber, RunCount>,
     /// Every PR each task was ever linked to, so a retired task keeps its PR for the rework report.
     pub(crate) linked_prs: BTreeMap<TaskId, BTreeSet<PrNumber>>,
     /// PRs logged as merged outside meta.
     pub(crate) outside: BTreeSet<PrNumber>,
+    /// Tasks waiting on the owner, with their questions.
+    pub(crate) waiting: BTreeMap<TaskId, Waiting>,
     pub(crate) starts_denied: usize,
     pub(crate) self_claims: usize,
     /// Each prediction's falsifying measures, latched at their first time.
@@ -91,6 +95,7 @@ impl Ledger {
                     Progress::Linked(linked) => Ok(linked.retire(reason.clone())),
                     other => Err(format!("{task} retired while {other}")),
                 }?;
+                self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Retired(retired));
             }
             Event::Deferred { task, reason } => {
@@ -98,6 +103,7 @@ impl Ledger {
                     Progress::Open(open) => Ok(open.defer(reason.clone())),
                     other => Err(format!("{task} deferred while {other}")),
                 }?;
+                self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Deferred(deferred));
             }
             Event::Undeferred { task } => {
@@ -118,7 +124,7 @@ impl Ledger {
             }
             Event::Merged { pr, runs, route, .. } => {
                 self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
-                self.landed.insert(*pr);
+                self.landed.insert(*pr, *runs);
                 if *route == Route::Outside {
                     self.outside.insert(*pr);
                 }
@@ -129,6 +135,7 @@ impl Ledger {
                     Progress::Linked(linked) => Ok(linked.finish()),
                     other => Err(format!("{task} done while {other}")),
                 }?;
+                self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Done(done));
             }
             Event::Escaped { kind, reason, pr, checked } => {
@@ -157,6 +164,21 @@ impl Ledger {
                     _ => Err(format!("{lease} used but not unused")),
                 }?;
                 self.leases.insert(*lease, LeaseSlot::Spent(spent));
+            }
+            Event::WaitingOnOwner { task, question } => {
+                match self.tasks.get(task) {
+                    Some(progress) if progress.is_active() => Ok(()),
+                    Some(other) => Err(format!("{task} waits on the owner while {other}")),
+                    None => Err(format!("unknown {task} waits on the owner")),
+                }?;
+                let leases = self.leases.iter().filter(|(_, slot)| slot.lease().task() == *task).map(|(id, _)| *id);
+                let waiting = Waiting::since(at, question.clone(), leases.collect());
+                self.waiting.insert(*task, waiting).map_or(Ok(()), |_| Err(format!("{task} waits twice")))?;
+            }
+            Event::OwnerAnswered { task, .. } => {
+                let waited = self.waiting.remove(task).ok_or_else(|| format!("{task} answered while not waiting"))?;
+                let span = waited.started().span_to(at);
+                self.leases.iter_mut().filter(|(id, _)| waited.covers(**id)).for_each(|(_, slot)| slot.delay(span));
             }
             Event::Falsified { prediction, measure, observed } => {
                 self.falsified

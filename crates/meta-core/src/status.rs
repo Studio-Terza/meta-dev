@@ -61,7 +61,12 @@ impl Ledger {
         let overdue: Vec<String> = self
             .leases
             .iter()
-            .filter(|(_, slot)| self.live(slot.lease()) && !slot.is_finished() && slot.deadline().passed(at))
+            .filter(|(_, slot)| {
+                self.live(slot.lease())
+                    && !self.waiting.contains_key(&slot.lease().task())
+                    && !slot.is_finished()
+                    && slot.deadline().passed(at)
+            })
             .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
             .collect();
         let main = kinds.as_ref().ok();
@@ -101,7 +106,7 @@ impl Ledger {
         let median_text = median.map_or_else(|| "none yet".to_owned(), |median| median.to_string());
         let missing: Result<Vec<PrNumber>, String> = match &github {
             Reconciliation::Listed(merges) => {
-                Ok(merges.prs().iter().filter(|pr| !self.landed.contains(pr)).copied().collect())
+                Ok(merges.prs().iter().filter(|pr| !self.landed.contains_key(pr)).copied().collect())
             }
             Reconciliation::Unavailable(why) => Err(format!("GitHub merged list unreadable: {why}")),
         };
@@ -174,6 +179,8 @@ impl Ledger {
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
+            section("waiting on the owner (flagged)", &self.waits(at)),
+            section("idle (flagged)", &self.idle()),
             format!(
                 "P1 agent starts through meta: {started}; prevented by the hook: {}; bypassed, from outside-start escapes: {starts_outside}; self-claims, not agent starts: {}\n",
                 self.starts_denied, self.self_claims
@@ -228,7 +235,7 @@ impl Ledger {
     fn merges_line(&self, through_meta: usize, outside_logged: usize, github: Reconciliation) -> String {
         match github {
             Reconciliation::Listed(merges) => {
-                let missing = merges.prs().iter().filter(|pr| !self.landed.contains(pr)).count();
+                let missing = merges.prs().iter().filter(|pr| !self.landed.contains_key(pr)).count();
                 format!(
                     "P1 merges through meta: {through_meta} of {}\nP1 merged outside meta: {} ({missing} missing from the log)\n",
                     through_meta + outside_logged + missing,
