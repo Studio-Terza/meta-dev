@@ -4,7 +4,7 @@ use meta_core::{
     Timestamp,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
-use meta_ports::real::JsonlLog;
+use meta_ports::real::{JsonlLog, Scratch};
 use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
@@ -568,8 +568,8 @@ fn link_refuses_another_branch_another_base_a_pr_linked_elsewhere_or_an_unclaime
 
 #[test]
 fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("lease-race-{nanos}.jsonl"));
+    let scratch = Scratch::new("lease-race");
+    let path = scratch.join("log.jsonl");
     let at = Timestamp::from_unix_seconds(1);
     let seed: Vec<Record> = claimed_task().into_iter().map(|event| Record { at, event }).collect();
     JsonlLog::at(path.clone()).transact(|_| (seed, ())).unwrap();
@@ -586,7 +586,6 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
             .collect();
         racers.into_iter().map(|racer| racer.join().unwrap()).collect()
     });
-    std::fs::remove_file(&path).unwrap();
     assert_eq!(replies.iter().filter(|reply| reply.text == ALLOW).count(), 1);
 }
 
@@ -1161,14 +1160,13 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
 
 #[test]
 fn escape_is_recorded_even_when_the_jsonl_log_does_not_parse() {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("garbled-{nanos}.jsonl"));
+    let scratch = Scratch::new("garbled");
+    let path = scratch.join("log.jsonl");
     std::fs::write(&path, "not a record\n").unwrap();
     let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
     let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock };
     let reply = answer(parsed("escape gap log is garbled"), &mut ports);
     let text = std::fs::read_to_string(&path).unwrap();
-    std::fs::remove_file(&path).unwrap();
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(reply.text.contains("id and counts unavailable"), "{}", reply.text);
     assert_eq!(text.lines().last(), Some(r#"{"at":2,"event":"Escaped","kind":"gap","reason":"log is garbled"}"#));

@@ -6,6 +6,7 @@
 //! 3. no manifest overrides the lint: the workspace sets it to `deny` and no crate sets it.
 
 use meta_core::Reason;
+use meta_ports::real::Scratch;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -207,9 +208,9 @@ fn a_crate_inherits_the_workspace_lints_and_no_manifest_overrides_the_ban() {
 
 #[test]
 fn the_tree_reader_follows_no_symlinks() {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("tree-{nanos}"));
-    let outside = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("outside-{nanos}"));
+    let scratch = Scratch::new("tree");
+    let root = scratch.join("tree");
+    let outside = scratch.join("outside");
     fs::create_dir_all(&root).unwrap();
     fs::create_dir_all(&outside).unwrap();
     fs::write(root.join("real.rs"), "fn f() {}\n").unwrap();

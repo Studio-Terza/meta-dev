@@ -78,13 +78,13 @@ impl Git for GitCli {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Scratch;
     use super::{GitCli, run};
     use meta_core::{Sha, TaskId};
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
-    fn repo(name: &str, branch: &str) -> PathBuf {
-        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let root = std::env::temp_dir().join(format!("meta-dev-{name}-{nanos}"));
+    fn repo(name: &str, branch: &str) -> Scratch {
+        let root = Scratch::new(name);
         let at = root.to_string_lossy().into_owned();
         let git = |args: &[&str]| run("git", &[&["-C", &at], args].concat()).unwrap();
         run("git", &["init", "--quiet", &at]).unwrap();

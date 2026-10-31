@@ -94,15 +94,16 @@ impl Log for JsonlLog {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Scratch;
     use super::JsonlLog;
     use crate::Log;
     use std::fs::{File, TryLockError};
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::Duration;
 
     #[test]
     fn a_transaction_holds_the_log_exclusively_from_read_to_append() {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("meta-dev-lock-{nanos}.jsonl"));
+        let scratch = Scratch::new("lock");
+        let path = scratch.join("log.jsonl");
         let mut log = JsonlLog::at(path.clone());
         let blocked = log
             .transact(|records| {
@@ -111,20 +112,18 @@ mod tests {
             })
             .unwrap();
         let free = JsonlLog::at(path.clone()).transact(|records| (records.unwrap(), ())).is_ok();
-        std::fs::remove_file(&path).unwrap();
         assert_eq!((blocked, free), ((0, true), true));
     }
 
     #[test]
     fn a_log_locked_past_the_deadline_is_a_port_failure() {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("meta-dev-deadline-{nanos}.jsonl"));
+        let scratch = Scratch::new("deadline");
+        let path = scratch.join("log.jsonl");
         let holder = File::create(&path).unwrap();
         holder.lock().unwrap();
         let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path.clone()) };
         let waited = log.transact(|_| (Vec::new(), ()));
         drop(holder);
-        std::fs::remove_file(&path).unwrap();
         assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
     }
 }

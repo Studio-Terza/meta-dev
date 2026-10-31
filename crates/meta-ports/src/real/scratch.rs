@@ -30,6 +30,14 @@ impl Deref for Scratch {
     }
 }
 
+impl Drop for Scratch {
+    /// A directory that cannot be removed is only left behind; it must not fail the test.
+    fn drop(&mut self) {
+        let removed = fs::remove_dir_all(&self.0);
+        drop(removed);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Scratch;
