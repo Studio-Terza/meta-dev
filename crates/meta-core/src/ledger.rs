@@ -58,17 +58,17 @@ impl Ledger {
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
             }
-            Event::Leased { lease, task, deadline } => {
+            Event::Leased { lease, task, agent, deadline } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
-                self.issue(Lease::issue(*lease, *task, Purpose::Work, at, Deadline::of(*deadline)))?;
+                self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, at, Deadline::of(*deadline)))?;
             }
-            Event::ReviewLeased { lease, task, pr, head, deadline } => {
+            Event::ReviewLeased { lease, task, agent, pr, head, deadline } => {
                 match self.tasks.get(task) {
                     Some(Progress::Linked(linked)) if linked.pr() == *pr => Ok(()),
                     _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
                 }?;
                 let purpose = Purpose::Review { pr: *pr, head: head.clone() };
-                self.issue(Lease::issue(*lease, *task, purpose, at, Deadline::of(*deadline)))?;
+                self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
             }
             Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,

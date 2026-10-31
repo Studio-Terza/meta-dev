@@ -1,3 +1,4 @@
+use crate::brief::ReviewText;
 use crate::event::Event;
 use crate::ids::{AgentName, LeaseId, PrNumber, TaskId, Timestamp, Title, Verdict};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
@@ -26,7 +27,7 @@ impl Ledger {
         });
         match (self.tasks.get(&task), pending) {
             (Some(Progress::Linked(_)), Some(unused)) => Err(Refusal::because(format!(
-                "review lease {unused} on {task} is unused. Next: put {unused} in the reviewer's Agent description."
+                "review lease {unused} on {task} is unused. Next: meta brief {unused} prints its brief again; put {unused} in the reviewer's Agent description."
             ))),
             (Some(Progress::Linked(linked)), None) => {
                 Ok(Reviewing { task, title: linked.title().clone(), agent, lease, pr: linked.pr() })
@@ -95,20 +96,22 @@ impl Reviewing {
             return Err(Refusal::because(format!("{pr} is not open; only an open PR can be reviewed.")));
         }
         let head = pull.head().clone();
-        let digits = pr.digits();
         let deadline_line = Deadline::of(Some(deadline)).brief_line();
-        let text = format!(
-            "review: {pr} for {task}: {title}\n\
-             agent: {agent}\n\
-             lease: {lease} (put it in the Agent description; it works once)\n\
-             deadline: {deadline_line}\n\
-             goal: find what is wrong with {pr} at head {head}, judged against {task} and the rules below.\n\
-             constraints:\n  \
-             - read the change with gh pr view {digits} and gh pr diff {digits}; push, comment, approve and merge nothing\n  \
-             - report each finding with its file, line and evidence, then a verdict: pass or fail\n\
-             rules:\n{rules}"
-        );
+        let agent_name = agent;
+        let agent = agent_name.to_string();
+        let text = ReviewText {
+            pr,
+            task,
+            title: &title,
+            agent: &agent,
+            lease,
+            deadline_line: &deadline_line,
+            head: &head,
+            rules,
+        }
+        .text();
         let deadline = Some(deadline);
-        Ok(Accepted::new(vec![Event::ReviewLeased { lease, task, pr, head, deadline }], text))
+        let agent = Some(agent_name);
+        Ok(Accepted::new(vec![Event::ReviewLeased { lease, task, agent, pr, head, deadline }], text))
     }
 }
