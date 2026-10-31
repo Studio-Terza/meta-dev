@@ -11,15 +11,16 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Runs the command given after the status and transcript paths, as the process group's leader,
-/// and stays its parent, for only a parent can read the exit status. Standard input is a pipe whose
-/// other end only the supervisor holds: when it closes, the supervisor is gone, so the group goes
-/// too. The script ends by killing the group, so nothing a session left behind outlives it.
+/// Runs the command given after the status, transcript and stderr paths, as the process group's
+/// leader, and stays its parent, for only a parent can read the exit status. Standard input is a
+/// pipe whose other end only the supervisor holds: when it closes, the supervisor is gone, so the
+/// group goes too. The script ends by killing the group, so nothing a session left behind outlives
+/// it. Stderr has its own file: the verdict is read from the transcript, stdout alone.
 const SESSION: &str = r#"umask 077
-status=$1; transcript=$2; shift 2
+status=$1; transcript=$2; errors=$3; shift 3
 exec 3<&0
 { cat <&3 >/dev/null; kill -KILL 0; } &
-"$@" </dev/null 3<&- >"$transcript" 2>&1 &
+"$@" </dev/null 3<&- >"$transcript" 2>"$errors" &
 wait $!
 printf %s "$?" >"$status.part" && mv "$status.part" "$status"
 kill -KILL 0
@@ -30,6 +31,7 @@ const WORKERS: &str = "workers";
 /// Beside the worker directories: those of starts that failed, kept and out of the way of a retry.
 const FAILED: &str = "failed";
 const TRANSCRIPT: &str = "transcript.jsonl";
+const STDERR: &str = "stderr.log";
 const STATUS: &str = "status";
 const SUPERVISOR: &str = "supervisor.log";
 const SCRATCH: &str = "scratch";
@@ -135,12 +137,15 @@ fn launch(dir: &Path, session: &Launch<'_>, lifeline: PipeReader) -> Result<Work
     write_private(&scratch.join(ReviewCopy::DIFF), &session.copy.diff)?;
     let transcript = dir.join(TRANSCRIPT);
     private_file(&transcript)?;
+    let errors = dir.join(STDERR);
+    private_file(&errors)?;
     let mut command = Command::new("/bin/sh");
     narrowed(&mut command);
     let leader = command
         .args(["-c", SESSION, "meta-worker"])
         .arg(dir.join(STATUS))
         .arg(&transcript)
+        .arg(&errors)
         .arg(session.program)
         .args(session.args)
         .current_dir(&scratch)
@@ -274,11 +279,11 @@ impl Sessions for HeadlessSessions {
 #[cfg(test)]
 mod tests {
     use super::{
-        HeadlessSessions, Launch, PASSED, RUN, STATUS, SUPERVISOR, TRANSCRIPT, is_alive, launch, listed_in, make_way,
-        passed, recorded, start_in, state_in, supervise,
+        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, is_alive, launch, listed_in,
+        make_way, passed, recorded, start_in, state_in, supervise,
     };
     use crate::{PortError, Sessions};
-    use meta_core::{ExitStatus, ReviewCopy, Session, WorkerRun};
+    use meta_core::{ExitStatus, ReviewCopy, Session, SessionVerdict, Verdict, WorkerRun};
     use meta_testkit::Scratch;
     use std::ffi::OsString;
     use std::fs;
@@ -330,8 +335,32 @@ mod tests {
         assert_eq!(ended(&dir, &run), Session::Ended(Some(ExitStatus::of(3))));
         let written = fs::read_to_string(dir.join(TRANSCRIPT)).unwrap();
         assert!(written.contains("/worker-1/scratch\n") && written.contains("the view\nthe diff\n"), "{written}");
-        assert!(written.contains("oops"), "{written}");
-        assert_eq!(HeadlessSessions.transcript(&run).unwrap().last().unwrap(), "oops");
+        assert!(!written.contains("oops"), "{written}");
+        assert_eq!(fs::read_to_string(dir.join(STDERR)).unwrap(), "oops");
+        assert_eq!(HeadlessSessions.transcript(&run).unwrap().last().unwrap(), "the diff");
+    }
+
+    /// A result event of the shape `SessionVerdict` reads.
+    fn result(verdict: &str) -> String {
+        format!(
+            r#"{{"type":"result","subtype":"success","is_error":false,"structured_output":{{"verdict":"{verdict}","findings":[]}}}}"#
+        )
+    }
+
+    #[test]
+    fn a_result_on_stderr_neither_changes_the_verdict_nor_stands_for_one() {
+        let root = Scratch::new("worker-stderr");
+        let read = |name: &str, script: String| {
+            let dir = root.join(name);
+            let (run, _lifeline) = session(&dir, &script);
+            ended(&dir, &run);
+            SessionVerdict::from_transcript(&HeadlessSessions.transcript(&run).unwrap())
+        };
+        let (pass, fail) = (result("pass"), result("fail"));
+        let judged = read("worker-1", format!("echo '{pass}'; echo '{fail}' >&2"));
+        assert_eq!(judged.unwrap().verdict(), Verdict::Pass);
+        let forged = read("worker-2", format!("echo '{pass}' >&2"));
+        assert!(forged.unwrap_err().to_string().contains("holds no result"));
     }
 
     #[test]
@@ -375,10 +404,10 @@ mod tests {
     fn the_worker_directory_and_everything_a_session_writes_are_private_to_the_user() {
         let root = Scratch::new("worker-modes");
         let dir = root.join("worker-1");
-        let (run, _lifeline) = session(&dir, "printf output; exit 0");
+        let (run, _lifeline) = session(&dir, "printf output; printf oops >&2; exit 0");
         ended(&dir, &run);
         assert_eq!((mode(&dir), mode(&dir.join("scratch"))), (0o700, 0o700));
-        assert_eq!(mode(&dir.join(TRANSCRIPT)), 0o600);
+        assert_eq!((mode(&dir.join(TRANSCRIPT)), mode(&dir.join(STDERR))), (0o600, 0o600));
         assert_eq!(mode(&dir.join(STATUS)), 0o600);
         assert_eq!(mode(&dir.join("scratch").join(ReviewCopy::DIFF)), 0o600);
     }

@@ -24,7 +24,7 @@ pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError>
         .collect()
 }
 
-/// The lines of a worker's transcript, as written: a session's own stderr lines stand among them.
+/// The lines of a worker's transcript, as written: the session's stdout, and nothing else.
 pub(super) fn lines(text: &str) -> Vec<String> {
     text.lines().map(str::to_owned).collect()
 }

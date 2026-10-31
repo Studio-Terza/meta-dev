@@ -193,9 +193,9 @@ impl SessionVerdict {
     const RESULT: &str = "result";
     const SUCCESS: &str = "success";
 
-    /// The verdict in the transcript's last result event. A line that is not an event is stepped
-    /// over: stderr shares the transcript. Anything but a successful result with a valid
-    /// structured output is no verdict.
+    /// The verdict in the transcript's last result event. The transcript is the session's stdout
+    /// alone, and a line that is not an event is stepped over. Anything but a successful result
+    /// with a valid structured output is no verdict.
     pub fn from_transcript(lines: &[String]) -> Result<Self, NoVerdict> {
         let is_result = |line: &&String| {
             serde_json::from_str::<TranscriptEvent>(line).is_ok_and(|event| event.kind == Self::RESULT)
@@ -586,7 +586,7 @@ mod tests {
     }
 
     #[test]
-    fn the_verdict_is_the_last_result_event_and_stderr_among_the_lines_does_not_matter() {
+    fn the_verdict_is_the_last_result_event_and_a_line_that_is_no_event_does_not_matter() {
         let (pass, fail) = (result("success", false, &output("pass")), result("success", false, &output("fail")));
         let verdict = read(&[r#"{"type":"system","subtype":"init"}"#, "Waiting for background work", &pass, "bye"]);
         assert_eq!(verdict.unwrap().verdict(), Verdict::Pass);

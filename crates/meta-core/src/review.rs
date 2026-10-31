@@ -44,12 +44,16 @@ impl Ledger {
         self.awaiting_lease(task).map(|(_, pr, _)| pr)
     }
 
-    /// The first used review lease of `task` with no verdict, and the PR and head it reviews.
+    /// The first used review lease of `task` with no verdict, and the PR and head it reviews. A
+    /// headless worker's lease is never one: its verdict comes only from its own session
+    /// (`verdict_of`), so a reviewer's verdict neither lands on it nor waits for it, running or dead.
     fn awaiting_lease(&self, task: TaskId) -> Result<(LeaseId, PrNumber, Sha), Refusal> {
         self.leases
             .iter()
             .find_map(|(id, slot)| match slot {
-                LeaseSlot::Spent(spent) if spent.lease().task() == task && spent.verdict().is_none() => {
+                LeaseSlot::Spent(spent)
+                    if spent.lease().task() == task && spent.verdict().is_none() && spent.worker().is_none() =>
+                {
                     match spent.lease().purpose() {
                         Purpose::Review { pr, head } => Some((*id, *pr, head.clone())),
                         Purpose::Work => None,
@@ -59,7 +63,8 @@ impl Ledger {
             })
             .ok_or_else(|| {
                 Refusal::because(format!(
-                    "no used review lease on {task} awaits a verdict. Next: meta review {task} --agent <name>, \
+                    "no used review lease on {task} awaits a verdict (meta records a headless worker's verdict itself). \
+                     Next: meta review {task} --agent <name>, \
                      start the reviewer with that lease, then the reviewer records its verdict."
                 ))
             })
