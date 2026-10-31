@@ -13,7 +13,7 @@ impl ReexportCount {
             file.items
                 .iter()
                 .filter_map(|item| match item {
-                    Item::Use(used) if !matches!(used.vis, Visibility::Inherited) => Some(Self::leaves(&used.tree)),
+                    Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Some(Self::leaves(&used.tree)),
                     _ => None,
                 })
                 .sum(),

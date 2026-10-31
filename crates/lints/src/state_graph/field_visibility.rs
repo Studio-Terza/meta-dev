@@ -2,7 +2,7 @@ use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use syn::{Index, ItemStruct, Member, Visibility};
+use syn::{Index, ItemMod, ItemStruct, Member, Visibility};
 
 use super::finding::Finding;
 use lint_core::LineNumber;
@@ -10,6 +10,7 @@ use lint_core::Name;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::Walk;
 
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,
@@ -25,7 +26,17 @@ impl<'scan> FieldVisibility<'scan> {
 }
 
 impl<'ast> Visit<'ast> for FieldVisibility<'_> {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+        Walk::enter(&item.attrs, || self.exposed(item));
+    }
+}
+
+impl FieldVisibility<'_> {
+    fn exposed(&mut self, item: &ItemStruct) {
         let exposed = item
             .fields
             .iter()

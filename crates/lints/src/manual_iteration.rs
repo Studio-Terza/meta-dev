@@ -4,9 +4,12 @@ use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use syn::{Block, Expr, ExprForLoop, ExprMethodCall, ItemMod, Local, Pat, Stmt};
+use syn::{
+    Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
+};
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -78,10 +81,27 @@ impl Iterations<'_> {
 
 impl<'ast> Visit<'ast> for Iterations<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    }
+
+    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+    }
+
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    }
+
+    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
     }
 
     fn visit_local(&mut self, local: &'ast Local) {

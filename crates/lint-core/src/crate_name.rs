@@ -16,8 +16,11 @@ impl From<&Ident> for CrateName {
 
 impl From<&CrateRoot> for CrateName {
     fn from(root: &CrateRoot) -> CrateName {
-        let directory = root.directory_name().unwrap_or_default().to_string_lossy();
-        let underscored: String = directory.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect();
+        let spelled = root.package().map_or_else(
+            || root.directory_name().unwrap_or_default().to_string_lossy().into_owned(),
+            ToString::to_string,
+        );
+        let underscored: String = spelled.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect();
         CrateName(Name::from(underscored.as_str()))
     }
 }

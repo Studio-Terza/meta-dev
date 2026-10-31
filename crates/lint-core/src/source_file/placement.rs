@@ -1,9 +1,14 @@
+mod source_directory;
+mod target_directory;
+
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::crate_root::CrateRoot;
 use crate::module_path::ModulePath;
 use crate::role::Role;
+use source_directory::SourceDirectory;
+use target_directory::TargetDirectory;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
@@ -14,18 +19,19 @@ pub struct Placement {
 
 impl Placement {
     const TARGET_DIRECTORIES: [&'static str; 3] = ["tests", "examples", "benches"];
-    const SOURCE_DIRECTORIES: [&'static str; 1] = ["src"];
-    const LIBRARY_ROOT: &'static str = "lib.rs";
+    const SOURCE_DIRECTORY: &'static str = "src";
 
     #[must_use]
     pub fn locate(path: &Path) -> Placement {
-        Self::in_source_directory(path)
-            .or_else(|| Self::in_target_directory(path, &Self::TARGET_DIRECTORIES))
-            .unwrap_or_else(|| Placement {
-                crate_root: CrateRoot::new(path.to_path_buf()),
-                module: ModulePath::default(),
-                role: Role::Other,
-            })
+        Self::within(&Self::guessed_package(path), path)
+    }
+
+    #[must_use]
+    pub fn within(package: &Path, file: &Path) -> Placement {
+        file.strip_prefix(package)
+            .ok()
+            .and_then(|inside| Self::in_package(package, inside))
+            .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
     }
 
     #[must_use]
@@ -49,28 +55,30 @@ impl Placement {
             .find(|ancestor| ancestor.file_name().and_then(OsStr::to_str).is_some_and(|name| accepted.contains(&name)))
     }
 
-    fn in_source_directory(path: &Path) -> Option<Placement> {
-        let source = Self::named_ancestor(path, &Self::SOURCE_DIRECTORIES)?;
-        let inside = path.strip_prefix(source).ok()?;
-        let role = Role::in_source(inside);
-        let module = match role {
-            Role::BinaryRoot => ModulePath::default(),
-            Role::Other | Role::Target if inside == Path::new(Self::LIBRARY_ROOT) => ModulePath::default(),
-            Role::Other | Role::Target => ModulePath::of_file(inside),
-        };
-        Some(Placement {
-            crate_root: CrateRoot::new(source.parent().unwrap_or(Path::new("")).to_path_buf()),
-            module,
-            role,
-        })
+    fn guessed_package(path: &Path) -> PathBuf {
+        Self::named_ancestor(path, &[Self::SOURCE_DIRECTORY])
+            .or_else(|| Self::named_ancestor(path, &Self::TARGET_DIRECTORIES))
+            .and_then(Path::parent)
+            .or_else(|| path.parent())
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
     }
 
-    fn in_target_directory(path: &Path, directories: &[&str]) -> Option<Placement> {
-        let directory = Self::named_ancestor(path, directories)?;
-        let inside = path.strip_prefix(directory).ok()?;
+    fn unplaced(crate_root: CrateRoot) -> Placement {
+        Placement { crate_root, module: ModulePath::default(), role: Role::Other }
+    }
+
+    fn in_package(package: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
-        let module = if rest.as_os_str().is_empty() { ModulePath::default() } else { ModulePath::of_file(rest) };
-        Some(Placement { crate_root: CrateRoot::new(directory.join(first)), module, role: Role::Target })
+        let directory = first.as_os_str().to_str()?;
+        if directory == Self::SOURCE_DIRECTORY {
+            Some(SourceDirectory::place(package, rest))
+        } else {
+            Self::TARGET_DIRECTORIES
+                .contains(&directory)
+                .then(|| TargetDirectory::place(&package.join(directory), rest))
+                .flatten()
+        }
     }
 }

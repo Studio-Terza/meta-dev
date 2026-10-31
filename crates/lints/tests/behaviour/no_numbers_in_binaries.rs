@@ -7,7 +7,9 @@ const UNITS: &str = "fn main() {\n    let first = 1;\n    let none = 0;\n}\n";
 const MODULE: &str = "fn main() {}\nmod wiring;\n";
 const WIRING: &str = "fn pause() -> u32 {\n    30\n}\n";
 
-const CASES: [Case; 5] = [
+const UNIT_FLOAT: &str = "fn main() {\n    drop(1.0);\n}\n";
+
+const CASES: [Case; 6] = [
     Case {
         name: "binary",
         sources: &[Source::new("src/main.rs", NUMBERS)],
@@ -20,7 +22,12 @@ const CASES: [Case; 5] = [
         sources: &[Source::new("src/main.rs", MODULE), Source::new("src/wiring.rs", WIRING)],
         flagged: &["src/wiring.rs:2"],
     },
-    Case { name: "other binary", sources: &[Source::new("src/bin/tool.rs", NUMBERS)], flagged: &[] },
+    Case {
+        name: "other binary",
+        sources: &[Source::new("src/bin/tool.rs", NUMBERS)],
+        flagged: &["src/bin/tool.rs:2", "src/bin/tool.rs:3"],
+    },
+    Case { name: "unit float", sources: &[Source::new("src/main.rs", UNIT_FLOAT)], flagged: &[] },
 ];
 
 #[test]

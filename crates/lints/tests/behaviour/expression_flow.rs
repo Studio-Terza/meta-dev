@@ -13,7 +13,14 @@ const MUTATED: &str = "fn f() -> Vec<u8> {\n    let mut items = Vec::new();\n   
 const CONST_LOOP: &str = "const fn f() -> u8 {\n    let mut i = 0;\n    while i < 3 { i += 1; }\n    i\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f() {\n        for _ in [1] {}\n    }\n}\n";
 
-const CASES: [Case; 10] = [
+const WRITTEN: &str =
+    "fn f() -> String {\n    let mut out = String::new();\n    write!(out, \"x\").ok();\n    out\n}\n";
+const CLOSURE: &str =
+    "fn f(limit: u8) {\n    let mut seen = Seen::default();\n    let mut bump = || seen.note(limit);\n    bump();\n}\n";
+const TEST_IMPL: &str = "struct A;\n#[cfg(test)]\nimpl A {\n    fn f() {\n        for _ in [1] {}\n    }\n}\n";
+const GENERATED: &str = "struct A;\nmacro_rules! looping {\n    () => {\n        impl A {\n            fn f() {\n                for _ in [1] {}\n            }\n        }\n    };\n}\n";
+
+const CASES: [Case; 14] = [
     Case {
         name: "early return",
         sources: &[Source::new("a.rs", EARLY_RETURN)],
@@ -28,6 +35,10 @@ const CASES: [Case; 10] = [
     Case { name: "mutated", sources: &[Source::new("a.rs", MUTATED)], flagged: &[] },
     Case { name: "const loop", sources: &[Source::new("a.rs", CONST_LOOP)], flagged: &[] },
     Case { name: "test module", sources: &[Source::new("a.rs", TEST_MODULE)], flagged: &[] },
+    Case { name: "written by a macro", sources: &[Source::new("a.rs", WRITTEN)], flagged: &[] },
+    Case { name: "called closure", sources: &[Source::new("a.rs", CLOSURE)], flagged: &[] },
+    Case { name: "test impl", sources: &[Source::new("a.rs", TEST_IMPL)], flagged: &[] },
+    Case { name: "inside a macro", sources: &[Source::new("a.rs", GENERATED)], flagged: &["a.rs:6"] },
 ];
 
 #[test]

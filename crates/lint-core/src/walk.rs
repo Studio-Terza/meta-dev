@@ -21,6 +21,13 @@ impl Walk {
         Self::skipped_by_any(attributes.iter().map(Self::of_attribute))
     }
 
+    pub fn enter(attributes: &[Attribute], visit: impl FnOnce()) {
+        match Self::outside_tests(attributes) {
+            Walk::Entered => visit(),
+            Walk::Skipped => {}
+        }
+    }
+
     fn of_attribute(attribute: &Attribute) -> Walk {
         if attribute.path().is_ident("cfg") {
             attribute.parse_args::<Meta>().map_or(Walk::Entered, |condition| Self::of_condition(&condition))
@@ -41,10 +48,8 @@ impl Walk {
 
     fn of_nested(list: &MetaList, nested: &Punctuated<Meta, Token![,]>) -> Walk {
         let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
-        if list.path.is_ident("all") {
+        if list.path.is_ident("all") || list.path.is_ident("any") {
             Self::skipped_by_any(walks.into_iter())
-        } else if list.path.is_ident("any") && !walks.is_empty() && walks.iter().all(|walk| *walk == Walk::Skipped) {
-            Walk::Skipped
         } else {
             Walk::Entered
         }

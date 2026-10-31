@@ -4,13 +4,14 @@ use std::path::{Path, PathBuf};
 use syn::{Item, ItemMod};
 
 use crate::name::Name;
+use crate::role::Role;
 use crate::source_file::SourceFile;
 
 #[derive(Debug)]
 pub struct BinaryFiles(BTreeSet<PathBuf>);
 
 impl BinaryFiles {
-    const BINARY_ROOT: &'static str = "src/main.rs";
+    const MAIN_FILE: &'static str = "main.rs";
     const MODULE_FILE: &'static str = "mod.rs";
     const SOURCE_EXTENSION: &'static str = "rs";
 
@@ -20,7 +21,7 @@ impl BinaryFiles {
         BinaryFiles(
             files
                 .iter()
-                .filter(|file| file.path().ends_with(Self::BINARY_ROOT))
+                .filter(|file| file.placement().role() == Role::BinaryRoot)
                 .fold(BTreeSet::new(), |members, root| Self::gather(root, &by_path, members)),
         )
     }
@@ -58,7 +59,7 @@ impl BinaryFiles {
     }
 
     fn declared_files(parent: &Path, module: &ItemMod) -> Vec<PathBuf> {
-        let directory = if parent.ends_with("main.rs") || parent.ends_with(Self::MODULE_FILE) {
+        let directory = if parent.ends_with(Self::MAIN_FILE) || parent.ends_with(Self::MODULE_FILE) {
             parent.parent().map(Path::to_path_buf)
         } else {
             Some(parent.with_extension(""))

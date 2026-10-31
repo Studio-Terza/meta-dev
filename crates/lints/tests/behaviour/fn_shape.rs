@@ -10,7 +10,11 @@ const BOOLEAN: &str = "fn f(x: u8) {\n    let ready = x > 1;\n    let typed: boo
 const TUPLE: &str = "fn f() {\n    let pair = (1, 2);\n    let total = items.iter().fold((0, 0), |a, b| a);\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(a: u8, b: u8, c: u8, d: u8, e: u8) {}\n}\n";
 
-const CASES: [Case; 7] = [
+const TEST_IMPL: &str = "struct A;\n#[cfg(test)]\nimpl A {\n    fn f(a: u8, b: u8, c: u8, d: u8, e: u8) {}\n}\n";
+const TEST_FN: &str = "#[cfg(test)]\nfn f(a: u8, b: u8, c: u8, d: u8, e: u8) {}\n";
+const GENERATED: &str = "struct A;\nmacro_rules! wide {\n    () => {\n        impl A {\n            fn f(a: u8, b: u8, c: u8, d: u8, e: u8) {}\n        }\n    };\n}\n";
+
+const CASES: [Case; 10] = [
     Case { name: "deep", sources: &[Source::new("a.rs", DEEP)], flagged: &["a.rs:4"] },
     Case { name: "shallow", sources: &[Source::new("a.rs", SHALLOW)], flagged: &[] },
     Case { name: "wide", sources: &[Source::new("a.rs", WIDE)], flagged: &["a.rs:1"] },
@@ -18,6 +22,9 @@ const CASES: [Case; 7] = [
     Case { name: "boolean locals", sources: &[Source::new("a.rs", BOOLEAN)], flagged: &["a.rs:2", "a.rs:3"] },
     Case { name: "tuples", sources: &[Source::new("a.rs", TUPLE)], flagged: &["a.rs:2", "a.rs:3"] },
     Case { name: "test module", sources: &[Source::new("a.rs", TEST_MODULE)], flagged: &[] },
+    Case { name: "test impl", sources: &[Source::new("a.rs", TEST_IMPL)], flagged: &[] },
+    Case { name: "test fn", sources: &[Source::new("a.rs", TEST_FN)], flagged: &[] },
+    Case { name: "inside a macro", sources: &[Source::new("a.rs", GENERATED)], flagged: &["a.rs:5"] },
 ];
 
 #[test]

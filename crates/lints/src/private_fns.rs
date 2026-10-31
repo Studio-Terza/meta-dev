@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 
 use finding::Finding;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, Visibility};
+use syn::{ImplItem, ItemImpl, ItemMod, Macro, Visibility};
 
+use lint_core::Macros;
 use lint_core::Most;
 use lint_core::Name;
 use lint_core::Report;
@@ -67,12 +68,20 @@ impl PrivateFnCounter {
 }
 
 impl<'ast> Visit<'ast> for PrivateFnCounter {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+    }
+
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        match Walk::inherent_impls(item) {
+        Walk::enter(&item.attrs, || match Walk::inherent_impls(item) {
             Walk::Entered => {
                 self.0.entry(TypeName::from_type(&item.self_ty)).or_default().extend(Self::private_names(item));
             }
             Walk::Skipped => {}
-        }
+        });
     }
 }

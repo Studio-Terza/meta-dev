@@ -13,7 +13,6 @@ impl Lint for ProcessStarters {
             "linted code does not start processes",
             files
                 .iter()
-                .filter(|file| file.is_shipped())
                 .flat_map(|file| {
                     CommandPaths::found(file).into_iter().map(move |line| {
                         Violation::new(

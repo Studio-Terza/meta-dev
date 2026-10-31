@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use syn::visit::Visit;
-use syn::{ImplItem, ImplItemFn, ItemImpl, Receiver};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::StateGraph;
 use super::declarations::Declarations;
@@ -20,6 +20,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
+use lint_core::Walk;
 
 pub struct EdgeScan<'scan> {
     declarations: &'scan Declarations,
@@ -124,7 +125,17 @@ impl<'scan> EdgeScan<'scan> {
 }
 
 impl<'ast> Visit<'ast> for EdgeScan<'_> {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || self.scanned(item));
+    }
+}
+
+impl EdgeScan<'_> {
+    fn scanned(&mut self, item: &ItemImpl) {
         let context = ImplContext::describe(item, self.declarations);
         item.items
             .iter()

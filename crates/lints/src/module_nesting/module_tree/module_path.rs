@@ -9,43 +9,32 @@ pub use relation::Relation;
 pub use same::Same;
 
 use std::fmt;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
+use lint_core::CrateRoot;
+use lint_core::SourceFile;
 use lint_core::UsePath;
 use lint_core::{Name, Whole};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModulePath {
-    crate_root: PathBuf,
+    crate_root: CrateRoot,
     segments: Vec<Name>,
     file: PathBuf,
 }
 
 impl ModulePath {
-    const SOURCE_ROOTS: [&'static str; 2] = ["src/lib.rs", "src/main.rs"];
-    const SOURCES: &'static str = "src";
     const MODULE_FILE: &'static str = "mod.rs";
     const CRATE: &'static str = "crate";
     const SUPER: &'static str = "super";
     const ANCHORS: [&'static str; 3] = ["crate", "super", "self"];
 
-    pub fn of_file(path: &Path) -> Option<ModulePath> {
-        let components: Vec<Component> = path.components().collect();
-        let source = components.iter().position(|component| component.as_os_str() == Self::SOURCES)?;
-        let crate_root: PathBuf = components.iter().take(source).collect();
-        let inside: PathBuf = components.iter().skip(source + 1).collect();
-        let stem = inside.file_stem()?.to_string_lossy().into_owned();
-        let segments = inside
-            .parent()
-            .into_iter()
-            .flat_map(Path::components)
-            .map(|component| Name::from(&*component.as_os_str().to_string_lossy()))
-            .chain(
-                (!Self::is_crate_root(path) && inside.file_name().is_some_and(|name| name != Self::MODULE_FILE))
-                    .then(|| Name::from(&*stem)),
-            )
-            .collect();
-        Some(ModulePath { crate_root, segments, file: path.to_path_buf() })
+    pub fn of_file(file: &SourceFile) -> ModulePath {
+        ModulePath {
+            crate_root: file.placement().crate_root().clone(),
+            segments: file.placement().module().segments().to_vec(),
+            file: file.path().to_path_buf(),
+        }
     }
 
     pub fn from_use(file: &ModulePath, path: &UsePath, modules: &[ModulePath]) -> Option<ModulePath> {
@@ -124,10 +113,6 @@ impl ModulePath {
 
     fn is_directory_module(&self) -> bool {
         self.file.file_name().is_some_and(|name| name == Self::MODULE_FILE)
-    }
-
-    fn is_crate_root(file: &Path) -> bool {
-        Self::SOURCE_ROOTS.iter().any(|root| file.ends_with(root))
     }
 }
 

@@ -9,11 +9,12 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
-    Arm, BinOp, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ItemMod, Lit,
-    Local, Pat, Signature, Type, UnOp,
+    Arm, BinOp, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn, ItemFn,
+    ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, Type, UnOp,
 };
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Most;
 use lint_core::Report;
 use lint_core::Site;
@@ -104,10 +105,27 @@ impl Shapes<'_> {
 
 impl<'ast> Visit<'ast> for Shapes<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    }
+
+    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+    }
+
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    }
+
+    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

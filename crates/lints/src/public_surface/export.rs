@@ -3,6 +3,7 @@ use syn::{Item, ItemUse, UseTree, Visibility};
 use lint_core::CrateName;
 use lint_core::LineNumber;
 use lint_core::Name;
+use lint_core::Role;
 use lint_core::SourceFile;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -14,8 +15,7 @@ pub struct Export {
 
 impl Export {
     pub fn in_root(file: &SourceFile) -> Vec<Export> {
-        file.path()
-            .ends_with("src/lib.rs")
+        (file.placement().role() == Role::LibraryRoot)
             .then(|| CrateName::from(file.placement().crate_root()))
             .map_or_else(Vec::new, |crate_name| {
                 Self::reexports(file).flat_map(|used| Self::leaves(&crate_name, &used.tree)).collect()
@@ -24,7 +24,7 @@ impl Export {
 
     fn reexports(file: &SourceFile) -> impl Iterator<Item = &ItemUse> {
         file.syntax().items.iter().filter_map(|item| match item {
-            Item::Use(used) if !matches!(used.vis, Visibility::Inherited) => Some(used),
+            Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Some(used),
             _ => None,
         })
     }
