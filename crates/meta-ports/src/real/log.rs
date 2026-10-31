@@ -1,5 +1,5 @@
 use crate::{Log, PortError};
-use meta_core::{Head, Marking, Place, Record, Standing, UnverifiedEscape, UnverifiedEscapes};
+use meta_core::{Head, Marking, Place, Record, SideLine, Standing, UnverifiedEscape, UnverifiedEscapes};
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::MetadataExt;
@@ -36,6 +36,9 @@ const UNMARKED: &str = "log.jsonl.unmarked";
 const MARKING: &str = "log.jsonl.marking";
 /// Beside the log, the escapes from builds not verified to be from main.
 const SIDE: &str = "escapes.unverified.jsonl";
+/// Beside the side file, the lines it keeps after an import, while they are written before they are
+/// renamed over the side file.
+const SIDE_IMPORTED: &str = "escapes.unverified.jsonl.importing";
 
 #[derive(Debug)]
 pub struct JsonlLog {
@@ -153,6 +156,18 @@ impl JsonlLog {
         path.parent().map_or(Ok(()), |dir| File::open(dir).and_then(|dir| dir.sync_all())).map_err(failed)
     }
 
+    /// Puts `kept` at `side` in one step: written and synced beside it, then renamed over it, then
+    /// the rename synced. A crash leaves the side file as it was or as it becomes, whole.
+    fn rewrite_side(side: &Path, kept: &[SideLine]) -> Result<(), PortError> {
+        let temp = side.with_file_name(SIDE_IMPORTED);
+        let failed = |error| Self::failed(&temp, error);
+        let text: Vec<u8> = kept.iter().flat_map(|line| [line.raw(), b"\n"].concat()).collect();
+        let mut file = File::create(&temp).map_err(failed)?;
+        file.write_all(&text).and_then(|()| file.sync_all()).map_err(failed)?;
+        fs::rename(&temp, side).map_err(failed)?;
+        side.parent().map_or(Ok(()), |dir| File::open(dir).and_then(|dir| dir.sync_all())).map_err(failed)
+    }
+
     fn failed(path: &Path, error: std::io::Error) -> PortError {
         PortError::new(format!("{}: {error}", path.display()))
     }
@@ -234,6 +249,37 @@ impl Log for JsonlLog {
             Err(error) if error.kind() == ErrorKind::NotFound => Ok(UnverifiedEscapes::default()),
             Err(error) => Err(Self::failed(&side, error)),
         }
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        let (mut file, path) = self.locked()?;
+        let side = self.side()?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).map_err(|error| Self::failed(path, error))?;
+        let standing = Self::head_of(path, bytes.as_slice()).standing(self.place);
+        let text = String::from_utf8(bytes)
+            .map_err(|error| Self::failed(path, std::io::Error::new(ErrorKind::InvalidData, error)));
+        let lines = match fs::read(&side) {
+            Ok(bytes) => super::jsonl::side_lines(&bytes),
+            Err(error) if error.kind() == ErrorKind::NotFound => Vec::new(),
+            Err(error) => return Err(Self::failed(&side, error)),
+        };
+        let (records, kept, decided) =
+            decide(standing, text.and_then(|text| super::jsonl::records(path, &text)), lines.clone());
+        Self::write(&mut file, path, &records)?;
+        file.sync_all().map_err(|error| Self::failed(path, error))?;
+        match kept {
+            Some(kept) if kept != lines => Self::rewrite_side(&side, &kept)?,
+            _ => {}
+        }
+        Ok(decided)
     }
 
     fn transact<T>(

@@ -2,8 +2,8 @@ pub mod memory;
 pub mod real;
 
 use meta_core::{
-    Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, Standing, TaskId,
-    Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing,
+    TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
 };
 use std::fmt;
 
@@ -44,6 +44,20 @@ pub trait Log {
     /// What the side file holds, read leniently; no side file holds nothing. An error means the
     /// file as a whole could not be read.
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError>;
+    /// Moves the side file's escapes into the log, holding the log exclusively throughout. `decide`
+    /// gets the standing as read inside the lock, the records, and the side file's lines as written
+    /// (no side file has none). The records it returns are appended and made durable first; only
+    /// then is the side file rewritten, by rename, to the lines it returns, so that a crash between
+    /// the two leaves every line in the side file and the log to recognise it by (`Importing`). It
+    /// returns `None` for the lines to leave the side file untouched.
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError>;
     /// Holds the log exclusively from read to append. `decide` gets the log's standing as read
     /// inside the lock (from its first record, so a marking that landed after `standing` was read
     /// shows), and the records, or why they do not parse; the records it returns are appended. A

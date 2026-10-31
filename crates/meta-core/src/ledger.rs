@@ -138,8 +138,8 @@ impl Ledger {
                 self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { kind, reason, pr, checked } => {
-                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked));
+            Event::Escaped { kind, reason, pr, checked, imported } => {
+                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked, *imported));
             }
             Event::Resolved { escape, task } => {
                 match self.tasks.get(task) {

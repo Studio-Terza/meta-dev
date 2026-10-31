@@ -1,5 +1,8 @@
-use crate::escape::{Checked, Logged};
+use crate::escape::{Checked, Logged, described};
+use crate::event::Event;
 use crate::ids::{EscapeKind, PrNumber, Reason, Timestamp};
+use crate::imported::Imported;
+use crate::line_hash::LineHash;
 use serde::{Deserialize, Serialize};
 
 /// An escape from a build not verified to be from main. It stays in the side file beside the real
@@ -21,7 +24,20 @@ impl UnverifiedEscape {
     }
 
     fn logged(&self) -> Logged {
-        Logged::new(self.kind.clone(), self.reason.clone(), self.pr, self.checked)
+        Logged::new(self.kind.clone(), self.reason.clone(), self.pr, self.checked, None)
+    }
+
+    /// The `Escaped` event that moves this escape into the log, marked as imported from the side
+    /// file line `line`, and what to say about it.
+    pub(crate) fn imported(&self, line: LineHash) -> (Event, String) {
+        let event = Event::Escaped {
+            kind: self.kind.clone(),
+            reason: self.reason.clone(),
+            pr: self.pr,
+            checked: self.checked,
+            imported: Some(Imported { line, written: self.at }),
+        };
+        (event, format!("{} (from an unverified build)", described(&self.kind, Checked::Listed, self.pr, &self.reason)))
     }
 }
 
