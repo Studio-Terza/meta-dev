@@ -380,7 +380,8 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         "P6 CI runs per merged PR: 6 runs over 2 merged PRs; median 3",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    assert!(!reply.text.contains("task-2") && !reply.text.contains("lease-2"), "{}", reply.text);
+    let listed = ["task-2 open", "task-2 claimed", "lease-2"];
+    assert!(listed.iter().all(|line| !reply.text.contains(line)), "{}", reply.text);
 }
 
 #[test]
@@ -1674,7 +1675,7 @@ fn status_reports_rework_per_task_from_ci_runs_and_failed_review_rounds_for_merg
         vec![Event::Retired { task: id("task-5"), reason: id("superseded") }],
     ]
     .concat();
-    let pulls = vec![("7", ran(3)), ("9", ran(2)), ("21", ran(1)), ("30", ran(1)), ("31", ran(5))];
+    let pulls = vec![("7", ran(3)), ("21", ran(1)), ("30", ran(1)), ("31", ran(5))];
     let (reply, added) = call(&mut given(history, pulls), &["status"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
@@ -1687,6 +1688,30 @@ fn status_reports_rework_per_task_from_ci_runs_and_failed_review_rounds_for_merg
         worst: task-3 (failed review rounds 4, CI runs 1)\n";
     assert!(reply.text.contains(expected), "{}", reply.text);
     assert!(reply.text.contains("P6 CI runs per merged PR: 2 runs over 1 merged PRs; median 2\n"), "{}", reply.text);
+}
+
+#[test]
+fn status_takes_a_merged_prs_ci_runs_from_the_log_and_never_reads_github_for_it() {
+    let history = [linked_by_lead("task-2", "9"), vec![merged("9", 4), done("task-2")]].concat();
+    let withheld = status_of(history.clone());
+    let line = "  task-2 (#9, done): failed review rounds 0, CI runs 4\n";
+    assert!(withheld.contains(line), "{withheld}");
+    let (reply, _) = call(&mut given(history, vec![("9", ran(1))]), &["status"], "");
+    assert!(reply.text.contains(line), "{}", reply.text);
+}
+
+#[test]
+fn status_reads_an_open_prs_ci_runs_live_and_names_them_unavailable_when_github_fails() {
+    let history =
+        [linked_by_lead("task-1", "7"), linked_by_lead("task-2", "9"), vec![merged("9", 2), done("task-2")]].concat();
+    let status = status_of(history);
+    assert!(
+        status.contains(
+            "  task-1 (#7, linked): failed review rounds 0, CI runs unavailable (no recorded reply for #7)\n"
+        ),
+        "{status}"
+    );
+    assert!(status.contains("  task-2 (#9, done): failed review rounds 0, CI runs 2\n"), "{status}");
 }
 
 #[test]

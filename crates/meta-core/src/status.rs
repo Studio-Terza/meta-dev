@@ -89,7 +89,7 @@ impl Ledger {
         let median_text = median.map_or_else(|| "none yet".to_owned(), |median| median.to_string());
         let missing: Result<Vec<PrNumber>, String> = match &github {
             Reconciliation::Listed(merges) => {
-                Ok(merges.prs().iter().filter(|pr| !self.landed.contains(pr)).copied().collect())
+                Ok(merges.prs().iter().filter(|pr| !self.landed.contains_key(pr)).copied().collect())
             }
             Reconciliation::Unavailable(why) => Err(format!("GitHub merged list unreadable: {why}")),
         };
@@ -209,7 +209,7 @@ impl Ledger {
     fn merges_line(&self, through_meta: usize, outside_logged: usize, github: Reconciliation) -> String {
         match github {
             Reconciliation::Listed(merges) => {
-                let missing = merges.prs().iter().filter(|pr| !self.landed.contains(pr)).count();
+                let missing = merges.prs().iter().filter(|pr| !self.landed.contains_key(pr)).count();
                 format!(
                     "P1 merges through meta: {through_meta} of {}\nP1 merged outside meta: {} ({missing} missing from the log)\n",
                     through_meta + outside_logged + missing,

@@ -13,7 +13,8 @@ pub struct Ledger {
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
     pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
-    pub(crate) landed: BTreeSet<PrNumber>,
+    /// Each PR merged, with the CI runs recorded at merge time: a merged PR's count cannot change.
+    pub(crate) landed: BTreeMap<PrNumber, RunCount>,
     /// Every PR each task was ever linked to, so a retired task keeps its PR for the rework report.
     pub(crate) linked_prs: BTreeMap<TaskId, BTreeSet<PrNumber>>,
     /// PRs logged as merged outside meta.
@@ -118,7 +119,7 @@ impl Ledger {
             }
             Event::Merged { pr, runs, route, .. } => {
                 self.linked(*pr).ok_or_else(|| format!("unlinked {pr} merged"))?;
-                self.landed.insert(*pr);
+                self.landed.insert(*pr, *runs);
                 if *route == Route::Outside {
                     self.outside.insert(*pr);
                 }
