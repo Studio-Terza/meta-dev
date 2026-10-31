@@ -1599,3 +1599,71 @@ fn status_falsifies_p1_for_each_outside_start_escape_and_hook_denials_never_coun
     assert!(reply.text.contains("P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;"), "{}", reply.text);
     assert!(reply.text.contains("bypassed, from outside-start escapes: 1;"), "{}", reply.text);
 }
+
+/// A task linked to `pr` by the lead, with no lease.
+fn linked_by_lead(task: &str, pr: &str) -> Vec<Event> {
+    vec![opened(task), self_claimed(task), Event::Linked { task: id(task), pr: id(pr), pin: id(PINNED) }]
+}
+
+/// One review round on `task`'s PR: a lease, its use and the verdict.
+fn review_round(lease: &str, task: &str, pr: &str, verdict: &str) -> Vec<Event> {
+    vec![
+        Event::ReviewLeased { lease: id(lease), task: id(task), pr: id(pr), head: id(PINNED), deadline: None },
+        used(lease),
+        Event::Reviewed { lease: id(lease), verdict: id(verdict) },
+    ]
+}
+
+/// The recorded `gh run list` reply of a PR's branch, with `runs` rows.
+fn ran(runs: usize) -> GhReplies {
+    let rows: Vec<serde_json::Value> = (1..=runs).map(|row| serde_json::json!({ "databaseId": row })).collect();
+    GhReplies { runs: serde_json::Value::Array(rows).to_string(), ..pull(PINNED, &[Outcome::Green]) }
+}
+
+#[test]
+fn status_reports_rework_per_task_from_ci_runs_and_failed_review_rounds_for_merged_open_and_retired_tasks() {
+    let history = [
+        linked_by_lead("task-1", "7"),
+        review_round("lease-1", "task-1", "7", "fail"),
+        review_round("lease-2", "task-1", "7", "fail"),
+        review_round("lease-3", "task-1", "7", "pass"),
+        linked_by_lead("task-2", "9"),
+        vec![merged("9", 2), done("task-2")],
+        linked_by_lead("task-3", "21"),
+        review_round("lease-4", "task-3", "21", "fail"),
+        review_round("lease-5", "task-3", "21", "fail"),
+        review_round("lease-6", "task-3", "21", "fail"),
+        review_round("lease-7", "task-3", "21", "fail"),
+        linked_by_lead("task-4", "30"),
+        linked_by_lead("task-5", "31"),
+        review_round("lease-8", "task-5", "31", "fail"),
+        vec![Event::Retired { task: id("task-5"), reason: id("superseded") }],
+    ]
+    .concat();
+    let pulls = vec![("7", ran(3)), ("9", ran(2)), ("21", ran(1)), ("30", ran(1)), ("31", ran(5))];
+    let (reply, added) = call(&mut given(history, pulls), &["status"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
+    let expected = "rework per task (report only; not part of P6)\n\
+        \x20 task-1 (#7, linked): failed review rounds 2, CI runs 3\n\
+        \x20 task-2 (#9, done): failed review rounds 0, CI runs 2\n\
+        \x20 task-3 (#21, linked): failed review rounds 4, CI runs 1\n\
+        \x20 task-5 (#31, retired): failed review rounds 1, CI runs 5\n\
+        rework total: tasks with 2 or more failed review rounds: 2 of 5 tasks with a PR; \
+        worst: task-3 (failed review rounds 4, CI runs 1)\n";
+    assert!(reply.text.contains(expected), "{}", reply.text);
+    assert!(reply.text.contains("P6 CI runs per merged PR: 2 runs over 1 merged PRs; median 2\n"), "{}", reply.text);
+}
+
+#[test]
+fn status_reports_rework_as_none_without_a_linked_pr_and_names_ci_runs_it_could_not_read() {
+    let status = status_of(vec![opened("task-1")]);
+    let none = "rework per task (report only; not part of P6)\n  (none)\n\
+        rework total: tasks with 2 or more failed review rounds: 0 of 0 tasks with a PR; worst: none\n";
+    assert!(status.contains(none), "{status}");
+    let history = [linked_by_lead("task-1", "7"), review_round("lease-1", "task-1", "7", "fail")].concat();
+    let status = status_of(history);
+    let unread = "  task-1 (#7, linked): failed review rounds 1, CI runs unavailable (no recorded reply for #7)\n";
+    assert!(status.contains(unread), "{status}");
+    assert!(status.contains("worst: task-1 (failed review rounds 1, CI runs unavailable)"), "{status}");
+}
