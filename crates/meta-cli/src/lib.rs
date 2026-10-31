@@ -125,7 +125,7 @@ impl Call {
                          meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
-                         meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
+                         meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n  meta hook subagent-stop < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -197,6 +197,7 @@ impl Call {
             ),
             ["hook", "pre-tool-use"] => Some(Ok(Self::Hook(Phase::Before, stdin()))),
             ["hook", "post-tool-use"] => Some(Ok(Self::Hook(Phase::After, stdin()))),
+            ["hook", "subagent-stop"] => Some(Ok(Self::Hook(Phase::Stop, stdin()))),
             _ => None,
         };
         let why = match call {
@@ -381,6 +382,7 @@ fn hook<L: Log>(
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
         Hook::Bind(binding) => Box::new(move |ledger: Ledger| ledger.bind(binding, at)),
+        Hook::Stopped(agent) => Box::new(move |ledger: Ledger| ledger.stopped(&agent)),
     };
     if let Err(unverified) = verify(standing) {
         return Answer::broken_hook(phase, unverified);

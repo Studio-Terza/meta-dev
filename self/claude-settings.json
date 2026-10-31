@@ -25,6 +25,17 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "meta hook subagent-stop || true",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

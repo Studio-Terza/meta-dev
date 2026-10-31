@@ -98,6 +98,11 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
     },
+    /// The agent a used lease started has stopped (Claude Code's SubagentStop hook). A finished
+    /// lease is never overdue and never running work, until a canned continue resumes its agent.
+    Finished {
+        lease: LeaseId,
+    },
     Denied {
         attempt: Attempt,
     },

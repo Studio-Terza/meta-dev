@@ -33,6 +33,8 @@ pub struct Spent {
     deadline: Deadline,
     resumes: usize,
     verdict: Option<Verdict>,
+    /// Set by the stop of the agent; a canned continue clears it, for the agent runs again.
+    stopped: bool,
 }
 
 impl Deadline {
@@ -108,7 +110,7 @@ impl Lease {
     pub(crate) fn spend(self) -> (Spent, Event) {
         let used = Event::LeaseUsed { lease: self.id };
         let deadline = self.deadline;
-        (Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None }, used)
+        (Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None, stopped: false }, used)
     }
 }
 
@@ -142,6 +144,24 @@ impl Spent {
 
     pub(crate) fn resume(&mut self) {
         self.resumes += 1;
+        self.stopped = false;
+    }
+
+    /// The stop of the agent this lease started.
+    pub(crate) fn stop(&mut self) -> Result<(), String> {
+        let id = self.lease.id;
+        match (&self.agent, self.stopped) {
+            (None, _) => Err(format!("{id} finished but no agent is recorded as started on it")),
+            (Some(_), true) => Err(format!("{id} finished twice")),
+            (Some(_), false) => {
+                self.stopped = true;
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn is_stopped(&self) -> bool {
+        self.stopped
     }
 
     /// The one verdict of a used review lease.
@@ -180,9 +200,17 @@ impl LeaseSlot {
         }
     }
 
-    /// Whether the agent on this lease has finished its part: a review with its verdict.
+    /// Whether the agent on this lease has finished its part: it stopped, or a review gave its verdict.
     pub(crate) fn is_finished(&self) -> bool {
-        matches!(self, Self::Spent(spent) if spent.verdict.is_some())
+        matches!(self, Self::Spent(spent) if spent.verdict.is_some() || spent.stopped)
+    }
+
+    /// The agent running on this lease: started, and not finished.
+    pub(crate) fn running_agent(&self) -> Option<&AgentId> {
+        match self {
+            Self::Spent(spent) if !self.is_finished() => spent.agent.as_ref(),
+            _ => None,
+        }
     }
 
     /// Moves every deadline of the lease later by `span`: the time its task waited on the owner.

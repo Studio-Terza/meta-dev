@@ -382,6 +382,8 @@ deferred
   (none)
 live leases
   lease-1 for task-1, no deadline
+running agents
+  (none)
 open escapes: 3
   escape-1 [gap] gh is down
   escape-2 [gap] gh is down again
@@ -2989,6 +2991,155 @@ fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
     assert!(bad.is_err());
     let old_flag = Call::parse(&command(&["claim", "task-1", "--agent", "a", "--role", "critic"]), String::new);
     assert!(old_flag.is_err());
+}
+
+// Task 44: a finished agent stops being overdue and running work, and status lists running agents.
+
+fn finished(lease: &str) -> Event {
+    Event::Finished { lease: id(lease) }
+}
+
+/// A SubagentStop hook input (Claude Code hooks reference, SubagentStop).
+fn subagent_stopped(agent: &str) -> String {
+    serde_json::json!({
+        "session_id": "abc123",
+        "transcript_path": "/session/abc123.jsonl",
+        "cwd": "/work",
+        "permission_mode": "default",
+        "hook_event_name": "SubagentStop",
+        "stop_hook_active": false,
+        "agent_id": agent,
+        "agent_type": "general-purpose",
+        "agent_transcript_path": "/session/abc123/subagents/agent.jsonl",
+        "last_assistant_message": "Done.",
+        "background_tasks": [],
+        "session_crons": [],
+    })
+    .to_string()
+}
+
+fn stop(events: Vec<Event>, agent: &str) -> (Answer, Vec<Event>) {
+    call(&mut given(events, Vec::new()), &["hook", "subagent-stop"], &subagent_stopped(agent))
+}
+
+/// A work lease due at unix `deadline`, used, with its agent started.
+fn running_until(deadline: u64) -> Vec<Event> {
+    let start = Event::Started {
+        lease: id("lease-1"),
+        agent: id(AGENT_ID),
+        deadline: Some(Timestamp::from_unix_seconds(deadline)),
+    };
+    vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", deadline), used("lease-1"), start]
+}
+
+#[test]
+fn subagent_stop_records_finished_for_the_lease_the_agent_was_started_on() {
+    let (reply, events) = stop(running_until(1000), AGENT_ID);
+    assert_eq!((reply.text.as_str(), reply.code, events), (ALLOW, Code::Done, vec![finished("lease-1")]));
+    let line = serde_json::to_string(&finished("lease-1")).unwrap();
+    assert_eq!(line, r#"{"event":"Finished","lease":1}"#);
+}
+
+#[test]
+fn subagent_stop_ignores_unknown_agents_and_agents_already_finished_quietly() {
+    let quiet = |events: Vec<Event>, agent: &str| {
+        let (reply, added) = stop(events, agent);
+        assert_eq!((reply.text.as_str(), reply.code, added), (ALLOW, Code::Done, Vec::new()), "{agent}");
+    };
+    quiet(running_until(1000), "a0000000000000000");
+    quiet(Vec::new(), AGENT_ID);
+    quiet(claimed_task(), AGENT_ID);
+    quiet([running_until(1000), vec![finished("lease-1")]].concat(), AGENT_ID);
+}
+
+#[test]
+fn subagent_stop_never_blocks_the_stop_even_when_it_cannot_decide() {
+    let mut ports = given(running_until(1000), Vec::new());
+    let (reply, events) = call(&mut ports, &["hook", "subagent-stop"], "not json");
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    assert!(reply.text.contains("systemMessage") && reply.text.contains("not recorded"), "{}", reply.text);
+    assert!(!reply.text.contains("block"), "{}", reply.text);
+    let mut corrupt = given(vec![claimed("task-1")], Vec::new());
+    let (reply, events) = call(&mut corrupt, &["hook", "subagent-stop"], &subagent_stopped(AGENT_ID));
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    assert!(reply.text.contains("systemMessage") && !reply.text.contains("block"), "{}", reply.text);
+}
+
+#[test]
+fn a_finished_lease_is_not_overdue() {
+    let overdue = |events: Vec<Event>| status_of(events).contains("lease-1 for task-1: agent");
+    assert!(overdue(running_until(1)));
+    assert!(!overdue([running_until(1), vec![finished("lease-1")]].concat()));
+}
+
+#[test]
+fn a_finished_lease_is_not_running_work_so_the_idle_alarm_fires() {
+    let silent = |events: Vec<Event>| status_of(events).contains("idle (flagged)\n  (none)\n");
+    assert!(silent(running_until(1000)));
+    let text = status_of([running_until(1000), vec![finished("lease-1")]].concat());
+    assert!(text.contains(&format!("idle (flagged)\n  {IDLE}task-1 (claimed)\n")), "{text}");
+}
+
+#[test]
+fn status_lists_each_started_unfinished_lease_under_running_agents() {
+    let text = status_of(running_until(1000));
+    let listed = format!("running agents\n  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000\n");
+    assert!(text.contains(&listed), "{text}");
+    assert!(text.contains("live leases\n  (none)\nrunning agents\n"), "{text}");
+    let none = "running agents\n  (none)\n";
+    assert!(status_of(claimed_task()).contains(none), "an unused lease is not an agent");
+    let unbound = vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1000), used("lease-1")];
+    assert!(status_of(unbound).contains(none), "a used lease with no agent recorded");
+    let done = [running_until(1000), vec![finished("lease-1")]].concat();
+    assert!(status_of(done).contains(none), "a finished lease");
+}
+
+#[test]
+fn a_started_lease_past_its_deadline_shows_under_overdue_not_running_agents() {
+    let text = status_of(running_until(1));
+    assert!(text.contains("running agents\n  (none)\n"), "{text}");
+    assert!(text.contains(&format!("overdue leases (flagged)\n  lease-1 for task-1: agent {AGENT_ID}")), "{text}");
+}
+
+#[test]
+fn running_agents_name_the_role_and_leave_out_agents_of_finished_tasks() {
+    let review = [
+        linked_task(),
+        vec![review_leased_until("lease-2", PINNED, 1000), used("lease-2")],
+        vec![Event::Started { lease: id("lease-2"), agent: id("a1"), deadline: None }],
+    ]
+    .concat();
+    let text = status_of(review.clone());
+    assert!(text.contains("  lease-2: agent a1, task-1, role review, deadline unix 1000\n"), "{text}");
+    let judged = [review, vec![Event::Reviewed { lease: id("lease-2"), verdict: id("pass") }]].concat();
+    assert!(status_of(judged).contains("running agents\n  (none)\n"));
+    let critic = [running_until(1000), vec![marked("task-1")]].concat();
+    assert!(status_of(critic).contains(&format!("agent {AGENT_ID}, task-1, role critic, deadline unix 1000\n")));
+    let task_done = [running_until(1000), vec![linked("task-1", "7"), merged("7", 1), done("task-1")]].concat();
+    assert!(status_of(task_done).contains("running agents\n  (none)\n"));
+}
+
+#[test]
+fn a_canned_continue_makes_a_finished_agent_run_again_until_it_stops_again() {
+    let resumed = [running_until(1000), vec![finished("lease-1"), Event::Resumed { lease: id("lease-1") }]].concat();
+    assert!(status_of(resumed.clone()).contains(&format!("lease-1: agent {AGENT_ID}, task-1, role work")));
+    let (reply, events) = stop(resumed.clone(), AGENT_ID);
+    assert_eq!((reply.text.as_str(), events), (ALLOW, vec![finished("lease-1")]));
+    let again = [resumed, vec![finished("lease-1")]].concat();
+    assert!(status_of(again).contains("running agents\n  (none)\n"));
+}
+
+#[test]
+fn a_finished_record_that_fits_no_started_lease_or_repeats_is_a_corrupt_log() {
+    let bad = |events: Vec<Event>| {
+        let (reply, added) = call(&mut given(events, Vec::new()), &["status"], "");
+        assert!(reply.text.contains("does not fit the log"), "{}", reply.text);
+        assert!(added.is_empty());
+    };
+    bad(vec![finished("lease-1")]);
+    bad([claimed_task(), vec![finished("lease-1")]].concat());
+    bad([claimed_task(), vec![used("lease-1"), finished("lease-1")]].concat());
+    bad([running_until(1000), vec![finished("lease-1"), finished("lease-1")]].concat());
 }
 
 /// A log whose records carry the given unix seconds, read by a status call made at `now`.

@@ -21,6 +21,13 @@ struct AgentInput {
     description: String,
 }
 
+/// The one field of a SubagentStop input that meta reads (Claude Code hooks reference, SubagentStop:
+/// `agent_id`, beside `agent_type`, `agent_transcript_path` and `last_assistant_message`).
+#[derive(Deserialize)]
+struct StopInput {
+    agent_id: AgentId,
+}
+
 /// The one field of an Agent call's `tool_response` that meta reads. Claude Code's hooks reference
 /// documents `agentId` for both a completed and an `async_launched` response.
 #[derive(Deserialize)]
@@ -45,6 +52,8 @@ struct SendInput {
 pub enum Phase {
     Before,
     After,
+    /// A subagent has stopped. It only reports: a reply never blocks the stop.
+    Stop,
 }
 
 #[derive(Debug)]
@@ -53,6 +62,8 @@ pub enum Hook {
     Agent(AgentStart),
     Resume(Resume),
     Bind(Binding),
+    /// A subagent stopped: the agent id Claude Code gave it.
+    Stopped(AgentId),
 }
 
 #[derive(Debug)]
@@ -86,6 +97,12 @@ impl Hook {
     const UNBOUND: &str = "no agent recorded, so a resume on this lease stays denied";
 
     pub fn read(phase: Phase, input: &str) -> Self {
+        if phase == Phase::Stop {
+            return match serde_json::from_str::<StopInput>(input) {
+                Ok(StopInput { agent_id }) => Self::Stopped(agent_id),
+                Err(why) => Self::Settled(phase.broken(&format!("hook input cannot be parsed ({why})"))),
+            };
+        }
         match Self::tool(phase, input) {
             Ok(hook) => hook,
             Err(why) => Self::Settled(phase.broken(&format!("hook input cannot be parsed ({why})"))),
@@ -125,7 +142,7 @@ impl Hook {
                     .map_err(|_| format!("the Agent description {description:?} is not exactly a lease id"));
                 Ok(Self::Bind(Binding(lease.map(|lease| (lease, agent)))))
             }
-            Phase::Before | Phase::After => Ok(Self::Settled(Self::allow(Vec::new()))),
+            Phase::Before | Phase::After | Phase::Stop => Ok(Self::Settled(Self::allow(Vec::new()))),
         }
     }
 
@@ -143,7 +160,7 @@ impl Phase {
     pub fn broken(self, why: &str) -> Accepted {
         let outcome = match self {
             Self::Before => "denied",
-            Self::After => "not recorded",
+            Self::After | Self::Stop => "not recorded",
         };
         self.refuse(format!("{why}; {outcome}, fail closed."), Vec::new())
     }
@@ -158,6 +175,8 @@ impl Phase {
                 }
             }),
             Self::After => json!({ "decision": "block", "reason": reason }),
+            // Never `decision: block` and never exit 2: either would keep the agent from stopping.
+            Self::Stop => json!({ "systemMessage": reason }),
         };
         Accepted::new(events, format!("{reply}\n"))
     }
@@ -198,6 +217,16 @@ impl Ledger {
                 None => refusal(format!("{lease} is unknown")),
             },
         }
+    }
+
+    /// Records the stop of the agent that a used lease started. An agent id no lease started, one
+    /// already recorded as stopped, and Claude Code's own internal agents are ignored quietly.
+    pub fn stopped(&self, agent: &AgentId) -> Accepted {
+        let finished = self.leases.iter().find_map(|(id, slot)| match slot {
+            LeaseSlot::Spent(spent) if spent.agent() == Some(agent) && !spent.is_stopped() => Some(*id),
+            _ => None,
+        });
+        Hook::allow(finished.map(|lease| Event::Finished { lease }).into_iter().collect())
     }
 
     pub fn resume(&self, resume: Resume) -> Accepted {

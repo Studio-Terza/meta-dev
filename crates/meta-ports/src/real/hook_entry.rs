@@ -56,3 +56,17 @@ fn the_hook_entries_block_when_meta_is_missing_or_crashes() {
         );
     });
 }
+
+#[test]
+fn the_subagent_stop_entry_records_every_stop_and_never_blocks_one() {
+    let settings: Value = serde_json::from_str(SETTINGS).unwrap();
+    let group = &settings["hooks"]["SubagentStop"][0];
+    let hook = &group["hooks"][0];
+    let command = hook["command"].as_str().unwrap();
+    assert_eq!(command, "meta hook subagent-stop || true");
+    assert!(group.get("matcher").is_none(), "internal agents are ignored by meta, so no matcher");
+    assert!(hook["timeout"].as_u64().unwrap() > JsonlLog::PATIENCE.as_secs());
+    let crashing = "meta() { return 101; }; ";
+    let outcomes = ["", crashing].map(|prelude| exit_code(prelude, command));
+    assert_eq!(outcomes, [Some(0), Some(0)], "exit 2 would keep the agent from stopping");
+}
