@@ -10,5 +10,8 @@ meta-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+meta-testkit.workspace = true
+
 [lints]
 workspace = true
