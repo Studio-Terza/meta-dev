@@ -3503,7 +3503,7 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
         "--allowedTools",
         "Read,Grep",
         "--disallowedTools",
-        "Agent,Task",
+        "Agent,Task,Bash",
         "--json-schema",
         schema,
         "--no-session-persistence",
@@ -3600,16 +3600,18 @@ fn worker_start_on_the_real_log_runs_a_main_build_only_and_reads_mains_allowlist
 }
 
 /// A `self/workers.toml` for the working tree that allows Glob and denies Agent and `denied`.
-fn tree_workers(model: &str, denied: &str) -> String {
+fn tree_workers(model: &str, denied: &[&str]) -> String {
+    let denials: String =
+        denied.iter().map(|tool| format!("[[review.deny]]\ntool = \"{tool}\"\nsource = \"s\"\n")).collect();
     format!(
-        "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[model]\nreview = \"{model}\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n[[review.deny]]\ntool = \"{denied}\"\nsource = \"s\"\n"
+        "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[model]\nreview = \"{model}\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n{denials}"
     )
 }
 
 #[test]
 fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist() {
     let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
-    ports.git.local.insert(SelfFile::Workers, tree_workers("sonnet", "Task"));
+    ports.git.local.insert(SelfFile::Workers, tree_workers("sonnet", &["Agent", "Task", "Bash"]));
     ports.git.files.remove(&SelfFile::Workers);
     let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
@@ -3621,8 +3623,10 @@ fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist
 }
 
 #[test]
-fn worker_start_is_stopped_at_parse_by_a_file_with_no_model_or_a_deny_list_that_lacks_task() {
-    for (model, denied) in [("", "Task"), ("opus", "Bash")] {
+fn worker_start_is_stopped_at_parse_by_a_file_with_no_model_or_a_deny_list_that_lacks_task_or_bash() {
+    let every = ["Agent", "Task", "Bash"];
+    for (model, denied) in [("", &every[..]), ("opus", &["Agent", "Bash"]), ("opus", &["Agent", "Task"]), ("opus", &[])]
+    {
         let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
         ports.git.local.insert(SelfFile::Workers, tree_workers(model, denied));
         let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
@@ -4026,8 +4030,9 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
     assert_eq!(ports.sessions.0.stopped.len(), 1);
 }
 
-/// A log whose second transaction fails, as a log held too long by others does.
-struct Flaky(MemoryLog, usize);
+/// A log whose transaction number `.2` (counted in `.1`) fails, as a log held too long by others
+/// does: before the decision runs, or, when `.3`, after it ran and its records are lost.
+struct Flaky(MemoryLog, usize, usize, bool);
 
 impl Log for Flaky {
     fn place(&self) -> String {
@@ -4070,9 +4075,11 @@ impl Log for Flaky {
         decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError> {
         self.1 += 1;
-        match self.1 {
-            2 => Err(PortError::new("the log is locked")),
-            _ => self.0.transact(decide),
+        match (self.1 == self.2, self.3) {
+            (false, _) => self.0.transact(decide),
+            (true, false) => Err(PortError::new("the log is locked")),
+            // The decision ran, with its effects outside the log, and then the log failed.
+            (true, true) => self.0.transact(decide).and_then(|_| Err(PortError::new("the log is locked"))),
         }
     }
 }
@@ -4080,14 +4087,26 @@ impl Log for Flaky {
 #[test]
 fn worker_wait_keeps_its_last_look_when_the_log_cannot_be_read_and_stops_when_it_never_could() {
     let Ports { log, git, github, clock, sessions, build } = given(worker_task(1), Vec::new());
-    let mut ports = Ports { log: Flaky(log, 0), git, github, clock, sessions, build };
+    let mut ports = Ports { log: Flaky(log, 0, 2, false), git, github, clock, sessions, build };
     ports.sessions.states.borrow_mut().extend([Ok(Session::Running), Ok(Session::Ended(None))]);
     let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
     assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
     let mut broken = given(worker_task(1), Vec::new());
     broken.log.broken = Some(PortError::new("no log"));
+    let before = broken.clock.now();
     let (reply, _) = call(&mut broken, &["worker", "wait", "lease-2"], "");
     assert_eq!((reply.code, reply.text.as_str()), (Code::Failed, "error: no log\n"));
+    assert!(broken.clock.now() > before, "the first look was tried again before giving up");
+}
+
+#[test]
+fn worker_wait_looks_again_when_its_first_look_finds_the_log_busy() {
+    let Ports { log, git, github, clock, sessions, build } = given(worker_task(1), Vec::new());
+    let mut ports = Ports { log: Flaky(log, 0, 1, false), git, github, clock, sessions, build };
+    ports.sessions.states.borrow_mut().extend([Ok(Session::Ended(None))]);
+    let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
 }
 
 #[test]
@@ -4155,6 +4174,36 @@ fn stop_that_cannot_kill_a_group_fails_naming_it_and_records_only_the_ones_it_ki
     let (reply, added) = call(&mut ports, &["stop"], "");
     assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
     assert_eq!(reply.text, "error: could not stop worker-2: not permitted\n");
+}
+
+#[test]
+fn stop_with_two_workers_where_one_group_will_not_stop_records_the_other_and_names_the_first() {
+    let mut ports = given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    ports.sessions.unstoppable = vec![run_of(802, 2)];
+    let (reply, added) = call(&mut ports, &["stop"], "");
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert_eq!(
+        reply.text,
+        "error: lease-4: worker worker-4 was stopped by meta stop\ncould not stop worker-2: not permitted\n"
+    );
+    assert_eq!(added, vec![Event::Finished { lease: id("lease-4"), end: Some(WorkerEnd::Stopped) }]);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)]);
+}
+
+#[test]
+fn stop_whose_log_fails_after_the_kills_names_the_killed_and_does_not_look_for_workers_again() {
+    let Ports { log, git, github, clock, mut sessions, build } =
+        given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    sessions.unstoppable = vec![run_of(802, 2)];
+    sessions.listed = Ok(vec![Ok((id("worker-2"), run_of(802, 2))), Ok((id("worker-4"), run_of(804, 4)))]);
+    let mut ports = Ports { log: Flaky(log, 0, 1, true), git, github, clock, sessions, build };
+    let reply = answer(parsed(&["stop"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert!(reply.text.contains("the log is locked"), "{}", reply.text);
+    assert!(reply.text.contains("killed worker-4; could not stop worker-2: not permitted"), "{}", reply.text);
+    assert!(reply.text.contains("nothing was recorded"), "{}", reply.text);
+    assert!(!reply.text.contains("no worker found"), "{}", reply.text);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)], "each group is killed once");
 }
 
 /// The JSONL log at `path` holding a line that does not parse, with recorded ports around it.

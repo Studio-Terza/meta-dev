@@ -23,7 +23,7 @@ Today `<model>` is `opus`, `<allow>` is `Read,Grep,Glob` and `<deny>` is `Agent,
 | `--model` | The model the session runs on. `--restricted` ignores user settings, so without this flag `self/workers.toml` would not choose the model. `[model] review` must be there, not empty, and have a source, or the file does not parse. The worker's model is recorded with its process group and transcript, and `meta status` shows it. |
 | `--tools` | The session's tools are exactly these. Without it, `--allowedTools` only skips prompts and every other tool stays available. Naming `Glob` and `Grep` here also brings them back on macOS and Linux, where the default set leaves them out. |
 | `--allowedTools` | These tools run with no approval. |
-| `--disallowedTools` | Deny comes first in rule order, so nothing can allow these back. A bare name removes the tool. `--tools` does not cover MCP tools, so `mcp__*` is denied too. A deny list without `Agent` or `Task` does not parse. |
+| `--disallowedTools` | Deny comes first in rule order, so nothing can allow these back. A bare name removes the tool. `--tools` does not cover MCP tools, so `mcp__*` is denied too. A deny list without `Agent`, `Task` or `Bash` does not parse. |
 | `--json-schema` | The session must end with `{verdict: pass or fail, findings: [text]}`. It adds the `StructuredOutput` tool, whose input is this verdict. |
 | `--no-session-persistence` | Nothing to resume: the transcript below is the record. |
 | `--permission-mode dontAsk` | Anything not allowed is denied, not asked. |
@@ -73,11 +73,10 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta worker start <lease>` | a live, unused review lease with a deadline, under the limit | one session starts, with the PR's view and diff in its scratch directory; events `LeaseUsed`, then `Started` with agent `worker-<n>`, the deadline counted from now, the process group, the transcript path and the model; prints all of them and returns at once |
 | `meta worker start <lease>` | the lease is unknown, used, not live, a work lease, or has no deadline | refused naming which; nothing starts; nothing is recorded |
 | `meta worker start <lease>` | the running workers have reached `concurrency.running` in `self/workers.toml` | refused naming them, with `meta stop <lease>` as the next step. The check holds the log's lock, so two starts cannot both take the last place. The limit is per log: a scratch log counts only its own workers, so 4 on the real log and 4 on a scratch log can run at once |
-| `meta worker start <lease>` | a worker gave its verdict and its session has not ended | it still counts towards the limit |
 | `meta worker start <lease>` | the log is real and the build is not from main | refused, as for any write; nothing starts |
 | `meta worker start <lease>` | the log is real | `self/workers.toml` is read from main; the working tree's copy is ignored |
 | `meta worker start <lease>` | the log is scratch | any build runs, with the working tree's `self/workers.toml`, so a branch can try the file it changes |
-| `meta worker start <lease>` | `self/workers.toml` cannot be read, an entry has no source, the model is missing or empty, or the deny list lacks `Agent` or `Task` | error; nothing starts; the lease stays unused |
+| `meta worker start <lease>` | `self/workers.toml` cannot be read, an entry has no source, the model is missing or empty, or the deny list lacks `Agent`, `Task` or `Bash` | error; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | `claude --version` is below the floor in `self/workers.toml` | refused naming both; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | `claude --version` fails, or its reply does not parse | error; nothing starts; the lease stays unused |
 | `meta worker start <lease>` | the PR is no longer at the lease's head | refused naming both heads, with `meta review` as the next step; nothing starts |
@@ -96,12 +95,13 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta worker wait <lease>` | the log cannot be read after the first look | it keeps the last look, so the deadline still holds |
 | `meta worker wait <lease>` | the worker's end is already recorded | exits with no event |
 | `meta worker wait <lease>` | the lease started no worker | refused, which ends the session |
-| `meta worker wait <lease>` | the first look at the log fails | error, which ends the session |
+| `meta worker wait <lease>` | the first look at the log fails for a reason other than a refusal, such as a lock held by another command | it looks again every 5 s, up to 6 more times; if every look fails, error, which ends the session |
 | `meta stop <lease>` | a worker is running on the lease | its process group is killed; event `Finished` with `end: stopped` |
 | `meta stop` | any workers are running | every group is killed and each is recorded; with none running, says so |
 | `meta stop <lease>` | the lease started no worker, or its worker has ended | refused; nothing is killed |
 | `meta stop` | the build may not write the log | it kills all the same, and says nothing was recorded: the kill switch always kills. The supervisor then records `vanished` if it can |
-| `meta stop` | a group cannot be killed | error naming it; the others are still killed and recorded |
+| `meta stop` | a group cannot be killed, or is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone |
+| `meta stop` | the log fails after some groups were killed | error saying which were killed and which could not be stopped, and that nothing was recorded |
 | `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; error saying which were killed and that nothing was recorded |
 | `meta verdict <task>` | the only used review lease with no verdict is a worker's, running or ended | refused: a worker's verdict comes only from its session |
 | `meta verdict <task>` | a worker's lease, running or ended, stands before a reviewer's | recorded on the reviewer's lease, whatever head the worker's lease has |
@@ -114,6 +114,6 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 ## What this piece leaves open
 
-- **Live canary: pending, run by the lead before the next review.** No session of this command has run with the `--restricted` flags in meta. The lead runs a live canary before the next review and adds what it observed to the PR body. It should also try a read outside the scratch directory.
+- **Live canary: run on a scratch log, not on the real log.** The lead ran it before review, on a scratch log, at 849ac01. The path through the real log is still unobserved until a build from main runs a worker.
 - **A worker with no supervisor stays listed.** If the machine restarts, the sessions are gone but the log still shows them running, and they count towards the limit. `meta stop` clears them: the port sees that the leader is not theirs, kills nothing, and records the end.
 - **A lost `Finished`.** If the log cannot be written when a worker ends, the supervisor reports it in `supervisor.log` and exits. `meta stop` clears that too.

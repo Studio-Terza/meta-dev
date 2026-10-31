@@ -2,6 +2,7 @@
 #![allow(clippy::disallowed_methods)]
 
 use crate::PortError;
+use nix::errno::Errno;
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
 use std::io::Read;
@@ -32,20 +33,71 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<Vec<u8>> {
     receiver
 }
 
-/// Ends a whole process group, so that what its leader started goes too: SIGTERM, a short grace,
-/// then SIGKILL. A group that is already gone is not an error.
-pub fn end_group(leader: u32) {
-    let group = i32::try_from(leader).ok().map(Pid::from_raw);
-    group.into_iter().for_each(|group| {
-        let _ = killpg(group, Signal::SIGTERM);
-        thread::sleep(GRACE);
-        let _ = killpg(group, Signal::SIGKILL);
-    });
+/// How long a group killed with SIGKILL has to be gone before it is reported as still there.
+const CONFIRM: Duration = Duration::from_secs(2);
+
+fn refused(group: Pid, error: Errno) -> PortError {
+    PortError::new(format!("process group {group}: {error}"))
 }
 
-/// Ends the command and its process group.
+/// SIGTERM, a short grace, then SIGKILL, with no look at the outcome after it. False when the
+/// group was already gone; an error when the first signal is refused (no permission, say). After
+/// that first signal the group is ours to signal, so a later refusal is the process table's way of
+/// saying that only zombies are left (macOS answers EPERM for them).
+fn signal_end(group: Pid) -> Result<bool, PortError> {
+    match killpg(group, Signal::SIGTERM) {
+        Ok(()) => {}
+        Err(Errno::ESRCH) => return Ok(false),
+        Err(error) => return Err(refused(group, error)),
+    }
+    thread::sleep(GRACE);
+    match killpg(group, Signal::SIGKILL) {
+        Ok(()) | Err(Errno::ESRCH | Errno::EPERM) => Ok(true),
+        Err(error) => Err(refused(group, error)),
+    }
+}
+
+/// Whether the group still has a live member: signal 0 finds a member, but a leader that is a
+/// zombie (nobody has waited for it) is gone for our purposes, and so is a group only zombies
+/// remain in.
+fn remains(group: Pid, leader: u32) -> Result<bool, PortError> {
+    match killpg(group, None) {
+        Ok(()) => {
+            let state = run_found("ps", &["-o", "stat=", "-p", &leader.to_string()])?;
+            Ok(state.is_some_and(|state| !state.trim_start().starts_with('Z')))
+        }
+        Err(Errno::ESRCH | Errno::EPERM) => Ok(false),
+        Err(error) => Err(refused(group, error)),
+    }
+}
+
+/// Ends a whole process group, so that what its leader started goes too: SIGTERM, a short grace,
+/// then SIGKILL. A group that is already gone is not an error. Ok means the group is gone: a kill
+/// that fails, or a group that is still there after `CONFIRM`, is an error.
+pub fn end_group(leader: u32) -> Result<(), PortError> {
+    let group = i32::try_from(leader)
+        .ok()
+        .filter(|id| *id > 1)
+        .map(Pid::from_raw)
+        .ok_or_else(|| PortError::new(format!("process group {leader}: not a group to kill")))?;
+    if !signal_end(group)? {
+        return Ok(());
+    }
+    let deadline = Instant::now() + CONFIRM;
+    while remains(group, leader)? {
+        if Instant::now() >= deadline {
+            return Err(PortError::new(format!("process group {leader}: still there after SIGKILL")));
+        }
+        thread::sleep(POLL);
+    }
+    Ok(())
+}
+
+/// Ends the command and its process group. The leader is this process's child and stays a zombie
+/// until waited for, so the group is not confirmed gone here.
 fn terminate(child: &mut Child) {
-    end_group(child.id());
+    let group = i32::try_from(child.id()).ok().map(Pid::from_raw);
+    group.into_iter().for_each(|group| drop(signal_end(group)));
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -147,7 +199,7 @@ pub fn decides_with(program: &str, args: &[&str], prepare: impl FnOnce(&mut Comm
 
 #[cfg(test)]
 mod tests {
-    use super::{decides_with, run, run_found, run_within};
+    use super::{decides_with, end_group, run, run_found, run_within};
     use meta_testkit::Scratch;
     use std::fs;
     use std::process::Command;
@@ -178,6 +230,26 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(gone(pid), "grandchild {pid} survived");
+    }
+
+    #[test]
+    fn end_group_returns_ok_only_once_the_group_is_gone_and_a_gone_group_is_not_an_error() {
+        use std::os::unix::process::CommandExt;
+        let mut child = Command::new("sleep").arg("30").process_group(0).spawn().unwrap();
+        let leader = child.id();
+        // Reaped as it dies, so that it is gone and not a zombie that still holds its group.
+        let reaper = std::thread::spawn(move || child.wait());
+        end_group(leader).unwrap();
+        reaper.join().unwrap().unwrap();
+        end_group(leader).unwrap();
+    }
+
+    #[test]
+    fn end_group_refuses_ids_that_are_no_group_to_kill() {
+        for leader in [0, 1, u32::MAX] {
+            let error = end_group(leader).unwrap_err();
+            assert!(error.to_string().contains("not a group to kill"), "{error}");
+        }
     }
 
     #[test]

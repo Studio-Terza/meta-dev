@@ -200,7 +200,7 @@ fn start_in(
     let (reader, writer) = std::io::pipe().map_err(|error| at(dir, error))?;
     let run = launch(dir, session, reader)?;
     let joined = record(dir, &run).and_then(|()| join(writer));
-    joined.inspect_err(|_| end_group(run.group.leader()))?;
+    joined.inspect_err(|_| drop(end_group(run.group.leader())))?;
     Ok(run)
 }
 
@@ -263,7 +263,7 @@ impl Sessions for HeadlessSessions {
 
     fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
         if is_alive(run)? {
-            end_group(run.group.leader());
+            end_group(run.group.leader())?;
         }
         Ok(())
     }

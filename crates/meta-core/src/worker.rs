@@ -56,14 +56,15 @@ struct Tools {
     deny: Denied,
 }
 
-/// The tools a session is denied, which always hold `Denied::SPAWNING`.
+/// The tools a session is denied, which always hold `Denied::SPAWNING`: the two that start an
+/// agent, and `Bash`, which could start `claude`.
 #[derive(Debug, Deserialize)]
 #[serde(try_from = "Vec<Tool>")]
 struct Denied(Vec<Tool>);
 
 impl Denied {
     /// A session must never start another agent (`docs/prereg.md`, "Headless workers").
-    const SPAWNING: [&str; 2] = ["Agent", "Task"];
+    const SPAWNING: [&str; 3] = ["Agent", "Task", "Bash"];
 }
 
 impl TryFrom<Vec<Tool>> for Denied {
@@ -598,7 +599,7 @@ mod tests {
 
     /// The review section with no allowed tools, denying what a session must not have.
     fn review() -> String {
-        format!("[review]\nallow = []\n{}", denying(&["Agent", "Task"]))
+        format!("[review]\nallow = []\n{}", denying(&["Agent", "Task", "Bash"]))
     }
 
     #[test]
@@ -641,11 +642,13 @@ mod tests {
     }
 
     #[test]
-    fn a_deny_list_that_lacks_agent_or_task_does_not_parse() {
+    fn a_deny_list_that_lacks_agent_task_or_bash_does_not_parse() {
         let with = |deny: String| Workers::parse(&format!("{CLAUDE}{MODEL}{LIMIT}[review]\nallow = []\n{deny}"));
         let why = |tools: &[&str]| with(denying(tools)).unwrap_err().to_string();
         assert!(with("deny = []\n".to_owned()).unwrap_err().to_string().contains("the deny list lacks Agent"));
         assert!(why(&["Agent"]).contains("the deny list lacks Task"));
+        assert!(why(&["Agent", "Task"]).contains("the deny list lacks Bash"));
+        assert!(why(&["Agent", "Bash"]).contains("the deny list lacks Task"));
         assert!(why(&["Task", "Bash"]).contains("the deny list lacks Agent"));
         assert!(why(&["Agent(reviewer)", "agent", "Task"]).contains("the deny list lacks Agent"));
         assert!(with(denying(&["Bash", "Task", "Agent"])).is_ok());
@@ -710,7 +713,7 @@ mod tests {
 
     #[test]
     fn a_tool_or_limit_with_no_source_does_not_parse() {
-        let deny = denying(&["Agent", "Task"]);
+        let deny = denying(&["Agent", "Task", "Bash"]);
         let allow = |source: &str| format!("{CLAUDE}{MODEL}{LIMIT}[[review.allow]]\ntool = \"Read\"\n{source}{deny}");
         assert!(Workers::parse(&allow("source = \"s\"\n")).is_ok());
         let limit = format!("{CLAUDE}{MODEL}[concurrency]\nrunning = 4\n{}", review());

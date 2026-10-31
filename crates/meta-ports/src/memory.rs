@@ -201,6 +201,8 @@ pub struct RecordedSessions {
     pub broken_start: Option<PortError>,
     /// Why stopping fails, when it does.
     pub broken_stop: Option<PortError>,
+    /// The runs whose stop fails while every other stops.
+    pub unstoppable: Vec<WorkerRun>,
     /// The replies to `state`, one per call; after them a session is running.
     pub states: RefCell<VecDeque<Result<Session, PortError>>>,
     /// The lines of every session's transcript.
@@ -217,6 +219,7 @@ impl Default for RecordedSessions {
             stopped: Vec::new(),
             broken_start: None,
             broken_stop: None,
+            unstoppable: Vec::new(),
             states: RefCell::default(),
             transcript: Ok(Vec::new()),
             listed: Ok(Vec::new()),
@@ -255,6 +258,9 @@ impl Sessions for RecordedSessions {
 
     fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
         self.broken_stop.clone().map_or(Ok(()), Err)?;
+        if self.unstoppable.contains(run) {
+            return Err(PortError::new("not permitted"));
+        }
         self.stopped.push(run.clone());
         Ok(())
     }
