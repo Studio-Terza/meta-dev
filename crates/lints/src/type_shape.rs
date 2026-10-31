@@ -1,3 +1,4 @@
+use crate::Lint;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -19,15 +20,16 @@ use lint_core::Walk;
 #[derive(Debug)]
 pub struct TypeShape;
 
-impl TypeShape {
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for TypeShape {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "types carry their meaning: no bool fields, no tuples in signatures, no String errors",
             files.iter().flat_map(Self::violations).collect(),
         )
     }
+}
 
+impl TypeShape {
     fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
@@ -125,9 +127,7 @@ impl<'ast> Visit<'ast> for TypeShapes<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        for statement in Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

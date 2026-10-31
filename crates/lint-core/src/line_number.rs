@@ -6,8 +6,11 @@ use proc_macro2::Span;
 pub struct LineNumber(usize);
 
 impl LineNumber {
-    #[must_use]
-    pub const fn new(line: usize) -> LineNumber {
+    pub const FIRST: LineNumber = LineNumber(1);
+}
+
+impl From<usize> for LineNumber {
+    fn from(line: usize) -> LineNumber {
         LineNumber(line)
     }
 }

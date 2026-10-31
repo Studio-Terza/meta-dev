@@ -1,10 +1,11 @@
+mod placement;
+
 use std::path::{Path, PathBuf};
 
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
-use crate::module_path::ModulePath;
-use crate::placement::Placement;
 use crate::role::Role;
+use placement::Placement;
 
 #[derive(Debug)]
 pub struct SourceFile {
@@ -27,7 +28,7 @@ impl SourceFile {
             line: LineNumber::from(source.span()),
             source,
         })?;
-        Ok(Self { path, placement: Placement::of(located), text, syntax })
+        Ok(Self { path, placement: Placement::locate(located), text, syntax })
     }
 
     #[must_use]
@@ -36,18 +37,13 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn crate_root(&self) -> &Path {
-        self.placement.crate_root()
+    pub fn placement(&self) -> &Placement {
+        &self.placement
     }
 
     #[must_use]
-    pub fn module(&self) -> &ModulePath {
-        self.placement.module()
-    }
-
-    #[must_use]
-    pub fn role(&self) -> Role {
-        self.placement.role()
+    pub fn is_shipped(&self) -> bool {
+        self.placement.role() != Role::Target
     }
 
     #[must_use]

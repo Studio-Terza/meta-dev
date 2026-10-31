@@ -1,5 +1,6 @@
 mod finding;
 
+use crate::Lint;
 use finding::Finding;
 use syn::visit::Visit;
 use syn::{Ident, ItemFn, Path};
@@ -14,11 +15,8 @@ use lint_core::Violation;
 #[derive(Debug)]
 pub struct NoFreeFns;
 
-impl NoFreeFns {
-    const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
-
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for NoFreeFns {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "free functions are not allowed; make them associated functions or methods",
             files
@@ -34,6 +32,10 @@ impl NoFreeFns {
                 .collect(),
         )
     }
+}
+
+impl NoFreeFns {
+    const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
 
     fn free_fns(file: &syn::File) -> Vec<Ident> {
         let mut visitor = FreeFns { found: Vec::new() };
@@ -64,8 +66,6 @@ impl<'ast> Visit<'ast> for FreeFns {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        for statement in lint_core::Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        lint_core::Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }

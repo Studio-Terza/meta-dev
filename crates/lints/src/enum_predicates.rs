@@ -4,13 +4,14 @@ mod finding;
 mod kind;
 mod predicates;
 
+use crate::Lint;
 use declaration::Declaration;
 use declarations::Declarations;
 use finding::Finding;
 use kind::Kind;
 use predicates::Predicates;
-use syn::Type;
 use syn::visit::Visit;
+use syn::{Type, TypePath};
 
 use lint_core::{ModulePath, Name, Report, SourceFile, Violation};
 
@@ -19,16 +20,17 @@ pub struct EnumPredicates {
     declarations: Vec<Declaration>,
 }
 
-impl EnumPredicates {
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
-        let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::of).collect() };
+impl Lint for EnumPredicates {
+    fn report(files: &[SourceFile]) -> Report {
+        let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
         Report::new(
             "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
             files.iter().flat_map(|file| predicates.violations(file)).collect(),
         )
     }
+}
 
+impl EnumPredicates {
     fn violations(&self, file: &SourceFile) -> Vec<Violation> {
         let mut scan = Predicates::new(self, file);
         scan.visit_file(file.syntax());
@@ -36,15 +38,22 @@ impl EnumPredicates {
     }
 
     fn is_enum(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> bool {
-        let Type::Path(path) = implemented else {
-            return false;
-        };
-        let Some(last) = path.path.segments.last() else {
-            return false;
-        };
-        let name = Name::from(&last.ident);
-        let candidates: Vec<&Declaration> =
-            self.declarations.iter().filter(|declaration| declaration.is_named(file.crate_root(), &name)).collect();
+        match implemented {
+            Type::Path(path) => path
+                .path
+                .segments
+                .last()
+                .is_some_and(|last| self.names_enum(file, module, path, &Name::from(&last.ident))),
+            _ => false,
+        }
+    }
+
+    fn names_enum(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> bool {
+        let candidates: Vec<&Declaration> = self
+            .declarations
+            .iter()
+            .filter(|declaration| declaration.is_named(file.placement().crate_root(), name))
+            .collect();
         let local = (path.qself.is_none() && path.path.segments.len() == 1)
             .then(|| candidates.iter().find(|declaration| declaration.is_in(module)))
             .flatten();

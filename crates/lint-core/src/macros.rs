@@ -7,6 +7,8 @@ use syn::{Block, Expr, Macro, Stmt, Token};
 pub struct Macros;
 
 impl Macros {
+    const ARROW_END: char = '>';
+
     #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {
         if invocation.path.is_ident("macro_rules") {
@@ -16,30 +18,31 @@ impl Macros {
         }
     }
 
+    pub fn walk(invocation: &Macro, visit: impl FnMut(&Stmt)) {
+        Self::statements(invocation).iter().for_each(visit);
+    }
+
     fn parsed(tokens: TokenStream) -> Vec<Stmt> {
-        Block::parse_within
-            .parse2(tokens.clone())
-            .or_else(|_| {
-                Punctuated::<Expr, Token![,]>::parse_terminated
-                    .parse2(tokens)
-                    .map(|arguments| arguments.into_iter().map(|argument| Stmt::Expr(argument, None)).collect())
-            })
-            .unwrap_or_default()
+        Block::parse_within.parse2(tokens.clone()).or_else(|_| Self::expressions(tokens)).unwrap_or_default()
+    }
+
+    fn expressions(tokens: TokenStream) -> syn::Result<Vec<Stmt>> {
+        Punctuated::<Expr, Token![,]>::parse_terminated
+            .parse2(tokens)
+            .map(|arguments| arguments.into_iter().map(|argument| Stmt::Expr(argument, None)).collect())
     }
 
     fn transcribers(rules: &TokenStream) -> Vec<TokenStream> {
-        let mut bodies = Vec::new();
-        let mut after_arrow = false;
-        for tree in rules.clone() {
-            match tree {
-                TokenTree::Punct(punct) if punct.as_char() == '>' => after_arrow = true,
-                TokenTree::Group(group) if after_arrow => {
-                    bodies.push(group.stream());
-                    after_arrow = false;
+        let trees: Vec<TokenTree> = rules.clone().into_iter().collect();
+        trees
+            .iter()
+            .zip(trees.iter().skip(1))
+            .filter_map(|(arrow, body)| match (arrow, body) {
+                (TokenTree::Punct(punct), TokenTree::Group(group)) if punct.as_char() == Self::ARROW_END => {
+                    Some(group.stream())
                 }
-                _ => after_arrow = false,
-            }
-        }
-        bodies
+                _ => None,
+            })
+            .collect()
     }
 }
