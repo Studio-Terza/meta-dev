@@ -89,8 +89,8 @@ impl Ledger {
                 let purpose = Purpose::Review { pr: *pr, head: head.clone() };
                 self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
             }
-            Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
-                Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,
+            Event::Reviewed { lease, verdict, head } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict, head.as_ref())?,
                 _ => Err(format!("{lease} reviewed but not used"))?,
             },
             Event::Started { lease, agent, deadline } => match self.leases.get_mut(lease) {

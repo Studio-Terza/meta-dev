@@ -48,7 +48,7 @@ pub use event::{Attempt, Event, Record, Route};
 pub use head::{Head, Marking, Standing};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Branch, CheckName, Claimant, Email, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
+    AgentId, AgentName, Binary, Branch, CheckName, Claimant, Email, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
     Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId,
     Timestamp, Title, Verdict,
 };
