@@ -47,9 +47,9 @@ const RUN: &str = "run.json";
 /// `claude` finds it from `HOME` (probed under `env -i`). Every token and socket of the caller stays
 /// behind. A session also gets `NO_MEMORY_FILES`, set by meta.
 const PASSED: [&str; 3] = ["PATH", "HOME", "USER"];
-/// Set for every session. Claude Code loads a `CLAUDE.md` in a subdirectory once a file beside it
-/// is read (docs, `/en/memory`), and `--restricted` does not stop that, as far as its docs say, so
-/// a PR that adds one to its checkout would otherwise give its session instructions (`/en/env-vars`).
+/// Set for every session. The Claude Code docs describe a risk: a `CLAUDE.md` in a subdirectory
+/// loads once a file beside it is read (`/en/memory`), and this setting stops it (`/en/env-vars`).
+/// A direct probe did not reproduce the risk, and showed no effect of the setting either way.
 const NO_MEMORY_FILES: (&str, &str) = ("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "1");
 
 /// Private to the user, whatever the umask: a transcript holds the session's whole run.
@@ -549,6 +549,36 @@ mod tests {
         assert_eq!(found, vec![Ok(("worker-1".parse().unwrap(), run.clone()))]);
         assert_eq!(unreadable.len(), 1, "{unreadable:?}");
         HeadlessSessions.stop(&run).unwrap();
+    }
+
+    #[test]
+    fn a_staged_place_beside_the_worker_directories_is_no_worker_and_no_error_to_the_list() {
+        let root = Scratch::new("worker-staged");
+        let live = root.join("worker-1");
+        let (run, _lifeline) = session(&live, "sleep 30");
+        super::record(&live, &run).unwrap();
+        let place = root.join("staged/worker-2.1");
+        fs::create_dir_all(place.join("tree/deep")).unwrap();
+        fs::write(place.join("tree/deep/kept"), "code\n").unwrap();
+        for (frozen, mode) in [("tree/deep/kept", 0o400), ("tree/deep", 0o500), ("tree", 0o500)] {
+            fs::set_permissions(place.join(frozen), fs::Permissions::from_mode(mode)).unwrap();
+        }
+        assert_eq!(listed_in(root.as_ref()), Ok(vec![Ok(("worker-1".parse().unwrap(), run.clone()))]));
+        HeadlessSessions.stop(&run).unwrap();
+    }
+
+    #[test]
+    fn a_failed_start_whose_checkout_is_frozen_is_moved_aside_whole() {
+        let root = Scratch::new("worker-frozen");
+        let dir = root.join("worker-1");
+        let (run, _lifeline) = session(&dir, "exit 0");
+        ended(&dir, &run);
+        let checkout = dir.join("scratch").join(ReviewCopy::CHECKOUT);
+        assert_eq!(mode(&checkout), 0o500);
+        make_way(&dir).unwrap();
+        assert!(!dir.exists());
+        let aside = root.join("failed/worker-1.1/scratch").join(ReviewCopy::CHECKOUT);
+        assert_eq!((mode(&aside), mode(&aside.join("kept"))), (0o500, 0o400));
     }
 
     #[test]

@@ -129,6 +129,6 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 ## What this piece leaves open
 
-- **Live canary: pending, run by the lead before the next review.** No session of this command has run with the `--restricted` flags in meta. The lead runs a live canary before the next review and adds what it observed to the PR body. It should also try a read outside the scratch directory, and it should check that a `CLAUDE.md` in `checkout/` does not reach the session: that rests on the docs, and no session has tried it.
+- **Live canary: run once, at an earlier commit.** The lead's canary ran a real session of this command on the task-52 branch at 4308098, on a scratch log. It read the checkout and its verdict was recorded. It ran before the merge of main and before the deadline was counted after staging, so the first real worker after this merges is the check at the final head. The `CLAUDE.md` setting was probed directly, and the probe showed no effect either way: a marker in a subdirectory `CLAUDE.md` was absent both with and without the setting.
 - **A worker with no supervisor stays listed.** If the machine restarts, the sessions are gone but the log still shows them running, and they count towards the limit. `meta stop` clears them: the port sees that the leader is not theirs, kills nothing, and records the end.
 - **A lost `Finished`.** If the log cannot be written when a worker ends, the supervisor reports it in `supervisor.log` and exits. `meta stop` clears that too.
