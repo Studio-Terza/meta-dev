@@ -1,8 +1,8 @@
 use meta_core::{
-    Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
-    Malformed, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, Pull, Reason,
-    Reconciliation, Record, Refusal, Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached,
-    Unreadable, Updating, Verdict,
+    Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, LeaseId,
+    Ledger, Malformed, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, Pull, Reason,
+    Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title,
+    Unreached, Unreadable, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -44,6 +44,8 @@ pub enum LedgerCall {
         agent: AgentName,
         deadline: Option<Minutes>,
     },
+    /// Prints again the brief of an unused, live lease; records nothing.
+    Brief(LeaseId),
     Status,
 }
 
@@ -111,7 +113,7 @@ impl Call {
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
-                         meta verdict <task> pass|fail\n  \
+                         meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
                          meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
@@ -133,6 +135,7 @@ impl Call {
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
             ["merge", pr, "--update"] => ledger(pr.parse().map(LedgerCall::Update)),
+            ["brief", lease] => ledger(lease.parse().map(LedgerCall::Brief)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
                 pr.parse()
@@ -315,6 +318,11 @@ enum Prepared {
         reason: Reason,
         pull: Option<Pull>,
     },
+    Brief {
+        lease: LeaseId,
+        origin: Origin,
+        rules: Rules,
+    },
     Review {
         task: TaskId,
         agent: AgentName,
@@ -354,7 +362,19 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
         LedgerCall::Local(local) => Prepared::Local(local),
         LedgerCall::Status => {
             let unreached = |failure: Failure| Unreached::by(&failure);
+            let runs = ledger
+                .rework_prs()
+                .into_iter()
+                .map(|pr| {
+                    let read = github
+                        .runs(pr)
+                        .map_err(|error| Unreached::by(&error))
+                        .and_then(|listed| RunCount::from_gh(&listed).map_err(|error| Unreached::by(&error)));
+                    (pr, read)
+                })
+                .collect();
             Prepared::Status(Sources {
+                runs,
                 github: match github.merged_list() {
                     Ok(listed) => Merges::from_gh(&listed),
                     Err(error) => Reconciliation::Unavailable(Cause::Port(Unreached::by(&error))),
@@ -393,6 +413,10 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
             let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
             Prepared::Retire { task, reason, pull }
         }
+        LedgerCall::Brief(lease) => {
+            ledger.reissue(lease)?;
+            Prepared::Brief { lease, origin: git.origin()?, rules: spec(git, SelfFile::Rules, Rules::parse)? }
+        }
         LedgerCall::Review { task, agent, deadline } => {
             let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
             let allowance = deadline.map_or_else(|| roles(git).map(|roles| roles.review()), Ok)?;
@@ -424,6 +448,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         },
         Prepared::Update { updating } => updating.record(),
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
+        Prepared::Brief { lease, origin, rules } => ledger.reissue(lease)?.brief(&origin, &rules),
         Prepared::Review { task, agent, pull, rules, allowance } => {
             ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?
         }

@@ -7,6 +7,7 @@ use crate::ledger::Ledger;
 use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
+use crate::rework::PrRuns;
 use crate::task::Progress;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
@@ -17,6 +18,8 @@ pub struct Sources {
     pub github: Reconciliation,
     pub kinds: Result<EscapeKinds, Unreached>,
     pub predictions: Result<Predictions, Unreached>,
+    /// CI runs of every PR in `Ledger::rework_prs`, for the report-only rework section.
+    pub runs: PrRuns,
 }
 
 /// Why P1's agent-start half cannot say "holds": meta sees a start without a lease only through an
@@ -34,7 +37,7 @@ impl Ledger {
     }
 
     fn report(&self, sources: Sources, at: Timestamp) -> (Vec<Event>, String) {
-        let Sources { github, kinds, predictions } = sources;
+        let Sources { github, kinds, predictions, runs: pr_runs } = sources;
         let listed = |keep: fn(&Progress) -> bool| -> Vec<String> {
             self.tasks.values().filter(|task| keep(task)).map(|task| task.to_string()).collect()
         };
@@ -173,6 +176,7 @@ impl Ledger {
                 self.closed_as_historical()
             ),
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
+            self.rework(&pr_runs),
             section("predictions", &predicted),
         ]
         .concat();

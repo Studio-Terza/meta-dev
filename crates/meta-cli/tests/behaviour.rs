@@ -42,12 +42,22 @@ fn claimed(task: &str) -> Event {
 }
 
 fn leased(lease: &str, task: &str) -> Event {
-    Event::Leased { lease: id(lease), task: id(task), deadline: None }
+    Event::Leased { lease: id(lease), task: id(task), agent: None, deadline: None }
 }
 
 /// A lease from this change on: its deadline in unix seconds.
 fn leased_until(lease: &str, task: &str, deadline: u64) -> Event {
-    Event::Leased { lease: id(lease), task: id(task), deadline: Some(Timestamp::from_unix_seconds(deadline)) }
+    leased_to("alice", lease, task, deadline)
+}
+
+/// A lease from this change on, with the agent it is for.
+fn leased_to(agent: &str, lease: &str, task: &str, deadline: u64) -> Event {
+    Event::Leased {
+        lease: id(lease),
+        task: id(task),
+        agent: Some(id(agent)),
+        deadline: Some(Timestamp::from_unix_seconds(deadline)),
+    }
 }
 
 fn linked(task: &str, pr: &str) -> Event {
@@ -232,6 +242,7 @@ fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
         "{}",
         reply.text
     );
+    assert!(reply.text.contains("meta brief lease-1 prints its brief again"), "{}", reply.text);
 }
 
 #[test]
@@ -240,7 +251,8 @@ fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
     [claimed_task(), linked_task()].into_iter().for_each(|history| {
         let history = [history, vec![spent.clone()]].concat();
         let (reply, events) = call(&mut given(history, Vec::new()), &["claim", "task-1", "--agent", "bob"], "");
-        assert_eq!((reply.code, events), (Code::Done, vec![leased_until("lease-2", "task-1", FIXTURE_WORK_DEADLINE)]));
+        let fresh = leased_to("bob", "lease-2", "task-1", FIXTURE_WORK_DEADLINE);
+        assert_eq!((reply.code, events), (Code::Done, vec![fresh]));
         assert!(reply.text.contains("lease: lease-2") && reply.text.contains("rules:"), "{}", reply.text);
     });
 }
@@ -351,7 +363,8 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         vec![Event::Denied { attempt: Attempt::AgentStart }],
     ]
     .concat();
-    let (reply, events) = call(&mut given(history, Vec::new()), &["status"], "");
+    let pulls = vec![("9", ran(1)), ("10", ran(1))];
+    let (reply, events) = call(&mut given(history, pulls), &["status"], "");
     assert_eq!(events, vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 1")]);
     let expected = [
         "task-1 claimed by alice",
@@ -730,12 +743,26 @@ fn self_claimed(task: &str) -> Event {
 }
 
 fn review_leased(lease: &str, head: &str) -> Event {
-    Event::ReviewLeased { lease: id(lease), task: id("task-1"), pr: id("7"), head: id(head), deadline: None }
+    Event::ReviewLeased {
+        lease: id(lease),
+        task: id("task-1"),
+        agent: None,
+        pr: id("7"),
+        head: id(head),
+        deadline: None,
+    }
 }
 
 fn review_leased_until(lease: &str, head: &str, deadline: u64) -> Event {
     let deadline = Some(Timestamp::from_unix_seconds(deadline));
-    Event::ReviewLeased { lease: id(lease), task: id("task-1"), pr: id("7"), head: id(head), deadline }
+    Event::ReviewLeased {
+        lease: id(lease),
+        task: id("task-1"),
+        agent: Some(id("rev")),
+        pr: id("7"),
+        head: id(head),
+        deadline,
+    }
 }
 
 fn finished_task() -> Vec<Event> {
@@ -1561,7 +1588,7 @@ fn leases_from_before_deadlines_fold_as_no_deadline_and_are_never_overdue() {
     assert_eq!(serde_json::from_str::<Record>(old).unwrap().event, started("lease-1", AGENT_ID));
     let new = Record { at: Timestamp::from_unix_seconds(1), event: leased_until("lease-1", "task-1", 9) };
     let line = serde_json::to_string(&new).unwrap();
-    assert_eq!(line, r#"{"at":1,"event":"Leased","lease":1,"task":1,"deadline":9}"#);
+    assert_eq!(line, r#"{"at":1,"event":"Leased","lease":1,"task":1,"agent":"alice","deadline":9}"#);
 }
 
 // Task 31 (critic issue #11): P1 judges agent starts too, and a hook denial is not a miss.
@@ -1876,4 +1903,137 @@ fn the_idle_alarm_follows_the_clock_through_a_wait_and_its_answer() {
     call(&mut ports, &["claim", "task-1", "--agent", "alice"], "");
     let (status, _) = call(&mut ports, &["status"], "");
     assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
+}
+
+/// A task linked to `pr` by the lead, with no lease.
+fn linked_by_lead(task: &str, pr: &str) -> Vec<Event> {
+    vec![opened(task), self_claimed(task), Event::Linked { task: id(task), pr: id(pr), pin: id(PINNED) }]
+}
+
+/// One review round on `task`'s PR: a lease, its use and the verdict.
+fn review_round(lease: &str, task: &str, pr: &str, verdict: &str) -> Vec<Event> {
+    vec![
+        Event::ReviewLeased {
+            lease: id(lease),
+            task: id(task),
+            agent: None,
+            pr: id(pr),
+            head: id(PINNED),
+            deadline: None,
+        },
+        used(lease),
+        Event::Reviewed { lease: id(lease), verdict: id(verdict) },
+    ]
+}
+
+/// The recorded `gh run list` reply of a PR's branch, with `runs` rows.
+fn ran(runs: usize) -> GhReplies {
+    let rows: Vec<serde_json::Value> = (1..=runs).map(|row| serde_json::json!({ "databaseId": row })).collect();
+    GhReplies { runs: serde_json::Value::Array(rows).to_string(), ..pull(PINNED, &[Outcome::Green]) }
+}
+
+#[test]
+fn status_reports_rework_per_task_from_ci_runs_and_failed_review_rounds_for_merged_open_and_retired_tasks() {
+    let history = [
+        linked_by_lead("task-1", "7"),
+        review_round("lease-1", "task-1", "7", "fail"),
+        review_round("lease-2", "task-1", "7", "fail"),
+        review_round("lease-3", "task-1", "7", "pass"),
+        linked_by_lead("task-2", "9"),
+        vec![merged("9", 2), done("task-2")],
+        linked_by_lead("task-3", "21"),
+        review_round("lease-4", "task-3", "21", "fail"),
+        review_round("lease-5", "task-3", "21", "fail"),
+        review_round("lease-6", "task-3", "21", "fail"),
+        review_round("lease-7", "task-3", "21", "fail"),
+        linked_by_lead("task-4", "30"),
+        linked_by_lead("task-5", "31"),
+        review_round("lease-8", "task-5", "31", "fail"),
+        vec![Event::Retired { task: id("task-5"), reason: id("superseded") }],
+    ]
+    .concat();
+    let pulls = vec![("7", ran(3)), ("9", ran(2)), ("21", ran(1)), ("30", ran(1)), ("31", ran(5))];
+    let (reply, added) = call(&mut given(history, pulls), &["status"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
+    let expected = "rework per task (report only; not part of P6)\n\
+        \x20 task-1 (#7, linked): failed review rounds 2, CI runs 3\n\
+        \x20 task-2 (#9, done): failed review rounds 0, CI runs 2\n\
+        \x20 task-3 (#21, linked): failed review rounds 4, CI runs 1\n\
+        \x20 task-5 (#31, retired): failed review rounds 1, CI runs 5\n\
+        rework total: tasks with 2 or more failed review rounds: 2 of 5 tasks with a PR; \
+        worst: task-3 (failed review rounds 4, CI runs 1)\n";
+    assert!(reply.text.contains(expected), "{}", reply.text);
+    assert!(reply.text.contains("P6 CI runs per merged PR: 2 runs over 1 merged PRs; median 2\n"), "{}", reply.text);
+}
+
+#[test]
+fn status_reports_rework_as_none_without_a_linked_pr_and_names_ci_runs_it_could_not_read() {
+    let status = status_of(vec![opened("task-1")]);
+    let none = "rework per task (report only; not part of P6)\n  (none)\n\
+        rework total: tasks with 2 or more failed review rounds: 0 of 0 tasks with a PR; worst: none\n";
+    assert!(status.contains(none), "{status}");
+    let history = [linked_by_lead("task-1", "7"), review_round("lease-1", "task-1", "7", "fail")].concat();
+    let status = status_of(history);
+    let unread = "  task-1 (#7, linked): failed review rounds 1, CI runs unavailable (no recorded reply for #7)\n";
+    assert!(status.contains(unread), "{status}");
+    assert!(status.contains("worst: task-1 (failed review rounds 1, CI runs unavailable)"), "{status}");
+}
+
+#[test]
+fn brief_of_an_unused_live_lease_prints_the_brief_its_claim_printed_and_records_nothing() {
+    let mut ports = given(vec![opened("task-1")], Vec::new());
+    let (claim, _) = call(&mut ports, &["claim", "task-1", "--agent", "alice", "--deadline", "10"], "");
+    ports.clock = FakeClock::at(Timestamp::from_unix_seconds(500));
+    let (reply, events) = call(&mut ports, &["brief", "lease-1"], "");
+    assert_eq!((reply, events), (claim, Vec::new()));
+    let used = Event::LeaseUsed { lease: id("lease-1") };
+    ports.log.records.push(Record { at: Timestamp::from_unix_seconds(3), event: used });
+    let (fresh, _) = call(&mut ports, &["claim", "task-1", "--agent", "bob"], "");
+    let (reply, events) = call(&mut ports, &["brief", "lease-2"], "");
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    assert_eq!(reply.text, fresh.text);
+    assert!(reply.text.contains("agent: bob\n") && reply.text.contains("lease: lease-2 "), "{}", reply.text);
+}
+
+#[test]
+fn brief_of_an_unused_review_lease_prints_the_review_brief_its_review_printed() {
+    let history = [linked_task(), vec![used("lease-1")]].concat();
+    let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
+    let (review, _) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    let (reply, events) = call(&mut ports, &["brief", "lease-2"], "");
+    assert_eq!((reply, events), (review, Vec::new()));
+    let (refused, _) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    assert!(refused.text.contains("meta brief lease-2 prints its brief again"), "{}", refused.text);
+}
+
+#[test]
+fn brief_of_a_lease_recorded_without_an_agent_names_the_task_agent_or_says_none_was_recorded() {
+    let (work, _) = call(&mut given(claimed_task(), Vec::new()), &["brief", "lease-1"], "");
+    assert!(work.text.contains("agent: alice\n") && work.text.contains("deadline: none\n"), "{}", work.text);
+    let history = [linked_task(), vec![used("lease-1"), review_leased("lease-2", MOVED)]].concat();
+    let (review, _) = call(&mut given(history, Vec::new()), &["brief", "lease-2"], "");
+    assert!(review.text.contains("agent: not recorded\n") && review.text.contains(MOVED), "{}", review.text);
+}
+
+#[test]
+fn brief_of_a_used_unknown_or_dead_lease_is_refused_with_the_reason_and_records_nothing() {
+    let spent = [claimed_task(), vec![used("lease-1")]].concat();
+    let cases = [
+        (spent, "lease-1", "already used"),
+        (claimed_task(), "lease-9", "lease-9 is unknown"),
+        (finished_task(), "lease-1", "not live"),
+        (
+            [claimed_task(), vec![Event::Retired { task: id("task-1"), reason: id("not wanted") }]].concat(),
+            "lease-1",
+            "not live",
+        ),
+    ];
+    cases.into_iter().for_each(|(events, lease, why)| {
+        let (reply, added) = call(&mut given(events, Vec::new()), &["brief", lease], "");
+        assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(why), "{}", reply.text);
+    });
+    let reply = Call::parse(&command(&["brief", "task-1"]), String::new).unwrap_err();
+    assert!(reply.code == Code::Failed && reply.text.contains("meta brief <lease>"), "{}", reply.text);
 }

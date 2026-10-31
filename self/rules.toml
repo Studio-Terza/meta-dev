@@ -14,7 +14,7 @@ source = "owner 2026-10-28: CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1; one centrall
 [[rule]]
 id = "pr-shape"
 text = "One PR per coherent change, branched off main, however large. Do not stack."
-source = "owner 2026-10-30: mega PRs are fine; CI is the only real gate; stacks churn CI"
+source = "owner 2026-10-30: mega PRs are fine. CI is the only real gate. stacks were overused at that point in time and were causing way too much churn"
 
 [[rule]]
 id = "push-and-stop"
@@ -43,10 +43,10 @@ source = "owner 2026-10: privacy"
 
 [[rule]]
 id = "red-first"
-text = "Tighten the check in the first commit; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix."
-source = "owner 2026-10-30: red first"
+text = "Only in a PR that adds or tightens a check (a lint, budget or threshold): tighten the check in the first commit so CI goes red on its target; push the red commit first; waiting for its CI run is the one allowed CI wait (poll every 60 s, at most 20 min); then push the fix. Other PRs need no red run."
+source = "owner 2026-10-25: we should have the cratemaxx lint go red first to verify that it works and then turn it green later in the pr"
 
 [[rule]]
 id = "review-gates"
 text = "Review: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds."
-source = "owner 2026-10-30: ordinary review instead of blocking approvals"
+source = "owner 2026-10-30: I don't want to get bombarded by a bunch of blocking requests... for now we stop this with normal review processes"

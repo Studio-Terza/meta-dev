@@ -1,11 +1,13 @@
 use crate::event::Event;
-use crate::ids::{AgentId, LeaseId, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
+use crate::ids::{AgentId, AgentName, LeaseId, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
 use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Lease {
     id: LeaseId,
     task: TaskId,
+    /// Who the lease is for; leases from before briefs could be reprinted have none.
+    agent: Option<AgentName>,
     purpose: Purpose,
     issued: Timestamp,
     deadline: Deadline,
@@ -71,8 +73,15 @@ impl fmt::Display for Deadline {
 }
 
 impl Lease {
-    pub(crate) fn issue(id: LeaseId, task: TaskId, purpose: Purpose, issued: Timestamp, deadline: Deadline) -> Self {
-        Self { id, task, purpose, issued, deadline }
+    pub(crate) fn issue(
+        id: LeaseId,
+        task: TaskId,
+        agent: Option<AgentName>,
+        purpose: Purpose,
+        issued: Timestamp,
+        deadline: Deadline,
+    ) -> Self {
+        Self { id, task, agent, purpose, issued, deadline }
     }
 
     /// The same allowance as this lease's, counted from `start` instead of from its issue.
@@ -86,6 +95,10 @@ impl Lease {
 
     pub(crate) fn task(&self) -> TaskId {
         self.task
+    }
+
+    pub(crate) fn agent(&self) -> Option<&AgentName> {
+        self.agent.as_ref()
     }
 
     pub(crate) fn purpose(&self) -> &Purpose {
