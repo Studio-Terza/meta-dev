@@ -127,7 +127,7 @@ pub enum Session {
     Ended(Option<ExitStatus>),
 }
 
-/// How a worker ended.
+/// How an agent is known to have ended. A subagent has one end only: `Stopped`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WorkerEnd {
@@ -136,7 +136,7 @@ pub enum WorkerEnd {
     Vanished,
     /// `meta worker wait` killed it at its deadline.
     Deadline,
-    /// `meta stop` killed it.
+    /// `meta stop` killed the worker, or a TaskStop stopped the subagent.
     Stopped,
 }
 

@@ -97,8 +97,8 @@ impl Ledger {
                 Some(LeaseSlot::Spent(spent)) => spent.start(agent.clone(), Deadline::of(*deadline), worker.clone())?,
                 _ => Err(format!("{lease} started an agent but is not used"))?,
             },
-            Event::Finished { lease, .. } => match self.leases.get_mut(lease) {
-                Some(LeaseSlot::Spent(spent)) => spent.stop()?,
+            Event::Finished { lease, end } => match self.leases.get_mut(lease) {
+                Some(LeaseSlot::Spent(spent)) => spent.stop(at, end.is_some())?,
                 _ => Err(format!("{lease} finished but not used"))?,
             },
             Event::Resumed { lease } => match self.leases.get_mut(lease) {

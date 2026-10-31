@@ -411,7 +411,7 @@ fn hook<L: Log>(
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
         Hook::Bind(binding) => Box::new(move |ledger: Ledger| ledger.bind(binding, at)),
-        Hook::Stopped(agent) => Box::new(move |ledger: Ledger| ledger.stopped(&agent)),
+        Hook::Stopped(agent, end) => Box::new(move |ledger: Ledger| ledger.stopped(&agent, end)),
     };
     if let Err(unverified) = verify(standing) {
         return Answer::broken_hook(phase, unverified);

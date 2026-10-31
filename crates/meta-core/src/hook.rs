@@ -3,6 +3,7 @@ use crate::ids::{AgentId, LeaseId, Timestamp};
 use crate::lease::LeaseSlot;
 use crate::ledger::Ledger;
 use crate::reply::Accepted;
+use crate::worker::WorkerEnd;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -36,6 +37,14 @@ struct AgentOutput {
     agent: AgentId,
 }
 
+/// The one field of a TaskStop's `tool_response` that meta reads: the id of the task it stopped,
+/// which for a subagent is its agent id. PostToolUse fires only after the tool succeeded, and the
+/// response holds the id even when the call named the agent some other way.
+#[derive(Deserialize)]
+struct TaskStopOutput {
+    task_id: AgentId,
+}
+
 /// Only these three fields are read; anything but the canned text is new instructions.
 #[derive(Deserialize)]
 struct SendInput {
@@ -52,7 +61,7 @@ struct SendInput {
 pub enum Phase {
     Before,
     After,
-    /// A subagent has stopped. It only reports: a reply never blocks the stop.
+    /// A subagent's turn has ended. It only reports: a reply never blocks the stop.
     Stop,
 }
 
@@ -62,8 +71,8 @@ pub enum Hook {
     Agent(AgentStart),
     Resume(Resume),
     Bind(Binding),
-    /// A subagent stopped: the agent id Claude Code gave it.
-    Stopped(AgentId),
+    /// A turn of the agent with this id ended, or, with an end, the agent itself did.
+    Stopped(AgentId, Option<WorkerEnd>),
 }
 
 #[derive(Debug)]
@@ -90,6 +99,7 @@ impl Hook {
     const GET_LEASE: &str =
         "Get one with meta claim <task> --agent <name>, then put its lease id in the Agent description.";
     const SEND_TOOL: &str = "SendMessage";
+    const STOP_TOOL: &str = "TaskStop";
     const CONTINUE: &str = "continue";
     const FRESH_AGENT: &str = "new instructions need a fresh agent on a fresh lease: meta claim <task> --agent <name>. \
                                A resume is only the message continue, to the agent a used lease started, \
@@ -99,7 +109,7 @@ impl Hook {
     pub fn read(phase: Phase, input: &str) -> Self {
         if phase == Phase::Stop {
             return match serde_json::from_str::<StopInput>(input) {
-                Ok(StopInput { agent_id }) => Self::Stopped(agent_id),
+                Ok(StopInput { agent_id }) => Self::Stopped(agent_id, None),
                 Err(why) => Self::Settled(phase.broken(&format!("hook input cannot be parsed ({why})"))),
             };
         }
@@ -141,6 +151,11 @@ impl Hook {
                     .parse()
                     .map_err(|_| format!("the Agent description {description:?} is not exactly a lease id"));
                 Ok(Self::Bind(Binding(lease.map(|lease| (lease, agent)))))
+            }
+            Phase::After if tool == Self::STOP_TOOL => {
+                let TaskStopOutput { task_id } = serde_json::from_value(parsed.tool_response)
+                    .map_err(|error| format!("{tool} tool_response: {error}"))?;
+                Ok(Self::Stopped(task_id, Some(WorkerEnd::Stopped)))
             }
             Phase::Before | Phase::After | Phase::Stop => Ok(Self::Settled(Self::allow(Vec::new()))),
         }
@@ -219,14 +234,15 @@ impl Ledger {
         }
     }
 
-    /// Records the stop of the agent that a used lease started. An agent id no lease started, one
-    /// already recorded as stopped, and Claude Code's own internal agents are ignored quietly.
-    pub fn stopped(&self, agent: &AgentId) -> Accepted {
+    /// Records a turn end of the agent that a used lease started, every one, for it can end many
+    /// turns; with `end`, records that the agent ended. An agent id no lease started, one already
+    /// recorded as ended, other background tasks and Claude Code's own internal agents are ignored quietly.
+    pub fn stopped(&self, agent: &AgentId, end: Option<WorkerEnd>) -> Accepted {
         let finished = self.leases.iter().find_map(|(id, slot)| match slot {
-            LeaseSlot::Spent(spent) if spent.agent() == Some(agent) && !spent.is_stopped() => Some(*id),
+            LeaseSlot::Spent(spent) if spent.agent() == Some(agent) && !spent.has_ended() => Some(*id),
             _ => None,
         });
-        Hook::allow(finished.map(|lease| Event::Finished { lease, end: None }).into_iter().collect())
+        Hook::allow(finished.map(|lease| Event::Finished { lease, end }).into_iter().collect())
     }
 
     pub fn resume(&self, resume: Resume) -> Accepted {

@@ -95,6 +95,18 @@ impl Ledger {
                 })
             })
             .collect();
+        let past: Vec<String> = self
+            .leases
+            .iter()
+            .filter(|(_, slot)| self.live(slot.lease()))
+            .filter_map(|(id, slot)| {
+                let agent = slot.agent();
+                agent.zip(slot.last_seen(at)).map(|(agent, seen)| {
+                    let (task, role, deadline) = (slot.lease().task(), self.agent_role(slot), slot.deadline());
+                    format!("{id}: agent {agent}, {task}, role {role}, {deadline}, {seen}")
+                })
+            })
+            .collect();
         let main = kinds.as_ref().ok();
         let set_aside = unverified.as_ref().map_or_else(|_| Vec::new(), UnverifiedEscapes::logged);
         let open_count = self.open_escapes() + set_aside.len();
@@ -194,7 +206,7 @@ impl Ledger {
             unverified.map_or_else(|why| format!("unverified escapes unavailable: {why}\n"), |read| read.note());
         let unjudged = match self.unjudged() {
             lines if lines.is_empty() => String::new(),
-            lines => section("review leases finished (flagged)", &lines),
+            lines => section("review leases with no verdict (flagged)", &lines),
         };
         let text = [
             match standing {
@@ -205,7 +217,8 @@ impl Ledger {
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             done_by_others,
             section("live leases", &leases),
-            section("running agents", &running),
+            section("agents with no turn end or stop recorded", &running),
+            section("agents with a turn end or stop recorded", &past),
             section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
@@ -235,7 +248,7 @@ impl Ledger {
         (fresh, text)
     }
 
-    /// Review leases whose agent stopped with no verdict, unless a later review of the task has one.
+    /// Review leases past a turn end or an end with no verdict, unless a later review of the task has one.
     fn unjudged(&self) -> Vec<String> {
         self.leases
             .iter()
@@ -248,14 +261,18 @@ impl Ledger {
                         other.lease().task() == task
                             && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
                     });
-                    (!later).then(|| format!("{id} for {task}: review finished with no verdict{}", slot.worker_note()))
+                    let how = match spent.has_ended() {
+                        true => "review finished",
+                        false => "review's last recorded turn ended",
+                    };
+                    (!later).then(|| format!("{id} for {task}: {how} with no verdict{}", slot.worker_note()))
                 }
                 _ => None,
             })
             .collect()
     }
 
-    /// A live lease of a task not waiting on the owner, past its deadline, whose agent has not finished.
+    /// A live lease of a task not waiting on the owner, past its deadline, with no turn end or end recorded.
     fn overdue(&self, slot: &LeaseSlot, at: Timestamp) -> bool {
         self.live(slot.lease())
             && !self.waiting.contains_key(&slot.lease().task())
