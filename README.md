@@ -1,3 +1,5 @@
 # meta-dev
 
-Agent-coordination tooling, bootstrapped from a minimal loop that is enforced from the start. See `docs/prereg.md` for the hypothesis and `docs/stage0.md` for the first stage.
+This repository is being rebuilt.
+Lints will be ported into it from the earlier repository.
+The earlier code remains in git history.
