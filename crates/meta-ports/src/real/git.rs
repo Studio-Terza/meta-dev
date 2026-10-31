@@ -67,3 +67,40 @@ impl Git for GitCli {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{GitCli, run};
+    use meta_core::{Sha, TaskId};
+    use std::path::{Path, PathBuf};
+
+    fn repo(name: &str, branch: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("meta-dev-{name}-{nanos}"));
+        let at = root.to_string_lossy().into_owned();
+        let git = |args: &[&str]| run("git", &[&["-C", &at], args].concat()).unwrap();
+        run("git", &["init", "--quiet", &at]).unwrap();
+        let who = ["-c", "user.name=Cinglein", "-c", "user.email=64114772+Cinglein@users.noreply.github.com"];
+        git(&[&who[..], &["commit", "--quiet", "--allow-empty", "-m", "m"]].concat());
+        git(&["branch", branch]);
+        root
+    }
+
+    fn head(root: &Path) -> Option<Sha> {
+        let task: TaskId = "task-1".parse().unwrap();
+        GitCli::head_in(root, task).unwrap()
+    }
+
+    #[test]
+    fn local_head_finds_exactly_the_branch_named_after_the_task() {
+        let found = repo("exact", "task-1");
+        let tip = run("git", &["-C", &found.to_string_lossy(), "rev-parse", "task-1"]).unwrap();
+        assert_eq!(head(&found), Some(tip.parse().unwrap()));
+    }
+
+    #[test]
+    fn local_head_is_none_for_a_branch_that_only_shares_the_prefix() {
+        assert_eq!(head(&repo("nested", "task-1/extra")), None);
+        assert_eq!(head(&repo("longer", "task-10")), None);
+    }
+}

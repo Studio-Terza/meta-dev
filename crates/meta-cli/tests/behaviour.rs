@@ -1,6 +1,7 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Timestamp,
+    Attempt, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha, Span,
+    Timestamp,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -467,6 +468,30 @@ fn link_refuses_naming_both_commits_when_github_never_reports_the_pushed_head_be
     for why in [PINNED, MOVED, "push has not landed", "git push origin task-1"] {
         assert!(reply.text.contains(why), "{}", reply.text);
     }
+    assert_eq!(ports.clock.now(), start.advanced(60));
+}
+
+#[test]
+fn link_retries_a_transient_github_error_until_it_reports_the_pushed_head() {
+    let mut ports = given(claimed_task(), vec![("7", pull(MOVED, &[]))]);
+    ports.git.branches.insert(id("task-1"), id(MOVED));
+    let flaky = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
+    ports.github.earlier.borrow_mut().insert(id("7"), VecDeque::from([pull(PINNED, &[]), flaky.clone(), flaky]));
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(events, vec![Event::Linked { task: id("task-1"), pr: id("7"), pin: id(MOVED) }]);
+    assert!(ports.clock.now() > start && ports.clock.now() < start.advanced(60));
+}
+
+#[test]
+fn link_fails_with_the_github_error_when_it_lasts_until_the_deadline() {
+    let down = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
+    let mut ports = given(claimed_task(), vec![("7", down)]);
+    let start = ports.clock.now();
+    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
+    assert!(reply.text.starts_with("error:") && reply.text.contains("HTTP 502"), "{}", reply.text);
     assert_eq!(ports.clock.now(), start.advanced(60));
 }
 
@@ -1410,19 +1435,19 @@ fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
         [vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1 + 2700)], vec![used("lease-1")]]
             .concat();
     let mut ports = given(history, Vec::new());
-    ports.clock.pause(100);
+    ports.clock.pause(Span::of_seconds(100));
     let (reply, events) = call(&mut ports, "hook post-tool-use", &agent_ran("Agent", "lease-1", AGENT_ID));
     let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
     let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
-    ports.clock.pause(2750 - 102);
+    ports.clock.pause(Span::of_seconds(2750 - 102));
     let (status, _) = call(&mut ports, "status", "");
     assert!(
         status.text.contains("overdue leases (flagged)\n  (none)\n"),
         "past the lease's own deadline: {}",
         status.text
     );
-    ports.clock.pause(2803 - 2750);
+    ports.clock.pause(Span::of_seconds(2803 - 2750));
     let (status, _) = call(&mut ports, "status", "");
     let flagged = format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix {}\n", 102 + 2700);
     assert!(status.text.contains(&flagged), "{}", status.text);
