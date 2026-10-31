@@ -21,6 +21,9 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 | `meta link <task> <pr>` | there is no local branch named after the task | refused; says to commit, push the branch, and link again |
 | `meta merge <pr>` | the PR is linked; required checks are green on its current head; the head equals the pinned SHA | squash-merges through the GitHub port with that head pinned; events `Merged` (route `Meta`) and `Done` |
 | `meta merge <pr>` | the PR is unlinked, closed, has a red or missing check (the worst report per check wins), has no required checks, or its head moved | refused; names which, and gives the next step |
+| `meta merge <pr>` | the PR is behind main (GitHub's merge state is `BEHIND`) | refused; says it is behind main and gives the next step: update the branch, wait for CI on the new head, link the new head, run `meta merge` again; nothing is merged |
+| `meta merge <pr> --update` | the PR is linked, open and behind main | the GitHub port updates the branch; no events; prints "updated; CI must pass on the new head before merging"; never merges in the same call |
+| `meta merge <pr> --update` | the PR is unlinked, not open, or not behind main | refused; names which; nothing is updated |
 | `meta merge <pr>` | the linked PR is already merged at the pinned head | events `Merged` (route `Outside`, not counted as through meta) and `Done`; no second merge |
 | `meta merge <pr>` | the protection lookup or the gh replies fail | error, no events |
 | `meta escape <reason>` | any, even a log that does not fold | event `Escaped`; prints the open escape count and how many times this reason has repeated |

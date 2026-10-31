@@ -1,5 +1,5 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp};
+use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -71,6 +71,7 @@ pub struct RecordedGitHub {
     /// Replies given first, one per call, before `replies` takes over: GitHub lagging behind a push.
     pub earlier: RefCell<BTreeMap<PrNumber, VecDeque<GhReplies>>>,
     pub merged: Vec<(PrNumber, Sha)>,
+    pub updated: Vec<PrNumber>,
     pub listed: Option<Result<String, PortError>>,
 }
 
@@ -85,6 +86,11 @@ impl GitHub for RecordedGitHub {
 
     fn merged_list(&self) -> Result<String, PortError> {
         self.listed.clone().unwrap_or_else(|| Err(PortError::new("no recorded merged list")))
+    }
+
+    fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError> {
+        self.updated.push(updating.pr());
+        Ok(())
     }
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {

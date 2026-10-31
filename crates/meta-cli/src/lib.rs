@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, Ledger,
     Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal,
-    Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable, Verdict,
+    Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -31,6 +31,8 @@ pub enum LedgerCall {
         pr: PrNumber,
     },
     Merge(PrNumber),
+    /// Merges main into a linked PR's branch when it is behind; never merges the PR.
+    Update(PrNumber),
     Retire {
         task: TaskId,
         reason: Reason,
@@ -103,7 +105,7 @@ impl Answer {
 impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
                          meta claim <task> --self\n  \
-                         meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> [--pr <pr>] <reason>\n  \
+                         meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  \
@@ -126,6 +128,7 @@ impl Call {
                 ledger(task.parse().and_then(|task| pr.parse().map(|pr| LedgerCall::Link { task, pr })))
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
+            ["merge", pr, "--update"] => ledger(pr.parse().map(LedgerCall::Update)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
                 pr.parse()
@@ -290,6 +293,9 @@ enum Prepared {
         pushed: Sha,
         pull: Pull,
     },
+    Update {
+        updating: Updating,
+    },
     Merge {
         pr: PrNumber,
         pull: Pull,
@@ -368,6 +374,11 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
             }
             Prepared::Merge { pr, pull }
         }
+        LedgerCall::Update(pr) => {
+            let updating = ledger.merge(pr)?.update(&github.pull(pr)?)?;
+            github.update_branch(&updating)?;
+            Prepared::Update { updating }
+        }
         LedgerCall::Retire { task, reason } => {
             let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
             Prepared::Retire { task, reason, pull }
@@ -399,6 +410,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
             Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),
         },
+        Prepared::Update { updating } => updating.record(),
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
         Prepared::Review { task, agent, pull, rules, allowance } => {
             ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?
