@@ -131,6 +131,13 @@ impl Ledger {
             .leases
             .get(&lease)
             .ok_or_else(|| Refusal::because(format!("{lease} is unknown. Next: meta status lists the live leases.")))?;
+        if let LeaseSlot::Replaced(replaced) = slot {
+            let task = replaced.task();
+            return Err(Refusal::because(format!(
+                "{lease} was replaced by a lease on the PR's newer head, and started no reviewer. \
+                 Next: meta status lists the live leases; meta review {task} --agent <name> starts a review of the current head."
+            )));
+        }
         let LeaseSlot::Unused(unused) = slot else {
             let task = slot.lease().task();
             let renew = match slot.lease().purpose() {

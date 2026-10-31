@@ -84,11 +84,31 @@ impl Ledger {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
                 self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, at, Deadline::of(*deadline)))?;
             }
-            Event::ReviewLeased { lease, task, agent, pr, head, deadline } => {
+            Event::ReviewLeased { lease, task, agent, pr, head, deadline, replaces } => {
                 match self.tasks.get(task) {
                     Some(Progress::Linked(linked)) if linked.pr() == *pr => Ok(()),
                     _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
                 }?;
+                if let Some(old) = replaces {
+                    match self.leases.remove(old) {
+                        Some(LeaseSlot::Unused(unused))
+                            if unused.task() == *task
+                                && matches!(
+                                    unused.purpose(),
+                                    Purpose::Review { pr: old_pr, head: stale } if old_pr == pr && stale != head
+                                ) =>
+                        {
+                            self.leases.insert(*old, LeaseSlot::Replaced(unused));
+                        }
+                        Some(other) => {
+                            self.leases.insert(*old, other);
+                            Err(format!(
+                                "{lease} replaces {old}, which is not an unused review lease of {task} on {pr} at another head"
+                            ))?;
+                        }
+                        None => Err(format!("{lease} replaces unknown {old}"))?,
+                    }
+                }
                 let purpose = Purpose::Review { pr: *pr, head: head.clone() };
                 self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
             }

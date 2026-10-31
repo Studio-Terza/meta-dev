@@ -211,6 +211,7 @@ impl Ledger {
             Some(LeaseSlot::Unused(lease)) if self.live(&lease) => Hook::allow(vec![lease.spend().1]),
             Some(LeaseSlot::Unused(lease)) => refusal(format!("{id} is not live: {} is done", lease.task())),
             Some(LeaseSlot::Spent(_)) => refusal(format!("{id} is already used; each lease starts one agent")),
+            Some(LeaseSlot::Replaced(_)) => refusal(format!("{id} was replaced by a lease on the PR's newer head")),
             None => refusal(format!("{id} is unknown")),
         }
     }
@@ -230,6 +231,9 @@ impl Ledger {
                     Some(earlier) => refusal(format!("{lease} already started {earlier}, not {agent}")),
                 },
                 Some(LeaseSlot::Unused(_)) => refusal(format!("{lease} is unused, so it started no agent")),
+                Some(LeaseSlot::Replaced(_)) => {
+                    refusal(format!("{lease} was replaced by a lease on the PR's newer head, so it started no agent"))
+                }
                 None => refusal(format!("{lease} is unknown")),
             },
         }
@@ -266,6 +270,11 @@ impl Ledger {
             Some(LeaseSlot::Spent(spent)) => spent,
             Some(LeaseSlot::Unused(_)) => {
                 return refusal(format!("{lease} is unused, so no agent of it can be resumed"));
+            }
+            Some(LeaseSlot::Replaced(_)) => {
+                return refusal(format!(
+                    "{lease} was replaced by a lease on the PR's newer head, so no agent of it can be resumed"
+                ));
             }
             None => return refusal(format!("{lease} is unknown")),
         };
