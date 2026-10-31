@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event")]
 pub enum Event {
+    /// The first record of the lead's real log, written once by `meta mark-real-log`. Only a main
+    /// build may write a log that starts with it, wherever the log is reached from.
+    RealLog,
     Opened {
         task: TaskId,
         title: Title,
@@ -45,7 +48,8 @@ pub enum Event {
     },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
     /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
-    /// could be read is marked unchecked.
+    /// could be read is marked unchecked. A build not verified to be from main never writes one:
+    /// its escape goes to the side file (`UnverifiedEscape`).
     Escaped {
         #[serde(default = "EscapeKind::unclassified")]
         kind: EscapeKind,

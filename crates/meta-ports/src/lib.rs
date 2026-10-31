@@ -1,7 +1,10 @@
 pub mod memory;
 pub mod real;
 
-use meta_core::{Cleared, Malformed, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
+use meta_core::{
+    Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, Standing, TaskId,
+    Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,7 +30,20 @@ impl From<Malformed> for PortError {
 
 pub trait Log {
     fn place(&self) -> String;
+    /// What this log is, by its first record (`Head::standing`): real when marked, unreadable, or
+    /// the default data dir's log not yet marked. Only a build from a commit on main may append to
+    /// a real log; any other log is scratch and takes any build.
+    fn standing(&self) -> Standing;
+    /// Puts `marker` first in the log, ahead of the records already there, unless the log already
+    /// starts with a marker. Holds the log exclusively while it does.
+    fn mark(&mut self, marker: Record) -> Result<Marking, PortError>;
     fn read(&self) -> Result<Vec<Record>, PortError>;
+    /// Appends an escape from a build not verified to be from main to the side file beside the
+    /// log, leaving the log untouched, and says where it went.
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError>;
+    /// What the side file holds, read leniently; no side file holds nothing. An error means the
+    /// file as a whole could not be read.
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError>;
     /// Holds the log exclusively from read to append. `decide` gets the records, or why they do not
     /// parse; the records it returns are appended. A log that cannot be opened or locked is an error.
     fn transact<T>(
@@ -45,6 +61,9 @@ pub trait Git {
     fn local(&self, file: SelfFile) -> Result<String, PortError>;
     /// The commit at the tip of the local branch named after the task; `None` when there is none.
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError>;
+    /// Whether `commit` is an ancestor of origin/main, by the local refs of the clone this binary
+    /// was built from, with no network.
+    fn on_main(&self, commit: &Sha) -> Result<bool, PortError>;
 }
 
 #[derive(Debug, Clone)]
@@ -81,4 +100,6 @@ pub struct Ports<L, G, H, C> {
     pub git: G,
     pub github: H,
     pub clock: C,
+    /// The commit this binary was built from.
+    pub build: Build,
 }

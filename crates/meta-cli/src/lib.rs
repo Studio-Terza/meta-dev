@@ -1,8 +1,8 @@
 use meta_core::{
-    Accepted, AgentName, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook, LeaseId,
-    Ledger, Malformed, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, Pull, Reason,
-    Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title,
-    Unreached, Unreadable, Updating, Verdict,
+    Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
+    LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber,
+    Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span,
+    Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -16,6 +16,8 @@ pub enum Call {
     },
     /// A Claude Code hook, before or after a tool runs, with its input.
     Hook(Phase, String),
+    /// Puts the `RealLog` marker first in the log, once; only a main build may.
+    MarkRealLog,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +117,7 @@ impl Call {
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
-                         meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
+                         meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -137,6 +139,7 @@ impl Call {
             ["merge", pr, "--update"] => ledger(pr.parse().map(LedgerCall::Update)),
             ["brief", lease] => ledger(lease.parse().map(LedgerCall::Brief)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
+            ["mark-real-log"] => Some(Ok(Self::MarkRealLog)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
                 pr.parse()
                     .and_then(|pr| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: Some(pr) }))
@@ -200,10 +203,26 @@ impl Call {
 }
 
 pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports<L, G, H, C>) -> Answer {
-    let Ports { log, git, github, clock } = ports;
+    let Ports { log, git, github, clock, build } = ports;
     let at = clock.now();
+    let standing = log.standing();
     match call {
-        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at),
+        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(standing, git, build)),
+        Call::MarkRealLog => {
+            if let Err(unverified) = verify(Standing::Real, git, build) {
+                return Answer::failed(Failure::Refused(unverified.into()));
+            }
+            match log.mark(Record { at, event: Event::RealLog }) {
+                Ok(Marking::Added) => Answer::done(format!(
+                    "marked {} as the real log: only a main build writes it now, by any path\n",
+                    log.place()
+                )),
+                Ok(Marking::AlreadyMarked) => {
+                    Answer::done(format!("{} is already marked as the real log\n", log.place()))
+                }
+                Err(error) => Answer::failed(error.into()),
+            }
+        }
         Call::Escape { kind, reason, pr } => {
             let kinds = git
                 .local(SelfFile::EscapeKinds)
@@ -214,6 +233,13 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(admitted) => admitted,
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
+            if let Err(unverified) = verify(standing, git, build) {
+                let (escape, text) = admitted.set_aside(at);
+                return match log.set_aside(&escape) {
+                    Ok(side) => Answer::done(format!("{text}kept in {side}, not in the log: {unverified}\n")),
+                    Err(error) => Answer::failed(error.into()),
+                };
+            }
             let recorded = log.transact(|records| {
                 let earlier = records.as_deref().map_err(ToString::to_string);
                 let (events, text) = admitted.tally(earlier).into_parts();
@@ -225,6 +251,10 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
             }
         }
         Call::Ledger(call) => {
+            let verified = verify(standing, git, build);
+            if let (false, Err(unverified)) = (call == LedgerCall::Status, &verified) {
+                return Answer::failed(Failure::Refused(unverified.clone().into()));
+            }
             let place = log.place();
             let fold =
                 |records: &[Record]| Ledger::fold(records).map_err(|corrupt| Failure::Broken(corrupt.in_log(&place)));
@@ -232,7 +262,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 .read()
                 .map_err(Failure::from)
                 .and_then(|records| fold(&records))
-                .and_then(|ledger| prepare(call, &ledger, git, github, clock));
+                .and_then(|ledger| prepare(call, &ledger, log, git, github, clock));
             let prepared = match prepared {
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
@@ -243,10 +273,11 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                     .and_then(|records| fold(&records))
                     .and_then(|ledger| finish(prepared, ledger, at))
                 {
-                    Ok(accepted) => {
-                        let (events, text) = accepted.into_parts();
-                        (stamped(events, at), Ok(text))
-                    }
+                    Ok(accepted) => match (accepted.into_parts(), &verified) {
+                        ((events, text), Ok(())) => (stamped(events, at), Ok(text)),
+                        ((events, text), Err(_)) if events.is_empty() => (Vec::new(), Ok(text)),
+                        ((_, text), Err(unverified)) => (Vec::new(), Ok(format!("{text}not recorded: {unverified}\n"))),
+                    },
                     Err(failure) => (Vec::new(), Err(failure)),
                 }
             });
@@ -258,13 +289,29 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     }
 }
 
-fn hook<L: Log>(phase: Phase, hook: Hook, log: &mut L, at: Timestamp) -> Answer {
+/// Whether this binary may append to the log: any build may write a scratch log, and only a build
+/// from a commit on main may write the real one, which the log's first record names
+/// (`Log::standing`). An ancestry that cannot be decided is unverified.
+fn verify<G: Git>(standing: Standing, git: &G, build: &Build) -> Result<(), Unverified> {
+    build.verify(standing, |commit| git.on_main(commit))
+}
+
+fn hook<L: Log>(
+    phase: Phase,
+    hook: Hook,
+    log: &mut L,
+    at: Timestamp,
+    verify: impl FnOnce() -> Result<(), Unverified>,
+) -> Answer {
     let decide: Box<dyn FnOnce(Ledger) -> Accepted> = match hook {
         Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
         Hook::Agent(start) => Box::new(|ledger: Ledger| ledger.admit(start)),
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
         Hook::Bind(binding) => Box::new(move |ledger: Ledger| ledger.bind(binding, at)),
     };
+    if let Err(unverified) = verify() {
+        return Answer::broken_hook(phase, unverified);
+    }
     let place = log.place();
     let outcome = log.transact(|records| {
         let folded = records
@@ -351,9 +398,10 @@ fn pull_at<H: GitHub, C: Clock>(github: &H, clock: &C, pr: PrNumber, pushed: &Sh
     }
 }
 
-fn prepare<G: Git, H: GitHub, C: Clock>(
+fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
     call: LedgerCall,
     ledger: &Ledger,
+    log: &L,
     git: &G,
     github: &mut H,
     clock: &C,
@@ -381,6 +429,8 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
                 },
                 kinds: spec(git, SelfFile::EscapeKinds, EscapeKinds::parse).map_err(unreached),
                 predictions: spec(git, SelfFile::Predictions, Predictions::parse).map_err(unreached),
+                unverified: log.set_aside_escapes().map_err(|error| Unreached::by(&error)),
+                standing: log.standing(),
             })
         }
         LedgerCall::Claim { task, claimant, deadline } => {

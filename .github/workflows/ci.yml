@@ -30,7 +30,7 @@ jobs:
         run: |
           exec 3>&2
           TIMEFORMAT='| test | %R s wall | %U s user CPU | %S s system CPU |'
-          { time cargo test --workspace --locked 2>&3 ; } 2> test-time.txt
+          { time cargo test --workspace --locked --no-fail-fast 2>&3 ; } 2> test-time.txt
       - name: test time (report-only)
         if: always()
         continue-on-error: true

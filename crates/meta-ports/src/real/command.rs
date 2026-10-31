@@ -113,9 +113,15 @@ pub fn run_found(program: &str, args: &[&str]) -> Result<Option<String>, PortErr
     }
 }
 
+/// A yes-or-no command, such as `git merge-base --is-ancestor`: exit 0 is yes and a quiet exit 1
+/// is no; anything else is an error.
+pub fn decides(program: &str, args: &[&str]) -> Result<bool, PortError> {
+    run_found(program, args).map(|found| found.is_some())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{run, run_found, run_within};
+    use super::{decides, run, run_found, run_within};
     use meta_testkit::Scratch;
     use std::fs;
     use std::process::Command;
@@ -193,6 +199,14 @@ mod tests {
     fn a_failed_command_shows_its_stderr_as_it_was_written() {
         let error = run("/bin/sh", &["-c", "printf ' boom\\n' >&2; exit 3"]).unwrap_err();
         assert_eq!(error.to_string(), "/bin/sh -c printf ' boom\\n' >&2; exit 3:  boom\n");
+    }
+
+    #[test]
+    fn a_yes_or_no_command_answers_by_exit_0_or_1_and_anything_else_is_an_error() {
+        let decided =
+            ["exit 0", "exit 1", "printf 'no repo' >&2; exit 128"].map(|script| decides("/bin/sh", &["-c", script]));
+        assert_eq!(decided[..2], [Ok(true), Ok(false)]);
+        assert_eq!(decided[2].clone().unwrap_err().to_string(), "/bin/sh -c printf 'no repo' >&2; exit 128: no repo");
     }
 
     #[test]

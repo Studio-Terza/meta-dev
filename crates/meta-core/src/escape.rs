@@ -1,8 +1,9 @@
 use crate::event::{Event, Record};
-use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId};
+use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId, Timestamp};
 use crate::ledger::Ledger;
 use crate::merges::Unreached;
 use crate::reply::{Accepted, Refusal};
+use crate::set_aside::UnverifiedEscape;
 use crate::spec::{SelfFile, Unreadable};
 use crate::task::Progress;
 use serde::{Deserialize, Serialize};
@@ -204,23 +205,23 @@ impl Logged {
     }
 
     /// Unchecked when it was recorded so, or when its kind is not on main.
-    pub(crate) fn line(&self, id: EscapeId, main: Option<&EscapeKinds>) -> String {
+    pub(crate) fn line(&self, main: Option<&EscapeKinds>) -> String {
         let checked = match self.off_main(main) {
             true => Checked::Unchecked,
             false => self.checked,
         };
-        format!("{id} {}", described(&self.kind, checked, self.pr, &self.reason))
+        described(&self.kind, checked, self.pr, &self.reason)
     }
 }
 
 /// `[kind] #pr reason`, with `unchecked` beside a kind that was not checked.
 fn described(kind: &EscapeKind, checked: Checked, pr: Option<PrNumber>, reason: &Reason) -> String {
-    let mark = match checked {
+    let checked = match checked {
         Checked::Listed => "",
         Checked::Unchecked => ", unchecked",
     };
     let pr = pr.map_or_else(String::new, |pr| format!("{pr} "));
-    format!("[{kind}{mark}] {pr}{reason}")
+    format!("[{kind}{checked}] {pr}{reason}")
 }
 
 #[derive(Debug)]
@@ -280,7 +281,21 @@ impl Admitted {
             Err(why) => format!("escape recorded: {what}\nid and counts unavailable: {why}\n"),
         };
         let unchecked = unchecked.map_or_else(String::new, |why| format!("kind unchecked: {why}\n"));
-        Accepted::new(vec![Event::Escaped { kind, reason, pr, checked }], counted + &unchecked)
+        let event = Event::Escaped { kind, reason, pr, checked };
+        Accepted::new(vec![event], counted + &unchecked)
+    }
+
+    /// The escape for the side file, from a build not verified to be from main, and what to say
+    /// about it. It has no id: only the log gives escapes ids.
+    pub fn set_aside(self, at: Timestamp) -> (UnverifiedEscape, String) {
+        let Self { escape: Escape { kind, reason, pr }, unchecked } = self;
+        let checked = unchecked.as_ref().map_or(Checked::Listed, |_| Checked::Unchecked);
+        let what = described(&kind, Checked::Listed, pr, &reason);
+        let unchecked = unchecked.map_or_else(String::new, |why| format!("kind unchecked: {why}\n"));
+        (
+            UnverifiedEscape::new(at, kind, reason, pr, checked),
+            format!("unverified escape recorded: {what}\n{unchecked}"),
+        )
     }
 }
 

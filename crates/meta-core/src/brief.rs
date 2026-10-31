@@ -29,7 +29,12 @@ pub(crate) fn work_text(
          1. git clone {origin} {task}\n  \
          2. cd {task} && git switch -c {task} origin/main\n  \
          3. set the git identity that rule identity names\n  \
-         4. push, open the PR with gh pr create, then run meta link {task} <pr>\n\
+         4. push, then open the PR with gh pr create\n  \
+         5. build meta from main, because only a main build writes the real log: \
+         git worktree add --detach ../{task}-main origin/main && \
+         cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target\n  \
+         6. from this clone, which holds the branch: ../{task}-main/target/release/meta link {task} <pr>\n  \
+         A meta built from your branch writes only a scratch log: run it with XDG_DATA_HOME set to a scratch dir.\n\
          rules:\n{rules}"
     )
 }

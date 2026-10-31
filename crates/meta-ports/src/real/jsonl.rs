@@ -1,10 +1,12 @@
 //! JSONL framing for the meta-dev log: exactly one record per line. Two records on a line, a
 //! record split over lines and a blank line are all refused, each with its line number.
+//! The side file of unverified escapes is read leniently instead: a line that cannot be read is
+//! counted, never fatal, because branch builds wrote it.
 //! A registered boundary (self/parse-boundaries.toml): a line is the unit that is parsed.
 #![allow(clippy::disallowed_methods)]
 
 use crate::PortError;
-use meta_core::Record;
+use meta_core::{Record, UnverifiedEscapes};
 use std::path::Path;
 
 pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
@@ -20,6 +22,16 @@ pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError>
             })
         })
         .collect()
+}
+
+/// Each line of `bytes`; a blank line is no line at all.
+pub(super) fn lenient(bytes: &[u8]) -> UnverifiedEscapes {
+    UnverifiedEscapes::of(
+        bytes
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| serde_json::from_slice(line).ok()),
+    )
 }
 
 #[cfg(test)]

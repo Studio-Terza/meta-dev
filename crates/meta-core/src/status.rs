@@ -1,5 +1,6 @@
-use crate::escape::{EscapeKinds, RepeatKey};
+use crate::escape::{EscapeKinds, Logged, RepeatKey};
 use crate::event::{Event, Route};
+use crate::head::Standing;
 use crate::ids::{EscapeId, PrNumber, RunCount, Timestamp};
 use crate::latch::Latch;
 use crate::lease::LeaseSlot;
@@ -8,6 +9,7 @@ use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
 use crate::rework::PrRuns;
+use crate::set_aside::UnverifiedEscapes;
 use crate::task::Progress;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
@@ -20,11 +22,16 @@ pub struct Sources {
     pub predictions: Result<Predictions, Unreached>,
     /// CI runs of every PR in `Ledger::rework_prs`, for the report-only rework section.
     pub runs: PrRuns,
+    pub unverified: Result<UnverifiedEscapes, Unreached>,
+    pub standing: Standing,
 }
 
 /// Why P1's agent-start half cannot say "holds": meta sees a start without a lease only through an
 /// `outside-start` escape, so a start nobody recorded is invisible to it.
 const UNSEEN_STARTS: &str = "agent starts without a lease are not observable: meta sees only those an outside-start escape records, not the hook's denials";
+
+/// What `meta status` tells the lead to do while the default data dir's log is unmarked.
+const MARK_THE_LOG: &str = "run meta mark-real-log with a main build";
 
 impl Ledger {
     /// A lease is flagged from its third resume onward.
@@ -37,7 +44,7 @@ impl Ledger {
     }
 
     fn report(&self, sources: Sources, at: Timestamp) -> (Vec<Event>, String) {
-        let Sources { github, kinds, predictions, runs: pr_runs } = sources;
+        let Sources { github, kinds, predictions, runs: pr_runs, unverified, standing } = sources;
         let listed = |keep: fn(&Progress) -> bool| -> Vec<String> {
             self.tasks.values().filter(|task| keep(task)).map(|task| task.to_string()).collect()
         };
@@ -63,9 +70,14 @@ impl Ledger {
             .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
             .collect();
         let main = kinds.as_ref().ok();
+        let set_aside = unverified.as_ref().map_or_else(|_| Vec::new(), UnverifiedEscapes::logged);
+        let open_count = self.open_escapes() + set_aside.len();
         let open_escapes: Vec<String> = (1..=self.escapes.len())
             .map(|number| EscapeId::after(number - 1))
-            .filter_map(|id| self.escape(id).filter(|logged| logged.is_open()).map(|logged| logged.line(id, main)))
+            .filter_map(|id| {
+                self.escape(id).filter(|logged| logged.is_open()).map(|logged| format!("{id} {}", logged.line(main)))
+            })
+            .chain(set_aside.iter().map(|logged| format!("unverified {}", logged.line(main))))
             .collect();
         let corrected: Vec<String> = (1..=self.escapes.len())
             .map(|number| EscapeId::after(number - 1))
@@ -81,7 +93,7 @@ impl Ledger {
                 _ => None,
             })
             .collect();
-        let repeats = self.repeats(main);
+        let repeats = self.repeats(&set_aside, main);
         let most = repeats.iter().filter(|(_, count)| **count > 0).max_by_key(|(_, count)| **count);
         let most_line = most.map_or_else(|| "0".to_owned(), |(key, count)| format!("{count} ({key})"));
         let started = self.leases.values().filter(|slot| matches!(slot, LeaseSlot::Spent(_))).count();
@@ -100,7 +112,7 @@ impl Ledger {
         };
         let observe = |measure: Measure| -> Observation {
             match measure {
-                Measure::OpenEscapes => Ok(Quantity::count(self.open_escapes())),
+                Measure::OpenEscapes => Ok(Quantity::count(open_count)),
                 Measure::RepeatsOfOneKind => Ok(Quantity::count(most.map_or(0, |(_, count)| *count))),
                 Measure::MedianCiRuns => median.ok_or_else(|| "no merged PRs yet".to_owned()),
                 Measure::UnrecordedBypasses => {
@@ -152,11 +164,17 @@ impl Ledger {
             }
             Err(why) => (vec![format!("unavailable: {why}")], Vec::new()),
         };
+        let side_note =
+            unverified.map_or_else(|why| format!("unverified escapes unavailable: {why}\n"), |read| read.note());
         let text = [
+            match standing {
+                Standing::AwaitingMark => format!("warning: this log is not marked yet; {MARK_THE_LOG}\n"),
+                Standing::Scratch | Standing::Real | Standing::MarkedElsewhere => String::new(),
+            },
             section("open tasks", &listed(Progress::is_active)),
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             section("live leases", &leases),
-            section(&format!("open escapes: {}", self.open_escapes()), &open_escapes),
+            section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
@@ -169,10 +187,10 @@ impl Ledger {
             ),
             self.merges_line(through_meta, outside_logged, github),
             format!(
-                "P2 open escapes: {} ({} closed as historical); most repeats of one kind: {most_line}\n",
-                self.open_escapes(),
+                "P2 open escapes: {open_count} ({} closed as historical); most repeats of one kind: {most_line}\n",
                 self.closed_as_historical()
             ),
+            side_note,
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             self.rework(&pr_runs),
             section("predictions", &predicted),
@@ -203,10 +221,11 @@ impl Ledger {
         self.escapes.iter().filter(|logged| logged.is_historical()).count()
     }
 
-    /// Repeats per kind, open or resolved: each kind's escapes after its first. Kinds that main does
-    /// not list share one key.
-    fn repeats<'a>(&'a self, main: Option<&EscapeKinds>) -> BTreeMap<RepeatKey<'a>, usize> {
-        let counts = self.escapes.iter().fold(BTreeMap::<RepeatKey<'a>, usize>::new(), |mut counts, logged| {
+    /// Repeats per kind, open or resolved, side-file escapes included: each kind's escapes after its
+    /// first. Kinds that main does not list share one key.
+    fn repeats<'a>(&'a self, set_aside: &'a [Logged], main: Option<&EscapeKinds>) -> BTreeMap<RepeatKey<'a>, usize> {
+        let escapes = self.escapes.iter().chain(set_aside);
+        let counts = escapes.fold(BTreeMap::<RepeatKey<'a>, usize>::new(), |mut counts, logged| {
             *counts.entry(logged.key(main)).or_default() += 1;
             counts
         });

@@ -186,7 +186,7 @@ impl Ledger {
                     .or_insert_with(|| Latch::new(at, observed.clone()));
             }
             Event::Denied { attempt: Attempt::AgentStart } => self.starts_denied += 1,
-            Event::Denied { attempt: Attempt::Merge } => {}
+            Event::Denied { attempt: Attempt::Merge } | Event::RealLog => {}
         }
         Ok(self)
     }

@@ -1,5 +1,8 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating};
+use meta_core::{
+    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, Span, Standing, TaskId, Timestamp,
+    UnverifiedEscape, UnverifiedEscapes, Updating,
+};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -7,6 +10,10 @@ use std::collections::{BTreeMap, VecDeque};
 pub struct MemoryLog {
     pub records: Vec<Record>,
     pub broken: Option<PortError>,
+    /// Where the log stands: the default data dir, or anywhere else.
+    pub place: Place,
+    /// The side file beside the log: its lines, `None` for one that cannot be read.
+    pub set_aside: Vec<Option<UnverifiedEscape>>,
 }
 
 impl MemoryLog {
@@ -20,8 +27,32 @@ impl Log for MemoryLog {
         "memory log".to_owned()
     }
 
+    fn standing(&self) -> Standing {
+        Head::of(self.open().map(|()| self.records.first())).standing(self.place)
+    }
+
+    fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
+        self.open()?;
+        match Head::of::<PortError>(Ok(self.records.first())) {
+            Head::Marked => Ok(Marking::AlreadyMarked),
+            _ => {
+                self.records.insert(0, marker);
+                Ok(Marking::Added)
+            }
+        }
+    }
+
     fn read(&self) -> Result<Vec<Record>, PortError> {
         self.open().map(|()| self.records.clone())
+    }
+
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
+        self.set_aside.push(Some(escape.clone()));
+        Ok("memory side file".to_owned())
+    }
+
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
+        Ok(UnverifiedEscapes::of(self.set_aside.iter().cloned()))
     }
 
     fn transact<T>(
@@ -44,6 +75,8 @@ pub struct RecordedGit {
     pub local: BTreeMap<SelfFile, String>,
     /// The tip of each local branch named after a task.
     pub branches: BTreeMap<TaskId, Sha>,
+    /// Whether each commit is on origin/main; any other commit is a port failure.
+    pub on_main: BTreeMap<Sha, bool>,
 }
 
 impl Git for RecordedGit {
@@ -62,6 +95,10 @@ impl Git for RecordedGit {
 
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
         Ok(self.branches.get(&task).cloned())
+    }
+
+    fn on_main(&self, commit: &Sha) -> Result<bool, PortError> {
+        self.on_main.get(commit).copied().ok_or_else(|| PortError::new(format!("no recorded ancestry for {commit}")))
     }
 }
 
