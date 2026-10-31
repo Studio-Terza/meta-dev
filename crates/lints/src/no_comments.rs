@@ -1,4 +1,4 @@
-use rustc_lexer::{FrontmatterAllowed, TokenKind, tokenize};
+use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 
 use lint_core::LineNumber;
 use lint_core::Report;
@@ -26,8 +26,9 @@ impl NoComments {
     }
 
     fn comment_lines(source: &str) -> Vec<LineNumber> {
-        tokenize(source, FrontmatterAllowed::Yes)
-            .scan(0, |offset, token| {
+        let shebang = strip_shebang(source).unwrap_or(0);
+        tokenize(source.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes)
+            .scan(shebang, |offset, token| {
                 let start = *offset;
                 *offset += usize::try_from(token.len).ok()?;
                 Some((start, token.kind))

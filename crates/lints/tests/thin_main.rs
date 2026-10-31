@@ -21,3 +21,16 @@ fn a_thin_main_passes() {
 fn files_other_than_the_binary_root_are_not_checked() {
     assert!(ThinMain::report(&[Sources::file("src/lib.rs", FAT)]).is_clean());
 }
+
+#[test]
+fn bin_directory_roots_are_checked() {
+    let report = ThinMain::report(&[Sources::file("src/bin/tool.rs", FAT)]);
+    assert_eq!(Sources::lines(&report), ["src/bin/tool.rs:3"]);
+}
+
+#[test]
+fn an_item_is_reported_on_its_own_line_not_its_attribute_line() {
+    let attributed = "#[derive(Debug)]\n#[allow(dead_code)]\nstruct Extra;\nfn main() {}\n";
+    let report = ThinMain::report(&[Sources::file("src/main.rs", attributed)]);
+    assert_eq!(Sources::lines(&report), ["src/main.rs:3"]);
+}

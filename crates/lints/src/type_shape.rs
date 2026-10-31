@@ -4,11 +4,12 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
-    Field, FnArg, GenericArgument, ItemImpl, ItemMod, ItemStruct, PathArguments, ReturnType, Signature, Type, TypePath,
-    TypeTuple,
+    Field, Fields, FnArg, GenericArgument, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro,
+    PathArguments, ReturnType, Signature, Type, TypePath, TypeTuple,
 };
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -49,7 +50,11 @@ impl TypeShape {
                 _ => None,
             })
             .filter(|argument| {
-                matches!(argument, GenericArgument::Type(Type::Path(error)) if error.path.is_ident("String"))
+                matches!(
+                    argument,
+                    GenericArgument::Type(Type::Path(error))
+                        if error.path.segments.last().is_some_and(|segment| segment.ident == "String")
+                )
             })
             .map(|_| "Result with a String error; errors are an enum with thiserror")
     }
@@ -71,10 +76,21 @@ impl TypeShapes<'_> {
         self.violations.extend(violations);
     }
 
+    fn check_fields(&mut self, fields: &Fields) {
+        fields.iter().for_each(|field| {
+            self.violations.extend(self.bool_field(field));
+            self.check_type(&field.ty);
+        });
+    }
+
     fn bool_field(&self, field: &Field) -> Option<Violation> {
-        matches!(&field.ty, Type::Path(path) if path.path.is_ident("bool")).then(|| {
+        matches!(
+            &field.ty,
+            Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "bool")
+        )
+        .then(|| {
             self.violation(
-                field.span(),
+                field.ident.as_ref().map_or_else(|| field.ty.span(), Ident::span),
                 "bool field; a stored flag is a stored mode, make it an enum or a type parameter",
             )
         })
@@ -97,10 +113,21 @@ impl<'ast> Visit<'ast> for TypeShapes<'_> {
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        item.fields.iter().for_each(|field| {
-            self.violations.extend(self.bool_field(field));
-            self.check_type(&field.ty);
-        });
+        self.check_fields(&item.fields);
+    }
+
+    fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
+        item.variants.iter().for_each(|variant| self.check_fields(&variant.fields));
+    }
+
+    fn visit_item_type(&mut self, item: &'ast ItemType) {
+        self.check_type(&item.ty);
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        for statement in Macros::statements(invocation) {
+            self.visit_stmt(&statement);
+        }
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {
