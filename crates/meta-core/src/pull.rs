@@ -8,6 +8,7 @@ pub struct Pull {
     branch: Branch,
     base: Branch,
     state: PullState,
+    merge_state: MergeState,
     required: Vec<CheckName>,
     reported: Vec<Check>,
     runs: RunCount,
@@ -19,6 +20,17 @@ pub enum PullState {
     Open,
     Merged,
     Closed,
+}
+
+/// What GitHub says about merging the PR into its base: `Behind` when the base has commits the
+/// branch lacks, which a branch that must be up to date cannot merge past. Any other report is not
+/// acted on here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+enum MergeState {
+    Behind,
+    #[serde(other)]
+    Other,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +53,7 @@ struct View {
     head_ref_name: Branch,
     base_ref_name: Branch,
     state: PullState,
+    merge_state_status: MergeState,
     status_check_rollup: Vec<Rollup>,
 }
 
@@ -85,6 +98,7 @@ impl Pull {
             branch: view.head_ref_name,
             base: view.base_ref_name,
             state: view.state,
+            merge_state: view.merge_state_status,
             required: required.contexts,
             reported: view.status_check_rollup.into_iter().filter_map(Rollup::check).collect(),
             runs: RunCount::of(runs.len()),
@@ -109,6 +123,10 @@ impl Pull {
 
     pub(crate) fn state(&self) -> PullState {
         self.state
+    }
+
+    pub(crate) fn is_behind(&self) -> bool {
+        self.merge_state == MergeState::Behind
     }
 
     pub(crate) fn required(&self) -> &[CheckName] {

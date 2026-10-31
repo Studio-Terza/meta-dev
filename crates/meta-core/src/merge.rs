@@ -14,6 +14,13 @@ pub struct Merging {
 #[derive(Debug)]
 pub struct Cleared(Landed);
 
+/// A linked, open PR that is behind main and is to have main merged into its branch.
+#[derive(Debug)]
+pub struct Updating {
+    task: TaskId,
+    pr: PrNumber,
+}
+
 #[derive(Debug)]
 pub struct Landed {
     task: TaskId,
@@ -53,12 +60,26 @@ impl Merging {
             (PullState::Merged, Some(moved)) => Err(Refusal::because(format!("{pr} was merged outside meta: {moved}"))),
             (PullState::Closed, _) => Err(Refusal::because(format!("{pr} is closed. Next: reopen it, then {relink}."))),
             (PullState::Open, moved) => {
-                Self::checks(pull, &relink, pr, moved).map(|()| Clearance::Unmerged(Cleared(landed(Route::Meta))))
+                Self::checks(pull, task, &relink, pr, moved).map(|()| Clearance::Unmerged(Cleared(landed(Route::Meta))))
             }
         }
     }
 
-    fn checks(pull: &Pull, relink: &str, pr: PrNumber, moved: Option<String>) -> Result<(), Refusal> {
+    /// Only an open PR that is behind main can be updated; the update never merges it.
+    pub fn update(self, pull: &Pull) -> Result<Updating, Refusal> {
+        let Self { task, pr, .. } = self;
+        match (pull.state(), pull.is_behind()) {
+            (PullState::Open, true) => Ok(Updating { task, pr }),
+            (PullState::Open, false) => {
+                Err(Refusal::because(format!("{pr} is not behind main. Next: meta merge {} to merge it.", pr.digits())))
+            }
+            (PullState::Merged | PullState::Closed, _) => {
+                Err(Refusal::because(format!("{pr} is not open, so it cannot be updated. Next: meta status.")))
+            }
+        }
+    }
+
+    fn checks(pull: &Pull, task: TaskId, relink: &str, pr: PrNumber, moved: Option<String>) -> Result<(), Refusal> {
         let unconfigured = pull.required().is_empty().then(|| {
             format!(
                 "missing check: no required checks are configured. \
@@ -77,7 +98,15 @@ impl Merging {
                 pr.digits()
             )),
         });
-        let blockers: Vec<String> = moved.into_iter().chain(unconfigured).chain(checks).collect();
+        let behind = pull.is_behind().then(|| {
+            format!(
+                "behind main: GitHub will not merge a branch that is not up to date. Next: update the branch \
+                 (meta merge {number} --update, then git pull origin {task}; or rebase on main and push), wait for \
+                 CI on the new head, {relink}, then meta merge {number} again.",
+                number = pr.digits()
+            )
+        });
+        let blockers: Vec<String> = moved.into_iter().chain(behind).chain(unconfigured).chain(checks).collect();
         match blockers.is_empty() {
             true => Ok(()),
             false => Err(Refusal::because(format!("{pr} cannot merge:\n{}", blockers.join("\n")))),
@@ -108,5 +137,22 @@ impl Landed {
         };
         let text = format!("{pr} {how} at {head}; {task} done\n");
         Accepted::new(vec![Event::Merged { pr, head, runs, route }, Event::Done { task }], text)
+    }
+}
+
+impl Updating {
+    pub fn pr(&self) -> PrNumber {
+        self.pr
+    }
+
+    pub fn record(self) -> Accepted {
+        let Self { task, pr } = self;
+        let text = format!(
+            "{pr} updated; CI must pass on the new head before merging. \
+             Next: git pull origin {task}, wait for CI, meta link {task} {}, then meta merge {} again.\n",
+            pr.digits(),
+            pr.digits()
+        );
+        Accepted::new(Vec::new(), text)
     }
 }

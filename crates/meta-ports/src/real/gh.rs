@@ -1,6 +1,6 @@
 use super::command::run;
 use crate::{GhReplies, GitHub, PortError};
-use meta_core::{Cleared, Merges, PrNumber, Pull};
+use meta_core::{Cleared, Merges, PrNumber, Pull, Updating};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy)]
@@ -16,7 +16,7 @@ struct Refs {
 impl GitHub for GhCli {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError> {
         let number = pr.digits();
-        let fields = "headRefOid,headRefName,baseRefName,state,url,statusCheckRollup";
+        let fields = "headRefOid,headRefName,baseRefName,state,mergeStateStatus,url,statusCheckRollup";
         let view = run("gh", &["pr", "view", &number, "--json", fields])?;
         let refs: Refs = serde_json::from_str(&view).map_err(|error| PortError::new(format!("gh pr view: {error}")))?;
         let protection =
@@ -30,6 +30,10 @@ impl GitHub for GhCli {
     fn merged_list(&self) -> Result<String, PortError> {
         let limit = (Merges::LIMIT + 1).to_string();
         run("gh", &["pr", "list", "--state", "merged", "--json", "number", "--limit", &limit])
+    }
+
+    fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError> {
+        run("gh", &["pr", "update-branch", &updating.pr().digits()]).map(|_| ())
     }
 
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {
