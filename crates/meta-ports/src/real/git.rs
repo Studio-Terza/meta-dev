@@ -1,4 +1,4 @@
-use super::command::run;
+use super::command::{run, run_found};
 use super::log::home;
 use crate::{Git, PortError};
 use meta_core::{Origin, SelfFile, Sha, TaskId};
@@ -41,6 +41,18 @@ impl GitCli {
     }
 }
 
+impl GitCli {
+    /// The tip of exactly the branch `refs/heads/<task>` in the repository at `repo`; a branch that
+    /// only shares the name as a prefix, such as `<task>/extra`, is not it.
+    pub fn head_in(repo: &Path, task: TaskId) -> Result<Option<Sha>, PortError> {
+        let at = repo.to_string_lossy();
+        let branch = format!("refs/heads/{task}");
+        run_found("git", &["-C", &at, "rev-parse", "--verify", "--quiet", &branch])?
+            .map(|found| found.parse().map_err(|error| PortError::new(format!("branch {task}: {error}"))))
+            .transpose()
+    }
+}
+
 impl Git for GitCli {
     fn origin(&self) -> Result<Origin, PortError> {
         run("git", &["remote", "get-url", "origin"])?
@@ -60,11 +72,7 @@ impl Git for GitCli {
     }
 
     fn local_head(&self, task: TaskId) -> Result<Option<Sha>, PortError> {
-        let found = run("git", &["for-each-ref", "--format=%(objectname)", &format!("refs/heads/{task}")])?;
-        match found.is_empty() {
-            true => Ok(None),
-            false => found.parse().map(Some).map_err(|error| PortError::new(format!("branch {task}: {error}"))),
-        }
+        Self::head_in(Path::new("."), task)
     }
 }
 

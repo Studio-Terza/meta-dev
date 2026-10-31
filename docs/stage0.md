@@ -16,6 +16,8 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 | `meta link <task> <pr>` | the task is not claimed, the branch or base differs, or another task links the PR | refused; names which, and gives the next step |
 | `meta link <task> <pr>` | GitHub still reports an older head than the local branch `<task>`, then reports it within 60 s | event `Linked`, pinned at the pushed commit |
 | `meta link <task> <pr>` | GitHub does not report the local branch's commit within 60 s | refused; names both SHAs, and says to push again or reconcile the branches |
+| `meta link <task> <pr>` | GitHub fails (an error from the port) while polling | asks again every 5 s; if the failure is still the last answer at 60 s, error with it, no events |
+| `meta link <task> <pr>` | the local branch is found by its exact ref `refs/heads/<task>`, not by prefix | a branch such as `<task>/extra` is not the task's branch |
 | `meta link <task> <pr>` | there is no local branch named after the task | refused; says to commit, push the branch, and link again |
 | `meta merge <pr>` | the PR is linked; required checks are green on its current head; the head equals the pinned SHA | squash-merges through the GitHub port with that head pinned; events `Merged` (route `Meta`) and `Done` |
 | `meta merge <pr>` | the PR is unlinked, closed, has a red or missing check (the worst report per check wins), has no required checks, or its head moved | refused; names which, and gives the next step |
