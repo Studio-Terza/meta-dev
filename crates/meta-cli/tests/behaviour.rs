@@ -1194,7 +1194,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
         reply.text.contains(
-            "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
+            "P1 The loop is used: FALSIFIED EARLIER; now UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
         ),
         "{}",
         reply.text
@@ -1202,7 +1202,9 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     ports.github.listed = Some(Err(PortError::new("gh is down")));
     let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
-        reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable"),
+        reply.text.contains(
+            "P1 The loop is used: FALSIFIED EARLIER; now UNDECIDED; observed unrecorded bypasses unavailable"
+        ),
         "{}",
         reply.text
     );
@@ -1456,8 +1458,9 @@ fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_predict
     ports.log.records.extend([1, 2, 3].map(|number| at(3, resolved(&format!("escape-{number}"), "task-1"))));
     let (reply, added) = call(&mut ports, &["status"], "");
     assert_eq!(added, Vec::new(), "{}", reply.text);
-    let holds = "P2 Gaps get fixed, not bypassed: holds; observed open escapes 3, most repeats of one escape kind 0;";
-    assert!(reply.text.contains(holds), "{}", reply.text);
+    let earlier = "P2 Gaps get fixed, not bypassed: FALSIFIED EARLIER; now holds; observed open escapes 3, most repeats of one escape kind 0;";
+    assert!(reply.text.contains(earlier), "{}", reply.text);
+    assert!(!reply.text.contains("not bypassed: holds"), "{}", reply.text);
     assert!(reply.text.contains(&format!("falsified at unix 2 ({open})")), "{}", reply.text);
 }
 
@@ -1465,11 +1468,21 @@ fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_predict
 fn status_shows_a_latched_falsification_read_from_the_log_and_latches_nothing_for_a_prediction_that_holds() {
     let history = [finished_task(), vec![falsified("P6", Measure::MedianCiRuns, "median CI runs per merged PR 4")]];
     let status = status_of(history.concat());
-    let p6 = "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2; \
+    let p6 = "P6 Little rework: FALSIFIED EARLIER; now holds; observed median CI runs per merged PR 1; expected Median at most 2; \
               falsified by Median above 3; measure: CI runs per merged PR; falsified at unix 1 (median CI runs per merged PR 4)\n";
     assert!(status.contains(p6), "{status}");
     let calm = status_of(finished_task());
     assert!(!calm.contains("falsified at"), "{calm}");
+}
+
+#[test]
+fn status_says_plainly_that_unclassified_escapes_count_towards_repeats_by_their_reason() {
+    let status =
+        status_of([finished_task(), vec![escaped("unclassified", "same"), escaped("unclassified", "same")]].concat());
+    let note = "P2 unclassified escapes (from before kinds existed): 2; they count towards repeats by their reason\n";
+    assert!(status.contains(note), "{status}");
+    assert!(status.contains("most repeats of one kind: 1 (unclassified \"same\")"), "{status}");
+    assert!(!status_of(finished_task()).contains("unclassified escapes"));
 }
 
 #[test]
