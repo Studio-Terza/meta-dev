@@ -1,9 +1,9 @@
-use crate::build::{Unverified, Writer};
 use crate::event::{Event, Record};
-use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId};
+use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId, Timestamp};
 use crate::ledger::Ledger;
 use crate::merges::Unreached;
 use crate::reply::{Accepted, Refusal};
+use crate::set_aside::UnverifiedEscape;
 use crate::spec::{SelfFile, Unreadable};
 use crate::task::Progress;
 use serde::{Deserialize, Serialize};
@@ -87,7 +87,6 @@ pub struct Logged {
     reason: Reason,
     pr: Option<PrNumber>,
     checked: Checked,
-    build: Writer,
     resolution: Option<Resolution>,
 }
 
@@ -131,8 +130,8 @@ impl std::fmt::Display for RepeatKey<'_> {
 }
 
 impl Logged {
-    pub(crate) fn new(kind: EscapeKind, reason: Reason, pr: Option<PrNumber>, checked: Checked, build: Writer) -> Self {
-        Self { kind, reason, pr, checked, build, resolution: None }
+    pub(crate) fn new(kind: EscapeKind, reason: Reason, pr: Option<PrNumber>, checked: Checked) -> Self {
+        Self { kind, reason, pr, checked, resolution: None }
     }
 
     pub(crate) fn resolve(&mut self, escape: EscapeId, task: TaskId) -> Result<(), String> {
@@ -206,28 +205,23 @@ impl Logged {
     }
 
     /// Unchecked when it was recorded so, or when its kind is not on main.
-    pub(crate) fn line(&self, id: EscapeId, main: Option<&EscapeKinds>) -> String {
+    pub(crate) fn line(&self, main: Option<&EscapeKinds>) -> String {
         let checked = match self.off_main(main) {
             true => Checked::Unchecked,
             false => self.checked,
         };
-        format!("{id} {}", described(&self.kind, checked, self.build, self.pr, &self.reason))
+        described(&self.kind, checked, self.pr, &self.reason)
     }
 }
 
-/// `[kind] #pr reason`, with `unchecked` beside a kind that was not checked and `unverified build`
-/// beside an escape written by a build not verified to be from main.
-fn described(kind: &EscapeKind, checked: Checked, build: Writer, pr: Option<PrNumber>, reason: &Reason) -> String {
+/// `[kind] #pr reason`, with `unchecked` beside a kind that was not checked.
+fn described(kind: &EscapeKind, checked: Checked, pr: Option<PrNumber>, reason: &Reason) -> String {
     let checked = match checked {
         Checked::Listed => "",
         Checked::Unchecked => ", unchecked",
     };
-    let build = match build {
-        Writer::Verified => "",
-        Writer::Unverified => ", unverified build",
-    };
     let pr = pr.map_or_else(String::new, |pr| format!("{pr} "));
-    format!("[{kind}{checked}{build}] {pr}{reason}")
+    format!("[{kind}{checked}] {pr}{reason}")
 }
 
 #[derive(Debug)]
@@ -264,12 +258,10 @@ impl Escape {
 
 impl Admitted {
     /// Records the escape from the raw records read under the log's lock, so that it works even on
-    /// a log that does not fold; a log that does not parse leaves the id and counts unknown. An
-    /// escape is the one record a build not verified to be from main still writes, marked so.
-    pub fn tally(self, earlier: Result<&[Record], String>, unverified: Option<Unverified>) -> Accepted {
+    /// a log that does not fold; a log that does not parse leaves the id and counts unknown.
+    pub fn tally(self, earlier: Result<&[Record], String>) -> Accepted {
         let Self { escape: Escape { kind, reason, pr }, unchecked } = self;
         let checked = unchecked.as_ref().map_or(Checked::Listed, |_| Checked::Unchecked);
-        let build = Writer::of(unverified.as_ref());
         let counts = earlier.map(|records| {
             records.iter().fold((0, 0, 0), |(escaped, resolved, repeats), record| match &record.event {
                 Event::Escaped { kind: earlier, .. } => {
@@ -279,7 +271,7 @@ impl Admitted {
                 _ => (escaped, resolved, repeats),
             })
         });
-        let what = described(&kind, Checked::Listed, Writer::Verified, pr, &reason);
+        let what = described(&kind, Checked::Listed, pr, &reason);
         let counted = match counts {
             Ok((escaped, resolved, repeats)) => format!(
                 "{} recorded: {what}\nopen escapes: {}\nrepeats of kind {kind}: {repeats}\n",
@@ -289,9 +281,21 @@ impl Admitted {
             Err(why) => format!("escape recorded: {what}\nid and counts unavailable: {why}\n"),
         };
         let unchecked = unchecked.map_or_else(String::new, |why| format!("kind unchecked: {why}\n"));
-        let unverified = unverified.map_or_else(String::new, |why| format!("written by an unverified build: {why}\n"));
-        let event = Event::Escaped { kind, reason, pr, checked, build };
-        Accepted::new(vec![event], counted + &unchecked + &unverified)
+        let event = Event::Escaped { kind, reason, pr, checked };
+        Accepted::new(vec![event], counted + &unchecked)
+    }
+
+    /// The escape for the side file, from a build not verified to be from main, and what to say
+    /// about it. It has no id: only the log gives escapes ids.
+    pub fn set_aside(self, at: Timestamp) -> (UnverifiedEscape, String) {
+        let Self { escape: Escape { kind, reason, pr }, unchecked } = self;
+        let checked = unchecked.as_ref().map_or(Checked::Listed, |_| Checked::Unchecked);
+        let what = described(&kind, Checked::Listed, pr, &reason);
+        let unchecked = unchecked.map_or_else(String::new, |why| format!("kind unchecked: {why}\n"));
+        (
+            UnverifiedEscape::new(at, kind, reason, pr, checked),
+            format!("unverified escape recorded: {what}\n{unchecked}"),
+        )
     }
 }
 

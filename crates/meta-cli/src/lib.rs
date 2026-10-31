@@ -1,8 +1,8 @@
 use meta_core::{
     Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
     LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason,
-    Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title,
-    Unreached, Unreadable, Unverified, Updating, Verdict,
+    Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, Standing, TaskId, Timestamp,
+    Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -196,11 +196,11 @@ impl Call {
 pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports<L, G, H, C>) -> Answer {
     let Ports { log, git, github, clock, build } = ports;
     let at = clock.now();
-    let real = log.is_real();
+    let standing = log.standing();
     match call {
-        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(real, git, build)),
+        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(standing, git, build)),
         Call::MarkRealLog => {
-            if let Err(unverified) = verify(true, git, build) {
+            if let Err(unverified) = verify(Standing::Real, git, build) {
                 return Answer::failed(Failure::Refused(unverified.into()));
             }
             match log.mark(Record { at, event: Event::RealLog }) {
@@ -224,10 +224,16 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(admitted) => admitted,
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
-            let unverified = verify(real, git, build).err();
+            if let Err(unverified) = verify(standing, git, build) {
+                let (escape, text) = admitted.set_aside(at);
+                return match log.set_aside(&escape) {
+                    Ok(side) => Answer::done(format!("{text}kept in {side}, not in the log: {unverified}\n")),
+                    Err(error) => Answer::failed(error.into()),
+                };
+            }
             let recorded = log.transact(|records| {
                 let earlier = records.as_deref().map_err(ToString::to_string);
-                let (events, text) = admitted.tally(earlier, unverified).into_parts();
+                let (events, text) = admitted.tally(earlier).into_parts();
                 (stamped(events, at), text)
             });
             match recorded {
@@ -236,7 +242,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
             }
         }
         Call::Ledger(call) => {
-            let verified = verify(real, git, build);
+            let verified = verify(standing, git, build);
             if let (false, Err(unverified)) = (call == LedgerCall::Status, &verified) {
                 return Answer::failed(Failure::Refused(unverified.clone().into()));
             }
@@ -247,7 +253,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 .read()
                 .map_err(Failure::from)
                 .and_then(|records| fold(&records))
-                .and_then(|ledger| prepare(call, &ledger, git, github, clock));
+                .and_then(|ledger| prepare(call, &ledger, log, git, github, clock));
             let prepared = match prepared {
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
@@ -275,13 +281,10 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 }
 
 /// Whether this binary may append to the log: any build may write a scratch log, and only a build
-/// from a commit on main may write the real one, which the log's first record names (`Log::is_real`).
-/// An ancestry that cannot be decided is unverified.
-fn verify<G: Git>(real: bool, git: &G, build: &Build) -> Result<(), Unverified> {
-    match real {
-        false => Ok(()),
-        true => build.verify(|commit| git.on_main(commit)),
-    }
+/// from a commit on main may write the real one, which the log's first record names
+/// (`Log::standing`). An ancestry that cannot be decided is unverified.
+fn verify<G: Git>(standing: Standing, git: &G, build: &Build) -> Result<(), Unverified> {
+    build.verify(standing, |commit| git.on_main(commit))
 }
 
 fn hook<L: Log>(
@@ -386,9 +389,10 @@ fn pull_at<H: GitHub, C: Clock>(github: &H, clock: &C, pr: PrNumber, pushed: &Sh
     }
 }
 
-fn prepare<G: Git, H: GitHub, C: Clock>(
+fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
     call: LedgerCall,
     ledger: &Ledger,
+    log: &L,
     git: &G,
     github: &mut H,
     clock: &C,
@@ -416,6 +420,8 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
                 },
                 kinds: spec(git, SelfFile::EscapeKinds, EscapeKinds::parse).map_err(unreached),
                 predictions: spec(git, SelfFile::Predictions, Predictions::parse).map_err(unreached),
+                unverified: log.set_aside_escapes().map_err(|error| Unreached::by(&error)),
+                standing: log.standing(),
             })
         }
         LedgerCall::Claim { task, claimant, deadline } => {

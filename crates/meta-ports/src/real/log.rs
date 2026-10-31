@@ -1,7 +1,8 @@
 use crate::{Log, PortError};
-use meta_core::{Head, Marking, Place, Record};
+use meta_core::{Head, Marking, Place, Record, Standing, UnverifiedEscape, UnverifiedEscapes};
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -31,6 +32,10 @@ const DIR: &str = "meta-dev";
 const LOG: &str = "log.jsonl";
 /// Beside the log, the copy `mark` keeps of the log as it was before marking.
 const UNMARKED: &str = "log.jsonl.unmarked";
+/// Beside the log, the marked log while `mark` writes it, before it is renamed over the log.
+const MARKING: &str = "log.jsonl.marking";
+/// Beside the log, the escapes from builds not verified to be from main.
+const SIDE: &str = "escapes.unverified.jsonl";
 
 #[derive(Debug)]
 pub struct JsonlLog {
@@ -82,15 +87,26 @@ impl JsonlLog {
         Head::of(first.as_ref().map(|records| records.first()))
     }
 
+    /// The log, opened and locked. `mark` renames a new file over the log, so a process that waited
+    /// on the lock may hold the old file: it opens the log again, or its append would be lost.
     fn locked(&self) -> Result<(File, &Path), PortError> {
         let path = self.path.as_ref().map_err(Clone::clone)?;
         path.parent().map_or(Ok(()), fs::create_dir_all).map_err(|error| Self::failed(path, error))?;
-        let file = OpenOptions::new().create(true).read(true).append(true).open(path);
-        let file = file.map_err(|error| Self::failed(path, error))?;
         let deadline = Instant::now() + self.patience;
         loop {
+            let file = OpenOptions::new().create(true).read(true).append(true).open(path);
+            let file = file.map_err(|error| Self::failed(path, error))?;
+            self.lock(&file, path, deadline)?;
+            if Self::is_current(&file, path) {
+                return Ok((file, path));
+            }
+        }
+    }
+
+    fn lock(&self, file: &File, path: &Path, deadline: Instant) -> Result<(), PortError> {
+        loop {
             match file.try_lock() {
-                Ok(()) => return Ok((file, path)),
+                Ok(()) => return Ok(()),
                 Err(TryLockError::WouldBlock) if Instant::now() < deadline => thread::sleep(Self::RETRY),
                 Err(TryLockError::WouldBlock) => {
                     let waited = self.patience.as_millis();
@@ -99,6 +115,38 @@ impl JsonlLog {
                 Err(TryLockError::Error(error)) => return Err(Self::failed(path, error)),
             }
         }
+    }
+
+    /// Whether `file` is still the file at `path`.
+    fn is_current(file: &File, path: &Path) -> bool {
+        match (file.metadata(), fs::metadata(path)) {
+            (Ok(held), Ok(there)) => (held.dev(), held.ino()) == (there.dev(), there.ino()),
+            _ => false,
+        }
+    }
+
+    /// The file `path` reaches, through any symlinks, or `path` itself while nothing is there.
+    fn resolved(path: &Path) -> PathBuf {
+        fs::canonicalize(path).unwrap_or_else(|_| path.to_owned())
+    }
+
+    /// The side file, beside the file the log's path reaches, so that a symlink leads to the same
+    /// side file as the log's own path. A hard link cannot be followed: it leads to its own.
+    fn side(&self) -> Result<PathBuf, PortError> {
+        self.path.as_ref().map_err(Clone::clone).map(|path| Self::resolved(path).with_file_name(SIDE))
+    }
+
+    /// Puts `marker` and `text` at `path` in one step: written and synced beside it first, then
+    /// renamed over it, then the rename synced. A crash leaves the old log or the new one, whole.
+    fn replace(path: &Path, marker: Record, text: &str) -> Result<(), PortError> {
+        let temp = path.with_file_name(MARKING);
+        let failed = |error| Self::failed(&temp, error);
+        let mut file = File::create(&temp).map_err(failed)?;
+        file.set_permissions(fs::metadata(path).map_err(failed)?.permissions()).map_err(failed)?;
+        Self::write(&mut file, &temp, &[marker])?;
+        file.write_all(text.as_bytes()).and_then(|()| file.sync_all()).map_err(failed)?;
+        fs::rename(&temp, path).map_err(failed)?;
+        path.parent().map_or(Ok(()), |dir| File::open(dir).and_then(|dir| dir.sync_all())).map_err(failed)
     }
 
     fn failed(path: &Path, error: std::io::Error) -> PortError {
@@ -126,12 +174,13 @@ impl Log for JsonlLog {
         self.path.as_ref().map_or_else(|_| "the meta-dev log".to_owned(), |path| path.display().to_string())
     }
 
-    fn is_real(&self) -> bool {
-        self.head().is_real(self.place)
+    fn standing(&self) -> Standing {
+        self.head().standing(self.place)
     }
 
     /// Keeps the log as it was in `log.jsonl.unmarked` first, and refuses when that copy already
-    /// exists, so that a marking cut short never loses the earlier copy.
+    /// exists, so that a marking cut short never loses the earlier copy. The marked log replaces
+    /// the log by rename, through any symlink, so a hard link made earlier keeps the old file.
     fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
         let (mut file, path) = self.locked()?;
         let mut text = String::new();
@@ -139,22 +188,48 @@ impl Log for JsonlLog {
         if Self::head_of(path, text.as_bytes()) == Head::Marked {
             return Ok(Marking::AlreadyMarked);
         }
+        let path = Self::resolved(path);
         let unmarked = path.with_file_name(UNMARKED);
         let kept = OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&unmarked)
             .and_then(|mut copy| copy.write_all(text.as_bytes()).and_then(|()| copy.sync_all()));
-        kept.map_err(|error| Self::failed(&unmarked, error))?;
-        file.set_len(0).map_err(|error| Self::failed(path, error))?;
-        Self::write(&mut file, path, &[marker])?;
-        file.write_all(text.as_bytes()).and_then(|()| file.sync_all()).map_err(|error| Self::failed(path, error))?;
+        kept.map_err(|error| {
+            PortError::new(format!(
+                "{}: {error}; the log was not changed. Next: compare that copy with the log and move it aside, then mark again.",
+                unmarked.display()
+            ))
+        })?;
+        Self::replace(&path, marker, &text).map_err(|error| {
+            PortError::new(format!("marking failed: {error}; the log as it was is in {}", unmarked.display()))
+        })?;
         Ok(Marking::Added)
     }
 
     fn read(&self) -> Result<Vec<Record>, PortError> {
         let (mut file, path) = self.locked()?;
         Self::contents(&mut file, path)
+    }
+
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
+        let side = self.side()?;
+        let line = serde_json::to_string(escape).map_err(|error| PortError::new(error.to_string()))? + "\n";
+        let written = side
+            .parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| OpenOptions::new().create(true).append(true).open(&side))
+            .and_then(|mut file| file.write_all(line.as_bytes()).and_then(|()| file.sync_all()));
+        written.map_err(|error| Self::failed(&side, error)).map(|()| side.display().to_string())
+    }
+
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
+        let side = self.side()?;
+        match fs::read(&side) {
+            Ok(bytes) => Ok(super::jsonl::lenient(&bytes)),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(UnverifiedEscapes::default()),
+            Err(error) => Err(Self::failed(&side, error)),
+        }
     }
 
     fn transact<T>(
@@ -225,7 +300,7 @@ mod tests {
             reached(Some(&share), None),
             reached(None, None),
         ];
-        let real = reach.map(|log| log.is_real());
+        let real = reach.map(|log| log.standing().is_real());
         assert_eq!(real, [true; 7]);
     }
 
@@ -245,8 +320,8 @@ mod tests {
         fs::create_dir_all(home.join(".local").join("share").join("meta-dev")).unwrap();
         fs::write(home.join(".local").join("share").join("meta-dev").join("log.jsonl"), DONE).unwrap();
         let default_unmarked = reached(None, Some(&home));
-        let real = [logs.map(|log| log.is_real()).to_vec(), vec![missing.is_real()]].concat();
-        let default = [default_missing.is_real(), default_unmarked.is_real()];
+        let real = [logs.map(|log| log.standing().is_real()).to_vec(), vec![missing.standing().is_real()]].concat();
+        let default = [default_missing.standing().is_real(), default_unmarked.standing().is_real()];
         assert_eq!(real, [false, false, true, false], "empty first line, unmarked, garbled, missing");
         assert_eq!(default, [true, true]);
     }
@@ -261,13 +336,13 @@ mod tests {
         let path = root.join("log.jsonl");
         fs::write(&path, [DONE, DONE].concat()).unwrap();
         let mut log = JsonlLog::at(path.clone());
-        let before = log.is_real();
+        let before = log.standing().is_real();
         let marked = [log.mark(marker()).unwrap(), log.mark(marker()).unwrap()];
         let text = fs::read_to_string(&path).unwrap();
         let kept = fs::read_to_string(root.join("log.jsonl.unmarked")).unwrap();
         assert_eq!((before, marked), (false, [Marking::Added, Marking::AlreadyMarked]));
         assert_eq!((text, kept), ([MARKER, DONE, DONE].concat(), [DONE, DONE].concat()));
-        assert_eq!((log.is_real(), log.read().unwrap().len()), (true, 3));
+        assert_eq!((log.standing().is_real(), log.read().unwrap().len()), (true, 3));
     }
 
     #[test]

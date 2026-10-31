@@ -1,7 +1,7 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
     Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Route, Rules, RunCount,
-    SelfFile, Sha, Span, Timestamp, Writer,
+    SelfFile, Sha, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -79,17 +79,11 @@ fn done(task: &str) -> Event {
 }
 
 fn escaped(kind: &str, reason: &str) -> Event {
-    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed, build: Writer::Verified }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed }
 }
 
 fn escaped_pr(kind: &str, pr: &str, reason: &str) -> Event {
-    Event::Escaped {
-        kind: id(kind),
-        reason: id(reason),
-        pr: Some(id(pr)),
-        checked: Checked::Listed,
-        build: Writer::Verified,
-    }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: Some(id(pr)), checked: Checked::Listed }
 }
 
 fn claimed_task() -> Vec<Event> {
@@ -162,6 +156,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
             records: events.into_iter().map(|event| Record { at, event }).collect(),
             broken: None,
             place: Place::Elsewhere,
+            set_aside: Vec::new(),
         },
         git: RecordedGit {
             origin: id(ORIGIN),
@@ -1198,7 +1193,6 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
         reason: id(reason),
         pr: None,
         checked: Checked::Unchecked,
-        build: Writer::Verified,
     };
     let (reply, events) = call(&mut ports, &["escape", "gap", "no", "review"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![unchecked("gap", "no review")]));
@@ -1235,8 +1229,16 @@ impl Log for Lagging {
         self.0.place()
     }
 
-    fn is_real(&self) -> bool {
-        self.0.is_real()
+    fn standing(&self) -> Standing {
+        self.0.standing()
+    }
+
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
+        self.0.set_aside(escape)
+    }
+
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
+        self.0.set_aside_escapes()
     }
 
     fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
@@ -1595,31 +1597,16 @@ fn real_log_still_answers_reads_from_a_build_not_on_main_and_latches_nothing() {
 }
 
 #[test]
-fn real_log_takes_an_escape_from_a_build_not_on_main_marked_as_written_by_an_unverified_build() {
+fn real_log_sets_aside_an_escape_from_a_build_not_on_main_and_appends_nothing() {
     unverified_builds().into_iter().for_each(|(build, why)| {
         let mut ports = on_real_log(vec![claimed("task-1")], Vec::new(), build);
         let (reply, events) = call(&mut ports, &["escape", "gap", "the", "hook", "denies", "every", "start"], "");
-        let marked = Event::Escaped {
-            kind: id("gap"),
-            reason: id("the hook denies every start"),
-            pr: None,
-            checked: Checked::Listed,
-            build: Writer::Unverified,
-        };
-        assert_eq!((reply.code, events), (Code::Done, vec![marked.clone()]), "{}", reply.text);
-        let said = ["escape-1 recorded", "written by an unverified build: ", why];
+        assert_eq!((reply.code, events), (Code::Done, Vec::new()), "{}", reply.text);
+        let said = ["unverified escape recorded: [gap] the hook denies every start", "kept in memory side file", why];
         assert!(said.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
-        let line = serde_json::to_string(&Record { at: Timestamp::from_unix_seconds(2), event: marked }).unwrap();
-        assert_eq!(
-            line,
-            r#"{"at":2,"event":"Escaped","kind":"gap","reason":"the hook denies every start","build":"unverified"}"#
-        );
+        assert_eq!(ports.log.records.len(), 1);
+        assert_eq!(ports.log.set_aside.len(), 1);
     });
-    let mut ports = on_real_log(Vec::new(), Vec::new(), Build::commit(id(BRANCH_BUILD)));
-    call(&mut ports, &["escape", "gap", "branch", "build"], "");
-    ports.build = Build::commit(id(MAIN_BUILD));
-    let status = call(&mut ports, &["status"], "").0.text;
-    assert!(status.contains("escape-1 [gap, unverified build] branch build"), "{status}");
 }
 
 #[test]
@@ -1655,7 +1642,7 @@ fn on_marked_log(events: Vec<Event>, build: Build) -> Memory {
 }
 
 #[test]
-fn a_marked_log_anywhere_refuses_every_write_but_an_unverified_escape_from_a_build_not_on_main() {
+fn a_marked_log_anywhere_refuses_every_write_from_a_build_not_on_main_and_sets_escapes_aside() {
     unverified_builds().into_iter().for_each(|(build, why)| {
         let (reply, events) =
             call(&mut on_marked_log(vec![opened("task-1")], build.clone()), &["defer", "task-1", "later"], "");
@@ -1667,14 +1654,7 @@ fn a_marked_log_anywhere_refuses_every_write_but_an_unverified_escape_from_a_bui
         assert!(reply.text.contains(DENY), "{}", reply.text);
         let (reply, events) =
             call(&mut on_marked_log(Vec::new(), build), &["escape", "gap", "from", "a", "branch"], "");
-        let marked = Event::Escaped {
-            kind: id("gap"),
-            reason: id("from a branch"),
-            pr: None,
-            checked: Checked::Listed,
-            build: Writer::Unverified,
-        };
-        assert_eq!((reply.code, events), (Code::Done, vec![marked]), "{}", reply.text);
+        assert_eq!((reply.code, events), (Code::Done, Vec::new()), "{}", reply.text);
     });
     let (reply, events) = call(
         &mut on_marked_log(vec![opened("task-1")], Build::commit(id(MAIN_BUILD))),
@@ -1761,6 +1741,30 @@ fn an_escape_from_a_build_not_on_main_goes_to_the_side_file_and_never_into_the_m
         assert_eq!(entry["kind"], "gap", "{side}");
         assert_eq!(entry["reason"], "the hook denies every start", "{side}");
     });
+}
+
+#[test]
+fn a_side_file_that_cannot_be_written_fails_the_escape_and_leaves_the_log_alone() {
+    let scratch = Scratch::new("side-blocked");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(BRANCH_BUILD)));
+    std::fs::create_dir(scratch.join(SIDE_FILE)).unwrap();
+    let reply = answer(parsed(&["escape", "gap", "from", "a", "branch"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert!(reply.text.contains(SIDE_FILE), "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), MARKER_LINE);
+}
+
+#[test]
+fn a_symlinked_log_leads_to_the_side_file_beside_the_log_it_reaches() {
+    let scratch = Scratch::new("side-symlink");
+    let (real, reach) = (scratch.join("real"), scratch.join("reach"));
+    std::fs::create_dir_all(&reach).unwrap();
+    std::fs::create_dir_all(&real).unwrap();
+    let mut ports = on_marked_jsonl(&real, Build::commit(id(BRANCH_BUILD)));
+    std::os::unix::fs::symlink(real.join("log.jsonl"), reach.join("log.jsonl")).unwrap();
+    ports.log = JsonlLog::at(reach.join("log.jsonl"));
+    assert_eq!(answer(parsed(&["escape", "gap", "linked"]), &mut ports).code, Code::Done);
+    assert!(real.join(SIDE_FILE).is_file() && !reach.join(SIDE_FILE).exists());
 }
 
 #[test]

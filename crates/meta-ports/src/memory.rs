@@ -1,6 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
 use meta_core::{
-    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, Span, TaskId, Timestamp, Updating,
+    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, Span, Standing, TaskId, Timestamp,
+    UnverifiedEscape, UnverifiedEscapes, Updating,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -11,6 +12,8 @@ pub struct MemoryLog {
     pub broken: Option<PortError>,
     /// Where the log stands: the default data dir, or anywhere else.
     pub place: Place,
+    /// The side file beside the log: its lines, `None` for one that cannot be read.
+    pub set_aside: Vec<Option<UnverifiedEscape>>,
 }
 
 impl MemoryLog {
@@ -24,8 +27,8 @@ impl Log for MemoryLog {
         "memory log".to_owned()
     }
 
-    fn is_real(&self) -> bool {
-        Head::of(self.open().map(|()| self.records.first())).is_real(self.place)
+    fn standing(&self) -> Standing {
+        Head::of(self.open().map(|()| self.records.first())).standing(self.place)
     }
 
     fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
@@ -41,6 +44,15 @@ impl Log for MemoryLog {
 
     fn read(&self) -> Result<Vec<Record>, PortError> {
         self.open().map(|()| self.records.clone())
+    }
+
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
+        self.set_aside.push(Some(escape.clone()));
+        Ok("memory side file".to_owned())
+    }
+
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
+        Ok(UnverifiedEscapes::of(self.set_aside.iter().cloned()))
     }
 
     fn transact<T>(

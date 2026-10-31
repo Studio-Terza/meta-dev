@@ -45,13 +45,20 @@ impl Stamp {
         }
     }
 
-    /// The cargo directive that embeds this stamp; `host.rs` reads it with `option_env!`.
+    /// The cargo directives that embed this stamp; `host.rs` reads them with `option_env!`. All
+    /// three are always set, the unused ones empty, so that a variable inherited from the caller
+    /// cannot stand in for the one left unset.
     pub fn directive(&self) -> String {
-        match self {
-            Self::Clean(commit) => format!("cargo::rustc-env=META_BUILD_COMMIT={commit}\n"),
-            Self::Dirty(commit) => format!("cargo::rustc-env=META_BUILD_DIRTY={commit}\n"),
-            Self::Unknown(why) => format!("cargo::rustc-env=META_BUILD_UNVERIFIED={why}\n"),
-        }
+        let (clean, dirty, why) = match self {
+            Self::Clean(commit) => (commit.as_str(), "", ""),
+            Self::Dirty(commit) => ("", commit.as_str(), ""),
+            Self::Unknown(why) => ("", "", why.as_str()),
+        };
+        format!(
+            "cargo::rustc-env=META_BUILD_COMMIT={clean}\n\
+             cargo::rustc-env=META_BUILD_DIRTY={dirty}\n\
+             cargo::rustc-env=META_BUILD_UNVERIFIED={why}\n"
+        )
     }
 }
 

@@ -16,6 +16,28 @@ pub enum Head {
     Unreadable,
 }
 
+/// What a log's first record and place make of it: who may write it, and what the way out is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Standing {
+    /// Any build may write it.
+    Scratch,
+    /// The default data dir's log, not yet marked: only a main build writes it, and status warns
+    /// until it is marked.
+    AwaitingMark,
+    /// Only a main build writes it, and a scratch data dir leads away from it: the default data
+    /// dir's marked log, or any log whose first record cannot be read (fail closed).
+    Real,
+    /// Marked, and reached from outside the default data dir, so a scratch data dir does not lead
+    /// away from it: only a main build writes it.
+    MarkedElsewhere,
+}
+
+impl Standing {
+    pub fn is_real(self) -> bool {
+        self != Self::Scratch
+    }
+}
+
 /// What `meta mark-real-log` did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Marking {
@@ -34,20 +56,22 @@ impl Head {
         }
     }
 
-    /// Whether only a main build may write the log. A marked log is real wherever it is reached
-    /// from. A first record that cannot be read is real: fail closed. The default data dir's log
-    /// is real until it is marked, so that the lead's log stays guarded before its one-time marking.
-    pub fn is_real(self, place: Place) -> bool {
+    /// A marked log is real wherever it is reached from. A first record that cannot be read is
+    /// real: fail closed. The default data dir's log is real until it is marked, so that the lead's
+    /// log stays guarded before its one-time marking.
+    pub fn standing(self, place: Place) -> Standing {
         match (self, place) {
-            (Self::Marked | Self::Unreadable, _) | (_, Place::Default) => true,
-            (Self::Empty | Self::Unmarked, Place::Elsewhere) => false,
+            (Self::Marked, Place::Elsewhere) => Standing::MarkedElsewhere,
+            (Self::Marked, Place::Default) | (Self::Unreadable, _) => Standing::Real,
+            (Self::Empty | Self::Unmarked, Place::Default) => Standing::AwaitingMark,
+            (Self::Empty | Self::Unmarked, Place::Elsewhere) => Standing::Scratch,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Head;
+    use super::{Head, Standing};
     use crate::event::{Event, Record};
     use crate::ids::Timestamp;
     use crate::place::Place;
@@ -64,9 +88,11 @@ mod tests {
             Head::of(Err(())),
         ];
         assert_eq!(heads, [Head::Empty, Head::Marked, Head::Unmarked, Head::Unreadable]);
-        let real = |place| heads.map(|head| head.is_real(place));
-        assert_eq!(real(Place::Elsewhere), [false, true, false, true]);
-        assert_eq!(real(Place::Default), [true, true, true, true]);
+        let standing = |place| heads.map(|head| head.standing(place));
+        let (scratch, waiting) = (Standing::Scratch, Standing::AwaitingMark);
+        assert_eq!(standing(Place::Elsewhere), [scratch, Standing::MarkedElsewhere, scratch, Standing::Real]);
+        assert_eq!(standing(Place::Default), [waiting, Standing::Real, waiting, Standing::Real]);
+        assert!(standing(Place::Default).iter().all(|standing| standing.is_real()));
     }
 
     #[test]

@@ -22,16 +22,17 @@ mod review;
 mod rework;
 mod roles;
 mod rules;
+mod set_aside;
 mod spec;
 mod status;
 mod task;
 
 pub use brief::Reissue;
-pub use build::{Build, Unverified, Writer};
+pub use build::{Build, Unverified};
 pub use claim::Claim;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
-pub use head::{Head, Marking};
+pub use head::{Head, Marking, Standing};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
     AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Minutes, Observed,
@@ -50,5 +51,6 @@ pub use review::Reviewing;
 pub use rework::PrRuns;
 pub use roles::Roles;
 pub use rules::Rules;
+pub use set_aside::{UnverifiedEscape, UnverifiedEscapes};
 pub use spec::{SelfFile, Unreadable};
 pub use status::Sources;

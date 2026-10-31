@@ -1,4 +1,3 @@
-use crate::build::Writer;
 use crate::escape::Checked;
 use crate::ids::{
     AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, PrNumber, PredictionId, Reason, RunCount,
@@ -49,8 +48,8 @@ pub enum Event {
     },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
     /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
-    /// could be read is marked unchecked; one written by a build not verified to be from main is
-    /// marked unverified.
+    /// could be read is marked unchecked. A build not verified to be from main never writes one:
+    /// its escape goes to the side file (`UnverifiedEscape`).
     Escaped {
         #[serde(default = "EscapeKind::unclassified")]
         kind: EscapeKind,
@@ -59,8 +58,6 @@ pub enum Event {
         pr: Option<PrNumber>,
         #[serde(default, skip_serializing_if = "Checked::is_listed")]
         checked: Checked,
-        #[serde(default, skip_serializing_if = "Writer::is_verified")]
-        build: Writer,
     },
     Resolved {
         escape: EscapeId,

@@ -156,7 +156,7 @@ A failed review round is a `Reviewed` event with verdict `fail`. Tasks never lin
 
 An agent ran `meta` built from its unmerged branch against the lead's real log. It appended events that main's binary cannot fold, so every hook denied and `meta merge` broke until the lead repaired the log by hand. The old meta-dev repo failed the same way: a stale binary against the log's schema.
 
-The build script (`crates/meta-ports/src/real/build.rs`, with its logic in `stamp.rs`) embeds the commit the binary is built from. Edits to tracked files make the build dirty: it embeds the commit as dirty, and the refusal says how to clear it (commit or stash the tracked edits, then rebuild). Untracked files do not count. A build outside git embeds no commit. The build script reruns when any tracked file changes, or git's `HEAD`, `index` or `logs/HEAD`. It reads the tracked files from `git ls-files`, so no hand-kept list can go stale. If it cannot list them, the build is unverified.
+The build script (`crates/meta-ports/src/real/build.rs`, with its logic in `stamp.rs`) embeds the commit the binary is built from. It always sets all three stamp variables, with the unused ones empty, and an empty one counts as unset, so a variable inherited from the caller cannot stand in for one left unset. Edits to tracked files make the build dirty: it embeds the commit as dirty, and the refusal says how to clear it (commit or stash the tracked edits, then rebuild). Untracked files do not count. A build outside git embeds no commit. The build script reruns when any tracked file changes, or git's `HEAD`, `index` or `logs/HEAD`. It reads the tracked files from `git ls-files`, so no hand-kept list can go stale. If it cannot list them, the build is unverified.
 
 The real log is known by its content, not by its path. Its first record is the marker `{"at":…,"event":"RealLog"}`, written once by `meta mark-real-log`. Before every write, meta reads the first record of the log it is about to write:
 
@@ -169,6 +169,18 @@ Tests use scratch or in-memory logs, and fake homes.
 
 `meta mark-real-log` puts the marker first in the log of the current data dir, ahead of the records already there. Only a main build may run it. It copies the log to `log.jsonl.unmarked` beside it first, and it refuses if that copy already exists. A log that already starts with the marker is left as it is.
 
+Marking is crash-safe. It writes the marked log to `log.jsonl.marking` in the same directory, syncs it, renames it over the log, then syncs the directory. A crash leaves the old log or the new one, whole. If marking fails, the error names the `.unmarked` copy. The rename goes through a symlink to the file it reaches. A hard link made before marking keeps the old file: it is then a separate, unmarked file, and writes to it do not reach the real log. A process that was waiting on the log's lock during the rename opens the log again, so its append lands in the new file.
+
+`meta status` warns while the default data dir's log is unmarked: "run meta mark-real-log with a main build".
+
+### Escapes from unverified builds
+
+Owner decision, 2026-10-31: a build not verified to be from main never writes an escape into the real log. It appends the escape to `escapes.unverified.jsonl`, in the directory of the file the log's path reaches. So a symlink leads to the same side file as the log's own path. A hard link cannot be followed, so its side file stands beside the link; the reply prints the path.
+
+Each line is one JSON object with `at`, `kind`, `reason`, and optionally `pr` and `checked`. It is not a log record and has no `escape-n` id. Any build reads the file leniently: unknown fields are skipped, and a line that cannot be read is counted and is never fatal. If the file as a whole cannot be read, status says so and prints the rest of the report.
+
+`meta status` lists each one under the open escapes as `unverified [kind] reason`. P2 counts them: they add to open escapes and to the repeats of their kind. A line below P2 gives their number and the number of unreadable lines. `meta resolve` cannot close them, because they have no id. P1 does not read them.
+
 Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. The ancestry check runs in the clone the binary was built in, by that clone's local refs, with no network. So a binary must stay in the clone it was built in. If that clone moves or is removed, every guarded write fails closed, and the refusal says that the clone has moved or been removed.
 
 | Command | Given | Result |
@@ -176,9 +188,13 @@ Before each write to the real log, meta asks the git port whether the embedded c
 | any ledger command that writes, on the real log | the build has no commit, has edits to tracked files, its commit is not on origin/main, or the ancestry cannot be read (for example, its clone is gone) | refused before any port call, with no events: "you are running a branch build (why) … Next: use a main build, or set XDG_DATA_HOME to a scratch data dir." |
 | `meta hook pre-tool-use` or `post-tool-use` for `Agent`, `Task` or `SendMessage`, on the real log | the same | denied or not recorded (fail closed), with the same reason |
 | `meta status`, on the real log | the same | the report prints; a falsification it would latch is not recorded, and the reason is printed |
-| `meta escape <kind> <reason>`, on the real log | the same | event `Escaped` marked `build: unverified`; prints why. `meta status` shows the mark beside the escape |
+| `meta escape <kind> <reason>`, on the real log | the same | no event; one line appended to `escapes.unverified.jsonl` beside the log; prints where it went and why. `meta status` shows it, marked unverified, and counts it in P2 |
+| `meta escape <kind> <reason>`, on the real log | the same, and the side file cannot be written | fails, naming the side file; the log is unchanged |
+| `meta status` | the side file holds unknown fields or unreadable lines | the report prints; unknown fields are skipped and unreadable lines are counted |
+| `meta status` | the default data dir's log is missing, empty or unmarked | the report starts with a warning: "run meta mark-real-log with a main build" |
 | any command | a build whose commit is on origin/main, or a scratch log | written as before, with no mark |
-| any write, on a log whose first record is the marker | a branch build reaches it with HOME elsewhere, through a hard link or a symlink, or with HOME unset | refused as on the real log (escapes are written, marked unverified) |
+| any write, on a log whose first record is the marker | a branch build reaches it from outside the default data dir: with XDG_DATA_HOME set, through a hard link or a symlink | refused with "this log is marked as the real log; use a main build", which does not advise a scratch dir (escapes go to the side file) |
+| any write, on the default data dir's log with the marker | a branch build | refused as on the real log, and the refusal advises a main build or a scratch data dir |
 | any write, on an unmarked log outside the default data dir | any build | written: the log is scratch |
 | any write, on the default data dir's log with no marker yet | a branch build | refused as on the real log, until the log is marked |
 | `meta mark-real-log` | a branch build | refused with the branch-build reason; the log is unchanged |
