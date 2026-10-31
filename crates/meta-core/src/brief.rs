@@ -55,7 +55,9 @@ impl ReviewText<'_> {
     pub(crate) fn text(&self) -> String {
         let Self { pr, task, title, agent, lease, deadline_line, head, rules } = self;
         let digits = pr.digits();
-        let lease_line = lease_line(*lease);
+        let lease_line = format!(
+            "{lease} (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you to do with this line)"
+        );
         format!(
             "review: {pr} for {task}: {title}\n\
              agent: {agent}\n\
@@ -64,7 +66,12 @@ impl ReviewText<'_> {
              goal: find what is wrong with {pr} at head {head}, judged against {task} and the rules below.\n\
              constraints:\n  \
              - read the change with gh pr view {digits} and gh pr diff {digits}; push, comment, approve and merge nothing\n  \
-             - report each finding with its file, line and evidence, then a verdict: pass or fail\n\
+             - report each finding with its file, line and evidence, then a verdict: pass or fail\n  \
+             - finish by recording the verdict yourself: meta verdict {task} pass|fail, run with a main build, because only a main build writes the real log. \
+             To get one: git worktree add --detach ../{task}-main origin/main && \
+             cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target, \
+             then ../{task}-main/target/release/meta verdict {task} pass|fail. \
+             meta refuses the verdict if {pr} no longer has head {head}; then report that and stop\n\
              rules:\n{rules}"
         )
     }

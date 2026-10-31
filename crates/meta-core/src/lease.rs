@@ -165,11 +165,15 @@ impl Spent {
     }
 
     /// The one verdict of a used review lease.
-    pub(crate) fn judge(&mut self, verdict: Verdict) -> Result<(), String> {
+    /// A verdict that names its head must name the lease's.
+    pub(crate) fn judge(&mut self, verdict: Verdict, judged: Option<&Sha>) -> Result<(), String> {
         let id = self.lease.id;
         match (&self.lease.purpose, self.verdict) {
             (Purpose::Work, _) => Err(format!("{id} is not a review lease")),
             (Purpose::Review { .. }, Some(earlier)) => Err(format!("{id} already has the verdict {earlier}")),
+            (Purpose::Review { head, .. }, None) if judged.is_some_and(|judged| judged != head) => {
+                Err(format!("{id} was issued at head {head} but its verdict judged another head"))
+            }
             (Purpose::Review { .. }, None) => {
                 self.verdict = Some(verdict);
                 Ok(())

@@ -47,6 +47,11 @@ pub enum LedgerCall {
         task: TaskId,
         by: PrNumber,
     },
+    /// The reviewer's verdict on the head its lease judged.
+    Verdict {
+        task: TaskId,
+        verdict: Verdict,
+    },
     /// `deadline` overrides the review default.
     Review {
         task: TaskId,
@@ -67,7 +72,6 @@ pub enum Local {
     Defer { task: TaskId, reason: Reason },
     Undefer(TaskId),
     Role { task: TaskId, role: Role },
-    Verdict { task: TaskId, verdict: Verdict },
     Wait { task: TaskId, question: OwnerQuestion },
     Unwait { task: TaskId, answer: OwnerAnswer },
 }
@@ -186,9 +190,9 @@ impl Call {
                 let deadline = Self::deadline(deadline)?;
                 agent.parse().map(|agent| LedgerCall::Review { task, agent, deadline })
             })),
-            ["verdict", task, verdict] => {
-                local(task.parse().and_then(|task| verdict.parse().map(|verdict| Local::Verdict { task, verdict })))
-            }
+            ["verdict", task, verdict] => ledger(
+                task.parse().and_then(|task| verdict.parse().map(|verdict| LedgerCall::Verdict { task, verdict })),
+            ),
             ["wait", task, "--owner", question @ ..] => local(
                 task.parse().and_then(|task| question.join(" ").parse().map(|question| Local::Wait { task, question })),
             ),
@@ -456,6 +460,11 @@ enum Prepared {
         origin: Origin,
         rules: Rules,
     },
+    Verdict {
+        task: TaskId,
+        verdict: Verdict,
+        pull: Pull,
+    },
     Review {
         task: TaskId,
         agent: AgentName,
@@ -559,6 +568,9 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
             ledger.reissue(lease)?;
             Prepared::Brief { lease, origin: git.origin()?, rules: spec(git, SelfFile::Rules, Rules::parse)? }
         }
+        LedgerCall::Verdict { task, verdict } => {
+            Prepared::Verdict { task, verdict, pull: github.pull(ledger.awaiting(task)?)? }
+        }
         LedgerCall::Review { task, agent, deadline } => {
             let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
             let allowance = deadline.map_or_else(|| roles(git).map(|roles| roles.review()), Ok)?;
@@ -577,7 +589,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Role { task, role }) => ledger.role(task, role)?,
-        Prepared::Local(Local::Verdict { task, verdict }) => ledger.verdict(task, verdict)?,
+        Prepared::Verdict { task, verdict, pull } => ledger.verdict(task, verdict, &pull)?,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),

@@ -132,6 +132,9 @@ pub enum Event {
     Reviewed {
         lease: LeaseId,
         verdict: Verdict,
+        /// The head the verdict judged, which was the lease's. Verdicts from before it was recorded have none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        head: Option<Sha>,
     },
     /// The first time a prediction's falsifier is met by one of its measures, kept for good: the
     /// record's own time is when. Resolving escapes later cannot erase it.
