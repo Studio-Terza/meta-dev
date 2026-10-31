@@ -1161,6 +1161,38 @@ fn a_verdict_after_the_deadline_lands_on_the_named_lease() {
 }
 
 #[test]
+fn a_verdict_on_a_workers_lease_points_at_wait_while_it_runs_and_at_a_new_review_once_it_ended_with_none() {
+    let at_pin = || vec![("1", pull(PINNED, &[Outcome::Green]))];
+    let (running, _) = call(&mut given(worker_task(1), at_pin()), &["verdict", "lease-2", "pass"], "");
+    assert_eq!(running.code, Code::Refused, "{}", running.text);
+    assert!(running.text.contains("meta worker wait lease-2 records it"), "{}", running.text);
+    for end in [WorkerEnd::Stopped, WorkerEnd::Deadline, WorkerEnd::Vanished, WorkerEnd::Exited(ExitStatus::of(1))] {
+        let finished = Event::Finished { lease: id("lease-2"), end: Some(end) };
+        let (ended, events) =
+            call(&mut given([worker_task(1), vec![finished]].concat(), at_pin()), &["verdict", "lease-2", "pass"], "");
+        assert_eq!((ended.code, events), (Code::Refused, Vec::new()), "{}", ended.text);
+        assert!(ended.text.contains("ended with no verdict"), "{}", ended.text);
+        assert!(ended.text.contains("Next: meta review task-1 --agent <name>"), "{}", ended.text);
+        assert!(!ended.text.contains("records it"), "{}", ended.text);
+    }
+}
+
+#[test]
+fn status_reads_the_latest_verdict_by_log_order_when_an_older_lease_is_judged_after_a_newer_one() {
+    let lease = |name: &str, head: &str| vec![review_leased(name, head), used(name)];
+    let events = [
+        linked_task(),
+        lease("lease-2", PINNED),
+        lease("lease-3", MOVED),
+        vec![reviewed("lease-3", "pass"), reviewed("lease-2", "fail")],
+    ]
+    .concat();
+    let text = status_of(events);
+    let line = format!("latest review verdict per linked PR\n  #7 task-1: fail at {PINNED}\n");
+    assert!(text.contains(&line), "{text}");
+}
+
+#[test]
 fn a_verdict_naming_a_wrong_unused_worker_or_judged_lease_is_refused_with_a_next_step() {
     let unused = reviewer_after_worker(PINNED)[..1].to_vec();
     let judged = [worker_task(1), vec![reviewed_at_pin("fail")]].concat();
