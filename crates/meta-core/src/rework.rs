@@ -54,7 +54,7 @@ impl Ledger {
         self.linked_prs.values().flatten().filter(|pr| !self.landed.contains_key(pr)).copied().collect()
     }
 
-    fn failed_rounds(&self, task: TaskId) -> FailedRounds {
+    pub(crate) fn failed_rounds(&self, task: TaskId) -> FailedRounds {
         let failed = self.leases.values().filter(|slot| match slot {
             LeaseSlot::Spent(spent) => {
                 spent.lease().task() == task

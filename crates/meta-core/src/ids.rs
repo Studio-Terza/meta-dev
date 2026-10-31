@@ -269,6 +269,11 @@ impl Span {
     pub const fn whole_minutes(self) -> u64 {
         self.0 / Minutes::SECONDS
     }
+
+    /// This stretch followed by `other`.
+    pub const fn plus(self, other: Self) -> Self {
+        Self(self.0.saturating_add(other.0))
+    }
 }
 
 /// A whole number of minutes, at least one: how long a lease runs before its deadline.
