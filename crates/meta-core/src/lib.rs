@@ -6,9 +6,12 @@ mod event;
 mod head;
 mod hook;
 mod ids;
+mod imported;
+mod importing;
 mod latch;
 mod lease;
 mod ledger;
+mod line_hash;
 mod link;
 mod merge;
 mod merges;
@@ -23,6 +26,7 @@ mod rework;
 mod roles;
 mod rules;
 mod set_aside;
+mod side_line;
 mod spec;
 mod stalled;
 mod status;
@@ -42,7 +46,10 @@ pub use ids::{
     Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title,
     Verdict,
 };
+pub use imported::Imported;
+pub use importing::Importing;
 pub use ledger::{Corrupt, Ledger};
+pub use line_hash::LineHash;
 pub use link::Linking;
 pub use merge::{Clearance, Cleared, Landed, Merging, Updating};
 pub use merges::{Cause, Merges, Reconciliation, Unreached};
@@ -56,5 +63,6 @@ pub use rework::PrRuns;
 pub use roles::Roles;
 pub use rules::Rules;
 pub use set_aside::{UnverifiedEscape, UnverifiedEscapes};
+pub use side_line::SideLine;
 pub use spec::{SelfFile, Unreadable};
 pub use status::Sources;

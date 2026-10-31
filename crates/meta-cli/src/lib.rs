@@ -1,8 +1,8 @@
 use meta_core::{
     Accepted, Admitted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event,
-    Hook, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber,
-    Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span,
-    Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
+    Hook, Importing, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase,
+    PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha,
+    Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -16,6 +16,8 @@ pub enum Call {
     },
     /// A Claude Code hook, before or after a tool runs, with its input.
     Hook(Phase, String),
+    /// Moves the side file's escapes into the log with ids; only a main build may.
+    ImportEscapes,
     /// Puts the `RealLog` marker first in the log, once; only a main build may.
     MarkRealLog,
 }
@@ -112,7 +114,7 @@ impl Answer {
 impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
                          meta claim <task> --self\n  \
-                         meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  \
+                         meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  meta escape --import\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
@@ -140,6 +142,7 @@ impl Call {
             ["brief", lease] => ledger(lease.parse().map(LedgerCall::Brief)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
             ["mark-real-log"] => Some(Ok(Self::MarkRealLog)),
+            ["escape", "--import"] => Some(Ok(Self::ImportEscapes)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
                 pr.parse()
                     .and_then(|pr| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: Some(pr) }))
@@ -224,6 +227,29 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                     Answer::done(format!("{} is already marked as the real log\n", log.place()))
                 }
                 Err(error) => Answer::failed(error.into()),
+            }
+        }
+        Call::ImportEscapes => {
+            if let Err(unverified) = guard.at(standing, git, build) {
+                return Answer::failed(Failure::Refused(unverified.into()));
+            }
+            // Checked again inside the lock, as for an escape. The side file is rewritten only
+            // after the appended records are durable.
+            let imported = log.import_set_aside(|now, records, lines| {
+                if let Err(unverified) = guard.at(now, git, build) {
+                    return (Vec::new(), None, Err(Failure::Refused(unverified.into())));
+                }
+                match records {
+                    Ok(records) => {
+                        let (events, kept, text) = Importing::of(lines, &records).into_parts();
+                        (stamped(events, at), Some(kept), Ok(text))
+                    }
+                    Err(error) => (Vec::new(), None, Err(error.into())),
+                }
+            });
+            match imported.map_err(Failure::from).and_then(|decided| decided) {
+                Ok(text) => Answer::done(text),
+                Err(failure) => Answer::failed(failure),
             }
         }
         Call::Escape { kind, reason, pr } => {

@@ -1,7 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
 use meta_core::{
-    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, Span, Standing, TaskId, Timestamp,
-    UnverifiedEscape, UnverifiedEscapes, Updating,
+    Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing, TaskId,
+    Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -53,6 +53,32 @@ impl Log for MemoryLog {
 
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
         Ok(UnverifiedEscapes::of(self.set_aside.iter().cloned()))
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.open()?;
+        let standing = self.standing();
+        let lines = self
+            .set_aside
+            .iter()
+            .map(|line| match line {
+                Some(escape) => SideLine::new(serde_json::to_vec(escape).unwrap_or_default(), Some(escape.clone())),
+                None => SideLine::new(b"unreadable".to_vec(), None),
+            })
+            .collect();
+        let (records, kept, decided) = decide(standing, Ok(self.records.clone()), lines);
+        self.records.extend(records);
+        if let Some(kept) = kept {
+            self.set_aside = kept.iter().map(|line| line.escape().cloned()).collect();
+        }
+        Ok(decided)
     }
 
     fn transact<T>(

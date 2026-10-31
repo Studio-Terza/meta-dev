@@ -1,7 +1,7 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
     Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Route, Rules, RunCount,
-    SelfFile, Sha, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
+    SelfFile, Sha, SideLine, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -79,11 +79,11 @@ fn done(task: &str) -> Event {
 }
 
 fn escaped(kind: &str, reason: &str) -> Event {
-    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed, imported: None }
 }
 
 fn escaped_pr(kind: &str, pr: &str, reason: &str) -> Event {
-    Event::Escaped { kind: id(kind), reason: id(reason), pr: Some(id(pr)), checked: Checked::Listed }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: Some(id(pr)), checked: Checked::Listed, imported: None }
 }
 
 fn claimed_task() -> Vec<Event> {
@@ -1213,6 +1213,7 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
         reason: id(reason),
         pr: None,
         checked: Checked::Unchecked,
+        imported: None,
     };
     let (reply, events) = call(&mut ports, &["escape", "gap", "no", "review"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![unchecked("gap", "no review")]));
@@ -1259,6 +1260,17 @@ impl Log for Lagging {
 
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
         self.0.set_aside_escapes()
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.0.import_set_aside(decide)
     }
 
     fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
@@ -1896,6 +1908,17 @@ impl Log for Unmarked {
 
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
         self.0.set_aside_escapes()
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.0.import_set_aside(decide)
     }
 
     fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
@@ -2626,4 +2649,153 @@ fn brief_of_a_used_unknown_or_dead_lease_is_refused_with_the_reason_and_records_
     });
     let reply = Call::parse(&command(&["brief", "task-1"]), String::new).unwrap_err();
     assert!(reply.code == Code::Failed && reply.text.contains("meta brief <lease>"), "{}", reply.text);
+}
+
+/// A side file line as a branch build writes it.
+fn side_line(at: u64, kind: &str, pr: Option<&str>, reason: &str) -> String {
+    let pr = pr.map_or_else(String::new, |pr| format!(",\"pr\":{pr}"));
+    format!("{{\"at\":{at},\"kind\":\"{kind}\",\"reason\":\"{reason}\"{pr}}}\n")
+}
+
+const IMPORT: [&str; 2] = ["escape", "--import"];
+
+#[test]
+fn import_moves_side_file_escapes_into_the_log_with_ids_keeps_unreadable_lines_and_status_shows_them() {
+    let scratch = Scratch::new("import");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let (first, second) = (side_line(3, "gap", None, "from a branch"), side_line(4, "gap", None, "again"));
+    std::fs::write(scratch.join(SIDE_FILE), [first.as_str(), "not a record\n", second.as_str()].concat()).unwrap();
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    let said = [
+        "escape-1 imported: [gap] from a branch (from an unverified build)",
+        "escape-2 imported: [gap] again (from an unverified build)",
+        "1 unreadable lines kept in the side file",
+    ];
+    assert!(said.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "not a record\n");
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 3, "{log}");
+    assert!(log.contains("\"imported\":{\"line\":") && log.contains("\"written\":3"), "{log}");
+    let status = answer(parsed(&["status"]), &mut ports);
+    let shown = [
+        "escape-1 [gap] from a branch (imported from an unverified build)\n",
+        "escape-2 [gap] again (imported from an unverified build)\n",
+        "open escapes: 2\n",
+        "1 unreadable lines",
+    ];
+    assert!(shown.iter().all(|part| status.text.contains(part)), "{}", status.text);
+    assert!(!status.text.contains("unverified [gap]"), "{}", status.text);
+    let resolved = answer(parsed(&["resolve", "escape-1", "--historical", "fixed", "upstream"]), &mut ports);
+    assert_eq!(resolved.code, Code::Done, "{}", resolved.text);
+    let again = answer(parsed(&["status"]), &mut ports);
+    assert!(again.text.contains("open escapes: 1\n"), "{}", again.text);
+}
+
+#[test]
+fn an_imported_escape_naming_a_pr_counts_for_p1_like_any_other_escape() {
+    let scratch = Scratch::new("import-p1");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let outside =
+        vec![opened("task-2"), claimed("task-2"), linked("task-2", "8"), merged_outside("8", 1), done("task-2")];
+    let history = [vec![Event::RealLog], finished_task(), outside].concat();
+    let text: String = history
+        .into_iter()
+        .map(|event| serde_json::to_string(&Record { at: Timestamp::from_unix_seconds(1), event }).unwrap() + "\n")
+        .collect();
+    std::fs::write(scratch.join("log.jsonl"), text).unwrap();
+    ports.github.listed = Some(Ok(listed(&[7, 8])));
+    let before = answer(parsed(&["status"]), &mut ports).text;
+    assert!(before.contains("P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;"), "{before}");
+    std::fs::write(scratch.join(SIDE_FILE), side_line(3, "outside-merge", Some("8"), "merged by hand")).unwrap();
+    assert_eq!(answer(parsed(&IMPORT), &mut ports).code, Code::Done);
+    let after = answer(parsed(&["status"]), &mut ports).text;
+    assert!(after.contains("P1 merged outside meta: 1 (0 missing from the log)"), "{after}");
+    assert!(after.contains("UNDECIDED; observed unrecorded bypasses unavailable"), "{after}");
+}
+
+#[test]
+fn import_is_refused_from_a_build_not_on_main_and_changes_neither_file() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let scratch = Scratch::new("import-refused");
+        let mut ports = on_marked_jsonl(&scratch, build);
+        let side = side_line(3, "gap", None, "from a branch");
+        std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+        let reply = answer(parsed(&IMPORT), &mut ports);
+        assert_eq!(reply.code, Code::Refused, "{}", reply.text);
+        assert!(reply.text.contains(why), "{}", reply.text);
+        assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+        assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), MARKER_LINE);
+    });
+}
+
+#[test]
+fn a_crash_between_the_append_and_the_side_file_rewrite_imports_nothing_twice_and_loses_nothing() {
+    let scratch = Scratch::new("import-crash");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let side =
+        [side_line(3, "gap", None, "one"), "not a record\n".to_owned(), side_line(4, "gap", None, "two")].concat();
+    std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+    std::fs::create_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    let cut = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(cut.code, Code::Failed, "{}", cut.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 3, "{log}");
+    std::fs::remove_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    let retry = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(retry.code, Code::Done, "{}", retry.text);
+    assert!(retry.text.contains("2 already in the log from an earlier import"), "{}", retry.text);
+    assert!(!retry.text.contains("imported:"), "{}", retry.text);
+    assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), log);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "not a record\n");
+    let last = answer(parsed(&IMPORT), &mut ports);
+    assert!(last.text.contains("1 unreadable lines kept"), "{}", last.text);
+    assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), log);
+}
+
+#[test]
+fn a_retry_drops_as_many_copies_of_a_line_as_the_log_holds_and_imports_the_surplus() {
+    let scratch = Scratch::new("import-count");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let twin = side_line(3, "gap", None, "twice");
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str()].concat()).unwrap();
+    std::fs::create_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    assert_eq!(answer(parsed(&IMPORT), &mut ports).code, Code::Failed);
+    std::fs::remove_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str(), twin.as_str()].concat()).unwrap();
+    let retry = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(retry.code, Code::Done, "{}", retry.text);
+    assert!(retry.text.contains("escape-3 imported:"), "{}", retry.text);
+    assert!(!retry.text.contains("escape-4") && retry.text.contains("2 already in the log"), "{}", retry.text);
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 4, "{log}");
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "");
+}
+
+#[test]
+fn import_with_nothing_in_the_side_file_says_so_and_a_scratch_log_takes_it_from_any_build() {
+    let scratch = Scratch::new("import-empty");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!((reply.code, reply.text.as_str()), (Code::Done, "the side file holds no escapes to import\n"));
+    assert!(!scratch.join(SIDE_FILE).exists());
+    let mut memory = Ports { build: Build::commit(id(BRANCH_BUILD)), ..given(Vec::new(), Vec::new()) };
+    memory.log.set_aside = vec![serde_json::from_str(&side_line(3, "gap", None, "scratch")).unwrap(), None];
+    let (reply, events) = call(&mut memory, &IMPORT, "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!((events.len(), memory.log.set_aside.len()), (1, 1));
+    assert!(matches!(&events[0], Event::Escaped { imported: Some(_), .. }), "{events:?}");
+}
+
+#[test]
+fn import_into_a_log_that_does_not_parse_fails_and_keeps_the_side_file() {
+    let scratch = Scratch::new("import-garbled");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    std::fs::write(scratch.join("log.jsonl"), format!("{MARKER_LINE}garbled\n")).unwrap();
+    let side = side_line(3, "gap", None, "one");
+    std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
 }
