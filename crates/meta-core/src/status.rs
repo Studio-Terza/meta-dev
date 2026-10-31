@@ -38,6 +38,14 @@ const UNSEEN_STARTS: &str = "agent starts without a lease are not observable: me
 /// What `meta status` tells the lead to do while the default data dir's log is unmarked.
 const MARK_THE_LOG: &str = "run meta mark-real-log with a main build";
 
+/// Says exactly what the section shows: a worker stays on it whatever its verdict or task, for its
+/// process is still there, and the log's other started agents are left out by these words.
+const NO_STOP_AGENTS: &str =
+    "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task";
+
+/// Says exactly what the section shows: a worker's end is reported by its own lines.
+const STOPPED_AGENTS: &str = "subagents with a turn end or stop recorded, no verdict, on an open task";
+
 impl Ledger {
     /// A lease is flagged from its third resume onward.
     const FLAGGED_RESUMES: usize = 3;
@@ -92,6 +100,18 @@ impl Ledger {
                         self.agent_role(slot),
                         slot.deadline()
                     )
+                })
+            })
+            .collect();
+        let past: Vec<String> = self
+            .leases
+            .iter()
+            .filter(|(_, slot)| self.live(slot.lease()))
+            .filter_map(|(id, slot)| {
+                let agent = slot.agent();
+                agent.zip(slot.last_seen(at)).map(|(agent, seen)| {
+                    let (task, role, deadline) = (slot.lease().task(), self.agent_role(slot), slot.deadline());
+                    format!("{id}: agent {agent}, {task}, role {role}, {deadline}, {seen}")
                 })
             })
             .collect();
@@ -194,7 +214,7 @@ impl Ledger {
             unverified.map_or_else(|why| format!("unverified escapes unavailable: {why}\n"), |read| read.note());
         let unjudged = match self.unjudged() {
             lines if lines.is_empty() => String::new(),
-            lines => section("review leases finished (flagged)", &lines),
+            lines => section("review leases with no verdict (flagged)", &lines),
         };
         let text = [
             match standing {
@@ -205,7 +225,8 @@ impl Ledger {
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             done_by_others,
             section("live leases", &leases),
-            section("running agents", &running),
+            section(NO_STOP_AGENTS, &running),
+            section(STOPPED_AGENTS, &past),
             section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
@@ -235,7 +256,7 @@ impl Ledger {
         (fresh, text)
     }
 
-    /// Review leases whose agent stopped with no verdict, unless a later review of the task has one.
+    /// Review leases past a turn end or an end with no verdict, unless a later review of the task has one.
     fn unjudged(&self) -> Vec<String> {
         self.leases
             .iter()
@@ -248,14 +269,19 @@ impl Ledger {
                         other.lease().task() == task
                             && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
                     });
-                    (!later).then(|| format!("{id} for {task}: review finished with no verdict{}", slot.worker_note()))
+                    let how = match (spent.has_ended(), spent.worker()) {
+                        (true, Some(_)) => "review finished",
+                        (true, None) => "review stopped by TaskStop",
+                        (false, _) => "review's last recorded turn ended",
+                    };
+                    (!later).then(|| format!("{id} for {task}: {how} with no verdict{}", slot.worker_note()))
                 }
                 _ => None,
             })
             .collect()
     }
 
-    /// A live lease of a task not waiting on the owner, past its deadline, whose agent has not finished.
+    /// A live lease of a task not waiting on the owner, past its deadline, with no turn end or end recorded.
     fn overdue(&self, slot: &LeaseSlot, at: Timestamp) -> bool {
         self.live(slot.lease())
             && !self.waiting.contains_key(&slot.lease().task())

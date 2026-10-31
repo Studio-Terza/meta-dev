@@ -25,6 +25,18 @@ pub enum Purpose {
     Review { pr: PrNumber, head: Sha },
 }
 
+/// What the log last shows of an agent. The log never shows the process, so none of these says
+/// that it runs now: a lost hook leaves `NoStop`, and an agent can wake after `TurnEnded`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Seen {
+    /// No turn end and no end recorded since its start or its last resume.
+    NoStop,
+    /// The last turn end recorded. The agent may be done, or waiting on background work.
+    TurnEnded(Timestamp),
+    /// The agent ended: a worker's end, or a TaskStop of a subagent.
+    Ended(Timestamp),
+}
+
 /// A lease after its agent started: the agent's id once recorded, the deadline counted from that
 /// start, how often a canned continue resumed it, and a review's verdict.
 #[derive(Debug)]
@@ -34,8 +46,8 @@ pub struct Spent {
     deadline: Deadline,
     resumes: usize,
     verdict: Option<Verdict>,
-    /// Set by the stop of the agent; a canned continue clears it, for the agent runs again.
-    stopped: bool,
+    /// Set by a turn end or the end of the agent; a canned continue clears it, for the agent runs again.
+    seen: Seen,
     /// Set when the agent is a headless worker.
     worker: Option<WorkerRun>,
 }
@@ -113,7 +125,10 @@ impl Lease {
     pub(crate) fn spend(self) -> (Spent, Event) {
         let used = Event::LeaseUsed { lease: self.id };
         let deadline = self.deadline;
-        (Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None, stopped: false, worker: None }, used)
+        (
+            Spent { lease: self, agent: None, deadline, resumes: 0, verdict: None, seen: Seen::NoStop, worker: None },
+            used,
+        )
     }
 }
 
@@ -157,24 +172,55 @@ impl Spent {
 
     pub(crate) fn resume(&mut self) {
         self.resumes += 1;
-        self.stopped = false;
+        self.seen = Seen::NoStop;
     }
 
-    /// The stop of the agent this lease started.
-    pub(crate) fn stop(&mut self) -> Result<(), String> {
+    /// A `Finished` of the agent this lease started: a worker's end, or in an older log a subagent's
+    /// first turn end. It stands alone since the start or the last resume, so a second one is corrupt.
+    pub(crate) fn finish(&mut self, at: Timestamp, ended: bool) -> Result<(), String> {
         let id = self.lease.id;
-        match (&self.agent, self.stopped) {
+        match (&self.agent, self.seen) {
             (None, _) => Err(format!("{id} finished but no agent is recorded as started on it")),
-            (Some(_), true) => Err(format!("{id} finished twice")),
-            (Some(_), false) => {
-                self.stopped = true;
+            (Some(_), Seen::NoStop) => {
+                self.seen = if ended { Seen::Ended(at) } else { Seen::TurnEnded(at) };
                 Ok(())
             }
+            (Some(_), _) => Err(format!("{id} finished twice")),
         }
     }
 
+    /// A `TurnEnded`. Turn ends repeat, and one fits after an older `Finished` with no end.
+    pub(crate) fn turn_end(&mut self, at: Timestamp) -> Result<(), String> {
+        self.before_an_end("ended a turn")?;
+        self.seen = Seen::TurnEnded(at);
+        Ok(())
+    }
+
+    /// A `Stopped`, the real end of a subagent. It fits after a turn end.
+    pub(crate) fn stop(&mut self, at: Timestamp) -> Result<(), String> {
+        self.before_an_end("stopped")?;
+        self.seen = Seen::Ended(at);
+        Ok(())
+    }
+
+    /// Only a started agent with no end recorded can end a turn or stop; only a resume follows an end.
+    fn before_an_end(&self, what: &str) -> Result<(), String> {
+        let id = self.lease.id;
+        match (&self.agent, self.seen) {
+            (None, _) => Err(format!("{id} {what} but no agent is recorded as started on it")),
+            (Some(_), Seen::Ended(_)) => Err(format!("{id} {what} after its agent ended")),
+            (Some(_), _) => Ok(()),
+        }
+    }
+
+    /// A turn end or the end of the agent is the log's last word on it.
     pub(crate) fn is_stopped(&self) -> bool {
-        self.stopped
+        self.seen != Seen::NoStop
+    }
+
+    /// The agent is known to have ended, not only to have ended a turn.
+    pub(crate) fn has_ended(&self) -> bool {
+        matches!(self.seen, Seen::Ended(_))
     }
 
     /// The one verdict of a used review lease.
@@ -217,12 +263,28 @@ impl LeaseSlot {
         }
     }
 
-    /// Whether the agent on this lease has finished its part: it stopped, or a review gave its verdict.
+    /// Whether the agent on this lease is taken as past its work: a turn end or an end is recorded,
+    /// or a review gave its verdict. A turn end does not show it is done: see `Seen`.
     pub(crate) fn is_finished(&self) -> bool {
-        matches!(self, Self::Spent(spent) if spent.verdict.is_some() || spent.stopped)
+        matches!(self, Self::Spent(spent) if spent.verdict.is_some() || spent.is_stopped())
     }
 
-    /// The agent running on this lease: started, and not finished.
+    /// What the log last shows of a subagent with no verdict, past a turn end or stopped, as a
+    /// status line says it at `now`. A worker's end is reported by its own lines.
+    pub(crate) fn last_seen(&self, now: Timestamp) -> Option<String> {
+        let ago = |time: Timestamp| format!("{time} ({} min ago)", time.span_to(now).whole_minutes());
+        match self {
+            Self::Spent(Spent { verdict: None, worker: None, seen: Seen::TurnEnded(time), .. }) => {
+                Some(format!("last recorded turn end {}, done or waiting is not known", ago(*time)))
+            }
+            Self::Spent(Spent { verdict: None, worker: None, seen: Seen::Ended(time), .. }) => {
+                Some(format!("stopped by TaskStop {}", ago(*time)))
+            }
+            _ => None,
+        }
+    }
+
+    /// The agent with no turn end, end or verdict recorded: started, and not finished.
     pub(crate) fn running_agent(&self) -> Option<&AgentId> {
         match self {
             Self::Spent(spent) if !self.is_finished() => spent.agent.as_ref(),
@@ -233,7 +295,7 @@ impl LeaseSlot {
     /// The session of a headless worker whose end is not recorded, verdict or none.
     pub(crate) fn running_worker(&self) -> Option<&WorkerRun> {
         match self {
-            Self::Spent(spent) if !spent.stopped => spent.worker.as_ref(),
+            Self::Spent(spent) if !spent.is_stopped() => spent.worker.as_ref(),
             _ => None,
         }
     }

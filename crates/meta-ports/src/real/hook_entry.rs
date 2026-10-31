@@ -23,12 +23,12 @@ fn exit_code(prelude: &str, command: &str) -> Option<i32> {
 }
 
 #[test]
-fn the_hook_entries_gate_agent_task_and_send_message_before_and_bind_agent_and_task_after() {
+fn the_hook_entries_gate_agent_task_and_send_message_before_and_read_agent_task_and_task_stop_after() {
     let (before, command) = entry("PreToolUse");
     assert_eq!(before, "Agent|Task|SendMessage");
     assert_eq!(command, "meta hook pre-tool-use || exit 2");
     let (after, command) = entry("PostToolUse");
-    assert_eq!(after, "Agent|Task");
+    assert_eq!(after, "Agent|Task|TaskStop");
     assert_eq!(command, "meta hook post-tool-use || exit 2");
 }
 
