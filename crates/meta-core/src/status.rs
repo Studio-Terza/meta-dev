@@ -48,6 +48,11 @@ impl Ledger {
         let listed = |keep: fn(&Progress) -> bool| -> Vec<String> {
             self.tasks.values().filter(|task| keep(task)).map(|task| task.to_string()).collect()
         };
+        let finished_by_others = listed(|task| task.done_by().is_some());
+        let done_by_others = match finished_by_others.is_empty() {
+            true => String::new(),
+            false => section("done by another task's PR", &finished_by_others),
+        };
         let leases: Vec<String> = self
             .leases
             .iter()
@@ -173,6 +178,7 @@ impl Ledger {
             },
             section("open tasks", &listed(Progress::is_active)),
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
+            done_by_others,
             section("live leases", &leases),
             section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),

@@ -137,10 +137,13 @@ impl Ledger {
                 }
                 self.merged.push((*runs, *route));
             }
-            Event::Done { task } => {
-                let done = match self.take(*task)? {
-                    Progress::Linked(linked) => Ok(linked.finish()),
-                    other => Err(format!("{task} done while {other}")),
+            Event::Done { task, by } => {
+                let done = match (self.take(*task)?, by) {
+                    (Progress::Linked(linked), None) => Ok(linked.finish()),
+                    (Progress::Open(open), Some(pr)) => Ok(open.finish_by(*pr)),
+                    (Progress::Claimed(claimed), Some(pr)) => Ok(claimed.finish_by(*pr)),
+                    (Progress::Linked(linked), Some(pr)) => Ok(linked.finish_by(*pr)),
+                    (other, _) => Err(format!("{task} done while {other}")),
                 }?;
                 self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Done(done));

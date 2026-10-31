@@ -54,6 +54,9 @@ An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind sin
 |---|---|---|
 | `meta retire <task> <reason>` | the task is open or claimed, and not linked to an open PR | event `Retired`; the task leaves the open list |
 | `meta retire <task> <reason>` | the task is deferred, done or retired | refused |
+| `meta done <task> --by <pr>` | the task is open, claimed or linked, and GitHub reports the PR merged | event `Done` with `by: <pr>`; `meta status` lists the task under "done by another task's PR" as "done by #N" |
+| `meta done <task> --by <pr>` | the PR is open or closed without merging, or GitHub does not report it | refused, with the reason |
+| `meta done <task> --by <pr>` | the task is unknown, deferred, done or retired | refused |
 | `meta defer <task> <reason>` | the task is open | event `Deferred`; listed under deferred |
 | `meta undefer <task>` | the task is deferred | event `Undeferred`; open again |
 

@@ -466,8 +466,10 @@ mod tests {
         holder.lock().unwrap();
         let mut waiting = JsonlLog::at(path.clone());
         let writer = thread::spawn(move || {
-            let record =
-                Record { at: Timestamp::from_unix_seconds(2), event: Event::Done { task: "task-1".parse().unwrap() } };
+            let record = Record {
+                at: Timestamp::from_unix_seconds(2),
+                event: Event::Done { task: "task-1".parse().unwrap(), by: None },
+            };
             waiting.transact(|_, _| (vec![record], ()))
         });
         thread::sleep(Duration::from_millis(100));

@@ -42,6 +42,11 @@ pub enum LedgerCall {
         task: TaskId,
         reason: Reason,
     },
+    /// Closes a task that another task's merged PR finished.
+    DoneBy {
+        task: TaskId,
+        by: PrNumber,
+    },
     /// `deadline` overrides the review default.
     Review {
         task: TaskId,
@@ -116,7 +121,7 @@ impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
                          meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  meta escape --import\n  \
-                         meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
+                         meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta done <task> --by <pr>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
@@ -167,6 +172,9 @@ impl Call {
                 task.parse()
                     .and_then(|task| reason.join(" ").parse().map(|reason| LedgerCall::Retire { task, reason })),
             ),
+            ["done", task, "--by", pr] => {
+                ledger(task.parse().and_then(|task| pr.parse().map(|by| LedgerCall::DoneBy { task, by })))
+            }
             ["defer", task, reason @ ..] => local(
                 task.parse().and_then(|task| reason.join(" ").parse().map(|reason| Local::Defer { task, reason })),
             ),
@@ -435,6 +443,11 @@ enum Prepared {
         reason: Reason,
         pull: Option<Pull>,
     },
+    DoneBy {
+        task: TaskId,
+        by: PrNumber,
+        pull: Pull,
+    },
     Brief {
         lease: LeaseId,
         origin: Origin,
@@ -533,6 +546,10 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
             let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
             Prepared::Retire { task, reason, pull }
         }
+        LedgerCall::DoneBy { task, by } => {
+            let pull = github.pull(ledger.done_by(task, by)?.pr())?;
+            Prepared::DoneBy { task, by, pull }
+        }
         LedgerCall::Brief(lease) => {
             ledger.reissue(lease)?;
             Prepared::Brief { lease, origin: git.origin()?, rules: spec(git, SelfFile::Rules, Rules::parse)? }
@@ -569,6 +586,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         },
         Prepared::Update { updating } => updating.record(),
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
+        Prepared::DoneBy { task, by, pull } => ledger.done_by(task, by)?.settle(&pull)?,
         Prepared::Brief { lease, origin, rules } => ledger.reissue(lease)?.brief(&origin, &rules),
         Prepared::Review { task, agent, pull, rules, allowance } => {
             ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?

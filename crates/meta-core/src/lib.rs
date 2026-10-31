@@ -1,6 +1,7 @@
 mod brief;
 mod build;
 mod claim;
+mod done;
 mod escape;
 mod event;
 mod head;
@@ -38,6 +39,7 @@ mod waiting;
 pub use brief::Reissue;
 pub use build::{Build, Unverified};
 pub use claim::Claim;
+pub use done::Finishing;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
 pub use head::{Head, Marking, Standing};
