@@ -1,0 +1,77 @@
+[
+  {
+    "baseRefName": "main",
+    "commits": [
+      {
+        "authoredDate": "2026-10-31T09:00:00Z",
+        "authors": [
+          { "email": "fixture@users.noreply.github.com", "id": "MDQ6VXNlcjE=", "login": "fixture", "name": "Fixture" },
+          { "email": "noreply@anthropic.com", "id": "MDQ6VXNlcjI=", "login": "", "name": "Claude" }
+        ],
+        "committedDate": "2026-10-31T09:00:00Z",
+        "messageBody": "Co-authored-by: Claude <noreply@anthropic.com>",
+        "messageHeadline": "task-1: a coherent change",
+        "oid": "1111111111111111111111111111111111111111"
+      }
+    ],
+    "number": 7
+  },
+  {
+    "baseRefName": "main",
+    "commits": [
+      {
+        "authoredDate": "2026-10-31T09:05:00Z",
+        "authors": [
+          { "email": "fixture@users.noreply.github.com", "id": "MDQ6VXNlcjE=", "login": "fixture", "name": "Fixture" }
+        ],
+        "committedDate": "2026-10-31T09:05:00Z",
+        "messageBody": "",
+        "messageHeadline": "a change nobody opened a task for",
+        "oid": "2222222222222222222222222222222222222222"
+      }
+    ],
+    "number": 8
+  },
+  {
+    "baseRefName": "task-7-stack",
+    "commits": [
+      {
+        "authoredDate": "2026-10-31T09:10:00Z",
+        "authors": [
+          { "email": "fixture@users.noreply.github.com", "id": "MDQ6VXNlcjE=", "login": "fixture", "name": "Fixture" }
+        ],
+        "committedDate": "2026-10-31T09:10:00Z",
+        "messageBody": "",
+        "messageHeadline": "stacked on another branch",
+        "oid": "3333333333333333333333333333333333333333"
+      }
+    ],
+    "number": 9
+  },
+  {
+    "baseRefName": "main",
+    "commits": [
+      {
+        "authoredDate": "2026-10-31T09:15:00Z",
+        "authors": [
+          { "email": "someone@example.org", "id": "", "login": "", "name": "Someone" }
+        ],
+        "committedDate": "2026-10-31T09:15:00Z",
+        "messageBody": "",
+        "messageHeadline": "made under another identity",
+        "oid": "4444444444444444444444444444444444444444"
+      },
+      {
+        "authoredDate": "2026-10-31T09:16:00Z",
+        "authors": [
+          { "email": "fixture@users.noreply.github.com", "id": "MDQ6VXNlcjE=", "login": "fixture", "name": "Fixture" }
+        ],
+        "committedDate": "2026-10-31T09:16:00Z",
+        "messageBody": "",
+        "messageHeadline": "made under the identity",
+        "oid": "5555555555555555555555555555555555555555"
+      }
+    ],
+    "number": 10
+  }
+]

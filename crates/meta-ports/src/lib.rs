@@ -100,6 +100,8 @@ impl GhReplies {
 pub trait GitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError>;
     fn merged_list(&self) -> Result<String, PortError>;
+    /// The one `gh pr list --state open` reply, with the number, base and commits of each PR.
+    fn open_list(&self) -> Result<String, PortError>;
     /// The `gh run list --json databaseId` reply for the PR's branch, merged or not.
     fn runs(&self, pr: PrNumber) -> Result<String, PortError>;
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError>;

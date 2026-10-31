@@ -17,6 +17,7 @@ const PREDICTIONS: &str = include_str!("fixtures/predictions.toml");
 const ROLES: &str = include_str!("fixtures/roles.toml");
 /// The recorded absolute path of the running binary; no real machine path is ever used.
 const BINARY: &str = "/recorded/main/meta";
+const OPEN_PRS: &str = include_str!("fixtures/open-prs.json");
 const ORIGIN: &str = "https://github.com/Studio-Terza/meta-dev.git";
 const REPO: &str = "Studio-Terza/meta-dev";
 const PINNED: &str = "aaaaaaa";
@@ -174,6 +175,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
             merged: Vec::new(),
             updated: Vec::new(),
             listed: Some(Ok("[]".to_owned())),
+            open: Some(Ok("[]".to_owned())),
         },
         clock: FakeClock::at(Timestamp::from_unix_seconds(2)),
         build: Build::commit(id(MAIN_BUILD)),
@@ -412,6 +414,8 @@ rework per task (report only; not part of P6)
   task-2 (#9, done): failed review rounds 0, CI runs 4
   task-4 (#10, done): failed review rounds 0, CI runs 2
 rework total: tasks with 2 or more failed review rounds: 0 of 2 tasks with a PR; worst: task-2 (failed review rounds 0, CI runs 4)
+drift (flagged)
+  (none)
 predictions
 ";
     assert_eq!(reply.text.get(..expected.len()), Some(expected), "{}", reply.text);
@@ -2740,6 +2744,87 @@ fn status_reports_rework_as_none_without_a_linked_pr_and_names_ci_runs_it_could_
     let unread = "  task-1 (#7, linked): failed review rounds 1, CI runs unavailable (no recorded reply for #7)\n";
     assert!(status.contains(unread), "{status}");
     assert!(status.contains("worst: task-1 (failed review rounds 1, CI runs unavailable)"), "{status}");
+}
+
+// Drift (docs/stage1.md): report only, from one recorded `gh pr list --state open` reply.
+
+fn drift_of(open: Option<Result<String, PortError>>, rules: Option<&str>) -> (Answer, Vec<Event>) {
+    let history =
+        [linked_by_lead("task-1", "7"), linked_by_lead("task-2", "9"), linked_by_lead("task-3", "10")].concat();
+    let mut ports = given(history, Vec::new());
+    ports.github.open = open;
+    if let Some(rules) = rules {
+        ports.git.files.insert(SelfFile::Rules, rules.to_owned());
+    }
+    call(&mut ports, &["status"], "")
+}
+
+#[test]
+fn status_flags_open_prs_with_no_linked_task_a_base_other_than_main_and_commits_not_by_the_identity_email() {
+    let (reply, added) = drift_of(Some(Ok(OPEN_PRS.to_owned())), None);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
+    let expected = "drift (flagged)\n\
+        \x20 #8: no linked task\n\
+        \x20 #9: base is task-7-stack, not main\n\
+        \x20 #10: commit 4444444444444444444444444444444444444444 is not by the identity email, author someone@example.org\n";
+    assert!(reply.text.contains(expected), "{}", reply.text);
+}
+
+#[test]
+fn status_does_not_flag_a_co_author_or_a_linked_pr_on_main_made_under_the_identity() {
+    let (reply, _) = drift_of(Some(Ok(OPEN_PRS.to_owned())), None);
+    assert!(!reply.text.contains("#7:"), "{}", reply.text);
+}
+
+#[test]
+fn status_shows_drift_as_none_when_no_pr_is_open() {
+    let (reply, _) = drift_of(Some(Ok("[]".to_owned())), None);
+    assert!(reply.text.contains("drift (flagged)\n  (none)\n"), "{}", reply.text);
+}
+
+#[test]
+fn status_says_drift_is_unavailable_when_the_open_list_cannot_be_read_and_never_shows_it_empty() {
+    let failures = [Some(Err(PortError::new("gh is down"))), Some(Ok("not json".to_owned())), None];
+    failures.into_iter().for_each(|open| {
+        let (reply, events) = drift_of(open, None);
+        assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+        assert!(reply.text.contains("drift (flagged)\n  drift unavailable: "), "{}", reply.text);
+        assert!(!reply.text.contains("drift (flagged)\n  (none)"), "{}", reply.text);
+    });
+}
+
+#[test]
+fn status_says_drift_is_unavailable_when_the_open_list_may_be_truncated() {
+    let rows: Vec<serde_json::Value> =
+        (1..=101).map(|number| serde_json::json!({ "number": number, "baseRefName": "main", "commits": [] })).collect();
+    let (reply, _) = drift_of(Some(Ok(serde_json::Value::Array(rows).to_string())), None);
+    assert!(reply.text.contains("drift unavailable: the open list is truncated"), "{}", reply.text);
+}
+
+#[test]
+fn status_names_commit_authors_unavailable_when_the_identity_rule_has_no_email_but_still_flags_the_rest() {
+    let rules =
+        "[[rule]]\nid = \"identity\"\ntext = \"Commit as the fixture identity.\"\nsource = \"fixture: identity\"\n";
+    let (reply, _) = drift_of(Some(Ok(OPEN_PRS.to_owned())), Some(rules));
+    assert!(reply.text.contains("  #8: no linked task\n"), "{}", reply.text);
+    assert!(reply.text.contains("  #7: commit authors unavailable: the identity rule"), "{}", reply.text);
+    assert!(!reply.text.contains("is not by the identity email"), "{}", reply.text);
+}
+
+#[test]
+fn status_names_commit_authors_truncated_for_a_pr_at_the_commit_cap() {
+    let commit = serde_json::json!({ "oid": "2222222222222222222222222222222222222222", "authors": [{ "email": "fixture@users.noreply.github.com" }] });
+    let rows = serde_json::json!([{ "number": 7, "baseRefName": "main", "commits": vec![commit; 100] }]).to_string();
+    let (reply, _) = drift_of(Some(Ok(rows)), None);
+    assert!(reply.text.contains("  #7: commit authors unavailable: commit list may be truncated\n"), "{}", reply.text);
+}
+
+#[test]
+fn status_shows_a_forged_base_name_on_one_line() {
+    let rows = serde_json::json!([{ "number": 7, "baseRefName": "x\ny", "commits": [] }]).to_string();
+    let (reply, _) = drift_of(Some(Ok(rows)), None);
+    assert!(reply.text.contains("  #7: base is x\\ny, not main\n"), "{}", reply.text);
 }
 
 #[test]

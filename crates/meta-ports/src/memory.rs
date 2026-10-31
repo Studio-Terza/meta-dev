@@ -143,6 +143,8 @@ pub struct RecordedGitHub {
     pub merged: Vec<(PrNumber, Sha)>,
     pub updated: Vec<PrNumber>,
     pub listed: Option<Result<String, PortError>>,
+    /// The reply to the one open-PR list call.
+    pub open: Option<Result<String, PortError>>,
 }
 
 impl GitHub for RecordedGitHub {
@@ -163,6 +165,10 @@ impl GitHub for RecordedGitHub {
 
     fn merged_list(&self) -> Result<String, PortError> {
         self.listed.clone().unwrap_or_else(|| Err(PortError::new("no recorded merged list")))
+    }
+
+    fn open_list(&self) -> Result<String, PortError> {
+        self.open.clone().unwrap_or_else(|| Err(PortError::new("no recorded open list")))
     }
 
     fn update_branch(&mut self, updating: &Updating) -> Result<(), PortError> {

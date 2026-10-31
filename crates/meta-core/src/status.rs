@@ -1,7 +1,8 @@
+use crate::drift::OpenPrs;
 use crate::escape::{EscapeKinds, Logged, RepeatKey};
 use crate::event::{Event, Route};
 use crate::head::Standing;
-use crate::ids::{EscapeId, PrNumber, RunCount, Timestamp};
+use crate::ids::{Email, EscapeId, PrNumber, RunCount, Timestamp};
 use crate::latch::Latch;
 use crate::lease::{LeaseSlot, Purpose};
 use crate::ledger::Ledger;
@@ -24,6 +25,10 @@ pub struct Sources {
     pub runs: PrRuns,
     pub unverified: Result<UnverifiedEscapes, Unreached>,
     pub standing: Standing,
+    /// Open PRs as GitHub lists them, for the report-only drift section.
+    pub open: Result<OpenPrs, Unreached>,
+    /// The email the identity rule names, which commit authors on open PRs are compared with.
+    pub identity: Result<Email, Unreached>,
 }
 
 /// Why P1's agent-start half cannot say "holds": meta sees a start without a lease only through an
@@ -44,7 +49,7 @@ impl Ledger {
     }
 
     fn report(&self, sources: Sources, at: Timestamp) -> (Vec<Event>, String) {
-        let Sources { github, kinds, predictions, runs: pr_runs, unverified, standing } = sources;
+        let Sources { github, kinds, predictions, runs: pr_runs, unverified, standing, open, identity } = sources;
         let listed = |keep: fn(&Progress) -> bool| -> Vec<String> {
             self.tasks.values().filter(|task| keep(task)).map(|task| task.to_string()).collect()
         };
@@ -216,6 +221,7 @@ impl Ledger {
             side_note,
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             self.rework(&pr_runs),
+            self.drift(&open, &identity),
             section("predictions", &predicted),
             self.timing(at),
         ]

@@ -1,3 +1,5 @@
+use crate::ids::Email;
+use crate::merges::Unreached;
 use crate::spec::{SelfFile, Unreadable};
 use serde::Deserialize;
 use std::fmt;
@@ -14,11 +16,19 @@ struct Rule {
     id: String,
     text: String,
     source: String,
+    /// The address a rule names as data, so that a check compares it without reading the text.
+    email: Option<Email>,
 }
 
 impl Rules {
     pub fn parse(text: &str) -> Result<Self, Unreadable> {
         SelfFile::Rules.parse(text)
+    }
+
+    /// The email the `identity` rule says commits carry, as the rule's `email` field.
+    pub fn identity_email(&self) -> Result<Email, Unreached> {
+        let field = self.rule.iter().find(|rule| rule.id == "identity").and_then(|rule| rule.email.clone());
+        field.ok_or_else(|| Unreached::by(&"the identity rule in self/rules.toml has no email field"))
     }
 }
 

@@ -2,6 +2,7 @@ mod brief;
 mod build;
 mod claim;
 mod done;
+mod drift;
 mod escape;
 mod event;
 mod head;
@@ -41,12 +42,13 @@ pub use brief::Reissue;
 pub use build::{Build, Unverified};
 pub use claim::Claim;
 pub use done::Finishing;
+pub use drift::OpenPrs;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};
 pub use head::{Head, Marking, Standing};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Binary, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
+    AgentId, AgentName, Binary, Branch, CheckName, Claimant, Email, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
     Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId,
     Timestamp, Title, Verdict,
 };
