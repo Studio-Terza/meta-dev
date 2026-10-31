@@ -157,12 +157,12 @@ impl Ledger {
                 let lines = readings
                     .iter()
                     .map(|reading| {
-                        let kept: String = latched
+                        let kept: Vec<String> = latched
                             .iter()
                             .filter(|((prediction, _), _)| *prediction == reading.id)
-                            .map(|(_, latch)| format!("; {}", latch.shown()))
+                            .map(|(_, latch)| latch.shown())
                             .collect();
-                        format!("{}{kept}", reading.line)
+                        reading.shown(&kept)
                     })
                     .collect();
                 (lines, fresh)
@@ -196,6 +196,7 @@ impl Ledger {
                 "P2 open escapes: {open_count} ({} closed as historical); most repeats of one kind: {most_line}\n",
                 self.closed_as_historical()
             ),
+            self.unclassified_note(&set_aside),
             side_note,
             format!("P6 CI runs per merged PR: {runs} runs over {merged} merged PRs; median {median_text}\n"),
             self.rework(&pr_runs),
@@ -217,6 +218,16 @@ impl Ledger {
         let missing = missing.as_ref().map_err(Clone::clone)?;
         let outside: BTreeSet<&PrNumber> = self.outside.iter().chain(missing).collect();
         Ok(outside.into_iter().filter(|pr| !named.contains(pr)).count())
+    }
+
+    /// Escapes from before kinds existed still count towards repeats by their reason: say so.
+    fn unclassified_note(&self, set_aside: &[Logged]) -> String {
+        match self.escapes.iter().chain(set_aside).filter(|logged| logged.is_unclassified()).count() {
+            0 => String::new(),
+            count => format!(
+                "P2 unclassified escapes (from before kinds existed): {count}; they count towards repeats by their reason\n"
+            ),
+        }
     }
 
     fn open_escapes(&self) -> usize {

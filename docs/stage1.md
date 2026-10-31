@@ -168,7 +168,8 @@ A verdict on an earlier head does not count for the pinned head. A linked task w
 | `meta status` | any | each prediction line shows its observed value, its registered expectation, and `FALSIFIED` when the falsifier holds |
 | `meta status` | a measure of a prediction's falsifier is above its bound and no `Falsified` event names that prediction and measure | event `Falsified { prediction, measure, observed }`, stamped with the time of the record, appended inside the same locked append that status reads under |
 | `meta status` | a `Falsified` event exists for the prediction | the line ends with `falsified at <time> (<observed>)` for each latched measure, whatever the current reading, so resolving escapes cannot erase a falsification; no new event |
-
+| `meta status` | a `Falsified` event exists for the prediction and its current reading is not `FALSIFIED` | the headline reads `FALSIFIED EARLIER; now <holds or UNDECIDED>`, then the current reading, then the latched lines; a bare `holds` never shows (critic issue #17) |
+| `meta status` | the log or the side file holds escapes of kind `unclassified`, logged before kinds existed | a line `P2 unclassified escapes (from before kinds existed): <n>; they count towards repeats by their reason`; they count by reason, as before |
 | `meta status` P1 | no unrecorded merge bypass and no `outside-start` escape | `UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable ...)`, never `holds` |
 | `meta status` P1 | an `outside-start` escape exists, with or without a readable merged list | `FALSIFIED`; each such escape adds one to the unrecorded bypasses |
 | `meta status` | the log holds `Denied` agent starts | the P1 starts line shows `prevented by the hook: <n>`; denials never change the P1 verdict |
