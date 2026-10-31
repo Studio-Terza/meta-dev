@@ -2755,6 +2755,25 @@ fn a_crash_between_the_append_and_the_side_file_rewrite_imports_nothing_twice_an
 }
 
 #[test]
+fn a_retry_drops_as_many_copies_of_a_line_as_the_log_holds_and_imports_the_surplus() {
+    let scratch = Scratch::new("import-count");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let twin = side_line(3, "gap", None, "twice");
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str()].concat()).unwrap();
+    std::fs::create_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    assert_eq!(answer(parsed(&IMPORT), &mut ports).code, Code::Failed);
+    std::fs::remove_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str(), twin.as_str()].concat()).unwrap();
+    let retry = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(retry.code, Code::Done, "{}", retry.text);
+    assert!(retry.text.contains("escape-3 imported:"), "{}", retry.text);
+    assert!(!retry.text.contains("escape-4") && retry.text.contains("2 already in the log"), "{}", retry.text);
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 4, "{log}");
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "");
+}
+
+#[test]
 fn import_with_nothing_in_the_side_file_says_so_and_a_scratch_log_takes_it_from_any_build() {
     let scratch = Scratch::new("import-empty");
     let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));

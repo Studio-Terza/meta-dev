@@ -36,6 +36,9 @@ const UNMARKED: &str = "log.jsonl.unmarked";
 const MARKING: &str = "log.jsonl.marking";
 /// Beside the log, the escapes from builds not verified to be from main.
 const SIDE: &str = "escapes.unverified.jsonl";
+/// Beside the side file, the file whose lock orders appends to the side file against an import. It
+/// is never renamed or replaced, so the lock always names the same file.
+const SIDE_LOCK: &str = "escapes.unverified.lock";
 /// Beside the side file, the lines it keeps after an import, while they are written before they are
 /// renamed over the side file.
 const SIDE_IMPORTED: &str = "escapes.unverified.jsonl.importing";
@@ -122,6 +125,17 @@ impl JsonlLog {
                 Err(TryLockError::Error(error)) => return Err(Self::failed(path, error)),
             }
         }
+    }
+
+    /// The side file's lock, taken within the same patience as the log's. A writer that cannot get
+    /// it fails visibly: the escape is not dropped.
+    fn side_locked(&self, side: &Path) -> Result<File, PortError> {
+        let path = side.with_file_name(SIDE_LOCK);
+        side.parent().map_or(Ok(()), fs::create_dir_all).map_err(|error| Self::failed(&path, error))?;
+        let file =
+            OpenOptions::new().create(true).append(true).open(&path).map_err(|error| Self::failed(&path, error))?;
+        self.lock(&file, &path, Instant::now() + self.patience)?;
+        Ok(file)
     }
 
     /// Whether `file` is still the file at `path`.
@@ -234,10 +248,12 @@ impl Log for JsonlLog {
     fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
         let side = self.side()?;
         let line = serde_json::to_string(escape).map_err(|error| PortError::new(error.to_string()))? + "\n";
-        let written = side
-            .parent()
-            .map_or(Ok(()), fs::create_dir_all)
-            .and_then(|()| OpenOptions::new().create(true).append(true).open(&side))
+        // Held until the line is synced: an import reads and renames the side file under it.
+        let _held = self.side_locked(&side)?;
+        let written = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&side)
             .and_then(|mut file| file.write_all(line.as_bytes()).and_then(|()| file.sync_all()));
         written.map_err(|error| Self::failed(&side, error)).map(|()| side.display().to_string())
     }
@@ -261,6 +277,9 @@ impl Log for JsonlLog {
     ) -> Result<T, PortError> {
         let (mut file, path) = self.locked()?;
         let side = self.side()?;
+        // From before the side file is read until after it is renamed: an escape set aside meanwhile
+        // waits, then lands in the new side file.
+        let _held = self.side_locked(&side)?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).map_err(|error| Self::failed(path, error))?;
         let standing = Self::head_of(path, bytes.as_slice()).standing(self.place);
@@ -301,7 +320,7 @@ impl Log for JsonlLog {
 mod tests {
     use super::{JsonlLog, data_dir_from};
     use crate::Log;
-    use meta_core::{Event, Marking, Record, Standing, Timestamp};
+    use meta_core::{Event, Marking, Record, Standing, Timestamp, UnverifiedEscape};
     use meta_testkit::Scratch;
     use std::fs::{self, File, TryLockError};
     use std::path::Path;
@@ -470,6 +489,67 @@ mod tests {
         JsonlLog::at(path.clone()).mark(marker()).unwrap();
         let inside = stale.transact(|standing, _| (Vec::new(), standing)).unwrap();
         assert_eq!((before, inside), (Standing::Scratch, Standing::MarkedElsewhere));
+    }
+
+    fn escape_line(reason: &str) -> UnverifiedEscape {
+        serde_json::from_str(&format!("{{\"at\":3,\"kind\":\"gap\",\"reason\":\"{reason}\"}}")).unwrap()
+    }
+
+    #[test]
+    fn escapes_set_aside_during_an_import_each_end_up_in_the_log_or_the_side_file_exactly_once() {
+        let root = Scratch::new("side-race");
+        let path = root.join("log.jsonl");
+        fs::write(&path, MARKER).unwrap();
+        let side = root.join("escapes.unverified.jsonl");
+        (0..4).for_each(|n| {
+            JsonlLog::at(path.clone()).set_aside(&escape_line(&format!("before-{n}"))).unwrap();
+        });
+        let writers: Vec<_> = (0..4)
+            .map(|writer| {
+                let mut log = JsonlLog::at(path.clone());
+                thread::spawn(move || {
+                    (0..10).for_each(|n| {
+                        log.set_aside(&escape_line(&format!("w{writer}-{n}"))).unwrap();
+                        thread::sleep(Duration::from_millis(15));
+                    });
+                })
+            })
+            .collect();
+        thread::sleep(Duration::from_millis(40));
+        let mut moved = Vec::new();
+        JsonlLog::at(path.clone())
+            .import_set_aside(|_, _, lines| {
+                thread::sleep(Duration::from_millis(250));
+                moved = lines.iter().map(|line| line.raw().to_vec()).collect();
+                (Vec::new(), Some(Vec::new()), ())
+            })
+            .unwrap();
+        writers.into_iter().for_each(|writer| writer.join().unwrap());
+        let left: Vec<Vec<u8>> =
+            super::super::jsonl::side_lines(&fs::read(&side).unwrap()).iter().map(|line| line.raw().to_vec()).collect();
+        let mut all: Vec<Vec<u8>> = [moved.clone(), left.clone()].concat();
+        all.sort();
+        let mut wanted: Vec<Vec<u8>> = (0..4)
+            .map(|n| format!("before-{n}"))
+            .chain((0..4).flat_map(|w| (0..10).map(move |n| format!("w{w}-{n}"))))
+            .map(|reason| serde_json::to_vec(&escape_line(&reason)).unwrap())
+            .collect();
+        wanted.sort();
+        assert_eq!(all, wanted);
+        assert!(moved.len() >= 4 && !left.is_empty(), "moved {}, left {}", moved.len(), left.len());
+    }
+
+    #[test]
+    fn setting_an_escape_aside_while_the_side_file_is_locked_past_the_deadline_fails_and_writes_nothing() {
+        let root = Scratch::new("side-deadline");
+        let path = root.join("log.jsonl");
+        let holder = File::create(root.join("escapes.unverified.lock")).unwrap();
+        holder.lock().unwrap();
+        let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path) };
+        let refused = log.set_aside(&escape_line("held"));
+        drop(holder);
+        assert!(refused.unwrap_err().to_string().contains("stayed locked for 50 ms"));
+        assert!(!root.join("escapes.unverified.jsonl").exists());
     }
 
     #[test]
