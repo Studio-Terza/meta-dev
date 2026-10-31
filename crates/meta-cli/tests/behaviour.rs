@@ -1196,7 +1196,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
         reply.text.contains(
-            "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
+            "P1 The loop is used: FALSIFIED EARLIER; now UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
         ),
         "{}",
         reply.text
@@ -1204,7 +1204,9 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     ports.github.listed = Some(Err(PortError::new("gh is down")));
     let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
-        reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable"),
+        reply.text.contains(
+            "P1 The loop is used: FALSIFIED EARLIER; now UNDECIDED; observed unrecorded bypasses unavailable"
+        ),
         "{}",
         reply.text
     );
@@ -1458,8 +1460,9 @@ fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_predict
     ports.log.records.extend([1, 2, 3].map(|number| at(3, resolved(&format!("escape-{number}"), "task-1"))));
     let (reply, added) = call(&mut ports, &["status"], "");
     assert_eq!(added, Vec::new(), "{}", reply.text);
-    let holds = "P2 Gaps get fixed, not bypassed: holds; observed open escapes 3, most repeats of one escape kind 0;";
-    assert!(reply.text.contains(holds), "{}", reply.text);
+    let earlier = "P2 Gaps get fixed, not bypassed: FALSIFIED EARLIER; now holds; observed open escapes 3, most repeats of one escape kind 0;";
+    assert!(reply.text.contains(earlier), "{}", reply.text);
+    assert!(!reply.text.contains("not bypassed: holds"), "{}", reply.text);
     assert!(reply.text.contains(&format!("falsified at unix 2 ({open})")), "{}", reply.text);
 }
 
@@ -1467,11 +1470,21 @@ fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_predict
 fn status_shows_a_latched_falsification_read_from_the_log_and_latches_nothing_for_a_prediction_that_holds() {
     let history = [finished_task(), vec![falsified("P6", Measure::MedianCiRuns, "median CI runs per merged PR 4")]];
     let status = status_of(history.concat());
-    let p6 = "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2; \
+    let p6 = "P6 Little rework: FALSIFIED EARLIER; now holds; observed median CI runs per merged PR 1; expected Median at most 2; \
               falsified by Median above 3; measure: CI runs per merged PR; falsified at unix 1 (median CI runs per merged PR 4)\n";
     assert!(status.contains(p6), "{status}");
     let calm = status_of(finished_task());
     assert!(!calm.contains("falsified at"), "{calm}");
+}
+
+#[test]
+fn status_says_plainly_that_unclassified_escapes_count_towards_repeats_by_their_reason() {
+    let status =
+        status_of([finished_task(), vec![escaped("unclassified", "same"), escaped("unclassified", "same")]].concat());
+    let note = "P2 unclassified escapes (from before kinds existed): 2; they count towards repeats by their reason\n";
+    assert!(status.contains(note), "{status}");
+    assert!(status.contains("most repeats of one kind: 1 (unclassified \"same\")"), "{status}");
+    assert!(!status_of(finished_task()).contains("unclassified escapes"));
 }
 
 #[test]
@@ -3127,4 +3140,96 @@ fn a_finished_record_that_fits_no_started_lease_or_repeats_is_a_corrupt_log() {
     bad([claimed_task(), vec![finished("lease-1")]].concat());
     bad([claimed_task(), vec![used("lease-1"), finished("lease-1")]].concat());
     bad([running_until(1000), vec![finished("lease-1"), finished("lease-1")]].concat());
+}
+
+/// A log whose records carry the given unix seconds, read by a status call made at `now`.
+fn status_at(now: u64, timed: Vec<(u64, Event)>) -> String {
+    let mut ports = given(timed.iter().map(|(_, event)| event.clone()).collect(), Vec::new());
+    for (record, (seconds, _)) in ports.log.records.iter_mut().zip(&timed) {
+        record.at = Timestamp::from_unix_seconds(*seconds);
+    }
+    ports.clock = FakeClock::at(Timestamp::from_unix_seconds(now));
+    let (reply, added) = call(&mut ports, &["status"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
+    reply.text
+}
+
+const TIMING: &str = "time and outcome per task (report only)\n";
+
+#[test]
+fn status_reports_each_tasks_time_open_to_done_time_waiting_on_the_owner_and_outcome_from_the_log() {
+    let history = vec![
+        (0, opened("task-1")),
+        (0, self_claimed("task-1")),
+        (10, linked("task-1", "7")),
+        (1200, waiting("task-1", "q")),
+        (1800, answered("task-1", "go")),
+        (6000, merged("7", 1)),
+        (6000, done("task-1")),
+        (0, opened("task-2")),
+        (0, self_claimed("task-2")),
+        (10, Event::Linked { task: id("task-2"), pr: id("9"), pin: id(PINNED) }),
+        (3600, merged_outside("9", 1)),
+        (3600, done("task-2")),
+        (0, opened("task-3")),
+        (600, Event::Done { task: id("task-3"), by: Some(id("7")) }),
+        (0, opened("task-4")),
+        (900, waiting("task-4", "q")),
+        (1200, Event::Retired { task: id("task-4"), reason: id("superseded") }),
+        (0, opened("task-5")),
+        (60, Event::Deferred { task: id("task-5"), reason: id("later") }),
+        (0, opened("task-6")),
+        (3000, waiting("task-6", "q")),
+    ];
+    let status = status_at(6600, history);
+    let expected = format!(
+        "{TIMING}\
+        \x20 task-1: merged through meta; opened to done 100 min; waiting on the owner 10 min\n\
+        \x20 task-2: merged outside meta; opened to done 60 min; waiting on the owner 0 min\n\
+        \x20 task-3: done by another PR; opened to done 10 min; waiting on the owner 0 min\n\
+        \x20 task-4: retired; opened to done 20 min; waiting on the owner 5 min\n\
+        \x20 task-5: deferred; open so far 110 min; waiting on the owner 0 min\n\
+        \x20 task-6: open; open so far 110 min; waiting on the owner 60 min\n"
+    );
+    assert!(status.contains(&expected), "{status}");
+}
+
+#[test]
+fn status_slope_sets_the_median_of_the_last_ten_delivered_against_the_ten_before_in_the_order_done() {
+    // Task n opens at 0 and is done at n * 600 s, so it took n * 10 min. Tasks 1 and 2 failed three review rounds.
+    let mut history = Vec::new();
+    for number in 1..=12u64 {
+        let task = format!("task-{number}");
+        let pr = (100 + number).to_string();
+        history.push((0, opened(&task)));
+        history.push((0, self_claimed(&task)));
+        history.push((1, linked(&task, &pr)));
+        if number <= 2 {
+            for round in 0..3 {
+                let lease = format!("lease-{}", number * 3 + round);
+                for event in review_round(&lease, &task, &pr, "fail") {
+                    history.push((2, event));
+                }
+            }
+        }
+        history.push((number * 600, merged(&pr, 1)));
+        history.push((number * 600, done(&task)));
+    }
+    let status = status_at(10_000, history);
+    let slope = "slope across delivered tasks, report only (P4 raw signal, no prediction reads it): 12 delivered; \
+        median minutes to deliver: most recent 10 75, the 2 before 15; \
+        median failed review rounds per task: most recent 0, the 2 before 3\n";
+    assert!(status.contains(slope), "{status}");
+}
+
+#[test]
+fn status_slope_says_none_yet_when_nothing_is_delivered_and_lists_no_tasks_for_an_empty_log() {
+    let status = status_of(Vec::new());
+    let expected = format!(
+        "{TIMING}  (none)\nslope across delivered tasks, report only (P4 raw signal, no prediction reads it): \
+         0 delivered; median minutes to deliver: most recent 0 none yet, the 0 before none yet; \
+         median failed review rounds per task: most recent none yet, the 0 before none yet\n"
+    );
+    assert!(status.contains(&expected), "{status}");
 }

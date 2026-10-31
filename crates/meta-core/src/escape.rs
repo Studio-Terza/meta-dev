@@ -202,6 +202,11 @@ impl Logged {
         self.kind == EscapeKind::outside_start()
     }
 
+    /// Whether this escape was logged before kinds existed (or says so): it counts by its reason.
+    pub(crate) fn is_unclassified(&self) -> bool {
+        self.kind == EscapeKind::unclassified()
+    }
+
     /// Whether main's kinds, when they could be read, leave this kind out. Unclassified never is.
     fn off_main(&self, main: Option<&EscapeKinds>) -> bool {
         self.kind != EscapeKind::unclassified() && main.is_some_and(|kinds| !kinds.lists(&self.kind))

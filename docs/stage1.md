@@ -188,7 +188,8 @@ A verdict on an earlier head does not count for the pinned head. A linked task w
 | `meta status` | any | each prediction line shows its observed value, its registered expectation, and `FALSIFIED` when the falsifier holds |
 | `meta status` | a measure of a prediction's falsifier is above its bound and no `Falsified` event names that prediction and measure | event `Falsified { prediction, measure, observed }`, stamped with the time of the record, appended inside the same locked append that status reads under |
 | `meta status` | a `Falsified` event exists for the prediction | the line ends with `falsified at <time> (<observed>)` for each latched measure, whatever the current reading, so resolving escapes cannot erase a falsification; no new event |
-
+| `meta status` | a `Falsified` event exists for the prediction and its current reading is not `FALSIFIED` | the headline reads `FALSIFIED EARLIER; now <holds or UNDECIDED>`, then the current reading, then the latched lines; a bare `holds` never shows (critic issue #17) |
+| `meta status` | the log or the side file holds escapes of kind `unclassified`, logged before kinds existed | a line `P2 unclassified escapes (from before kinds existed): <n>; they count towards repeats by their reason`; they count by reason, as before |
 | `meta status` P1 | no unrecorded merge bypass and no `outside-start` escape | `UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable ...)`, never `holds` |
 | `meta status` P1 | an `outside-start` escape exists, with or without a readable merged list | `FALSIFIED`; each such escape adds one to the unrecorded bypasses |
 | `meta status` | the log holds `Denied` agent starts | the P1 starts line shows `prevented by the hook: <n>`; denials never change the P1 verdict |
@@ -210,6 +211,22 @@ P6 counts CI runs per merged PR. It cannot see PRs that never merge or failed re
 `pull` reads the branch name once and runs `gh run list` with it; `runs` shares that one call. Every port command (`gh`, `git`) is killed after a named timeout (`PORT_TIMEOUT`, 30 s) and returns a port error `<command>: timed out after <n> s`, so a hung `gh` or `git` cannot hang `meta status`; status shows such a PR as `CI runs unavailable`, never zero.
 
 A failed review round is a `Reviewed` event with verdict `fail`. Tasks never linked to a PR are not counted. A task listed without failed rounds only has more than one CI run, which red-first makes the norm.
+
+### Time and outcome per task (stage 2, spend deferred)
+
+Stage 2 of `docs/prereg.md` measures the loop. Spend is deferred; time and outcome are built. The section is report only: no prediction reads it, and `self/predictions.toml` is unchanged. It comes from the log's timestamps and the clock, with no GitHub call, so `meta status` stays fast.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta status` | any task | a line `task-N: <outcome>; opened to done <n> min; waiting on the owner <n> min` for a task that ended (done or retired); `open so far <n> min` in place of `opened to done` for a task still open, claimed, linked or deferred |
+| `meta status` | the task is done by its own PR | outcome `merged through meta` when the PR's `Merged` event has route `meta`, else `merged outside meta` |
+| `meta status` | the task is done by `meta done --by` | outcome `done by another PR` |
+| `meta status` | the task is retired, deferred, or still open, claimed or linked | outcome `retired`, `deferred` or `open` |
+| `meta status` | the task waited on the owner | the wait time is the sum of its waits, each from `WaitingOnOwner` to `OwnerAnswered`, `Done`, `Retired` or `Deferred`; a wait still going counts up to now |
+| `meta status` | any | a slope line across delivered tasks, a task being delivered when it is done, in the order of the `Done` records: the median minutes to deliver of the most recent 10 against the 10 before them, and the median failed review rounds per task on the same split |
+| `meta status` | fewer than 10 delivered tasks before the recent 10, or none | the side with no tasks reads `none yet`; the line names how many tasks each side holds |
+
+The slope line is the raw P4 signal. P4's wording and its falsifier are unchanged, and spend per delivered feature stays unmeasured until spend is. Time is whole minutes, rounded down. Failed review rounds are the `fail` verdicts of the rework section.
 
 ### Rules
 

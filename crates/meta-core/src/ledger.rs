@@ -6,6 +6,7 @@ use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
 use crate::predictions::Measure;
 use crate::role::Role;
 use crate::task::{Linked, Progress, Task};
+use crate::timeline::Timeline;
 use crate::waiting::Waiting;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -27,6 +28,10 @@ pub struct Ledger {
     pub(crate) self_claims: usize,
     /// Tasks marked critic: long-running by design, so never stalled and never running work.
     pub(crate) critics: BTreeSet<TaskId>,
+    /// When each task opened, ended and how long it waited on the owner, for the time and outcome report.
+    pub(crate) timelines: BTreeMap<TaskId, Timeline>,
+    /// Tasks done, in the order they were done: the order of the slope line.
+    pub(crate) delivered: Vec<TaskId>,
     /// Each prediction's falsifying measures, latched at their first time.
     pub(crate) falsified: BTreeMap<(PredictionId, Measure), Latch>,
 }
@@ -58,6 +63,7 @@ impl Ledger {
             Event::Opened { task, title } => {
                 let fresh = Progress::Open(Task::new(*task, title.clone()));
                 self.tasks.insert(*task, fresh).map_or(Ok(()), |_| Err(format!("{task} opened twice")))?;
+                self.timelines.insert(*task, Timeline::opened(at));
             }
             Event::Claimed { task, agent } => {
                 let claimed = match self.take(*task)? {
@@ -106,7 +112,8 @@ impl Ledger {
                     Progress::Linked(linked) => Ok(linked.retire(reason.clone())),
                     other => Err(format!("{task} retired while {other}")),
                 }?;
-                self.waiting.remove(task);
+                self.settle_wait(*task, at);
+                self.timelines.entry(*task).and_modify(|timeline| timeline.end(at));
                 self.tasks.insert(*task, Progress::Retired(retired));
             }
             Event::Deferred { task, reason } => {
@@ -114,7 +121,7 @@ impl Ledger {
                     Progress::Open(open) => Ok(open.defer(reason.clone())),
                     other => Err(format!("{task} deferred while {other}")),
                 }?;
-                self.waiting.remove(task);
+                self.settle_wait(*task, at);
                 self.tasks.insert(*task, Progress::Deferred(deferred));
             }
             Event::Undeferred { task } => {
@@ -142,6 +149,7 @@ impl Ledger {
                 self.merged.push((*runs, *route));
             }
             Event::Done { task, by } => {
+                let merged_route = self.linked_pr_of(*task).map(|pr| self.route_of(pr));
                 let done = match (self.take(*task)?, by) {
                     (Progress::Linked(linked), None) => Ok(linked.finish()),
                     (Progress::Open(open), Some(pr)) => Ok(open.finish_by(*pr)),
@@ -149,7 +157,10 @@ impl Ledger {
                     (Progress::Linked(linked), Some(pr)) => Ok(linked.finish_by(*pr)),
                     (other, _) => Err(format!("{task} done while {other}")),
                 }?;
-                self.waiting.remove(task);
+                self.settle_wait(*task, at);
+                let route = merged_route.filter(|_| by.is_none());
+                self.timelines.entry(*task).and_modify(|timeline| timeline.finish(at, route));
+                self.delivered.push(*task);
                 self.tasks.insert(*task, Progress::Done(done));
             }
             Event::Escaped { kind, reason, pr, checked, imported } => {
@@ -190,7 +201,7 @@ impl Ledger {
                 self.waiting.insert(*task, waiting).map_or(Ok(()), |_| Err(format!("{task} waits twice")))?;
             }
             Event::OwnerAnswered { task, .. } => {
-                let waited = self.waiting.remove(task).ok_or_else(|| format!("{task} answered while not waiting"))?;
+                let waited = self.settle_wait(*task, at).ok_or_else(|| format!("{task} answered while not waiting"))?;
                 let span = waited.started().span_to(at);
                 self.leases.iter_mut().filter(|(id, _)| waited.covers(**id)).for_each(|(_, slot)| slot.delay(span));
             }
@@ -203,6 +214,29 @@ impl Ledger {
             Event::Denied { attempt: Attempt::Merge } | Event::RealLog => {}
         }
         Ok(self)
+    }
+
+    /// The task stops waiting on the owner: the time it waited is added to its timeline.
+    fn settle_wait(&mut self, task: TaskId, at: Timestamp) -> Option<Waiting> {
+        let waited = self.waiting.remove(&task)?;
+        self.timelines.entry(task).and_modify(|timeline| timeline.waited(waited.started().span_to(at)));
+        Some(waited)
+    }
+
+    /// The PR the task is linked to now, if it is linked.
+    fn linked_pr_of(&self, task: TaskId) -> Option<PrNumber> {
+        match self.tasks.get(&task) {
+            Some(Progress::Linked(linked)) => Some(linked.pr()),
+            _ => None,
+        }
+    }
+
+    /// How a merged PR was merged, read when its task is done: the merge was logged just before.
+    fn route_of(&self, pr: PrNumber) -> Route {
+        match self.outside.contains(&pr) {
+            true => Route::Outside,
+            false => Route::Meta,
+        }
     }
 
     fn issue(&mut self, lease: Lease) -> Result<(), String> {
