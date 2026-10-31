@@ -1196,6 +1196,44 @@ fn a_verdict_on_a_replaced_lease_says_it_was_replaced_not_that_it_is_unused() {
 }
 
 #[test]
+fn brief_of_a_replaced_lease_is_refused_as_replaced_and_records_nothing() {
+    let (reply, events) = call(&mut ready_on_pr_7(replaced_lease()), &["brief", "lease-2"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("lease-2 was replaced by a lease on the PR's newer head"), "{}", reply.text);
+    assert!(reply.text.contains("meta review task-1 --agent <name>"), "{}", reply.text);
+    assert!(!reply.text.contains("already used"), "{}", reply.text);
+}
+
+#[test]
+fn review_refuses_an_unused_lease_on_another_pr_of_the_task() {
+    let earlier_pr = Event::ReviewLeased {
+        lease: id("lease-2"),
+        task: id("task-1"),
+        agent: None,
+        pr: id("6"),
+        head: id(PINNED),
+        deadline: None,
+        replaces: None,
+    };
+    let history = [claimed_task(), vec![linked("task-1", "6"), earlier_pr, linked("task-1", "7")]].concat();
+    let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
+    let (reply, events) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+    assert!(reply.text.contains("review lease lease-2 on task-1 is unused"), "{}", reply.text);
+}
+
+#[test]
+fn a_replaced_lease_gets_the_replaced_wording_from_the_bind_and_resume_hooks_too() {
+    let (bound, _) = after(replaced_lease(), &agent_ran("Agent", "lease-2", AGENT_ID));
+    assert!(bound.text.contains("was replaced by a lease on the PR's newer head"), "{}", bound.text);
+    assert!(!bound.text.contains("is unused"), "{}", bound.text);
+    let canned = serde_json::json!("continue");
+    let (resumed, _) = hook(replaced_lease(), &send(AGENT_ID, canned, Some("lease-2")));
+    assert!(resumed.text.contains("was replaced by a lease on the PR's newer head"), "{}", resumed.text);
+    assert!(!resumed.text.contains("is unused"), "{}", resumed.text);
+}
+
+#[test]
 fn a_replaced_lease_past_its_deadline_is_not_listed_overdue() {
     let none = "overdue leases (flagged)\n  (none)\n";
     let unreplaced = [linked_task(), vec![review_leased_until("lease-2", PINNED, 1)]].concat();
@@ -1221,16 +1259,32 @@ fn the_replay_guard_refuses_a_lease_that_replaces_what_it_may_not() {
             replaces: None,
         },
     ];
+    // Each history is valid up to the last event, so the replay guard is what refuses it.
+    let not_unused = "lease-4 replaces lease-2, which is not an unused review lease of task-1 on #7 at another head";
     let cases = [
-        ("non-unused", vec![review_leased("lease-2", PINNED), used("lease-2")], "lease-2", MOVED),
-        ("same head", vec![review_leased("lease-2", PINNED)], "lease-2", PINNED),
-        ("other task", other_task, "lease-3", MOVED),
-        ("unknown", vec![review_leased("lease-2", PINNED)], "lease-9", MOVED),
+        ("spent", vec![review_leased("lease-2", PINNED), used("lease-2")], "lease-2", MOVED, not_unused),
+        (
+            "already replaced",
+            vec![review_leased("lease-2", PINNED), review_replacing("lease-3", "task-1", MOVED, "lease-2")],
+            "lease-2",
+            MOVED,
+            not_unused,
+        ),
+        ("same head", vec![review_leased("lease-2", PINNED)], "lease-2", PINNED, not_unused),
+        (
+            "other task",
+            other_task,
+            "lease-3",
+            MOVED,
+            "lease-4 replaces lease-3, which is not an unused review lease of task-1 on #7 at another head",
+        ),
+        ("unknown", vec![review_leased("lease-2", PINNED)], "lease-9", MOVED, "lease-4 replaces unknown lease-9"),
     ];
-    for (name, setup, old, head) in cases {
+    for (name, setup, old, head, why) in cases {
         let history = [linked_task(), setup, vec![review_replacing("lease-4", "task-1", head, old)]].concat();
         let (reply, _) = call(&mut given(history, Vec::new()), &["status"], "");
         assert_eq!(reply.code, Code::Failed, "{name}: {}", reply.text);
+        assert!(reply.text.contains(why), "{name}: {}", reply.text);
     }
 }
 

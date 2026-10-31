@@ -18,7 +18,7 @@ pub struct Reviewing {
     pr: PrNumber,
     /// The task's unused review lease and the head it was issued at, if it has one. Whether it
     /// blocks the review depends on the head the PR has now, so `brief` decides.
-    pending: Option<(LeaseId, Sha)>,
+    pending: Option<(LeaseId, PrNumber, Sha)>,
 }
 
 impl Ledger {
@@ -26,12 +26,10 @@ impl Ledger {
         let lease = LeaseId::after(self.leases.len());
         match self.tasks.get(&task) {
             Some(Progress::Linked(linked)) => {
-                // Only a lease on the PR the task links now: one on an earlier PR is neither a
-                // block nor replaced.
                 let pending = self.leases.iter().find_map(|(id, slot)| match slot {
                     LeaseSlot::Unused(unused) if unused.task() == task => match unused.purpose() {
-                        Purpose::Review { pr, head } if *pr == linked.pr() => Some((*id, head.clone())),
-                        _ => None,
+                        Purpose::Review { pr, head } => Some((*id, *pr, head.clone())),
+                        Purpose::Work => None,
                     },
                     _ => None,
                 });
@@ -165,15 +163,15 @@ impl Reviewing {
             return Err(Refusal::because(format!("{pr} is not open; only an open PR can be reviewed.")));
         }
         let head = pull.head().clone();
-        // An unused lease on the current head still blocks; one on an old head can never start a
-        // worker (the PR moved), so this lease replaces it instead of waiting out its deadline.
+        // Any unused review lease on the task blocks, except one on an earlier head of this same
+        // PR: it can never start a worker (the PR moved), so this lease replaces it.
         let replaces = match pending {
-            Some((unused, unused_head)) if pull.is_at(&unused_head) => {
+            Some((unused, unused_pr, unused_head)) if unused_pr == pr && !pull.is_at(&unused_head) => Some(unused),
+            Some((unused, _, _)) => {
                 return Err(Refusal::because(format!(
                     "review lease {unused} on {task} is unused. Next: meta brief {unused} prints its brief again; put {unused} in the reviewer's Agent description."
                 )));
             }
-            Some((unused, _)) => Some(unused),
             None => None,
         };
         let deadline_line = Deadline::of(Some(deadline)).brief_line();

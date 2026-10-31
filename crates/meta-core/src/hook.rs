@@ -230,8 +230,9 @@ impl Ledger {
                     }
                     Some(earlier) => refusal(format!("{lease} already started {earlier}, not {agent}")),
                 },
-                Some(LeaseSlot::Unused(_) | LeaseSlot::Replaced(_)) => {
-                    refusal(format!("{lease} is unused, so it started no agent"))
+                Some(LeaseSlot::Unused(_)) => refusal(format!("{lease} is unused, so it started no agent")),
+                Some(LeaseSlot::Replaced(_)) => {
+                    refusal(format!("{lease} was replaced by a lease on the PR's newer head, so it started no agent"))
                 }
                 None => refusal(format!("{lease} is unknown")),
             },
@@ -267,8 +268,13 @@ impl Ledger {
         };
         let spent = match self.leases.get(&lease) {
             Some(LeaseSlot::Spent(spent)) => spent,
-            Some(LeaseSlot::Unused(_) | LeaseSlot::Replaced(_)) => {
+            Some(LeaseSlot::Unused(_)) => {
                 return refusal(format!("{lease} is unused, so no agent of it can be resumed"));
+            }
+            Some(LeaseSlot::Replaced(_)) => {
+                return refusal(format!(
+                    "{lease} was replaced by a lease on the PR's newer head, so no agent of it can be resumed"
+                ));
             }
             None => return refusal(format!("{lease} is unknown")),
         };
