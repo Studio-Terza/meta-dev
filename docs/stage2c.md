@@ -62,7 +62,7 @@ The session's standard input is a pipe whose other end only the supervisor holds
 
 The supervisor looks at its worker every 5 s, so it can be up to 5 s late at the deadline. It reads the log under the lock, so its first look waits for `start` to record the worker. A worker recorded by nothing therefore ends itself: the supervisor refuses the lease, exits, and takes the session with it.
 
-Before it signals a group or calls a session alive, the port checks that the leader's command line names the run's transcript. A process id can be reused, and a stranger's group must never be killed.
+Before it signals a group or calls a session alive, the port checks that the leader's command line names the run's transcript. A process id can be reused, and a stranger's group must never be killed. A leader can also die before the rest of its group, so `meta stop` and the deadline kill go on to ask whether a live member names the transcript. The shell that holds the lifeline does, for it keeps the leader's arguments. That group is still the run's, and it is ended.
 
 ## Behaviours
 
@@ -101,7 +101,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta stop <lease>` | the lease started no worker, or its worker has ended | refused; nothing is killed |
 | `meta stop` | the build may not write the log | it kills all the same, and says nothing was recorded: the kill switch always kills. The supervisor then records `vanished` if it can |
 | `meta stop` | a group cannot be killed, or a member that is not a zombie, leader or not, is still there 2 s after SIGKILL | error naming it, with the port's reason; the others are still killed and recorded. An end is recorded only for a group confirmed gone: the process table shows no live member. A signal refused for a group of zombies only is not a failure |
-| `meta stop` | the session had already ended | nothing is killed; says the worker was already gone; event `Finished` with `end: stopped` |
+| `meta stop` | the session had already ended: no live member of its group names the transcript | nothing is killed; says the worker was already gone; event `Finished` with `end: stopped` |
 | `meta stop` | the log fails after the closure ran | error saying which were killed, which were already gone and which could not be stopped, and that nothing was recorded. It says no worker was found only when none was |
 | `meta stop [<lease>]` | the log does not parse or cannot be opened | the live sessions are found from the `run.json` files, the leader check still guards each kill, and all (or the lease's) are killed; the same error |
 | `meta verdict <task>` | the only used review lease with no verdict is a worker's, running or ended | refused: a worker's verdict comes only from its session |

@@ -59,26 +59,54 @@ fn signal_end(signal: impl Fn(Signal) -> Result<(), Errno>) -> (Stopped, Option<
     }
 }
 
-/// The whole process table, one `<process group> <state>` line per process. Two `-o` flags, for in
-/// BSD `ps` a header runs to the end of its argument.
+/// The whole process table, one `<process group> <state> <command>` line per process. A flag per
+/// column, for in BSD `ps` a header runs to the end of its argument. Decoded lossily: the command
+/// line of some other process must not stop a kill.
 fn process_table() -> Result<String, PortError> {
-    run("ps", &["-A", "-o", "pgid=", "-o", "stat="])
+    let args = ["-A", "-ww", "-o", "pgid=", "-o", "stat=", "-o", "command="];
+    let output = execute("ps", &args, PORT_TIMEOUT, |_| ())?;
+    match output.status.success() {
+        true => Ok(String::from_utf8_lossy(&output.stdout).into_owned()),
+        false => Err(PortError::new(format!("ps: {}", String::from_utf8_lossy(&output.stderr)))),
+    }
 }
 
-/// Whether `table` holds a member of `group` that is not a zombie, leader or not. A zombie has
+/// The lines of `table` for members of `group` that are not zombies, leader or not. A zombie has
 /// exited and only waits for its parent to read its status. A line that cannot be read is an
 /// error, so that a table nobody can read never counts as a group gone.
-fn has_live_member(table: &str, group: Pid) -> Result<bool, PortError> {
-    let mut live = false;
+fn live_members(table: &str, group: Pid) -> Result<Vec<&str>, PortError> {
+    let mut live = Vec::new();
     for line in table.lines() {
         let mut columns = line.split_whitespace();
         let member = columns.next().and_then(|id| id.parse::<i32>().ok());
         let (Some(member), Some(state)) = (member, columns.next()) else {
             return Err(PortError::new(format!("process group {group}: unreadable ps line: {line}")));
         };
-        live |= member == group.as_raw() && !state.starts_with('Z');
+        if member == group.as_raw() && !state.starts_with('Z') {
+            live.push(line);
+        }
     }
     Ok(live)
+}
+
+fn has_live_member(table: &str, group: Pid) -> Result<bool, PortError> {
+    live_members(table, group).map(|live| !live.is_empty())
+}
+
+/// The process group a leader's id names, unless it is none that may be killed.
+fn group_of(leader: u32) -> Result<Pid, PortError> {
+    i32::try_from(leader)
+        .ok()
+        .filter(|id| *id > 1)
+        .map(Pid::from_raw)
+        .ok_or_else(|| PortError::new(format!("process group {leader}: not a group to kill")))
+}
+
+/// Whether a live member of the group has `mark` on its command line. A leader can die before the
+/// rest of its group, and an id can be reused, so this is what tells such a group from a stranger's.
+pub fn group_holds(leader: u32, mark: &str) -> Result<bool, PortError> {
+    let table = process_table()?;
+    Ok(live_members(&table, group_of(leader)?)?.iter().any(|member| member.contains(mark)))
 }
 
 /// Ends `group` through `signal`, and confirms the end through `table`, for up to `confirm`. Only a
@@ -113,11 +141,7 @@ fn end_through(
 /// then SIGKILL. A group that is already gone is not an error. Ok means no live member is left: a
 /// kill that fails, or a live member still there after `CONFIRM`, is an error.
 pub fn end_group(leader: u32) -> Result<Stopped, PortError> {
-    let group = i32::try_from(leader)
-        .ok()
-        .filter(|id| *id > 1)
-        .map(Pid::from_raw)
-        .ok_or_else(|| PortError::new(format!("process group {leader}: not a group to kill")))?;
+    let group = group_of(leader)?;
     end_through(group, |signal| killpg(group, signal), process_table, CONFIRM)
 }
 
@@ -230,7 +254,8 @@ pub fn decides_with(program: &str, args: &[&str], prepare: impl FnOnce(&mut Comm
 #[cfg(test)]
 mod tests {
     use super::{
-        Stopped, decides_with, end_group, end_through, has_live_member, process_table, run, run_found, run_within,
+        Stopped, decides_with, end_group, end_through, group_holds, has_live_member, process_table, run, run_found,
+        run_within,
     };
     use crate::PortError;
     use meta_testkit::Scratch;
@@ -313,16 +338,34 @@ mod tests {
     #[test]
     fn a_live_member_keeps_the_group_there_whatever_became_of_its_leader() {
         let cases = [
-            ("  4242 Z\n  4242 S\n", true),
-            ("  4242 Ss+\n", true),
-            ("  4242 ?E\n", true),
-            ("  4242 Z+\n 4242 Z\n", false),
-            ("  4243 S\n  424 R+\n", false),
+            ("  4242 Z (sh)\n  4242 S /bin/sh -c x\n", true),
+            ("  4242 Ss+ sleep 30\n", true),
+            ("  4242 ?E sleep 30\n", true),
+            ("  4242 Z+ (sh)\n 4242 Z (sleep)\n", false),
+            ("  4243 S sleep 30\n  424 R+ sleep 30\n", false),
             ("", false),
         ];
         for (table, live) in cases {
             assert_eq!(has_live_member(table, group()), Ok(live), "{table}");
         }
+    }
+
+    #[test]
+    fn a_group_holds_a_mark_only_on_a_live_member_of_that_group() {
+        use std::os::unix::process::CommandExt;
+        let scratch = Scratch::new("group-holds");
+        let mark = scratch.join("the-mark").display().to_string();
+        let script = format!("sleep 30; : {mark}");
+        let mut held = Command::new("/bin/sh").args(["-c", &script]).process_group(0).spawn().unwrap();
+        let mut other = Command::new("sleep").arg("30").process_group(0).spawn().unwrap();
+        assert_eq!(group_holds(held.id(), &mark), Ok(true));
+        assert_eq!(group_holds(held.id(), "/nothing/has/this"), Ok(false));
+        assert_eq!(group_holds(other.id(), &mark), Ok(false));
+        assert_eq!(end_group(held.id()), Ok(Stopped::Killed));
+        assert_eq!(group_holds(held.id(), &mark), Ok(false), "a zombie holds nothing");
+        assert_eq!(end_group(other.id()), Ok(Stopped::Killed));
+        held.wait().unwrap();
+        other.wait().unwrap();
     }
 
     #[test]

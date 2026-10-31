@@ -1,4 +1,4 @@
-use super::command::{end_group, run_found, run_prepared};
+use super::command::{end_group, group_holds, run_found, run_prepared};
 use super::jsonl;
 use super::log::home;
 use crate::{Listed, PortError, Sessions};
@@ -273,8 +273,10 @@ impl Sessions for HeadlessSessions {
     }
 
     fn stop(&mut self, run: &WorkerRun) -> Result<Stopped, PortError> {
-        match is_alive(run)? {
-            true => end_group(run.group.leader()),
+        // The group outlives a leader that dies first, and its lifeline's shell still names the run.
+        let leader = run.group.leader();
+        match is_alive(run)? || group_holds(leader, &run.transcript.to_string())? {
+            true => end_group(leader),
             false => Ok(Stopped::AlreadyGone),
         }
     }
@@ -292,8 +294,8 @@ impl Sessions for HeadlessSessions {
 #[cfg(test)]
 mod tests {
     use super::{
-        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, abandoned, is_alive, launch,
-        listed_in, make_way, passed, recorded, start_in, state_in, supervise,
+        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, abandoned, group_holds,
+        is_alive, launch, listed_in, make_way, passed, recorded, start_in, state_in, supervise,
     };
     use crate::{PortError, Sessions};
     use meta_core::{ExitStatus, Model, ReviewCopy, Session, SessionVerdict, Stopped, Verdict, WorkerRun};
@@ -536,6 +538,28 @@ mod tests {
         let (run, _lifeline) = session(&dir, "sleep 30");
         assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::Killed));
         assert_eq!(ended(&dir, &run), Session::Ended(None));
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::AlreadyGone));
+    }
+
+    #[test]
+    fn stop_ends_the_rest_of_a_group_whose_leader_died_first() {
+        let root = Scratch::new("worker-headless");
+        let dir = root.join("worker-1");
+        let (run, _lifeline) = session(&dir, "printf up; sleep 30");
+        let started = Instant::now();
+        while fs::read_to_string(dir.join(TRANSCRIPT)).unwrap().is_empty() {
+            assert!(started.elapsed() < Duration::from_secs(10), "the session never started");
+            thread::sleep(Duration::from_millis(10));
+        }
+        let leader = run.group.leader();
+        let pid = nix::unistd::Pid::from_raw(i32::try_from(leader).unwrap());
+        nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGKILL).unwrap();
+        ended(&dir, &run);
+        assert_eq!(is_alive(&run), Ok(false));
+        let transcript = run.transcript.to_string();
+        assert_eq!(group_holds(leader, &transcript), Ok(true), "the leader went alone");
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::Killed));
+        assert_eq!(group_holds(leader, &transcript), Ok(false));
         assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::AlreadyGone));
     }
 
