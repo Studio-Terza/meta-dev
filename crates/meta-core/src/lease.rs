@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::ids::{AgentId, AgentName, LeaseId, PrNumber, Sha, TaskId, Timestamp, Verdict};
+use crate::ids::{AgentId, AgentName, LeaseId, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -50,6 +50,11 @@ impl Deadline {
             Some(deadline) => format!("{deadline}, report or stop by then"),
             None => "none".to_owned(),
         }
+    }
+
+    /// The deadline moved later by `span`; none stays none.
+    pub(crate) fn delayed(self, span: Span) -> Self {
+        Self(self.0.map(|deadline| deadline.plus(span)))
     }
 
     /// Whether the deadline has passed at `now`; a lease with none never passes it.
@@ -178,6 +183,17 @@ impl LeaseSlot {
     /// Whether the agent on this lease has finished its part: a review with its verdict.
     pub(crate) fn is_finished(&self) -> bool {
         matches!(self, Self::Spent(spent) if spent.verdict.is_some())
+    }
+
+    /// Moves every deadline of the lease later by `span`: the time its task waited on the owner.
+    pub(crate) fn delay(&mut self, span: Span) {
+        match self {
+            Self::Unused(lease) => lease.deadline = lease.deadline.delayed(span),
+            Self::Spent(spent) => {
+                spent.lease.deadline = spent.lease.deadline.delayed(span);
+                spent.deadline = spent.deadline.delayed(span);
+            }
+        }
     }
 
     /// Who holds the lease, for a flag: the agent id once recorded.

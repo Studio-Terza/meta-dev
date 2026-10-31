@@ -1627,6 +1627,284 @@ fn status_falsifies_p1_for_each_outside_start_escape_and_hook_denials_never_coun
     assert!(reply.text.contains("bypassed, from outside-start escapes: 1;"), "{}", reply.text);
 }
 
+// Task 33: waiting on the owner pauses deadlines, and the idle alarm (docs/stage1.md "Waiting on the owner").
+
+fn waiting(task: &str, question: &str) -> Event {
+    Event::WaitingOnOwner { task: id(task), question: id(question) }
+}
+
+fn answered(task: &str, answer: &str) -> Event {
+    Event::OwnerAnswered { task: id(task), answer: id(answer) }
+}
+
+const IDLE: &str = "idle: no live work; stalled: ";
+
+#[test]
+fn wait_records_the_question_and_status_lists_the_task_under_waiting_on_the_owner() {
+    let mut ports = given(claimed_task(), Vec::new());
+    let (reply, events) = call(&mut ports, &["wait", "task-1", "--owner", "Merge", "the", "mega", "PR?"], "");
+    assert_eq!((reply.code, events), (Code::Done, vec![waiting("task-1", "Merge the mega PR?")]));
+    let (status, _) = call(&mut ports, &["status"], "");
+    let listed = "waiting on the owner (flagged)\n  task-1: Merge the mega PR? (waiting 0 min)\n";
+    assert!(status.text.contains(listed), "{}", status.text);
+    let (reply, events) = call(&mut ports, &["wait", "task-1", "--owner", "again"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("already waiting"), "{}", reply.text);
+    let (reply, events) = call(&mut ports, &["unwait", "task-1", "Yes,", "merge", "it"], "");
+    assert_eq!((reply.code, events), (Code::Done, vec![answered("task-1", "Yes, merge it")]));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("waiting on the owner (flagged)\n  (none)\n"), "{}", status.text);
+}
+
+#[test]
+fn wait_and_unwait_are_refused_for_unknown_finished_or_not_waiting_tasks_and_malformed_words_get_usage() {
+    let refused = |events: Vec<Event>, args: &[&str]| {
+        let (reply, added) = call(&mut given(events, Vec::new()), args, "");
+        assert_eq!((reply.code, added), (Code::Refused, Vec::new()), "{args:?}: {}", reply.text);
+    };
+    refused(Vec::new(), &["wait", "task-1", "--owner", "q"]);
+    refused(finished_task(), &["wait", "task-1", "--owner", "q"]);
+    refused(
+        vec![opened("task-1"), Event::Deferred { task: id("task-1"), reason: id("later") }],
+        &["wait", "task-1", "--owner", "q"],
+    );
+    refused(vec![opened("task-1")], &["unwait", "task-1", "a"]);
+    refused(Vec::new(), &["unwait", "task-1", "a"]);
+    let done_while_waiting = [linked_task(), vec![waiting("task-1", "q"), merged("7", 1), done("task-1")]].concat();
+    refused(done_while_waiting, &["unwait", "task-1", "a"]);
+    [&["wait", "task-1", "q"][..], &["wait", "task-1", "--owner"], &["unwait", "task-1"]].into_iter().for_each(
+        |args| {
+            let reply = Call::parse(&command(args), String::new).unwrap_err();
+            assert!(reply.code == Code::Failed && reply.text.contains("usage:"), "{args:?}: {}", reply.text);
+        },
+    );
+}
+
+#[test]
+fn a_waiting_task_is_not_overdue_and_its_deadlines_resume_from_the_answer() {
+    // The fake clock stands at unix 2; the lease is due at unix 100.
+    let history = vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100)];
+    let mut ports = given(history, Vec::new());
+    call(&mut ports, &["wait", "task-1", "--owner", "q"], "");
+    ports.clock.pause(Span::of_seconds(498));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("overdue leases (flagged)\n  (none)\n"), "waiting at unix 500: {}", status.text);
+    let (reply, events) = call(&mut ports, &["unwait", "task-1", "a"], "");
+    assert_eq!((reply.code, events), (Code::Done, vec![answered("task-1", "a")]));
+    // It waited from unix 2 to unix 500: the deadline moves from 100 to 598.
+    ports.clock.pause(Span::of_seconds(98));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("overdue leases (flagged)\n  (none)\n"), "unix 598: {}", status.text);
+    assert!(status.text.contains("lease-1 for task-1, deadline unix 598"), "{}", status.text);
+    ports.clock.pause(Span::of_seconds(1));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("lease-1 for task-1: unused, deadline unix 598\n"), "unix 599: {}", status.text);
+}
+
+#[test]
+fn unwait_moves_the_started_deadline_too_and_leaves_other_tasks_alone() {
+    let started =
+        Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline: Some(Timestamp::from_unix_seconds(200)) };
+    let history = vec![
+        opened("task-1"),
+        claimed("task-1"),
+        leased_until("lease-1", "task-1", 100),
+        used("lease-1"),
+        started,
+        opened("task-2"),
+        claimed("task-2"),
+        leased_until("lease-2", "task-2", 100),
+        waiting("task-1", "q"),
+    ];
+    let mut ports = given(history, Vec::new());
+    ports.clock.pause(Span::of_seconds(1000));
+    call(&mut ports, &["unwait", "task-1", "a"], "");
+    let (status, _) = call(&mut ports, &["status"], "");
+    let flagged = "overdue leases (flagged)\n  lease-2 for task-2: unused, deadline unix 100\n";
+    assert!(status.text.contains(flagged), "task-1 resumed at unix 1002, due 1201: {}", status.text);
+    assert!(!status.text.contains("lease-1 for task-1:"), "{}", status.text);
+    ports.clock.pause(Span::of_seconds(200));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(
+        status.text.contains(&format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix 1201")),
+        "{}",
+        status.text
+    );
+}
+
+#[test]
+fn waiting_records_fold_old_logs_and_round_trip_as_json() {
+    let wait = Record { at: Timestamp::from_unix_seconds(5), event: waiting("task-1", "q") };
+    let line = serde_json::to_string(&wait).unwrap();
+    assert_eq!(line, r#"{"at":5,"event":"WaitingOnOwner","task":1,"question":"q"}"#);
+    assert_eq!(serde_json::from_str::<Record>(&line).unwrap(), wait);
+    let twice = vec![opened("task-1"), waiting("task-1", "a"), waiting("task-1", "b")];
+    let (reply, _) = call(&mut given(twice, Vec::new()), &["status"], "");
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    let unasked = vec![opened("task-1"), answered("task-1", "a")];
+    let (reply, _) = call(&mut given(unasked, Vec::new()), &["status"], "");
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+}
+
+fn reviewed(lease: &str, verdict: &str) -> Event {
+    Event::Reviewed { lease: id(lease), verdict: id(verdict) }
+}
+
+/// task-1 linked at PINNED with an old work lease, then a used review lease-2 at `head` with `verdict`.
+fn judged(head: &str, verdict: &str) -> Vec<Event> {
+    [linked_task(), vec![review_leased("lease-2", head), used("lease-2"), reviewed("lease-2", verdict)]].concat()
+}
+
+fn idle_line(stalled: &str) -> String {
+    format!("idle (flagged)\n  {IDLE}{stalled}\n")
+}
+
+fn quiet(events: Vec<Event>) {
+    let text = status_of(events);
+    assert!(text.contains("idle (flagged)\n  (none)\n"), "{text}");
+}
+
+fn flagged(events: Vec<Event>, stalled: &str) {
+    let text = status_of(events);
+    assert!(text.contains(&idle_line(stalled)), "expected {stalled:?}: {text}");
+}
+
+#[test]
+fn only_a_lease_with_a_deadline_on_an_open_or_claimed_task_is_running_work() {
+    flagged(vec![opened("task-1")], "task-1 (open)");
+    quiet(Vec::new());
+    quiet(vec![opened("task-1"), Event::Deferred { task: id("task-1"), reason: id("later") }]);
+    quiet(finished_task());
+    quiet(vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100)]);
+    quiet(
+        [vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100)], vec![used("lease-1")]]
+            .concat(),
+    );
+    // A lease with no deadline is not running work, so the claimed task is stalled.
+    flagged(claimed_task(), "task-1 (claimed)");
+    flagged(bound(), "task-1 (claimed)");
+    // A review lease is not work.
+    let reviewing = [
+        vec![opened("task-1"), claimed("task-1"), linked("task-1", "7"), opened("task-2")],
+        vec![review_leased_until("lease-1", PINNED, 100), used("lease-1")],
+    ]
+    .concat();
+    flagged(reviewing, "task-2 (open)");
+}
+
+#[test]
+fn a_lease_of_a_linked_task_does_not_silence_the_alarm() {
+    let leftover = [
+        vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100), linked("task-1", "7")],
+        vec![opened("task-2")],
+    ]
+    .concat();
+    flagged(leftover.clone(), "task-1 (no verdict on head), task-2 (open)");
+    // The same leftover lease and nothing else: still stalled, still flagged.
+    flagged(leftover[..4].to_vec(), "task-1 (no verdict on head)");
+    // Running work on the other task silences the alarm, as before.
+    let working = [leftover, vec![claimed("task-2"), leased_until("lease-2", "task-2", 100)]].concat();
+    quiet(working);
+}
+
+#[test]
+fn a_linked_task_with_no_next_step_is_stalled_without_an_age_threshold() {
+    flagged(linked_task(), "task-1 (no verdict on head)");
+    // A verdict on an earlier head does not count for the pinned head.
+    flagged(judged(MOVED, "pass"), "task-1 (no verdict on head)");
+    flagged(judged(PINNED, "pass"), "task-1 (pass on head, PR not merged)");
+    flagged(judged(PINNED, "fail"), "task-1 (fail on head, no live work lease)");
+    // A review lease that is live is the next step, used or not.
+    quiet([linked_task(), vec![review_leased_until("lease-2", PINNED, 100)]].concat());
+    quiet([linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat());
+    // Merged and awaiting done, or done: no stall.
+    quiet([judged(PINNED, "pass"), vec![merged("7", 1)]].concat());
+    quiet([judged(PINNED, "pass"), vec![merged("7", 1), done("task-1")]].concat());
+    // A fail followed by a new work lease with a deadline is the fix under way; a leftover one is not.
+    let fixing = [judged(PINNED, "fail"), vec![leased_until("lease-3", "task-1", 100)]].concat();
+    quiet(fixing);
+    let leftover = [
+        vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 100), linked("task-1", "7")],
+        vec![review_leased("lease-2", PINNED), used("lease-2"), reviewed("lease-2", "fail")],
+    ]
+    .concat();
+    flagged(leftover, "task-1 (fail on head, no live work lease)");
+    // Retired tasks are not stalled.
+    quiet([linked_task(), vec![Event::Retired { task: id("task-1"), reason: id("dropped") }]].concat());
+}
+
+#[test]
+fn a_lead_who_claimed_a_task_itself_counts_as_stalled() {
+    flagged(vec![opened("task-1"), self_claimed("task-1")], "task-1 (claimed)");
+    quiet(vec![opened("task-1"), self_claimed("task-1"), leased_until("lease-1", "task-1", 100)]);
+}
+
+#[test]
+fn a_task_waiting_on_the_owner_is_not_stalled_and_its_lease_is_not_work() {
+    quiet(vec![opened("task-1"), waiting("task-1", "q")]);
+    quiet([linked_task(), vec![waiting("task-1", "q")]].concat());
+    let paused = vec![
+        opened("task-1"),
+        opened("task-2"),
+        claimed("task-2"),
+        leased_until("lease-1", "task-2", 100),
+        waiting("task-2", "q"),
+    ];
+    flagged(paused, "task-1 (open)");
+    let other = vec![
+        opened("task-1"),
+        opened("task-2"),
+        claimed("task-2"),
+        leased_until("lease-1", "task-2", 100),
+        waiting("task-1", "q"),
+    ];
+    quiet(other);
+}
+
+#[test]
+fn the_alarm_lists_every_stalled_task_by_name_in_task_order() {
+    let history = vec![
+        opened("task-1"),
+        opened("task-2"),
+        opened("task-3"),
+        opened("task-4"),
+        claimed("task-3"),
+        self_claimed("task-4"),
+        waiting("task-2", "q"),
+    ];
+    flagged(history, "task-1 (open), task-3 (claimed), task-4 (claimed)");
+}
+
+#[test]
+fn waiting_tasks_show_their_age_in_a_flagged_section() {
+    let mut ports = given(vec![opened("task-1")], Vec::new());
+    call(&mut ports, &["wait", "task-1", "--owner", "Merge", "it?"], "");
+    ports.clock.pause(Span::of_seconds(3600 + 59));
+    let (status, _) = call(&mut ports, &["status"], "");
+    let listed = "waiting on the owner (flagged)\n  task-1: Merge it? (waiting 60 min)\n";
+    assert!(status.text.contains(listed), "{}", status.text);
+    let (next, _) = call(&mut ports, &["unwait", "task-1", "yes"], "");
+    assert_eq!(next.code, Code::Done);
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("waiting on the owner (flagged)\n  (none)\n"), "{}", status.text);
+}
+
+#[test]
+fn the_idle_alarm_follows_the_clock_through_a_wait_and_its_answer() {
+    let mut ports = given(vec![opened("task-1")], Vec::new());
+    call(&mut ports, &["wait", "task-1", "--owner", "q"], "");
+    ports.clock.pause(Span::of_seconds(3600));
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
+    assert!(status.text.contains("task-1: q (waiting 60 min)"), "{}", status.text);
+    call(&mut ports, &["unwait", "task-1", "go"], "");
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains(&idle_line("task-1 (open)")), "{}", status.text);
+    call(&mut ports, &["claim", "task-1", "--agent", "alice"], "");
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
+}
+
 /// A task linked to `pr` by the lead, with no lease.
 fn linked_by_lead(task: &str, pr: &str) -> Vec<Event> {
     vec![opened(task), self_claimed(task), Event::Linked { task: id(task), pr: id(pr), pin: id(PINNED) }]
