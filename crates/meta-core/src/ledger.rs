@@ -14,6 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Ledger {
     pub(crate) tasks: BTreeMap<TaskId, Progress>,
     pub(crate) leases: BTreeMap<LeaseId, LeaseSlot>,
+    /// The review leases that have a verdict, in the order the log recorded their verdicts: a lease
+    /// can be judged after a later one, so lease order is not verdict order.
+    pub(crate) judged: Vec<LeaseId>,
     pub(crate) escapes: Vec<Logged>,
     pub(crate) merged: Vec<(RunCount, Route)>,
     /// Each PR merged, with the CI runs recorded at merge time: a merged PR's count cannot change.
@@ -90,7 +93,10 @@ impl Ledger {
                 self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
             }
             Event::Reviewed { lease, verdict, head } => match self.leases.get_mut(lease) {
-                Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict, head.as_ref())?,
+                Some(LeaseSlot::Spent(spent)) => {
+                    spent.judge(*verdict, head.as_ref())?;
+                    self.judged.push(*lease);
+                }
                 _ => Err(format!("{lease} reviewed but not used"))?,
             },
             Event::Started { lease, agent, deadline, worker } => match self.leases.get_mut(lease) {

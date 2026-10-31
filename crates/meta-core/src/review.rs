@@ -68,6 +68,10 @@ impl Ledger {
                 (Some(verdict), _) => Err(Refusal::because(format!(
                     "{lease} already has the verdict {verdict}. Next: {review} of the current head."
                 ))),
+                (None, Some(_)) if spent.is_stopped() => Err(Refusal::because(format!(
+                    "{lease} is a headless worker's lease, and the worker has ended with no verdict; \
+                     meta worker wait cannot record one now. Next: {review} of the current head."
+                ))),
                 (None, Some(_)) => Err(Refusal::because(format!(
                     "{lease} is a headless worker's lease; its verdict comes only from its session. \
                      Next: meta worker wait {lease} records it, or {review} of your own."
@@ -127,12 +131,12 @@ impl Ledger {
                 _ => None,
             })
             .filter_map(|linked| {
-                let latest = self.leases.values().rev().find_map(|slot| match slot {
-                    LeaseSlot::Spent(spent) => match (spent.lease().purpose(), spent.verdict()) {
+                let latest = self.judged.iter().rev().find_map(|lease| match self.leases.get(lease) {
+                    Some(LeaseSlot::Spent(spent)) => match (spent.lease().purpose(), spent.verdict()) {
                         (Purpose::Review { pr, head }, Some(verdict)) if *pr == linked.pr() => Some((head, verdict)),
                         _ => None,
                     },
-                    LeaseSlot::Unused(_) => None,
+                    _ => None,
                 });
                 latest.map(|(head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
             })
