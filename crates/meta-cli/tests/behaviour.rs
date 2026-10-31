@@ -366,22 +366,37 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
     let pulls = vec![("9", ran(1)), ("10", ran(1))];
     let (reply, events) = call(&mut given(history, pulls), &["status"], "");
     assert_eq!(events, vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 1")]);
-    let expected = [
-        "task-1 claimed by alice",
-        "task-3 open",
-        "lease-1 for task-1",
-        "open escapes: 3",
-        "escape-1 [gap] gh is down",
-        "escape-3 [outside-merge] hook too strict",
-        "P1 agent starts through meta: 1; prevented by the hook: 1; bypassed, from outside-start escapes: 0;",
-        "P1 merges through meta: 1 of 2",
-        "P1 merged outside meta: 1 (0 missing from the log)",
-        "P2 open escapes: 3 (0 closed as historical); most repeats of one kind: 1 (gap)",
-        "P6 CI runs per merged PR: 6 runs over 2 merged PRs; median 3",
-    ];
-    assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    let listed = ["task-2 open", "task-2 claimed", "lease-2"];
-    assert!(listed.iter().all(|line| !reply.text.contains(line)), "{}", reply.text);
+    let expected = "open tasks
+  task-1 claimed by alice: Fix the hook
+  task-3 open: Fix the hook
+deferred
+  (none)
+live leases
+  lease-1 for task-1, no deadline
+open escapes: 3
+  escape-1 [gap] gh is down
+  escape-2 [gap] gh is down again
+  escape-3 [outside-merge] hook too strict
+escapes corrected to historical
+  (none)
+latest review verdict per linked PR
+  (none)
+leases resumed 3 or more times (flagged)
+  (none)
+overdue leases (flagged)
+  (none)
+P1 agent starts through meta: 1; prevented by the hook: 1; bypassed, from outside-start escapes: 0; self-claims, not agent starts: 0
+P1 merges through meta: 1 of 2
+P1 merged outside meta: 1 (0 missing from the log)
+P2 open escapes: 3 (0 closed as historical); most repeats of one kind: 1 (gap)
+P6 CI runs per merged PR: 6 runs over 2 merged PRs; median 3
+rework per task (report only; not part of P6)
+  task-2 (#9, done): failed review rounds 0, CI runs 4
+  task-4 (#10, done): failed review rounds 0, CI runs 2
+rework total: tasks with 2 or more failed review rounds: 0 of 2 tasks with a PR; worst: task-2 (failed review rounds 0, CI runs 4)
+predictions
+";
+    assert_eq!(reply.text.get(..expected.len()), Some(expected), "{}", reply.text);
 }
 
 #[test]
