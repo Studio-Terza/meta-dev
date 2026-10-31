@@ -42,6 +42,7 @@ pub use ids::{
     Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title,
     Verdict,
 };
+pub use lease::LeaseRole;
 pub use ledger::{Corrupt, Ledger};
 pub use link::Linking;
 pub use merge::{Clearance, Cleared, Landed, Merging, Updating};

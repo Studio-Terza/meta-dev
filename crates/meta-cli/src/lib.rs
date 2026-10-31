@@ -1,8 +1,8 @@
 use meta_core::{
     Accepted, Admitted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event,
-    Hook, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber,
-    Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span,
-    Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
+    Hook, LeaseId, LeaseRole, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase,
+    PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha,
+    Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -28,6 +28,7 @@ pub enum LedgerCall {
         task: TaskId,
         claimant: Claimant,
         deadline: Option<Minutes>,
+        role: LeaseRole,
     },
     Link {
         task: TaskId,
@@ -110,7 +111,7 @@ impl Answer {
 }
 
 impl Call {
-    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
+    const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--role critic] [--deadline <minutes>]\n  \
                          meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
@@ -125,12 +126,15 @@ impl Call {
         let local = |call: Result<Local, Malformed>| ledger(call.map(LedgerCall::Local));
         let call: Option<Result<Self, Malformed>> = match words.as_slice() {
             ["open", title @ ..] => local(title.join(" ").parse().map(Local::Open)),
-            ["claim", task, "--self"] => {
-                ledger(task.parse().map(|task| LedgerCall::Claim { task, claimant: Claimant::Lead, deadline: None }))
-            }
-            ["claim", task, "--agent", agent, deadline @ ..] => ledger(task.parse().and_then(|task| {
-                let deadline = Self::deadline(deadline)?;
-                agent.parse().map(|agent| LedgerCall::Claim { task, claimant: Claimant::Agent(agent), deadline })
+            ["claim", task, "--self"] => ledger(task.parse().map(|task| LedgerCall::Claim {
+                task,
+                claimant: Claimant::Lead,
+                deadline: None,
+                role: LeaseRole::Worker,
+            })),
+            ["claim", task, "--agent", agent, options @ ..] => ledger(task.parse().and_then(|task| {
+                let (role, deadline) = Self::claim_options(options)?;
+                agent.parse().map(|agent| LedgerCall::Claim { task, claimant: Claimant::Agent(agent), deadline, role })
             })),
             ["link", task, pr] => {
                 ledger(task.parse().and_then(|task| pr.parse().map(|pr| LedgerCall::Link { task, pr })))
@@ -190,6 +194,15 @@ impl Call {
             None => "unknown command".to_owned(),
         };
         Err(Answer { text: format!("{why}\n{}", Self::USAGE), code: Code::Failed })
+    }
+
+    /// The optional `--role critic` and `--deadline <minutes>` of an agent's claim, in either order.
+    fn claim_options(words: &[&str]) -> Result<(LeaseRole, Option<Minutes>), Malformed> {
+        match words {
+            ["--role", role, rest @ ..] => Ok((role.parse()?, Self::deadline(rest)?)),
+            ["--deadline", minutes, "--role", role] => Ok((role.parse()?, Some(minutes.parse()?))),
+            _ => Ok((LeaseRole::Worker, Self::deadline(words)?)),
+        }
     }
 
     /// The optional `--deadline <minutes>` that ends a claim or review by an agent.
@@ -383,6 +396,7 @@ enum Prepared {
     Claim {
         task: TaskId,
         claimant: Claimant,
+        role: LeaseRole,
         origin: Origin,
         rules: Rules,
         allowance: Option<Minutes>,
@@ -473,14 +487,14 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
                 standing: log.standing(),
             })
         }
-        LedgerCall::Claim { task, claimant, deadline } => {
-            ledger.claim(task, claimant.clone())?;
+        LedgerCall::Claim { task, claimant, deadline, role } => {
+            ledger.claim(task, claimant.clone(), role)?;
             let rules = spec(git, SelfFile::Rules, Rules::parse)?;
             let allowance = match claimant {
                 Claimant::Lead => None,
                 Claimant::Agent(_) => Some(deadline.map_or_else(|| roles(git).map(|roles| roles.work()), Ok)?),
             };
-            Prepared::Claim { task, claimant, origin: git.origin()?, rules, allowance }
+            Prepared::Claim { task, claimant, role, origin: git.origin()?, rules, allowance }
         }
         LedgerCall::Link { task, pr } => {
             let pushed = ledger.link(task, pr)?.pushed(git.local_head(task)?)?;
@@ -528,8 +542,8 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),
-        Prepared::Claim { task, claimant, origin, rules, allowance } => {
-            ledger.claim(task, claimant)?.brief(&origin, &rules, allowance.map(|minutes| at.plus(minutes.span())))
+        Prepared::Claim { task, claimant, role, origin, rules, allowance } => {
+            ledger.claim(task, claimant, role)?.brief(&origin, &rules, allowance.map(|minutes| at.plus(minutes.span())))
         }
         Prepared::Link { task, pr, pushed, pull } => ledger.link(task, pr)?.pin(&pushed, &pull)?,
         Prepared::Merge { pr, pull } => match ledger.merge(pr)?.clear(&pull)? {

@@ -3,6 +3,7 @@ use crate::ids::{
     AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, OwnerAnswer, OwnerQuestion, PrNumber,
     PredictionId, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
 };
+use crate::lease::LeaseRole;
 use crate::predictions::Measure;
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +32,9 @@ pub enum Event {
         /// When the agent must report or stop. Leases from before deadlines have none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
+        /// The critic's lease is not running work. Leases from before roles are workers.
+        #[serde(default, skip_serializing_if = "LeaseRole::is_worker")]
+        role: LeaseRole,
     },
     Linked {
         task: TaskId,

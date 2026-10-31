@@ -2,7 +2,7 @@ use crate::escape::Logged;
 use crate::event::{Attempt, Event, Record, Route};
 use crate::ids::{EscapeId, LeaseId, PrNumber, PredictionId, RunCount, TaskId, Timestamp};
 use crate::latch::Latch;
-use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
+use crate::lease::{Deadline, Lease, LeaseRole, LeaseSlot, Purpose};
 use crate::predictions::Measure;
 use crate::task::{Linked, Progress, Task};
 use crate::waiting::Waiting;
@@ -64,9 +64,10 @@ impl Ledger {
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
             }
-            Event::Leased { lease, task, agent, deadline } => {
+            Event::Leased { lease, task, agent, deadline, role } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
-                self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, at, Deadline::of(*deadline)))?;
+                let deadline = Deadline::of(*deadline);
+                self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, *role, at, deadline))?;
             }
             Event::ReviewLeased { lease, task, agent, pr, head, deadline } => {
                 match self.tasks.get(task) {
@@ -74,7 +75,8 @@ impl Ledger {
                     _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
                 }?;
                 let purpose = Purpose::Review { pr: *pr, head: head.clone() };
-                self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
+                let deadline = Deadline::of(*deadline);
+                self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, LeaseRole::Worker, at, deadline))?;
             }
             Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,

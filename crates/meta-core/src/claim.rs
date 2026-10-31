@@ -1,7 +1,7 @@
 use crate::brief::{lease_line, work_text};
 use crate::event::Event;
 use crate::ids::{AgentName, Claimant, LeaseId, Origin, TaskId, Timestamp, Title};
-use crate::lease::{Deadline, LeaseSlot, Purpose};
+use crate::lease::{Deadline, LeaseRole, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
 use crate::rules::Rules;
@@ -12,6 +12,7 @@ pub struct Claim {
     task: TaskId,
     title: Title,
     grant: Grant,
+    role: LeaseRole,
 }
 
 #[derive(Debug)]
@@ -22,9 +23,9 @@ enum Grant {
 }
 
 impl Ledger {
-    pub fn claim(&self, task: TaskId, claimant: Claimant) -> Result<Claim, Refusal> {
+    pub fn claim(&self, task: TaskId, claimant: Claimant, role: LeaseRole) -> Result<Claim, Refusal> {
         let lease = LeaseId::after(self.leases.len());
-        let grant = |title: &Title, grant| Ok(Claim { task, title: title.clone(), grant });
+        let grant = |title: &Title, grant| Ok(Claim { task, title: title.clone(), grant, role });
         match (claimant, self.tasks.get(&task), self.unused_lease(task)) {
             (Claimant::Lead, Some(Progress::Open(open)), _) => grant(open.title(), Grant::SelfClaim),
             (Claimant::Lead, Some(Progress::Claimed(claimed)), _) => Err(Refusal::because(format!(
@@ -75,7 +76,7 @@ impl Claim {
     /// The brief, and the events of the claim. An agent's lease ends at `deadline`; a self-claim has
     /// no lease and no deadline, whatever `deadline` says.
     pub fn brief(self, origin: &Origin, rules: &Rules, deadline: Option<Timestamp>) -> Accepted {
-        let Self { task, title, grant } = self;
+        let Self { task, title, grant, role } = self;
         let (who, lease_line, deadline_line) = match &grant {
             Grant::FirstClaim { agent, lease } | Grant::FreshLease { agent, lease } => {
                 (agent.to_string(), lease_line(*lease), Deadline::of(deadline).brief_line())
@@ -91,10 +92,12 @@ impl Claim {
             Grant::FirstClaim { agent, lease } => {
                 vec![
                     Event::Claimed { task, agent: Claimant::Agent(agent.clone()) },
-                    Event::Leased { lease, task, agent: Some(agent), deadline },
+                    Event::Leased { lease, task, agent: Some(agent), deadline, role },
                 ]
             }
-            Grant::FreshLease { agent, lease } => vec![Event::Leased { lease, task, agent: Some(agent), deadline }],
+            Grant::FreshLease { agent, lease } => {
+                vec![Event::Leased { lease, task, agent: Some(agent), deadline, role }]
+            }
             Grant::SelfClaim => vec![Event::Claimed { task, agent: Claimant::Lead }],
         };
         Accepted::new(events, text)

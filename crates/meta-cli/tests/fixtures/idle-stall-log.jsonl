@@ -1,0 +1,15 @@
+{"at":1793388000,"event":"Opened","task":14,"title":"Critic: review the loop"}
+{"at":1793388001,"event":"Claimed","task":14,"agent":"claude-critic"}
+{"at":1793388002,"event":"Leased","lease":1,"task":14,"agent":"claude-critic","deadline":1793474400,"role":"critic"}
+{"at":1793388003,"event":"LeaseUsed","lease":1}
+{"at":1793388004,"event":"Started","lease":1,"agent":"a1b2c3d4e5f60718","deadline":1793474400}
+{"at":1793400000,"event":"Opened","task":20,"title":"Fix the idle alarm"}
+{"at":1793400001,"event":"Claimed","task":20,"agent":"claude-t20"}
+{"at":1793400002,"event":"Leased","lease":2,"task":20,"agent":"claude-t20","deadline":1793405402}
+{"at":1793400003,"event":"LeaseUsed","lease":2}
+{"at":1793400004,"event":"Started","lease":2,"agent":"0f1e2d3c4b5a6978","deadline":1793405404}
+{"at":1793400100,"event":"Opened","task":21,"title":"Retire the hand-made stack"}
+{"at":1793400101,"event":"Claimed","task":21,"agent":"claude-t21"}
+{"at":1793400102,"event":"Leased","lease":3,"task":21,"agent":"claude-t21","deadline":1793405502}
+{"at":1793400200,"event":"Opened","task":30,"title":"Open and unworked"}
+{"at":1793400300,"event":"Opened","task":31,"title":"Also open and unworked"}
