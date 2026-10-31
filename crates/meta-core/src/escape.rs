@@ -1,5 +1,6 @@
 use crate::event::{Event, Record};
 use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId, Timestamp};
+use crate::imported::Imported;
 use crate::ledger::Ledger;
 use crate::merges::Unreached;
 use crate::reply::{Accepted, Refusal};
@@ -87,6 +88,8 @@ pub struct Logged {
     reason: Reason,
     pr: Option<PrNumber>,
     checked: Checked,
+    /// Set when the escape was imported from the side file of unverified builds.
+    imported: Option<Imported>,
     resolution: Option<Resolution>,
 }
 
@@ -132,8 +135,14 @@ impl std::fmt::Display for RepeatKey<'_> {
 }
 
 impl Logged {
-    pub(crate) fn new(kind: EscapeKind, reason: Reason, pr: Option<PrNumber>, checked: Checked) -> Self {
-        Self { kind, reason, pr, checked, resolution: None }
+    pub(crate) fn new(
+        kind: EscapeKind,
+        reason: Reason,
+        pr: Option<PrNumber>,
+        checked: Checked,
+        imported: Option<Imported>,
+    ) -> Self {
+        Self { kind, reason, pr, checked, imported, resolution: None }
     }
 
     pub(crate) fn resolve(&mut self, escape: EscapeId, task: TaskId) -> Result<(), String> {
@@ -212,12 +221,16 @@ impl Logged {
             true => Checked::Unchecked,
             false => self.checked,
         };
-        described(&self.kind, checked, self.pr, &self.reason)
+        let line = described(&self.kind, checked, self.pr, &self.reason);
+        match self.imported {
+            Some(_) => format!("{line} (imported from an unverified build)"),
+            None => line,
+        }
     }
 }
 
 /// `[kind] #pr reason`, with `unchecked` beside a kind that was not checked.
-fn described(kind: &EscapeKind, checked: Checked, pr: Option<PrNumber>, reason: &Reason) -> String {
+pub(crate) fn described(kind: &EscapeKind, checked: Checked, pr: Option<PrNumber>, reason: &Reason) -> String {
     let checked = match checked {
         Checked::Listed => "",
         Checked::Unchecked => ", unchecked",
@@ -283,7 +296,7 @@ impl Admitted {
             Err(why) => format!("escape recorded: {what}\nid and counts unavailable: {why}\n"),
         };
         let unchecked = unchecked.map_or_else(String::new, |why| format!("kind unchecked: {why}\n"));
-        let event = Event::Escaped { kind, reason, pr, checked };
+        let event = Event::Escaped { kind, reason, pr, checked, imported: None };
         Accepted::new(vec![event], counted + &unchecked)
     }
 

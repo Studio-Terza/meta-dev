@@ -3,8 +3,9 @@ use crate::ids::{
     AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, OwnerAnswer, OwnerQuestion, PrNumber,
     PredictionId, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
 };
-use crate::lease::LeaseRole;
+use crate::imported::Imported;
 use crate::predictions::Measure;
+use crate::role::Role;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,9 +33,6 @@ pub enum Event {
         /// When the agent must report or stop. Leases from before deadlines have none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
-        /// The critic's lease is not running work. Leases from before roles are workers.
-        #[serde(default, skip_serializing_if = "LeaseRole::is_worker")]
-        role: LeaseRole,
     },
     Linked {
         task: TaskId,
@@ -50,6 +48,11 @@ pub enum Event {
     Done {
         task: TaskId,
     },
+    /// The task has a role. Every lease on a critic task, past and future, is not running work.
+    TaskRole {
+        task: TaskId,
+        role: Role,
+    },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
     /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
     /// could be read is marked unchecked. A build not verified to be from main never writes one:
@@ -62,6 +65,10 @@ pub enum Event {
         pr: Option<PrNumber>,
         #[serde(default, skip_serializing_if = "Checked::is_listed")]
         checked: Checked,
+        /// Set on an escape `meta escape --import` moved into the log from the side file of
+        /// unverified builds: the side file line it came from, and when that line was written.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        imported: Option<Imported>,
     },
     Resolved {
         escape: EscapeId,

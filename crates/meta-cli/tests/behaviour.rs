@@ -1,7 +1,7 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Build, Checked, Claimant, Event, LeaseRole, Measure, Outcome, Place, PrNumber, Record, Route, Rules,
-    RunCount, SelfFile, Sha, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
+    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Role, Route, Rules, RunCount,
+    SelfFile, Sha, SideLine, Span, Standing, Timestamp, UnverifiedEscape, UnverifiedEscapes,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -44,7 +44,7 @@ fn claimed(task: &str) -> Event {
 }
 
 fn leased(lease: &str, task: &str) -> Event {
-    Event::Leased { lease: id(lease), task: id(task), agent: None, deadline: None, role: LeaseRole::Worker }
+    Event::Leased { lease: id(lease), task: id(task), agent: None, deadline: None }
 }
 
 /// A lease from this change on: its deadline in unix seconds.
@@ -59,7 +59,6 @@ fn leased_to(agent: &str, lease: &str, task: &str, deadline: u64) -> Event {
         task: id(task),
         agent: Some(id(agent)),
         deadline: Some(Timestamp::from_unix_seconds(deadline)),
-        role: LeaseRole::Worker,
     }
 }
 
@@ -80,11 +79,11 @@ fn done(task: &str) -> Event {
 }
 
 fn escaped(kind: &str, reason: &str) -> Event {
-    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: None, checked: Checked::Listed, imported: None }
 }
 
 fn escaped_pr(kind: &str, pr: &str, reason: &str) -> Event {
-    Event::Escaped { kind: id(kind), reason: id(reason), pr: Some(id(pr)), checked: Checked::Listed }
+    Event::Escaped { kind: id(kind), reason: id(reason), pr: Some(id(pr)), checked: Checked::Listed, imported: None }
 }
 
 fn claimed_task() -> Vec<Event> {
@@ -1214,6 +1213,7 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
         reason: id(reason),
         pr: None,
         checked: Checked::Unchecked,
+        imported: None,
     };
     let (reply, events) = call(&mut ports, &["escape", "gap", "no", "review"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![unchecked("gap", "no review")]));
@@ -1260,6 +1260,17 @@ impl Log for Lagging {
 
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
         self.0.set_aside_escapes()
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.0.import_set_aside(decide)
     }
 
     fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
@@ -1897,6 +1908,17 @@ impl Log for Unmarked {
 
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
         self.0.set_aside_escapes()
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.0.import_set_aside(decide)
     }
 
     fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
@@ -2629,28 +2651,190 @@ fn brief_of_a_used_unknown_or_dead_lease_is_refused_with_the_reason_and_records_
     assert!(reply.code == Code::Failed && reply.text.contains("meta brief <lease>"), "{}", reply.text);
 }
 
-// Critic #33: the idle alarm missed the real stall of Oct 31 (docs/stage1.md "Waiting on the owner, and the idle alarm").
+/// A side file line as a branch build writes it.
+fn side_line(at: u64, kind: &str, pr: Option<&str>, reason: &str) -> String {
+    let pr = pr.map_or_else(String::new, |pr| format!(",\"pr\":{pr}"));
+    format!("{{\"at\":{at},\"kind\":\"{kind}\",\"reason\":\"{reason}\"{pr}}}\n")
+}
 
-/// The log as it stood at 03:06Z on Oct 31: the critic's lease live, two work leases past their
-/// deadlines, and two open tasks unworked.
-fn stall_of_oct_31() -> Memory {
-    let text = include_str!("fixtures/idle-stall-log.jsonl");
-    let mut ports = given(Vec::new(), Vec::new());
-    ports.log.records = serde_json::Deserializer::from_str(text).into_iter().map(Result::unwrap).collect();
-    let now = Timestamp::from_unix_seconds(1_793_415_960);
-    ports.clock = FakeClock::at(now);
-    ports
+const IMPORT: [&str; 2] = ["escape", "--import"];
+
+#[test]
+fn import_moves_side_file_escapes_into_the_log_with_ids_keeps_unreadable_lines_and_status_shows_them() {
+    let scratch = Scratch::new("import");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let (first, second) = (side_line(3, "gap", None, "from a branch"), side_line(4, "gap", None, "again"));
+    std::fs::write(scratch.join(SIDE_FILE), [first.as_str(), "not a record\n", second.as_str()].concat()).unwrap();
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    let said = [
+        "escape-1 imported: [gap] from a branch (from an unverified build)",
+        "escape-2 imported: [gap] again (from an unverified build)",
+        "1 unreadable lines kept in the side file",
+    ];
+    assert!(said.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "not a record\n");
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 3, "{log}");
+    assert!(log.contains("\"imported\":{\"line\":") && log.contains("\"written\":3"), "{log}");
+    let status = answer(parsed(&["status"]), &mut ports);
+    let shown = [
+        "escape-1 [gap] from a branch (imported from an unverified build)\n",
+        "escape-2 [gap] again (imported from an unverified build)\n",
+        "open escapes: 2\n",
+        "1 unreadable lines",
+    ];
+    assert!(shown.iter().all(|part| status.text.contains(part)), "{}", status.text);
+    assert!(!status.text.contains("unverified [gap]"), "{}", status.text);
+    let resolved = answer(parsed(&["resolve", "escape-1", "--historical", "fixed", "upstream"]), &mut ports);
+    assert_eq!(resolved.code, Code::Done, "{}", resolved.text);
+    let again = answer(parsed(&["status"]), &mut ports);
+    assert!(again.text.contains("open escapes: 1\n"), "{}", again.text);
 }
 
 #[test]
-fn the_idle_alarm_fires_and_names_the_tasks_on_the_recorded_stall_of_oct_31() {
-    let (status, _) = call(&mut stall_of_oct_31(), &["status"], "");
-    assert!(
-        status.text.contains(&idle_line("task-20 (claimed), task-21 (claimed), task-30 (open), task-31 (open)")),
-        "{}",
-        status.text
-    );
-    assert!(!status.text.contains("task-14 (claimed)"), "{}", status.text);
+fn an_imported_escape_naming_a_pr_counts_for_p1_like_any_other_escape() {
+    let scratch = Scratch::new("import-p1");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let outside =
+        vec![opened("task-2"), claimed("task-2"), linked("task-2", "8"), merged_outside("8", 1), done("task-2")];
+    let history = [vec![Event::RealLog], finished_task(), outside].concat();
+    let text: String = history
+        .into_iter()
+        .map(|event| serde_json::to_string(&Record { at: Timestamp::from_unix_seconds(1), event }).unwrap() + "\n")
+        .collect();
+    std::fs::write(scratch.join("log.jsonl"), text).unwrap();
+    ports.github.listed = Some(Ok(listed(&[7, 8])));
+    let before = answer(parsed(&["status"]), &mut ports).text;
+    assert!(before.contains("P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;"), "{before}");
+    std::fs::write(scratch.join(SIDE_FILE), side_line(3, "outside-merge", Some("8"), "merged by hand")).unwrap();
+    assert_eq!(answer(parsed(&IMPORT), &mut ports).code, Code::Done);
+    let after = answer(parsed(&["status"]), &mut ports).text;
+    assert!(after.contains("P1 merged outside meta: 1 (0 missing from the log)"), "{after}");
+    assert!(after.contains("UNDECIDED; observed unrecorded bypasses unavailable"), "{after}");
+}
+
+#[test]
+fn import_is_refused_from_a_build_not_on_main_and_changes_neither_file() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let scratch = Scratch::new("import-refused");
+        let mut ports = on_marked_jsonl(&scratch, build);
+        let side = side_line(3, "gap", None, "from a branch");
+        std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+        let reply = answer(parsed(&IMPORT), &mut ports);
+        assert_eq!(reply.code, Code::Refused, "{}", reply.text);
+        assert!(reply.text.contains(why), "{}", reply.text);
+        assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+        assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), MARKER_LINE);
+    });
+}
+
+#[test]
+fn a_crash_between_the_append_and_the_side_file_rewrite_imports_nothing_twice_and_loses_nothing() {
+    let scratch = Scratch::new("import-crash");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let side =
+        [side_line(3, "gap", None, "one"), "not a record\n".to_owned(), side_line(4, "gap", None, "two")].concat();
+    std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+    std::fs::create_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    let cut = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(cut.code, Code::Failed, "{}", cut.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 3, "{log}");
+    std::fs::remove_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    let retry = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(retry.code, Code::Done, "{}", retry.text);
+    assert!(retry.text.contains("2 already in the log from an earlier import"), "{}", retry.text);
+    assert!(!retry.text.contains("imported:"), "{}", retry.text);
+    assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), log);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "not a record\n");
+    let last = answer(parsed(&IMPORT), &mut ports);
+    assert!(last.text.contains("1 unreadable lines kept"), "{}", last.text);
+    assert_eq!(std::fs::read_to_string(scratch.join("log.jsonl")).unwrap(), log);
+}
+
+#[test]
+fn a_retry_drops_as_many_copies_of_a_line_as_the_log_holds_and_imports_the_surplus() {
+    let scratch = Scratch::new("import-count");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let twin = side_line(3, "gap", None, "twice");
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str()].concat()).unwrap();
+    std::fs::create_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    assert_eq!(answer(parsed(&IMPORT), &mut ports).code, Code::Failed);
+    std::fs::remove_dir(scratch.join("escapes.unverified.jsonl.importing")).unwrap();
+    std::fs::write(scratch.join(SIDE_FILE), [twin.as_str(), twin.as_str(), twin.as_str()].concat()).unwrap();
+    let retry = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(retry.code, Code::Done, "{}", retry.text);
+    assert!(retry.text.contains("escape-3 imported:"), "{}", retry.text);
+    assert!(!retry.text.contains("escape-4") && retry.text.contains("2 already in the log"), "{}", retry.text);
+    let log = std::fs::read_to_string(scratch.join("log.jsonl")).unwrap();
+    assert_eq!(log.bytes().filter(|byte| *byte == b'\n').count(), 4, "{log}");
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), "");
+}
+
+#[test]
+fn import_with_nothing_in_the_side_file_says_so_and_a_scratch_log_takes_it_from_any_build() {
+    let scratch = Scratch::new("import-empty");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!((reply.code, reply.text.as_str()), (Code::Done, "the side file holds no escapes to import\n"));
+    assert!(!scratch.join(SIDE_FILE).exists());
+    let mut memory = Ports { build: Build::commit(id(BRANCH_BUILD)), ..given(Vec::new(), Vec::new()) };
+    memory.log.set_aside = vec![serde_json::from_str(&side_line(3, "gap", None, "scratch")).unwrap(), None];
+    let (reply, events) = call(&mut memory, &IMPORT, "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!((events.len(), memory.log.set_aside.len()), (1, 1));
+    assert!(matches!(&events[0], Event::Escaped { imported: Some(_), .. }), "{events:?}");
+}
+
+#[test]
+fn import_into_a_log_that_does_not_parse_fails_and_keeps_the_side_file() {
+    let scratch = Scratch::new("import-garbled");
+    let mut ports = on_marked_jsonl(&scratch, Build::commit(id(MAIN_BUILD)));
+    std::fs::write(scratch.join("log.jsonl"), format!("{MARKER_LINE}garbled\n")).unwrap();
+    let side = side_line(3, "gap", None, "one");
+    std::fs::write(scratch.join(SIDE_FILE), &side).unwrap();
+    let reply = answer(parsed(&IMPORT), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(scratch.join(SIDE_FILE)).unwrap(), side);
+}
+
+// Critic #33: the idle alarm missed the real stall of Oct 31 (docs/stage1.md "Waiting on the owner, and the idle alarm").
+
+/// 03:06:30Z on Oct 31, just after the last event of the log below.
+const STALL_CLOCK: u64 = 1_793_417_190;
+
+/// The real log as it stood at 03:06Z on Oct 31, the last event before 06:18Z (titles and reasons
+/// made generic), then the marking of task-14, the critic's task, as the critic's. The marking is
+/// its last line.
+fn stall_log() -> Vec<Record> {
+    let text = include_str!("fixtures/idle-stall-log.jsonl");
+    serde_json::Deserializer::from_str(text).into_iter().map(Result::unwrap).collect()
+}
+
+fn stall_of_oct_31(records: Vec<Record>) -> Memory {
+    let mut ports = given(Vec::new(), Vec::new());
+    ports.log.records = records;
+    ports.clock = FakeClock::at(Timestamp::from_unix_seconds(STALL_CLOCK));
+    ports
+}
+
+const STALLED_TASKS: &str = "task-7 (open), task-8 (open), task-12 (open), task-21 (open), task-25 (fail on head, no live work lease), task-27 (open)";
+
+#[test]
+fn the_idle_alarm_fires_on_the_recorded_stall_of_oct_31_and_does_not_name_the_critic() {
+    let (status, _) = call(&mut stall_of_oct_31(stall_log()), &["status"], "");
+    assert!(status.text.contains(&idle_line(STALLED_TASKS)), "{}", status.text);
+    assert!(!status.text.contains("task-14 ("), "{}", status.text);
+}
+
+#[test]
+fn without_the_critics_mark_the_critics_live_lease_silences_the_alarm_on_that_log() {
+    let mut records = stall_log();
+    assert!(matches!(records.pop().map(|record| record.event), Some(Event::TaskRole { .. })));
+    let (status, _) = call(&mut stall_of_oct_31(records), &["status"], "");
+    assert!(status.text.contains("idle (flagged)\n  (none)\n"), "{}", status.text);
 }
 
 #[test]
@@ -2667,32 +2851,49 @@ fn a_work_lease_before_its_deadline_is_running_and_after_it_is_not() {
     assert!(status.text.contains(&idle_line("task-1 (claimed)")), "past the deadline: {}", status.text);
 }
 
-#[test]
-fn a_critic_lease_is_never_running_work_and_its_task_is_never_stalled() {
-    let critic = |lease: &str, task: &str| Event::Leased {
-        lease: id(lease),
-        task: id(task),
-        agent: Some(id("critic")),
-        deadline: Some(Timestamp::from_unix_seconds(100)),
-        role: LeaseRole::Critic,
-    };
-    // Only the critic is working: nothing stalled, but an open task is, because the critic's lease is not work.
-    quiet(vec![opened("task-1"), claimed("task-1"), critic("lease-1", "task-1")]);
-    flagged(vec![opened("task-1"), claimed("task-1"), critic("lease-1", "task-1"), opened("task-2")], "task-2 (open)");
+fn marked(task: &str) -> Event {
+    Event::TaskRole { task: id(task), role: Role::Critic }
 }
 
 #[test]
-fn claim_role_critic_records_the_role_and_a_plain_claim_leaves_it_out() {
-    let mut ports = given(vec![opened("task-1"), opened("task-2")], Vec::new());
-    let (reply, events) = call(&mut ports, &["claim", "task-1", "--agent", "critic", "--role", "critic"], "");
+fn every_lease_on_a_marked_task_is_not_running_work_and_the_task_is_never_stalled() {
+    let work = |lease: &str, task: &str| leased_until(lease, task, 100);
+    // Only the critic's task is leased: nothing else is running, so an open task is stalled, the critic's is not.
+    flagged(
+        vec![opened("task-1"), claimed("task-1"), work("lease-1", "task-1"), marked("task-1"), opened("task-2")],
+        "task-2 (open)",
+    );
+    // A lease issued after the mark is not running work either.
+    flagged(
+        vec![opened("task-1"), claimed("task-1"), marked("task-1"), work("lease-1", "task-1"), opened("task-2")],
+        "task-2 (open)",
+    );
+    quiet(vec![opened("task-1"), claimed("task-1"), marked("task-1"), work("lease-1", "task-1")]);
+    // Other tasks' leases still run.
+    quiet(vec![
+        opened("task-1"),
+        claimed("task-1"),
+        marked("task-1"),
+        opened("task-2"),
+        claimed("task-2"),
+        work("lease-2", "task-2"),
+    ]);
+}
+
+#[test]
+fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
+    let mut ports = given(vec![opened("task-1")], Vec::new());
+    let (reply, events) = call(&mut ports, &["role", "task-1", "critic"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
-    assert!(matches!(events[1], Event::Leased { role: LeaseRole::Critic, .. }), "{events:?}");
-    let (_, events) = call(&mut ports, &["claim", "task-2", "--agent", "alice", "--deadline", "5"], "");
-    assert!(matches!(events[1], Event::Leased { role: LeaseRole::Worker, .. }), "{events:?}");
-    let line = serde_json::to_string(&events[1]).unwrap();
-    assert!(!line.contains("role"), "{line}");
-    let (reply, _) = call(&mut ports, &["status"], "");
-    assert!(reply.text.contains("idle (flagged)\n  (none)\n"), "{}", reply.text);
-    let bad = Call::parse(&command(&["claim", "task-1", "--agent", "a", "--role", "boss"]), String::new);
+    assert_eq!(events, vec![marked("task-1")]);
+    let line = serde_json::to_string(&events[0]).unwrap();
+    assert_eq!(line, r#"{"event":"TaskRole","task":1,"role":"critic"}"#);
+    let (again, events) = call(&mut ports, &["role", "task-1", "critic"], "");
+    assert!(again.code == Code::Refused && events.is_empty(), "{}", again.text);
+    let (unknown, events) = call(&mut ports, &["role", "task-9", "critic"], "");
+    assert!(unknown.code == Code::Refused && events.is_empty(), "{}", unknown.text);
+    let bad = Call::parse(&command(&["role", "task-1", "boss"]), String::new);
     assert!(bad.is_err());
+    let old_flag = Call::parse(&command(&["claim", "task-1", "--agent", "a", "--role", "critic"]), String::new);
+    assert!(old_flag.is_err());
 }

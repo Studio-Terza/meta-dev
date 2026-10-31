@@ -2,8 +2,9 @@ use crate::escape::Logged;
 use crate::event::{Attempt, Event, Record, Route};
 use crate::ids::{EscapeId, LeaseId, PrNumber, PredictionId, RunCount, TaskId, Timestamp};
 use crate::latch::Latch;
-use crate::lease::{Deadline, Lease, LeaseRole, LeaseSlot, Purpose};
+use crate::lease::{Deadline, Lease, LeaseSlot, Purpose};
 use crate::predictions::Measure;
+use crate::role::Role;
 use crate::task::{Linked, Progress, Task};
 use crate::waiting::Waiting;
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,6 +25,8 @@ pub struct Ledger {
     pub(crate) waiting: BTreeMap<TaskId, Waiting>,
     pub(crate) starts_denied: usize,
     pub(crate) self_claims: usize,
+    /// Tasks marked critic: long-running by design, so never stalled and never running work.
+    pub(crate) critics: BTreeSet<TaskId>,
     /// Each prediction's falsifying measures, latched at their first time.
     pub(crate) falsified: BTreeMap<(PredictionId, Measure), Latch>,
 }
@@ -64,10 +67,13 @@ impl Ledger {
                 self.tasks.insert(*task, claimed);
                 self.self_claims += usize::from(agent.is_lead());
             }
-            Event::Leased { lease, task, agent, deadline, role } => {
+            Event::TaskRole { task, role: Role::Critic } => {
+                self.tasks.get(task).ok_or_else(|| format!("{task} marked critic while unknown"))?;
+                self.critics.insert(*task);
+            }
+            Event::Leased { lease, task, agent, deadline } => {
                 self.tasks.get(task).ok_or_else(|| format!("{lease} leased for unknown {task}"))?;
-                let deadline = Deadline::of(*deadline);
-                self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, *role, at, deadline))?;
+                self.issue(Lease::issue(*lease, *task, agent.clone(), Purpose::Work, at, Deadline::of(*deadline)))?;
             }
             Event::ReviewLeased { lease, task, agent, pr, head, deadline } => {
                 match self.tasks.get(task) {
@@ -75,8 +81,7 @@ impl Ledger {
                     _ => Err(format!("{lease} leased to review {pr}, which {task} does not link")),
                 }?;
                 let purpose = Purpose::Review { pr: *pr, head: head.clone() };
-                let deadline = Deadline::of(*deadline);
-                self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, LeaseRole::Worker, at, deadline))?;
+                self.issue(Lease::issue(*lease, *task, agent.clone(), purpose, at, Deadline::of(*deadline)))?;
             }
             Event::Reviewed { lease, verdict } => match self.leases.get_mut(lease) {
                 Some(LeaseSlot::Spent(spent)) => spent.judge(*verdict)?,
@@ -140,8 +145,8 @@ impl Ledger {
                 self.waiting.remove(task);
                 self.tasks.insert(*task, Progress::Done(done));
             }
-            Event::Escaped { kind, reason, pr, checked } => {
-                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked));
+            Event::Escaped { kind, reason, pr, checked, imported } => {
+                self.escapes.push(Logged::new(kind.clone(), reason.clone(), *pr, *checked, *imported));
             }
             Event::Resolved { escape, task } => {
                 match self.tasks.get(task) {

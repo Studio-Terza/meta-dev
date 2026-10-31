@@ -6,7 +6,7 @@
 #![allow(clippy::disallowed_methods)]
 
 use crate::PortError;
-use meta_core::{Record, UnverifiedEscapes};
+use meta_core::{Record, SideLine, UnverifiedEscapes};
 use std::path::Path;
 
 pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError> {
@@ -24,14 +24,19 @@ pub(super) fn records(path: &Path, text: &str) -> Result<Vec<Record>, PortError>
         .collect()
 }
 
-/// Each line of `bytes`; a blank line is no line at all.
+/// Each line of `bytes` as written, with the escape it holds when it can be read; a blank line is
+/// no line at all.
+pub(super) fn side_lines(bytes: &[u8]) -> Vec<SideLine> {
+    bytes
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .map(|line| SideLine::new(line.to_vec(), serde_json::from_slice(line).ok()))
+        .collect()
+}
+
+/// What the side file holds, each line that cannot be read only counted.
 pub(super) fn lenient(bytes: &[u8]) -> UnverifiedEscapes {
-    UnverifiedEscapes::of(
-        bytes
-            .split(|byte| *byte == b'\n')
-            .filter(|line| !line.is_empty())
-            .map(|line| serde_json::from_slice(line).ok()),
-    )
+    UnverifiedEscapes::of(side_lines(bytes).iter().map(|line| line.escape().cloned()))
 }
 
 #[cfg(test)]

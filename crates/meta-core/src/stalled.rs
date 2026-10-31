@@ -1,5 +1,5 @@
-use crate::ids::{LeaseId, TaskId, Timestamp, Verdict};
-use crate::lease::{LeaseRole, LeaseSlot, Purpose};
+use crate::ids::{LeaseId, Timestamp, Verdict};
+use crate::lease::{LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::task::{Linked, Progress, Task};
 
@@ -10,7 +10,7 @@ impl Ledger {
         let stalled: Vec<String> = self
             .tasks
             .iter()
-            .filter(|(task, _)| !self.waiting.contains_key(task) && !self.criticised(**task))
+            .filter(|(task, _)| !self.waiting.contains_key(task) && !self.critics.contains(task))
             .filter_map(|(task, progress)| self.stall(progress, at).map(|why| format!("{task} ({why})")))
             .collect();
         match (self.leases.iter().any(|(id, slot)| self.runs(*id, slot, at)), stalled.is_empty()) {
@@ -63,20 +63,15 @@ impl Ledger {
         })
     }
 
-    /// Whether the critic holds a lease on the task: the task is the critic's, not stalled work.
-    fn criticised(&self, task: TaskId) -> bool {
-        self.leases.values().any(|slot| slot.lease().task() == task && slot.lease().role() == LeaseRole::Critic)
-    }
-
     /// Running work at `at`: a worker's work lease with a deadline not yet passed, on a task an agent is working (open or claimed),
     /// or on a linked task whose pinned head failed review before the lease was issued. A task that
     /// waits on the owner is paused, so its lease is not running. A lease past its deadline is not
     /// running: the agent was to report or stop by then, and nothing records that it finished sooner.
-    /// The critic's lease never counts.
+    /// A lease on a critic task never counts.
     fn runs(&self, id: LeaseId, slot: &LeaseSlot, at: Timestamp) -> bool {
         let lease = slot.lease();
         let working = *lease.purpose() == Purpose::Work
-            && lease.role() == LeaseRole::Worker
+            && !self.critics.contains(&lease.task())
             && slot.deadline().time().is_some()
             && !slot.deadline().passed(at)
             && !self.waiting.contains_key(&lease.task());

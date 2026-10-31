@@ -1,8 +1,6 @@
 use crate::event::Event;
-use crate::ids::{AgentId, AgentName, LeaseId, Malformed, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
-use serde::{Deserialize, Serialize};
+use crate::ids::{AgentId, AgentName, LeaseId, PrNumber, Sha, Span, TaskId, Timestamp, Verdict};
 use std::fmt;
-use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct Lease {
@@ -11,38 +9,8 @@ pub struct Lease {
     /// Who the lease is for; leases from before briefs could be reprinted have none.
     agent: Option<AgentName>,
     purpose: Purpose,
-    role: LeaseRole,
     issued: Timestamp,
     deadline: Deadline,
-}
-
-/// What the agent on a work lease is: a worker, or the critic. The critic's lease and task are
-/// long-running by design, so they never count as running work and the critic's task is never
-/// stalled. Recorded in the log with the lease; leases from before roles are workers.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LeaseRole {
-    #[default]
-    Worker,
-    Critic,
-}
-
-impl LeaseRole {
-    pub(crate) fn is_worker(&self) -> bool {
-        *self == Self::Worker
-    }
-}
-
-impl FromStr for LeaseRole {
-    type Err = Malformed;
-
-    fn from_str(text: &str) -> Result<Self, Malformed> {
-        match text {
-            "worker" => Ok(Self::Worker),
-            "critic" => Ok(Self::Critic),
-            other => Err(Malformed::because(format!("{other:?} is not a role; the roles are worker and critic"))),
-        }
-    }
 }
 
 /// When the agent on a lease must report or stop; leases from before deadlines have none.
@@ -110,11 +78,10 @@ impl Lease {
         task: TaskId,
         agent: Option<AgentName>,
         purpose: Purpose,
-        role: LeaseRole,
         issued: Timestamp,
         deadline: Deadline,
     ) -> Self {
-        Self { id, task, agent, purpose, role, issued, deadline }
+        Self { id, task, agent, purpose, issued, deadline }
     }
 
     /// The same allowance as this lease's, counted from `start` instead of from its issue.
@@ -136,10 +103,6 @@ impl Lease {
 
     pub(crate) fn purpose(&self) -> &Purpose {
         &self.purpose
-    }
-
-    pub(crate) fn role(&self) -> LeaseRole {
-        self.role
     }
 
     pub(crate) fn spend(self) -> (Spent, Event) {

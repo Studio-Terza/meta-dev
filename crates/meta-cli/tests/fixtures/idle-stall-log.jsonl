@@ -1,15 +1,302 @@
-{"at":1793388000,"event":"Opened","task":14,"title":"Critic: review the loop"}
-{"at":1793388001,"event":"Claimed","task":14,"agent":"claude-critic"}
-{"at":1793388002,"event":"Leased","lease":1,"task":14,"agent":"claude-critic","deadline":1793474400,"role":"critic"}
-{"at":1793388003,"event":"LeaseUsed","lease":1}
-{"at":1793388004,"event":"Started","lease":1,"agent":"a1b2c3d4e5f60718","deadline":1793474400}
-{"at":1793400000,"event":"Opened","task":20,"title":"Fix the idle alarm"}
-{"at":1793400001,"event":"Claimed","task":20,"agent":"claude-t20"}
-{"at":1793400002,"event":"Leased","lease":2,"task":20,"agent":"claude-t20","deadline":1793405402}
-{"at":1793400003,"event":"LeaseUsed","lease":2}
-{"at":1793400004,"event":"Started","lease":2,"agent":"0f1e2d3c4b5a6978","deadline":1793405404}
-{"at":1793400100,"event":"Opened","task":21,"title":"Retire the hand-made stack"}
-{"at":1793400101,"event":"Claimed","task":21,"agent":"claude-t21"}
-{"at":1793400102,"event":"Leased","lease":3,"task":21,"agent":"claude-t21","deadline":1793405502}
-{"at":1793400200,"event":"Opened","task":30,"title":"Open and unworked"}
-{"at":1793400300,"event":"Opened","task":31,"title":"Also open and unworked"}
+{"at":1793390514,"event":"Denied","attempt":"Merge"}
+{"at":1793390514,"event":"Denied","attempt":"AgentStart"}
+{"at":1793390520,"event":"Escaped","reason":"reason"}
+{"at":1793390520,"event":"Escaped","reason":"reason"}
+{"at":1793390520,"event":"Escaped","reason":"reason"}
+{"at":1793390520,"event":"Escaped","reason":"reason"}
+{"at":1793390520,"event":"Escaped","reason":"reason"}
+{"at":1793390526,"event":"Denied","attempt":"Merge"}
+{"at":1793390531,"event":"Opened","task":1,"title":"Task 1"}
+{"at":1793390533,"event":"Claimed","task":1,"agent":"claude-lead"}
+{"at":1793390533,"event":"Leased","lease":1,"task":1}
+{"at":1793390550,"event":"Linked","task":1,"pr":3,"pin":"0dddf59ced988b64961ac8ef23d9045fdc529b08"}
+{"at":1793390587,"event":"Merged","pr":3,"head":"0dddf59ced988b64961ac8ef23d9045fdc529b08","runs":1,"route":"Meta"}
+{"at":1793390587,"event":"Done","task":1}
+{"at":1793390920,"event":"Opened","task":2,"title":"Task 2"}
+{"at":1793390920,"event":"Claimed","task":2,"agent":"claude-lead"}
+{"at":1793390920,"event":"Leased","lease":2,"task":2}
+{"at":1793390937,"event":"Linked","task":2,"pr":4,"pin":"3abe32eb52ec42193877c0af3c970bff523e3218"}
+{"at":1793392662,"event":"Denied","attempt":"Merge"}
+{"at":1793392669,"event":"Linked","task":2,"pr":4,"pin":"f4412e5523fa6f3d1ed3e845a095dd1ab4a58d2e"}
+{"at":1793392833,"event":"Merged","pr":4,"head":"f4412e5523fa6f3d1ed3e845a095dd1ab4a58d2e","runs":2,"route":"Meta"}
+{"at":1793392833,"event":"Done","task":2}
+{"at":1793393224,"event":"Denied","attempt":"AgentStart"}
+{"at":1793393229,"event":"Denied","attempt":"AgentStart"}
+{"at":1793393232,"event":"Opened","task":3,"title":"Task 3"}
+{"at":1793394192,"event":"Opened","task":4,"title":"Task 4"}
+{"at":1793394529,"event":"Opened","task":5,"title":"Task 5"}
+{"at":1793394529,"event":"Escaped","reason":"reason"}
+{"at":1793394670,"event":"Claimed","task":5,"agent":"claude-hookcut"}
+{"at":1793394670,"event":"Leased","lease":3,"task":5}
+{"at":1793394671,"event":"Claimed","task":4,"agent":"claude-strlint"}
+{"at":1793394671,"event":"Leased","lease":4,"task":4}
+{"at":1793394684,"event":"LeaseUsed","lease":3}
+{"at":1793394694,"event":"LeaseUsed","lease":4}
+{"at":1793394822,"event":"Linked","task":5,"pr":5,"pin":"6cb817ef7d16611d08a14e1a5bdcc3303b05cfe0"}
+{"at":1793394835,"event":"Opened","task":6,"title":"Task 6"}
+{"at":1793394835,"event":"Claimed","task":6,"agent":"claude-rev5"}
+{"at":1793394835,"event":"Leased","lease":5,"task":6}
+{"at":1793394835,"event":"Escaped","reason":"reason"}
+{"at":1793394841,"event":"LeaseUsed","lease":5}
+{"at":1793394841,"event":"Linked","task":4,"pr":6,"pin":"24ebdbd5657cef247e8551d95f0f9e2428e1f702"}
+{"at":1793394865,"event":"Escaped","reason":"reason"}
+{"at":1793394865,"event":"Opened","task":7,"title":"Task 7"}
+{"at":1793394865,"event":"Opened","task":8,"title":"Task 8"}
+{"at":1793394888,"event":"Merged","pr":5,"head":"6cb817ef7d16611d08a14e1a5bdcc3303b05cfe0","runs":1,"route":"Meta"}
+{"at":1793394888,"event":"Done","task":5}
+{"at":1793394895,"event":"Opened","task":9,"title":"Task 9"}
+{"at":1793394904,"event":"Escaped","reason":"reason"}
+{"at":1793394904,"event":"Leased","lease":6,"task":4}
+{"at":1793394904,"event":"Claimed","task":9,"agent":"claude-recon"}
+{"at":1793394904,"event":"Leased","lease":7,"task":9}
+{"at":1793394912,"event":"LeaseUsed","lease":6}
+{"at":1793394919,"event":"LeaseUsed","lease":7}
+{"at":1793394995,"event":"Linked","task":9,"pr":7,"pin":"61825a49840a1e99bfcbfd7d6a085bbf4efea46a"}
+{"at":1793395024,"event":"Merged","pr":7,"head":"61825a49840a1e99bfcbfd7d6a085bbf4efea46a","runs":1,"route":"Meta"}
+{"at":1793395024,"event":"Done","task":9}
+{"at":1793395068,"event":"Linked","task":4,"pr":6,"pin":"24e350a74bbd2800e61b7ccb55c05f3ba2073f79"}
+{"at":1793395084,"event":"Linked","task":4,"pr":6,"pin":"12a180494e772343cf5f9bb5626583ee10c09ded"}
+{"at":1793395111,"event":"Opened","task":10,"title":"Task 10"}
+{"at":1793395111,"event":"Claimed","task":10,"agent":"claude-rev6"}
+{"at":1793395111,"event":"Leased","lease":8,"task":10}
+{"at":1793395111,"event":"Opened","task":11,"title":"Task 11"}
+{"at":1793395111,"event":"Opened","task":12,"title":"Task 12"}
+{"at":1793395118,"event":"LeaseUsed","lease":8}
+{"at":1793395236,"event":"Leased","lease":9,"task":4}
+{"at":1793395252,"event":"LeaseUsed","lease":9}
+{"at":1793395772,"event":"Linked","task":4,"pr":6,"pin":"e7e89de39ae3437a70ccbdee5c23c797318201fe"}
+{"at":1793395794,"event":"Opened","task":13,"title":"Task 13"}
+{"at":1793395794,"event":"Claimed","task":13,"agent":"claude-rev6b"}
+{"at":1793395794,"event":"Leased","lease":10,"task":13}
+{"at":1793395802,"event":"LeaseUsed","lease":10}
+{"at":1793396204,"event":"Opened","task":14,"title":"Task 14"}
+{"at":1793396204,"event":"Opened","task":15,"title":"Task 15"}
+{"at":1793396204,"event":"Opened","task":16,"title":"Task 16"}
+{"at":1793396204,"event":"Claimed","task":14,"agent":"claude-critic"}
+{"at":1793396204,"event":"Leased","lease":11,"task":14}
+{"at":1793396218,"event":"LeaseUsed","lease":11}
+{"at":1793396225,"event":"Leased","lease":12,"task":4}
+{"at":1793396225,"event":"Claimed","task":15,"agent":"claude-strlint4"}
+{"at":1793396225,"event":"Leased","lease":13,"task":15}
+{"at":1793396239,"event":"LeaseUsed","lease":12}
+{"at":1793396356,"event":"Linked","task":15,"pr":8,"pin":"f278ef778071cfb45f1bac7ec59813de54c8c78e"}
+{"at":1793396530,"event":"Linked","task":4,"pr":6,"pin":"60b2ced43901c50b9a3de6a9d1b2570847a4d575"}
+{"at":1793396531,"event":"Linked","task":15,"pr":8,"pin":"f278ef778071cfb45f1bac7ec59813de54c8c78e"}
+{"at":1793396571,"event":"Merged","pr":8,"head":"f278ef778071cfb45f1bac7ec59813de54c8c78e","runs":1,"route":"Meta"}
+{"at":1793396571,"event":"Done","task":15}
+{"at":1793396583,"event":"Leased","lease":14,"task":4}
+{"at":1793396589,"event":"LeaseUsed","lease":14}
+{"at":1793396603,"event":"Escaped","reason":"reason"}
+{"at":1793396603,"event":"Opened","task":17,"title":"Task 17"}
+{"at":1793396603,"event":"Claimed","task":17,"agent":"claude-lead"}
+{"at":1793396603,"event":"Leased","lease":15,"task":17}
+{"at":1793396620,"event":"Linked","task":4,"pr":6,"pin":"c9e5465a2c2019d839026be06e307f59e1c84000"}
+{"at":1793396625,"event":"Linked","task":17,"pr":15,"pin":"79e309bfba03a948e3a4a9a9d28d4051a7199ca4"}
+{"at":1793396664,"event":"Merged","pr":6,"head":"c9e5465a2c2019d839026be06e307f59e1c84000","runs":8,"route":"Meta"}
+{"at":1793396664,"event":"Done","task":4}
+{"at":1793397454,"event":"Linked","task":17,"pr":15,"pin":"79e309bfba03a948e3a4a9a9d28d4051a7199ca4"}
+{"at":1793397459,"event":"Linked","task":17,"pr":15,"pin":"f12ea0f55f7944cdde69d485405d43a7acfff948"}
+{"at":1793398211,"event":"Linked","task":17,"pr":15,"pin":"10ca199827d5eb213caf072a951614aaeabc1210"}
+{"at":1793398283,"event":"Opened","task":18,"title":"Task 18"}
+{"at":1793398295,"event":"Opened","task":19,"title":"Task 19"}
+{"at":1793398303,"event":"Linked","task":17,"pr":15,"pin":"e02b5474db94e56789945487a3bde02cde50918c"}
+{"at":1793398336,"event":"Merged","pr":15,"head":"e02b5474db94e56789945487a3bde02cde50918c","runs":4,"route":"Meta"}
+{"at":1793398336,"event":"Done","task":17}
+{"at":1793398346,"event":"Claimed","task":18,"agent":"claude-stage1"}
+{"at":1793398346,"event":"Leased","lease":16,"task":18}
+{"at":1793398354,"event":"LeaseUsed","lease":16}
+{"at":1793399000,"event":"Linked","task":18,"pr":16,"pin":"0faba58fc3ada5ec53b217cfedc7c61af7865c5d"}
+{"at":1793399037,"event":"Opened","task":20,"title":"Task 20"}
+{"at":1793399037,"event":"Claimed","task":20,"agent":"claude-rev16"}
+{"at":1793399037,"event":"Leased","lease":17,"task":20}
+{"at":1793399055,"event":"Opened","task":21,"title":"Task 21"}
+{"at":1793399062,"event":"LeaseUsed","lease":17}
+{"at":1793399275,"event":"Leased","lease":18,"task":18}
+{"at":1793399290,"event":"LeaseUsed","lease":18}
+{"at":1793399526,"event":"Opened","task":22,"title":"Task 22"}
+{"at":1793400029,"event":"Linked","task":18,"pr":16,"pin":"844be67f08572bcbe9660b8149c9f76812c0f5c3"}
+{"at":1793400056,"event":"Opened","task":23,"title":"Task 23"}
+{"at":1793400056,"event":"Claimed","task":23,"agent":"claude-rev16b"}
+{"at":1793400056,"event":"Leased","lease":19,"task":23}
+{"at":1793400064,"event":"LeaseUsed","lease":19}
+{"at":1793400297,"event":"Merged","pr":16,"head":"844be67f08572bcbe9660b8149c9f76812c0f5c3","runs":3,"route":"Meta"}
+{"at":1793400297,"event":"Done","task":18}
+{"at":1793400317,"event":"Retired","task":6,"reason":"reason"}
+{"at":1793400317,"event":"Retired","task":10,"reason":"reason"}
+{"at":1793400317,"event":"Retired","task":13,"reason":"reason"}
+{"at":1793400317,"event":"Retired","task":20,"reason":"reason"}
+{"at":1793400317,"event":"Retired","task":23,"reason":"reason"}
+{"at":1793400317,"event":"Retired","task":3,"reason":"reason"}
+{"at":1793400317,"event":"Deferred","task":22,"reason":"reason"}
+{"at":1793400317,"event":"Deferred","task":16,"reason":"reason"}
+{"at":1793400327,"event":"Opened","task":24,"title":"Task 24"}
+{"at":1793400331,"event":"Claimed","task":24,"agent":"claude-s1follow"}
+{"at":1793400331,"event":"Leased","lease":20,"task":24}
+{"at":1793400339,"event":"LeaseUsed","lease":20}
+{"at":1793400339,"event":"Started","lease":20,"agent":"ab35ca572817b92fd"}
+{"at":1793400548,"event":"Linked","task":24,"pr":18,"pin":"52b524eaeda1b4455c6947689cb0e35f3784f881"}
+{"at":1793400558,"event":"Linked","task":24,"pr":18,"pin":"19325c7ab8194e0bb2c0f569ad45e80941cbaa66"}
+{"at":1793400589,"event":"Escaped","kind":"broken-log","reason":"reason"}
+{"at":1793400589,"event":"Opened","task":25,"title":"Task 25"}
+{"at":1793400592,"event":"ReviewLeased","lease":21,"task":24,"pr":18,"head":"19325c7ab8194e0bb2c0f569ad45e80941cbaa66"}
+{"at":1793400601,"event":"LeaseUsed","lease":21}
+{"at":1793400601,"event":"Started","lease":21,"agent":"a35e7599e07351592"}
+{"at":1793400654,"event":"Reviewed","lease":21,"verdict":"pass"}
+{"at":1793400654,"event":"Merged","pr":18,"head":"19325c7ab8194e0bb2c0f569ad45e80941cbaa66","runs":2,"route":"Meta"}
+{"at":1793400654,"event":"Done","task":24}
+{"at":1793400662,"event":"Falsified","prediction":"P1","measure":"unrecorded_bypasses","observed":"unrecorded bypasses 1"}
+{"at":1793400662,"event":"Falsified","prediction":"P2","measure":"open_escapes","observed":"open escapes 11"}
+{"at":1793400666,"event":"Escaped","kind":"outside-merge","reason":"reason","pr":1}
+{"at":1793400676,"event":"Resolved","escape":1,"task":1}
+{"at":1793400676,"event":"Resolved","escape":2,"task":1}
+{"at":1793400676,"event":"Resolved","escape":3,"task":1}
+{"at":1793400676,"event":"Resolved","escape":4,"task":1}
+{"at":1793400676,"event":"Resolved","escape":12,"task":1}
+{"at":1793400676,"event":"Resolved","escape":5,"task":5}
+{"at":1793400676,"event":"Resolved","escape":6,"task":18}
+{"at":1793400676,"event":"Resolved","escape":7,"task":18}
+{"at":1793400676,"event":"Resolved","escape":8,"task":18}
+{"at":1793400676,"event":"Resolved","escape":9,"task":18}
+{"at":1793400676,"event":"Resolved","escape":10,"task":18}
+{"at":1793400742,"event":"Claimed","task":25,"agent":"claude-logguard"}
+{"at":1793400742,"event":"Leased","lease":22,"task":25}
+{"at":1793400743,"event":"Claimed","task":11,"agent":"claude-linkpin"}
+{"at":1793400743,"event":"Leased","lease":23,"task":11}
+{"at":1793400753,"event":"LeaseUsed","lease":22}
+{"at":1793400753,"event":"Started","lease":22,"agent":"ac517edd37c9a6c7a"}
+{"at":1793400760,"event":"LeaseUsed","lease":23}
+{"at":1793400760,"event":"Started","lease":23,"agent":"ab3ef6d8dd76dd0b4"}
+{"at":1793400775,"event":"Opened","task":26,"title":"Task 26"}
+{"at":1793400775,"event":"Claimed","task":26,"agent":"claude-history"}
+{"at":1793400775,"event":"Leased","lease":24,"task":26}
+{"at":1793400784,"event":"LeaseUsed","lease":24}
+{"at":1793400784,"event":"Started","lease":24,"agent":"a2f1c9490930cf8e0"}
+{"at":1793400879,"event":"Linked","task":11,"pr":19,"pin":"61e178b0f14fa91f684a74ecee2e09b31cd64aaa"}
+{"at":1793400884,"event":"Linked","task":26,"pr":20,"pin":"352b529b16e3b0e09a6232403931f8ce1466164a"}
+{"at":1793400895,"event":"ReviewLeased","lease":25,"task":11,"pr":19,"head":"61e178b0f14fa91f684a74ecee2e09b31cd64aaa"}
+{"at":1793400896,"event":"Opened","task":27,"title":"Task 27"}
+{"at":1793400900,"event":"ReviewLeased","lease":26,"task":26,"pr":20,"head":"352b529b16e3b0e09a6232403931f8ce1466164a"}
+{"at":1793400904,"event":"LeaseUsed","lease":25}
+{"at":1793400904,"event":"Started","lease":25,"agent":"a0fa4f1482e7c178a"}
+{"at":1793400908,"event":"LeaseUsed","lease":26}
+{"at":1793400908,"event":"Started","lease":26,"agent":"a910c2c7f2215c3be"}
+{"at":1793400954,"event":"Reviewed","lease":25,"verdict":"pass"}
+{"at":1793400955,"event":"Merged","pr":19,"head":"61e178b0f14fa91f684a74ecee2e09b31cd64aaa","runs":1,"route":"Meta"}
+{"at":1793400955,"event":"Done","task":11}
+{"at":1793400959,"event":"Opened","task":28,"title":"Task 28"}
+{"at":1793400965,"event":"Reviewed","lease":26,"verdict":"pass"}
+{"at":1793400998,"event":"Linked","task":26,"pr":20,"pin":"fe36f99e2b69a4f6a53185eaf68211c28b0ffa40"}
+{"at":1793401031,"event":"Merged","pr":20,"head":"fe36f99e2b69a4f6a53185eaf68211c28b0ffa40","runs":2,"route":"Meta"}
+{"at":1793401031,"event":"Done","task":26}
+{"at":1793401057,"event":"Corrected","escape":1,"reason":"reason"}
+{"at":1793401057,"event":"Corrected","escape":2,"reason":"reason"}
+{"at":1793401057,"event":"Corrected","escape":3,"reason":"reason"}
+{"at":1793401057,"event":"Corrected","escape":4,"reason":"reason"}
+{"at":1793401057,"event":"Corrected","escape":12,"reason":"reason"}
+{"at":1793401057,"event":"Corrected","escape":5,"reason":"reason"}
+{"at":1793401231,"event":"Opened","task":29,"title":"Task 29"}
+{"at":1793401231,"event":"Claimed","task":29,"agent":"claude-p2hist"}
+{"at":1793401231,"event":"Leased","lease":27,"task":29}
+{"at":1793401238,"event":"LeaseUsed","lease":27}
+{"at":1793401238,"event":"Started","lease":27,"agent":"af0ed6c1d0f990f64"}
+{"at":1793402784,"event":"Linked","task":29,"pr":22,"pin":"3aaa6dc784aef4296691acb3fc7b75b53743062f"}
+{"at":1793402799,"event":"ReviewLeased","lease":28,"task":29,"pr":22,"head":"3aaa6dc784aef4296691acb3fc7b75b53743062f"}
+{"at":1793402803,"event":"LeaseUsed","lease":28}
+{"at":1793402803,"event":"Started","lease":28,"agent":"a441d5dbe15202622"}
+{"at":1793402836,"event":"Reviewed","lease":28,"verdict":"pass"}
+{"at":1793402836,"event":"Merged","pr":22,"head":"3aaa6dc784aef4296691acb3fc7b75b53743062f","runs":2,"route":"Meta"}
+{"at":1793402836,"event":"Done","task":29}
+{"at":1793402901,"event":"Opened","task":30,"title":"Task 30"}
+{"at":1793402901,"event":"Claimed","task":30,"agent":"claude-deadline"}
+{"at":1793402901,"event":"Leased","lease":29,"task":30}
+{"at":1793402911,"event":"LeaseUsed","lease":29}
+{"at":1793402911,"event":"Started","lease":29,"agent":"aaa59faede929613c"}
+{"at":1793402929,"event":"Linked","task":25,"pr":21,"pin":"d6ea3b10f822004762b748052870170221095e55"}
+{"at":1793402964,"event":"ReviewLeased","lease":30,"task":25,"pr":21,"head":"d6ea3b10f822004762b748052870170221095e55"}
+{"at":1793402971,"event":"LeaseUsed","lease":30}
+{"at":1793402971,"event":"Started","lease":30,"agent":"ad25b290dbbe20b00"}
+{"at":1793403168,"event":"Reviewed","lease":30,"verdict":"fail"}
+{"at":1793403168,"event":"Leased","lease":31,"task":25}
+{"at":1793403178,"event":"LeaseUsed","lease":31}
+{"at":1793403178,"event":"Started","lease":31,"agent":"addc07542717c6377"}
+{"at":1793403249,"event":"Linked","task":30,"pr":23,"pin":"171d0d482fdaf28a4625a17d982c87530a6bdd67"}
+{"at":1793403272,"event":"ReviewLeased","lease":32,"task":30,"pr":23,"head":"171d0d482fdaf28a4625a17d982c87530a6bdd67"}
+{"at":1793403276,"event":"LeaseUsed","lease":32}
+{"at":1793403276,"event":"Started","lease":32,"agent":"ac0c9f5d350ffbc0e"}
+{"at":1793403335,"event":"Reviewed","lease":32,"verdict":"pass"}
+{"at":1793403336,"event":"Merged","pr":23,"head":"171d0d482fdaf28a4625a17d982c87530a6bdd67","runs":2,"route":"Meta"}
+{"at":1793403336,"event":"Done","task":30}
+{"at":1793404215,"event":"Linked","task":25,"pr":21,"pin":"2662a586345f80d31acc339060f42a85f3e44e0c"}
+{"at":1793404263,"event":"ReviewLeased","lease":33,"task":25,"pr":21,"head":"2662a586345f80d31acc339060f42a85f3e44e0c","deadline":1793406063}
+{"at":1793404269,"event":"LeaseUsed","lease":33}
+{"at":1793404269,"event":"Started","lease":33,"agent":"a2f7877675d91f997","deadline":1793406069}
+{"at":1793404498,"event":"Reviewed","lease":33,"verdict":"fail"}
+{"at":1793404498,"event":"Leased","lease":34,"task":25,"deadline":1793409898}
+{"at":1793404510,"event":"LeaseUsed","lease":34}
+{"at":1793404510,"event":"Started","lease":34,"agent":"af065012a834d33e7","deadline":1793409910}
+{"at":1793404990,"event":"Linked","task":25,"pr":21,"pin":"a0ddce6b57590e81f78f31d7777ea3e466ba85f9"}
+{"at":1793405016,"event":"ReviewLeased","lease":35,"task":25,"pr":21,"head":"a0ddce6b57590e81f78f31d7777ea3e466ba85f9","deadline":1793406816}
+{"at":1793405022,"event":"LeaseUsed","lease":35}
+{"at":1793405022,"event":"Started","lease":35,"agent":"a74e32895e58367b9","deadline":1793406822}
+{"at":1793407143,"event":"Leased","lease":36,"task":14,"deadline":1793421543}
+{"at":1793407152,"event":"LeaseUsed","lease":36}
+{"at":1793407152,"event":"Started","lease":36,"agent":"a29e0ad96ce3ef787","deadline":1793421552}
+{"at":1793407631,"event":"Reviewed","lease":35,"verdict":"fail"}
+{"at":1793412834,"event":"Claimed","task":19,"agent":"claude-mergebehind"}
+{"at":1793412834,"event":"Leased","lease":37,"task":19,"deadline":1793418234}
+{"at":1793412835,"event":"Claimed","task":28,"agent":"claude-mergebehind"}
+{"at":1793412835,"event":"Leased","lease":38,"task":28,"deadline":1793418235}
+{"at":1793412835,"event":"Opened","task":31,"title":"Task 31"}
+{"at":1793412843,"event":"LeaseUsed","lease":37}
+{"at":1793412843,"event":"Started","lease":37,"agent":"ae042d3ada9135091","deadline":1793418243}
+{"at":1793412845,"event":"Claimed","task":31,"agent":"claude-p1starts"}
+{"at":1793412845,"event":"Leased","lease":39,"task":31,"deadline":1793418245}
+{"at":1793412853,"event":"LeaseUsed","lease":39}
+{"at":1793412853,"event":"Started","lease":39,"agent":"a84d92ef9017dcbcf","deadline":1793418253}
+{"at":1793413017,"event":"Linked","task":19,"pr":26,"pin":"c2a8d59595121ec0a66f04fecf5eb85f78fc0e32"}
+{"at":1793413108,"event":"Linked","task":28,"pr":27,"pin":"976939e93888ccd3f9c3bfecd219d01b2ae76771"}
+{"at":1793413125,"event":"ReviewLeased","lease":40,"task":19,"pr":26,"head":"c2a8d59595121ec0a66f04fecf5eb85f78fc0e32","deadline":1793414925}
+{"at":1793413126,"event":"ReviewLeased","lease":41,"task":28,"pr":27,"head":"976939e93888ccd3f9c3bfecd219d01b2ae76771","deadline":1793414926}
+{"at":1793413132,"event":"LeaseUsed","lease":40}
+{"at":1793413132,"event":"Started","lease":40,"agent":"a2e9d2eb963325154","deadline":1793414932}
+{"at":1793413135,"event":"LeaseUsed","lease":41}
+{"at":1793413135,"event":"Started","lease":41,"agent":"a269344192d8e7145","deadline":1793414935}
+{"at":1793413158,"event":"Reviewed","lease":40,"verdict":"pass"}
+{"at":1793413159,"event":"Merged","pr":26,"head":"c2a8d59595121ec0a66f04fecf5eb85f78fc0e32","runs":2,"route":"Meta"}
+{"at":1793413159,"event":"Done","task":19}
+{"at":1793413174,"event":"Reviewed","lease":41,"verdict":"fail"}
+{"at":1793413179,"event":"Denied","attempt":"AgentStart"}
+{"at":1793413191,"event":"LeaseUsed","lease":38}
+{"at":1793413191,"event":"Started","lease":38,"agent":"a4ff33ebd4af9e503","deadline":1793418591}
+{"at":1793413438,"event":"Linked","task":28,"pr":27,"pin":"5060ea335b98886f1e787636152cd21cd48b60a8"}
+{"at":1793413440,"event":"ReviewLeased","lease":42,"task":28,"pr":27,"head":"5060ea335b98886f1e787636152cd21cd48b60a8","deadline":1793415240}
+{"at":1793413447,"event":"LeaseUsed","lease":42}
+{"at":1793413447,"event":"Started","lease":42,"agent":"af18162ba56584c27","deadline":1793415247}
+{"at":1793413508,"event":"Reviewed","lease":42,"verdict":"pass"}
+{"at":1793413509,"event":"Merged","pr":27,"head":"5060ea335b98886f1e787636152cd21cd48b60a8","runs":4,"route":"Meta"}
+{"at":1793413509,"event":"Done","task":28}
+{"at":1793413517,"event":"Opened","task":32,"title":"Task 32"}
+{"at":1793413714,"event":"Linked","task":31,"pr":28,"pin":"c850868b70f72f44c021bc6902944ce9ce73d507"}
+{"at":1793413729,"event":"ReviewLeased","lease":43,"task":31,"pr":28,"head":"c850868b70f72f44c021bc6902944ce9ce73d507","deadline":1793415529}
+{"at":1793413734,"event":"LeaseUsed","lease":43}
+{"at":1793413734,"event":"Started","lease":43,"agent":"a5f29414505276eba","deadline":1793415534}
+{"at":1793413771,"event":"Reviewed","lease":43,"verdict":"pass"}
+{"at":1793413777,"event":"Linked","task":31,"pr":28,"pin":"0d6afe4bc0eab04af959ebf18dd7b95d485f84c4"}
+{"at":1793413826,"event":"Merged","pr":28,"head":"0d6afe4bc0eab04af959ebf18dd7b95d485f84c4","runs":3,"route":"Meta"}
+{"at":1793413826,"event":"Done","task":31}
+{"at":1793415606,"event":"Claimed","task":32,"agent":"claude-testkit"}
+{"at":1793415606,"event":"Leased","lease":44,"task":32,"deadline":1793421006}
+{"at":1793415614,"event":"LeaseUsed","lease":44}
+{"at":1793415614,"event":"Started","lease":44,"agent":"a9487d2203c771958","deadline":1793421014}
+{"at":1793415765,"event":"Linked","task":32,"pr":29,"pin":"e57b2dc191a4836f9053f93480f2852a4657363e"}
+{"at":1793415767,"event":"ReviewLeased","lease":45,"task":32,"pr":29,"head":"e57b2dc191a4836f9053f93480f2852a4657363e","deadline":1793417567}
+{"at":1793415770,"event":"LeaseUsed","lease":45}
+{"at":1793415770,"event":"Started","lease":45,"agent":"a84b7be879966e424","deadline":1793417570}
+{"at":1793415816,"event":"Reviewed","lease":45,"verdict":"fail"}
+{"at":1793415816,"event":"Leased","lease":46,"task":32,"deadline":1793421216}
+{"at":1793415822,"event":"LeaseUsed","lease":46}
+{"at":1793415822,"event":"Started","lease":46,"agent":"af15205da507cc70d","deadline":1793421222}
+{"at":1793415956,"event":"Linked","task":32,"pr":29,"pin":"5077b26dcf377077b4850bbd946830e2ae2d588b"}
+{"at":1793415988,"event":"Merged","pr":29,"head":"5077b26dcf377077b4850bbd946830e2ae2d588b","runs":3,"route":"Meta"}
+{"at":1793415988,"event":"Done","task":32}
+{"at":1793417189,"event":"TaskRole","task":14,"role":"critic"}
