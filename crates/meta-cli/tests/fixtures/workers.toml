@@ -1,3 +1,7 @@
+[claude]
+floor = "2.1.314"
+source = "failure: a recorded floor"
+
 [concurrency]
 running = 4
 source = "owner 2026-10-30: at most 4 workers at once"
@@ -7,7 +11,7 @@ tool = "Read"
 source = "owner 2026-10-30: an explicit allowlist"
 
 [[review.allow]]
-tool = "Bash"
+tool = "Grep"
 source = "owner 2026-10-30: an explicit allowlist"
 
 [[review.deny]]

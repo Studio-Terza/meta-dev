@@ -238,6 +238,14 @@ impl LeaseSlot {
         }
     }
 
+    /// The transcript of the headless worker on this lease, as a status line ends with it.
+    pub(crate) fn transcript_note(&self) -> String {
+        match self {
+            Self::Spent(Spent { worker: Some(run), .. }) => format!(", transcript {}", run.transcript),
+            _ => String::new(),
+        }
+    }
+
     /// Whether a headless worker ever started on this lease.
     pub(crate) fn is_worker(&self) -> bool {
         matches!(self, Self::Spent(Spent { worker: Some(_), .. }))

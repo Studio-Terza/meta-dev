@@ -1,8 +1,12 @@
 use crate::brief::Reissue;
 use crate::event::Event;
-use crate::ids::{AgentId, Binary, ExitStatus, LeaseId, Origin, ProcessGroup, Reason, Timestamp, ToolRule, Transcript};
+use crate::ids::{
+    AgentId, Binary, ClaudeVersion, ExitStatus, LeaseId, Origin, PrNumber, ProcessGroup, Reason, Sha, Timestamp,
+    ToolRule, Transcript, Verdict,
+};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
+use crate::pull::Pull;
 use crate::reply::{Accepted, Refusal};
 use crate::rules::Rules;
 use crate::spec::{SelfFile, Unreadable};
@@ -13,8 +17,18 @@ use std::fmt;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Workers {
+    claude: Floor,
     concurrency: Concurrency,
     review: Tools,
+}
+
+/// The oldest `claude` a worker may run on.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Floor {
+    floor: ClaudeVersion,
+    #[allow(dead_code)]
+    source: Reason,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +57,18 @@ struct Tool {
 impl Workers {
     pub fn parse(text: &str) -> Result<Self, Unreadable> {
         SelfFile::Workers.parse(text)
+    }
+
+    /// Refused when `installed` is below the floor, for the flags that confine a session may be
+    /// missing from it.
+    pub fn admit(&self, installed: ClaudeVersion) -> Result<(), Refusal> {
+        let floor = self.claude.floor;
+        match installed < floor {
+            true => Err(Refusal::because(format!(
+                "claude {installed} is below the floor {floor} in self/workers.toml. Next: update claude, then start the worker again."
+            ))),
+            false => Ok(()),
+        }
     }
 }
 
@@ -97,6 +123,102 @@ impl fmt::Display for WorkerEnd {
     }
 }
 
+impl WorkerEnd {
+    /// Why this end leaves no verdict; only a session that exited cleanly gave one.
+    pub fn no_verdict(self) -> Option<NoVerdict> {
+        match self {
+            Self::Exited(status) if status.is_success() => None,
+            other => Some(NoVerdict(format!("the worker {other}"))),
+        }
+    }
+}
+
+/// The change as meta read it from GitHub, for the session's scratch directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReviewCopy {
+    pub view: String,
+    pub diff: String,
+}
+
+impl ReviewCopy {
+    /// The file that holds `gh pr view`.
+    pub const VIEW: &str = "pr-view.json";
+    /// The file that holds `gh pr diff`.
+    pub const DIFF: &str = "pr.diff";
+}
+
+/// What a review session must end with (`--json-schema`).
+const VERDICT_SCHEMA: &str = r#"{"type":"object","properties":{"verdict":{"enum":["pass","fail"]},"findings":{"type":"array","items":{"type":"string"}}},"required":["verdict","findings"],"additionalProperties":false}"#;
+
+/// Why a session left no verdict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoVerdict(String);
+
+impl NoVerdict {
+    pub fn because(why: impl ToString) -> Self {
+        Self(why.to_string())
+    }
+}
+
+impl fmt::Display for NoVerdict {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+/// The session's structured output, as `VERDICT_SCHEMA` shapes it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionVerdict {
+    verdict: Verdict,
+    findings: Vec<String>,
+}
+
+/// Any line of a transcript that is a JSON object naming its type.
+#[derive(Deserialize)]
+struct TranscriptEvent {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+/// The last event of a `stream-json` run (Claude Code docs, headless, structured output).
+#[derive(Deserialize)]
+struct SessionResult {
+    subtype: String,
+    is_error: bool,
+    structured_output: Option<SessionVerdict>,
+}
+
+impl SessionVerdict {
+    const RESULT: &str = "result";
+    const SUCCESS: &str = "success";
+
+    /// The verdict in the transcript's last result event. A line that is not an event is stepped
+    /// over: stderr shares the transcript. Anything but a successful result with a valid
+    /// structured output is no verdict.
+    pub fn from_transcript(lines: &[String]) -> Result<Self, NoVerdict> {
+        let is_result = |line: &&String| {
+            serde_json::from_str::<TranscriptEvent>(line).is_ok_and(|event| event.kind == Self::RESULT)
+        };
+        let line = lines.iter().rev().find(is_result);
+        let line = line.ok_or_else(|| NoVerdict::because("the transcript holds no result"))?;
+        let result: SessionResult = serde_json::from_str(line)
+            .map_err(|error| NoVerdict(format!("the result is not a valid verdict: {error}")))?;
+        match (result.is_error, result.subtype.as_str(), result.structured_output) {
+            (false, Self::SUCCESS, Some(verdict)) => Ok(verdict),
+            (false, Self::SUCCESS, None) => Err(NoVerdict::because("the result has no structured output")),
+            (_, subtype, _) => Err(NoVerdict(format!("the session failed: {subtype}"))),
+        }
+    }
+
+    pub fn verdict(&self) -> Verdict {
+        self.verdict
+    }
+}
+
+/// What a finished session leaves: its verdict and the PR as GitHub reports it now, or why none.
+pub type Judged = Result<(SessionVerdict, Pull), NoVerdict>;
+
 /// One headless session to start, and the supervisor that watches it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkerPlan {
@@ -105,6 +227,7 @@ pub struct WorkerPlan {
     prompt: String,
     tools: String,
     denied: String,
+    copy: ReviewCopy,
     repository: Origin,
     binary: Binary,
 }
@@ -114,7 +237,13 @@ impl WorkerPlan {
         &self.id
     }
 
-    /// The repository `gh` reads from the worker's scratch directory, which is no clone (`GH_REPO`).
+    /// What meta fetched for the session to read.
+    pub fn copy(&self) -> &ReviewCopy {
+        &self.copy
+    }
+
+    /// The repository the supervisor asks GitHub about from the worker's directory, which is no
+    /// clone (`GH_REPO`).
     pub fn repository(&self) -> &Origin {
         &self.repository
     }
@@ -132,12 +261,16 @@ impl WorkerPlan {
         [
             "-p",
             self.prompt.as_str(),
+            "--restricted",
             "--tools",
             tools,
             "--allowedTools",
             tools,
             "--disallowedTools",
             self.denied.as_str(),
+            "--json-schema",
+            VERDICT_SCHEMA,
+            "--no-session-persistence",
             "--permission-mode",
             "dontAsk",
             "--permission-prompts",
@@ -167,6 +300,8 @@ pub struct Starting {
     lease: LeaseId,
     reissue: Reissue,
     deadline: Timestamp,
+    pr: PrNumber,
+    head: Sha,
     running: Vec<LeaseId>,
 }
 
@@ -179,9 +314,14 @@ pub struct Planned {
 }
 
 impl Starting {
-    /// The plan of this worker; refused when `workers`' limit of running workers is reached.
-    pub fn plan(self, workers: &Workers, origin: &Origin, binary: &Binary, rules: &Rules) -> Result<Planned, Refusal> {
-        let Self { lease, reissue, deadline, running } = self;
+    /// The PR the worker will review, to fetch for it.
+    pub fn pr(&self) -> PrNumber {
+        self.pr
+    }
+
+    /// Refused when `workers`' limit of running workers is reached.
+    pub fn within_limit(&self, workers: &Workers) -> Result<(), Refusal> {
+        let running = &self.running;
         let cap = workers.concurrency.running;
         if running.len() >= cap {
             let holders: Vec<String> = running.iter().map(ToString::to_string).collect();
@@ -192,13 +332,42 @@ impl Starting {
                 cap
             )));
         }
-        let (_, prompt) = reissue.brief(origin, binary, rules).into_parts();
+        Ok(())
+    }
+
+    /// Refused unless `pull`, read after the copy, stands at the head the lease reviews: a copy
+    /// fetched at any other head is not the change this lease judges.
+    pub fn at_head(&self, pull: &Pull) -> Result<(), Refusal> {
+        let Self { lease, pr, head, .. } = self;
+        match pull.is_at(head) {
+            true => Ok(()),
+            false => Err(Refusal::because(format!(
+                "{pr} is at head {}, but {lease} reviews head {head}. Next: meta review <task> --agent <name> issues a lease for the current head.",
+                pull.head()
+            ))),
+        }
+    }
+
+    /// The plan of this worker, with the change fetched for it.
+    pub fn plan(
+        self,
+        workers: &Workers,
+        copy: ReviewCopy,
+        origin: &Origin,
+        binary: &Binary,
+        rules: &Rules,
+    ) -> Result<Planned, Refusal> {
+        self.within_limit(workers)?;
+        let Self { lease, reissue, deadline, pr, head, .. } = self;
+        let id = AgentId::worker(lease);
+        let prompt = reissue.worker_brief(&id, pr, &head, Deadline::of(Some(deadline)), rules);
         let plan = WorkerPlan {
             lease,
-            id: AgentId::worker(lease),
+            id,
             prompt,
             tools: Tools::rules(&workers.review.allow),
             denied: Tools::rules(&workers.review.deny),
+            copy,
             repository: origin.clone(),
             binary: binary.clone(),
         };
@@ -233,6 +402,8 @@ pub struct Worker {
     agent: AgentId,
     run: WorkerRun,
     deadline: Deadline,
+    pr: PrNumber,
+    head: Sha,
 }
 
 /// What `meta worker wait` finds on its lease.
@@ -252,6 +423,15 @@ impl Worker {
         &self.run
     }
 
+    pub fn pr(&self) -> PrNumber {
+        self.pr
+    }
+
+    /// The head the worker reviewed.
+    pub fn head(&self) -> &Sha {
+        &self.head
+    }
+
     /// Whether the worker's deadline has passed at `now`. A task waiting on the owner does not
     /// hold it back: a running session never goes without a deadline.
     pub fn is_past_deadline(&self, now: Timestamp) -> bool {
@@ -263,6 +443,11 @@ impl Worker {
         let Self { lease, agent, .. } = self;
         Accepted::new(vec![Event::Finished { lease, end: Some(end) }], format!("{lease}: worker {agent} {end}\n"))
     }
+
+    /// The lease, for what a supervisor reports.
+    pub fn lease(&self) -> LeaseId {
+        self.lease
+    }
 }
 
 impl Ledger {
@@ -272,11 +457,11 @@ impl Ledger {
         let reissue = self.reissue(lease)?;
         let slot = self.leases.get(&lease).map(LeaseSlot::lease);
         let unused = slot.ok_or_else(|| Refusal::because(format!("{lease} is unknown. Next: meta status.")))?;
-        if *unused.purpose() == Purpose::Work {
+        let Purpose::Review { pr, head } = unused.purpose().clone() else {
             return Err(Refusal::because(format!(
                 "{lease} is a work lease; a worker runs only a review lease for now. Next: start the agent with its lease."
             )));
-        }
+        };
         let deadline = unused.deadline_from(at);
         let time = deadline.time().ok_or_else(|| {
             Refusal::because(format!(
@@ -284,7 +469,7 @@ impl Ledger {
             ))
         })?;
         let running = self.running_workers().into_iter().map(|worker| worker.lease).collect();
-        Ok(Starting { lease, reissue: reissue.deadline(deadline), deadline: time, running })
+        Ok(Starting { lease, reissue, deadline: time, pr, head, running })
     }
 
     /// The workers whose end is not recorded, whatever became of their tasks.
@@ -295,7 +480,28 @@ impl Ledger {
     fn running_worker(lease: LeaseId, slot: &LeaseSlot) -> Option<Worker> {
         let run = slot.running_worker()?.clone();
         let agent = slot.agent()?.clone();
-        Some(Worker { lease, agent, run, deadline: slot.deadline() })
+        let Purpose::Review { pr, head } = slot.lease().purpose().clone() else { return None };
+        Some(Worker { lease, agent, run, deadline: slot.deadline(), pr, head })
+    }
+
+    /// The record of `worker`'s end, with the verdict its session left on the head it judged. With
+    /// none, the status report says so (`unjudged`) and this says why, for the supervisor's log.
+    pub fn worker_ended(&self, worker: Worker, end: WorkerEnd, judged: Judged) -> Accepted {
+        let lease = worker.lease;
+        let (finished, line) = worker.ended(end).into_parts();
+        let reviewed = judged.and_then(|(session, pull)| {
+            let (events, text) =
+                self.verdict_of(lease, session.verdict, &pull).map_err(NoVerdict::because)?.into_parts();
+            Ok((events, text, session.findings))
+        });
+        match reviewed {
+            Ok((mut events, text, findings)) => {
+                events.extend(finished);
+                let findings: String = findings.iter().map(|finding| format!("  {finding}\n")).collect();
+                Accepted::new(events, format!("{line}{text}{findings}"))
+            }
+            Err(why) => Accepted::new(finished, format!("{line}{lease}: review finished with no verdict: {why}\n")),
+        }
     }
 
     /// The worker on `lease`, for its supervisor.
@@ -324,7 +530,7 @@ impl Ledger {
 
 #[cfg(test)]
 mod tests {
-    use super::Workers;
+    use super::{ClaudeVersion, NoVerdict, SessionVerdict, VERDICT_SCHEMA, Verdict, WorkerEnd, Workers};
 
     const REPO: &str = include_str!("../../../self/workers.toml");
 
@@ -332,15 +538,100 @@ mod tests {
     fn the_repo_gives_reviewers_four_tools_denies_spawning_and_runs_at_most_4_workers() {
         let workers = Workers::parse(REPO).unwrap();
         assert_eq!(workers.concurrency.running, 4);
-        assert_eq!(super::Tools::rules(&workers.review.allow), "Read,Grep,Glob,Bash");
-        assert_eq!(super::Tools::rules(&workers.review.deny), "Agent,Task,Bash(claude *),mcp__*");
+        assert_eq!(super::Tools::rules(&workers.review.allow), "Read,Grep,Glob");
+        assert_eq!(super::Tools::rules(&workers.review.deny), "Agent,Task,Bash,mcp__*");
+    }
+
+    const CLAUDE: &str = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n";
+
+    #[test]
+    fn the_floor_admits_its_own_version_and_newer_and_compares_numbers_not_text() {
+        let workers = Workers::parse(REPO).unwrap();
+        let admits = |version: &str| workers.admit(version.parse().unwrap()).is_ok();
+        assert!(admits("2.1.314") && admits("2.1.1000") && admits("2.2.0") && admits("10.0.0"));
+        assert!(!admits("2.1.313") && !admits("2.0.999") && !admits("1.9.999"));
+        let refusal = workers.admit("2.1.99".parse().unwrap()).unwrap_err().to_string();
+        assert!(refusal.contains("claude 2.1.99 is below the floor 2.1.314 in self/workers.toml"), "{refusal}");
+    }
+
+    #[test]
+    fn a_version_reply_parses_by_its_first_word_and_anything_else_is_malformed() {
+        assert_eq!(ClaudeVersion::from_reply("2.1.314 (Claude Code)\n"), "2.1.314".parse());
+        let bad = ["", "\n", "claude 2.1.314", "2.1", "2.1.3.4", "2.1.x", "2.1.+3", "2.1.03", "-2.1.3"];
+        assert!(bad.iter().all(|reply| ClaudeVersion::from_reply(reply).is_err()), "{bad:?}");
+    }
+
+    #[test]
+    fn workers_without_a_floor_do_not_parse() {
+        let rest = "[concurrency]\nrunning = 4\nsource = \"s\"\n[review]\nallow = []\ndeny = []\n";
+        assert!(Workers::parse(rest).is_err());
+        assert!(Workers::parse(&format!("{CLAUDE}{rest}")).is_ok());
+        assert!(Workers::parse(&format!("[claude]\nfloor = \"new\"\nsource = \"s\"\n{rest}")).is_err());
+        assert!(Workers::parse(&format!("[claude]\nfloor = \"2.1.314\"\n{rest}")).is_err());
+    }
+
+    /// A result event as a real run wrote it (the probe of these flags), cut to what is read.
+    fn result(subtype: &str, is_error: bool, output: &str) -> String {
+        format!(
+            r#"{{"type":"result","subtype":"{subtype}","is_error":{is_error},"num_turns":5,"result":"{{}}","structured_output":{output}}}"#
+        )
+    }
+
+    fn output(verdict: &str) -> String {
+        format!(r#"{{"verdict":"{verdict}","findings":["a.txt:1 reads hello"]}}"#)
+    }
+
+    fn read(lines: &[&str]) -> Result<SessionVerdict, NoVerdict> {
+        SessionVerdict::from_transcript(&lines.iter().map(ToString::to_string).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn the_verdict_is_the_last_result_event_and_stderr_among_the_lines_does_not_matter() {
+        let (pass, fail) = (result("success", false, &output("pass")), result("success", false, &output("fail")));
+        let verdict = read(&[r#"{"type":"system","subtype":"init"}"#, "Waiting for background work", &pass, "bye"]);
+        assert_eq!(verdict.unwrap().verdict(), Verdict::Pass);
+        assert_eq!(read(&[&pass, &fail]).unwrap().verdict(), Verdict::Fail);
+    }
+
+    #[test]
+    fn anything_but_a_successful_result_with_a_valid_structured_output_is_no_verdict() {
+        let pass = output("pass");
+        let cases: [(String, &str); 8] = [
+            ("{\"type\":\"assistant\"}".to_owned(), "holds no result"),
+            ("{\"type\":\"res".to_owned(), "holds no result"),
+            (result("success", true, &pass), "the session failed: success"),
+            (result("error_max_turns", false, &pass), "the session failed: error_max_turns"),
+            (r#"{"type":"result","subtype":"success","is_error":false}"#.to_owned(), "no structured output"),
+            (result("success", false, &output("maybe")), "not a valid verdict"),
+            (result("success", false, r#"{"verdict":"pass"}"#), "not a valid verdict"),
+            (result("success", false, r#"{"verdict":"pass","findings":[],"extra":1}"#), "not a valid verdict"),
+        ];
+        for (line, said) in cases {
+            let why = read(&[&line]).unwrap_err().to_string();
+            assert!(why.contains(said), "{line}: {why}");
+        }
+    }
+
+    #[test]
+    fn only_a_clean_exit_can_leave_a_verdict() {
+        use crate::ids::ExitStatus;
+        assert_eq!(WorkerEnd::Exited(ExitStatus::of(0)).no_verdict(), None);
+        let ends = [WorkerEnd::Exited(ExitStatus::of(1)), WorkerEnd::Vanished, WorkerEnd::Deadline, WorkerEnd::Stopped];
+        assert!(ends.iter().all(|end| end.no_verdict().is_some()));
+    }
+
+    #[test]
+    fn the_verdict_schema_is_json_that_names_the_fields_a_verdict_parses_from() {
+        let schema: serde_json::Value = serde_json::from_str(VERDICT_SCHEMA).unwrap();
+        assert_eq!(schema["required"], serde_json::json!(["verdict", "findings"]));
+        assert_eq!(schema["properties"]["verdict"]["enum"], serde_json::json!(["pass", "fail"]));
     }
 
     #[test]
     fn a_tool_or_limit_with_no_source_does_not_parse() {
-        let limit = "[concurrency]\nrunning = 4\n[review]\nallow = []\ndeny = []\n";
-        let tool = "[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
-        let empty = "[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\nsource = \" \"\n[review]\ndeny = []\n";
-        assert!([limit, tool, empty].iter().all(|text| Workers::parse(text).is_err()));
+        let limit = format!("{CLAUDE}[concurrency]\nrunning = 4\n[review]\nallow = []\ndeny = []\n");
+        let tool = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
+        let empty = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\nsource = \" \"\n[review]\ndeny = []\n";
+        assert!([limit.as_str(), tool, empty].iter().all(|text| Workers::parse(text).is_err()));
     }
 }

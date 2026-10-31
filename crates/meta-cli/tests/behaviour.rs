@@ -6,7 +6,7 @@ use meta_core::{
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub, RecordedSessions};
 use meta_ports::real::JsonlLog;
-use meta_ports::{Clock, GhReplies, Log, PortError, Ports, Sessions};
+use meta_ports::{Clock, GhReplies, Listed, Log, PortError, Ports, Sessions};
 use meta_testkit::Scratch;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
@@ -178,6 +178,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
             updated: Vec::new(),
             listed: Some(Ok("[]".to_owned())),
             open: Some(Ok("[]".to_owned())),
+            broken_copy: None,
         },
         clock: FakeClock::at(Timestamp::from_unix_seconds(2)),
         sessions: RecordedSessions::default(),
@@ -3429,6 +3430,16 @@ fn review_task(number: u64) -> Vec<Event> {
     ]
 }
 
+/// Ports over `events` whose PRs 1 to 5 all stand open at the pinned head.
+fn ready(events: Vec<Event>) -> Memory {
+    given(events, ["1", "2", "3", "4", "5"].map(|pr| (pr, pull(PINNED, &[Outcome::Green]))).to_vec())
+}
+
+/// `ready`, on the marked log.
+fn ready_on_marked_log(events: Vec<Event>, build: Build) -> Memory {
+    Ports { github: ready(Vec::new()).github, ..on_marked_log(events, build) }
+}
+
 /// `review_task(number)` with a worker running on its review lease.
 fn worker_task(number: u64) -> Vec<Event> {
     let lease = 2 * number;
@@ -3443,7 +3454,7 @@ fn worker_task(number: u64) -> Vec<Event> {
 
 #[test]
 fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_the_brief_and_allowlist() {
-    let mut ports = given(review_task(1), Vec::new());
+    let mut ports = ready(review_task(1));
     let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     let transcript = "/recorded/workers/worker-2/transcript.jsonl";
@@ -3471,13 +3482,24 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
     let (brief, flags) = (&args[1], &args[2..]);
     assert!(brief.contains("review: #1 for task-1: "), "{brief}");
     assert!(brief.contains(&format!("deadline: unix {WORKER_DEADLINE}, report or stop by then")), "{brief}");
+    assert!(brief.contains(&format!("#1 at head {PINNED}")) && brief.contains("pr-view.json"), "{brief}");
+    assert!(brief.contains("pr.diff") && brief.contains("structured output"), "{brief}");
+    assert!(!brief.contains("gh pr diff 1") && !brief.contains(BINARY) && !brief.contains("meta verdict"), "{brief}");
+    assert_eq!(plan.copy().view, "recorded view of #1");
+    assert_eq!(plan.copy().diff, "recorded diff of #1");
+    let schema = flags[8].as_str();
+    assert_eq!(serde_json::from_str::<serde_json::Value>(schema).unwrap()["required"][0], "verdict");
     let expected = [
+        "--restricted",
         "--tools",
-        "Read,Bash",
+        "Read,Grep",
         "--allowedTools",
-        "Read,Bash",
+        "Read,Grep",
         "--disallowedTools",
         "Agent",
+        "--json-schema",
+        schema,
+        "--no-session-persistence",
         "--permission-mode",
         "dontAsk",
         "--permission-prompts",
@@ -3532,7 +3554,7 @@ fn worker_start_is_refused_without_a_session_for_a_lease_no_worker_may_use() {
 #[test]
 fn worker_start_is_refused_at_the_limit_of_running_workers_until_one_ends() {
     let running = [worker_task(1), worker_task(2), worker_task(3), worker_task(4)].concat();
-    let mut full = given([running.clone(), review_task(5)].concat(), Vec::new());
+    let mut full = ready([running.clone(), review_task(5)].concat());
     let (reply, added) = call(&mut full, &["worker", "start", "lease-10"], "");
     assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
     assert!(
@@ -3543,7 +3565,7 @@ fn worker_start_is_refused_at_the_limit_of_running_workers_until_one_ends() {
     assert!(reply.text.contains("meta stop <lease>"), "{}", reply.text);
     assert!(full.sessions.started.is_empty());
     let ended = Event::Finished { lease: id("lease-4"), end: Some(WorkerEnd::Exited(ExitStatus::of(0))) };
-    let mut freed = given([running, vec![ended], review_task(5)].concat(), Vec::new());
+    let mut freed = ready([running, vec![ended], review_task(5)].concat());
     assert_eq!(call(&mut freed, &["worker", "start", "lease-10"], "").0.code, Code::Done);
 }
 
@@ -3551,38 +3573,38 @@ fn worker_start_is_refused_at_the_limit_of_running_workers_until_one_ends() {
 fn a_worker_that_gave_its_verdict_counts_towards_the_limit_until_its_session_ends() {
     let verdict = Event::Reviewed { lease: id("lease-2"), verdict: id("pass"), head: Some(id(PINNED)) };
     let events = [worker_task(1), vec![verdict], worker_task(2), worker_task(3), worker_task(4), review_task(5)];
-    let mut ports = given(events.concat(), Vec::new());
+    let mut ports = ready(events.concat());
     assert_eq!(call(&mut ports, &["worker", "start", "lease-10"], "").0.code, Code::Refused);
 }
 
 #[test]
 fn worker_start_on_the_real_log_runs_a_main_build_only_and_reads_mains_allowlist() {
     for (build, why) in unverified_builds() {
-        let mut ports = Ports { build, ..on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD))) };
+        let mut ports = Ports { build, ..ready_on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD))) };
         let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
         assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
         assert!(ports.sessions.started.is_empty());
     }
-    let mut main = on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
+    let mut main = ready_on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
     main.git.local.insert(SelfFile::Workers, "tampered".to_owned());
     assert_eq!(call(&mut main, &["worker", "start", "lease-2"], "").0.code, Code::Done);
-    assert_eq!(main.sessions.started[0].arguments()[3], "Read,Bash");
+    assert_eq!(main.sessions.started[0].arguments()[4], "Read,Grep");
 }
 
 #[test]
 fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist() {
-    let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..given(review_task(1), Vec::new()) };
-    let tree = "[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
+    let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
+    let tree = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
     ports.git.local.insert(SelfFile::Workers, tree.to_owned());
     ports.git.files.remove(&SelfFile::Workers);
     assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
-    assert_eq!(ports.sessions.started[0].arguments()[3], "Glob");
+    assert_eq!(ports.sessions.started[0].arguments()[4], "Glob");
 }
 
 #[test]
 fn worker_start_with_an_unreadable_allowlist_fails_and_keeps_the_lease() {
-    let mut ports = on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
+    let mut ports = ready_on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
     ports.git.files.remove(&SelfFile::Workers);
     let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
@@ -3595,7 +3617,7 @@ fn worker_start_with_an_unreadable_allowlist_fails_and_keeps_the_lease() {
 
 #[test]
 fn worker_start_that_cannot_start_the_session_records_nothing_so_the_lease_stays_unused() {
-    let mut ports = given(review_task(1), Vec::new());
+    let mut ports = ready(review_task(1));
     ports.sessions.broken_start = Some(PortError::new("no claude here"));
     let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
@@ -3613,9 +3635,208 @@ fn worker_wait_records_the_exit_status_when_the_session_ends() {
         Ok(Session::Ended(Some(ExitStatus::of(0)))),
     ]);
     let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
-    assert_eq!(reply.text, "lease-2: worker worker-2 exited with status 0\n");
+    assert_eq!(
+        reply.text,
+        "lease-2: worker worker-2 exited with status 0\nlease-2: review finished with no verdict: the transcript holds no result\n"
+    );
     assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Exited(ExitStatus::of(0))) }]);
     assert!(ports.sessions.stopped.is_empty());
+}
+
+/// A result event as the probe of these flags recorded it, cut to what meta reads.
+fn result_of(is_error: bool, verdict: &str) -> String {
+    format!(
+        r#"{{"type":"result","subtype":"success","is_error":{is_error},"structured_output":{{"verdict":"{verdict}","findings":["src/a.rs:1 is wrong"]}}}}"#
+    )
+}
+
+fn result_line(verdict: &str) -> String {
+    result_of(false, verdict)
+}
+
+/// A worker on lease-2 that ended cleanly and left `line` as its transcript.
+fn finished_worker(line: String, head: &str) -> Memory {
+    let mut ports = given(worker_task(1), vec![("1", pull(head, &[Outcome::Green]))]);
+    ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(Some(ExitStatus::of(0)))));
+    ports.sessions.transcript = Ok(vec![r#"{"type":"system","subtype":"init"}"#.to_owned(), line]);
+    ports
+}
+
+fn clean_end() -> WorkerEnd {
+    WorkerEnd::Exited(ExitStatus::of(0))
+}
+
+fn reviewed_at_pin(verdict: &str) -> Event {
+    Event::Reviewed { lease: id("lease-2"), verdict: id(verdict), head: Some(id(PINNED)) }
+}
+
+#[test]
+fn worker_wait_records_the_structured_verdict_on_the_reviewed_head_then_the_end() {
+    for verdict in ["pass", "fail"] {
+        let mut ports = finished_worker(result_line(verdict), PINNED);
+        let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+        assert_eq!(
+            events,
+            vec![reviewed_at_pin(verdict), Event::Finished { lease: id("lease-2"), end: Some(clean_end()) }]
+        );
+        assert_eq!(
+            reply.text,
+            format!(
+                "lease-2: worker worker-2 exited with status 0\ntask-1: verdict {verdict} recorded for review lease lease-2 at head {PINNED}\n  src/a.rs:1 is wrong\n"
+            )
+        );
+        let (status, _) = call(&mut ports, &["status"], "");
+        assert!(!status.text.contains("no verdict"), "{}", status.text);
+    }
+}
+
+#[test]
+fn a_verdict_lands_on_the_workers_own_lease_not_on_an_older_review_of_the_task() {
+    let older = [
+        review_task(1)[..4].to_vec(),
+        vec![
+            Event::ReviewLeased {
+                lease: id("lease-3"),
+                task: id("task-1"),
+                agent: None,
+                pr: id("1"),
+                head: id("bbbbbbb"),
+                deadline: None,
+            },
+            used("lease-3"),
+        ],
+    ]
+    .concat();
+    let review = Event::ReviewLeased {
+        lease: id("lease-4"),
+        task: id("task-1"),
+        agent: None,
+        pr: id("1"),
+        head: id(PINNED),
+        deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+    };
+    let started = Event::Started {
+        lease: id("lease-4"),
+        agent: id("worker-4"),
+        deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+        worker: Some(run_of(804, 4)),
+    };
+    let events = [older, vec![review, used("lease-4"), started]].concat();
+    let mut ports = given(events, vec![("1", pull(PINNED, &[Outcome::Green]))]);
+    ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(Some(ExitStatus::of(0)))));
+    ports.sessions.transcript = Ok(vec![result_line("pass")]);
+    let (_, events) = call(&mut ports, &["worker", "wait", "lease-4"], "");
+    assert_eq!(events[0], Event::Reviewed { lease: id("lease-4"), verdict: id("pass"), head: Some(id(PINNED)) });
+}
+
+#[test]
+fn no_valid_structured_verdict_records_no_verdict_and_status_says_review_finished_with_no_verdict() {
+    let no_output = r#"{"type":"result","subtype":"success","is_error":false}"#.to_owned();
+    let errored = result_of(true, "pass");
+    let cases = [
+        (no_output, "no structured output"),
+        (errored, "the session failed"),
+        (result_line("maybe"), "not a valid verdict"),
+    ];
+    for (line, said) in cases {
+        let mut ports = finished_worker(line, PINNED);
+        let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+        assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(clean_end()) }]);
+        assert!(reply.text.contains("lease-2: review finished with no verdict: "), "{}", reply.text);
+        assert!(reply.text.contains(said), "{}", reply.text);
+        let (status, _) = call(&mut ports, &["status"], "");
+        let line = "lease-2 for task-1: review finished with no verdict, transcript /recorded/workers/worker-2/t.jsonl";
+        assert!(status.text.contains(line), "{}", status.text);
+    }
+}
+
+#[test]
+fn a_verdict_on_a_head_that_moved_is_not_recorded() {
+    let mut ports = finished_worker(result_line("pass"), "bbbbbbb");
+    let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(clean_end()) }]);
+    assert!(reply.text.contains("review finished with no verdict: refused: #1 is at head bbbbbbb"), "{}", reply.text);
+}
+
+#[test]
+fn a_session_that_did_not_exit_cleanly_leaves_no_verdict_whatever_its_transcript_says() {
+    let cases = [Ok(Session::Ended(Some(ExitStatus::of(1)))), Ok(Session::Ended(None))];
+    for state in cases {
+        let mut ports = finished_worker(result_line("pass"), PINNED);
+        *ports.sessions.states.borrow_mut() = [state].into();
+        let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+        assert_eq!(events.len(), 1, "{}", reply.text);
+        assert!(reply.text.contains("review finished with no verdict: the worker "), "{}", reply.text);
+    }
+    let mut late = finished_worker(result_line("pass"), PINNED);
+    late.sessions.states.borrow_mut().clear();
+    let (_, events) = call(&mut late, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
+}
+
+#[test]
+fn a_transcript_or_github_that_cannot_be_read_leaves_no_verdict_and_still_records_the_end() {
+    let mut unread = finished_worker(result_line("pass"), PINNED);
+    unread.sessions.transcript = Err(PortError::new("transcript gone"));
+    let (reply, events) = call(&mut unread, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events.len(), 1);
+    assert!(reply.text.contains("no verdict: transcript gone"), "{}", reply.text);
+    let mut offline = finished_worker(result_line("pass"), PINNED);
+    offline.github.replies.clear();
+    let (reply, events) = call(&mut offline, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events.len(), 1);
+    assert!(reply.text.contains("no verdict: no recorded reply for #1"), "{}", reply.text);
+}
+
+#[test]
+fn a_verdict_already_given_on_the_lease_is_not_given_twice() {
+    let events = [worker_task(1), vec![reviewed_at_pin("fail")]].concat();
+    let mut ports = given(events, vec![("1", pull(PINNED, &[Outcome::Green]))]);
+    ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(Some(ExitStatus::of(0)))));
+    ports.sessions.transcript = Ok(vec![result_line("pass")]);
+    let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+    assert_eq!(events.len(), 1);
+    assert!(reply.text.contains("no verdict: refused: lease-2 awaits no verdict"), "{}", reply.text);
+}
+
+#[test]
+fn worker_start_below_the_version_floor_is_refused_and_keeps_the_lease() {
+    let mut ports = ready(review_task(1));
+    ports.sessions.version = Ok("2.1.313 (Claude Code)\n".to_owned());
+    let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("claude 2.1.313 is below the floor 2.1.314"), "{}", reply.text);
+    assert!(ports.sessions.started.is_empty());
+}
+
+#[test]
+fn worker_start_fails_closed_when_the_version_cannot_be_read() {
+    for version in [Ok("no version here".to_owned()), Err(PortError::new("no claude here"))] {
+        let mut ports = ready(review_task(1));
+        ports.sessions.version = version;
+        let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+        assert_eq!((reply.code, added), (Code::Failed, Vec::new()), "{}", reply.text);
+        assert!(ports.sessions.started.is_empty());
+    }
+}
+
+#[test]
+fn worker_start_is_refused_when_the_pr_moved_off_the_leased_head_and_fails_when_github_gives_no_copy() {
+    let mut moved = given(review_task(1), vec![("1", pull("bbbbbbb", &[Outcome::Green]))]);
+    let (reply, added) = call(&mut moved, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
+    assert!(
+        reply.text.contains(&format!("#1 is at head bbbbbbb, but lease-2 reviews head {PINNED}")),
+        "{}",
+        reply.text
+    );
+    assert!(moved.sessions.started.is_empty());
+    let mut offline = ready(review_task(1));
+    offline.github.broken_copy = Some(PortError::new("gh pr diff: HTTP 502"));
+    let (reply, added) = call(&mut offline, &["worker", "start", "lease-2"], "");
+    assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
+    assert_eq!(reply.text, "error: gh pr diff: HTTP 502\n");
+    assert!(offline.sessions.started.is_empty());
 }
 
 #[test]
@@ -3623,7 +3844,7 @@ fn worker_wait_records_a_session_that_vanished_with_no_exit_status() {
     let mut ports = given(worker_task(1), Vec::new());
     ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(None)));
     let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
-    assert_eq!(reply.text, "lease-2: worker worker-2 ended with no exit status\n");
+    assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
     assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Vanished) }]);
 }
 
@@ -3631,7 +3852,7 @@ fn worker_wait_records_a_session_that_vanished_with_no_exit_status() {
 fn worker_wait_kills_the_group_at_the_deadline_and_records_it() {
     let mut ports = given(worker_task(1), Vec::new());
     let (reply, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
-    assert_eq!(reply.text, "lease-2: worker worker-2 was killed at its deadline\n");
+    assert!(reply.text.contains("lease-2: worker worker-2 was killed at its deadline\n"), "{}", reply.text);
     assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
     assert_eq!(ports.sessions.stopped, vec![run_of(802, 2)]);
     assert!(ports.clock.now() > Timestamp::from_unix_seconds(WORKER_DEADLINE));
@@ -3651,8 +3872,17 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
     #[derive(Default)]
     struct Stubborn(RecordedSessions, std::cell::Cell<bool>);
     impl Sessions for Stubborn {
+        fn version(&self) -> Result<String, PortError> {
+            self.0.version()
+        }
         fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
             self.0.start(plan)
+        }
+        fn transcript(&self, run: &WorkerRun) -> Result<Vec<String>, PortError> {
+            self.0.transcript(run)
+        }
+        fn listed(&self) -> Result<Listed, PortError> {
+            self.0.listed()
         }
         fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError> {
             self.0.state(worker, run)
@@ -3667,7 +3897,7 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
     let Ports { log, git, github, clock, build, .. } = given(worker_task(1), Vec::new());
     let mut ports = Ports { log, git, github, clock, sessions: Stubborn::default(), build };
     let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
-    assert_eq!(reply.text, "lease-2: worker worker-2 was killed at its deadline\n");
+    assert!(reply.text.contains("lease-2: worker worker-2 was killed at its deadline\n"), "{}", reply.text);
     assert_eq!(ports.sessions.0.stopped.len(), 1);
 }
 
@@ -3728,7 +3958,7 @@ fn worker_wait_keeps_its_last_look_when_the_log_cannot_be_read_and_stops_when_it
     let mut ports = Ports { log: Flaky(log, 0), git, github, clock, sessions, build };
     ports.sessions.states.borrow_mut().extend([Ok(Session::Running), Ok(Session::Ended(None))]);
     let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
-    assert_eq!(reply.text, "lease-2: worker worker-2 ended with no exit status\n");
+    assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
     let mut broken = given(worker_task(1), Vec::new());
     broken.log.broken = Some(PortError::new("no log"));
     let (reply, _) = call(&mut broken, &["worker", "wait", "lease-2"], "");
@@ -3741,7 +3971,7 @@ fn worker_wait_stops_at_once_when_the_end_is_recorded_and_refuses_a_lease_with_n
     let (reply, added) = call(&mut given(over, Vec::new()), &["worker", "wait", "lease-2"], "");
     assert_eq!((reply.code, added), (Code::Done, Vec::new()));
     assert_eq!(reply.text, "lease-2: the worker's end is already recorded\n");
-    let (reply, added) = call(&mut given(review_task(1), Vec::new()), &["worker", "wait", "lease-2"], "");
+    let (reply, added) = call(&mut ready(review_task(1)), &["worker", "wait", "lease-2"], "");
     assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("lease-2 started no worker"), "{}", reply.text);
 }
@@ -3766,7 +3996,7 @@ fn stop_with_no_lease_kills_every_running_worker_and_says_so_when_there_are_none
     );
     assert_eq!(events.len(), 2);
     assert_eq!(ports.sessions.stopped, vec![run_of(804, 4), run_of(806, 6)]);
-    let (reply, added) = call(&mut given(review_task(1), Vec::new()), &["stop"], "");
+    let (reply, added) = call(&mut ready(review_task(1)), &["stop"], "");
     assert_eq!((reply.code, reply.text.as_str(), added), (Code::Done, "no workers are running\n", Vec::new()));
 }
 
@@ -3800,6 +4030,64 @@ fn stop_that_cannot_kill_a_group_fails_naming_it_and_records_only_the_ones_it_ki
     let (reply, added) = call(&mut ports, &["stop"], "");
     assert_eq!((reply.code, added), (Code::Failed, Vec::new()));
     assert_eq!(reply.text, "error: could not stop worker-2: not permitted\n");
+}
+
+/// The JSONL log at `path` holding a line that does not parse, with recorded ports around it.
+fn on_corrupt_log(path: &std::path::Path) -> Ports<JsonlLog, RecordedGit, RecordedGitHub, FakeClock, RecordedSessions> {
+    std::fs::write(path, "not a record\n").unwrap();
+    let Ports { git, github, clock, sessions, build, .. } = given(Vec::new(), Vec::new());
+    Ports { log: JsonlLog::at(path.to_path_buf()), git, github, clock, sessions, build }
+}
+
+#[test]
+fn stop_on_a_corrupt_log_kills_the_workers_found_without_it_and_says_nothing_was_recorded() {
+    let scratch = Scratch::new("stop-corrupt");
+    let path = scratch.join("log.jsonl");
+    let mut ports = on_corrupt_log(&path);
+    let found = vec![
+        Ok((id("worker-2"), run_of(802, 2))),
+        Err(PortError::new("worker-3/run.json: unreadable")),
+        Ok((id("worker-4"), run_of(804, 4))),
+    ];
+    ports.sessions.listed = Ok(found.clone());
+    let reply = answer(parsed(&["stop"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert_eq!(ports.sessions.stopped, vec![run_of(802, 2), run_of(804, 4)]);
+    assert!(reply.text.contains("killed worker-2, worker-4"), "{}", reply.text);
+    assert!(reply.text.contains("could not stop worker-3/run.json: unreadable"), "{}", reply.text);
+    assert!(reply.text.contains("nothing was recorded"), "{}", reply.text);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "not a record\n");
+    let mut one = on_corrupt_log(&path);
+    one.sessions.listed = Ok(found);
+    answer(parsed(&["stop", "lease-4"]), &mut one);
+    assert_eq!(one.sessions.stopped, vec![run_of(804, 4)]);
+}
+
+#[test]
+fn stop_on_a_log_it_cannot_open_kills_too_and_a_list_that_fails_is_reported() {
+    let mut ports = given(worker_task(1), Vec::new());
+    ports.log.broken = Some(PortError::new("no log"));
+    ports.sessions.listed = Ok(vec![Ok((id("worker-2"), run_of(802, 2)))]);
+    let (reply, _) = call(&mut ports, &["stop"], "");
+    assert_eq!(ports.sessions.stopped, vec![run_of(802, 2)]);
+    assert!(reply.text.contains("no log") && reply.text.contains("killed worker-2"), "{}", reply.text);
+    let scratch = Scratch::new("stop-unlisted");
+    let mut unlisted = on_corrupt_log(&scratch.join("log.jsonl"));
+    unlisted.sessions.listed = Err(PortError::new("no worker directory"));
+    let reply = answer(parsed(&["stop"]), &mut unlisted);
+    assert_eq!(reply.code, Code::Failed);
+    assert!(reply.text.contains("no worker found to kill; could not stop no worker directory"), "{}", reply.text);
+}
+
+#[test]
+fn status_shows_the_transcript_of_an_overdue_worker_too() {
+    let mut ports = given(worker_task(1), Vec::new());
+    ports.clock.pause(Span::of_seconds(WORKER_DEADLINE + 1));
+    let (status, _) = call(&mut ports, &["status"], "");
+    let line = format!(
+        "lease-2 for task-1: agent worker-2, deadline unix {WORKER_DEADLINE}, transcript /recorded/workers/worker-2/t.jsonl"
+    );
+    assert!(status.text.contains(&format!("overdue leases (flagged)\n  {line}")), "{}", status.text);
 }
 
 #[test]

@@ -69,6 +69,30 @@ impl Ledger {
     /// the verdict judged must be the one the lease was issued at.
     pub fn verdict(&self, task: TaskId, verdict: Verdict, now: &Pull) -> Result<Accepted, Refusal> {
         let (lease, pr, head) = self.awaiting_lease(task)?;
+        Self::on_head(task, lease, pr, head, verdict, now)
+    }
+
+    /// Records the verdict of the worker on `lease`, the very lease whose head it judged.
+    pub(crate) fn verdict_of(&self, lease: LeaseId, verdict: Verdict, now: &Pull) -> Result<Accepted, Refusal> {
+        match self.leases.get(&lease) {
+            Some(LeaseSlot::Spent(spent)) if spent.verdict().is_none() => match spent.lease().purpose() {
+                Purpose::Review { pr, head } => {
+                    Self::on_head(spent.lease().task(), lease, *pr, head.clone(), verdict, now)
+                }
+                Purpose::Work => Err(Refusal::because(format!("{lease} is not a review lease."))),
+            },
+            _ => Err(Refusal::because(format!("{lease} awaits no verdict."))),
+        }
+    }
+
+    fn on_head(
+        task: TaskId,
+        lease: LeaseId,
+        pr: PrNumber,
+        head: Sha,
+        verdict: Verdict,
+        now: &Pull,
+    ) -> Result<Accepted, Refusal> {
         match now.is_at(&head) {
             true => {
                 let text = format!("{task}: verdict {verdict} recorded for review lease {lease} at head {head}\n");

@@ -3,13 +3,18 @@
 # source = "owner YYYY-MM-DD: <words>" or "failure: <what happened>"
 # `tool` is a Claude Code tool name or permission rule, as --allowedTools and --disallowedTools take it.
 
+# meta refuses to start a worker on a claude older than this. --restricted, --json-schema and the
+# stream-json result line were probed on this version, so nothing below it is known to hold.
+[claude]
+floor = "2.1.314"
+source = "failure: review of #47: the session's confinement rests on flags a claude too old may not have"
+
 [concurrency]
 running = 4
 source = "owner 2026-10-30: at most 4 workers at once"
 
 # What a reviewer may use: --tools limits the session to these, --allowedTools approves them, and
-# dontAsk denies everything else. Bash is here because the review brief needs gh pr diff and meta
-# verdict. It is not read-only by itself; docs/stage2c.md says what that leaves open.
+# dontAsk denies everything else. No Bash: meta fetches the change and records the verdict itself.
 [[review.allow]]
 tool = "Read"
 source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
@@ -22,10 +27,6 @@ source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
 tool = "Glob"
 source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
 
-[[review.allow]]
-tool = "Bash"
-source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
-
 [[review.deny]]
 tool = "Agent"
 source = "owner 2026-10-30: Agent, Task and starting claude are denied"
@@ -34,10 +35,9 @@ source = "owner 2026-10-30: Agent, Task and starting claude are denied"
 tool = "Task"
 source = "owner 2026-10-30: Agent, Task and starting claude are denied"
 
-# A Bash rule matches the command as written, so this stops the plain form only (Claude Code
-# permissions, Bash rule limits).
+# Starting claude takes a command, and no reviewer runs one.
 [[review.deny]]
-tool = "Bash(claude *)"
+tool = "Bash"
 source = "owner 2026-10-30: Agent, Task and starting claude are denied"
 
 # --tools does not cover MCP tools (Claude Code CLI reference, --tools).

@@ -1,9 +1,10 @@
-use crate::ids::{Binary, LeaseId, Origin, PrNumber, Sha, TaskId, Title};
+use crate::ids::{AgentId, Binary, LeaseId, Origin, PrNumber, Sha, TaskId, Title};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
 use crate::rules::Rules;
 use crate::task::Progress;
+use crate::worker::ReviewCopy;
 
 /// The lease line of a brief for an agent.
 pub(crate) fn lease_line(lease: LeaseId) -> String {
@@ -79,6 +80,37 @@ impl ReviewText<'_> {
     }
 }
 
+/// The brief of a headless worker on a review lease: meta fetches the change and records the
+/// verdict, so it asks for neither `gh` nor `meta verdict`.
+pub(crate) struct WorkerReviewText<'a> {
+    pub(crate) pr: PrNumber,
+    pub(crate) task: TaskId,
+    pub(crate) title: &'a Title,
+    pub(crate) agent: &'a AgentId,
+    pub(crate) deadline_line: &'a str,
+    pub(crate) head: &'a Sha,
+    pub(crate) rules: &'a Rules,
+}
+
+impl WorkerReviewText<'_> {
+    pub(crate) fn text(&self) -> String {
+        let Self { pr, task, title, agent, deadline_line, head, rules } = self;
+        let (view, diff) = (ReviewCopy::VIEW, ReviewCopy::DIFF);
+        format!(
+            "review: {pr} for {task}: {title}\n\
+             agent: {agent}\n\
+             deadline: {deadline_line}\n\
+             goal: find what is wrong with {pr} at head {head}, judged against {task} and the rules below.\n\
+             constraints:\n  \
+             - the change is in this directory, as read at head {head}: {view} holds gh pr view and {diff} holds gh pr diff. \
+             You have Read, Grep and Glob; nothing outside this directory can be read and no command can be run\n  \
+             - give each finding with its file, line and evidence, and a verdict, pass or fail, in the structured output. \
+             meta records that verdict; it reads nothing else you write\n\
+             rules:\n{rules}"
+        )
+    }
+}
+
 /// A brief to print again for a lease that is unused and live.
 #[derive(Debug)]
 pub struct Reissue {
@@ -138,9 +170,18 @@ impl Ledger {
 }
 
 impl Reissue {
-    /// The same brief, stating `deadline` instead of the lease's.
-    pub(crate) fn deadline(self, deadline: Deadline) -> Self {
-        Self { deadline, ..self }
+    /// The brief of the headless worker `agent` on this review, which ends at `deadline`.
+    pub(crate) fn worker_brief(
+        &self,
+        agent: &AgentId,
+        pr: PrNumber,
+        head: &Sha,
+        deadline: Deadline,
+        rules: &Rules,
+    ) -> String {
+        let deadline_line = deadline.brief_line();
+        let (task, title) = (self.task, &self.title);
+        WorkerReviewText { pr, task, title, agent, deadline_line: &deadline_line, head, rules }.text()
     }
 
     /// The brief the lease's own claim or review printed; no event.

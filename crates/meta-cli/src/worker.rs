@@ -1,8 +1,9 @@
-use super::{Answer, Failure, Guard, spec, stamped};
+use super::{Answer, Failure, Guard, pull_at, spec, stamped};
 use meta_core::{
-    Accepted, Build, LeaseId, Ledger, Record, Rules, SelfFile, Session, Span, Timestamp, Watch, WorkerEnd, Workers,
+    Accepted, AgentId, Build, ClaudeVersion, Judged, LeaseId, Ledger, NoVerdict, Record, Rules, SelfFile, Session,
+    SessionVerdict, Span, Timestamp, Watch, Worker, WorkerEnd, Workers,
 };
-use meta_ports::{Clock, Git, Log, PortError, Sessions};
+use meta_ports::{Clock, Git, GitHub, Log, PortError, Sessions};
 
 /// How often a supervisor looks at its worker, and so how late it can be at the deadline.
 const POLL: Span = Span::of_seconds(5);
@@ -20,10 +21,11 @@ fn limits<L: Log, G: Git>(log: &L, git: &G) -> Result<Workers, Failure> {
     }
 }
 
-pub(super) fn start<L: Log, G: Git, S: Sessions>(
+pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
     lease: LeaseId,
     log: &mut L,
     git: &G,
+    github: &H,
     sessions: &mut S,
     build: &Build,
     at: Timestamp,
@@ -35,11 +37,17 @@ pub(super) fn start<L: Log, G: Git, S: Sessions>(
     let place = log.place();
     // Asked before any git or network call, so that a refusal costs nothing.
     let inputs = folded(log.read(), &place).and_then(|ledger| {
-        ledger.worker(lease, at)?;
+        let starting = ledger.worker(lease, at)?;
         let rules = spec(git, SelfFile::Rules, Rules::parse)?;
-        Ok((limits(log, git)?, git.origin()?, git.binary()?, rules))
+        let workers = limits(log, git)?;
+        starting.within_limit(&workers)?;
+        workers.admit(ClaudeVersion::from_reply(&sessions.version()?).map_err(PortError::from)?)?;
+        // The diff is read before the head is checked, so a head that moved meanwhile refuses.
+        let copy = github.review_copy(starting.pr())?;
+        starting.at_head(&github.pull(starting.pr())?)?;
+        Ok((workers, copy, git.origin()?, git.binary()?, rules))
     });
-    let (workers, origin, binary, rules) = match inputs {
+    let (workers, copy, origin, binary, rules) = match inputs {
         Ok(inputs) => inputs,
         Err(failure) => return Answer::failed(failure),
     };
@@ -49,7 +57,7 @@ pub(super) fn start<L: Log, G: Git, S: Sessions>(
         let decided =
             guard.at(now, git, build).map_err(|unverified| Failure::Refused(unverified.into())).and_then(|()| {
                 let ledger = folded(records, &place)?;
-                let planned = ledger.worker(lease, at)?.plan(&workers, &origin, &binary, &rules)?;
+                let planned = ledger.worker(lease, at)?.plan(&workers, copy, &origin, &binary, &rules)?;
                 let run = sessions.start(planned.session())?;
                 Ok(planned.started(run))
             });
@@ -76,10 +84,11 @@ fn settled(outcome: Result<Result<String, Failure>, PortError>) -> Answer {
 /// log is read through its lock, so the first look waits for `start` to record the worker. A read
 /// that fails after that keeps the last look: the deadline holds even on a broken log. When this
 /// process ends for any reason, the session ends with it (`Sessions::start`).
-pub(super) fn wait<L: Log, G: Git, S: Sessions, C: Clock>(
+pub(super) fn wait<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
     lease: LeaseId,
     log: &mut L,
     git: &G,
+    github: &H,
     sessions: &mut S,
     clock: &C,
     build: &Build,
@@ -102,17 +111,35 @@ pub(super) fn wait<L: Log, G: Git, S: Sessions, C: Clock>(
             _ => None,
         };
         if let Some(end) = end {
-            return finish(lease, end, log, git, clock.now(), build);
+            let judged = judged(&worker, end, github, sessions, clock);
+            return finish(lease, (end, judged), log, git, clock.now(), build);
         }
         last = Some(worker);
         clock.pause(POLL);
     }
 }
 
-/// Records the end unless another command got there first: `meta stop` records its own, inside the lock.
+/// What the ended session leaves: the verdict in its transcript, and the PR as GitHub reports it
+/// now, which ties the verdict to the head the worker reviewed. Asked outside the lock.
+fn judged<H: GitHub, S: Sessions, C: Clock>(
+    worker: &Worker,
+    end: WorkerEnd,
+    github: &H,
+    sessions: &S,
+    clock: &C,
+) -> Judged {
+    end.no_verdict().map_or(Ok(()), Err)?;
+    let lines = sessions.transcript(worker.run()).map_err(NoVerdict::because)?;
+    let verdict = SessionVerdict::from_transcript(&lines)?;
+    let pull = pull_at(github, clock, worker.pr(), worker.head()).map_err(NoVerdict::because)?;
+    Ok((verdict, pull))
+}
+
+/// Records the end and any verdict unless another command got there first: `meta stop` records its
+/// own, inside the lock.
 fn finish<L: Log, G: Git>(
     lease: LeaseId,
-    end: WorkerEnd,
+    (end, judged): (WorkerEnd, Judged),
     log: &mut L,
     git: &G,
     at: Timestamp,
@@ -123,8 +150,9 @@ fn finish<L: Log, G: Git>(
     let outcome = log.transact(|now, records| {
         let decided =
             guard.at(now, git, build).map_err(|unverified| Failure::Refused(unverified.into())).and_then(|()| {
-                match folded(records, &place)?.watch(lease)? {
-                    Watch::Running(worker) => Ok(Some(worker.ended(end))),
+                let ledger = folded(records, &place)?;
+                match ledger.watch(lease)? {
+                    Watch::Running(worker) => Ok(Some(ledger.worker_ended(worker, end, judged))),
                     Watch::Over => Ok(None),
                 }
             });
@@ -138,7 +166,8 @@ fn finish<L: Log, G: Git>(
 }
 
 /// The kill switch. Each group ends inside the lock, so that its supervisor finds the end recorded
-/// and not a session that vanished. A build that may not write the log still kills.
+/// and not a session that vanished. A build that may not write the log still kills, and so does a
+/// log that cannot be read: then the workers come from their own directories (`Sessions::listed`).
 pub(super) fn stop<L: Log, G: Git, S: Sessions>(
     lease: Option<LeaseId>,
     log: &mut L,
@@ -150,10 +179,13 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
     let mut guard = Guard::default();
     let place = log.place();
     let outcome = log.transact(|now, records| {
-        let workers = folded(records, &place).and_then(|ledger| Ok(ledger.stopping(lease)?));
-        let workers = match workers {
+        let ledger = match folded(records, &place) {
+            Ok(ledger) => ledger,
+            Err(failure) => return (Vec::new(), Err(stop_listed(lease, sessions, &failure))),
+        };
+        let workers = match ledger.stopping(lease) {
             Ok(workers) => workers,
-            Err(failure) => return (Vec::new(), Err(failure)),
+            Err(refusal) => return (Vec::new(), Err(refusal.into())),
         };
         if workers.is_empty() {
             return (Vec::new(), Ok("no workers are running\n".to_owned()));
@@ -183,5 +215,36 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
         };
         (stamped(events, at), decided)
     });
-    settled(outcome)
+    match outcome {
+        Ok(decided) => settled(Ok(decided)),
+        Err(error) => Answer::failed(stop_listed(lease, sessions, &Failure::from(error))),
+    }
+}
+
+/// Kills the workers found without the log, which cannot record it: the failure says what became
+/// of each, after `why` the log could not be used.
+fn stop_listed<S: Sessions>(lease: Option<LeaseId>, sessions: &mut S, why: &Failure) -> Failure {
+    let wanted = lease.map(AgentId::worker);
+    let mut killed = Vec::new();
+    let mut failed = Vec::new();
+    let listed = sessions.listed().unwrap_or_else(|error| vec![Err(error)]);
+    for entry in listed {
+        match entry {
+            Ok((id, run)) if wanted.as_ref().is_none_or(|wanted| *wanted == id) => match sessions.stop(&run) {
+                Ok(()) => killed.push(id.to_string()),
+                Err(error) => failed.push(format!("{id}: {error}")),
+            },
+            Ok(_) => {}
+            Err(error) => failed.push(error.to_string()),
+        }
+    }
+    let killed = match killed.is_empty() {
+        true => "no worker found to kill".to_owned(),
+        false => format!("killed {}", killed.join(", ")),
+    };
+    let failed = match failed.is_empty() {
+        true => String::new(),
+        false => format!("; could not stop {}", failed.join("; ")),
+    };
+    Failure::Broken(format!("{why}\n{killed}{failed}; nothing was recorded, for the log could not be used"))
 }

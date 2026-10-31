@@ -1,6 +1,6 @@
 use super::command::run;
 use crate::{GhReplies, GitHub, PortError};
-use meta_core::{Cleared, Merges, OpenPrs, PrNumber, Pull, Updating};
+use meta_core::{Cleared, Merges, OpenPrs, PrNumber, Pull, ReviewCopy, Updating};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +36,15 @@ impl GitHub for GhCli {
         let branch = refs.head_ref_name;
         let runs = branch_runs(&branch)?;
         GhReplies { view, required, runs }.pull()
+    }
+
+    fn review_copy(&self, pr: PrNumber) -> Result<ReviewCopy, PortError> {
+        let number = pr.digits();
+        let fields = "number,title,body,url,state,baseRefName,headRefName,headRefOid,files";
+        Ok(ReviewCopy {
+            view: run("gh", &["pr", "view", &number, "--json", fields])?,
+            diff: run("gh", &["pr", "diff", &number])?,
+        })
     }
 
     fn runs(&self, pr: PrNumber) -> Result<String, PortError> {

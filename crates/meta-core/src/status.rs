@@ -72,7 +72,10 @@ impl Ledger {
             .leases
             .iter()
             .filter(|(_, slot)| self.overdue(slot, at))
-            .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
+            .map(|(id, slot)| {
+                let note = slot.transcript_note();
+                format!("{id} for {}: {}, {}{note}", slot.lease().task(), slot.holder(), slot.deadline())
+            })
             .collect();
         let running: Vec<String> = self
             .leases
@@ -81,10 +84,10 @@ impl Ledger {
             .filter_map(|(id, slot)| {
                 let worker = slot.running_worker();
                 let agent = worker.and(slot.agent()).or_else(|| slot.running_agent());
-                let transcript = worker.map_or_else(String::new, |run| format!(", transcript {}", run.transcript));
+                let note = slot.transcript_note();
                 agent.map(|agent| {
                     format!(
-                        "{id}: agent {agent}, {}, role {}, {}{transcript}",
+                        "{id}: agent {agent}, {}, role {}, {}{note}",
                         slot.lease().task(),
                         self.agent_role(slot),
                         slot.deadline()
@@ -245,7 +248,8 @@ impl Ledger {
                         other.lease().task() == task
                             && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
                     });
-                    (!later).then(|| format!("{id} for {task}: review finished with no verdict"))
+                    (!later)
+                        .then(|| format!("{id} for {task}: review finished with no verdict{}", slot.transcript_note()))
                 }
                 _ => None,
             })
