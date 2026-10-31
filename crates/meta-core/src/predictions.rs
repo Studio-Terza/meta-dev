@@ -163,15 +163,12 @@ impl Predictions {
                 };
                 let terms: String =
                     prediction.terms.iter().map(|(word, reading)| format!("; read {word} as {reading}")).collect();
-                let line = format!(
-                    "{} {}: {judgement}; {observed}; expected {}; falsified by {}; measure: {}{terms}",
-                    prediction.id,
-                    prediction.hypothesis,
-                    prediction.expected,
-                    prediction.falsified_by,
-                    prediction.measure
+                let head = format!("{} {}", prediction.id, prediction.hypothesis);
+                let rest = format!(
+                    "{observed}; expected {}; falsified by {}; measure: {}{terms}",
+                    prediction.expected, prediction.falsified_by, prediction.measure
                 );
-                Reading { id: prediction.id.clone(), line, falsifying }
+                Reading { id: prediction.id.clone(), head, judgement, rest, falsifying }
             })
             .collect()
     }
@@ -181,8 +178,23 @@ impl Predictions {
 #[derive(Debug)]
 pub(crate) struct Reading {
     pub(crate) id: PredictionId,
-    pub(crate) line: String,
+    head: String,
+    judgement: &'static str,
+    rest: String,
     pub(crate) falsifying: Vec<(Measure, Observed)>,
+}
+
+impl Reading {
+    /// The line: the judgement, or FALSIFIED EARLIER then the current judgement when a falsification is
+    /// latched and the reading no longer falsifies, so a bare "holds" never hides it. Then the latches.
+    pub(crate) fn shown(&self, latched: &[String]) -> String {
+        let judgement = match (self.judgement, latched.is_empty()) {
+            ("FALSIFIED", _) | (_, true) => self.judgement.to_owned(),
+            (now, false) => format!("FALSIFIED EARLIER; now {now}"),
+        };
+        let kept: String = latched.iter().map(|latch| format!("; {latch}")).collect();
+        format!("{}: {judgement}; {}{kept}", self.head, self.rest)
+    }
 }
 
 #[cfg(test)]
