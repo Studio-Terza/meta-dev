@@ -799,6 +799,7 @@ fn review_leased(lease: &str, head: &str) -> Event {
         pr: id("7"),
         head: id(head),
         deadline: None,
+        replaces: None,
     }
 }
 
@@ -811,6 +812,7 @@ fn review_leased_until(lease: &str, head: &str, deadline: u64) -> Event {
         pr: id("7"),
         head: id(head),
         deadline,
+        replaces: None,
     }
 }
 
@@ -1110,6 +1112,43 @@ fn review_of_a_task_linked_to_an_open_pr_leases_and_prints_an_unprimed_brief_wit
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
+}
+
+#[test]
+fn review_replaces_an_unused_lease_on_an_old_head_and_records_it() {
+    let history = [linked_task(), vec![review_leased("lease-2", PINNED)]].concat();
+    let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
+    let (reply, events) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    let deadline = Some(Timestamp::from_unix_seconds(FIXTURE_REVIEW_DEADLINE));
+    let replacing = Event::ReviewLeased {
+        lease: id("lease-3"),
+        task: id("task-1"),
+        agent: Some(id("rev")),
+        pr: id("7"),
+        head: id(MOVED),
+        deadline,
+        replaces: Some(id("lease-2")),
+    };
+    assert_eq!((reply.code, events), (Code::Done, vec![replacing]), "{}", reply.text);
+    assert!(reply.text.contains("lease: lease-3"), "{}", reply.text);
+    let (status, _) = call(&mut ports, &["status"], "");
+    assert!(
+        status.text.contains("lease-3 for task-1") && !status.text.contains("lease-2 for task-1"),
+        "{}",
+        status.text
+    );
+    let (again, events) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    assert_eq!((again.code, events), (Code::Refused, Vec::new()));
+    assert!(again.text.contains("review lease lease-3 on task-1 is unused"), "{}", again.text);
+}
+
+#[test]
+fn review_still_refuses_an_unused_lease_on_the_current_head() {
+    let history = [linked_task(), vec![review_leased("lease-2", MOVED)]].concat();
+    let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
+    let (reply, events) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("review lease lease-2 on task-1 is unused"), "{}", reply.text);
 }
 
 #[test]
@@ -2731,6 +2770,7 @@ fn review_round(lease: &str, task: &str, pr: &str, verdict: &str) -> Vec<Event> 
             pr: id(pr),
             head: id(PINNED),
             deadline: None,
+            replaces: None,
         },
         used(lease),
         Event::Reviewed { lease: id(lease), verdict: id(verdict), head: None },
@@ -3640,6 +3680,7 @@ fn review_task(number: u64) -> Vec<Event> {
             pr: id(&pr),
             head: id(PINNED),
             deadline: Some(Timestamp::from_unix_seconds(1 + ISSUED_ALLOWANCE)),
+            replaces: None,
         },
     ]
 }
@@ -3752,6 +3793,7 @@ fn worker_start_is_refused_without_a_session_for_a_lease_no_worker_may_use() {
             pr: id("1"),
             head: id(PINNED),
             deadline: None,
+            replaces: None,
         }],
     ]
     .concat();
@@ -3945,6 +3987,7 @@ fn a_verdict_lands_on_the_workers_own_lease_not_on_an_older_review_of_the_task()
                 pr: id("1"),
                 head: id("bbbbbbb"),
                 deadline: None,
+                replaces: None,
             },
             used("lease-3"),
         ],
@@ -3957,6 +4000,7 @@ fn a_verdict_lands_on_the_workers_own_lease_not_on_an_older_review_of_the_task()
         pr: id("1"),
         head: id(PINNED),
         deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+        replaces: None,
     };
     let started = Event::Started {
         lease: id("lease-4"),
@@ -3981,6 +4025,7 @@ fn reviewer_after_worker(head: &str) -> Vec<Event> {
         pr: id("1"),
         head: id(head),
         deadline: None,
+        replaces: None,
     };
     vec![review, used("lease-3")]
 }

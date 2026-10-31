@@ -146,6 +146,9 @@ pub enum Event {
         /// When the agent must report or stop. Leases from before deadlines have none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
+        /// The unused review lease on an earlier head of this PR that this lease replaces.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        replaces: Option<LeaseId>,
     },
     Reviewed {
         lease: LeaseId,

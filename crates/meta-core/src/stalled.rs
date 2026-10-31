@@ -59,7 +59,7 @@ impl Ledger {
                 }
                 _ => None,
             },
-            LeaseSlot::Unused(_) => None,
+            LeaseSlot::Unused(_) | LeaseSlot::Replaced(_) => None,
         })
     }
 

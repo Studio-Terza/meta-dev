@@ -244,13 +244,16 @@ impl Spent {
 #[derive(Debug)]
 pub enum LeaseSlot {
     Unused(Lease),
+    /// An unused review lease on a head the PR left, replaced by a lease on the current head.
+    /// It starts no agent and blocks nothing.
+    Replaced(Lease),
     Spent(Spent),
 }
 
 impl LeaseSlot {
     pub(crate) fn lease(&self) -> &Lease {
         match self {
-            Self::Unused(lease) => lease,
+            Self::Unused(lease) | Self::Replaced(lease) => lease,
             Self::Spent(spent) => &spent.lease,
         }
     }
@@ -258,15 +261,20 @@ impl LeaseSlot {
     /// The deadline in force: from the start once an agent started, else from the lease.
     pub(crate) fn deadline(&self) -> Deadline {
         match self {
-            Self::Unused(lease) => lease.deadline,
+            Self::Unused(lease) | Self::Replaced(lease) => lease.deadline,
             Self::Spent(spent) => spent.deadline,
         }
     }
 
     /// Whether the agent on this lease is taken as past its work: a turn end or an end is recorded,
-    /// or a review gave its verdict. A turn end does not show it is done: see `Seen`.
+    /// or a review gave its verdict. A turn end does not show it is done: see `Seen`. A replaced
+    /// lease has no agent and never will, so it counts as finished.
     pub(crate) fn is_finished(&self) -> bool {
-        matches!(self, Self::Spent(spent) if spent.verdict.is_some() || spent.is_stopped())
+        match self {
+            Self::Spent(spent) => spent.verdict.is_some() || spent.is_stopped(),
+            Self::Replaced(_) => true,
+            Self::Unused(_) => false,
+        }
     }
 
     /// What the log last shows of a subagent with no verdict, past a turn end or stopped, as a
@@ -319,7 +327,7 @@ impl LeaseSlot {
     pub(crate) fn agent(&self) -> Option<&AgentId> {
         match self {
             Self::Spent(spent) => spent.agent.as_ref(),
-            Self::Unused(_) => None,
+            Self::Unused(_) | Self::Replaced(_) => None,
         }
     }
 
@@ -327,7 +335,7 @@ impl LeaseSlot {
     /// worker's deadline stays where its start put it: its session does not pause for the wait.
     pub(crate) fn delay(&mut self, span: Span) {
         match self {
-            Self::Unused(lease) => lease.deadline = lease.deadline.delayed(span),
+            Self::Unused(lease) | Self::Replaced(lease) => lease.deadline = lease.deadline.delayed(span),
             Self::Spent(Spent { worker: Some(_), .. }) => {}
             Self::Spent(spent) => {
                 spent.lease.deadline = spent.lease.deadline.delayed(span);
@@ -340,6 +348,7 @@ impl LeaseSlot {
     pub(crate) fn holder(&self) -> String {
         match self {
             Self::Unused(_) => "unused".to_owned(),
+            Self::Replaced(_) => "replaced".to_owned(),
             Self::Spent(Spent { agent: Some(agent), .. }) => format!("agent {agent}"),
             Self::Spent(Spent { agent: None, .. }) => "agent unknown".to_owned(),
         }

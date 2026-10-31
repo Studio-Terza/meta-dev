@@ -61,7 +61,7 @@ impl Ledger {
                     && matches!(spent.lease().purpose(), Purpose::Review { .. })
                     && spent.verdict() == Some(Verdict::Fail)
             }
-            LeaseSlot::Unused(_) => false,
+            LeaseSlot::Unused(_) | LeaseSlot::Replaced(_) => false,
         });
         FailedRounds::of(failed.count())
     }

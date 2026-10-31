@@ -16,26 +16,29 @@ pub struct Reviewing {
     agent: AgentName,
     lease: LeaseId,
     pr: PrNumber,
+    /// The task's unused review lease and the head it was issued at, if it has one. Whether it
+    /// blocks the review depends on the head the PR has now, so `brief` decides.
+    pending: Option<(LeaseId, Sha)>,
 }
 
 impl Ledger {
     pub fn review(&self, task: TaskId, agent: AgentName) -> Result<Reviewing, Refusal> {
         let lease = LeaseId::after(self.leases.len());
         let pending = self.leases.iter().find_map(|(id, slot)| match slot {
-            LeaseSlot::Unused(unused) if unused.task() == task && *unused.purpose() != Purpose::Work => Some(*id),
+            LeaseSlot::Unused(unused) if unused.task() == task => match unused.purpose() {
+                Purpose::Review { head, .. } => Some((*id, head.clone())),
+                Purpose::Work => None,
+            },
             _ => None,
         });
-        match (self.tasks.get(&task), pending) {
-            (Some(Progress::Linked(_)), Some(unused)) => Err(Refusal::because(format!(
-                "review lease {unused} on {task} is unused. Next: meta brief {unused} prints its brief again; put {unused} in the reviewer's Agent description."
-            ))),
-            (Some(Progress::Linked(linked)), None) => {
-                Ok(Reviewing { task, title: linked.title().clone(), agent, lease, pr: linked.pr() })
+        match self.tasks.get(&task) {
+            Some(Progress::Linked(linked)) => {
+                Ok(Reviewing { task, title: linked.title().clone(), agent, lease, pr: linked.pr(), pending })
             }
-            (Some(other), _) => Err(Refusal::because(format!(
+            Some(other) => Err(Refusal::because(format!(
                 "{other}; only a task linked to an open PR can be reviewed. Next: meta link {task} <pr>."
             ))),
-            (None, _) => Err(Refusal::because(format!("{task} is unknown. Next: meta status."))),
+            None => Err(Refusal::because(format!("{task} is unknown. Next: meta status."))),
         }
     }
 
@@ -60,7 +63,7 @@ impl Ledger {
                 "{lease} is a work lease on {task}, not a review lease. \
                  Next: name the lease your review brief gives, or {review}."
             ))),
-            (LeaseSlot::Unused(_), Purpose::Review { .. }) => Err(Refusal::because(format!(
+            (LeaseSlot::Unused(_) | LeaseSlot::Replaced(_), Purpose::Review { .. }) => Err(Refusal::because(format!(
                 "review lease {lease} is unused: no reviewer started on it. \
                  Next: meta brief {lease} prints its brief again; put {lease} in the reviewer's Agent description."
             ))),
@@ -132,7 +135,7 @@ impl Ledger {
                         (Purpose::Review { pr, head }, Some(verdict)) if *pr == linked.pr() => Some((head, verdict)),
                         _ => None,
                     },
-                    LeaseSlot::Unused(_) => None,
+                    LeaseSlot::Unused(_) | LeaseSlot::Replaced(_) => None,
                 });
                 latest.map(|(head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
             })
@@ -147,11 +150,22 @@ impl Reviewing {
 
     /// The review brief and its lease, which ends at `deadline`.
     pub fn brief(self, pull: &Pull, binary: &Binary, rules: &Rules, deadline: Timestamp) -> Result<Accepted, Refusal> {
-        let Self { task, title, agent, lease, pr } = self;
+        let Self { task, title, agent, lease, pr, pending } = self;
         if pull.state() != PullState::Open {
             return Err(Refusal::because(format!("{pr} is not open; only an open PR can be reviewed.")));
         }
         let head = pull.head().clone();
+        // An unused lease on the current head still blocks; one on an old head can never start a
+        // worker (the PR moved), so this lease replaces it instead of waiting out its deadline.
+        let replaces = match pending {
+            Some((unused, unused_head)) if pull.is_at(&unused_head) => {
+                return Err(Refusal::because(format!(
+                    "review lease {unused} on {task} is unused. Next: meta brief {unused} prints its brief again; put {unused} in the reviewer's Agent description."
+                )));
+            }
+            Some((unused, _)) => Some(unused),
+            None => None,
+        };
         let deadline_line = Deadline::of(Some(deadline)).brief_line();
         let agent_name = agent;
         let agent = agent_name.to_string();
@@ -169,6 +183,7 @@ impl Reviewing {
         .text();
         let deadline = Some(deadline);
         let agent = Some(agent_name);
-        Ok(Accepted::new(vec![Event::ReviewLeased { lease, task, agent, pr, head, deadline }], text))
+        let leased = Event::ReviewLeased { lease, task, agent, pr, head, deadline, replaces };
+        Ok(Accepted::new(vec![leased], text))
     }
 }
