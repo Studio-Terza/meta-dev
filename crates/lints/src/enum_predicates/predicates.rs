@@ -15,7 +15,7 @@ pub struct Predicates<'scan> {
 
 impl<'scan> Predicates<'scan> {
     pub fn new(known: &'scan EnumPredicates, file: &'scan SourceFile) -> Predicates<'scan> {
-        Predicates { known, file, module: file.module().clone(), violations: Vec::new() }
+        Predicates { known, file, module: file.placement().module().clone(), violations: Vec::new() }
     }
 
     pub fn into_violations(self) -> Vec<Violation> {
@@ -55,16 +55,16 @@ impl<'ast> Visit<'ast> for Predicates<'_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        if block.trait_.is_none() && self.known.is_enum(self.file, &self.module, &block.self_ty) {
-            let found = self.predicates(block);
-            self.violations.extend(found);
-        }
+        let found = if block.trait_.is_none() && self.known.is_enum(self.file, &self.module, &block.self_ty) {
+            self.predicates(block)
+        } else {
+            Vec::new()
+        };
+        self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        for statement in Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }

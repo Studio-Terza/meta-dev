@@ -1,5 +1,6 @@
 mod finding;
 
+use crate::Lint;
 use finding::Finding;
 use proc_macro2::Span;
 use syn::spanned::Spanned;
@@ -10,14 +11,13 @@ use lint_core::{LineNumber, Report, Role, Site, SourceFile, Violation};
 #[derive(Debug)]
 pub struct ThinMain;
 
-impl ThinMain {
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for ThinMain {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "a binary is a thin main over its library",
             files
                 .iter()
-                .filter(|file| file.role() == Role::BinaryRoot)
+                .filter(|file| file.placement().role() == Role::BinaryRoot)
                 .flat_map(|file| {
                     file.syntax().items.iter().filter(|item| !Self::is_thin(item)).map(|item| {
                         Violation::new(Site::new(file.path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
@@ -26,7 +26,9 @@ impl ThinMain {
                 .collect(),
         )
     }
+}
 
+impl ThinMain {
     fn keyword(item: &Item) -> Span {
         match item {
             Item::Use(found) => found.use_token.span,

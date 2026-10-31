@@ -1,5 +1,6 @@
 mod finding;
 
+use crate::Lint;
 use finding::Finding;
 use syn::visit::Visit;
 
@@ -15,11 +16,8 @@ use lint_core::Violation;
 #[derive(Debug)]
 pub struct NamedLifetimes;
 
-impl NamedLifetimes {
-    const MINIMUM_LENGTH: usize = 2;
-
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for NamedLifetimes {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "lifetimes are named with a word, never a letter",
             files
@@ -35,6 +33,10 @@ impl NamedLifetimes {
                 .collect(),
         )
     }
+}
+
+impl NamedLifetimes {
+    const MINIMUM_LENGTH: usize = 2;
 
     fn short_lifetimes(file: &syn::File) -> Vec<Ident> {
         let mut visitor = ShortLifetimes { found: Vec::new() };
@@ -54,8 +56,6 @@ impl<'ast> Visit<'ast> for ShortLifetimes {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        for statement in lint_core::Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        lint_core::Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }

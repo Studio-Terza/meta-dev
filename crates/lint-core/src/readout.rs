@@ -17,15 +17,19 @@ impl Readout {
         std::mem::take(&mut self.failures)
     }
 
-    pub fn add_file(&mut self, file: SourceFile) {
-        self.files.push(file);
+    #[must_use]
+    pub fn with_file(self, file: SourceFile) -> Readout {
+        Readout { files: self.files.into_iter().chain([file]).collect(), ..self }
     }
 
-    pub fn add_failure(&mut self, failure: Failure) {
-        self.failures.push(failure);
+    #[must_use]
+    pub fn with_failure(self, failure: Failure) -> Readout {
+        Readout { failures: self.failures.into_iter().chain([failure]).collect(), ..self }
     }
 
-    pub fn sort(&mut self) {
+    #[must_use]
+    pub fn sorted(mut self) -> Readout {
         self.files.sort_by(|left, right| left.path().cmp(right.path()));
+        self
     }
 }

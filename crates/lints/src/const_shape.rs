@@ -1,3 +1,4 @@
+use crate::Lint;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::visit::Visit;
@@ -18,15 +19,16 @@ use lint_core::Walk;
 #[derive(Debug)]
 pub struct ConstShape;
 
-impl ConstShape {
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for ConstShape {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "casts live in const fns, and const loops walk slices",
             files.iter().flat_map(Self::violations).collect(),
         )
     }
+}
 
+impl ConstShape {
     fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut contexts = ConstContexts { path: file.path(), context: Context::Surface, violations: Vec::new() };
         contexts.visit_file(file.syntax());
@@ -127,15 +129,14 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
 
     fn visit_variant(&mut self, variant: &'ast Variant) {
         self.visit_fields(&variant.fields);
-        if let Some((_, discriminant)) = &variant.discriminant {
-            self.within(Context::Const, |this| this.visit_expr(discriminant));
-        }
+        variant
+            .discriminant
+            .iter()
+            .for_each(|(_, discriminant)| self.within(Context::Const, |this| this.visit_expr(discriminant)));
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        for statement in Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_expr_cast(&mut self, cast: &'ast ExprCast) {

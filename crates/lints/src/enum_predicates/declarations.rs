@@ -12,14 +12,19 @@ pub struct Declarations<'scan> {
 }
 
 impl Declarations<'_> {
-    pub fn of(file: &SourceFile) -> Vec<Declaration> {
-        let mut scan = Declarations { file, module: file.module().clone(), found: Vec::new() };
+    pub fn in_file(file: &SourceFile) -> Vec<Declaration> {
+        let mut scan = Declarations { file, module: file.placement().module().clone(), found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found
     }
 
     fn record(&mut self, ident: &Ident, kind: Kind) {
-        self.found.push(Declaration::new(self.file.crate_root(), self.module.clone(), Name::from(ident), kind));
+        self.found.push(Declaration::new(
+            self.file.placement().crate_root(),
+            self.module.clone(),
+            Name::from(ident),
+            kind,
+        ));
     }
 }
 
@@ -44,8 +49,6 @@ impl<'ast> Visit<'ast> for Declarations<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        for statement in Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }

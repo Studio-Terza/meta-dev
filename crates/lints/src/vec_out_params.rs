@@ -1,9 +1,10 @@
 mod finding;
 
+use crate::Lint;
 use finding::Finding;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, PathArguments, Signature, Type};
+use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, PathArguments, PathSegment, Signature, Type, TypePath};
 
 use lint_core::{LineNumber, Macros, Name, Report, Site, SourceFile, Violation, Walk};
 
@@ -13,9 +14,8 @@ pub struct VecOutParams<'file> {
     violations: Vec<Violation>,
 }
 
-impl VecOutParams<'_> {
-    #[must_use]
-    pub fn report(files: &[SourceFile]) -> Report {
+impl Lint for VecOutParams<'_> {
+    fn report(files: &[SourceFile]) -> Report {
         Report::new(
             "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",
             files
@@ -28,28 +28,34 @@ impl VecOutParams<'_> {
                 .collect(),
         )
     }
+}
+
+impl VecOutParams<'_> {
+    const VECTOR: &'static str = "Vec";
+    const OPTION: &'static str = "Option";
 
     fn is_vec_out(parameter: &Type) -> bool {
         match parameter {
             Type::Reference(reference) => {
                 reference.mutability.is_some()
-                    && matches!(
-                        reference.elem.as_ref(),
-                        Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "Vec")
-                    )
+                    && matches!(reference.elem.as_ref(), Type::Path(path) if Self::last_segment(path, Self::VECTOR).is_some())
             }
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .filter(|segment| segment.ident == "Option")
-                .and_then(|segment| match &segment.arguments {
-                    PathArguments::AngleBracketed(arguments) => arguments.args.first(),
-                    _ => None,
-                })
+            Type::Path(path) => Self::last_segment(path, Self::OPTION)
+                .and_then(Self::first_argument)
                 .is_some_and(|argument| matches!(argument, GenericArgument::Type(inner) if Self::is_vec_out(inner))),
             _ => false,
         }
+    }
+
+    fn first_argument(segment: &PathSegment) -> Option<&GenericArgument> {
+        match &segment.arguments {
+            PathArguments::AngleBracketed(arguments) => arguments.args.first(),
+            _ => None,
+        }
+    }
+
+    fn last_segment<'path>(path: &'path TypePath, name: &str) -> Option<&'path PathSegment> {
+        path.path.segments.last().filter(|segment| segment.ident == name)
     }
 }
 
@@ -69,9 +75,7 @@ impl<'ast> Visit<'ast> for VecOutParams<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        for statement in Macros::statements(invocation) {
-            self.visit_stmt(&statement);
-        }
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {

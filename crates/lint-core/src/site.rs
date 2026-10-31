@@ -16,13 +16,13 @@ impl Site {
     }
 
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn of_file(path: &Path) -> Site {
+        Site::new(path, LineNumber::FIRST)
     }
 
     #[must_use]
-    pub fn line(&self) -> LineNumber {
-        self.line
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 }
 

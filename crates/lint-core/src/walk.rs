@@ -32,15 +32,14 @@ impl Walk {
     fn of_condition(condition: &Meta) -> Walk {
         match condition {
             Meta::Path(path) if path.is_ident("test") => Walk::Skipped,
-            Meta::List(list) => Self::of_list(list),
+            Meta::List(list) => list
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .map_or(Walk::Entered, |nested| Self::of_nested(list, &nested)),
             Meta::Path(_) | Meta::NameValue(_) => Walk::Entered,
         }
     }
 
-    fn of_list(list: &MetaList) -> Walk {
-        let Ok(nested) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) else {
-            return Walk::Entered;
-        };
+    fn of_nested(list: &MetaList, nested: &Punctuated<Meta, Token![,]>) -> Walk {
         let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
         if list.path.is_ident("all") {
             Self::skipped_by_any(walks.into_iter())

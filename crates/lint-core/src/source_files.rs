@@ -1,13 +1,17 @@
+mod modules;
+mod roots;
+mod tree;
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::failure::Failure;
-use crate::modules::Modules;
 use crate::readout::Readout;
-use crate::roots::Roots;
 use crate::source_file::SourceFile;
-use crate::tree::Tree;
+use modules::Modules;
+use roots::Roots;
+use tree::Tree;
 
 #[derive(Debug, Default)]
 pub struct SourceFiles {
@@ -21,48 +25,48 @@ impl SourceFiles {
     }
 
     pub fn read_all(roots: &[PathBuf]) -> Result<Readout, Failure> {
-        let mut reading = SourceFiles::default();
-        for root in roots {
-            reading.tree(&Tree::open(root)?)?;
-        }
-        reading.readout.sort();
-        Ok(reading.readout)
+        roots
+            .iter()
+            .try_fold(SourceFiles::default(), |reading, root| reading.tree(&Tree::open(root)?))
+            .map(|reading| reading.readout.sorted())
     }
 
-    fn tree(&mut self, tree: &Tree) -> Result<(), Failure> {
+    fn tree(self, tree: &Tree) -> Result<SourceFiles, Failure> {
         let roots = Roots::under(tree)?;
         if roots.is_empty() {
-            return Err(Failure::NoSources { path: tree.given().to_path_buf() });
+            Err(tree.without_sources())
+        } else {
+            Ok(roots.into_iter().fold(self, |reading, root| {
+                let children = root.parent().map(Path::to_path_buf).unwrap_or_default();
+                reading.file(tree, &root, &children)
+            }))
         }
-        for root in roots {
-            let children = root.parent().map(Path::to_path_buf).unwrap_or_default();
-            self.file(tree, &root, &children);
-        }
-        Ok(())
     }
 
-    fn file(&mut self, tree: &Tree, file: &Path, children_directory: &Path) {
+    fn file(mut self, tree: &Tree, file: &Path, children_directory: &Path) -> SourceFiles {
+        if self.seen.insert(file.to_path_buf()) { self.opened(tree, file, children_directory) } else { self }
+    }
+
+    fn opened(self, tree: &Tree, file: &Path, children_directory: &Path) -> SourceFiles {
         let shown = tree.display(file);
-        if !self.seen.insert(file.to_path_buf()) {
-            return;
+        let read = fs::read_to_string(file)
+            .map_err(|source| Failure::Io { path: shown.clone(), source })
+            .and_then(|text| SourceFile::parse_at(shown, file, text));
+        match read {
+            Ok(parsed) => self.parsed(tree, file, children_directory, parsed),
+            Err(failure) => SourceFiles { readout: self.readout.with_failure(failure), ..self },
         }
-        let text = match fs::read_to_string(file) {
-            Ok(text) => text,
-            Err(source) => return self.readout.add_failure(Failure::Io { path: shown, source }),
-        };
-        match SourceFile::parse_at(shown, file, text) {
-            Ok(parsed) => {
-                let mut modules = Modules::declared_in(file, children_directory, &parsed.syntax().items);
-                self.readout.add_file(parsed);
-                for failure in modules.take_failures() {
-                    self.readout.add_failure(failure);
-                }
-                for child in modules.take_children() {
-                    let canonical = fs::canonicalize(child.path()).unwrap_or_else(|_| child.path().to_path_buf());
-                    self.file(tree, &canonical, child.children_directory());
-                }
-            }
-            Err(failure) => self.readout.add_failure(failure),
-        }
+    }
+
+    fn parsed(self, tree: &Tree, file: &Path, children_directory: &Path, parsed: SourceFile) -> SourceFiles {
+        let mut modules = Modules::declared_in(file, children_directory, &parsed.syntax().items);
+        let with_file = SourceFiles { readout: self.readout.with_file(parsed), ..self };
+        let with_failures = modules.take_failures().into_iter().fold(with_file, |reading, failure| SourceFiles {
+            readout: reading.readout.with_failure(failure),
+            ..reading
+        });
+        modules.take_children().into_iter().fold(with_failures, |reading, child| {
+            child.canonically(|path, directory| reading.file(tree, path, directory))
+        })
     }
 }
