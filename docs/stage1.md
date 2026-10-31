@@ -72,7 +72,7 @@ An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind sin
 | `meta verdict <task> pass\|fail` | the log holds a `Reviewed` whose `head` is not its lease's head | the log is corrupt; the fold fails. A `Reviewed` with no `head` (recorded before heads) folds as before |
 | `meta review <task> --agent <name>` | the brief is printed | the reviewer records its own verdict (critic register U22): a constraint tells it to finish with `meta verdict <task> pass\|fail`, run with a main build, names the absolute path of the binary that printed the brief, read at run time through the git port (`current_exe`), as that main build, with no worktree or cargo step, and says to report and stop if meta refuses because the head moved |
 | `meta review <task> --agent <name>` | the brief is printed | the lease line is worded for the lead, not the reviewer: "for the lead: put it in the Agent description; it works once. Reviewer: nothing for you to do with this line" |
-| `meta status` | a review lease has a turn end or an end recorded with no verdict, and no later review lease of the task has a verdict | listed under "review leases with no verdict (flagged)" as `<lease> for <task>: review finished with no verdict` after an end, or `<lease> for <task>: review's last recorded turn ended with no verdict` after only a turn end; with none, the section is not printed |
+| `meta status` | a review lease has a turn end or an end recorded with no verdict, and no later review lease of the task has a verdict | listed under "review leases with no verdict (flagged)" as `<lease> for <task>: review finished with no verdict` after a worker's end, `<lease> for <task>: review stopped by TaskStop with no verdict` after a subagent's end, or `<lease> for <task>: review's last recorded turn ended with no verdict` after only a turn end; with none, the section is not printed |
 
 No separate task is opened for a review. `meta merge` does not require a review; CI remains the only merge gate.
 
@@ -119,7 +119,7 @@ Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, s
 
 The role defaults are data, each with a source. A headless worker is killed at its deadline (`docs/stage2c.md`); for any other agent the flag is the only enforcement.
 
-### Finished agents and running agents
+### Agents' turn ends and stops
 
 Finished agents stayed flagged as overdue, and running agents were nowhere in `meta status`: "live leases" lists only unused leases (task-44). Claude Code's SubagentStop hook input has `agent_id` (hooks reference, SubagentStop: `session_id`, `transcript_path`, `cwd`, `permission_mode`, `hook_event_name`, `stop_hook_active`, `agent_id`, `agent_type`, `agent_transcript_path`, `last_assistant_message`). meta reads only `agent_id`, the id that `Started` bound to the lease. The hook fires for Claude Code's own internal agents too; their ids match no lease, so they are ignored.
 
@@ -131,16 +131,17 @@ Finished agents stayed flagged as overdue, and running agents were nowhere in `m
 | `meta hook post-tool-use` with tool `TaskStop` | `task_id` matches no lease, such as a shell task, or its lease has an end recorded | nothing recorded; reply `{}`, quietly |
 | `meta hook post-tool-use` with tool `TaskStop` | a response with no readable `task_id` | nothing recorded; the reason is reported, like any other input the hook cannot parse |
 | `meta hook subagent-stop` | input that cannot be parsed, or a log meta cannot read | nothing recorded; reply `{"systemMessage": <reason>}`. It never exits 2 and never sets `decision`, because either would keep the agent from stopping |
-| `meta hook subagent-stop` | the stop arrives before `Started` was recorded | ignored like an unknown agent; the lease then stays running until its deadline |
-| `meta status` | a lease is started, no turn end or end is recorded, its task is open, claimed or linked, and its deadline has not passed (or it has none) | listed under "agents with no turn end or stop recorded" as `<lease>: agent <agent>, <task>, role <work, review or critic>, <deadline>`; the role is critic for a task marked critic |
-| `meta status` | a started lease is past its deadline and not finished | listed under "overdue leases (flagged)" only, not under "agents with no turn end or stop recorded" |
-| `meta status` | a lease is finished, unused, or has no agent recorded, or its task is done or retired | not listed under "agents with no turn end or stop recorded" |
-| `meta status` | a subagent's last record is a turn end, it has no verdict, and its task is open, claimed or linked | listed under "agents with a turn end or stop recorded" as `<lease>: agent <agent>, <task>, role <role>, <deadline>, last recorded turn end <time> (N min ago), done or waiting is not known` |
-| `meta status` | a subagent's last record is a TaskStop, it has no verdict, and its task is open, claimed or linked | listed under "agents with a turn end or stop recorded" as `<lease>: agent <agent>, <task>, role <role>, <deadline>, stopped by TaskStop <time> (N min ago)` |
+| `meta hook subagent-stop` | the stop arrives before `Started` was recorded | ignored like an unknown agent; the lease then shows no turn end recorded until its deadline, then is flagged overdue |
+| `meta status` | a lease is started, no turn end or end is recorded, it has no verdict, its task is open, claimed or linked, and it is not flagged overdue | listed under "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task" as `<lease>: agent <agent>, <task>, role <work, review or critic>, <deadline>`; the role is critic for a task marked critic |
+| `meta status` | a started lease is past its deadline and not finished | listed under "overdue leases (flagged)" only, not under "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task" |
+| `meta status` | a lease is finished, unused, or has no agent recorded, or its task is done or retired | not listed under "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task" |
+| `meta status` | a subagent's last record is a turn end, it has no verdict, and its task is open, claimed or linked | listed under "subagents with a turn end or stop recorded, no verdict, on an open task" as `<lease>: agent <agent>, <task>, role <role>, <deadline>, last recorded turn end <time> (N min ago), done or waiting is not known` |
+| `meta status` | a subagent's last record is a TaskStop, it has no verdict, and its task is open, claimed or linked | listed under "subagents with a turn end or stop recorded, no verdict, on an open task" as `<lease>: agent <agent>, <task>, role <role>, <deadline>, stopped by TaskStop <time> (N min ago)` |
 | `meta status` | a lease is finished | not listed under "overdue leases (flagged)", whatever its deadline |
 | `meta status` | the only work lease is finished and a task has no next step | the idle alarm fires: a finished lease is not running work |
-| canned `continue` (`Resumed`) | the lease was finished | the lease is unfinished again, so listed under "agents with no turn end or stop recorded" and overdue after its deadline, until the hook records another `Finished` |
-| log fold | `Finished` for a lease that is unused or has no agent recorded, or that follows an end with no resume between | corrupt log, reported like any other record that does not fit. A `Finished` with no end after another is a second turn end and fits |
+| canned `continue` (`Resumed`) | the lease was finished | the lease is unfinished again, so listed under "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task" and overdue after its deadline, until the hook records another `Finished` |
+| log fold | `Finished` for a lease that is unused or has no agent recorded, or that follows a `Finished` with an end (the `Ended` state) with no resume between | corrupt log, reported like any other record that does not fit |
+| log fold | `Finished` after a `Finished` with no end, with no resume between | fits. Before critic #49 any second `Finished` was corrupt. Two pairs are newly allowed: no-end after no-end, a second turn end, and with-end after no-end, a real stop after a turn end. So a doubly written turn end is no longer caught, and a build from before this change reads a log holding either pair as corrupt |
 
 `self/claude-settings.json` adds a SubagentStop entry with no matcher: `meta hook subagent-stop || true`, timeout 10 s. Unlike the other entries it has no `onFailure: block` and no `|| exit 2`, so a missing or crashing meta lets the agent stop. The cost of a missed record is visible: the agent is listed with no turn end recorded until its deadline, then flagged overdue.
 
@@ -171,7 +172,7 @@ The critic's task is long-running by design. The role belongs to the task, not t
 
 Critic issue #33. On Oct 31 the alarm stayed silent at 03:06Z through a real stall: six tasks (7, 8, 12, 21, 27 open, 25 with a failed review and no fix) had no next step. The expired leases were not the cause: no work lease on those tasks was live. Only the critic's own live lease on task 14 silenced the alarm. The marking of task 14 as critic fixes it: its lease no longer counts, so the alarm fires and names the six tasks, not task 14. The regression test replays the real log cut at that point (generic titles and reasons) with the marking as its last event.
 
-Finished leases (critic #9 U21, #33 point 4). Claude Code's SubagentStop hook tells meta when an agent's turn ends, so a lease is finished when a turn end or an end of its agent is recorded (event `Finished`) or, for a review lease, when it has its verdict. A finished lease may still have an agent waiting on background work. A finished lease is never overdue and never running work. See "Finished agents and running agents".
+Finished leases (critic #9 U21, #33 point 4). Claude Code's SubagentStop hook tells meta when an agent's turn ends, so a lease is finished when a turn end or an end of its agent is recorded (event `Finished`) or, for a review lease, when it has its verdict. A finished lease may still have an agent waiting on background work. A finished lease is never overdue and never running work. See "Agents' turn ends and stops".
 
 A task is stalled when it is not waiting on the owner and has no next step. This is a state check, with no age threshold:
 

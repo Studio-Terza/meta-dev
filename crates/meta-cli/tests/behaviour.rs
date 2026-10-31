@@ -392,9 +392,9 @@ deferred
   (none)
 live leases
   lease-1 for task-1, no deadline
-agents with no turn end or stop recorded
+agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task
   (none)
-agents with a turn end or stop recorded
+subagents with a turn end or stop recorded, no verdict, on an open task
   (none)
 open escapes: 3
   escape-1 [gap] gh is down
@@ -1184,10 +1184,21 @@ fn status_flags_a_review_lease_that_finished_with_no_verdict_until_a_later_revie
         [stopped.clone(), vec![review_leased("lease-3", PINNED), used("lease-3"), reviewed("lease-3", "pass")]]
             .concat();
     let (status, _) = call(&mut given(retried, Vec::new()), &["status"], "");
-    assert!(!status.text.contains("with no verdict"), "{}", status.text);
+    assert!(!status.text.contains("review leases with no verdict"), "{}", status.text);
     let judged_first = [judged(PINNED, "pass"), vec![started("lease-2", "agent-r"), finished("lease-2")]].concat();
     let (status, _) = call(&mut given(judged_first, Vec::new()), &["status"], "");
-    assert!(!status.text.contains("with no verdict"), "{}", status.text);
+    assert!(!status.text.contains("review leases with no verdict"), "{}", status.text);
+}
+
+#[test]
+fn a_review_stopped_by_task_stop_reads_as_stopped_and_never_as_finished() {
+    let start = vec![review_leased("lease-2", PINNED), used("lease-2"), started("lease-2", "agent-r")];
+    let line = "lease-2 for task-1: review stopped by TaskStop with no verdict\n";
+    for last in [vec![], vec![finished("lease-2")]] {
+        let events = [linked_task(), start.clone(), last, vec![task_stopped("lease-2")]].concat();
+        let text = status_of(events);
+        assert!(text.contains(line) && !text.contains("review finished"), "{text}");
+    }
 }
 
 #[test]
@@ -3156,7 +3167,7 @@ fn meta_role_marks_a_task_once_and_refuses_an_unknown_task_or_role() {
     assert!(old_flag.is_err());
 }
 
-// Task 44: a finished agent stops being overdue and running work, and status lists running agents.
+// Task 44: a finished agent stops being overdue and running work, and status lists started agents.
 
 fn finished(lease: &str) -> Event {
     Event::Finished { lease: id(lease), end: None }
@@ -3216,20 +3227,21 @@ fn subagent_stop_ignores_unknown_agents_and_agents_already_finished_quietly() {
     quiet([running_until(1000), vec![task_stopped("lease-1")]].concat(), AGENT_ID);
 }
 
-// Critic #49: a turn end is not an end, and a TaskStop is. Lease-50 and lease-105 of the real log.
+// Critic #49: a turn end is not an end, and a TaskStop is. These records stand for lease-50 and
+// lease-105 of the real log; the payload is a real TaskStop's, with neutral paths and ids.
+
+const TASK_STOP: &str = include_str!("fixtures/task-stop-payload.json");
 
 fn task_stopped(lease: &str) -> Event {
     Event::Finished { lease: id(lease), end: Some(WorkerEnd::Stopped) }
 }
 
-/// A PostToolUse input of the tool result the lead's transcript records for a TaskStop.
+/// The real PostToolUse input of a TaskStop, naming `task_id`.
 fn task_stop(task_id: serde_json::Value) -> String {
-    serde_json::json!({
-        "tool_name": "TaskStop",
-        "tool_input": { "task_id": task_id },
-        "tool_response": { "message": "Successfully stopped task", "task_id": task_id, "task_type": "local_agent", "command": "lease-1" },
-    })
-    .to_string()
+    let mut input: serde_json::Value = serde_json::from_str(TASK_STOP).expect("the fixture is JSON");
+    input["tool_input"]["task_id"] = task_id.clone();
+    input["tool_response"]["task_id"] = task_id;
+    input.to_string()
 }
 
 /// `running_until(1000)` with its records at unix 100, then `events` at the unix second each names.
@@ -3238,7 +3250,13 @@ fn timed_status(now: u64, events: Vec<(u64, Event)>) -> String {
     status_at(now, start.chain(events).collect())
 }
 
-const NO_STOP: &str = "agents with no turn end or stop recorded\n  (none)\n";
+const NO_STOP_HEADING: &str =
+    "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task\n";
+const NO_STOP: &str = concat!(
+    "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task\n",
+    "  (none)\n"
+);
+const STOPPED_HEADING: &str = "subagents with a turn end or stop recorded, no verdict, on an open task\n";
 
 #[test]
 fn every_turn_end_is_recorded_for_an_agent_can_wake_and_end_another() {
@@ -3250,7 +3268,7 @@ fn every_turn_end_is_recorded_for_an_agent_can_wake_and_end_another() {
 fn a_turn_end_reads_as_a_turn_end_with_its_time_and_never_as_finished() {
     let text = timed_status(760, vec![(160, finished("lease-1")), (400, finished("lease-1"))]);
     let line = format!(
-        "agents with a turn end or stop recorded\n  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000, last recorded turn end unix 400 (6 min ago), done or waiting is not known\n"
+        "{STOPPED_HEADING}  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000, last recorded turn end unix 400 (6 min ago), done or waiting is not known\n"
     );
     assert!(text.contains(NO_STOP) && text.contains(&line), "{text}");
 }
@@ -3268,13 +3286,13 @@ fn a_task_stop_reads_as_stopped_at_its_time_after_a_turn_end_or_none() {
 fn a_canned_continue_clears_a_task_stop() {
     let events = [running_until(1000), vec![task_stopped("lease-1"), Event::Resumed { lease: id("lease-1") }]].concat();
     let text = status_of(events);
-    assert!(text.contains("agents with a turn end or stop recorded\n  (none)\n"), "{text}");
+    assert!(text.contains(&format!("{STOPPED_HEADING}  (none)\n")), "{text}");
 }
 
 #[test]
 fn task_stop_of_a_leased_agent_records_its_end_and_any_other_task_is_ignored() {
     let record = |events: Vec<Event>, task: &str| after(events, &task_stop(serde_json::json!(task)));
-    let (reply, events) = record(running_until(1000), AGENT_ID);
+    let (reply, events) = after(running_until(1000), TASK_STOP);
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![task_stopped("lease-1")]));
     let (reply, events) = record([running_until(1000), vec![finished("lease-1")]].concat(), AGENT_ID);
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![task_stopped("lease-1")]));
@@ -3320,12 +3338,11 @@ fn a_finished_lease_is_not_running_work_so_the_idle_alarm_fires() {
 }
 
 #[test]
-fn status_lists_each_started_unfinished_lease_under_running_agents() {
+fn status_lists_each_started_unfinished_lease_as_having_no_turn_end_or_stop() {
     let text = status_of(running_until(1000));
-    let heading = "agents with no turn end or stop recorded\n";
-    let listed = format!("{heading}  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000\n");
+    let listed = format!("{NO_STOP_HEADING}  lease-1: agent {AGENT_ID}, task-1, role work, deadline unix 1000\n");
     assert!(text.contains(&listed), "{text}");
-    assert!(text.contains(&format!("live leases\n  (none)\n{heading}")), "{text}");
+    assert!(text.contains(&format!("live leases\n  (none)\n{NO_STOP_HEADING}")), "{text}");
     let none = NO_STOP;
     assert!(status_of(claimed_task()).contains(none), "an unused lease is not an agent");
     let unbound = vec![opened("task-1"), claimed("task-1"), leased_until("lease-1", "task-1", 1000), used("lease-1")];
@@ -3335,14 +3352,14 @@ fn status_lists_each_started_unfinished_lease_under_running_agents() {
 }
 
 #[test]
-fn a_started_lease_past_its_deadline_shows_under_overdue_not_running_agents() {
+fn a_started_lease_past_its_deadline_shows_under_overdue_only() {
     let text = status_of(running_until(1));
     assert!(text.contains(NO_STOP), "{text}");
     assert!(text.contains(&format!("overdue leases (flagged)\n  lease-1 for task-1: agent {AGENT_ID}")), "{text}");
 }
 
 #[test]
-fn running_agents_name_the_role_and_leave_out_agents_of_finished_tasks() {
+fn agents_with_no_stop_name_the_role_and_leave_out_agents_of_finished_tasks() {
     let review = [
         linked_task(),
         vec![review_leased_until("lease-2", PINNED, 1000), used("lease-2")],
@@ -3795,7 +3812,7 @@ fn worker_wait_records_the_structured_verdict_on_the_reviewed_head_then_the_end(
             )
         );
         let (status, _) = call(&mut ports, &["status"], "");
-        assert!(!status.text.contains("no verdict"), "{}", status.text);
+        assert!(!status.text.contains("review leases with no verdict"), "{}", status.text);
     }
 }
 

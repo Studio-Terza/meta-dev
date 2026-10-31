@@ -38,6 +38,14 @@ const UNSEEN_STARTS: &str = "agent starts without a lease are not observable: me
 /// What `meta status` tells the lead to do while the default data dir's log is unmarked.
 const MARK_THE_LOG: &str = "run meta mark-real-log with a main build";
 
+/// Says exactly what the section shows: a worker stays on it whatever its verdict or task, for its
+/// process is still there, and the log's other started agents are left out by these words.
+const NO_STOP_AGENTS: &str =
+    "agents with no turn end or stop recorded, not flagged overdue; subagents also with no verdict, on an open task";
+
+/// Says exactly what the section shows: a worker's end is reported by its own lines.
+const STOPPED_AGENTS: &str = "subagents with a turn end or stop recorded, no verdict, on an open task";
+
 impl Ledger {
     /// A lease is flagged from its third resume onward.
     const FLAGGED_RESUMES: usize = 3;
@@ -217,8 +225,8 @@ impl Ledger {
             section("deferred", &listed(|task| matches!(task, Progress::Deferred(_)))),
             done_by_others,
             section("live leases", &leases),
-            section("agents with no turn end or stop recorded", &running),
-            section("agents with a turn end or stop recorded", &past),
+            section(NO_STOP_AGENTS, &running),
+            section(STOPPED_AGENTS, &past),
             section(&format!("open escapes: {open_count}"), &open_escapes),
             section("escapes corrected to historical", &corrected),
             section("latest review verdict per linked PR", &self.verdicts()),
@@ -261,9 +269,10 @@ impl Ledger {
                         other.lease().task() == task
                             && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
                     });
-                    let how = match spent.has_ended() {
-                        true => "review finished",
-                        false => "review's last recorded turn ended",
+                    let how = match (spent.has_ended(), spent.worker()) {
+                        (true, Some(_)) => "review finished",
+                        (true, None) => "review stopped by TaskStop",
+                        (false, _) => "review's last recorded turn ended",
                     };
                     (!later).then(|| format!("{id} for {task}: {how} with no verdict{}", slot.worker_note()))
                 }
