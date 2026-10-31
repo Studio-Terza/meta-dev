@@ -40,19 +40,24 @@ impl Ledger {
     }
 
     /// The PR a used review lease of `task` awaits a verdict on: the one to ask GitHub about.
-    pub fn awaiting(&self, task: TaskId) -> Result<PrNumber, Refusal> {
-        self.awaiting_lease(task).map(|(_, pr, _)| pr)
+    pub fn awaiting(&self, task: TaskId, at: Timestamp) -> Result<PrNumber, Refusal> {
+        self.awaiting_lease(task, at).map(|(_, pr, _)| pr)
     }
 
     /// The first used review lease of `task` with no verdict, and the PR and head it reviews. A
     /// headless worker's lease is never one: its verdict comes only from its own session
     /// (`verdict_of`), so a reviewer's verdict neither lands on it nor waits for it, running or dead.
-    fn awaiting_lease(&self, task: TaskId) -> Result<(LeaseId, PrNumber, Sha), Refusal> {
+    /// Nor is a lease of any kind whose deadline has passed at `at`: its agent has ended, and a
+    /// reviewer on a later lease must be able to record its verdict.
+    fn awaiting_lease(&self, task: TaskId, at: Timestamp) -> Result<(LeaseId, PrNumber, Sha), Refusal> {
         self.leases
             .iter()
             .find_map(|(id, slot)| match slot {
                 LeaseSlot::Spent(spent)
-                    if spent.lease().task() == task && spent.verdict().is_none() && spent.worker().is_none() =>
+                    if spent.lease().task() == task
+                        && spent.verdict().is_none()
+                        && spent.worker().is_none()
+                        && !slot.deadline().passed(at) =>
                 {
                     match spent.lease().purpose() {
                         Purpose::Review { pr, head } => Some((*id, *pr, head.clone())),
@@ -72,8 +77,8 @@ impl Ledger {
 
     /// Records the verdict on the review lease of `task`, given the head the PR has now: the head
     /// the verdict judged must be the one the lease was issued at.
-    pub fn verdict(&self, task: TaskId, verdict: Verdict, now: &Pull) -> Result<Accepted, Refusal> {
-        let (lease, pr, head) = self.awaiting_lease(task)?;
+    pub fn verdict(&self, task: TaskId, verdict: Verdict, now: &Pull, at: Timestamp) -> Result<Accepted, Refusal> {
+        let (lease, pr, head) = self.awaiting_lease(task, at)?;
         Self::on_head(task, lease, pr, head, verdict, now)
     }
 

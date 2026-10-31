@@ -1137,6 +1137,21 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
 }
 
 #[test]
+fn verdict_skips_an_ordinary_reviewers_lease_past_its_deadline_and_lands_on_a_later_live_one() {
+    let dead = vec![review_leased_until("lease-2", PINNED, 1), used("lease-2")];
+    let live = vec![review_leased_until("lease-3", PINNED, 1000), used("lease-3")];
+    let at_pinned = || vec![("7", pull(PINNED, &[]))];
+    let history = [linked_task(), dead.clone(), live].concat();
+    let (reply, events) = call(&mut given(history, at_pinned()), &["verdict", "task-1", "pass"], "");
+    let expected = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(PINNED)) };
+    assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
+    let alone = [linked_task(), dead].concat();
+    let (reply, events) = call(&mut given(alone, at_pinned()), &["verdict", "task-1", "pass"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    assert!(reply.text.contains("awaits a verdict"), "{}", reply.text);
+}
+
+#[test]
 fn verdict_is_refused_when_the_pr_head_is_not_the_head_the_review_lease_judged() {
     let used_review = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
     let mut ports = given(used_review, vec![("7", pull(MOVED, &[]))]);

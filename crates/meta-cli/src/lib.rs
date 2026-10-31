@@ -609,7 +609,7 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
             }
         }
         LedgerCall::Verdict { task, verdict } => {
-            Prepared::Verdict { task, verdict, pull: github.pull(ledger.awaiting(task)?)? }
+            Prepared::Verdict { task, verdict, pull: github.pull(ledger.awaiting(task, clock.now())?)? }
         }
         LedgerCall::Review { task, agent, deadline } => {
             let pull = github.pull(ledger.review(task, agent.clone())?.pr())?;
@@ -636,7 +636,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Role { task, role }) => ledger.role(task, role)?,
-        Prepared::Verdict { task, verdict, pull } => ledger.verdict(task, verdict, &pull)?,
+        Prepared::Verdict { task, verdict, pull } => ledger.verdict(task, verdict, &pull, at)?,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),
