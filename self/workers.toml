@@ -1,0 +1,51 @@
+# Headless workers (docs/prereg.md, "Headless workers"; docs/stage2c.md). Each entry must cite where
+# it came from. A tool without a source is a bug: this file does not parse.
+# source = "owner YYYY-MM-DD: <words>" or "failure: <what happened>"
+# `tool` is a Claude Code tool name or permission rule, as --allowedTools and --disallowedTools take it.
+
+# meta refuses to start a worker on a claude older than this. --restricted, --json-schema and the
+# stream-json result line were probed on this version, so nothing below it is known to hold.
+[claude]
+floor = "2.1.314"
+source = "failure: review of #47: the session's confinement rests on flags a claude too old may not have"
+
+# Passed as --model. --restricted ignores user settings, so a session gets no other choice of model.
+[model]
+review = "opus"
+source = "owner 2026-10-26: model tier by difficulty: reviews run on opus"
+
+[concurrency]
+running = 4
+source = "owner 2026-10-30: at most 4 workers at once"
+
+# What a reviewer may use: --tools limits the session to these, --allowedTools approves them, and
+# dontAsk denies everything else. No Bash: meta fetches the change and records the verdict itself.
+[[review.allow]]
+tool = "Read"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.allow]]
+tool = "Grep"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.allow]]
+tool = "Glob"
+source = "owner 2026-10-30: an explicit allowlist, fixers and reviewers first"
+
+[[review.deny]]
+tool = "Agent"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+[[review.deny]]
+tool = "Task"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+# Starting claude takes a command, and no reviewer runs one.
+[[review.deny]]
+tool = "Bash"
+source = "owner 2026-10-30: Agent, Task and starting claude are denied"
+
+# --tools does not cover MCP tools (Claude Code CLI reference, --tools).
+[[review.deny]]
+tool = "mcp__*"
+source = "owner 2026-10-30: an explicit allowlist"

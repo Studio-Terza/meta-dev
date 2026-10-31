@@ -37,6 +37,7 @@ mod task;
 mod timeline;
 mod wait;
 mod waiting;
+mod worker;
 
 pub use brief::Reissue;
 pub use build::{Build, Unverified};
@@ -48,9 +49,9 @@ pub use event::{Attempt, Event, Record, Route};
 pub use head::{Head, Marking, Standing};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Binary, Branch, CheckName, Claimant, Email, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
-    Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId,
-    Timestamp, Title, Verdict,
+    AgentId, AgentName, Binary, Branch, CheckName, Claimant, ClaudeVersion, Email, EscapeId, EscapeKind, ExitStatus,
+    LeaseId, Malformed, Minutes, Model, Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId,
+    ProcessGroup, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title, ToolRule, Transcript, Verdict,
 };
 pub use imported::Imported;
 pub use importing::Importing;
@@ -73,3 +74,7 @@ pub use set_aside::{UnverifiedEscape, UnverifiedEscapes};
 pub use side_line::SideLine;
 pub use spec::{SelfFile, Unreadable};
 pub use status::Sources;
+pub use worker::{
+    Judged, NoVerdict, Planned, ReviewCopy, Session, SessionVerdict, Starting, Watch, Worker, WorkerEnd, WorkerPlan,
+    WorkerRun, Workers,
+};

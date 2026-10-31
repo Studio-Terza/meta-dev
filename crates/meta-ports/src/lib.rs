@@ -2,8 +2,9 @@ pub mod memory;
 pub mod real;
 
 use meta_core::{
-    Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span,
-    Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    AgentId, Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, ReviewCopy, SelfFile, Session,
+    Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating, WorkerPlan,
+    WorkerRun,
 };
 use std::fmt;
 
@@ -99,6 +100,8 @@ impl GhReplies {
 
 pub trait GitHub {
     fn pull(&self, pr: PrNumber) -> Result<Pull, PortError>;
+    /// `gh pr view` and `gh pr diff` of the PR, as text for a reviewer to read.
+    fn review_copy(&self, pr: PrNumber) -> Result<ReviewCopy, PortError>;
     fn merged_list(&self) -> Result<String, PortError>;
     /// The one `gh pr list --state open` reply, with the number, base and commits of each PR.
     fn open_list(&self) -> Result<String, PortError>;
@@ -115,11 +118,33 @@ pub trait Clock {
     fn pause(&self, span: Span);
 }
 
-pub struct Ports<L, G, H, C> {
+/// The sessions found without the log, each as read or why it could not be.
+pub type Listed = Vec<Result<(AgentId, WorkerRun), PortError>>;
+
+/// Headless Claude sessions: the only way a worker runs.
+pub trait Sessions {
+    /// The `claude --version` reply: the one `claude` call besides the sessions themselves.
+    fn version(&self) -> Result<String, PortError>;
+    /// Starts the session, detached, and the supervisor that watches it; returns once both run. A
+    /// supervisor that ends takes the session with it. A session that the supervisor could not
+    /// join is ended again, and what it left does not stand in the way of the next start.
+    fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError>;
+    fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError>;
+    /// Ends the session's process group. A session already gone is not an error.
+    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError>;
+    /// The lines of the session's transcript.
+    fn transcript(&self, run: &WorkerRun) -> Result<Vec<String>, PortError>;
+    /// The sessions alive now, found without the log, so that `meta stop` still kills on a log it
+    /// cannot read. An entry that cannot be read is an error of its own, not the end of the list.
+    fn listed(&self) -> Result<Listed, PortError>;
+}
+
+pub struct Ports<L, G, H, C, S> {
     pub log: L,
     pub git: G,
     pub github: H,
     pub clock: C,
+    pub sessions: S,
     /// The commit this binary was built from.
     pub build: Build,
 }

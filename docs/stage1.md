@@ -117,7 +117,7 @@ Agents can and will stall (owner, 2026-10-30). Every lease carries a deadline, s
 | `meta status` | the task of an overdue lease is done | the lease is no longer flagged |
 | `meta status` | a lease recorded before deadlines existed | it folds with no deadline: "live leases" shows "no deadline", and it is never flagged overdue |
 
-The role defaults are data, each with a source. Headless workers will be stopped at their deadline later; for now the flag is the only enforcement.
+The role defaults are data, each with a source. A headless worker is killed at its deadline (`docs/stage2c.md`); for any other agent the flag is the only enforcement.
 
 ### Finished agents and running agents
 

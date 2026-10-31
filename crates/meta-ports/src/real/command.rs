@@ -32,15 +32,20 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<Vec<u8>> {
     receiver
 }
 
-/// Ends the command's whole process group, so that what it started goes too: SIGTERM, a short
-/// grace, then SIGKILL. A group that is already gone is not an error.
-fn terminate(child: &mut Child) {
-    let group = i32::try_from(child.id()).ok().map(Pid::from_raw);
+/// Ends a whole process group, so that what its leader started goes too: SIGTERM, a short grace,
+/// then SIGKILL. A group that is already gone is not an error.
+pub fn end_group(leader: u32) {
+    let group = i32::try_from(leader).ok().map(Pid::from_raw);
     group.into_iter().for_each(|group| {
         let _ = killpg(group, Signal::SIGTERM);
         thread::sleep(GRACE);
         let _ = killpg(group, Signal::SIGKILL);
     });
+}
+
+/// Ends the command and its process group.
+fn terminate(child: &mut Child) {
+    end_group(child.id());
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -94,12 +99,22 @@ fn execute(
 }
 
 pub fn run(program: &str, args: &[&str]) -> Result<String, PortError> {
-    run_within(program, args, PORT_TIMEOUT)
+    run_within(program, args, PORT_TIMEOUT, |_| ())
 }
 
-fn run_within(program: &str, args: &[&str], limit: Duration) -> Result<String, PortError> {
+/// Like `run`, with the command prepared first, as a worker's narrowed environment is.
+pub fn run_prepared(program: &str, args: &[&str], prepare: impl FnOnce(&mut Command)) -> Result<String, PortError> {
+    run_within(program, args, PORT_TIMEOUT, prepare)
+}
+
+fn run_within(
+    program: &str,
+    args: &[&str],
+    limit: Duration,
+    prepare: impl FnOnce(&mut Command),
+) -> Result<String, PortError> {
     let shown = format!("{program} {}", args.join(" "));
-    let output = execute(program, args, limit, |_| ())?;
+    let output = execute(program, args, limit, prepare)?;
     match output.status.success() {
         true => String::from_utf8(output.stdout).map_err(|error| PortError::new(format!("{shown}: {error}"))),
         false => Err(PortError::new(format!("{shown}: {}", String::from_utf8_lossy(&output.stderr)))),
@@ -170,7 +185,7 @@ mod tests {
         let scratch = Scratch::new("grandchild");
         let file = scratch.join("pid");
         let script = format!("sleep 30 & printf %s $! > {}; wait; true", file.display());
-        let error = run_within("/bin/sh", &["-c", &script], Duration::from_millis(500)).unwrap_err();
+        let error = run_within("/bin/sh", &["-c", &script], Duration::from_millis(500), |_| ()).unwrap_err();
         assert_eq!(error.to_string(), format!("/bin/sh -c {script}: timed out after 0.5 s"));
         assert_ends_gone(&written_pid(&file));
     }
@@ -181,7 +196,7 @@ mod tests {
         let file = scratch.join("pid");
         let script = format!("sleep 30 & printf %s $! > {}", file.display());
         let started = Instant::now();
-        let error = run_within("/bin/sh", &["-c", &script], Duration::from_millis(500)).unwrap_err();
+        let error = run_within("/bin/sh", &["-c", &script], Duration::from_millis(500), |_| ()).unwrap_err();
         assert_eq!(error.to_string(), format!("/bin/sh -c {script}: timed out after 0.5 s"));
         assert!(started.elapsed() < Duration::from_secs(10));
         assert_ends_gone(&written_pid(&file));
@@ -223,13 +238,13 @@ mod tests {
     #[test]
     fn a_command_that_outlasts_the_limit_is_killed_and_fails_with_a_port_error() {
         let started = Instant::now();
-        let error = run_within("/bin/sh", &["-c", "sleep 30"], Duration::from_millis(200)).unwrap_err();
+        let error = run_within("/bin/sh", &["-c", "sleep 30"], Duration::from_millis(200), |_| ()).unwrap_err();
         assert_eq!(error.to_string(), "/bin/sh -c sleep 30: timed out after 0.2 s");
         assert!(started.elapsed() < Duration::from_secs(10));
     }
 
     #[test]
     fn a_command_that_ends_within_the_limit_keeps_its_output() {
-        assert_eq!(run_within("/bin/sh", &["-c", "printf abc"], Duration::from_secs(10)).as_deref(), Ok("abc"));
+        assert_eq!(run_within("/bin/sh", &["-c", "printf abc"], Duration::from_secs(10), |_| ()).as_deref(), Ok("abc"));
     }
 }

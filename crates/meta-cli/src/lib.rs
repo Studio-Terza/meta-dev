@@ -5,7 +5,9 @@ use meta_core::{
     Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable,
     Unverified, Updating, Verdict,
 };
-use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
+use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports, Sessions};
+
+mod worker;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
@@ -21,6 +23,17 @@ pub enum Call {
     ImportEscapes,
     /// Puts the `RealLog` marker first in the log, once; only a main build may.
     MarkRealLog,
+    Worker(WorkerCall),
+}
+
+/// Headless workers: starting one, the supervisor of one, and the kill switch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkerCall {
+    Start(LeaseId),
+    /// Blocks until the worker on the lease has ended: `meta worker start` spawns this.
+    Wait(LeaseId),
+    /// Ends the worker on the lease, or with none every running worker.
+    Stop(Option<LeaseId>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,6 +143,7 @@ impl Call {
                          meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
+                         meta worker start <lease>\n  meta worker wait <lease>\n  meta stop [<lease>]\n  \
                          meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n  meta hook subagent-stop < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
@@ -152,6 +166,10 @@ impl Call {
             ["merge", pr, "--update"] => ledger(pr.parse().map(LedgerCall::Update)),
             ["brief", lease] => ledger(lease.parse().map(LedgerCall::Brief)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
+            ["worker", "start", lease] => Some(lease.parse().map(|lease| Self::Worker(WorkerCall::Start(lease)))),
+            ["worker", "wait", lease] => Some(lease.parse().map(|lease| Self::Worker(WorkerCall::Wait(lease)))),
+            ["stop"] => Some(Ok(Self::Worker(WorkerCall::Stop(None)))),
+            ["stop", lease] => Some(lease.parse().map(|lease| Self::Worker(WorkerCall::Stop(Some(lease))))),
             ["mark-real-log"] => Some(Ok(Self::MarkRealLog)),
             ["escape", "--import"] => Some(Ok(Self::ImportEscapes)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
@@ -223,8 +241,11 @@ impl Call {
     }
 }
 
-pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports<L, G, H, C>) -> Answer {
-    let Ports { log, git, github, clock, build } = ports;
+pub fn answer<L: Log, G: Git, H: GitHub, C: Clock, S: Sessions>(
+    call: Call,
+    ports: &mut Ports<L, G, H, C, S>,
+) -> Answer {
+    let Ports { log, git, github, clock, sessions, build } = ports;
     let at = clock.now();
     let standing = log.standing();
     let mut guard = Guard::default();
@@ -232,6 +253,9 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
         Call::Hook(phase, input) => {
             hook(phase, Hook::read(phase, &input), log, at, standing, |standing| guard.at(standing, git, build))
         }
+        Call::Worker(WorkerCall::Start(lease)) => worker::start(lease, log, git, github, sessions, build, at),
+        Call::Worker(WorkerCall::Wait(lease)) => worker::wait(lease, log, git, github, sessions, clock, build),
+        Call::Worker(WorkerCall::Stop(lease)) => worker::stop(lease, log, git, sessions, build, at),
         Call::MarkRealLog => {
             if let Err(unverified) = build.verify_marking(|commit| git.on_main(commit)) {
                 return Answer::failed(Failure::Refused(unverified.into()));

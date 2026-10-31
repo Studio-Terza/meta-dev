@@ -1,7 +1,8 @@
-use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
+use crate::{Clock, GhReplies, Git, GitHub, Listed, Log, PortError, Sessions};
 use meta_core::{
-    Binary, Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing,
-    TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    AgentId, Binary, Cleared, Head, Marking, Origin, Place, PrNumber, ProcessGroup, Pull, Record, ReviewCopy, SelfFile,
+    Session, Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    WorkerPlan, WorkerRun,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
@@ -145,6 +146,8 @@ pub struct RecordedGitHub {
     pub listed: Option<Result<String, PortError>>,
     /// The reply to the one open-PR list call.
     pub open: Option<Result<String, PortError>>,
+    /// Why fetching a review copy fails, when it does.
+    pub broken_copy: Option<PortError>,
 }
 
 impl GitHub for RecordedGitHub {
@@ -154,6 +157,11 @@ impl GitHub for RecordedGitHub {
             .or_else(|| self.replies.get(&pr).cloned())
             .ok_or_else(|| PortError::new(format!("no recorded reply for {pr}")))?
             .pull()
+    }
+
+    fn review_copy(&self, pr: PrNumber) -> Result<ReviewCopy, PortError> {
+        self.broken_copy.clone().map_or(Ok(()), Err)?;
+        Ok(ReviewCopy { view: format!("recorded view of {pr}"), diff: format!("recorded diff of {pr}") })
     }
 
     fn runs(&self, pr: PrNumber) -> Result<String, PortError> {
@@ -179,6 +187,84 @@ impl GitHub for RecordedGitHub {
     fn squash_merge(&mut self, cleared: &Cleared) -> Result<(), PortError> {
         self.merged.push((cleared.pr(), cleared.head().clone()));
         Ok(())
+    }
+}
+
+/// Sessions that only record what they were asked; no process runs.
+#[derive(Debug)]
+pub struct RecordedSessions {
+    /// The `claude --version` reply.
+    pub version: Result<String, PortError>,
+    pub started: Vec<WorkerPlan>,
+    pub stopped: Vec<WorkerRun>,
+    /// Why starting fails, when it does.
+    pub broken_start: Option<PortError>,
+    /// Why stopping fails, when it does.
+    pub broken_stop: Option<PortError>,
+    /// The replies to `state`, one per call; after them a session is running.
+    pub states: RefCell<VecDeque<Result<Session, PortError>>>,
+    /// The lines of every session's transcript.
+    pub transcript: Result<Vec<String>, PortError>,
+    /// What the port finds without the log.
+    pub listed: Result<Listed, PortError>,
+}
+
+impl Default for RecordedSessions {
+    fn default() -> Self {
+        Self {
+            version: Ok(Self::VERSION.to_owned()),
+            started: Vec::new(),
+            stopped: Vec::new(),
+            broken_start: None,
+            broken_stop: None,
+            states: RefCell::default(),
+            transcript: Ok(Vec::new()),
+            listed: Ok(Vec::new()),
+        }
+    }
+}
+
+impl RecordedSessions {
+    /// A `claude --version` reply, as the real command words it.
+    pub const VERSION: &str = "2.1.314 (Claude Code)\n";
+
+    /// The first process group handed out.
+    pub const FIRST_GROUP: u32 = 900;
+
+    pub fn transcript(worker: &AgentId) -> String {
+        format!("/recorded/workers/{worker}/transcript.jsonl")
+    }
+}
+
+impl Sessions for RecordedSessions {
+    fn version(&self) -> Result<String, PortError> {
+        self.version.clone()
+    }
+
+    fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
+        self.broken_start.clone().map_or(Ok(()), Err)?;
+        self.started.push(plan.clone());
+        let group = Self::FIRST_GROUP.saturating_add(u32::try_from(self.started.len()).unwrap_or(u32::MAX));
+        let transcript = Self::transcript(plan.id()).parse()?;
+        Ok(WorkerRun { group: ProcessGroup::of(group), transcript, model: plan.model().clone() })
+    }
+
+    fn state(&self, _: &AgentId, _: &WorkerRun) -> Result<Session, PortError> {
+        self.states.borrow_mut().pop_front().unwrap_or(Ok(Session::Running))
+    }
+
+    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
+        self.broken_stop.clone().map_or(Ok(()), Err)?;
+        self.stopped.push(run.clone());
+        Ok(())
+    }
+
+    fn transcript(&self, _: &WorkerRun) -> Result<Vec<String>, PortError> {
+        self.transcript.clone()
+    }
+
+    fn listed(&self) -> Result<Listed, PortError> {
+        self.listed.clone()
     }
 }
 
