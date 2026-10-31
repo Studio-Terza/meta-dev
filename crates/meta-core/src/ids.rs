@@ -122,6 +122,11 @@ impl EscapeKind {
     pub fn unclassified() -> Self {
         Self("unclassified".to_owned())
     }
+
+    /// The kind of an escape that records an agent start without a lease (P1).
+    pub fn outside_start() -> Self {
+        Self("outside-start".to_owned())
+    }
 }
 
 /// A reviewer's verdict on a linked PR.

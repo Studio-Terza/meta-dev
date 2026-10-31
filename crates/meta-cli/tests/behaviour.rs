@@ -364,7 +364,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         "open escapes: 3",
         "escape-1 [gap] gh is down",
         "escape-3 [outside-merge] hook too strict",
-        "P1 agent starts through meta: 1 of 2",
+        "P1 agent starts through meta: 1; prevented by the hook: 1; bypassed, from outside-start escapes: 0;",
         "P1 merges through meta: 1 of 2",
         "P1 merged outside meta: 1 (0 missing from the log)",
         "P2 open escapes: 3 (0 closed as historical); most repeats of one kind: 1 (gap)",
@@ -852,7 +852,7 @@ fn escapes_logged_before_kinds_fold_as_unclassified_beside_old_denied_and_lease_
     let expected = [
         "escape-1 [unclassified] bootstrap: agent started",
         "escape-2 [unclassified] no retire command",
-        "P1 agent starts through meta: 1 of 2",
+        "P1 agent starts through meta: 1; prevented by the hook: 1; bypassed, from outside-start escapes: 0;",
         "P2 open escapes: 2 (0 closed as historical); most repeats of one kind: 0",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -867,8 +867,10 @@ fn claim_self_of_an_open_task_records_claimed_by_the_lead_with_no_lease_and_prin
     let brief = ["task-1: Fix the hook", "lease: none", "setup:", "rules:", "fixture: identity"];
     assert!(brief.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
     let status = status_of(vec![opened("task-1"), self_claimed("task-1"), opened("task-2")]);
-    let expected =
-        ["task-1 claimed by the lead", "P1 agent starts through meta: 0 of 0; self-claims, not agent starts: 1"];
+    let expected = [
+        "task-1 claimed by the lead",
+        "P1 agent starts through meta: 0; prevented by the hook: 0; bypassed, from outside-start escapes: 0; self-claims, not agent starts: 1",
+    ];
     assert!(expected.iter().all(|line| status.contains(line)), "{status}");
     let record = Record { at: Timestamp::from_unix_seconds(1), event: self_claimed("task-1") };
     let line = serde_json::to_string(&record).unwrap();
@@ -1024,7 +1026,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let calm = [finished_task(), vec![escaped("gap", "no retire")]].concat();
     let status = status_of(calm);
     let lines = [
-        "P1 The loop is used: holds; observed unrecorded bypasses 0; expected 100%, except recorded escapes",
+        "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable",
         "P2 Gaps get fixed, not bypassed: holds; observed open escapes 1, most repeats of one escape kind 0; \
          expected Each reason fixed before its 3rd repeat; at most 5 open",
         "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2",
@@ -1050,7 +1052,13 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
         event: escaped_pr("outside-merge", "1", "merged by hand"),
     });
     let (reply, _) = call(&mut ports, "status", "");
-    assert!(reply.text.contains("P1 The loop is used: holds; observed unrecorded bypasses 0;"), "{}", reply.text);
+    assert!(
+        reply.text.contains(
+            "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
+        ),
+        "{}",
+        reply.text
+    );
     ports.github.listed = Some(Err(PortError::new("gh is down")));
     let (reply, _) = call(&mut ports, "status", "");
     assert!(
@@ -1081,7 +1089,7 @@ fn status_falsifies_p1_for_each_pr_merged_outside_meta_that_no_outside_merge_esc
         (vec![escaped_pr("outside-merge", "99", "merged by hand")], "FALSIFIED; observed unrecorded bypasses 2;"),
         (
             vec![escaped_pr("outside-merge", "8", "by hand"), escaped_pr("outside-merge", "12", "by hand")],
-            "P1 The loop is used: holds; observed unrecorded bypasses 0;",
+            "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable",
         ),
     ];
     cases.into_iter().for_each(|(escapes, expected)| {
@@ -1405,7 +1413,7 @@ fn p1_still_counts_an_outside_merge_escape_that_names_a_pr_when_it_is_resolved_h
         let mut ports = given(history, Vec::new());
         ports.github.listed = Some(Ok(listed(&[7, 8])));
         let (reply, _) = call(&mut ports, "status", "");
-        assert!(reply.text.contains("P1 The loop is used: holds; observed unrecorded bypasses 0;"), "{}", reply.text);
+        assert!(reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"), "{}", reply.text);
     });
 }
 
@@ -1536,4 +1544,40 @@ fn leases_from_before_deadlines_fold_as_no_deadline_and_are_never_overdue() {
     let new = Record { at: Timestamp::from_unix_seconds(1), event: leased_until("lease-1", "task-1", 9) };
     let line = serde_json::to_string(&new).unwrap();
     assert_eq!(line, r#"{"at":1,"event":"Leased","lease":1,"task":1,"deadline":9}"#);
+}
+
+// Task 31 (critic issue #11): P1 judges agent starts too, and a hook denial is not a miss.
+
+#[test]
+fn status_never_shows_p1_as_holds_because_meta_cannot_observe_starts_without_a_lease() {
+    let denied = vec![Event::Denied { attempt: Attempt::AgentStart }, Event::Denied { attempt: Attempt::AgentStart }];
+    let status = status_of([finished_task(), denied].concat());
+    assert!(status.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"), "{status}");
+    assert!(
+        !status.contains("P1 The loop is used: holds") && !status.contains("P1 The loop is used: FALSIFIED"),
+        "{status}"
+    );
+    assert!(status.contains("prevented by the hook: 2;"), "{status}");
+}
+
+#[test]
+fn status_falsifies_p1_for_each_outside_start_escape_and_hook_denials_never_count() {
+    let start = |reason: &str| escaped("outside-start", reason);
+    let cases = [
+        (vec![start("agent without a lease")], "FALSIFIED; observed unrecorded bypasses 1;"),
+        (vec![start("one"), start("two")], "FALSIFIED; observed unrecorded bypasses 2;"),
+        (
+            vec![start("one"), Event::Denied { attempt: Attempt::AgentStart }],
+            "FALSIFIED; observed unrecorded bypasses 1;",
+        ),
+    ];
+    cases.into_iter().for_each(|(escapes, expected)| {
+        let status = status_of([finished_task(), escapes].concat());
+        assert!(status.contains(expected), "{expected}\n{status}");
+    });
+    let mut ports = given([finished_task(), vec![start("no lease")]].concat(), Vec::new());
+    ports.github.listed = Some(Err(PortError::new("gh is down")));
+    let (reply, _) = call(&mut ports, "status", "");
+    assert!(reply.text.contains("P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;"), "{}", reply.text);
+    assert!(reply.text.contains("bypassed, from outside-start escapes: 1;"), "{}", reply.text);
 }

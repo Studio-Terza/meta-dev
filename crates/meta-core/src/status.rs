@@ -19,6 +19,10 @@ pub struct Sources {
     pub predictions: Result<Predictions, Unreached>,
 }
 
+/// Why P1's agent-start half cannot say "holds": meta sees a start without a lease only through an
+/// `outside-start` escape, so a start nobody recorded is invisible to it.
+const UNSEEN_STARTS: &str = "agent starts without a lease are not observable: meta sees only those an outside-start escape records, not the hook's denials";
+
 impl Ledger {
     /// A lease is flagged from its third resume onward.
     const FLAGGED_RESUMES: usize = 3;
@@ -73,6 +77,7 @@ impl Ledger {
         let most = repeats.iter().filter(|(_, count)| **count > 0).max_by_key(|(_, count)| **count);
         let most_line = most.map_or_else(|| "0".to_owned(), |(key, count)| format!("{count} ({key})"));
         let started = self.leases.values().filter(|slot| matches!(slot, LeaseSlot::Spent(_))).count();
+        let starts_outside = self.escapes.iter().filter(|logged| logged.is_outside_start()).count();
         let merged = self.merged.len();
         let through_meta = self.merged.iter().filter(|(_, route)| *route == Route::Meta).count();
         let outside_logged = merged - through_meta;
@@ -91,12 +96,15 @@ impl Ledger {
                 Measure::RepeatsOfOneKind => Ok(Quantity::count(most.map_or(0, |(_, count)| *count))),
                 Measure::MedianCiRuns => median.ok_or_else(|| "no merged PRs yet".to_owned()),
                 Measure::UnrecordedBypasses => {
-                    let kinds = kinds.as_ref().map_err(|why| format!("escape kinds unreadable: {why}"))?;
-                    let named: BTreeSet<PrNumber> =
-                        self.escapes.iter().filter_map(|logged| logged.merged_pr(kinds)).collect();
-                    let missing = missing.as_ref().map_err(Clone::clone)?;
-                    let outside: BTreeSet<&PrNumber> = self.outside.iter().chain(missing).collect();
-                    Ok(Quantity::count(outside.into_iter().filter(|pr| !named.contains(pr)).count()))
+                    let merges = self.unnamed_outside_merges(&kinds, &missing);
+                    let starts = self.escapes.iter().filter(|logged| logged.is_outside_start()).count();
+                    // A known bypass falsifies whatever else is unreadable; none known leaves the rest undecided.
+                    match (merges, starts) {
+                        (Ok(merges), starts) if merges + starts > 0 => Ok(Quantity::count(merges + starts)),
+                        (Err(_), starts) if starts > 0 => Ok(Quantity::count(starts)),
+                        (Err(why), _) => Err(why),
+                        (Ok(_), _) => Err(UNSEEN_STARTS.to_owned()),
+                    }
                 }
             }
         };
@@ -146,9 +154,8 @@ impl Ledger {
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
             format!(
-                "P1 agent starts through meta: {started} of {}; self-claims, not agent starts: {}\n",
-                started + self.starts_denied,
-                self.self_claims
+                "P1 agent starts through meta: {started}; prevented by the hook: {}; bypassed, from outside-start escapes: {starts_outside}; self-claims, not agent starts: {}\n",
+                self.starts_denied, self.self_claims
             ),
             self.merges_line(through_meta, outside_logged, github),
             format!(
@@ -161,6 +168,19 @@ impl Ledger {
         ]
         .concat();
         (fresh, text)
+    }
+
+    /// PRs merged outside meta, logged or missing from the log, that no escape naming a merged PR names.
+    fn unnamed_outside_merges(
+        &self,
+        kinds: &Result<EscapeKinds, Unreached>,
+        missing: &Result<Vec<PrNumber>, String>,
+    ) -> Result<usize, String> {
+        let kinds = kinds.as_ref().map_err(|why| format!("escape kinds unreadable: {why}"))?;
+        let named: BTreeSet<PrNumber> = self.escapes.iter().filter_map(|logged| logged.merged_pr(kinds)).collect();
+        let missing = missing.as_ref().map_err(Clone::clone)?;
+        let outside: BTreeSet<&PrNumber> = self.outside.iter().chain(missing).collect();
+        Ok(outside.into_iter().filter(|pr| !named.contains(pr)).count())
     }
 
     fn open_escapes(&self) -> usize {
