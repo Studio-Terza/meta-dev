@@ -447,6 +447,7 @@ enum Prepared {
         task: TaskId,
         by: PrNumber,
         pull: Pull,
+        own: Option<Pull>,
     },
     Brief {
         lease: LeaseId,
@@ -547,8 +548,10 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
             Prepared::Retire { task, reason, pull }
         }
         LedgerCall::DoneBy { task, by } => {
-            let pull = github.pull(ledger.done_by(task, by)?.pr())?;
-            Prepared::DoneBy { task, by, pull }
+            let finishing = ledger.done_by(task, by)?;
+            let pull = github.pull(finishing.pr())?;
+            let own = finishing.own().map(|pr| github.pull(pr)).transpose()?;
+            Prepared::DoneBy { task, by, pull, own }
         }
         LedgerCall::Brief(lease) => {
             ledger.reissue(lease)?;
@@ -586,7 +589,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         },
         Prepared::Update { updating } => updating.record(),
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
-        Prepared::DoneBy { task, by, pull } => ledger.done_by(task, by)?.settle(&pull)?,
+        Prepared::DoneBy { task, by, pull, own } => ledger.done_by(task, by)?.settle(&pull, own.as_ref())?,
         Prepared::Brief { lease, origin, rules } => ledger.reissue(lease)?.brief(&origin, &rules),
         Prepared::Review { task, agent, pull, rules, allowance } => {
             ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?

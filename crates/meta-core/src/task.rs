@@ -67,13 +67,14 @@ impl<Stage> Task<Stage> {
     }
 }
 
-impl Task<Open> {
-    pub fn finish_by(self, pr: PrNumber) -> Task<Done> {
-        self.into_stage(Done { how: Finish::By(pr) })
-    }
-}
+/// A stage a task can leave by another task's merged PR.
+pub trait Finishable {}
 
-impl Task<Claimed> {
+impl Finishable for Open {}
+impl Finishable for Claimed {}
+impl Finishable for Linked {}
+
+impl<Stage: Finishable> Task<Stage> {
     pub fn finish_by(self, pr: PrNumber) -> Task<Done> {
         self.into_stage(Done { how: Finish::By(pr) })
     }
@@ -125,10 +126,6 @@ impl Task<Linked> {
     pub fn finish(self) -> Task<Done> {
         let Linked { agent, pr, .. } = self.stage;
         Task { id: self.id, title: self.title, stage: Done { how: Finish::Own { agent, pr } } }
-    }
-
-    pub fn finish_by(self, pr: PrNumber) -> Task<Done> {
-        self.into_stage(Done { how: Finish::By(pr) })
     }
 
     pub fn pr(&self) -> PrNumber {

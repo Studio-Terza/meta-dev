@@ -974,8 +974,14 @@ fn done_by_event(task: &str, pr: &str) -> Event {
 #[test]
 fn done_by_a_merged_pr_closes_an_open_claimed_or_linked_task_and_status_shows_done_by() {
     let merged_pr = || ("9", Gh { state: "MERGED", ..gh(PINNED, &[]) }.replies());
-    [vec![opened("task-1")], claimed_task(), linked_task()].into_iter().for_each(|history| {
-        let mut ports = given(history, vec![merged_pr()]);
+    let own_closed = || ("7", Gh { state: "CLOSED", ..gh(PINNED, &[]) }.replies());
+    let cases = [
+        (vec![opened("task-1")], vec![merged_pr()]),
+        (claimed_task(), vec![merged_pr()]),
+        (linked_task(), vec![merged_pr(), own_closed()]),
+    ];
+    cases.into_iter().for_each(|(history, pulls)| {
+        let mut ports = given(history, pulls);
         let (reply, events) = call(&mut ports, &["done", "task-1", "--by", "9"], "");
         assert_eq!((reply.code, events), (Code::Done, vec![done_by_event("task-1", "9")]), "{}", reply.text);
         let (status, _) = call(&mut ports, &["status"], "");
@@ -1009,6 +1015,30 @@ fn done_by_is_refused_unless_the_pr_is_merged_and_the_task_is_open_claimed_or_li
     ];
     cases.into_iter().for_each(|(history, replies, why)| {
         let (reply, events) = call(&mut given(history, vec![replies]), &["done", "task-1", "--by", "9"], "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(why), "{}", reply.text);
+    });
+}
+
+#[test]
+fn done_by_the_tasks_own_linked_pr_is_refused_and_points_to_meta_merge() {
+    let own = ("7", Gh { state: "MERGED", ..gh(PINNED, &[]) }.replies());
+    let (reply, events) = call(&mut given(linked_task(), vec![own]), &["done", "task-1", "--by", "7"], "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+    assert!(
+        reply.text.contains("#7 is task-1's own linked PR") && reply.text.contains("meta merge 7"),
+        "{}",
+        reply.text
+    );
+}
+
+#[test]
+fn done_of_a_linked_task_by_another_pr_is_refused_while_its_own_pr_is_open_or_merged() {
+    let by = || ("9", Gh { state: "MERGED", ..gh(PINNED, &[]) }.replies());
+    let cases = [("OPEN", "#7 is linked and open"), ("MERGED", "#7 is merged")];
+    cases.into_iter().for_each(|(state, why)| {
+        let own = ("7", Gh { state, ..gh(PINNED, &[]) }.replies());
+        let (reply, events) = call(&mut given(linked_task(), vec![by(), own]), &["done", "task-1", "--by", "9"], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
         assert!(reply.text.contains(why), "{}", reply.text);
     });
