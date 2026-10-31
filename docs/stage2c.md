@@ -39,7 +39,7 @@ Today `<model>` is `opus`, `<allow>` is `Read,Grep,Glob` and `<deny>` is `Agent,
 
 | Property | How |
 |---|---|
-| Exactly the PR's head | `git fetch --depth=1 <origin> <head>` asks for the commit by id, so what comes is that commit or nothing. A moved head cannot reach it, because the commit is the lease's own |
+| Exactly the PR's head | `git fetch --depth=1 <origin> <head>` asks for the commit by id, so what comes is that commit or nothing. A moved head cannot reach it, because the commit is the lease's own. The PR's own `.gitattributes` can still apply text conversions such as `eol`; named filters are blocked |
 | No remote, no credentials | The git data stays in `<data dir>/workers/staged/`; only the tree moves to `scratch/`, so `checkout/` has no `.git`. The fetch names the origin on its command line, so no remote is configured there either. Only the fetch has the machine's git configuration, for a credential helper; the session gets nothing from it |
 | Not writable | After the move every directory is 0500 and every file 0400. The move comes first, because a directory that may not be written cannot change its parent |
 | No way out through a link | `core.symlinks=false` writes each symlink as a file that holds its target. A symlink found while freezing fails the start, and its target is not touched |
@@ -129,6 +129,6 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 ## What this piece leaves open
 
-- **Live canary: run once, at an earlier commit.** The lead's canary ran a real session of this command on the task-52 branch at 4308098, on a scratch log. It read the checkout and its verdict was recorded. It ran before the merge of main and before the deadline was counted after staging, so the first real worker after this merges is the check at the final head. The `CLAUDE.md` setting was probed directly, and the probe showed no effect either way: a marker in a subdirectory `CLAUDE.md` was absent both with and without the setting.
+- **Live canary: run once, at an earlier commit.** The lead's canary ran a real session of this command on the task-52 branch at 4308098, on a scratch log. It read the checkout and its verdict was recorded. It ran before the merge of main and before the deadline was counted after staging, so the first real worker after this merges is the check at the final head. The `CLAUDE.md` setting was probed directly, and the probe showed no effect either way: a marker in a subdirectory `CLAUDE.md` was absent both with and without the setting. A read outside the scratch directory was tried in the #47 canary, in a direct session with the same flags, and was refused.
 - **A worker with no supervisor stays listed.** If the machine restarts, the sessions are gone but the log still shows them running, and they count towards the limit. `meta stop` clears them: the port sees that the leader is not theirs, kills nothing, and records the end.
 - **A lost `Finished`.** If the log cannot be written when a worker ends, the supervisor reports it in `supervisor.log` and exits. `meta stop` clears that too.

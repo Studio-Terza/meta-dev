@@ -52,6 +52,15 @@ fn alone(command: &mut Command) {
     scrub(command).env("GIT_CONFIG_GLOBAL", "/dev/null").env("GIT_CONFIG_NOSYSTEM", "1");
 }
 
+/// The User-Agent of the fetch: web requests name `basho-trip-planner`.
+const USER_AGENT: &str = "http.userAgent=basho-trip-planner";
+
+/// The arguments of the one fetch of `wanted` from `url` into the git data at `git`.
+fn fetch_args<'a>(git: &'a str, url: &'a str, wanted: &'a str) -> Vec<&'a str> {
+    let depth = ["fetch", "--quiet", "--depth=1", "--no-tags", "--no-recurse-submodules"];
+    [&["-c", USER_AGENT, "--git-dir", git][..], &depth[..], &["--", url, wanted]].concat()
+}
+
 /// Writes the tree of `head` from `origin` in `place`. The fetch names the origin only on its
 /// command line, so no remote is configured, and it keeps the machine's credential helper, which a
 /// private origin needs. The commit is asked for by its id, so what comes is that commit or nothing.
@@ -63,8 +72,7 @@ fn fetch(place: &Path, origin: &Origin, head: &Sha) -> Result<(), PortError> {
     let (git, tree) = (git.display().to_string(), tree.display().to_string());
     let (url, wanted) = (origin.to_string(), format!("{head}:{REVIEWED}"));
     run_prepared("git", &["init", "--quiet", "--bare", "--template=", &git], alone)?;
-    let depth = ["fetch", "--quiet", "--depth=1", "--no-tags", "--no-recurse-submodules"];
-    let fetched = [&["--git-dir", git.as_str()], &depth[..], &["--", url.as_str(), wanted.as_str()]].concat();
+    let fetched = fetch_args(&git, &url, &wanted);
     run_prepared("git", &fetched, fetching)?;
     let safe = ["-c", "core.symlinks=false", "-c", "core.hooksPath=/dev/null"];
     let places = ["--git-dir", git.as_str(), "--work-tree", tree.as_str()];
@@ -104,7 +112,7 @@ pub fn take(place: &Path, target: &Path) -> Result<(), PortError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FROZEN_DIR, FROZEN_FILE, freeze, new_place, stage, take};
+    use super::{FROZEN_DIR, FROZEN_FILE, fetch_args, freeze, new_place, stage, take};
     use crate::real::command::run;
     use meta_core::{AgentId, Origin, Sha};
     use meta_testkit::Scratch;
@@ -170,6 +178,14 @@ mod tests {
         let tip = run("git", &["--git-dir", &git, "rev-parse", "refs/heads/reviewed"]).unwrap();
         assert_eq!(tip.parse::<Sha>().unwrap(), first);
         assert_eq!(run("git", &["--git-dir", &git, "rev-list", "--count", "refs/heads/reviewed"]).unwrap(), "1\n");
+    }
+
+    #[test]
+    fn the_fetch_names_basho_trip_planner_as_its_user_agent() {
+        let args = fetch_args("g", "u", "w");
+        let at = args.iter().position(|arg| *arg == "http.userAgent=basho-trip-planner").unwrap();
+        assert_eq!(args[at - 1], "-c");
+        assert!(at < args.iter().position(|arg| *arg == "fetch").unwrap(), "-c must come before the subcommand");
     }
 
     #[test]
