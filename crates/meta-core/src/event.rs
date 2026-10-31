@@ -1,7 +1,7 @@
 use crate::escape::Checked;
 use crate::ids::{
-    AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, PrNumber, PredictionId, Reason, RunCount,
-    Sha, TaskId, Timestamp, Title, Verdict,
+    AgentId, AgentName, Claimant, EscapeId, EscapeKind, LeaseId, Observed, OwnerAnswer, OwnerQuestion, PrNumber,
+    PredictionId, Reason, RunCount, Sha, TaskId, Timestamp, Title, Verdict,
 };
 use crate::predictions::Measure;
 use serde::{Deserialize, Serialize};
@@ -116,6 +116,16 @@ pub enum Event {
         prediction: PredictionId,
         measure: Measure,
         observed: Observed,
+    },
+    /// The task needs a decision only the owner can give. Its lease deadlines pause until the answer.
+    WaitingOnOwner {
+        task: TaskId,
+        question: OwnerQuestion,
+    },
+    /// The owner's answer. The deadlines of the task's leases move later by the time it waited.
+    OwnerAnswered {
+        task: TaskId,
+        answer: OwnerAnswer,
     },
     /// A canned `continue` restarted the agent of a used lease.
     Resumed {

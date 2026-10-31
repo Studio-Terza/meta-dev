@@ -54,7 +54,12 @@ impl Ledger {
         let overdue: Vec<String> = self
             .leases
             .iter()
-            .filter(|(_, slot)| self.live(slot.lease()) && !slot.is_finished() && slot.deadline().passed(at))
+            .filter(|(_, slot)| {
+                self.live(slot.lease())
+                    && !self.waiting.contains_key(&slot.lease().task())
+                    && !slot.is_finished()
+                    && slot.deadline().passed(at)
+            })
             .map(|(id, slot)| format!("{id} for {}: {}, {}", slot.lease().task(), slot.holder(), slot.deadline()))
             .collect();
         let main = kinds.as_ref().ok();
@@ -156,6 +161,8 @@ impl Ledger {
             section("latest review verdict per linked PR", &self.verdicts()),
             section(&format!("leases resumed {} or more times (flagged)", Self::FLAGGED_RESUMES), &resumes),
             section("overdue leases (flagged)", &overdue),
+            section("waiting on the owner (flagged)", &self.waits(at)),
+            section("idle (flagged)", &self.idle()),
             format!(
                 "P1 agent starts through meta: {started}; prevented by the hook: {}; bypassed, from outside-start escapes: {starts_outside}; self-claims, not agent starts: {}\n",
                 self.starts_denied, self.self_claims
