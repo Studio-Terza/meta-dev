@@ -20,6 +20,7 @@ mod rework;
 mod roles;
 mod rules;
 mod spec;
+mod stalled;
 mod status;
 mod task;
 mod wait;

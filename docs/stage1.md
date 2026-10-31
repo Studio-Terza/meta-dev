@@ -119,12 +119,26 @@ Work stalled for about an hour with unblocked tasks open and nothing flagged it 
 | `meta wait` | the task is unknown, deferred, done or retired, or already waiting | refused, with the reason |
 | `meta unwait <task> <answer>` | the task is waiting | event `OwnerAnswered { task, answer }`; each lease the task had when it began to wait gets its deadline moved later by the time it waited, so the deadlines resume from the answer |
 | `meta unwait` | the task is unknown or not waiting | refused |
-| `meta status` | a task is waiting on the owner | listed under "waiting on the owner" as `<task>: <question>`; its leases are not flagged overdue while it waits |
+| `meta status` | a task is waiting on the owner | listed under "waiting on the owner (flagged)" as `<task>: <question> (waiting N min)`, N the whole minutes since `meta wait`; its leases are not flagged overdue while it waits |
 | `meta status` | a task done, retired or deferred while waiting | it is no longer listed as waiting |
-| `meta status` | no work lease is live, and at least one task is not waiting on the owner and is open or claimed by an agent | "idle (flagged)" shows "idle: no live work lease while N open tasks are not waiting on the owner" |
+| `meta status` | no task waits | "waiting on the owner (flagged)" shows "(none)" |
+| `meta status` | no running work, and at least one task is stalled | "idle (flagged)" shows `idle: no live work; stalled: <task> (<why>), ...` with each stalled task by id, in task order |
 | `meta status` | otherwise | "idle (flagged)" shows "(none)" |
 
-A work lease is live when it is unused or running (its task is open, claimed or linked). These do not count as work: a review lease, and a lease of a task that waits on the owner, which is paused. A task claimed by the lead with `--self` and a linked task awaiting review and merge do not count as open tasks for N, because no agent has anything left to start on them.
+Running work is a work lease that has a deadline, on a task an agent is working: open or claimed. A lease on a linked task is not running work, so a leftover lease on a linked task does not silence the alarm. One exception: a work lease with a deadline issued after the failing review of a linked task's pinned head is the fix under way, and counts. A lease of a task waiting on the owner is paused and does not count. A review lease is never work.
+
+A task is stalled when it is not waiting on the owner and has no next step. This is a state check, with no age threshold:
+
+| Task | Stalled when | Shown as |
+|---|---|---|
+| open | always | `open` |
+| claimed, by an agent or by the lead with `--self` | always | `claimed` |
+| linked | no review lease on it is live (unused, or used with no verdict yet), and its pinned head has no verdict | `no verdict on head` |
+| linked | no review lease is live, the latest verdict on its pinned head is pass, and its PR is not merged | `pass on head, PR not merged` |
+| linked | no review lease is live, the latest verdict on its pinned head is fail, and no running work lease was issued after that review | `fail on head, no live work lease` |
+| deferred, retired, done | never | |
+
+A verdict on an earlier head does not count for the pinned head. A linked task whose PR is merged and that awaits `done` is not stalled. The alarm needs both conditions: no running work, and N of at least 1 stalled tasks.
 
 ### Predictions against registered numbers
 

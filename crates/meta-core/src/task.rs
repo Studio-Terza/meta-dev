@@ -132,16 +132,6 @@ impl Progress {
         matches!(self, Self::Open(_) | Self::Claimed(_) | Self::Linked(_))
     }
 
-    /// Open, or claimed by an agent: work an agent still has to do. A lead's self-claim is the
-    /// lead working, and a linked task is waiting on review and merge.
-    pub fn awaits_an_agent(&self) -> bool {
-        match self {
-            Self::Open(_) => true,
-            Self::Claimed(task) => !task.agent().is_lead(),
-            _ => false,
-        }
-    }
-
     /// The stage's name, as the rework report shows it.
     pub fn stage(&self) -> &'static str {
         match self {

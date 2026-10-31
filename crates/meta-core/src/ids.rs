@@ -265,6 +265,10 @@ impl Span {
     pub const fn whole_seconds(self) -> u64 {
         self.0
     }
+
+    pub const fn whole_minutes(self) -> u64 {
+        self.0 / Minutes::SECONDS
+    }
 }
 
 /// A whole number of minutes, at least one: how long a lease runs before its deadline.
