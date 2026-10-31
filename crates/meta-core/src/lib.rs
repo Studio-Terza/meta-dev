@@ -1,3 +1,4 @@
+mod brief;
 mod claim;
 mod escape;
 mod event;
@@ -22,6 +23,7 @@ mod spec;
 mod status;
 mod task;
 
+pub use brief::Reissue;
 pub use claim::Claim;
 pub use escape::{Admitted, Checked, Escape, EscapeKinds};
 pub use event::{Attempt, Event, Record, Route};

@@ -66,6 +66,20 @@ An escape whose kind is not in main's `self/escapes.toml` (a typo, or a kind sin
 
 No separate task is opened for a review. `meta merge` does not require a review; CI remains the only merge gate.
 
+### Printing a brief again
+
+A lease that is not yet used can be handed over without the lead writing the agent's instructions by hand.
+
+| Command | Given | Result |
+|---|---|---|
+| `meta brief <lease>` | the lease is unused and its task is open, claimed or linked | prints the brief that the claim or review which issued the lease printed: task, agent, deadline, setup and rules, or the review goal and constraints; no event |
+| `meta brief <lease>` | the lease is used | refused; the reason says each lease starts one agent, and the next step is a fresh claim or review |
+| `meta brief <lease>` | the lease is unknown, or its task is done, retired or deferred, or a review lease's task no longer links its PR | refused with the reason |
+| `meta claim <task> --agent <name>` | the task already has an unused work lease | refused; the next step names `meta brief <lease>` |
+| `meta review <task> --agent <name>` | the task already has an unused review lease | refused; the next step names `meta brief <lease>` |
+
+`Leased` and `ReviewLeased` carry the agent the lease is for, so the reprinted brief names the same agent. A lease recorded without one prints the task's agent (work) or "not recorded" (review). The deadline is the one the lease was issued with; the rules and origin are read from main when the brief is printed.
+
 ### Resumes
 
 | Hook | Given | Result |
