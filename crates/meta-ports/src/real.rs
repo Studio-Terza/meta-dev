@@ -1,3 +1,4 @@
+mod checkout;
 mod clock;
 mod command;
 mod gh;

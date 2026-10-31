@@ -2,7 +2,7 @@ use crate::brief::Reissue;
 use crate::event::Event;
 use crate::ids::{
     AgentId, Binary, ClaudeVersion, ExitStatus, LeaseId, Malformed, Model, Origin, PrNumber, ProcessGroup, Reason, Sha,
-    Timestamp, ToolRule, Transcript, Verdict,
+    Staged, Timestamp, ToolRule, Transcript, Verdict,
 };
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
@@ -179,6 +179,8 @@ impl ReviewCopy {
     pub const VIEW: &str = "pr-view.json";
     /// The file that holds `gh pr diff`.
     pub const DIFF: &str = "pr.diff";
+    /// The directory that holds the whole repository at the PR's head, read-only.
+    pub const CHECKOUT: &str = "checkout";
 }
 
 /// What a review session must end with (`--json-schema`).
@@ -263,6 +265,7 @@ pub struct WorkerPlan {
     tools: String,
     denied: String,
     copy: ReviewCopy,
+    staged: Staged,
     repository: Origin,
     binary: Binary,
 }
@@ -280,6 +283,11 @@ impl WorkerPlan {
     /// What meta fetched for the session to read.
     pub fn copy(&self) -> &ReviewCopy {
         &self.copy
+    }
+
+    /// Where meta fetched the session's checkout, for the start to take.
+    pub fn staged(&self) -> &Staged {
+        &self.staged
     }
 
     /// The repository the supervisor asks GitHub about from the worker's directory, which is no
@@ -362,6 +370,16 @@ impl Starting {
         self.pr
     }
 
+    /// The worker this start would run, which its checkout is staged for.
+    pub fn worker(&self) -> AgentId {
+        AgentId::worker(self.lease)
+    }
+
+    /// The head the lease reviews, which is the commit of the checkout.
+    pub fn head(&self) -> &Sha {
+        &self.head
+    }
+
     /// Refused when `workers`' limit of running workers is reached.
     pub fn within_limit(&self, workers: &Workers) -> Result<(), Refusal> {
         let running = &self.running;
@@ -396,6 +414,7 @@ impl Starting {
         self,
         workers: &Workers,
         copy: ReviewCopy,
+        staged: Staged,
         origin: &Origin,
         binary: &Binary,
         rules: &Rules,
@@ -412,6 +431,7 @@ impl Starting {
             tools: Tools::rules(&workers.review.allow),
             denied: Tools::rules(&workers.review.deny.0),
             copy,
+            staged,
             repository: origin.clone(),
             binary: binary.clone(),
         };

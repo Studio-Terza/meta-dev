@@ -1,5 +1,6 @@
 use std::fs;
 use std::ops::Deref;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -30,9 +31,19 @@ impl Deref for Scratch {
     }
 }
 
+/// Lets the owner write every directory under `dir`, which a read-only tree does not, so that it can
+/// be removed. Follows no link.
+fn thaw(dir: &Path) {
+    let opened = fs::set_permissions(dir, fs::Permissions::from_mode(0o700));
+    drop(opened);
+    let entries = fs::read_dir(dir).into_iter().flatten().flatten();
+    entries.filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir())).for_each(|entry| thaw(&entry.path()));
+}
+
 impl Drop for Scratch {
     /// A directory that cannot be removed is only left behind; it must not fail the test.
     fn drop(&mut self) {
+        thaw(&self.0);
         let removed = fs::remove_dir_all(&self.0);
         drop(removed);
     }
@@ -42,6 +53,7 @@ impl Drop for Scratch {
 mod tests {
     use super::Scratch;
     use std::fs;
+    use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
 
     #[test]
@@ -51,6 +63,19 @@ mod tests {
         fs::write(scratch.join("deep/er/file"), "x").unwrap();
         let kept: PathBuf = scratch.to_path_buf();
         assert!(kept.is_dir());
+        drop(scratch);
+        assert!(!kept.exists());
+    }
+
+    #[test]
+    fn dropping_the_scratch_removes_a_read_only_tree_too() {
+        let scratch = Scratch::new("guard-frozen");
+        fs::create_dir_all(scratch.join("deep/er")).unwrap();
+        fs::write(scratch.join("deep/er/file"), "x").unwrap();
+        for path in ["deep/er", "deep"] {
+            fs::set_permissions(scratch.join(path), fs::Permissions::from_mode(0o500)).unwrap();
+        }
+        let kept: PathBuf = scratch.to_path_buf();
         drop(scratch);
         assert!(!kept.exists());
     }

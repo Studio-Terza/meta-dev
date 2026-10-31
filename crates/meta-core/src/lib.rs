@@ -51,7 +51,7 @@ pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
     AgentId, AgentName, Binary, Branch, CheckName, Claimant, ClaudeVersion, Email, EscapeId, EscapeKind, ExitStatus,
     LeaseId, Malformed, Minutes, Model, Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId,
-    ProcessGroup, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title, ToolRule, Transcript, Verdict,
+    ProcessGroup, Reason, RunCount, Sha, Span, Staged, TaskId, Timestamp, Title, ToolRule, Transcript, Verdict,
 };
 pub use imported::Imported;
 pub use importing::Importing;

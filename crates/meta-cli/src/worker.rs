@@ -45,9 +45,18 @@ pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
         // The diff is read before the head is checked, so a head that moved meanwhile refuses.
         let copy = github.review_copy(starting.pr())?;
         starting.at_head(&github.pull(starting.pr())?)?;
-        Ok((workers, copy, git.origin()?, git.binary()?, rules))
+        let (origin, binary) = (git.origin()?, git.binary()?);
+        // Fetched by the lease's own commit, which cannot move, and outside the lock, so that a slow
+        // fetch holds up neither the log nor `meta stop`.
+        let staged = sessions.stage(&starting.worker(), &origin, starting.head()).map_err(|error| {
+            PortError::new(format!(
+                "no checkout of {} for {lease}: {error}\nNothing started and {lease} stays unused. Next: meta worker start {lease} tries again.",
+                starting.head()
+            ))
+        })?;
+        Ok((workers, copy, staged, origin, binary, rules))
     });
-    let (workers, copy, origin, binary, rules) = match inputs {
+    let (workers, copy, staged, origin, binary, rules) = match inputs {
         Ok(inputs) => inputs,
         Err(failure) => return Answer::failed(failure),
     };
@@ -57,12 +66,14 @@ pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
         let decided =
             guard.at(now, git, build).map_err(|unverified| Failure::Refused(unverified.into())).and_then(|()| {
                 let ledger = folded(records, &place)?;
-                let planned = ledger.worker(lease, at)?.plan(&workers, copy, &origin, &binary, &rules)?;
+                let staged = staged.clone();
+                let planned = ledger.worker(lease, at)?.plan(&workers, copy, staged, &origin, &binary, &rules)?;
                 let run = sessions.start(planned.session())?;
                 Ok(planned.started(run))
             });
         recorded(decided, at)
     });
+    sessions.unstage(&staged);
     settled(outcome)
 }
 
