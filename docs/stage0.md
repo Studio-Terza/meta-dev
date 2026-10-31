@@ -39,7 +39,7 @@ Each row below is one behaviour-table test. A test drives `meta` through a singl
 
 `meta status` prints these from the log. They are report-only.
 
-- P1: agent starts and merges through meta, out of all. The hook counts denied agent starts. `meta status` lists the PRs merged on GitHub and compares them with the log's `Merged` events; a merge missing from the log counts as "merged outside meta".
+- P1: agent starts and merges through meta, out of all. Denied agent starts are prevented attempts, shown beside P1 and not counted against it (docs/stage1.md). `meta status` lists the PRs merged on GitHub and compares them with the log's `Merged` events; a merge missing from the log counts as "merged outside meta".
 - P2: open escapes, and how often each reason repeats.
 - P6: CI runs per merged PR, read from the GitHub port at merge time.
 

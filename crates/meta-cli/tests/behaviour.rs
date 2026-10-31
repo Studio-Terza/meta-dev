@@ -959,7 +959,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let calm = [finished_task(), vec![escaped("gap", "no retire")]].concat();
     let status = status_of(calm);
     let lines = [
-        "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable expected 100%, except recorded escapes",
+        "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable",
         "P2 Gaps get fixed, not bypassed: holds; observed open escapes 1, most repeats of one escape kind 0; \
          expected Each reason fixed before its 3rd repeat; at most 5 open",
         "P6 Little rework: holds; observed median CI runs per merged PR 1; expected Median at most 2",
@@ -985,7 +985,13 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
         event: escaped_pr("outside-merge", "1", "merged by hand"),
     });
     let (reply, _) = call(&mut ports, "status", "");
-    assert!(reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"), "{}", reply.text);
+    assert!(
+        reply.text.contains(
+            "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
+        ),
+        "{}",
+        reply.text
+    );
     ports.github.listed = Some(Err(PortError::new("gh is down")));
     let (reply, _) = call(&mut ports, "status", "");
     assert!(

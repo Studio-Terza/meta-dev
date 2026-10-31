@@ -185,6 +185,11 @@ impl Logged {
         self.pr.filter(|_| kinds.names_merged_pr(&self.kind))
     }
 
+    /// Whether this escape records an agent start without a lease: a bypass known to have happened (P1).
+    pub(crate) fn is_outside_start(&self) -> bool {
+        self.kind == EscapeKind::outside_start()
+    }
+
     /// Whether main's kinds, when they could be read, leave this kind out. Unclassified never is.
     fn off_main(&self, main: Option<&EscapeKinds>) -> bool {
         self.kind != EscapeKind::unclassified() && main.is_some_and(|kinds| !kinds.lists(&self.kind))
