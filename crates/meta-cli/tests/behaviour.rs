@@ -3671,6 +3671,70 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
     assert_eq!(ports.sessions.0.stopped.len(), 1);
 }
 
+/// A log whose second transaction fails, as a log held too long by others does.
+struct Flaky(MemoryLog, usize);
+
+impl Log for Flaky {
+    fn place(&self) -> String {
+        self.0.place()
+    }
+
+    fn standing(&self) -> Standing {
+        self.0.standing()
+    }
+
+    fn set_aside(&mut self, escape: &UnverifiedEscape) -> Result<String, PortError> {
+        self.0.set_aside(escape)
+    }
+
+    fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError> {
+        self.0.set_aside_escapes()
+    }
+
+    fn import_set_aside<T>(
+        &mut self,
+        decide: impl FnOnce(
+            Standing,
+            Result<Vec<Record>, PortError>,
+            Vec<SideLine>,
+        ) -> (Vec<Record>, Option<Vec<SideLine>>, T),
+    ) -> Result<T, PortError> {
+        self.0.import_set_aside(decide)
+    }
+
+    fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
+        self.0.mark(marker)
+    }
+
+    fn read(&self) -> Result<Vec<Record>, PortError> {
+        self.0.read()
+    }
+
+    fn transact<T>(
+        &mut self,
+        decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+    ) -> Result<T, PortError> {
+        self.1 += 1;
+        match self.1 {
+            2 => Err(PortError::new("the log is locked")),
+            _ => self.0.transact(decide),
+        }
+    }
+}
+
+#[test]
+fn worker_wait_keeps_its_last_look_when_the_log_cannot_be_read_and_stops_when_it_never_could() {
+    let Ports { log, git, github, clock, sessions, build } = given(worker_task(1), Vec::new());
+    let mut ports = Ports { log: Flaky(log, 0), git, github, clock, sessions, build };
+    ports.sessions.states.borrow_mut().extend([Ok(Session::Running), Ok(Session::Ended(None))]);
+    let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
+    assert_eq!(reply.text, "lease-2: worker worker-2 ended with no exit status\n");
+    let mut broken = given(worker_task(1), Vec::new());
+    broken.log.broken = Some(PortError::new("no log"));
+    let (reply, _) = call(&mut broken, &["worker", "wait", "lease-2"], "");
+    assert_eq!((reply.code, reply.text.as_str()), (Code::Failed, "error: no log\n"));
+}
+
 #[test]
 fn worker_wait_stops_at_once_when_the_end_is_recorded_and_refuses_a_lease_with_no_worker() {
     let over = [worker_task(1), vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Stopped) }]].concat();

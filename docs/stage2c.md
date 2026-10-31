@@ -25,7 +25,7 @@ Each flag, from the Claude Code docs (`/en/headless`, `/en/cli-reference`, `/en/
 | `--strict-mcp-config` | With no `--mcp-config`, no MCP server connects. |
 | `--output-format stream-json --verbose` | The transcript is the whole run, event by event, and its last line has the cost. |
 
-`--bare` is the recommended mode for scripts, but it reads no OAuth login and needs `ANTHROPIC_API_KEY`, which this machine's account does not use. Without it the session loads the user's settings, hooks and `CLAUDE.md`, as any `claude -p` does.
+`--bare` is the recommended mode for scripts, but it never reads a subscription login: it needs `ANTHROPIC_API_KEY`. So workers run without it, and the session loads the user's settings, hooks and `CLAUDE.md`, as any `claude -p` does.
 
 Each worker has a directory, `<data dir>/workers/worker-<n>/`, kept after it ends:
 
@@ -71,6 +71,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 | `meta worker wait <lease>` | the log cannot be read after the first look | it keeps the last look, so the deadline still holds |
 | `meta worker wait <lease>` | the worker's end is already recorded | exits with no event |
 | `meta worker wait <lease>` | the lease started no worker | refused, which ends the session |
+| `meta worker wait <lease>` | the first look at the log fails | error, which ends the session |
 | `meta stop <lease>` | a worker is running on the lease | its process group is killed; event `Finished` with `end: stopped` |
 | `meta stop` | any workers are running | every group is killed and each is recorded; with none running, says so |
 | `meta stop <lease>` | the lease started no worker, or its worker has ended | refused; nothing is killed |
