@@ -94,6 +94,7 @@ struct Gh<'a> {
     branch: &'a str,
     base: &'a str,
     state: &'a str,
+    merge_state: &'a str,
     rollup: Vec<serde_json::Value>,
     required: Result<Vec<&'a str>, &'a str>,
 }
@@ -105,6 +106,7 @@ impl Gh<'_> {
             "headRefName": self.branch,
             "baseRefName": self.base,
             "state": self.state,
+            "mergeStateStatus": self.merge_state,
             "url": format!("https://github.com/{REPO}/pull/7"),
             "statusCheckRollup": self.rollup,
         });
@@ -123,6 +125,7 @@ fn gh<'a>(head: &'a str, outcomes: &[Outcome]) -> Gh<'a> {
         branch: "task-1",
         base: "main",
         state: "OPEN",
+        merge_state: "CLEAN",
         rollup: outcomes.iter().map(rollup).collect(),
         required: Ok(vec![REQUIRED]),
     }
@@ -146,6 +149,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
             earlier: RefCell::default(),
             replies: pulls.into_iter().map(|(pr, replies)| (id::<PrNumber>(pr), replies)).collect(),
             merged: Vec::new(),
+            updated: Vec::new(),
             listed: Some(Ok("[]".to_owned())),
         },
         clock: FakeClock::at(Timestamp::from_unix_seconds(2)),
@@ -288,6 +292,45 @@ fn merge_of_an_unlinked_red_missing_or_moved_pr_is_refused_naming_which_with_the
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(which) && reply.text.contains(next), "{}", reply.text);
         assert!(ports.github.merged.is_empty());
+    });
+}
+
+#[test]
+fn merge_of_a_pr_behind_main_is_refused_with_the_update_step_and_does_not_merge() {
+    let behind = Gh { merge_state: "BEHIND", ..gh(PINNED, &[Outcome::Green]) }.replies();
+    let mut ports = given(linked_task(), vec![("7", behind)]);
+    let (reply, events) = call(&mut ports, "merge 7", "");
+    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+    for why in ["behind main", "meta merge 7 --update", "wait for CI", "meta link task-1 7", "meta merge 7 again"] {
+        assert!(reply.text.contains(why), "{}", reply.text);
+    }
+    assert!(ports.github.merged.is_empty() && ports.github.updated.is_empty());
+}
+
+#[test]
+fn merge_update_of_a_pr_behind_main_updates_the_branch_and_does_not_merge_in_the_same_call() {
+    let behind = Gh { merge_state: "BEHIND", ..gh(PINNED, &[Outcome::Green]) }.replies();
+    let mut ports = given(linked_task(), vec![("7", behind)]);
+    let (reply, events) = call(&mut ports, "merge 7 --update", "");
+    assert_eq!((reply.code, events), (Code::Done, Vec::new()));
+    assert!(reply.text.contains("updated; CI must pass on the new head before merging"), "{}", reply.text);
+    assert_eq!(ports.github.updated, vec![id::<PrNumber>("7")]);
+    assert!(ports.github.merged.is_empty());
+}
+
+#[test]
+fn merge_update_is_refused_for_a_pr_that_is_not_behind_is_unlinked_or_is_not_open() {
+    let cases = [
+        ("7", pull(PINNED, &[Outcome::Green]), "not behind main"),
+        ("8", pull(PINNED, &[Outcome::Green]), "#8 is unlinked"),
+        ("7", Gh { state: "CLOSED", merge_state: "BEHIND", ..gh(PINNED, &[]) }.replies(), "not open"),
+    ];
+    cases.into_iter().for_each(|(pr, recorded, why)| {
+        let mut ports = given(linked_task(), vec![(pr, recorded)]);
+        let (reply, events) = call(&mut ports, &format!("merge {pr} --update"), "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+        assert!(reply.text.contains(why), "{}", reply.text);
+        assert!(ports.github.updated.is_empty() && ports.github.merged.is_empty());
     });
 }
 
