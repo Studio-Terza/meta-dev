@@ -253,7 +253,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock, S: Sessions>(
         Call::Hook(phase, input) => {
             hook(phase, Hook::read(phase, &input), log, at, standing, |standing| guard.at(standing, git, build))
         }
-        Call::Worker(WorkerCall::Start(lease)) => worker::start(lease, log, git, github, sessions, build, at),
+        Call::Worker(WorkerCall::Start(lease)) => worker::start(lease, log, git, github, sessions, clock, build),
         Call::Worker(WorkerCall::Wait(lease)) => worker::wait(lease, log, git, github, sessions, clock, build),
         Call::Worker(WorkerCall::Stop(lease)) => worker::stop(lease, log, git, sessions, build, at),
         Call::MarkRealLog => {

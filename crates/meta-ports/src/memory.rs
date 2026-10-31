@@ -1,7 +1,7 @@
 use crate::{Clock, GhReplies, Git, GitHub, Listed, Log, PortError, Sessions};
 use meta_core::{
     AgentId, Binary, Cleared, Head, Marking, Origin, Place, PrNumber, ProcessGroup, Pull, Record, ReviewCopy, SelfFile,
-    Session, Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    Session, Sha, SideLine, Span, Staged, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
     WorkerPlan, WorkerRun,
 };
 use std::cell::{Cell, RefCell};
@@ -195,6 +195,12 @@ impl GitHub for RecordedGitHub {
 pub struct RecordedSessions {
     /// The `claude --version` reply.
     pub version: Result<String, PortError>,
+    /// The checkouts asked for, each with where it was fetched from and at what commit.
+    pub staged: Vec<(AgentId, Origin, Sha)>,
+    /// The staged places dropped.
+    pub unstaged: Vec<Staged>,
+    /// Why fetching a checkout fails, when it does.
+    pub broken_stage: Option<PortError>,
     pub started: Vec<WorkerPlan>,
     pub stopped: Vec<WorkerRun>,
     /// Why starting fails, when it does.
@@ -213,6 +219,9 @@ impl Default for RecordedSessions {
     fn default() -> Self {
         Self {
             version: Ok(Self::VERSION.to_owned()),
+            staged: Vec::new(),
+            unstaged: Vec::new(),
+            broken_stage: None,
             started: Vec::new(),
             stopped: Vec::new(),
             broken_start: None,
@@ -239,6 +248,16 @@ impl RecordedSessions {
 impl Sessions for RecordedSessions {
     fn version(&self) -> Result<String, PortError> {
         self.version.clone()
+    }
+
+    fn stage(&mut self, worker: &AgentId, origin: &Origin, head: &Sha) -> Result<Staged, PortError> {
+        self.broken_stage.clone().map_or(Ok(()), Err)?;
+        self.staged.push((worker.clone(), origin.clone(), head.clone()));
+        Ok(format!("/recorded/staged/{worker}").parse()?)
+    }
+
+    fn unstage(&mut self, staged: &Staged) {
+        self.unstaged.push(staged.clone());
     }
 
     fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {

@@ -21,19 +21,20 @@ fn limits<L: Log, G: Git>(log: &L, git: &G) -> Result<Workers, Failure> {
     }
 }
 
-pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
+pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
     lease: LeaseId,
     log: &mut L,
     git: &G,
     github: &H,
     sessions: &mut S,
+    clock: &C,
     build: &Build,
-    at: Timestamp,
 ) -> Answer {
     let mut guard = Guard::default();
     if let Err(unverified) = guard.at(log.standing(), git, build) {
         return Answer::failed(Failure::Refused(unverified.into()));
     }
+    let at = clock.now();
     let place = log.place();
     // Asked before any git or network call, so that a refusal costs nothing.
     let inputs = folded(log.read(), &place).and_then(|ledger| {
@@ -45,24 +46,37 @@ pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
         // The diff is read before the head is checked, so a head that moved meanwhile refuses.
         let copy = github.review_copy(starting.pr())?;
         starting.at_head(&github.pull(starting.pr())?)?;
-        Ok((workers, copy, git.origin()?, git.binary()?, rules))
+        let (origin, binary) = (git.origin()?, git.binary()?);
+        // Fetched by the lease's own commit, which cannot move, and outside the lock, so that a slow
+        // fetch holds up neither the log nor `meta stop`.
+        let staged = sessions.stage(&starting.worker(), &origin, starting.head()).map_err(|error| {
+            PortError::new(format!(
+                "no checkout of {} for {lease}: {error}\nNothing started and {lease} stays unused. Next: meta worker start {lease} tries again.",
+                starting.head()
+            ))
+        })?;
+        Ok((workers, copy, staged, origin, binary, rules))
     });
-    let (workers, copy, origin, binary, rules) = match inputs {
+    let (workers, copy, staged, origin, binary, rules) = match inputs {
         Ok(inputs) => inputs,
         Err(failure) => return Answer::failed(failure),
     };
+    // Taken after the checkout is staged, so that a slow fetch does not come off the worker's deadline.
+    let at = clock.now();
     // The session starts inside the lock: the lease and the limit hold until it is recorded, and a
     // session that fails to start leaves the lease unused.
     let outcome = log.transact(|now, records| {
         let decided =
             guard.at(now, git, build).map_err(|unverified| Failure::Refused(unverified.into())).and_then(|()| {
                 let ledger = folded(records, &place)?;
-                let planned = ledger.worker(lease, at)?.plan(&workers, copy, &origin, &binary, &rules)?;
+                let staged = staged.clone();
+                let planned = ledger.worker(lease, at)?.plan(&workers, copy, staged, &origin, &binary, &rules)?;
                 let run = sessions.start(planned.session())?;
                 Ok(planned.started(run))
             });
         recorded(decided, at)
     });
+    sessions.unstage(&staged);
     settled(outcome)
 }
 

@@ -120,6 +120,7 @@ text!(AgentId, "agent id");
 text!(ToolRule, "tool rule");
 text!(Model, "model");
 text!(Transcript, "transcript path");
+text!(Staged, "staged checkout path");
 text!(PredictionId, "prediction id");
 text!(Observed, "observation");
 text!(Email, "email");

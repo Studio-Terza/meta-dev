@@ -1,8 +1,11 @@
+use super::checkout;
 use super::command::{end_group, run_found, run_prepared};
 use super::jsonl;
 use super::log::home;
 use crate::{Listed, PortError, Sessions};
-use meta_core::{AgentId, Binary, ExitStatus, Model, Origin, ProcessGroup, ReviewCopy, Session, WorkerPlan, WorkerRun};
+use meta_core::{
+    AgentId, Binary, ExitStatus, Model, Origin, ProcessGroup, ReviewCopy, Session, Sha, Staged, WorkerPlan, WorkerRun,
+};
 use std::ffi::OsString;
 use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::io::{ErrorKind, PipeReader, PipeWriter, Write};
@@ -30,6 +33,8 @@ kill -KILL 0
 const WORKERS: &str = "workers";
 /// Beside the worker directories: those of starts that failed, kept and out of the way of a retry.
 const FAILED: &str = "failed";
+/// Beside the worker directories: checkouts fetched for a start that has not yet taken them.
+const STAGED: &str = "staged";
 const TRANSCRIPT: &str = "transcript.jsonl";
 const STDERR: &str = "stderr.log";
 const STATUS: &str = "status";
@@ -38,9 +43,14 @@ const SCRATCH: &str = "scratch";
 /// The session's process group and transcript, so that `meta stop` finds it without the log.
 const RUN: &str = "run.json";
 
-/// All a session's environment. The subscription login needs nothing more: `claude` finds it from
-/// `HOME` (probed under `env -i`). Every token and socket of the caller stays behind.
+/// What a session takes from the caller's environment. The subscription login needs nothing more:
+/// `claude` finds it from `HOME` (probed under `env -i`). Every token and socket of the caller stays
+/// behind. A session also gets `NO_MEMORY_FILES`, set by meta.
 const PASSED: [&str; 3] = ["PATH", "HOME", "USER"];
+/// Set for every session. The Claude Code docs describe a risk: a `CLAUDE.md` in a subdirectory
+/// loads once a file beside it is read (`/en/memory`), and this setting stops it (`/en/env-vars`).
+/// A direct probe did not reproduce the risk, and showed no effect of the setting either way.
+const NO_MEMORY_FILES: (&str, &str) = ("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "1");
 
 /// Private to the user, whatever the umask: a transcript holds the session's whole run.
 const PRIVATE_DIR: u32 = 0o700;
@@ -54,6 +64,7 @@ struct Launch<'a> {
     program: &'a str,
     args: &'a [String],
     copy: &'a ReviewCopy,
+    staged: &'a Path,
     model: &'a Model,
 }
 
@@ -77,7 +88,8 @@ fn passed(all: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString, OsS
 
 /// Narrows `command` to a session's environment.
 fn narrowed(command: &mut Command) {
-    command.env_clear().envs(passed(std::env::vars_os()));
+    let (name, value) = NO_MEMORY_FILES;
+    command.env_clear().envs(passed(std::env::vars_os())).env(name, value);
 }
 
 fn private_file(path: &Path) -> Result<File, PortError> {
@@ -136,6 +148,7 @@ fn launch(dir: &Path, session: &Launch<'_>, lifeline: PipeReader) -> Result<Work
     folders.recursive(false).create(&scratch).map_err(|error| at(&scratch, error))?;
     write_private(&scratch.join(ReviewCopy::VIEW), &session.copy.view)?;
     write_private(&scratch.join(ReviewCopy::DIFF), &session.copy.diff)?;
+    checkout::take(session.staged, &scratch.join(ReviewCopy::CHECKOUT))?;
     let transcript = dir.join(TRANSCRIPT);
     private_file(&transcript)?;
     let errors = dir.join(STDERR);
@@ -247,10 +260,22 @@ impl Sessions for HeadlessSessions {
         run_prepared("claude", &["--version"], narrowed)
     }
 
+    fn stage(&mut self, worker: &AgentId, origin: &Origin, head: &Sha) -> Result<Staged, PortError> {
+        let place = checkout::stage(&worker_root()?.join(STAGED), worker, origin, head)?;
+        place.display().to_string().parse().map_err(|error| PortError::new(format!("{error}")))
+    }
+
+    /// A place that cannot be removed is only left behind, under `STAGED`, and stands in nobody's way.
+    fn unstage(&mut self, staged: &Staged) {
+        drop(fs::remove_dir_all(staged.to_string()));
+    }
+
     fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
         let dir = worker_dir(plan.id())?;
         let args = plan.arguments();
-        let session = Launch { program: plan.program(), args: &args, copy: plan.copy(), model: plan.model() };
+        let staged = PathBuf::from(plan.staged().to_string());
+        let session =
+            Launch { program: plan.program(), args: &args, copy: plan.copy(), staged: &staged, model: plan.model() };
         // The writer goes to the supervisor; dropped on the way, it ends the session too.
         start_in(&dir, &session, |writer| {
             supervise(&dir, plan.binary(), &plan.supervisor_arguments(), plan.repository(), writer)
@@ -281,8 +306,8 @@ impl Sessions for HeadlessSessions {
 #[cfg(test)]
 mod tests {
     use super::{
-        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, is_alive, launch, listed_in,
-        make_way, passed, recorded, start_in, state_in, supervise,
+        HeadlessSessions, Launch, NO_MEMORY_FILES, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, is_alive,
+        launch, listed_in, make_way, passed, recorded, start_in, state_in, supervise,
     };
     use crate::{PortError, Sessions};
     use meta_core::{ExitStatus, Model, ReviewCopy, Session, SessionVerdict, Verdict, WorkerRun};
@@ -291,7 +316,7 @@ mod tests {
     use std::fs;
     use std::io::{PipeWriter, Write};
     use std::os::unix::fs::PermissionsExt;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::thread;
     use std::time::{Duration, Instant};
 
@@ -309,11 +334,20 @@ mod tests {
         ["-c".to_owned(), script.to_owned()]
     }
 
+    /// A staged place beside `dir`, as a fetch leaves it, with a tree of one file.
+    fn staged(dir: &Path) -> PathBuf {
+        let place = dir.with_extension("staged");
+        fs::create_dir_all(place.join("tree")).unwrap();
+        fs::write(place.join("tree/kept"), "unchanged code\n").unwrap();
+        place
+    }
+
     /// A session of `/bin/sh -c <script>`; no real `claude` runs in tests.
     fn session(dir: &Path, script: &str) -> (WorkerRun, PipeWriter) {
         let (reader, writer) = std::io::pipe().unwrap();
         let args = sh(script);
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
+        let place = staged(dir);
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), staged: &place, model: &model() };
         (launch(dir, &launched, reader).unwrap(), writer)
     }
 
@@ -336,14 +370,33 @@ mod tests {
     fn a_session_keeps_its_output_and_exit_status_and_reads_the_copy_in_a_fresh_directory() {
         let root = Scratch::new("worker-exit");
         let dir = root.join("worker-1");
-        let script = "pwd; cat pr-view.json pr.diff; printf oops >&2; exit 3";
+        let script = "pwd; cat checkout/kept pr-view.json pr.diff; printf oops >&2; exit 3";
         let (run, _lifeline) = session(&dir, script);
         assert_eq!(ended(&dir, &run), Session::Ended(Some(ExitStatus::of(3))));
         let written = fs::read_to_string(dir.join(TRANSCRIPT)).unwrap();
-        assert!(written.contains("/worker-1/scratch\n") && written.contains("the view\nthe diff\n"), "{written}");
+        let read = "unchanged code\nthe view\nthe diff\n";
+        assert!(written.contains("/worker-1/scratch\n") && written.contains(read), "{written}");
         assert!(!written.contains("oops"), "{written}");
         assert_eq!(fs::read_to_string(dir.join(STDERR)).unwrap(), "oops");
         assert_eq!(HeadlessSessions.transcript(&run).unwrap().last().unwrap(), "the diff");
+    }
+
+    #[test]
+    fn a_session_cannot_write_its_checkout_and_a_start_with_no_tree_starts_no_session() {
+        let root = Scratch::new("worker-checkout");
+        let dir = root.join("worker-1");
+        let script = "echo changed >>checkout/kept; echo new >checkout/new; cat checkout/kept";
+        let (run, _lifeline) = session(&dir, script);
+        ended(&dir, &run);
+        assert_eq!(HeadlessSessions.transcript(&run).unwrap(), ["unchanged code"]);
+        let scratch = dir.join("scratch");
+        assert_eq!((mode(&scratch.join("checkout")), mode(&scratch.join("checkout/kept"))), (0o500, 0o400));
+        assert!(!dir.with_extension("staged").join("tree").exists(), "the tree moved");
+        let (lost, _writer) = std::io::pipe().unwrap();
+        let (args, nothing) = (sh("exit 0"), root.join("nothing"));
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), staged: &nothing, model: &model() };
+        assert!(launch(&root.join("worker-2"), &launched, lost).is_err());
+        assert!(!root.join("worker-2").join(TRANSCRIPT).exists(), "no session was started");
     }
 
     /// A result event of the shape `SessionVerdict` reads.
@@ -388,8 +441,9 @@ mod tests {
         let dir = root.join("worker-1");
         let (run, _lifeline) = session(&dir, "env");
         ended(&dir, &run);
-        let shell = ["PWD", "OLDPWD", "SHLVL", "_", "__CF_USER_TEXT_ENCODING"];
+        let shell = ["PWD", "OLDPWD", "SHLVL", "_", "__CF_USER_TEXT_ENCODING", NO_MEMORY_FILES.0];
         let written = HeadlessSessions.transcript(&run).unwrap();
+        assert!(written.contains(&"CLAUDE_CODE_DISABLE_CLAUDE_MDS=1".to_owned()), "{written:?}");
         let foreign: Vec<&String> = written
             .iter()
             .filter(|line| {
@@ -441,7 +495,8 @@ mod tests {
         let root = Scratch::new("worker-retry");
         let dir = root.join("worker-1");
         let args = sh("sleep 30");
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
+        let place = staged(&dir);
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), staged: &place, model: &model() };
         let missing = "/nonexistent/meta".parse().unwrap();
         let repository = REPOSITORY.parse().unwrap();
         let failed =
@@ -451,6 +506,7 @@ mod tests {
         assert_eq!(is_alive(&run), Ok(false));
         let shell = "/bin/sh".parse().unwrap();
         let script = sh("printf %s \"$GH_REPO\"; exec sleep 5");
+        staged(&dir);
         let again = start_in(&dir, &launched, |writer| supervise(&dir, &shell, &script, &repository, writer)).unwrap();
         assert_eq!(state_in(&dir, &again), Ok(Session::Running));
         let supervisor = dir.join(SUPERVISOR);
@@ -468,7 +524,8 @@ mod tests {
         let root = Scratch::new("worker-unjoined");
         let dir = root.join("worker-1");
         let args = sh("sleep 30");
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
+        let place = staged(&dir);
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), staged: &place, model: &model() };
         let refused = start_in(&dir, &launched, |_| Err(PortError::new("no supervisor")));
         assert_eq!(refused, Err(PortError::new("no supervisor")));
         assert_eq!(is_alive(&recorded(&dir).unwrap().unwrap()), Ok(false));
@@ -492,6 +549,36 @@ mod tests {
         assert_eq!(found, vec![Ok(("worker-1".parse().unwrap(), run.clone()))]);
         assert_eq!(unreadable.len(), 1, "{unreadable:?}");
         HeadlessSessions.stop(&run).unwrap();
+    }
+
+    #[test]
+    fn a_staged_place_beside_the_worker_directories_is_no_worker_and_no_error_to_the_list() {
+        let root = Scratch::new("worker-staged");
+        let live = root.join("worker-1");
+        let (run, _lifeline) = session(&live, "sleep 30");
+        super::record(&live, &run).unwrap();
+        let place = root.join("staged/worker-2.1");
+        fs::create_dir_all(place.join("tree/deep")).unwrap();
+        fs::write(place.join("tree/deep/kept"), "code\n").unwrap();
+        for (frozen, mode) in [("tree/deep/kept", 0o400), ("tree/deep", 0o500), ("tree", 0o500)] {
+            fs::set_permissions(place.join(frozen), fs::Permissions::from_mode(mode)).unwrap();
+        }
+        assert_eq!(listed_in(root.as_ref()), Ok(vec![Ok(("worker-1".parse().unwrap(), run.clone()))]));
+        HeadlessSessions.stop(&run).unwrap();
+    }
+
+    #[test]
+    fn a_failed_start_whose_checkout_is_frozen_is_moved_aside_whole() {
+        let root = Scratch::new("worker-frozen");
+        let dir = root.join("worker-1");
+        let (run, _lifeline) = session(&dir, "exit 0");
+        ended(&dir, &run);
+        let checkout = dir.join("scratch").join(ReviewCopy::CHECKOUT);
+        assert_eq!(mode(&checkout), 0o500);
+        make_way(&dir).unwrap();
+        assert!(!dir.exists());
+        let aside = root.join("failed/worker-1.1/scratch").join(ReviewCopy::CHECKOUT);
+        assert_eq!((mode(&aside), mode(&aside.join("kept"))), (0o500, 0o400));
     }
 
     #[test]

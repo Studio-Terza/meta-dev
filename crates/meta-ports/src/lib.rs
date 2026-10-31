@@ -3,8 +3,8 @@ pub mod real;
 
 use meta_core::{
     AgentId, Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, ReviewCopy, SelfFile, Session,
-    Sha, SideLine, Span, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating, WorkerPlan,
-    WorkerRun,
+    Sha, SideLine, Span, Staged, Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    WorkerPlan, WorkerRun,
 };
 use std::fmt;
 
@@ -125,9 +125,15 @@ pub type Listed = Vec<Result<(AgentId, WorkerRun), PortError>>;
 pub trait Sessions {
     /// The `claude --version` reply: the one `claude` call besides the sessions themselves.
     fn version(&self) -> Result<String, PortError>;
-    /// Starts the session, detached, and the supervisor that watches it; returns once both run. A
-    /// supervisor that ends takes the session with it. A session that the supervisor could not
-    /// join is ended again, and what it left does not stand in the way of the next start.
+    /// Fetches the tree of `head` from `origin` for `worker`, to be taken by a start. Called outside
+    /// the log's lock, for it goes to the network. A failed fetch leaves nothing.
+    fn stage(&mut self, worker: &AgentId, origin: &Origin, head: &Sha) -> Result<Staged, PortError>;
+    /// Drops what `stage` left, once a start has taken its tree or has been refused.
+    fn unstage(&mut self, staged: &Staged);
+    /// Starts the session, detached, and the supervisor that watches it; returns once both run. The
+    /// session finds the staged tree in its scratch directory, read-only. A supervisor that ends
+    /// takes the session with it. A session that the supervisor could not join is ended again, and
+    /// what it left does not stand in the way of the next start.
     fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError>;
     fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError>;
     /// Ends the session's process group. A session already gone is not an error.
