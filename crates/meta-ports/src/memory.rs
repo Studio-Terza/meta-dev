@@ -1,5 +1,5 @@
 use crate::{Clock, GhReplies, Git, GitHub, Log, PortError};
-use meta_core::{Cleared, Origin, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
+use meta_core::{Cleared, Head, Marking, Origin, Place, PrNumber, Pull, Record, SelfFile, Sha, TaskId, Timestamp};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, VecDeque};
 pub struct MemoryLog {
     pub records: Vec<Record>,
     pub broken: Option<PortError>,
-    /// Stands for the lead's real log, which only a main build may write.
-    pub real: bool,
+    /// Where the log stands: the default data dir, or anywhere else.
+    pub place: Place,
 }
 
 impl MemoryLog {
@@ -23,7 +23,13 @@ impl Log for MemoryLog {
     }
 
     fn is_real(&self) -> bool {
-        self.real
+        Head::of(self.open().map(|()| self.records.first())).is_real(self.place)
+    }
+
+    fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
+        self.open()?;
+        let _ = marker;
+        Ok(Marking::Added)
     }
 
     fn read(&self) -> Result<Vec<Record>, PortError> {

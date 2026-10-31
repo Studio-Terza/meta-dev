@@ -68,15 +68,24 @@ fn watched(repo: &Path) -> Result<String, String> {
 
 /// Everything the build script prints for the checkout at `repo`.
 pub fn directives(repo: &Path) -> String {
-    match watched(repo) {
-        Ok(watched) => watched + &Stamp::of(repo).directive(),
-        Err(why) => Stamp::Unknown(why).directive(),
+    stamped(Stamp::of(repo), || watched(repo))
+}
+
+/// The stamp with its rerun directives. Outside git there is nothing to watch. A checkout that git
+/// reads but whose tracked files git cannot list with `--format` has a git older than 2.38.
+fn stamped(stamp: Stamp, watched: impl FnOnce() -> Result<String, String>) -> String {
+    match stamp {
+        Stamp::Unknown(_) => stamp.directive(),
+        stamp => match watched() {
+            Ok(watched) => watched + &stamp.directive(),
+            Err(why) => Stamp::Unknown(why).directive(),
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Stamp, directives, git};
+    use super::{Stamp, directives, git, stamped};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -125,5 +134,14 @@ mod tests {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let gone = std::env::temp_dir().join(format!("meta-dev-stamp-none-{nanos}"));
         assert!(directives(&gone).contains("META_BUILD_UNVERIFIED="));
+    }
+
+    #[test]
+    fn a_git_that_cannot_list_tracked_files_with_format_is_named_as_too_old_to_stamp_the_build() {
+        let commit = "0123456789012345678901234567890123456789".to_owned();
+        let printed = stamped(Stamp::Clean(commit), || Err("git ls-files --format failed".to_owned()));
+        let expected =
+            "META_BUILD_UNVERIFIED=git older than 2.38 cannot stamp the build (git ls-files --format failed)\n";
+        assert!(printed.contains(expected), "{printed}");
     }
 }

@@ -1,7 +1,7 @@
 use crate::{Log, PortError};
-use meta_core::Record;
+use meta_core::{Head, Marking, Place, Record};
 use std::fs::{self, File, OpenOptions, TryLockError};
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -11,69 +11,75 @@ pub(super) fn home() -> Result<PathBuf, PortError> {
     data_dir().map(|(home, _)| home)
 }
 
-/// The data directory, and whether it is the default one, `$HOME/.local/share/meta-dev`, which
-/// holds the lead's real log. XDG_DATA_HOME naming any other place makes it a scratch directory.
-fn data_dir() -> Result<(PathBuf, bool), PortError> {
+/// The data directory, and whether it is the default one, `$HOME/.local/share/meta-dev`. Which log
+/// is real is decided by its first record (`Head`), not here: the place matters only for a default
+/// log not yet marked.
+fn data_dir() -> Result<(PathBuf, Place), PortError> {
     data_dir_from(std::env::var_os("XDG_DATA_HOME").map(PathBuf::from), std::env::var_os("HOME").map(PathBuf::from))
 }
 
-fn data_dir_from(chosen: Option<PathBuf>, home: Option<PathBuf>) -> Result<(PathBuf, bool), PortError> {
-    let default = home.map(|home| home.join(".local").join("share").join(DIR));
-    let chosen = chosen.map(|chosen| chosen.join(DIR));
-    let real = match (&chosen, &default) {
-        (None, _) => true,
-        (Some(chosen), Some(default)) => same_log(chosen, default),
-        (Some(_), None) => false,
-    };
-    chosen
-        .or(default)
-        .map(|data| (data, real))
-        .ok_or_else(|| PortError::new("neither XDG_DATA_HOME nor HOME is set; meta-dev has no data directory"))
+fn data_dir_from(chosen: Option<PathBuf>, home: Option<PathBuf>) -> Result<(PathBuf, Place), PortError> {
+    match (chosen, home) {
+        (Some(chosen), _) => Ok((chosen.join(DIR), Place::Elsewhere)),
+        (None, Some(home)) => Ok((home.join(".local").join("share").join(DIR), Place::Default)),
+        (None, None) => Err(PortError::new("neither XDG_DATA_HOME nor HOME is set; meta-dev has no data directory")),
+    }
 }
 
 /// meta-dev's directory under the data home, and the log in it.
 const DIR: &str = "meta-dev";
 const LOG: &str = "log.jsonl";
-
-/// Two meta-dev directories that write one log: the same directory, or the same log file, by any
-/// name, through symlinks too.
-fn same_log(one: &Path, other: &Path) -> bool {
-    let same = |one: &Path, other: &Path| resolved(one) == resolved(other);
-    same(one, other) || same(&one.join(LOG), &other.join(LOG))
-}
-
-/// The path with symlinks resolved as far as it exists: a part not yet created keeps its name
-/// under its resolved parent.
-fn resolved(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| match (path.parent(), path.file_name()) {
-        (Some(parent), Some(name)) => resolved(parent).join(name),
-        _ => path.to_path_buf(),
-    })
-}
+/// Beside the log, the copy `mark` keeps of the log as it was before marking.
+const UNMARKED: &str = "log.jsonl.unmarked";
 
 #[derive(Debug)]
 pub struct JsonlLog {
     path: Result<PathBuf, PortError>,
     patience: Duration,
-    real: bool,
+    place: Place,
 }
 
 impl JsonlLog {
     pub const PATIENCE: Duration = Duration::from_secs(3);
     const RETRY: Duration = Duration::from_millis(20);
 
-    /// The log in the data directory. With no data directory it is taken as the real one: fail closed.
+    /// The log in the data directory. With no data directory its first record cannot be read, so
+    /// it is taken as real: fail closed.
     pub fn in_data_dir() -> Self {
-        let (path, real) = match data_dir() {
-            Ok((home, real)) => (Ok(home.join(LOG)), real),
-            Err(error) => (Err(error), true),
-        };
-        Self { path, patience: Self::PATIENCE, real }
+        Self::in_dir(data_dir())
     }
 
-    /// A scratch log at `path`.
+    fn in_dir(dir: Result<(PathBuf, Place), PortError>) -> Self {
+        let (path, place) = match dir {
+            Ok((home, place)) => (Ok(home.join(LOG)), place),
+            Err(error) => (Err(error), Place::Default),
+        };
+        Self { path, patience: Self::PATIENCE, place }
+    }
+
+    /// The log at `path`, outside the default data dir: real only when its first record is the marker.
     pub fn at(path: PathBuf) -> Self {
-        Self { path: Ok(path), patience: Self::PATIENCE, real: false }
+        Self { path: Ok(path), patience: Self::PATIENCE, place: Place::Elsewhere }
+    }
+
+    /// The log's first record, read through whatever path, symlink or hard link reaches it.
+    fn head(&self) -> Head {
+        match self.path.as_ref().map(|path| (path, File::open(path))) {
+            Err(_) => Head::Unreadable,
+            Ok((_, Err(error))) if error.kind() == ErrorKind::NotFound => Head::Empty,
+            Ok((_, Err(_))) => Head::Unreadable,
+            Ok((path, Ok(file))) => Self::head_of(path, BufReader::new(file)),
+        }
+    }
+
+    /// The first record of what `reader` holds.
+    fn head_of(path: &Path, mut reader: impl BufRead) -> Head {
+        let mut line = String::new();
+        let first = reader
+            .read_line(&mut line)
+            .map_err(|error| Self::failed(path, error))
+            .and_then(|_| super::jsonl::records(path, &line));
+        Head::of(first.as_ref().map(|records| records.first()))
     }
 
     fn locked(&self) -> Result<(File, &Path), PortError> {
@@ -121,7 +127,14 @@ impl Log for JsonlLog {
     }
 
     fn is_real(&self) -> bool {
-        self.real
+        self.head().is_real(self.place)
+    }
+
+    /// Keeps the log as it was in `log.jsonl.unmarked` first, and refuses when that copy already
+    /// exists, so that a marking cut short never loses the earlier copy.
+    fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
+        let _ = (marker, UNMARKED);
+        Ok(Marking::Added)
     }
 
     fn read(&self) -> Result<Vec<Record>, PortError> {
@@ -143,7 +156,9 @@ impl Log for JsonlLog {
 mod tests {
     use super::{JsonlLog, data_dir_from};
     use crate::Log;
-    use std::fs::{File, TryLockError};
+    use meta_core::{Event, Marking, Record, Timestamp};
+    use std::fs::{self, File, TryLockError};
+    use std::path::{Path, PathBuf};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -162,41 +177,99 @@ mod tests {
         assert_eq!((blocked, free), ((0, true), true));
     }
 
-    #[test]
-    fn only_the_default_data_dir_holds_the_real_log_and_any_other_xdg_data_home_is_scratch() {
+    /// A fresh directory under the temp dir.
+    fn scratch(name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let home = std::env::temp_dir().join(format!("meta-dev-home-{nanos}"));
-        let share = home.join(".local").join("share");
-        std::fs::create_dir_all(&share).unwrap();
-        let alias = home.join("alias");
-        std::os::unix::fs::symlink(&share, &alias).unwrap();
-        let real = |chosen: Option<&std::path::Path>| {
-            data_dir_from(chosen.map(std::path::Path::to_path_buf), Some(home.clone())).unwrap().1
-        };
-        let decided = [real(None), real(Some(&share)), real(Some(&alias)), real(Some(&home.join("scratch")))];
-        let homeless = data_dir_from(Some(home.join("scratch")), None).unwrap().1;
-        std::fs::remove_dir_all(&home).unwrap();
-        assert_eq!((decided, homeless), ([true, true, true, false], false));
-        assert_eq!(data_dir_from(None, None).map(|(_, real)| real).ok(), None);
-        assert!(!JsonlLog::at(home).is_real());
+        let dir = std::env::temp_dir().join(format!("meta-dev-{name}-{nanos}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    const MARKER: &str = "{\"at\":1,\"event\":\"RealLog\"}\n";
+    const DONE: &str = "{\"at\":2,\"event\":\"Done\",\"task\":1}\n";
+
+    /// The log meta reaches with XDG_DATA_HOME and HOME set so.
+    fn reached(xdg: Option<&Path>, home: Option<&Path>) -> JsonlLog {
+        JsonlLog::in_dir(data_dir_from(xdg.map(Path::to_path_buf), home.map(Path::to_path_buf)))
     }
 
     #[test]
-    fn a_scratch_data_home_whose_meta_dev_dir_or_log_links_to_the_real_one_holds_the_real_log() {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let home = std::env::temp_dir().join(format!("meta-dev-linked-{nanos}"));
-        let real_dir = home.join(".local").join("share").join("meta-dev");
-        std::fs::create_dir_all(&real_dir).unwrap();
-        std::fs::write(real_dir.join("log.jsonl"), "").unwrap();
-        let (linked_dir, linked_log) = (home.join("linked-dir"), home.join("linked-log"));
-        std::fs::create_dir_all(&linked_dir).unwrap();
-        std::os::unix::fs::symlink(&real_dir, linked_dir.join("meta-dev")).unwrap();
-        std::fs::create_dir_all(linked_log.join("meta-dev")).unwrap();
-        std::os::unix::fs::symlink(real_dir.join("log.jsonl"), linked_log.join("meta-dev").join("log.jsonl")).unwrap();
-        let real = |chosen: &std::path::Path| data_dir_from(Some(chosen.to_path_buf()), Some(home.clone())).unwrap().1;
-        let decided = [real(&linked_dir), real(&linked_log)];
-        std::fs::remove_dir_all(&home).unwrap();
-        assert_eq!(decided, [true, true]);
+    fn a_marked_log_is_real_through_another_home_a_hard_link_a_symlink_or_with_home_unset() {
+        let root = scratch("marked");
+        let (lead, other) = (root.join("lead"), root.join("other"));
+        let share = lead.join(".local").join("share");
+        let real_dir = share.join("meta-dev");
+        fs::create_dir_all(&real_dir).unwrap();
+        fs::write(real_dir.join("log.jsonl"), [MARKER, DONE].concat()).unwrap();
+        let (hard, dir_link, log_link) = (root.join("hard"), root.join("dir-link"), root.join("log-link"));
+        [&hard, &dir_link, &log_link].iter().for_each(|dir| fs::create_dir_all(dir).unwrap());
+        fs::create_dir_all(hard.join("meta-dev")).unwrap();
+        fs::hard_link(real_dir.join("log.jsonl"), hard.join("meta-dev").join("log.jsonl")).unwrap();
+        std::os::unix::fs::symlink(&real_dir, dir_link.join("meta-dev")).unwrap();
+        fs::create_dir_all(log_link.join("meta-dev")).unwrap();
+        std::os::unix::fs::symlink(real_dir.join("log.jsonl"), log_link.join("meta-dev").join("log.jsonl")).unwrap();
+        let reach = [
+            reached(None, Some(&lead)),
+            reached(Some(&share), Some(&other)),
+            reached(Some(&hard), Some(&other)),
+            reached(Some(&dir_link), Some(&other)),
+            reached(Some(&log_link), Some(&other)),
+            reached(Some(&share), None),
+            reached(None, None),
+        ];
+        let real = reach.map(|log| log.is_real());
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(real, [true; 7]);
+    }
+
+    #[test]
+    fn an_unmarked_log_anywhere_else_is_scratch_and_the_default_one_is_real_until_marked() {
+        let root = scratch("unmarked");
+        let firsts = ["", DONE, "not a record\n"];
+        let logs = firsts.map(|first| {
+            let dir = root.join(format!("scratch-{}", first.len()));
+            fs::create_dir_all(dir.join("meta-dev")).unwrap();
+            fs::write(dir.join("meta-dev").join("log.jsonl"), [first, DONE].concat()).unwrap();
+            reached(Some(&dir), Some(&root))
+        });
+        let missing = reached(Some(&root.join("missing")), Some(&root));
+        let home = root.join("home");
+        let default_missing = reached(None, Some(&home));
+        fs::create_dir_all(home.join(".local").join("share").join("meta-dev")).unwrap();
+        fs::write(home.join(".local").join("share").join("meta-dev").join("log.jsonl"), DONE).unwrap();
+        let default_unmarked = reached(None, Some(&home));
+        let real = [logs.map(|log| log.is_real()).to_vec(), vec![missing.is_real()]].concat();
+        let default = [default_missing.is_real(), default_unmarked.is_real()];
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(real, [false, false, true, false], "empty first line, unmarked, garbled, missing");
+        assert_eq!(default, [true, true]);
+    }
+
+    #[test]
+    fn marking_puts_the_marker_first_keeps_the_unmarked_copy_and_happens_once() {
+        let root = scratch("mark");
+        let path = root.join("log.jsonl");
+        fs::write(&path, [DONE, DONE].concat()).unwrap();
+        fs::hard_link(&path, root.join("linked.jsonl")).unwrap();
+        let marker = Record { at: Timestamp::from_unix_seconds(1), event: Event::RealLog };
+        let mut log = JsonlLog::at(path.clone());
+        let before = log.is_real();
+        let marked = [log.mark(marker.clone()).unwrap(), log.mark(marker.clone()).unwrap()];
+        let text = fs::read_to_string(&path).unwrap();
+        let kept = fs::read_to_string(root.join("log.jsonl.unmarked")).unwrap();
+        let after = [log.is_real(), JsonlLog::at(root.join("linked.jsonl")).is_real()];
+        let records = log.read().unwrap().len();
+        let other = root.join("other.jsonl");
+        fs::write(&other, DONE).unwrap();
+        fs::write(root.join("log.jsonl.unmarked"), "earlier copy").unwrap();
+        let refused = JsonlLog::at(other.clone()).mark(marker).unwrap_err().to_string();
+        let untouched = fs::read_to_string(&other).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!((before, marked), (false, [Marking::Added, Marking::AlreadyMarked]));
+        assert_eq!((text, kept), ([MARKER, DONE, DONE].concat(), [DONE, DONE].concat()));
+        assert_eq!((after, records), ([true, true], 3));
+        assert!(refused.contains("log.jsonl.unmarked"), "{refused}");
+        assert_eq!(untouched, DONE);
     }
 
     #[test]

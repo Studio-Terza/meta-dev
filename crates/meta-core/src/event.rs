@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event")]
 pub enum Event {
+    /// The first record of the lead's real log, written once by `meta mark-real-log`. Only a main
+    /// build may write a log that starts with it, wherever the log is reached from.
+    RealLog,
     Opened {
         task: TaskId,
         title: Title,

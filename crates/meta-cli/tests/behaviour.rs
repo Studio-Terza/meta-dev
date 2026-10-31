@@ -1,7 +1,7 @@
 use meta_cli::{Answer, Call, Code, answer};
 use meta_core::{
-    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, PrNumber, Record, Route, RunCount, SelfFile, Sha,
-    Timestamp, Writer,
+    Attempt, Build, Checked, Claimant, Event, Measure, Outcome, Place, PrNumber, Record, Route, RunCount, SelfFile,
+    Sha, Timestamp, Writer,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
@@ -147,7 +147,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
         log: MemoryLog {
             records: events.into_iter().map(|event| Record { at, event }).collect(),
             broken: None,
-            real: false,
+            place: Place::Elsewhere,
         },
         git: RecordedGit {
             origin: id(ORIGIN),
@@ -1134,6 +1134,10 @@ impl Log for Lagging {
         self.0.is_real()
     }
 
+    fn mark(&mut self, marker: Record) -> Result<meta_core::Marking, PortError> {
+        self.0.mark(marker)
+    }
+
     fn read(&self) -> Result<Vec<Record>, PortError> {
         Ok(Vec::new())
     }
@@ -1382,7 +1386,7 @@ fn a_log_that_resolves_historically_twice_or_corrects_a_non_task_resolution_does
 const BRANCH_BUILD_REFUSAL: &str = "you are running a branch build";
 const MAIN_BUILD_NEXT: &str = "Next: use a main build, or set XDG_DATA_HOME to a scratch data dir.";
 
-/// The real log in the default data dir, written by `build`.
+/// The default data dir's log, not yet marked, written by `build`.
 fn on_real_log(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>, build: Build) -> Memory {
     Ports { build, ..given(events, pulls) }.real()
 }
@@ -1393,7 +1397,7 @@ trait Real {
 
 impl Real for Memory {
     fn real(mut self) -> Self {
-        self.log.real = true;
+        self.log.place = Place::Default;
         self
     }
 }
@@ -1533,6 +1537,74 @@ fn a_scratch_log_takes_every_write_from_any_build_with_no_ancestry_check() {
         let (reply, events) = call(&mut ports, "escape gap scratch", "");
         assert_eq!((reply.code, events), (Code::Done, vec![escaped("gap", "scratch")]), "{}", reply.text);
     });
+}
+
+/// A log that starts with the `RealLog` marker, at no default place: reached by another HOME, a
+/// hard link, a symlink or with HOME unset. The JSONL port's tests reach it each of those ways.
+fn on_marked_log(events: Vec<Event>, build: Build) -> Memory {
+    let marked = [vec![Event::RealLog], events].concat();
+    Ports { build, ..given(marked, Vec::new()) }
+}
+
+#[test]
+fn a_marked_log_anywhere_refuses_every_write_but_an_unverified_escape_from_a_build_not_on_main() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let (reply, events) = call(&mut on_marked_log(vec![opened("task-1")], build.clone()), "defer task-1 later", "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(why), "{}", reply.text);
+        let (reply, events) =
+            call(&mut on_marked_log(claimed_task(), build.clone()), "hook pre-tool-use", &agent("lease-1"));
+        assert_eq!(events, Vec::new(), "{}", reply.text);
+        assert!(reply.text.contains(DENY), "{}", reply.text);
+        let (reply, events) = call(&mut on_marked_log(Vec::new(), build), "escape gap from a branch", "");
+        let marked = Event::Escaped {
+            kind: id("gap"),
+            reason: id("from a branch"),
+            pr: None,
+            checked: Checked::Listed,
+            build: Writer::Unverified,
+        };
+        assert_eq!((reply.code, events), (Code::Done, vec![marked]), "{}", reply.text);
+    });
+    let (reply, events) =
+        call(&mut on_marked_log(vec![opened("task-1")], Build::commit(id(MAIN_BUILD))), "defer task-1 later", "");
+    assert_eq!((reply.code, events.len()), (Code::Done, 1), "{}", reply.text);
+}
+
+#[test]
+fn a_marked_jsonl_log_at_a_scratch_path_is_still_refused_to_a_branch_build() {
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("marked-{nanos}.jsonl"));
+    let marked = "{\"at\":1,\"event\":\"RealLog\"}\n{\"at\":1,\"event\":\"Opened\",\"task\":1,\"title\":\"Fix\"}\n";
+    std::fs::write(&path, marked).unwrap();
+    let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
+    let mut ports =
+        Ports { log: JsonlLog::at(path.clone()), git, github, clock, build: Build::commit(id(BRANCH_BUILD)) };
+    let reply = answer(parsed("defer task-1 later"), &mut ports);
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!((reply.code, text.as_str()), (Code::Refused, marked), "{}", reply.text);
+}
+
+#[test]
+fn mark_real_log_puts_the_marker_first_once_and_only_from_a_main_build() {
+    unverified_builds().into_iter().for_each(|(build, why)| {
+        let mut ports = Ports { build, ..given(claimed_task(), Vec::new()) };
+        let reply = answer(parsed("mark-real-log"), &mut ports);
+        assert_eq!(reply.code, Code::Refused, "{}", reply.text);
+        assert!(reply.text.contains(why), "{}", reply.text);
+        assert_eq!(ports.log.records.len(), 3);
+    });
+    let mut ports = on_real_log(claimed_task(), Vec::new(), Build::commit(id(MAIN_BUILD)));
+    let first = answer(parsed("mark-real-log"), &mut ports);
+    let again = answer(parsed("mark-real-log"), &mut ports);
+    let events: Vec<Event> = ports.log.records.iter().map(|record| record.event.clone()).collect();
+    assert_eq!((first.code, again.code), (Code::Done, Code::Done), "{}{}", first.text, again.text);
+    assert!(first.text.contains("marked memory log as the real log"), "{}", first.text);
+    assert!(again.text.contains("already marked"), "{}", again.text);
+    assert_eq!(events, [vec![Event::RealLog], claimed_task()].concat());
+    let status = call(&mut ports, "status", "");
+    assert!(status.0.text.contains("task-1 claimed by alice"), "{}", status.0.text);
 }
 
 #[test]

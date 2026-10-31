@@ -16,9 +16,14 @@ enum Stamp {
     Unknown(String),
 }
 
-/// Why this binary may not append to the real log.
+/// Why this binary may not append to the real log: it is a branch build (a commit not on main,
+/// edits to tracked files, or an ancestry that cannot be read), or it carries no commit at all (a
+/// build outside git, or a git too old to stamp it).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unverified(String);
+pub enum Unverified {
+    Branch(String),
+    Unstamped(String),
+}
 
 /// Who wrote a record: a build that may write the log, or a build that could not be verified to be
 /// from main. Only escapes are ever written by an unverified build.
@@ -50,14 +55,16 @@ impl Build {
     /// ancestry that cannot be decided, is unverified: fail closed.
     pub fn verify<E: fmt::Display>(&self, on_main: impl FnOnce(&Sha) -> Result<bool, E>) -> Result<(), Unverified> {
         match &self.0 {
-            Stamp::Unknown(why) => Err(Unverified(format!("built from {why}"))),
-            Stamp::Dirty(commit) => Err(Unverified(format!(
+            Stamp::Unknown(why) => Err(Unverified::Unstamped(why.clone())),
+            Stamp::Dirty(commit) => Err(Unverified::Branch(format!(
                 "built from {commit} with edits to tracked files; to clear it, commit or stash them, then rebuild"
             ))),
             Stamp::Clean(commit) => match on_main(commit) {
                 Ok(true) => Ok(()),
-                Ok(false) => Err(Unverified(format!("built from {commit}, which is not on origin/main"))),
-                Err(error) => Err(Unverified(format!("cannot tell whether {commit} is on origin/main: {error}"))),
+                Ok(false) => Err(Unverified::Branch(format!("built from {commit}, which is not on origin/main"))),
+                Err(error) => {
+                    Err(Unverified::Branch(format!("cannot tell whether {commit} is on origin/main: {error}")))
+                }
             },
         }
     }
@@ -75,11 +82,13 @@ impl Writer {
 
 impl fmt::Display for Unverified {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "you are running a branch build ({}); only a build from a commit on main may write the real log. \
+        match self {
+            Self::Branch(why) => write!(formatter, "you are running a branch build ({why}); "),
+            Self::Unstamped(why) => write!(formatter, "you are running a branch build (built from {why}); "),
+        }?;
+        formatter.write_str(
+            "only a build from a commit on main may write the real log. \
              Next: use a main build, or set XDG_DATA_HOME to a scratch data dir.",
-            self.0
         )
     }
 }
@@ -87,5 +96,18 @@ impl fmt::Display for Unverified {
 impl From<Unverified> for Refusal {
     fn from(unverified: Unverified) -> Self {
         Self::because(unverified.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Build;
+
+    #[test]
+    fn a_build_git_could_not_stamp_says_why_and_is_not_called_a_branch_build() {
+        let why = "git older than 2.38 cannot stamp the build (git ls-files --format failed)";
+        let refusal = Build::embedded(None, None, Some(why)).verify(|_| Ok::<_, String>(true)).unwrap_err().to_string();
+        assert!(refusal.contains("git older than 2.38 cannot stamp the build"), "{refusal}");
+        assert!(!refusal.contains("branch build"), "{refusal}");
     }
 }

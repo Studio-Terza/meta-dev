@@ -1,7 +1,7 @@
 use meta_core::{
     Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
-    Ledger, Malformed, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record,
-    Refusal, Roles, Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified,
+    Ledger, Malformed, Marking, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation,
+    Record, Refusal, Roles, Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified,
     Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
@@ -16,6 +16,8 @@ pub enum Call {
     },
     /// A Claude Code hook, before or after a tool runs, with its input.
     Hook(Phase, String),
+    /// Puts the `RealLog` marker first in the log, once; only a main build may.
+    MarkRealLog,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,7 +110,7 @@ impl Call {
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  \
-                         meta status\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
+                         meta status\n  meta mark-real-log\n  meta hook pre-tool-use < input\n  meta hook post-tool-use < input\n";
 
     pub fn parse(args: &[String], stdin: impl FnOnce() -> String) -> Result<Self, Answer> {
         let words: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -128,6 +130,7 @@ impl Call {
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
+            ["mark-real-log"] => Some(Ok(Self::MarkRealLog)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
                 pr.parse()
                     .and_then(|pr| reason.join(" ").parse().map(|reason| Self::Escape { kind, reason, pr: Some(pr) }))
@@ -190,6 +193,21 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     let real = log.is_real();
     match call {
         Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(real, git, build)),
+        Call::MarkRealLog => {
+            if let Err(unverified) = verify(true, git, build) {
+                return Answer::failed(Failure::Refused(unverified.into()));
+            }
+            match log.mark(Record { at, event: Event::RealLog }) {
+                Ok(Marking::Added) => Answer::done(format!(
+                    "marked {} as the real log: only a main build writes it now, by any path\n",
+                    log.place()
+                )),
+                Ok(Marking::AlreadyMarked) => {
+                    Answer::done(format!("{} is already marked as the real log\n", log.place()))
+                }
+                Err(error) => Answer::failed(error.into()),
+            }
+        }
         Call::Escape { kind, reason, pr } => {
             let kinds = git
                 .local(SelfFile::EscapeKinds)
@@ -251,7 +269,8 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 }
 
 /// Whether this binary may append to the log: any build may write a scratch log, and only a build
-/// from a commit on main may write the real one. An ancestry that cannot be decided is unverified.
+/// from a commit on main may write the real one, which the log's first record names (`Log::is_real`).
+/// An ancestry that cannot be decided is unverified.
 fn verify<G: Git>(real: bool, git: &G, build: &Build) -> Result<(), Unverified> {
     match real {
         false => Ok(()),

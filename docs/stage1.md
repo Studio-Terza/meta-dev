@@ -124,7 +124,16 @@ An agent ran `meta` built from its unmerged branch against the lead's real log. 
 
 The build script (`crates/meta-ports/src/real/build.rs`, with its logic in `stamp.rs`) embeds the commit the binary is built from. Edits to tracked files make the build dirty: it embeds the commit as dirty, and the refusal says how to clear it (commit or stash the tracked edits, then rebuild). Untracked files do not count. A build outside git embeds no commit. The build script reruns when any tracked file changes, or git's `HEAD`, `index` or `logs/HEAD`. It reads the tracked files from `git ls-files`, so no hand-kept list can go stale. If it cannot list them, the build is unverified.
 
-The real log is the one in the default data dir, `$HOME/.local/share/meta-dev`. An XDG_DATA_HOME that names any other place is a scratch data dir. The exception is a place whose `meta-dev` dir, or whose `log.jsonl`, resolves through symlinks to the real one. Such a place is real. Tests use scratch or in-memory logs.
+The real log is known by its content, not by its path. Its first record is the marker `{"at":…,"event":"RealLog"}`, written once by `meta mark-real-log`. Before every write, meta reads the first record of the log it is about to write:
+
+- The first record is the marker: the log is real, wherever it is reached from. HOME, XDG_DATA_HOME, symlinks and hard links do not change this.
+- The first record cannot be read or parsed: the log is real (fail closed).
+- The log is missing or empty, or its first record is any other event: the log is scratch.
+- The exception: the log in the default data dir (XDG_DATA_HOME unset, `$HOME/.local/share/meta-dev`) is real until it is marked. This keeps the lead's log guarded before its one-time marking.
+
+Tests use scratch or in-memory logs, and fake homes.
+
+`meta mark-real-log` puts the marker first in the log of the current data dir, ahead of the records already there. Only a main build may run it. It copies the log to `log.jsonl.unmarked` beside it first, and it refuses if that copy already exists. A log that already starts with the marker is left as it is.
 
 Before each write to the real log, meta asks the git port whether the embedded commit is an ancestor of origin/main. The ancestry check runs in the clone the binary was built in, by that clone's local refs, with no network. So a binary must stay in the clone it was built in. If that clone moves or is removed, every guarded write fails closed, and the refusal says that the clone has moved or been removed.
 
@@ -134,7 +143,13 @@ Before each write to the real log, meta asks the git port whether the embedded c
 | `meta hook pre-tool-use` or `post-tool-use` for `Agent`, `Task` or `SendMessage`, on the real log | the same | denied or not recorded (fail closed), with the same reason |
 | `meta status`, on the real log | the same | the report prints; a falsification it would latch is not recorded, and the reason is printed |
 | `meta escape <kind> <reason>`, on the real log | the same | event `Escaped` marked `build: unverified`; prints why. `meta status` shows the mark beside the escape |
-| any command | a build whose commit is on origin/main, or a scratch data dir | written as before, with no mark |
+| any command | a build whose commit is on origin/main, or a scratch log | written as before, with no mark |
+| any write, on a log whose first record is the marker | a branch build reaches it with HOME elsewhere, through a hard link or a symlink, or with HOME unset | refused as on the real log (escapes are written, marked unverified) |
+| any write, on an unmarked log outside the default data dir | any build | written: the log is scratch |
+| any write, on the default data dir's log with no marker yet | a branch build | refused as on the real log, until the log is marked |
+| `meta mark-real-log` | a branch build | refused with the branch-build reason; the log is unchanged |
+| `meta mark-real-log` | a main build | the marker goes first, once; a second run says the log is already marked |
+| any command that writes, on the real log | `git ls-files --format` is unsupported when the binary is built | refused: "this build carries no commit (git older than 2.38 cannot stamp the build …)", not "branch build" |
 
 `meta claim` prints how an agent gets a main build for `meta link`: a detached worktree at origin/main, built with `cargo build --release`. It also says that a branch build may run only with XDG_DATA_HOME set to a scratch dir.
 
@@ -145,6 +160,7 @@ Blocking owner approval of gate changes waits for a proper escalation system. Bl
 ## After merge
 
 - Rebuild the lead's hook binary from main once this lands (`git pull`, then `cargo build --release`). The hook writes `LeaseUsed` and `Started`. The hook binary built from main before this change keeps writing unchecked until then; a hook binary built from a branch or a dirty tree denies every agent start.
+- Then mark the lead's log once, with that main build and XDG_DATA_HOME unset: `meta mark-real-log`. It prints `marked <path> as the real log`; the log as it was stays in `~/.local/share/meta-dev/log.jsonl.unmarked`. A binary built before this change cannot read the marker, so rebuild every main build the lead uses first.
 
 - Resolve the bootstrap escapes against the stage 0 task.
 - Resolve the stage-0 gap escapes against this stage's task.
