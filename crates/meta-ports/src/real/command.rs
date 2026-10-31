@@ -31,7 +31,26 @@ pub fn run_found(program: &str, args: &[&str]) -> Result<Option<String>, PortErr
 
 #[cfg(test)]
 mod tests {
-    use super::run;
+    use super::{run, run_found};
+
+    fn found(script: &str) -> Result<Option<String>, String> {
+        run_found("/bin/sh", &["-c", script]).map_err(|error| error.to_string())
+    }
+
+    #[test]
+    fn run_found_answers_none_only_for_a_quiet_exit_of_one() {
+        assert_eq!(found("exit 1"), Ok(None));
+        assert_eq!(found("printf abc"), Ok(Some("abc".to_owned())));
+    }
+
+    #[test]
+    fn run_found_fails_for_an_exit_other_than_zero_or_one_and_for_a_noisy_one() {
+        let other = "printf 'bad\\n' >&2; exit 2";
+        let noisy = "printf 'bad\\n' >&2; exit 1";
+        assert_eq!(found(other), Err(format!("/bin/sh -c {other}: bad\n")));
+        assert_eq!(found(noisy), Err(format!("/bin/sh -c {noisy}: bad\n")));
+        assert_eq!(found("exit 2"), Err("/bin/sh -c exit 2: ".to_owned()));
+    }
 
     #[test]
     fn a_failed_command_shows_its_stderr_as_it_was_written() {
