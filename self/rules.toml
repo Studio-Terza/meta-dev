@@ -51,3 +51,8 @@ source = "owner 2026-10-25: we should have the cratemaxx lint go red first to ve
 id = "review-gates"
 text = "Review: flag any change that loosens a gate, such as the CI workflow, lint config, parse boundaries, rules, predictions or escape kinds."
 source = "owner 2026-10-30: I don't want to get bombarded by a bunch of blocking requests... for now we stop this with normal review processes"
+
+[[rule]]
+id = "live-reads"
+text = "A PR that adds or changes something that reads real data (the meta log, GitHub, git, any other external source) runs it against that real data before review, and the PR body says what it observed."
+source = "failure 2026-10-31: the idle alarm and the drift query passed their tests and failed live"
