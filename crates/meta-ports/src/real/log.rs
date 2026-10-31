@@ -133,7 +133,22 @@ impl Log for JsonlLog {
     /// Keeps the log as it was in `log.jsonl.unmarked` first, and refuses when that copy already
     /// exists, so that a marking cut short never loses the earlier copy.
     fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
-        let _ = (marker, UNMARKED);
+        let (mut file, path) = self.locked()?;
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(|error| Self::failed(path, error))?;
+        if Self::head_of(path, text.as_bytes()) == Head::Marked {
+            return Ok(Marking::AlreadyMarked);
+        }
+        let unmarked = path.with_file_name(UNMARKED);
+        let kept = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&unmarked)
+            .and_then(|mut copy| copy.write_all(text.as_bytes()).and_then(|()| copy.sync_all()));
+        kept.map_err(|error| Self::failed(&unmarked, error))?;
+        file.set_len(0).map_err(|error| Self::failed(path, error))?;
+        Self::write(&mut file, path, &[marker])?;
+        file.write_all(text.as_bytes()).and_then(|()| file.sync_all()).map_err(|error| Self::failed(path, error))?;
         Ok(Marking::Added)
     }
 

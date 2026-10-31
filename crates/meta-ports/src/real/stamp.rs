@@ -78,7 +78,7 @@ fn stamped(stamp: Stamp, watched: impl FnOnce() -> Result<String, String>) -> St
         Stamp::Unknown(_) => stamp.directive(),
         stamp => match watched() {
             Ok(watched) => watched + &stamp.directive(),
-            Err(why) => Stamp::Unknown(why).directive(),
+            Err(why) => Stamp::Unknown(format!("git older than 2.38 cannot stamp the build ({why})")).directive(),
         },
     }
 }

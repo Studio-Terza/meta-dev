@@ -28,8 +28,13 @@ impl Log for MemoryLog {
 
     fn mark(&mut self, marker: Record) -> Result<Marking, PortError> {
         self.open()?;
-        let _ = marker;
-        Ok(Marking::Added)
+        match Head::of::<PortError>(Ok(self.records.first())) {
+            Head::Marked => Ok(Marking::AlreadyMarked),
+            _ => {
+                self.records.insert(0, marker);
+                Ok(Marking::Added)
+            }
+        }
     }
 
     fn read(&self) -> Result<Vec<Record>, PortError> {

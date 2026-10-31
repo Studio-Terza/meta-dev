@@ -38,8 +38,10 @@ impl Head {
     /// from. A first record that cannot be read is real: fail closed. The default data dir's log
     /// is real until it is marked, so that the lead's log stays guarded before its one-time marking.
     pub fn is_real(self, place: Place) -> bool {
-        let _ = self;
-        place == Place::Default
+        match (self, place) {
+            (Self::Marked | Self::Unreadable, _) | (_, Place::Default) => true,
+            (Self::Empty | Self::Unmarked, Place::Elsewhere) => false,
+        }
     }
 }
 

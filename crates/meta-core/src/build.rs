@@ -84,7 +84,7 @@ impl fmt::Display for Unverified {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Branch(why) => write!(formatter, "you are running a branch build ({why}); "),
-            Self::Unstamped(why) => write!(formatter, "you are running a branch build (built from {why}); "),
+            Self::Unstamped(why) => write!(formatter, "this build carries no commit ({why}); "),
         }?;
         formatter.write_str(
             "only a build from a commit on main may write the real log. \
