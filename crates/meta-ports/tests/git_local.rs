@@ -1,16 +1,16 @@
 use meta_core::SelfFile;
 use meta_ports::PortError;
 use meta_ports::real::GitCli;
+use meta_testkit::Scratch;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const TREE: &str = "[[kind]]\nid = \"tree\"\ntext = \"t\"\nsource = \"s\"\nnames_merged_pr = false\n";
 const CACHED: &str = "[[kind]]\nid = \"cached\"\ntext = \"t\"\nsource = \"s\"\nnames_merged_pr = false\n";
 const GARBLED: &str = "this is [not toml";
 
-fn scratch(name: &str) -> PathBuf {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}-{nanos}"));
+fn scratch(name: &str) -> Scratch {
+    let root = Scratch::new(name);
     fs::create_dir_all(root.join("tree/self")).unwrap();
     fs::create_dir_all(root.join("cache/self")).unwrap();
     root

@@ -11,6 +11,7 @@ serde_json.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+meta-testkit.workspace = true
 syn.workspace = true
 
 [lints]

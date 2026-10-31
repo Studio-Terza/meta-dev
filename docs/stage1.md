@@ -100,6 +100,8 @@ The role defaults are data, each with a source. Headless workers will be stopped
 `self/predictions.toml` holds each measurable prediction as data. Today these are P1, P2 and P6, each quoting its `docs/prereg.md` row verbatim, with its falsifier as numbers. A falsifier names at least one measure; a prediction without one shows `UNDECIDED`.
 
 - P1: unrecorded bypasses are the PRs merged outside meta, logged or missing from the log, that no `outside-merge` escape names. An escape of another kind, or an unclassified one, records no merge.
+- P1 also judges agent starts (critic issue #11). A start that bypasses meta is one known to have happened without a lease. Meta sees that only through an escape of kind `outside-start`, which counts one unrecorded bypass each (a `Started` record without a used lease does not fold, so it shows as a corrupt log, not as a count). Meta cannot see an unleased start nobody recorded, so with no known bypass the measure is `UNDECIDED` with that reason, never `holds`. A known bypass falsifies P1 even when the merged list is unreadable.
+- A hook denial is a start the hook prevented. It is shown as "prevented by the hook" and never counts against P1.
 - P2: prereg's "reason" is read as "escape kind" (field `terms`). The owner's registered intent is that the third escape of one kind falsifies, so the bound is repeats above 1.
 
 | Command | Given | Result |
@@ -107,6 +109,11 @@ The role defaults are data, each with a source. Headless workers will be stopped
 | `meta status` | any | each prediction line shows its observed value, its registered expectation, and `FALSIFIED` when the falsifier holds |
 | `meta status` | a measure of a prediction's falsifier is above its bound and no `Falsified` event names that prediction and measure | event `Falsified { prediction, measure, observed }`, stamped with the time of the record, appended inside the same locked append that status reads under |
 | `meta status` | a `Falsified` event exists for the prediction | the line ends with `falsified at <time> (<observed>)` for each latched measure, whatever the current reading, so resolving escapes cannot erase a falsification; no new event |
+
+| `meta status` P1 | no unrecorded merge bypass and no `outside-start` escape | `UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable ...)`, never `holds` |
+| `meta status` P1 | an `outside-start` escape exists, with or without a readable merged list | `FALSIFIED`; each such escape adds one to the unrecorded bypasses |
+| `meta status` | the log holds `Denied` agent starts | the P1 starts line shows `prevented by the hook: <n>`; denials never change the P1 verdict |
+| `meta status` | any | the P1 starts line reads `P1 agent starts through meta: <n>; prevented by the hook: <n>; bypassed, from outside-start escapes: <n>; self-claims, not agent starts: <n>` |
 
 A falsification latches once per prediction and measure, so a prediction first falsified by one measure and later by another latches twice (critic issue #17). Time is shown as unix seconds.
 

@@ -1,5 +1,5 @@
 use crate::Clock;
-use meta_core::Timestamp;
+use meta_core::{Span, Timestamp};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy)]
@@ -11,7 +11,7 @@ impl Clock for SystemClock {
         Timestamp::from_unix_seconds(seconds)
     }
 
-    fn pause(&self, seconds: u64) {
-        std::thread::sleep(std::time::Duration::from_secs(seconds));
+    fn pause(&self, span: Span) {
+        std::thread::sleep(std::time::Duration::from_secs(span.whole_seconds()));
     }
 }

@@ -172,14 +172,15 @@ mod tests {
     use super::{JsonlLog, data_dir_from};
     use crate::Log;
     use meta_core::{Event, Marking, Record, Timestamp};
+    use meta_testkit::Scratch;
     use std::fs::{self, File, TryLockError};
-    use std::path::{Path, PathBuf};
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::path::Path;
+    use std::time::Duration;
 
     #[test]
     fn a_transaction_holds_the_log_exclusively_from_read_to_append() {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("meta-dev-lock-{nanos}.jsonl"));
+        let scratch = Scratch::new("lock");
+        let path = scratch.join("log.jsonl");
         let mut log = JsonlLog::at(path.clone());
         let blocked = log
             .transact(|records| {
@@ -188,16 +189,7 @@ mod tests {
             })
             .unwrap();
         let free = JsonlLog::at(path.clone()).transact(|records| (records.unwrap(), ())).is_ok();
-        std::fs::remove_file(&path).unwrap();
         assert_eq!((blocked, free), ((0, true), true));
-    }
-
-    /// A fresh directory under the temp dir.
-    fn scratch(name: &str) -> PathBuf {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let dir = std::env::temp_dir().join(format!("meta-dev-{name}-{nanos}"));
-        fs::create_dir_all(&dir).unwrap();
-        dir
     }
 
     const MARKER: &str = "{\"at\":1,\"event\":\"RealLog\"}\n";
@@ -210,7 +202,7 @@ mod tests {
 
     #[test]
     fn a_marked_log_is_real_through_another_home_a_hard_link_a_symlink_or_with_home_unset() {
-        let root = scratch("marked");
+        let root = Scratch::new("marked");
         let (lead, other) = (root.join("lead"), root.join("other"));
         let share = lead.join(".local").join("share");
         let real_dir = share.join("meta-dev");
@@ -233,13 +225,12 @@ mod tests {
             reached(None, None),
         ];
         let real = reach.map(|log| log.is_real());
-        fs::remove_dir_all(&root).unwrap();
         assert_eq!(real, [true; 7]);
     }
 
     #[test]
     fn an_unmarked_log_anywhere_else_is_scratch_and_the_default_one_is_real_until_marked() {
-        let root = scratch("unmarked");
+        let root = Scratch::new("unmarked");
         let firsts = ["", DONE, "not a record\n"];
         let logs = firsts.map(|first| {
             let dir = root.join(format!("scratch-{}", first.len()));
@@ -255,14 +246,13 @@ mod tests {
         let default_unmarked = reached(None, Some(&home));
         let real = [logs.map(|log| log.is_real()).to_vec(), vec![missing.is_real()]].concat();
         let default = [default_missing.is_real(), default_unmarked.is_real()];
-        fs::remove_dir_all(&root).unwrap();
         assert_eq!(real, [false, false, true, false], "empty first line, unmarked, garbled, missing");
         assert_eq!(default, [true, true]);
     }
 
     #[test]
     fn marking_puts_the_marker_first_keeps_the_unmarked_copy_and_happens_once() {
-        let root = scratch("mark");
+        let root = Scratch::new("mark");
         let path = root.join("log.jsonl");
         fs::write(&path, [DONE, DONE].concat()).unwrap();
         fs::hard_link(&path, root.join("linked.jsonl")).unwrap();
@@ -279,7 +269,6 @@ mod tests {
         fs::write(root.join("log.jsonl.unmarked"), "earlier copy").unwrap();
         let refused = JsonlLog::at(other.clone()).mark(marker).unwrap_err().to_string();
         let untouched = fs::read_to_string(&other).unwrap();
-        fs::remove_dir_all(&root).unwrap();
         assert_eq!((before, marked), (false, [Marking::Added, Marking::AlreadyMarked]));
         assert_eq!((text, kept), ([MARKER, DONE, DONE].concat(), [DONE, DONE].concat()));
         assert_eq!((after, records), ([true, true], 3));
@@ -289,14 +278,13 @@ mod tests {
 
     #[test]
     fn a_log_locked_past_the_deadline_is_a_port_failure() {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("meta-dev-deadline-{nanos}.jsonl"));
+        let scratch = Scratch::new("deadline");
+        let path = scratch.join("log.jsonl");
         let holder = File::create(&path).unwrap();
         holder.lock().unwrap();
         let mut log = JsonlLog { patience: Duration::from_millis(50), ..JsonlLog::at(path.clone()) };
         let waited = log.transact(|_| (Vec::new(), ()));
         drop(holder);
-        std::fs::remove_file(&path).unwrap();
         assert!(waited.unwrap_err().to_string().contains("stayed locked for 50 ms"));
     }
 }

@@ -1,8 +1,8 @@
 use meta_core::{
     Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
     Ledger, Malformed, Marking, Merges, Minutes, Origin, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation,
-    Record, Refusal, Roles, Rules, SelfFile, Sha, Sources, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified,
-    Verdict,
+    Record, Refusal, Roles, Rules, SelfFile, Sha, Sources, Span, TaskId, Timestamp, Title, Unreached, Unreadable,
+    Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports};
 
@@ -34,6 +34,8 @@ pub enum LedgerCall {
         pr: PrNumber,
     },
     Merge(PrNumber),
+    /// Merges main into a linked PR's branch when it is behind; never merges the PR.
+    Update(PrNumber),
     Retire {
         task: TaskId,
         reason: Reason,
@@ -106,7 +108,7 @@ impl Answer {
 impl Call {
     const USAGE: &str = "usage:\n  meta open <title>\n  meta claim <task> --agent <name> [--deadline <minutes>]\n  \
                          meta claim <task> --self\n  \
-                         meta link <task> <pr>\n  meta merge <pr>\n  meta escape <kind> [--pr <pr>] <reason>\n  \
+                         meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta defer <task> <reason>\n  \
                          meta undefer <task>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <task> pass|fail\n  \
@@ -129,6 +131,7 @@ impl Call {
                 ledger(task.parse().and_then(|task| pr.parse().map(|pr| LedgerCall::Link { task, pr })))
             }
             ["merge", pr] => ledger(pr.parse().map(LedgerCall::Merge)),
+            ["merge", pr, "--update"] => ledger(pr.parse().map(LedgerCall::Update)),
             ["status"] => ledger(Ok(LedgerCall::Status)),
             ["mark-real-log"] => Some(Ok(Self::MarkRealLog)),
             ["escape", kind, "--pr", pr, reason @ ..] => Some(kind.parse().and_then(|kind| {
@@ -335,6 +338,9 @@ enum Prepared {
         pushed: Sha,
         pull: Pull,
     },
+    Update {
+        updating: Updating,
+    },
     Merge {
         pr: PrNumber,
         pull: Pull,
@@ -354,19 +360,21 @@ enum Prepared {
 }
 
 /// How long `meta link` waits for GitHub to report the commit that was pushed, and how often it asks.
-const LINK_DEADLINE_SECONDS: u64 = 60;
-const LINK_POLL_SECONDS: u64 = 5;
+const LINK_DEADLINE: Span = Span::of_seconds(60);
+const LINK_POLL: Span = Span::of_seconds(5);
 
 /// The PR as GitHub reports it once its head is `pushed`; when the deadline passes first, the last
-/// report, so that the pin refuses with both commits named.
+/// report, so that the pin refuses with both commits named. A GitHub error before the deadline is
+/// asked again; one still standing at the deadline is the failure.
 fn pull_at<H: GitHub, C: Clock>(github: &H, clock: &C, pr: PrNumber, pushed: &Sha) -> Result<Pull, Failure> {
-    let deadline = clock.now().advanced(LINK_DEADLINE_SECONDS);
+    let deadline = clock.now().plus(LINK_DEADLINE);
     loop {
-        let pull = github.pull(pr)?;
-        match pull.is_at(pushed) || clock.now() >= deadline {
-            true => return Ok(pull),
-            false => clock.pause(LINK_POLL_SECONDS),
+        let reported = github.pull(pr);
+        let settled = reported.as_ref().is_ok_and(|pull| pull.is_at(pushed));
+        if settled || clock.now() >= deadline {
+            return Ok(reported?);
         }
+        clock.pause(LINK_POLL);
     }
 }
 
@@ -411,6 +419,11 @@ fn prepare<G: Git, H: GitHub, C: Clock>(
             }
             Prepared::Merge { pr, pull }
         }
+        LedgerCall::Update(pr) => {
+            let updating = ledger.merge(pr)?.update(&github.pull(pr)?)?;
+            github.update_branch(&updating)?;
+            Prepared::Update { updating }
+        }
         LedgerCall::Retire { task, reason } => {
             let pull = ledger.retire(task, reason.clone())?.pr().map(|pr| github.pull(pr)).transpose()?;
             Prepared::Retire { task, reason, pull }
@@ -442,6 +455,7 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
             Clearance::Unmerged(cleared) => cleared.land().record(),
             Clearance::AlreadyMerged(landed) => landed.record(),
         },
+        Prepared::Update { updating } => updating.record(),
         Prepared::Retire { task, reason, pull } => ledger.retire(task, reason)?.settle(pull.as_ref())?,
         Prepared::Review { task, agent, pull, rules, allowance } => {
             ledger.review(task, agent)?.brief(&pull, &rules, at.plus(allowance.span()))?
