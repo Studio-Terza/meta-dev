@@ -1,12 +1,16 @@
 use super::{Answer, Failure, Guard, pull_at, spec, stamped};
 use meta_core::{
     Accepted, AgentId, Build, ClaudeVersion, Judged, LeaseId, Ledger, NoVerdict, Record, Rules, SelfFile, Session,
-    SessionVerdict, Span, Timestamp, Watch, Worker, WorkerEnd, Workers,
+    SessionVerdict, Span, Stopped, Timestamp, Watch, Worker, WorkerEnd, Workers,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Sessions};
 
 /// How often a supervisor looks at its worker, and so how late it can be at the deadline.
 const POLL: Span = Span::of_seconds(5);
+
+/// How many times a supervisor whose first look fails looks again, `POLL` apart, before it gives
+/// up: a log lock held by another command for a moment must not end the session.
+const FIRST_LOOKS: usize = 6;
 
 fn folded(records: Result<Vec<Record>, PortError>, place: &str) -> Result<Ledger, Failure> {
     Ledger::fold(&records?).map_err(|corrupt| Failure::Broken(corrupt.in_log(place)))
@@ -95,6 +99,7 @@ pub(super) fn wait<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
 ) -> Answer {
     let place = log.place();
     let mut last = None;
+    let mut unseen = 0;
     loop {
         let look = log
             .transact(|_, records| (Vec::new(), folded(records, &place).and_then(|ledger| Ok(ledger.watch(lease)?))))
@@ -103,11 +108,18 @@ pub(super) fn wait<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
         let worker = match (look, last.take()) {
             (Ok(Watch::Running(worker)), _) | (Err(_), Some(worker)) => worker,
             (Ok(Watch::Over), _) => return Answer::done(format!("{lease}: the worker's end is already recorded\n")),
+            // A log that is merely busy or mid-write is tried again, a bounded number of times; a
+            // refusal (the lease started no worker) is final.
+            (Err(Failure::Broken(_)), None) if unseen < FIRST_LOOKS => {
+                unseen += 1;
+                clock.pause(POLL);
+                continue;
+            }
             (Err(failure), None) => return Answer::failed(failure),
         };
         let end = match sessions.state(worker.agent(), worker.run()) {
             Ok(Session::Ended(status)) => Some(WorkerEnd::from(status)),
-            _ if worker.is_past_deadline(clock.now()) => sessions.stop(worker.run()).ok().map(|()| WorkerEnd::Deadline),
+            _ if worker.is_past_deadline(clock.now()) => sessions.stop(worker.run()).ok().map(|_| WorkerEnd::Deadline),
             _ => None,
         };
         if let Some(end) = end {
@@ -178,10 +190,17 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
 ) -> Answer {
     let mut guard = Guard::default();
     let place = log.place();
+    // What the closure killed, kept outside it: if the log then fails, the text still names them.
+    let mut kills: Option<Kills> = None;
     let outcome = log.transact(|now, records| {
         let ledger = match folded(records, &place) {
             Ok(ledger) => ledger,
-            Err(failure) => return (Vec::new(), Err(stop_listed(lease, sessions, &failure))),
+            Err(failure) => {
+                let found = kill_listed(lease, sessions);
+                let text = Failure::Broken(unrecorded(&failure, &found));
+                kills = Some(found);
+                return (Vec::new(), Err(text));
+            }
         };
         let workers = match ledger.stopping(lease) {
             Ok(workers) => workers,
@@ -193,18 +212,17 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
         let verified = guard.at(now, git, build);
         let mut events = Vec::new();
         let mut text = String::new();
-        let mut failed = Vec::new();
+        let mut found = Kills::default();
         for worker in workers {
             let id = worker.agent().clone();
-            match sessions.stop(worker.run()) {
-                Ok(()) => {
-                    let (ended, line) = worker.ended(WorkerEnd::Stopped).into_parts();
-                    events.extend(ended);
-                    text.push_str(&line);
-                }
-                Err(error) => failed.push(format!("{id}: {error}")),
+            if let Some(stopped) = found.note(&id, sessions.stop(worker.run())) {
+                let (ended, line) = worker.stopped(stopped).into_parts();
+                events.extend(ended);
+                text.push_str(&line);
             }
         }
+        let failed = found.failed.clone();
+        kills = Some(found);
         if let Err(unverified) = verified {
             text.push_str(&format!("not recorded: {unverified}\n"));
             events.clear();
@@ -217,34 +235,69 @@ pub(super) fn stop<L: Log, G: Git, S: Sessions>(
     });
     match outcome {
         Ok(decided) => settled(Ok(decided)),
-        Err(error) => Answer::failed(stop_listed(lease, sessions, &Failure::from(error))),
+        Err(error) => {
+            // The log failed after the closure ran: its kills stand, so they are named, not looked
+            // for again.
+            let why = Failure::from(error);
+            let found = kills.unwrap_or_else(|| kill_listed(lease, sessions));
+            Answer::failed(Failure::Broken(unrecorded(&why, &found)))
+        }
     }
 }
 
-/// Kills the workers found without the log, which cannot record it: the failure says what became
-/// of each, after `why` the log could not be used.
-fn stop_listed<S: Sessions>(lease: Option<LeaseId>, sessions: &mut S, why: &Failure) -> Failure {
+/// What a stop killed, what had already gone, and what it could not stop.
+#[derive(Default)]
+struct Kills {
+    killed: Vec<String>,
+    gone: Vec<String>,
+    failed: Vec<String>,
+}
+
+impl Kills {
+    /// Files the outcome of stopping `id`, and hands back a stop that left no live process.
+    fn note(&mut self, id: &AgentId, outcome: Result<Stopped, PortError>) -> Option<Stopped> {
+        match &outcome {
+            Ok(Stopped::Killed) => self.killed.push(id.to_string()),
+            Ok(Stopped::AlreadyGone) => self.gone.push(id.to_string()),
+            Err(error) => self.failed.push(format!("{id}: {error}")),
+        }
+        outcome.ok()
+    }
+}
+
+/// The failure text for kills that were not recorded, after `why` the log could not be used. It says
+/// no worker was found only when none was.
+fn unrecorded(why: &Failure, found: &Kills) -> String {
+    let said = [
+        ("killed ", &found.killed, ", "),
+        ("already gone: ", &found.gone, ", "),
+        ("could not stop ", &found.failed, "; "),
+    ];
+    let parts: Vec<String> = said
+        .iter()
+        .filter(|(_, names, _)| !names.is_empty())
+        .map(|(heading, names, between)| format!("{heading}{}", names.join(between)))
+        .collect();
+    let found = match parts.is_empty() {
+        true => "no worker found to kill".to_owned(),
+        false => parts.join("; "),
+    };
+    format!("{why}\n{found}; nothing was recorded, for the log could not be used")
+}
+
+/// Kills the workers found without the log, which cannot record it.
+fn kill_listed<S: Sessions>(lease: Option<LeaseId>, sessions: &mut S) -> Kills {
     let wanted = lease.map(AgentId::worker);
-    let mut killed = Vec::new();
-    let mut failed = Vec::new();
+    let mut found = Kills::default();
     let listed = sessions.listed().unwrap_or_else(|error| vec![Err(error)]);
     for entry in listed {
         match entry {
-            Ok((id, run)) if wanted.as_ref().is_none_or(|wanted| *wanted == id) => match sessions.stop(&run) {
-                Ok(()) => killed.push(id.to_string()),
-                Err(error) => failed.push(format!("{id}: {error}")),
-            },
+            Ok((id, run)) if wanted.as_ref().is_none_or(|wanted| *wanted == id) => {
+                found.note(&id, sessions.stop(&run));
+            }
             Ok(_) => {}
-            Err(error) => failed.push(error.to_string()),
+            Err(error) => found.failed.push(error.to_string()),
         }
     }
-    let killed = match killed.is_empty() {
-        true => "no worker found to kill".to_owned(),
-        false => format!("killed {}", killed.join(", ")),
-    };
-    let failed = match failed.is_empty() {
-        true => String::new(),
-        false => format!("; could not stop {}", failed.join("; ")),
-    };
-    Failure::Broken(format!("{why}\n{killed}{failed}; nothing was recorded, for the log could not be used"))
+    found
 }

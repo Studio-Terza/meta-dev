@@ -1,7 +1,7 @@
 use meta_cli::{Answer, Call, Code, WorkerCall, answer};
 use meta_core::{
     AgentId, Attempt, Build, Checked, Claimant, Event, ExitStatus, Measure, Outcome, Place, PrNumber, ProcessGroup,
-    Record, Role, Route, Rules, RunCount, SelfFile, Session, Sha, SideLine, Span, Standing, Timestamp,
+    Record, Role, Route, Rules, RunCount, SelfFile, Session, Sha, SideLine, Span, Standing, Stopped, Timestamp,
     UnverifiedEscape, UnverifiedEscapes, WorkerEnd, WorkerPlan, WorkerRun,
 };
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub, RecordedSessions};
@@ -4225,7 +4225,7 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
         fn state(&self, worker: &AgentId, run: &WorkerRun) -> Result<Session, PortError> {
             self.0.state(worker, run)
         }
-        fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
+        fn stop(&mut self, run: &WorkerRun) -> Result<Stopped, PortError> {
             match self.1.replace(true) {
                 true => self.0.stop(run),
                 false => Err(PortError::new("ps failed")),
@@ -4239,8 +4239,9 @@ fn worker_wait_keeps_watching_while_the_kill_fails() {
     assert_eq!(ports.sessions.0.stopped.len(), 1);
 }
 
-/// A log whose second transaction fails, as a log held too long by others does.
-struct Flaky(MemoryLog, usize);
+/// A log whose transaction number `.2` (counted in `.1`) fails, as a log held too long by others
+/// does: before the decision runs, or, when `.3`, after it ran and its records are lost.
+struct Flaky(MemoryLog, usize, usize, bool);
 
 impl Log for Flaky {
     fn place(&self) -> String {
@@ -4283,9 +4284,14 @@ impl Log for Flaky {
         decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError> {
         self.1 += 1;
-        match self.1 {
-            2 => Err(PortError::new("the log is locked")),
-            _ => self.0.transact(decide),
+        match (self.1 == self.2, self.3) {
+            (false, _) => self.0.transact(decide),
+            (true, false) => Err(PortError::new("the log is locked")),
+            // The decision runs, with its effects outside the log, and its records are not written.
+            (true, true) => {
+                drop(decide(self.0.standing(), self.0.read()));
+                Err(PortError::new("the log is locked"))
+            }
         }
     }
 }
@@ -4293,14 +4299,27 @@ impl Log for Flaky {
 #[test]
 fn worker_wait_keeps_its_last_look_when_the_log_cannot_be_read_and_stops_when_it_never_could() {
     let Ports { log, git, github, clock, sessions, build } = given(worker_task(1), Vec::new());
-    let mut ports = Ports { log: Flaky(log, 0), git, github, clock, sessions, build };
+    let mut ports = Ports { log: Flaky(log, 0, 2, false), git, github, clock, sessions, build };
     ports.sessions.states.borrow_mut().extend([Ok(Session::Running), Ok(Session::Ended(None))]);
     let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
     assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
     let mut broken = given(worker_task(1), Vec::new());
     broken.log.broken = Some(PortError::new("no log"));
+    let before = broken.clock.now();
     let (reply, _) = call(&mut broken, &["worker", "wait", "lease-2"], "");
     assert_eq!((reply.code, reply.text.as_str()), (Code::Failed, "error: no log\n"));
+    let waited = before.span_to(broken.clock.now());
+    assert_eq!(waited, Span::of_seconds(6 * 5), "the first look is tried 6 more times, 5 s apart");
+}
+
+#[test]
+fn worker_wait_looks_again_when_its_first_look_finds_the_log_busy() {
+    let Ports { log, git, github, clock, sessions, build } = given(worker_task(1), Vec::new());
+    let mut ports = Ports { log: Flaky(log, 0, 1, false), git, github, clock, sessions, build };
+    ports.sessions.states.borrow_mut().extend([Ok(Session::Ended(None))]);
+    let reply = answer(parsed(&["worker", "wait", "lease-2"]), &mut ports);
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(reply.text.contains("lease-2: worker worker-2 ended with no exit status\n"), "{}", reply.text);
 }
 
 #[test]
@@ -4370,6 +4389,86 @@ fn stop_that_cannot_kill_a_group_fails_naming_it_and_records_only_the_ones_it_ki
     assert_eq!(reply.text, "error: could not stop worker-2: not permitted\n");
 }
 
+#[test]
+fn stop_with_two_workers_where_one_group_will_not_stop_records_the_other_and_names_the_first() {
+    let mut ports = given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    ports.sessions.unstoppable = vec![run_of(802, 2)];
+    let (reply, added) = call(&mut ports, &["stop"], "");
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert_eq!(
+        reply.text,
+        "error: lease-4: worker worker-4 was stopped by meta stop\ncould not stop worker-2: not permitted\n"
+    );
+    assert_eq!(added, vec![Event::Finished { lease: id("lease-4"), end: Some(WorkerEnd::Stopped) }]);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)]);
+}
+
+#[test]
+fn stop_whose_log_fails_after_the_kills_names_the_killed_and_does_not_look_for_workers_again() {
+    let Ports { log, git, github, clock, mut sessions, build } =
+        given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    sessions.unstoppable = vec![run_of(802, 2)];
+    sessions.listed = Ok(vec![Ok((id("worker-2"), run_of(802, 2))), Ok((id("worker-4"), run_of(804, 4)))]);
+    let before = log.records.len();
+    let mut ports = Ports { log: Flaky(log, 0, 1, true), git, github, clock, sessions, build };
+    let reply = answer(parsed(&["stop"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert!(reply.text.contains("the log is locked"), "{}", reply.text);
+    assert!(reply.text.contains("killed worker-4; could not stop worker-2: not permitted"), "{}", reply.text);
+    assert!(reply.text.contains("nothing was recorded"), "{}", reply.text);
+    assert!(!reply.text.contains("no worker found"), "{}", reply.text);
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)], "each group is killed once");
+    assert_eq!(ports.log.0.records.len(), before, "the records of the kill were lost");
+}
+
+#[test]
+fn stop_whose_every_group_failed_on_a_failing_log_says_so_and_not_that_no_worker_was_found() {
+    let Ports { log, git, github, clock, mut sessions, build } =
+        given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    sessions.unstoppable = vec![run_of(802, 2), run_of(804, 4)];
+    let before = log.records.len();
+    let mut ports = Ports { log: Flaky(log, 0, 1, true), git, github, clock, sessions, build };
+    let reply = answer(parsed(&["stop"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert!(
+        reply.text.contains(
+            "the log is locked\ncould not stop worker-2: not permitted; worker-4: not permitted; nothing was recorded, for the log could not be used\n"
+        ),
+        "{}",
+        reply.text
+    );
+    assert!(ports.sessions.stopped.is_empty());
+    assert_eq!(ports.log.0.records.len(), before);
+}
+
+#[test]
+fn stop_of_a_session_already_gone_records_its_end_and_does_not_say_it_killed_it() {
+    let mut ports = given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    ports.sessions.gone = vec![run_of(802, 2)];
+    let (reply, events) = call(&mut ports, &["stop"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert_eq!(
+        reply.text,
+        "lease-2: worker worker-2 was already gone\nlease-4: worker worker-4 was stopped by meta stop\n"
+    );
+    assert_eq!(
+        events,
+        ["lease-2", "lease-4"].map(|lease| Event::Finished { lease: id(lease), end: Some(WorkerEnd::Stopped) })
+    );
+    assert_eq!(ports.sessions.stopped, vec![run_of(804, 4)]);
+}
+
+#[test]
+fn stop_on_a_failing_log_tells_a_session_already_gone_from_one_it_killed() {
+    let Ports { log, git, github, clock, mut sessions, build } =
+        given([worker_task(1), worker_task(2)].concat(), Vec::new());
+    sessions.gone = vec![run_of(802, 2)];
+    let mut ports = Ports { log: Flaky(log, 0, 1, true), git, github, clock, sessions, build };
+    let reply = answer(parsed(&["stop"]), &mut ports);
+    assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    assert!(reply.text.contains("killed worker-4; already gone: worker-2; nothing was recorded"), "{}", reply.text);
+}
+
 /// The JSONL log at `path` holding a line that does not parse, with recorded ports around it.
 fn on_corrupt_log(path: &std::path::Path) -> Ports<JsonlLog, RecordedGit, RecordedGitHub, FakeClock, RecordedSessions> {
     std::fs::write(path, "not a record\n").unwrap();
@@ -4414,7 +4513,11 @@ fn stop_on_a_log_it_cannot_open_kills_too_and_a_list_that_fails_is_reported() {
     unlisted.sessions.listed = Err(PortError::new("no worker directory"));
     let reply = answer(parsed(&["stop"]), &mut unlisted);
     assert_eq!(reply.code, Code::Failed);
-    assert!(reply.text.contains("no worker found to kill; could not stop no worker directory"), "{}", reply.text);
+    assert!(reply.text.contains("\ncould not stop no worker directory; nothing was recorded"), "{}", reply.text);
+    assert!(!reply.text.contains("no worker found"), "{}", reply.text);
+    let mut none = on_corrupt_log(&scratch.join("none.jsonl"));
+    let reply = answer(parsed(&["stop"]), &mut none);
+    assert!(reply.text.contains("\nno worker found to kill; nothing was recorded"), "{}", reply.text);
 }
 
 #[test]

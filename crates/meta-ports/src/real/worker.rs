@@ -1,8 +1,10 @@
-use super::command::{end_group, run_found, run_prepared};
+use super::command::{end_group, group_holds, run_found, run_prepared};
 use super::jsonl;
 use super::log::home;
 use crate::{Listed, PortError, Sessions};
-use meta_core::{AgentId, Binary, ExitStatus, Model, Origin, ProcessGroup, ReviewCopy, Session, WorkerPlan, WorkerRun};
+use meta_core::{
+    AgentId, Binary, ExitStatus, Model, Origin, ProcessGroup, ReviewCopy, Session, Stopped, WorkerPlan, WorkerRun,
+};
 use std::ffi::OsString;
 use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::io::{ErrorKind, PipeReader, PipeWriter, Write};
@@ -200,8 +202,17 @@ fn start_in(
     let (reader, writer) = std::io::pipe().map_err(|error| at(dir, error))?;
     let run = launch(dir, session, reader)?;
     let joined = record(dir, &run).and_then(|()| join(writer));
-    joined.inspect_err(|_| end_group(run.group.leader()))?;
+    joined.map_err(|error| abandoned(&error, end_group(run.group.leader())))?;
     Ok(run)
+}
+
+/// Why a start failed, and, if its session could not be ended, that too: that group runs on with
+/// nothing recording it.
+fn abandoned(error: &PortError, ended: Result<Stopped, PortError>) -> PortError {
+    match ended {
+        Ok(_) => error.clone(),
+        Err(left) => PortError::new(format!("{error}; the session could not be ended either: {left}")),
+    }
 }
 
 /// Whether the leader of the run's group is alive and is that run's: its command line names the
@@ -261,11 +272,13 @@ impl Sessions for HeadlessSessions {
         state_in(&worker_dir(worker)?, run)
     }
 
-    fn stop(&mut self, run: &WorkerRun) -> Result<(), PortError> {
-        if is_alive(run)? {
-            end_group(run.group.leader());
+    fn stop(&mut self, run: &WorkerRun) -> Result<Stopped, PortError> {
+        // The group outlives a leader that dies first, and its lifeline's shell still names the run.
+        let leader = run.group.leader();
+        match is_alive(run)? || group_holds(leader, &run.transcript.to_string())? {
+            true => end_group(leader),
+            false => Ok(Stopped::AlreadyGone),
         }
-        Ok(())
     }
 
     fn transcript(&self, run: &WorkerRun) -> Result<Vec<String>, PortError> {
@@ -281,11 +294,11 @@ impl Sessions for HeadlessSessions {
 #[cfg(test)]
 mod tests {
     use super::{
-        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, is_alive, launch, listed_in,
-        make_way, passed, recorded, start_in, state_in, supervise,
+        HeadlessSessions, Launch, PASSED, RUN, STATUS, STDERR, SUPERVISOR, TRANSCRIPT, abandoned, group_holds,
+        is_alive, launch, listed_in, make_way, passed, recorded, start_in, state_in, supervise,
     };
     use crate::{PortError, Sessions};
-    use meta_core::{ExitStatus, Model, ReviewCopy, Session, SessionVerdict, Verdict, WorkerRun};
+    use meta_core::{ExitStatus, Model, ReviewCopy, Session, SessionVerdict, Stopped, Verdict, WorkerRun};
     use meta_testkit::Scratch;
     use std::ffi::OsString;
     use std::fs;
@@ -330,6 +343,18 @@ mod tests {
 
     fn mode(path: &Path) -> u32 {
         fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn a_failed_start_says_so_when_its_session_could_not_be_ended_either() {
+        let why = PortError::new("no supervisor");
+        assert_eq!(abandoned(&why, Ok(Stopped::Killed)), why);
+        assert_eq!(abandoned(&why, Ok(Stopped::AlreadyGone)), why);
+        let left = abandoned(&why, Err(PortError::new("process group 7: still there after SIGKILL")));
+        assert_eq!(
+            left.to_string(),
+            "no supervisor; the session could not be ended either: process group 7: still there after SIGKILL"
+        );
     }
 
     #[test]
@@ -511,9 +536,31 @@ mod tests {
         let root = Scratch::new("worker-stop");
         let dir = root.join("worker-1");
         let (run, _lifeline) = session(&dir, "sleep 30");
-        HeadlessSessions.stop(&run).unwrap();
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::Killed));
         assert_eq!(ended(&dir, &run), Session::Ended(None));
-        assert_eq!(HeadlessSessions.stop(&run), Ok(()));
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::AlreadyGone));
+    }
+
+    #[test]
+    fn stop_ends_the_rest_of_a_group_whose_leader_died_first() {
+        let root = Scratch::new("worker-headless");
+        let dir = root.join("worker-1");
+        let (run, _lifeline) = session(&dir, "printf up; sleep 30");
+        let started = Instant::now();
+        while fs::read_to_string(dir.join(TRANSCRIPT)).unwrap().is_empty() {
+            assert!(started.elapsed() < Duration::from_secs(10), "the session never started");
+            thread::sleep(Duration::from_millis(10));
+        }
+        let leader = run.group.leader();
+        let pid = nix::unistd::Pid::from_raw(i32::try_from(leader).unwrap());
+        nix::sys::signal::kill(pid, nix::sys::signal::Signal::SIGKILL).unwrap();
+        ended(&dir, &run);
+        assert_eq!(is_alive(&run), Ok(false));
+        let transcript = run.transcript.to_string();
+        assert_eq!(group_holds(leader, &transcript), Ok(true), "the leader went alone");
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::Killed));
+        assert_eq!(group_holds(leader, &transcript), Ok(false));
+        assert_eq!(HeadlessSessions.stop(&run), Ok(Stopped::AlreadyGone));
     }
 
     #[test]
@@ -523,7 +570,7 @@ mod tests {
         let (run, _lifeline) = session(&dir, "sleep 30");
         let stranger = WorkerRun { transcript: "/elsewhere/transcript.jsonl".parse().unwrap(), ..run.clone() };
         assert_eq!(is_alive(&stranger), Ok(false));
-        assert_eq!(HeadlessSessions.stop(&stranger), Ok(()));
+        assert_eq!(HeadlessSessions.stop(&stranger), Ok(Stopped::AlreadyGone));
         assert_eq!(state_in(&dir, &run), Ok(Session::Running));
         assert!(!dir.join(STATUS).exists());
         HeadlessSessions.stop(&run).unwrap();
