@@ -2797,9 +2797,17 @@ fn status_says_drift_is_unavailable_when_the_open_list_cannot_be_read_and_never_
 #[test]
 fn status_says_drift_is_unavailable_when_the_open_list_may_be_truncated() {
     let rows: Vec<serde_json::Value> =
-        (1..=101).map(|number| serde_json::json!({ "number": number, "baseRefName": "main", "commits": [] })).collect();
+        (1..=49).map(|number| serde_json::json!({ "number": number, "baseRefName": "main", "commits": [] })).collect();
     let (reply, _) = drift_of(Some(Ok(serde_json::Value::Array(rows).to_string())), None);
-    assert!(reply.text.contains("drift unavailable: the open list is truncated"), "{}", reply.text);
+    assert!(reply.text.contains("drift unavailable: open PR list may be truncated"), "{}", reply.text);
+}
+
+#[test]
+fn status_still_lists_drift_when_the_open_list_is_under_the_limit() {
+    let rows: Vec<serde_json::Value> =
+        (1..=48).map(|number| serde_json::json!({ "number": number, "baseRefName": "main", "commits": [] })).collect();
+    let (reply, _) = drift_of(Some(Ok(serde_json::Value::Array(rows).to_string())), None);
+    assert!(!reply.text.contains("drift unavailable"), "{}", reply.text);
 }
 
 #[test]
