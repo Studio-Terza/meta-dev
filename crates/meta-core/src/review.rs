@@ -131,16 +131,27 @@ impl Ledger {
                 _ => None,
             })
             .filter_map(|linked| {
-                let latest = self.judged.iter().rev().find_map(|lease| match self.leases.get(lease) {
-                    Some(LeaseSlot::Spent(spent)) => match (spent.lease().purpose(), spent.verdict()) {
-                        (Purpose::Review { pr, head }, Some(verdict)) if *pr == linked.pr() => Some((head, verdict)),
-                        _ => None,
-                    },
-                    _ => None,
-                });
-                latest.map(|(head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
+                self.latest_verdict(linked.pr(), |_| true)
+                    .map(|(_, head, verdict)| format!("{} {}: {verdict} at {head}", linked.pr(), linked.id()))
             })
             .collect()
+    }
+
+    /// The latest verdict on `pr` at a head `wanted` accepts, in log order, with the review lease and head it judged.
+    pub(crate) fn latest_verdict(
+        &self,
+        pr: PrNumber,
+        wanted: impl Fn(&Sha) -> bool,
+    ) -> Option<(LeaseId, &Sha, Verdict)> {
+        self.judged.iter().rev().find_map(|lease| match self.leases.get(lease) {
+            Some(LeaseSlot::Spent(spent)) => match (spent.lease().purpose(), spent.verdict()) {
+                (Purpose::Review { pr: judged, head }, Some(verdict)) if *judged == pr && wanted(head) => {
+                    Some((*lease, head, verdict))
+                }
+                _ => None,
+            },
+            _ => None,
+        })
     }
 }
 

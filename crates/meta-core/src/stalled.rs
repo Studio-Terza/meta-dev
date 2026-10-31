@@ -50,17 +50,9 @@ impl Ledger {
         }
     }
 
-    /// The latest verdict on the linked task's pinned head, and the review lease that gave it.
+    /// The latest verdict, in log order, on the linked task's pinned head, and the review lease that gave it.
     fn judged_head(&self, linked: &Task<Linked>) -> Option<(LeaseId, Verdict)> {
-        self.leases.iter().rev().find_map(|(id, slot)| match slot {
-            LeaseSlot::Spent(spent) => match (spent.lease().purpose(), spent.verdict()) {
-                (Purpose::Review { pr, head }, Some(verdict)) if *pr == linked.pr() && head == linked.pin() => {
-                    Some((*id, verdict))
-                }
-                _ => None,
-            },
-            LeaseSlot::Unused(_) => None,
-        })
+        self.latest_verdict(linked.pr(), |head| head == linked.pin()).map(|(lease, _, verdict)| (lease, verdict))
     }
 
     /// Running work at `at`: a worker's work lease with a deadline not yet passed, on a task an agent is working (open or claimed),

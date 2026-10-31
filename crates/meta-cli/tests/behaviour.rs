@@ -2677,6 +2677,19 @@ fn a_linked_task_with_no_next_step_is_stalled_without_an_age_threshold() {
 }
 
 #[test]
+fn the_idle_alarm_reads_the_latest_verdict_by_log_order_when_lease_3_is_judged_before_lease_2() {
+    let lease = |name: &str| vec![review_leased(name, PINNED), used(name)];
+    let events = [
+        linked_task(),
+        lease("lease-2"),
+        lease("lease-3"),
+        vec![reviewed("lease-3", "pass"), reviewed("lease-2", "fail")],
+    ]
+    .concat();
+    flagged(events, "task-1 (fail on head, no live work lease)");
+}
+
+#[test]
 fn a_lead_who_claimed_a_task_itself_counts_as_stalled() {
     flagged(vec![opened("task-1"), self_claimed("task-1")], "task-1 (claimed)");
     quiet(vec![opened("task-1"), self_claimed("task-1"), leased_until("lease-1", "task-1", 100)]);
