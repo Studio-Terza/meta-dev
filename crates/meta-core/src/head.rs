@@ -80,7 +80,7 @@ mod tests {
     fn a_marked_or_unreadable_log_is_real_anywhere_and_an_unmarked_one_only_in_the_default_data_dir() {
         let at = Timestamp::from_unix_seconds(1);
         let marker = Record { at, event: Event::RealLog };
-        let other = Record { at, event: Event::Done { task: "task-1".parse().unwrap() } };
+        let other = Record { at, event: Event::Done { task: "task-1".parse().unwrap(), by: None } };
         let heads = [
             Head::of::<()>(Ok(None)),
             Head::of::<()>(Ok(Some(&marker))),

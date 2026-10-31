@@ -136,7 +136,7 @@ impl Landed {
             Route::Outside => "was already merged outside meta",
         };
         let text = format!("{pr} {how} at {head}; {task} done\n");
-        Accepted::new(vec![Event::Merged { pr, head, runs, route }, Event::Done { task }], text)
+        Accepted::new(vec![Event::Merged { pr, head, runs, route }, Event::Done { task, by: None }], text)
     }
 }
 

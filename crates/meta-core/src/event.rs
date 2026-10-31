@@ -47,6 +47,9 @@ pub enum Event {
     },
     Done {
         task: TaskId,
+        /// Set when another task's merged PR finished the task (`meta done <task> --by <pr>`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<PrNumber>,
     },
     /// The task has a role. Every lease on a critic task, past and future, is not running work.
     TaskRole {

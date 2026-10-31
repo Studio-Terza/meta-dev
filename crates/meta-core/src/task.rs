@@ -25,8 +25,16 @@ pub struct Linked {
 
 #[derive(Debug)]
 pub struct Done {
-    agent: Claimant,
-    pr: PrNumber,
+    how: Finish,
+}
+
+/// How a task came to be done.
+#[derive(Debug)]
+enum Finish {
+    /// Merged through its own linked PR.
+    Own { agent: Claimant, pr: PrNumber },
+    /// Finished by another task's merged PR.
+    By(PrNumber),
 }
 
 /// Off the open list for good, without a merge.
@@ -56,6 +64,19 @@ impl<Stage> Task<Stage> {
 
     pub fn retire(self, reason: Reason) -> Task<Retired> {
         self.into_stage(Retired { reason })
+    }
+}
+
+/// A stage a task can leave by another task's merged PR.
+pub trait Finishable {}
+
+impl Finishable for Open {}
+impl Finishable for Claimed {}
+impl Finishable for Linked {}
+
+impl<Stage: Finishable> Task<Stage> {
+    pub fn finish_by(self, pr: PrNumber) -> Task<Done> {
+        self.into_stage(Done { how: Finish::By(pr) })
     }
 }
 
@@ -104,7 +125,7 @@ impl Task<Linked> {
 
     pub fn finish(self) -> Task<Done> {
         let Linked { agent, pr, .. } = self.stage;
-        Task { id: self.id, title: self.title, stage: Done { agent, pr } }
+        Task { id: self.id, title: self.title, stage: Done { how: Finish::Own { agent, pr } } }
     }
 
     pub fn pr(&self) -> PrNumber {
@@ -144,6 +165,17 @@ impl Progress {
         }
     }
 
+    /// The PR that finished the task when it was not its own: set by `meta done --by`.
+    pub fn done_by(&self) -> Option<PrNumber> {
+        match self {
+            Self::Done(task) => match task.stage.how {
+                Finish::By(pr) => Some(pr),
+                Finish::Own { .. } => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Claimed or linked by the lead working it itself.
     pub fn is_self_claimed(&self) -> bool {
         match self {
@@ -162,9 +194,10 @@ impl fmt::Display for Progress {
             Self::Linked(task) => {
                 write!(formatter, "{} linked to {} by {}: {}", task.id, task.stage.pr, task.stage.agent, task.title)
             }
-            Self::Done(task) => {
-                write!(formatter, "{} done in {} by {}: {}", task.id, task.stage.pr, task.stage.agent, task.title)
-            }
+            Self::Done(task) => match &task.stage.how {
+                Finish::Own { agent, pr } => write!(formatter, "{} done in {pr} by {agent}: {}", task.id, task.title),
+                Finish::By(pr) => write!(formatter, "{} done by {pr}: {}", task.id, task.title),
+            },
             Self::Retired(task) => write!(formatter, "{} retired ({}): {}", task.id, task.stage.reason, task.title),
             Self::Deferred(task) => write!(formatter, "{} deferred ({}): {}", task.id, task.stage.reason, task.title),
         }
