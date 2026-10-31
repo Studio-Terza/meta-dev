@@ -1,8 +1,8 @@
 use crate::brief::Reissue;
 use crate::event::Event;
 use crate::ids::{
-    AgentId, Binary, ClaudeVersion, ExitStatus, LeaseId, Origin, PrNumber, ProcessGroup, Reason, Sha, Timestamp,
-    ToolRule, Transcript, Verdict,
+    AgentId, Binary, ClaudeVersion, ExitStatus, LeaseId, Malformed, Model, Origin, PrNumber, ProcessGroup, Reason, Sha,
+    Timestamp, ToolRule, Transcript, Verdict,
 };
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
@@ -18,6 +18,7 @@ use std::fmt;
 #[serde(deny_unknown_fields)]
 pub struct Workers {
     claude: Floor,
+    model: Models,
     concurrency: Concurrency,
     review: Tools,
 }
@@ -27,6 +28,15 @@ pub struct Workers {
 #[serde(deny_unknown_fields)]
 struct Floor {
     floor: ClaudeVersion,
+    #[allow(dead_code)]
+    source: Reason,
+}
+
+/// The model a session runs on. `--restricted` ignores user settings, so a session gets no other.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Models {
+    review: Model,
     #[allow(dead_code)]
     source: Reason,
 }
@@ -43,7 +53,30 @@ struct Concurrency {
 #[serde(deny_unknown_fields)]
 struct Tools {
     allow: Vec<Tool>,
-    deny: Vec<Tool>,
+    deny: Denied,
+}
+
+/// The tools a session is denied, which always hold `Denied::SPAWNING`.
+#[derive(Debug, Deserialize)]
+#[serde(try_from = "Vec<Tool>")]
+struct Denied(Vec<Tool>);
+
+impl Denied {
+    /// A session must never start another agent (`docs/prereg.md`, "Headless workers").
+    const SPAWNING: [&str; 2] = ["Agent", "Task"];
+}
+
+impl TryFrom<Vec<Tool>> for Denied {
+    type Error = Malformed;
+
+    fn try_from(tools: Vec<Tool>) -> Result<Self, Malformed> {
+        let names: Vec<String> = tools.iter().map(|tool| tool.tool.to_string()).collect();
+        let missing = Self::SPAWNING.iter().find(|tool| !names.iter().any(|name| name == *tool));
+        match missing {
+            Some(tool) => Err(Malformed::because(format!("the deny list lacks {tool}"))),
+            None => Ok(Self(tools)),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,6 +116,7 @@ impl Tools {
 pub struct WorkerRun {
     pub group: ProcessGroup,
     pub transcript: Transcript,
+    pub model: Model,
 }
 
 /// What the spawn port sees of a worker's session.
@@ -225,6 +259,7 @@ pub struct WorkerPlan {
     lease: LeaseId,
     id: AgentId,
     prompt: String,
+    model: Model,
     tools: String,
     denied: String,
     copy: ReviewCopy,
@@ -235,6 +270,11 @@ pub struct WorkerPlan {
 impl WorkerPlan {
     pub fn id(&self) -> &AgentId {
         &self.id
+    }
+
+    /// The model the session runs on.
+    pub fn model(&self) -> &Model {
+        &self.model
     }
 
     /// What meta fetched for the session to read.
@@ -258,10 +298,13 @@ impl WorkerPlan {
     /// first.
     pub fn arguments(&self) -> Vec<String> {
         let tools = self.tools.as_str();
+        let model = self.model.to_string();
         [
             "-p",
             self.prompt.as_str(),
             "--restricted",
+            "--model",
+            model.as_str(),
             "--tools",
             tools,
             "--allowedTools",
@@ -365,8 +408,9 @@ impl Starting {
             lease,
             id,
             prompt,
+            model: workers.model.review.clone(),
             tools: Tools::rules(&workers.review.allow),
-            denied: Tools::rules(&workers.review.deny),
+            denied: Tools::rules(&workers.review.deny.0),
             copy,
             repository: origin.clone(),
             binary: binary.clone(),
@@ -384,8 +428,8 @@ impl Planned {
     pub fn started(self, run: WorkerRun) -> Accepted {
         let Self { lease, plan, deadline } = self;
         let text = format!(
-            "{lease}: worker {} started, process group {}, deadline {deadline}, transcript {}\n",
-            plan.id, run.group, run.transcript
+            "{lease}: worker {} started, model {}, process group {}, deadline {deadline}, transcript {}\n",
+            plan.id, run.model, run.group, run.transcript
         );
         let events = vec![
             Event::LeaseUsed { lease },
@@ -535,14 +579,27 @@ mod tests {
     const REPO: &str = include_str!("../../../self/workers.toml");
 
     #[test]
-    fn the_repo_gives_reviewers_four_tools_denies_spawning_and_runs_at_most_4_workers() {
+    fn the_repo_gives_reviewers_three_tools_on_opus_denies_spawning_and_runs_at_most_4_workers() {
         let workers = Workers::parse(REPO).unwrap();
         assert_eq!(workers.concurrency.running, 4);
+        assert_eq!(workers.model.review.to_string(), "opus");
         assert_eq!(super::Tools::rules(&workers.review.allow), "Read,Grep,Glob");
-        assert_eq!(super::Tools::rules(&workers.review.deny), "Agent,Task,Bash,mcp__*");
+        assert_eq!(super::Tools::rules(&workers.review.deny.0), "Agent,Task,Bash,mcp__*");
     }
 
     const CLAUDE: &str = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n";
+    const MODEL: &str = "[model]\nreview = \"opus\"\nsource = \"s\"\n";
+    const LIMIT: &str = "[concurrency]\nrunning = 4\nsource = \"s\"\n";
+
+    /// A `[[review.deny]]` entry for each of `tools`.
+    fn denying(tools: &[&str]) -> String {
+        tools.iter().map(|tool| format!("[[review.deny]]\ntool = \"{tool}\"\nsource = \"s\"\n")).collect()
+    }
+
+    /// The review section with no allowed tools, denying what a session must not have.
+    fn review() -> String {
+        format!("[review]\nallow = []\n{}", denying(&["Agent", "Task"]))
+    }
 
     #[test]
     fn the_floor_admits_its_own_version_and_newer_and_compares_numbers_not_text() {
@@ -563,11 +620,35 @@ mod tests {
 
     #[test]
     fn workers_without_a_floor_do_not_parse() {
-        let rest = "[concurrency]\nrunning = 4\nsource = \"s\"\n[review]\nallow = []\ndeny = []\n";
-        assert!(Workers::parse(rest).is_err());
+        let rest = format!("{MODEL}{LIMIT}{}", review());
+        assert!(Workers::parse(&rest).is_err());
         assert!(Workers::parse(&format!("{CLAUDE}{rest}")).is_ok());
         assert!(Workers::parse(&format!("[claude]\nfloor = \"new\"\nsource = \"s\"\n{rest}")).is_err());
         assert!(Workers::parse(&format!("[claude]\nfloor = \"2.1.314\"\n{rest}")).is_err());
+    }
+
+    #[test]
+    fn workers_without_a_model_with_an_empty_one_or_with_no_source_do_not_parse() {
+        let with = |model: &str| Workers::parse(&format!("{CLAUDE}{model}{LIMIT}{}", review()));
+        assert_eq!(with(MODEL).unwrap().model.review.to_string(), "opus");
+        for model in ["", "[model]\nsource = \"s\"\n", "[model]\nreview = \"opus\"\n"] {
+            assert!(with(model).is_err(), "{model}");
+        }
+        for model in ["[model]\nreview = \"\"\nsource = \"s\"\n", "[model]\nreview = \" \"\nsource = \"s\"\n"] {
+            let why = with(model).unwrap_err().to_string();
+            assert!(why.contains("model is empty"), "{why}");
+        }
+    }
+
+    #[test]
+    fn a_deny_list_that_lacks_agent_or_task_does_not_parse() {
+        let with = |deny: String| Workers::parse(&format!("{CLAUDE}{MODEL}{LIMIT}[review]\nallow = []\n{deny}"));
+        let why = |tools: &[&str]| with(denying(tools)).unwrap_err().to_string();
+        assert!(with("deny = []\n".to_owned()).unwrap_err().to_string().contains("the deny list lacks Agent"));
+        assert!(why(&["Agent"]).contains("the deny list lacks Task"));
+        assert!(why(&["Task", "Bash"]).contains("the deny list lacks Agent"));
+        assert!(why(&["Agent(reviewer)", "agent", "Task"]).contains("the deny list lacks Agent"));
+        assert!(with(denying(&["Bash", "Task", "Agent"])).is_ok());
     }
 
     /// A result event as a real run wrote it (the probe of these flags), cut to what is read.
@@ -629,9 +710,12 @@ mod tests {
 
     #[test]
     fn a_tool_or_limit_with_no_source_does_not_parse() {
-        let limit = format!("{CLAUDE}[concurrency]\nrunning = 4\n[review]\nallow = []\ndeny = []\n");
-        let tool = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
-        let empty = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Read\"\nsource = \" \"\n[review]\ndeny = []\n";
-        assert!([limit.as_str(), tool, empty].iter().all(|text| Workers::parse(text).is_err()));
+        let deny = denying(&["Agent", "Task"]);
+        let allow = |source: &str| format!("{CLAUDE}{MODEL}{LIMIT}[[review.allow]]\ntool = \"Read\"\n{source}{deny}");
+        assert!(Workers::parse(&allow("source = \"s\"\n")).is_ok());
+        let limit = format!("{CLAUDE}{MODEL}[concurrency]\nrunning = 4\n{}", review());
+        let tool = allow("");
+        let empty = allow("source = \" \"\n");
+        assert!([limit, tool, empty].iter().all(|text| Workers::parse(text).is_err()));
     }
 }

@@ -2,7 +2,7 @@ use super::command::{end_group, run_found, run_prepared};
 use super::jsonl;
 use super::log::home;
 use crate::{Listed, PortError, Sessions};
-use meta_core::{AgentId, Binary, ExitStatus, Origin, ProcessGroup, ReviewCopy, Session, WorkerPlan, WorkerRun};
+use meta_core::{AgentId, Binary, ExitStatus, Model, Origin, ProcessGroup, ReviewCopy, Session, WorkerPlan, WorkerRun};
 use std::ffi::OsString;
 use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::io::{ErrorKind, PipeReader, PipeWriter, Write};
@@ -54,6 +54,7 @@ struct Launch<'a> {
     program: &'a str,
     args: &'a [String],
     copy: &'a ReviewCopy,
+    model: &'a Model,
 }
 
 /// `error` as a port error that names `path`.
@@ -159,6 +160,7 @@ fn launch(dir: &Path, session: &Launch<'_>, lifeline: PipeReader) -> Result<Work
     Ok(WorkerRun {
         group: ProcessGroup::of(leader.id()),
         transcript: transcript.display().to_string().parse().map_err(|error| PortError::new(format!("{error}")))?,
+        model: session.model.clone(),
     })
 }
 
@@ -248,7 +250,7 @@ impl Sessions for HeadlessSessions {
     fn start(&mut self, plan: &WorkerPlan) -> Result<WorkerRun, PortError> {
         let dir = worker_dir(plan.id())?;
         let args = plan.arguments();
-        let session = Launch { program: plan.program(), args: &args, copy: plan.copy() };
+        let session = Launch { program: plan.program(), args: &args, copy: plan.copy(), model: plan.model() };
         // The writer goes to the supervisor; dropped on the way, it ends the session too.
         start_in(&dir, &session, |writer| {
             supervise(&dir, plan.binary(), &plan.supervisor_arguments(), plan.repository(), writer)
@@ -283,7 +285,7 @@ mod tests {
         make_way, passed, recorded, start_in, state_in, supervise,
     };
     use crate::{PortError, Sessions};
-    use meta_core::{ExitStatus, ReviewCopy, Session, SessionVerdict, Verdict, WorkerRun};
+    use meta_core::{ExitStatus, Model, ReviewCopy, Session, SessionVerdict, Verdict, WorkerRun};
     use meta_testkit::Scratch;
     use std::ffi::OsString;
     use std::fs;
@@ -299,6 +301,10 @@ mod tests {
         ReviewCopy { view: "the view\n".to_owned(), diff: "the diff\n".to_owned() }
     }
 
+    fn model() -> Model {
+        "opus".parse().unwrap()
+    }
+
     fn sh(script: &str) -> [String; 2] {
         ["-c".to_owned(), script.to_owned()]
     }
@@ -307,7 +313,7 @@ mod tests {
     fn session(dir: &Path, script: &str) -> (WorkerRun, PipeWriter) {
         let (reader, writer) = std::io::pipe().unwrap();
         let args = sh(script);
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy() };
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
         (launch(dir, &launched, reader).unwrap(), writer)
     }
 
@@ -435,7 +441,7 @@ mod tests {
         let root = Scratch::new("worker-retry");
         let dir = root.join("worker-1");
         let args = sh("sleep 30");
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy() };
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
         let missing = "/nonexistent/meta".parse().unwrap();
         let repository = REPOSITORY.parse().unwrap();
         let failed =
@@ -462,7 +468,7 @@ mod tests {
         let root = Scratch::new("worker-unjoined");
         let dir = root.join("worker-1");
         let args = sh("sleep 30");
-        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy() };
+        let launched = Launch { program: "/bin/sh", args: &args, copy: &copy(), model: &model() };
         let refused = start_in(&dir, &launched, |_| Err(PortError::new("no supervisor")));
         assert_eq!(refused, Err(PortError::new("no supervisor")));
         assert_eq!(is_alive(&recorded(&dir).unwrap().unwrap()), Ok(false));

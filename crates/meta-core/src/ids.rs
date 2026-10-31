@@ -118,6 +118,7 @@ text!(Branch, "branch");
 text!(EscapeKind, "escape kind");
 text!(AgentId, "agent id");
 text!(ToolRule, "tool rule");
+text!(Model, "model");
 text!(Transcript, "transcript path");
 text!(PredictionId, "prediction id");
 text!(Observed, "observation");

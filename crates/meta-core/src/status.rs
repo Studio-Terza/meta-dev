@@ -73,7 +73,7 @@ impl Ledger {
             .iter()
             .filter(|(_, slot)| self.overdue(slot, at))
             .map(|(id, slot)| {
-                let note = slot.transcript_note();
+                let note = slot.worker_note();
                 format!("{id} for {}: {}, {}{note}", slot.lease().task(), slot.holder(), slot.deadline())
             })
             .collect();
@@ -84,7 +84,7 @@ impl Ledger {
             .filter_map(|(id, slot)| {
                 let worker = slot.running_worker();
                 let agent = worker.and(slot.agent()).or_else(|| slot.running_agent());
-                let note = slot.transcript_note();
+                let note = slot.worker_note();
                 agent.map(|agent| {
                     format!(
                         "{id}: agent {agent}, {}, role {}, {}{note}",
@@ -248,8 +248,7 @@ impl Ledger {
                         other.lease().task() == task
                             && matches!(other, LeaseSlot::Spent(spent) if spent.verdict().is_some())
                     });
-                    (!later)
-                        .then(|| format!("{id} for {task}: review finished with no verdict{}", slot.transcript_note()))
+                    (!later).then(|| format!("{id} for {task}: review finished with no verdict{}", slot.worker_note()))
                 }
                 _ => None,
             })

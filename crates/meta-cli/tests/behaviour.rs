@@ -3403,7 +3403,8 @@ const ISSUED_ALLOWANCE: u64 = 1800;
 const WORKER_DEADLINE: u64 = 2 + ISSUED_ALLOWANCE;
 
 fn run_of(group: u32, lease: u64) -> WorkerRun {
-    WorkerRun { group: ProcessGroup::of(group), transcript: id(&format!("/recorded/workers/worker-{lease}/t.jsonl")) }
+    let transcript = id(&format!("/recorded/workers/worker-{lease}/t.jsonl"));
+    WorkerRun { group: ProcessGroup::of(group), transcript, model: id("opus") }
 }
 
 /// Task `number`, linked to PR `number`, with its work lease `2n - 1` and review lease `2n` unused.
@@ -3458,7 +3459,8 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
     let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     let transcript = "/recorded/workers/worker-2/transcript.jsonl";
-    let run = WorkerRun { group: ProcessGroup::of(RecordedSessions::FIRST_GROUP + 1), transcript: id(transcript) };
+    let group = ProcessGroup::of(RecordedSessions::FIRST_GROUP + 1);
+    let run = WorkerRun { group, transcript: id(transcript), model: id("opus") };
     assert_eq!(
         events,
         vec![
@@ -3474,7 +3476,7 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
     assert_eq!(
         reply.text,
         format!(
-            "lease-2: worker worker-2 started, process group 901, deadline unix {WORKER_DEADLINE}, transcript {transcript}\n"
+            "lease-2: worker worker-2 started, model opus, process group 901, deadline unix {WORKER_DEADLINE}, transcript {transcript}\n"
         )
     );
     let [plan] = ports.sessions.started.as_slice() else { panic!("one session: {:?}", ports.sessions.started) };
@@ -3490,16 +3492,18 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
     assert!(!brief.contains("gh pr diff 1") && !brief.contains(BINARY) && !brief.contains("meta verdict"), "{brief}");
     assert_eq!(plan.copy().view, "recorded view of #1");
     assert_eq!(plan.copy().diff, "recorded diff of #1");
-    let schema = flags[8].as_str();
+    let schema = flags[10].as_str();
     assert_eq!(serde_json::from_str::<serde_json::Value>(schema).unwrap()["required"][0], "verdict");
     let expected = [
         "--restricted",
+        "--model",
+        "opus",
         "--tools",
         "Read,Grep",
         "--allowedTools",
         "Read,Grep",
         "--disallowedTools",
-        "Agent",
+        "Agent,Task",
         "--json-schema",
         schema,
         "--no-session-persistence",
@@ -3592,17 +3596,40 @@ fn worker_start_on_the_real_log_runs_a_main_build_only_and_reads_mains_allowlist
     let mut main = ready_on_marked_log(review_task(1), Build::commit(id(MAIN_BUILD)));
     main.git.local.insert(SelfFile::Workers, "tampered".to_owned());
     assert_eq!(call(&mut main, &["worker", "start", "lease-2"], "").0.code, Code::Done);
-    assert_eq!(main.sessions.started[0].arguments()[4], "Read,Grep");
+    assert_eq!(main.sessions.started[0].arguments()[6], "Read,Grep");
+}
+
+/// A `self/workers.toml` for the working tree that allows Glob and denies Agent and `denied`.
+fn tree_workers(model: &str, denied: &str) -> String {
+    format!(
+        "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[model]\nreview = \"{model}\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n[[review.deny]]\ntool = \"{denied}\"\nsource = \"s\"\n"
+    )
 }
 
 #[test]
 fn worker_start_on_a_scratch_log_takes_any_build_and_the_working_trees_allowlist() {
     let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
-    let tree = "[claude]\nfloor = \"2.1.314\"\nsource = \"s\"\n[concurrency]\nrunning = 4\nsource = \"s\"\n[[review.allow]]\ntool = \"Glob\"\nsource = \"s\"\n[[review.deny]]\ntool = \"Agent\"\nsource = \"s\"\n";
-    ports.git.local.insert(SelfFile::Workers, tree.to_owned());
+    ports.git.local.insert(SelfFile::Workers, tree_workers("sonnet", "Task"));
     ports.git.files.remove(&SelfFile::Workers);
-    assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
-    assert_eq!(ports.sessions.started[0].arguments()[4], "Glob");
+    let (reply, events) = call(&mut ports, &["worker", "start", "lease-2"], "");
+    assert_eq!(reply.code, Code::Done, "{}", reply.text);
+    assert!(reply.text.contains("model sonnet"), "{}", reply.text);
+    let args = ports.sessions.started[0].arguments();
+    assert_eq!((args[4].as_str(), args[6].as_str()), ("sonnet", "Glob"));
+    let Event::Started { worker: Some(run), .. } = &events[1] else { panic!("{events:?}") };
+    assert_eq!(run.model, id("sonnet"), "the worker records the model its session runs on");
+}
+
+#[test]
+fn worker_start_is_stopped_at_parse_by_a_file_with_no_model_or_a_deny_list_that_lacks_task() {
+    for (model, denied) in [("", "Task"), ("opus", "Bash")] {
+        let mut ports = Ports { build: Build::commit(id(BRANCH_BUILD)), ..ready(review_task(1)) };
+        ports.git.local.insert(SelfFile::Workers, tree_workers(model, denied));
+        let (reply, added) = call(&mut ports, &["worker", "start", "lease-2"], "");
+        assert_eq!((reply.code, added), (Code::Failed, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains("self/workers.toml is unreadable"), "{}", reply.text);
+        assert!(ports.sessions.started.is_empty());
+    }
 }
 
 #[test]
@@ -3791,7 +3818,7 @@ fn no_valid_structured_verdict_records_no_verdict_and_status_says_review_finishe
         assert!(reply.text.contains("lease-2: review finished with no verdict: "), "{}", reply.text);
         assert!(reply.text.contains(said), "{}", reply.text);
         let (status, _) = call(&mut ports, &["status"], "");
-        let line = "lease-2 for task-1: review finished with no verdict, transcript /recorded/workers/worker-2/t.jsonl";
+        let line = "lease-2 for task-1: review finished with no verdict, model opus, transcript /recorded/workers/worker-2/t.jsonl";
         assert!(status.text.contains(line), "{}", status.text);
     }
 }
@@ -3910,6 +3937,58 @@ fn worker_wait_does_not_let_a_task_waiting_on_the_owner_hold_back_the_kill() {
     let mut ports = given([worker_task(1), vec![waiting]].concat(), Vec::new());
     let (_, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
     assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
+}
+
+/// `cycles` waits on the owner, each `span` long and answered.
+fn wait_and_unwait(ports: &mut Memory, cycles: usize, span: Span) {
+    for _ in 0..cycles {
+        assert_eq!(call(ports, &["wait", "task-1", "--owner", "Which?"], "").0.code, Code::Done);
+        ports.clock.pause(span);
+        assert_eq!(call(ports, &["unwait", "task-1", "This."], "").0.code, Code::Done);
+    }
+}
+
+#[test]
+fn unwait_leaves_a_running_workers_deadline_where_its_start_put_it_however_many_cycles() {
+    for cycles in [1, 3] {
+        let mut ports = given(worker_task(1), Vec::new());
+        wait_and_unwait(&mut ports, cycles, Span::of_seconds(300));
+        let (status, _) = call(&mut ports, &["status"], "");
+        let listed = format!("lease-2: agent worker-2, task-1, role review, deadline unix {WORKER_DEADLINE}, model");
+        assert!(status.text.contains(&listed), "{}", status.text);
+        let (_, events) = call(&mut ports, &["worker", "wait", "lease-2"], "");
+        assert_eq!(events, vec![Event::Finished { lease: id("lease-2"), end: Some(WorkerEnd::Deadline) }]);
+        let poll = Span::of_seconds(5);
+        let latest = Timestamp::from_unix_seconds(WORKER_DEADLINE + 1).plus(poll);
+        assert!(ports.clock.now() <= latest, "killed at {} after {cycles} cycles", ports.clock.now());
+    }
+}
+
+#[test]
+fn a_worker_started_during_a_wait_keeps_its_deadline_when_the_owner_answers() {
+    let mut ports = ready(review_task(1));
+    assert_eq!(call(&mut ports, &["wait", "task-1", "--owner", "Which?"], "").0.code, Code::Done);
+    assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
+    ports.clock.pause(Span::of_seconds(300));
+    assert_eq!(call(&mut ports, &["unwait", "task-1", "This."], "").0.code, Code::Done);
+    let (status, _) = call(&mut ports, &["status"], "");
+    let listed = format!("lease-2: agent worker-2, task-1, role review, deadline unix {WORKER_DEADLINE}, model");
+    assert!(status.text.contains(&listed), "{}", status.text);
+}
+
+#[test]
+fn an_ordinary_reviewer_on_the_same_task_still_gets_the_wait_back() {
+    let started = Event::Started {
+        lease: id("lease-2"),
+        agent: id(AGENT_ID),
+        deadline: Some(Timestamp::from_unix_seconds(WORKER_DEADLINE)),
+        worker: None,
+    };
+    let mut ports = given([review_task(1), vec![used("lease-2"), started]].concat(), Vec::new());
+    wait_and_unwait(&mut ports, 3, Span::of_seconds(300));
+    let (status, _) = call(&mut ports, &["status"], "");
+    let delayed = WORKER_DEADLINE + 900;
+    assert!(status.text.contains(&format!("deadline unix {delayed}")), "{}", status.text);
 }
 
 #[test]
@@ -4131,15 +4210,15 @@ fn status_shows_the_transcript_of_an_overdue_worker_too() {
     ports.clock.pause(Span::of_seconds(WORKER_DEADLINE + 1));
     let (status, _) = call(&mut ports, &["status"], "");
     let line = format!(
-        "lease-2 for task-1: agent worker-2, deadline unix {WORKER_DEADLINE}, transcript /recorded/workers/worker-2/t.jsonl"
+        "lease-2 for task-1: agent worker-2, deadline unix {WORKER_DEADLINE}, model opus, transcript /recorded/workers/worker-2/t.jsonl"
     );
     assert!(status.text.contains(&format!("overdue leases (flagged)\n  {line}")), "{}", status.text);
 }
 
 #[test]
-fn status_lists_a_running_worker_with_its_role_and_transcript_even_on_a_finished_task() {
+fn status_lists_a_running_worker_with_its_role_model_and_transcript_even_on_a_finished_task() {
     let line = format!(
-        "lease-2: agent worker-2, task-1, role review, deadline unix {WORKER_DEADLINE}, transcript /recorded/workers/worker-2/t.jsonl"
+        "lease-2: agent worker-2, task-1, role review, deadline unix {WORKER_DEADLINE}, model opus, transcript /recorded/workers/worker-2/t.jsonl"
     );
     assert!(status_of(worker_task(1)).contains(&line), "{}", status_of(worker_task(1)));
     let retired = Event::Retired { task: id("task-1"), reason: id("moot") };
@@ -4164,7 +4243,7 @@ fn a_worker_round_trips_through_the_log_and_older_records_read_as_no_worker() {
     let line = serde_json::to_string(&started).unwrap();
     assert_eq!(
         line,
-        r#"{"event":"Started","lease":2,"agent":"worker-2","worker":{"group":801,"transcript":"/recorded/workers/worker-2/t.jsonl"}}"#
+        r#"{"event":"Started","lease":2,"agent":"worker-2","worker":{"group":801,"transcript":"/recorded/workers/worker-2/t.jsonl","model":"opus"}}"#
     );
     assert_eq!(serde_json::from_str::<Event>(&line).unwrap(), started);
     let cases = [

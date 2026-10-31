@@ -98,7 +98,7 @@ pub enum Event {
         agent: AgentId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         deadline: Option<Timestamp>,
-        /// Set on a headless worker: its process group and transcript.
+        /// Set on a headless worker: its process group, transcript and model.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         worker: Option<WorkerRun>,
     },

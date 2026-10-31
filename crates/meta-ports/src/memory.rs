@@ -246,7 +246,7 @@ impl Sessions for RecordedSessions {
         self.started.push(plan.clone());
         let group = Self::FIRST_GROUP.saturating_add(u32::try_from(self.started.len()).unwrap_or(u32::MAX));
         let transcript = Self::transcript(plan.id()).parse()?;
-        Ok(WorkerRun { group: ProcessGroup::of(group), transcript })
+        Ok(WorkerRun { group: ProcessGroup::of(group), transcript, model: plan.model().clone() })
     }
 
     fn state(&self, _: &AgentId, _: &WorkerRun) -> Result<Session, PortError> {

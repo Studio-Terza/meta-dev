@@ -9,6 +9,11 @@
 floor = "2.1.314"
 source = "failure: review of #47: the session's confinement rests on flags a claude too old may not have"
 
+# Passed as --model. --restricted ignores user settings, so a session gets no other choice of model.
+[model]
+review = "opus"
+source = "owner 2026-10-26: model tier by difficulty: reviews run on opus"
+
 [concurrency]
 running = 4
 source = "owner 2026-10-30: at most 4 workers at once"

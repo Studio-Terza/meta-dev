@@ -238,10 +238,12 @@ impl LeaseSlot {
         }
     }
 
-    /// The transcript of the headless worker on this lease, as a status line ends with it.
-    pub(crate) fn transcript_note(&self) -> String {
+    /// The model and transcript of the headless worker on this lease, as a status line ends with them.
+    pub(crate) fn worker_note(&self) -> String {
         match self {
-            Self::Spent(Spent { worker: Some(run), .. }) => format!(", transcript {}", run.transcript),
+            Self::Spent(Spent { worker: Some(run), .. }) => {
+                format!(", model {}, transcript {}", run.model, run.transcript)
+            }
             _ => String::new(),
         }
     }
@@ -259,10 +261,12 @@ impl LeaseSlot {
         }
     }
 
-    /// Moves every deadline of the lease later by `span`: the time its task waited on the owner.
+    /// Moves every deadline of the lease later by `span`: the time its task waited on the owner. A
+    /// worker's deadline stays where its start put it: its session does not pause for the wait.
     pub(crate) fn delay(&mut self, span: Span) {
         match self {
             Self::Unused(lease) => lease.deadline = lease.deadline.delayed(span),
+            Self::Spent(Spent { worker: Some(_), .. }) => {}
             Self::Spent(spent) => {
                 spent.lease.deadline = spent.lease.deadline.delayed(span);
                 spent.deadline = spent.deadline.delayed(span);
