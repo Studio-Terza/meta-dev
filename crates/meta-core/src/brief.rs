@@ -61,7 +61,7 @@ impl ReviewText<'_> {
         let Self { pr, task, title, agent, lease, deadline_line, head, binary, rules } = self;
         let digits = pr.digits();
         let lease_line = format!(
-            "{lease} (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you to do with this line)"
+            "{lease} (for the lead: put it in the Agent description; it starts one agent. Reviewer: the verdict command below names it)"
         );
         format!(
             "review: {pr} for {task}: {title}\n\
@@ -73,7 +73,7 @@ impl ReviewText<'_> {
              - read the change with gh pr view {digits} and gh pr diff {digits}; push, comment, approve and merge nothing\n  \
              - report each finding with its file, line and evidence, then a verdict: pass or fail\n  \
              - finish by recording the verdict yourself with this main build, which writes the real log; build nothing: \
-             {binary} verdict {task} pass|fail. \
+             {binary} verdict {lease} pass|fail. \
              meta refuses the verdict if {pr} no longer has head {head}; then report that and stop\n\
              rules:\n{rules}"
         )

@@ -661,7 +661,8 @@ fn unknown_or_malformed_commands_answer_with_usage() {
         &["resolve", "escape-1"][..],
         &["resolve", "escape-1", "--historical"][..],
         &["resolve", "escape-1", "--historical", "--correcting"][..],
-        &["verdict", "task-1", "maybe"][..],
+        &["verdict", "lease-2", "maybe"][..],
+        &["verdict", "task-1", "pass"][..],
         &["retire", "task-1"][..],
         &["done", "task-1"][..],
         &["done", "task-1", "--by"][..],
@@ -1114,17 +1115,11 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
     let reviewed =
         |verdict: &str| Event::Reviewed { lease: id("lease-2"), verdict: id(verdict), head: Some(id(PINNED)) };
     let at_pinned = || vec![("7", pull(PINNED, &[]))];
-    let (reply, events) = call(&mut given(linked_task(), at_pinned()), &["verdict", "task-1", "pass"], "");
-    assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
-    let unused = [linked_task(), vec![review_leased("lease-2", PINNED)]].concat();
-    let (reply, _) = call(&mut given(unused.clone(), at_pinned()), &["verdict", "task-1", "pass"], "");
-    assert!(reply.code == Code::Refused && reply.text.contains("awaits a verdict"), "{}", reply.text);
-    let mut ports = given([unused, vec![used("lease-2")]].concat(), at_pinned());
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "fail"], "");
+    let history = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
+    let mut ports = given(history, at_pinned());
+    let (reply, events) = call(&mut ports, &["verdict", "lease-2", "fail"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed("fail")]));
     assert!(reply.text.contains(&format!("at head {PINNED}")), "{}", reply.text);
-    let (reply, _) = call(&mut ports, &["verdict", "task-1", "pass"], "");
-    assert_eq!(reply.code, Code::Refused);
     let later = vec![
         review_leased("lease-3", MOVED),
         used("lease-3"),
@@ -1137,10 +1132,56 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
 }
 
 #[test]
+fn a_dead_reviewers_lease_at_an_older_head_does_not_block_a_later_reviewer() {
+    // Whether the dead reviewer's deadline has passed or not: it may crash long before it.
+    for deadline in [1, 1000] {
+        let dead = vec![review_leased_until("lease-2", PINNED, deadline), used("lease-2")];
+        let history = [linked_task(), dead, vec![review_leased("lease-3", MOVED), used("lease-3")]].concat();
+        let (reply, events) =
+            call(&mut given(history, vec![("7", pull(MOVED, &[]))]), &["verdict", "lease-3", "pass"], "");
+        let expected = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(MOVED)) };
+        assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
+    }
+}
+
+#[test]
+fn a_verdict_after_the_deadline_lands_on_the_named_lease() {
+    let late = |lease: &str| vec![review_leased_until(lease, PINNED, 1), used(lease)];
+    let history = [linked_task(), late("lease-2"), late("lease-3")].concat();
+    for lease in ["lease-2", "lease-3"] {
+        let mut ports = given(history.clone(), vec![("7", pull(PINNED, &[]))]);
+        let (status, _) = call(&mut ports, &["status"], "");
+        assert!(status.text.contains(&format!("{lease} for task-1: ")), "not overdue: {}", status.text);
+        let (reply, events) = call(&mut ports, &["verdict", lease, "pass"], "");
+        let expected = Event::Reviewed { lease: id(lease), verdict: id("pass"), head: Some(id(PINNED)) };
+        assert_eq!((reply.code, events), (Code::Done, vec![expected]), "{}", reply.text);
+    }
+}
+
+#[test]
+fn a_verdict_naming_a_wrong_unused_worker_or_judged_lease_is_refused_with_a_next_step() {
+    let unused = reviewer_after_worker(PINNED)[..1].to_vec();
+    let judged = [worker_task(1), vec![reviewed_at_pin("fail")]].concat();
+    let cases = [
+        (worker_task(1), "lease-9", "lease-9 is unknown"),
+        (worker_task(1), "lease-1", "lease-1 is a work lease"),
+        (worker_task(1), "lease-2", "lease-2 is a headless worker's lease"),
+        ([worker_task(1), unused].concat(), "lease-3", "review lease lease-3 is unused"),
+        (judged, "lease-2", "lease-2 already has the verdict fail"),
+    ];
+    for (history, lease, why) in cases {
+        let mut ports = given(history, vec![("1", pull(PINNED, &[Outcome::Green]))]);
+        let (reply, events) = call(&mut ports, &["verdict", lease, "pass"], "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(why) && reply.text.contains("Next: "), "{}", reply.text);
+    }
+}
+
+#[test]
 fn verdict_is_refused_when_the_pr_head_is_not_the_head_the_review_lease_judged() {
     let used_review = [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
     let mut ports = given(used_review, vec![("7", pull(MOVED, &[]))]);
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut ports, &["verdict", "lease-2", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     for needle in [MOVED, PINNED, "lease-2", "head it judged", "meta review task-1"] {
         assert!(reply.text.contains(needle), "{needle}: {}", reply.text);
@@ -1161,11 +1202,12 @@ fn review_brief_tells_the_reviewer_to_record_its_verdict_with_a_main_build_and_w
         call(&mut given(linked_task(), vec![("7", pull(PINNED, &[]))]), &["review", "task-1", "--agent", "rev"], "");
     let wanted = [
         "main build",
-        "/recorded/main/meta verdict task-1 pass|fail",
-        "lease: lease-2 (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you",
+        "/recorded/main/meta verdict lease-2 pass|fail",
+        "lease: lease-2 (for the lead: put it in the Agent description; it starts one agent. Reviewer: the verdict command",
     ];
     assert!(wanted.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
+    let unwanted = ["worktree", "cargo", "nothing for you"];
+    assert!(unwanted.iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
 }
 
 #[test]
@@ -3818,7 +3860,7 @@ fn a_worker_that_ended_with_no_verdict_does_not_block_the_verdict_of_a_later_rev
         let finished = Event::Finished { lease: id("lease-2"), end: Some(end) };
         let events = [worker_task(1), vec![finished], reviewer_after_worker(MOVED)].concat();
         let mut ports = given(events, vec![("1", pull(MOVED, &[Outcome::Green]))]);
-        let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+        let (reply, events) = call(&mut ports, &["verdict", "lease-3", "pass"], "");
         let reviewed = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(MOVED)) };
         assert_eq!((reply.code, events), (Code::Done, vec![reviewed]), "{}", reply.text);
         let (status, _) = call(&mut ports, &["status"], "");
@@ -3829,11 +3871,11 @@ fn a_worker_that_ended_with_no_verdict_does_not_block_the_verdict_of_a_later_rev
 #[test]
 fn an_ordinary_verdict_never_lands_on_a_running_workers_lease() {
     let at_pin = || vec![("1", pull(PINNED, &[Outcome::Green]))];
-    let (reply, events) = call(&mut given(worker_task(1), at_pin()), &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut given(worker_task(1), at_pin()), &["verdict", "lease-2", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("meta review task-1"), "{}", reply.text);
     let mut ports = given([worker_task(1), reviewer_after_worker(PINNED)].concat(), at_pin());
-    let (reply, events) = call(&mut ports, &["verdict", "task-1", "pass"], "");
+    let (reply, events) = call(&mut ports, &["verdict", "lease-3", "pass"], "");
     let reviewed = Event::Reviewed { lease: id("lease-3"), verdict: id("pass"), head: Some(id(PINNED)) };
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed]), "{}", reply.text);
     ports.sessions.states.borrow_mut().push_back(Ok(Session::Ended(Some(ExitStatus::of(0)))));
