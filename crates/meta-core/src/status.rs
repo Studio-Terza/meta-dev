@@ -9,7 +9,7 @@ use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
 use crate::rework::PrRuns;
-use crate::set_aside::UnverifiedEscapes;
+use crate::set_aside::{UnverifiedEscapes, one_line};
 use crate::task::Progress;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
@@ -77,7 +77,7 @@ impl Ledger {
             .filter_map(|id| {
                 self.escape(id).filter(|logged| logged.is_open()).map(|logged| format!("{id} {}", logged.line(main)))
             })
-            .chain(set_aside.iter().map(|logged| format!("unverified {}", logged.line(main))))
+            .chain(set_aside.iter().map(|logged| format!("unverified {}", one_line(&logged.line(main)))))
             .collect();
         let corrected: Vec<String> = (1..=self.escapes.len())
             .map(|number| EscapeId::after(number - 1))

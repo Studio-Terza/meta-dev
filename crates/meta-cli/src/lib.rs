@@ -1,6 +1,6 @@
 use meta_core::{
-    Accepted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event, Hook,
-    LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber,
+    Accepted, Admitted, AgentName, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind, EscapeKinds, Event,
+    Hook, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, Origin, OwnerAnswer, OwnerQuestion, Phase, PrNumber,
     Predictions, Pull, Reason, Reconciliation, Record, Refusal, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span,
     Standing, TaskId, Timestamp, Title, Unreached, Unreadable, Unverified, Updating, Verdict,
 };
@@ -206,10 +206,13 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
     let Ports { log, git, github, clock, build } = ports;
     let at = clock.now();
     let standing = log.standing();
+    let mut guard = Guard::default();
     match call {
-        Call::Hook(phase, input) => hook(phase, Hook::read(phase, &input), log, at, || verify(standing, git, build)),
+        Call::Hook(phase, input) => {
+            hook(phase, Hook::read(phase, &input), log, at, standing, |standing| guard.at(standing, git, build))
+        }
         Call::MarkRealLog => {
-            if let Err(unverified) = verify(Standing::Real, git, build) {
+            if let Err(unverified) = build.verify_marking(|commit| git.on_main(commit)) {
                 return Answer::failed(Failure::Refused(unverified.into()));
             }
             match log.mark(Record { at, event: Event::RealLog }) {
@@ -233,26 +236,36 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(admitted) => admitted,
                 Err(refusal) => return Answer::failed(refusal.into()),
             };
-            if let Err(unverified) = verify(standing, git, build) {
+            let set_aside = |log: &mut L, admitted: Admitted, unverified: Unverified| {
                 let (escape, text) = admitted.set_aside(at);
-                return match log.set_aside(&escape) {
+                match log.set_aside(&escape) {
                     Ok(side) => Answer::done(format!("{text}kept in {side}, not in the log: {unverified}\n")),
                     Err(error) => Answer::failed(error.into()),
-                };
+                }
+            };
+            if let Err(unverified) = guard.at(standing, git, build) {
+                return set_aside(log, admitted, unverified);
             }
-            let recorded = log.transact(|_, records| {
-                let earlier = records.as_deref().map_err(ToString::to_string);
-                let (events, text) = admitted.tally(earlier).into_parts();
-                (stamped(events, at), text)
+            // The log's first record is read again inside the lock: a marking that landed since
+            // `standing` was read turns this append into a set-aside.
+            let recorded = log.transact(|now, records| match guard.at(now, git, build) {
+                Ok(()) => {
+                    let earlier = records.as_deref().map_err(ToString::to_string);
+                    let (events, text) = admitted.tally(earlier).into_parts();
+                    (stamped(events, at), Ok(text))
+                }
+                Err(unverified) => (Vec::new(), Err((admitted, unverified))),
             });
             match recorded {
-                Ok(text) => Answer::done(text),
+                Ok(Ok(text)) => Answer::done(text),
+                Ok(Err((admitted, unverified))) => set_aside(log, admitted, unverified),
                 Err(error) => Answer::failed(error.into()),
             }
         }
         Call::Ledger(call) => {
-            let verified = verify(standing, git, build);
-            if let (false, Err(unverified)) = (call == LedgerCall::Status, &verified) {
+            let verified = guard.at(standing, git, build);
+            let reading = call == LedgerCall::Status;
+            if let (false, Err(unverified)) = (reading, &verified) {
                 return Answer::failed(Failure::Refused(unverified.clone().into()));
             }
             let place = log.place();
@@ -267,7 +280,12 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
                 Ok(prepared) => prepared,
                 Err(failure) => return Answer::failed(failure),
             };
-            let outcome = log.transact(|_, records| {
+            let outcome = log.transact(|now, records| {
+                // Rechecked against the first record inside the lock, as for an escape.
+                let verified = guard.at(now, git, build);
+                if let (false, Err(unverified)) = (reading, &verified) {
+                    return (Vec::new(), Err(Failure::Refused(unverified.clone().into())));
+                }
                 match records
                     .map_err(Failure::from)
                     .and_then(|records| fold(&records))
@@ -291,9 +309,25 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock>(call: Call, ports: &mut Ports
 
 /// Whether this binary may append to the log: any build may write a scratch log, and only a build
 /// from a commit on main may write the real one, which the log's first record names
-/// (`Log::standing`). An ancestry that cannot be decided is unverified.
-fn verify<G: Git>(standing: Standing, git: &G, build: &Build) -> Result<(), Unverified> {
-    build.verify(standing, |commit| git.on_main(commit))
+/// (`Log::standing`). An ancestry that cannot be decided is unverified. The standing is read once
+/// before the lock and again inside it, so the ancestry is asked at most once, and not at all for
+/// a log that stays scratch.
+#[derive(Default)]
+struct Guard {
+    real: Option<Result<(), Unverified>>,
+}
+
+impl Guard {
+    fn at<G: Git>(&mut self, standing: Standing, git: &G, build: &Build) -> Result<(), Unverified> {
+        match standing {
+            Standing::Scratch => Ok(()),
+            Standing::AwaitingMark | Standing::Real | Standing::MarkedElsewhere => self
+                .real
+                .get_or_insert_with(|| build.verify(Standing::Real, |commit| git.on_main(commit)))
+                .clone()
+                .map_err(|unverified| unverified.at(standing)),
+        }
+    }
 }
 
 fn hook<L: Log>(
@@ -301,7 +335,8 @@ fn hook<L: Log>(
     hook: Hook,
     log: &mut L,
     at: Timestamp,
-    verify: impl FnOnce() -> Result<(), Unverified>,
+    standing: Standing,
+    mut verify: impl FnMut(Standing) -> Result<(), Unverified>,
 ) -> Answer {
     let decide: Box<dyn FnOnce(Ledger) -> Accepted> = match hook {
         Hook::Settled(accepted) => return Answer::done(accepted.into_parts().1),
@@ -309,11 +344,16 @@ fn hook<L: Log>(
         Hook::Resume(resume) => Box::new(|ledger: Ledger| ledger.resume(resume)),
         Hook::Bind(binding) => Box::new(move |ledger: Ledger| ledger.bind(binding, at)),
     };
-    if let Err(unverified) = verify() {
+    if let Err(unverified) = verify(standing) {
         return Answer::broken_hook(phase, unverified);
     }
     let place = log.place();
-    let outcome = log.transact(|_, records| {
+    let outcome = log.transact(|now, records| {
+        // The log's first record is read again inside the lock: a marking that landed since
+        // `standing` was read refuses this append.
+        if let Err(unverified) = verify(now) {
+            return (Vec::new(), Err(unverified.to_string()));
+        }
         let folded = records
             .map_err(|error| error.to_string())
             .and_then(|records| Ledger::fold(&records).map_err(|corrupt| corrupt.in_log(&place)));

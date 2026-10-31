@@ -25,6 +25,24 @@ impl UnverifiedEscape {
     }
 }
 
+/// The text as one line a reader cannot mistake for several: a branch build wrote the side file, so
+/// its text is not trusted. Line breaks and other control characters, and the backslash that
+/// introduces an escape, show as escapes.
+pub(crate) fn one_line(text: &str) -> String {
+    text.chars().map(shown).collect()
+}
+
+fn shown(character: char) -> String {
+    match character {
+        '\\' => "\\\\".to_owned(),
+        '\n' => "\\n".to_owned(),
+        '\r' => "\\r".to_owned(),
+        '\t' => "\\t".to_owned(),
+        other if other.is_control() || matches!(other, '\u{2028}' | '\u{2029}') => other.escape_unicode().to_string(),
+        other => other.to_string(),
+    }
+}
+
 /// What a side file holds. A line that cannot be read is only counted: a branch build's lines must
 /// never stop a main build.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

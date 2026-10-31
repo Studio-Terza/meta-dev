@@ -54,6 +54,12 @@ impl Stamp {
             Ok(commit) => commit,
             Err(why) => return Self::Unknown(why),
         };
+        // The repository that encloses `repo` may not be the one `repo` was cloned from: a copy
+        // with no .git of its own, placed inside a clone, would be stamped with that clone's
+        // commit. Only a crate whose own files that repository tracks is built from its commit.
+        if let Err(why) = git(&["ls-files", "--error-unmatch", "--", "."]) {
+            return Self::Unknown(format!("the files here are not tracked by the enclosing repository ({why})"));
+        }
         // Only edits to tracked files count: an untracked file changes nothing that is built, and
         // the build script is not rerun when one appears or goes.
         match git(&["status", "--porcelain", "--untracked-files=no"]).map(|status| status.is_empty()) {
