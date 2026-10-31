@@ -4631,3 +4631,190 @@ fn worker_commands_take_a_lease_id_and_stop_takes_at_most_one() {
     assert_eq!(malformed(&["worker", "start"]), Code::Failed);
     assert_eq!(malformed(&["stop", "lease-3", "lease-4"]), Code::Failed);
 }
+
+// Task 64: a project is a marked task with members, and meta shows each member's next step.
+
+fn project_marked(task: &str) -> Event {
+    Event::TaskRole { task: id(task), role: Role::Project }
+}
+
+fn joined(task: &str, project: &str) -> Event {
+    Event::Joined { task: id(task), project: id(project) }
+}
+
+/// `events`, then a project task-9 that task-1 joined.
+fn with_project(events: Vec<Event>) -> Vec<Event> {
+    [events, vec![opened("task-9"), project_marked("task-9"), joined("task-1", "task-9")]].concat()
+}
+
+/// The view of the project of `with_project`; it records nothing.
+fn project_view(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> String {
+    let (reply, added) = call(&mut given(with_project(events), pulls), &["project", "task-9"], "");
+    assert_eq!((reply.code, added), (Code::Done, Vec::new()), "{}", reply.text);
+    reply.text
+}
+
+fn on_pin(outcome: Outcome) -> Vec<(&'static str, GhReplies)> {
+    vec![("7", pull(PINNED, &[outcome]))]
+}
+
+#[test]
+fn meta_role_marks_a_project_once_and_one_task_has_one_role() {
+    let mut ports = given(vec![opened("task-1"), opened("task-2"), project_marked("task-2")], Vec::new());
+    let (reply, events) = call(&mut ports, &["role", "task-1", "project"], "");
+    assert_eq!((reply.code, events), (Code::Done, vec![project_marked("task-1")]), "{}", reply.text);
+    assert_eq!(
+        serde_json::to_string(&project_marked("task-1")).unwrap(),
+        r#"{"event":"TaskRole","task":1,"role":"project"}"#
+    );
+    for role in ["critic", "project"] {
+        let (again, events) = call(&mut ports, &["role", "task-1", role], "");
+        assert_eq!((again.code, events), (Code::Refused, Vec::new()), "{}", again.text);
+        assert!(again.text.contains("task-1 is already marked project"), "{}", again.text);
+    }
+    let mut member = given(with_project(vec![opened("task-1")]), Vec::new());
+    let (nested, events) = call(&mut member, &["role", "task-1", "project"], "");
+    assert_eq!((nested.code, events), (Code::Refused, Vec::new()), "{}", nested.text);
+    assert!(nested.text.contains("task-1 is a member of task-9"), "{}", nested.text);
+}
+
+#[test]
+fn project_add_joins_a_task_to_one_project_for_good() {
+    let mut ports = given(
+        vec![opened("task-1"), opened("task-2"), opened("task-3"), marked("task-3"), opened("task-9")],
+        Vec::new(),
+    );
+    let not_yet = call(&mut ports, &["project", "task-9", "add", "task-1"], "");
+    assert_eq!((not_yet.0.code, not_yet.1), (Code::Refused, Vec::new()), "{}", not_yet.0.text);
+    assert!(not_yet.0.text.contains("Next: meta role task-9 project"), "{}", not_yet.0.text);
+    call(&mut ports, &["role", "task-9", "project"], "");
+    let (reply, events) = call(&mut ports, &["project", "task-9", "add", "task-1"], "");
+    assert_eq!((reply.code, events), (Code::Done, vec![joined("task-1", "task-9")]), "{}", reply.text);
+    assert_eq!(
+        serde_json::to_string(&joined("task-1", "task-9")).unwrap(),
+        r#"{"event":"Joined","task":1,"project":9}"#
+    );
+    for (task, says) in [
+        ("task-1", "task-1 is already a member of task-9"),
+        ("task-3", "task-3 is marked critic"),
+        ("task-9", "task-9 is marked project"),
+        ("task-7", "task-7 is unknown"),
+    ] {
+        let (refused, events) = call(&mut ports, &["project", "task-9", "add", task], "");
+        assert_eq!((refused.code, events), (Code::Refused, Vec::new()), "{}", refused.text);
+        assert!(refused.text.contains(says), "{}", refused.text);
+    }
+}
+
+#[test]
+fn a_log_with_a_join_that_does_not_fit_is_corrupt() {
+    for history in [
+        vec![opened("task-1"), opened("task-9"), joined("task-1", "task-9")],
+        vec![opened("task-9"), project_marked("task-9"), joined("task-1", "task-9")],
+        [with_project(vec![opened("task-1")]), vec![joined("task-1", "task-9")]].concat(),
+    ] {
+        let (reply, _) = call(&mut given(history, Vec::new()), &["project", "task-9"], "");
+        assert_eq!(reply.code, Code::Failed, "{}", reply.text);
+    }
+}
+
+#[test]
+fn project_view_gives_each_tasks_next_step_and_only_the_pinned_head_counts() {
+    let used_review = || [linked_task(), vec![review_leased("lease-2", PINNED), used("lease-2")]].concat();
+    let behind = Gh { merge_state: "BEHIND", ..gh(PINNED, &[Outcome::Green]) }.replies();
+    let merged_outside_meta = Gh { state: "MERGED", ..gh(PINNED, &[Outcome::Green]) }.replies();
+    let cases = vec![
+        (vec![opened("task-1")], Vec::new(), "next: claim it: meta claim task-1 --self"),
+        (claimed_task(), Vec::new(), "next: no PR yet: push it, then meta link task-1 <pr>"),
+        (linked_task(), on_pin(Outcome::Green), "next: no verdict at aaaaaaa: meta review task-1"),
+        (
+            [linked_task(), vec![review_leased("lease-2", PINNED)]].concat(),
+            on_pin(Outcome::Green),
+            "next: review lease-2 is unused: meta worker start lease-2",
+        ),
+        (used_review(), on_pin(Outcome::Green), "next: review lease-2 is under way"),
+        (judged(PINNED, "fail"), on_pin(Outcome::Green), "next: fail at aaaaaaa by lease-2: judge its findings"),
+        (judged(PINNED, "pass"), on_pin(Outcome::Green), "next: ready: pass at aaaaaaa, gates green"),
+        (
+            judged(PINNED, "pass"),
+            on_pin(Outcome::Red),
+            "pass at aaaaaaa, but refused: #7 cannot merge:\nred check gates",
+        ),
+        (judged(PINNED, "pass"), on_pin(Outcome::Pending), "missing check gates"),
+        (judged(PINNED, "pass"), vec![("7", behind)], "behind main"),
+        (judged(PINNED, "pass"), vec![("7", merged_outside_meta)], "next: merged at aaaaaaa: meta merge 7 records it"),
+        (judged(MOVED, "pass"), on_pin(Outcome::Green), "next: no verdict at aaaaaaa"),
+        (
+            judged(PINNED, "pass"),
+            vec![("7", pull(MOVED, &[Outcome::Green]))],
+            "next: #7 moved from pinned aaaaaaa to bbbbbbb: meta link task-1 7",
+        ),
+        (judged(PINNED, "pass"), Vec::new(), "next: #7 cannot be read"),
+    ];
+    for (events, pulls, says) in cases {
+        let text = project_view(events, pulls);
+        assert!(text.contains(says), "expected {says:?}: {text}");
+    }
+}
+
+#[test]
+fn project_view_names_the_owners_question_and_no_step_for_a_task_that_ended() {
+    let question = Event::WaitingOnOwner { task: id("task-1"), question: id("Which gate?") };
+    let waiting = project_view(vec![opened("task-1"), question], Vec::new());
+    assert!(waiting.contains("next: waiting on the owner: Which gate?"), "{waiting}");
+    let finished = project_view(finished_task(), Vec::new());
+    assert!(finished.contains("task-1 done"), "{finished}");
+    assert!(!finished.contains("task-1 --self"), "{finished}");
+}
+
+#[test]
+fn project_view_names_the_latest_work_lease_on_the_root_or_says_how_to_get_one() {
+    let root = |events: Vec<Event>| project_view([vec![opened("task-1")], events].concat(), Vec::new());
+    assert!(root(Vec::new()).contains("agent\n  none. Next: meta claim task-9 --agent <name>\n"));
+    let on_root = |lease: &str| {
+        vec![opened("task-9"), project_marked("task-9"), claimed("task-9"), leased_until(lease, "task-9", 100)]
+    };
+    let view = |events: Vec<Event>| {
+        let (reply, _) = call(&mut given(events, Vec::new()), &["project", "task-9"], "");
+        reply.text
+    };
+    assert!(view(on_root("lease-1")).contains("agent\n  lease-1: unused, deadline unix 100\n"));
+    let replaced = [
+        on_root("lease-1"),
+        vec![used("lease-1"), started("lease-1", "first"), leased_until("lease-2", "task-9", 200), used("lease-2")],
+        vec![started("lease-2", "second")],
+    ]
+    .concat();
+    let text = view(replaced);
+    assert!(text.contains("agent\n  lease-2: agent second, deadline unix 200, no turn end recorded\n"), "{text}");
+}
+
+#[test]
+fn project_view_refuses_what_is_no_project_and_any_build_may_read_it() {
+    for task in ["task-1", "task-7"] {
+        let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), &["project", task], "");
+        assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
+        assert!(reply.text.contains(&format!("{task} is not a project")), "{}", reply.text);
+    }
+    let build = || Build::commit(id(BRANCH_BUILD));
+    let history = || with_project(vec![opened("task-1")]);
+    let (read, _) = call(&mut on_real_log(history(), Vec::new(), build()), &["project", "task-9"], "");
+    assert_eq!(read.code, Code::Done, "{}", read.text);
+    let (join, events) =
+        call(&mut on_real_log(history(), Vec::new(), build()), &["project", "task-9", "add", "task-9"], "");
+    assert_eq!((join.code, events), (Code::Refused, Vec::new()), "{}", join.text);
+    assert!(join.text.contains(BRANCH_BUILD_REFUSAL), "{}", join.text);
+}
+
+#[test]
+fn a_work_lease_on_a_project_runs_while_its_root_is_linked_and_status_says_project() {
+    let lease = |task| leased_until("lease-1", task, 100);
+    let root = [opened("task-2"), claimed("task-2"), lease("task-2"), used("lease-1")];
+    let started_root = [root.to_vec(), vec![started("lease-1", "planner"), opened("task-3")]].concat();
+    let linked_root = Event::Linked { task: id("task-2"), pr: id("8"), pin: id(PINNED) };
+    // Unmarked, a linked task's old lease is not running work, so the open task is stalled.
+    flagged([started_root.clone(), vec![linked_root.clone()]].concat(), "task-2 (no verdict on head), task-3 (open)");
+    let project = [started_root, vec![project_marked("task-2"), linked_root]].concat();
+    quiet(project.clone());
+    assert!(status_of(project).contains("lease-1: agent planner, task-2, role project, deadline unix 100"));
+}

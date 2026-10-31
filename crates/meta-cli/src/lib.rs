@@ -1,9 +1,9 @@
 use meta_core::{
     Accepted, Admitted, AgentName, Binary, Build, Cause, Claimant, Clearance, Escape, EscapeId, EscapeKind,
     EscapeKinds, Event, Hook, Importing, LeaseId, Ledger, Malformed, Marking, Merges, Minutes, OpenPrs, Origin,
-    OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, Pull, Reason, Reconciliation, Record, Refusal, Role,
-    Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, Standing, TaskId, Timestamp, Title, Unreached, Unreadable,
-    Unverified, Updating, Verdict,
+    OwnerAnswer, OwnerQuestion, Phase, PrNumber, Predictions, ProjectPulls, Pull, Reason, Reconciliation, Record,
+    Refusal, Role, Roles, Rules, RunCount, SelfFile, Sha, Sources, Span, Standing, TaskId, Timestamp, Title, Unreached,
+    Unreadable, Unverified, Updating, Verdict,
 };
 use meta_ports::{Clock, Git, GitHub, Log, PortError, Ports, Sessions};
 
@@ -75,6 +75,15 @@ pub enum LedgerCall {
     /// Prints again the brief of an unused, live lease; records nothing.
     Brief(LeaseId),
     Status,
+    /// A project's agent and each task's next step; records nothing.
+    Project(TaskId),
+}
+
+impl LedgerCall {
+    /// Reads only, so a build that may not write the log may still answer.
+    fn is_reading(&self) -> bool {
+        matches!(self, Self::Status | Self::Project(_))
+    }
 }
 
 /// A ledger command decided from the log alone.
@@ -86,6 +95,7 @@ pub enum Local {
     Defer { task: TaskId, reason: Reason },
     Undefer(TaskId),
     Role { task: TaskId, role: Role },
+    Join { project: TaskId, task: TaskId },
     Wait { task: TaskId, question: OwnerQuestion },
     Unwait { task: TaskId, answer: OwnerAnswer },
 }
@@ -140,7 +150,7 @@ impl Call {
                          meta claim <task> --self\n  \
                          meta link <task> <pr>\n  meta merge <pr> [--update]\n  meta escape <kind> [--pr <pr>] <reason>\n  meta escape --import\n  \
                          meta resolve <escape> <task>\n  meta resolve <escape> --historical <reason> [--correcting]\n  meta retire <task> <reason>\n  meta done <task> --by <pr>\n  meta defer <task> <reason>\n  \
-                         meta undefer <task>\n  meta role <task> critic\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
+                         meta undefer <task>\n  meta role <task> critic|project\n  meta project <task>\n  meta project <task> add <member>\n  meta review <task> --agent <name> [--deadline <minutes>]\n  \
                          meta verdict <lease> pass|fail\n  meta brief <lease>\n  \
                          meta wait <task> --owner <question>\n  meta unwait <task> <answer>\n  \
                          meta worker start <lease>\n  meta worker wait <lease>\n  meta stop [<lease>]\n  \
@@ -204,6 +214,10 @@ impl Call {
             ["undefer", task] => local(task.parse().map(Local::Undefer)),
             ["role", task, role] => {
                 local(task.parse().and_then(|task| role.parse().map(|role| Local::Role { task, role })))
+            }
+            ["project", task] => ledger(task.parse().map(LedgerCall::Project)),
+            ["project", project, "add", task] => {
+                local(project.parse().and_then(|project| task.parse().map(|task| Local::Join { project, task })))
             }
             ["review", task, "--agent", agent, deadline @ ..] => ledger(task.parse().and_then(|task| {
                 let deadline = Self::deadline(deadline)?;
@@ -332,7 +346,7 @@ pub fn answer<L: Log, G: Git, H: GitHub, C: Clock, S: Sessions>(
         }
         Call::Ledger(call) => {
             let verified = guard.at(standing, git, build);
-            let reading = call == LedgerCall::Status;
+            let reading = call.is_reading();
             if let (false, Err(unverified)) = (reading, &verified) {
                 return Answer::failed(Failure::Refused(unverified.clone().into()));
             }
@@ -449,6 +463,10 @@ fn spec<G: Git, T>(git: &G, file: SelfFile, parse: fn(&str) -> Result<T, Unreada
 enum Prepared {
     Local(Local),
     Status(Sources),
+    Project {
+        project: TaskId,
+        pulls: ProjectPulls,
+    },
     /// `allowance` is how long an agent's lease runs; a self-claim has none.
     Claim {
         task: TaskId,
@@ -564,6 +582,10 @@ fn prepare<L: Log, G: Git, H: GitHub, C: Clock>(
                 standing: log.standing(),
             })
         }
+        LedgerCall::Project(project) => {
+            let read = |pr| (pr, github.pull(pr).map_err(|error| Unreached::by(&error)));
+            Prepared::Project { project, pulls: ledger.project_prs(project)?.into_iter().map(read).collect() }
+        }
         LedgerCall::Claim { task, claimant, deadline } => {
             ledger.claim(task, claimant.clone())?;
             let rules = spec(git, SelfFile::Rules, Rules::parse)?;
@@ -637,10 +659,12 @@ fn finish(prepared: Prepared, ledger: Ledger, at: Timestamp) -> Result<Accepted,
         Prepared::Local(Local::Defer { task, reason }) => ledger.defer(task, reason)?,
         Prepared::Local(Local::Undefer(task)) => ledger.undefer(task)?,
         Prepared::Local(Local::Role { task, role }) => ledger.role(task, role)?,
+        Prepared::Local(Local::Join { project, task }) => ledger.join(project, task)?,
         Prepared::Verdict { lease, verdict, pull } => ledger.verdict(lease, verdict, &pull)?,
         Prepared::Local(Local::Wait { task, question }) => ledger.wait(task, question)?,
         Prepared::Local(Local::Unwait { task, answer }) => ledger.unwait(task, answer)?,
         Prepared::Status(sources) => ledger.status(sources, at),
+        Prepared::Project { project, pulls } => ledger.project(project, &pulls, at)?,
         Prepared::Claim { task, claimant, origin, binary, rules, allowance } => ledger.claim(task, claimant)?.brief(
             &origin,
             &binary,

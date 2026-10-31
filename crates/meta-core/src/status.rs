@@ -10,6 +10,7 @@ use crate::merges::{Reconciliation, Unreached};
 use crate::predictions::{Measure, Observation, Predictions, Quantity};
 use crate::reply::Accepted;
 use crate::rework::PrRuns;
+use crate::role::Role;
 use crate::set_aside::{UnverifiedEscapes, one_line};
 use crate::task::Progress;
 use std::collections::btree_map::Entry;
@@ -289,12 +290,14 @@ impl Ledger {
             && slot.deadline().passed(at)
     }
 
-    /// What the agent on a lease is: a critic on a task marked critic, else a worker or a reviewer.
+    /// What the agent on a lease is: a critic on a task marked critic, a project agent on a project's
+    /// work lease, else a worker or a reviewer.
     fn agent_role(&self, slot: &LeaseSlot) -> &'static str {
-        match (self.critics.contains(&slot.lease().task()), slot.lease().purpose()) {
-            (true, _) => "critic",
-            (false, Purpose::Work) => "work",
-            (false, Purpose::Review { .. }) => "review",
+        match (self.role_of(slot.lease().task()), slot.lease().purpose()) {
+            (Some(Role::Critic), _) => "critic",
+            (Some(Role::Project), Purpose::Work) => "project",
+            (None, Purpose::Work) => "work",
+            (Some(Role::Project) | None, Purpose::Review { .. }) => "review",
         }
     }
 
@@ -358,7 +361,7 @@ impl Ledger {
     }
 }
 
-fn section(heading: &str, lines: &[String]) -> String {
+pub(crate) fn section(heading: &str, lines: &[String]) -> String {
     let body = match lines.is_empty() {
         true => "  (none)\n".to_owned(),
         false => lines.iter().map(|line| format!("  {line}\n")).collect(),

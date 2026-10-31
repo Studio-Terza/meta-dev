@@ -52,10 +52,17 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         by: Option<PrNumber>,
     },
-    /// The task has a role. Every lease on a critic task, past and future, is not running work.
+    /// The task has a role. Every lease on a critic task, past and future, is not running work;
+    /// a work lease on a project's task is running work through every active stage.
     TaskRole {
         task: TaskId,
         role: Role,
+    },
+    /// The task joined the project whose root is `project`, for good. A task opened before its
+    /// project was marked can still join, which is why this is not a field of `Opened`.
+    Joined {
+        task: TaskId,
+        project: TaskId,
     },
     /// The nth `Escaped` record is `escape-n`. Records from before kinds existed fold as unclassified.
     /// An escape of a kind that names a merged PR carries it (P1). One recorded while no kinds
