@@ -6,7 +6,7 @@ use meta_core::{
 use meta_ports::memory::{FakeClock, MemoryLog, RecordedGit, RecordedGitHub};
 use meta_ports::real::JsonlLog;
 use meta_ports::{Clock, GhReplies, Log, PortError, Ports};
-use meta_testkit::{Scratch, words};
+use meta_testkit::Scratch;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::str::FromStr;
@@ -169,19 +169,24 @@ fn self_files() -> std::collections::BTreeMap<SelfFile, String> {
     .into()
 }
 
-fn call(ports: &mut Memory, args: &str, stdin: &str) -> (Answer, Vec<Event>) {
+/// The words of a command line, as `Call::parse` takes them.
+fn command(args: &[&str]) -> Vec<String> {
+    args.iter().map(|word| (*word).to_owned()).collect()
+}
+
+fn call(ports: &mut Memory, args: &[&str], stdin: &str) -> (Answer, Vec<Event>) {
     let before = ports.log.records.len();
-    let reply = answer(Call::parse(&words(args), || stdin.to_owned()).unwrap(), ports);
+    let reply = answer(Call::parse(&command(args), || stdin.to_owned()).unwrap(), ports);
     let added = ports.log.records[before..].iter().map(|record| record.event.clone()).collect();
     (reply, added)
 }
 
-fn parsed(args: &str) -> Call {
-    Call::parse(&words(args), String::new).unwrap()
+fn parsed(args: &[&str]) -> Call {
+    Call::parse(&command(args), String::new).unwrap()
 }
 
 fn hook(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
-    call(&mut given(events, Vec::new()), "hook pre-tool-use", input)
+    call(&mut given(events, Vec::new()), &["hook", "pre-tool-use"], input)
 }
 
 fn agent(description: &str) -> String {
@@ -191,14 +196,15 @@ fn agent(description: &str) -> String {
 
 #[test]
 fn open_prints_a_new_task_id_and_records_opened() {
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "open Fix the hook", "");
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), &["open", "Fix", "the", "hook"], "");
     assert_eq!(reply, Answer { text: "task-2\n".to_owned(), code: Code::Done });
     assert_eq!(events, vec![opened("task-2")]);
 }
 
 #[test]
 fn claim_of_an_open_unclaimed_task_leases_and_prints_the_brief_with_every_sourced_rule() {
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice", "");
+    let (reply, events) =
+        call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--agent", "alice"], "");
     assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", FIXTURE_WORK_DEADLINE)]);
     assert_eq!(reply.code, Code::Done);
     let rules = Rules::parse(RULES).unwrap().to_string();
@@ -216,11 +222,11 @@ fn claim_of_a_claimed_done_or_unknown_task_is_refused_with_the_reason() {
         (Vec::new(), "task-9", "unknown"),
     ];
     cases.into_iter().for_each(|(events, task, reason)| {
-        let (reply, added) = call(&mut given(events, Vec::new()), &format!("claim {task} --agent bob"), "");
+        let (reply, added) = call(&mut given(events, Vec::new()), &["claim", task, "--agent", "bob"], "");
         assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(reason), "{}", reply.text);
     });
-    let (reply, _) = call(&mut given(claimed_task(), Vec::new()), "claim task-1 --agent bob", "");
+    let (reply, _) = call(&mut given(claimed_task(), Vec::new()), &["claim", "task-1", "--agent", "bob"], "");
     assert!(
         reply.text.contains("once it is spent, meta claim task-1 --agent <name> issues a fresh lease"),
         "{}",
@@ -233,7 +239,7 @@ fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
     let spent = Event::LeaseUsed { lease: id("lease-1") };
     [claimed_task(), linked_task()].into_iter().for_each(|history| {
         let history = [history, vec![spent.clone()]].concat();
-        let (reply, events) = call(&mut given(history, Vec::new()), "claim task-1 --agent bob", "");
+        let (reply, events) = call(&mut given(history, Vec::new()), &["claim", "task-1", "--agent", "bob"], "");
         assert_eq!((reply.code, events), (Code::Done, vec![leased_until("lease-2", "task-1", FIXTURE_WORK_DEADLINE)]));
         assert!(reply.text.contains("lease: lease-2") && reply.text.contains("rules:"), "{}", reply.text);
     });
@@ -242,7 +248,7 @@ fn claim_of_a_claimed_task_whose_lease_is_spent_issues_a_fresh_lease() {
 #[test]
 fn link_of_a_claimed_task_records_linked_with_the_head_pinned() {
     let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!(reply.code, Code::Done);
     assert_eq!(events, vec![linked("task-1", "7")]);
 }
@@ -250,7 +256,7 @@ fn link_of_a_claimed_task_records_linked_with_the_head_pinned() {
 #[test]
 fn merge_of_a_linked_green_unmoved_pr_squash_merges_with_the_head_pinned() {
     let mut ports = given(linked_task(), vec![("7", pull(PINNED, &[Outcome::Green, Outcome::Green]))]);
-    let (reply, events) = call(&mut ports, "merge 7", "");
+    let (reply, events) = call(&mut ports, &["merge", "7"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert_eq!(events, vec![merged("7", 3), done("task-1")]);
     assert_eq!(ports.github.merged, vec![(id::<PrNumber>("7"), id::<Sha>(PINNED))]);
@@ -279,7 +285,7 @@ fn merge_of_an_unlinked_red_missing_or_moved_pr_is_refused_naming_which_with_the
     ];
     cases.into_iter().for_each(|(pr, recorded, which, next)| {
         let mut ports = given(linked_task(), vec![(pr, recorded)]);
-        let (reply, events) = call(&mut ports, &format!("merge {pr}"), "");
+        let (reply, events) = call(&mut ports, &["merge", pr], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(which) && reply.text.contains(next), "{}", reply.text);
         assert!(ports.github.merged.is_empty());
@@ -290,7 +296,7 @@ fn merge_of_an_unlinked_red_missing_or_moved_pr_is_refused_naming_which_with_the
 fn merge_of_a_pr_behind_main_is_refused_with_the_update_step_and_does_not_merge() {
     let behind = Gh { merge_state: "BEHIND", ..gh(PINNED, &[Outcome::Green]) }.replies();
     let mut ports = given(linked_task(), vec![("7", behind)]);
-    let (reply, events) = call(&mut ports, "merge 7", "");
+    let (reply, events) = call(&mut ports, &["merge", "7"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     for why in ["behind main", "meta merge 7 --update", "wait for CI", "meta link task-1 7", "meta merge 7 again"] {
         assert!(reply.text.contains(why), "{}", reply.text);
@@ -302,7 +308,7 @@ fn merge_of_a_pr_behind_main_is_refused_with_the_update_step_and_does_not_merge(
 fn merge_update_of_a_pr_behind_main_updates_the_branch_and_does_not_merge_in_the_same_call() {
     let behind = Gh { merge_state: "BEHIND", ..gh(PINNED, &[Outcome::Green]) }.replies();
     let mut ports = given(linked_task(), vec![("7", behind)]);
-    let (reply, events) = call(&mut ports, "merge 7 --update", "");
+    let (reply, events) = call(&mut ports, &["merge", "7", "--update"], "");
     assert_eq!((reply.code, events), (Code::Done, Vec::new()));
     assert!(reply.text.contains("updated; CI must pass on the new head before merging"), "{}", reply.text);
     assert_eq!(ports.github.updated, vec![id::<PrNumber>("7")]);
@@ -318,7 +324,7 @@ fn merge_update_is_refused_for_a_pr_that_is_not_behind_is_unlinked_or_is_not_ope
     ];
     cases.into_iter().for_each(|(pr, recorded, why)| {
         let mut ports = given(linked_task(), vec![(pr, recorded)]);
-        let (reply, events) = call(&mut ports, &format!("merge {pr} --update"), "");
+        let (reply, events) = call(&mut ports, &["merge", pr, "--update"], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
         assert!(ports.github.updated.is_empty() && ports.github.merged.is_empty());
@@ -345,7 +351,7 @@ fn status_prints_open_tasks_live_leases_open_escapes_and_the_measures() {
         vec![Event::Denied { attempt: Attempt::AgentStart }],
     ]
     .concat();
-    let (reply, events) = call(&mut given(history, Vec::new()), "status", "");
+    let (reply, events) = call(&mut given(history, Vec::new()), &["status"], "");
     assert_eq!(events, vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 1")]);
     let expected = [
         "task-1 claimed by alice",
@@ -448,9 +454,9 @@ fn merge_reads_required_checks_from_recorded_gh_json_and_ignores_unrequired_ones
         serde_json::json!({ "__typename": "CheckRun", "name": "lint", "status": "COMPLETED", "conclusion": "FAILURE" });
     let green = Gh { rollup: vec![context("SUCCESS"), lint.clone()], ..gh(PINNED, &[]) }.replies();
     let mut ports = given(linked_task(), vec![("7", green)]);
-    assert_eq!(call(&mut ports, "merge 7", "").1, vec![merged("7", 3), done("task-1")]);
+    assert_eq!(call(&mut ports, &["merge", "7"], "").1, vec![merged("7", 3), done("task-1")]);
     let red = Gh { rollup: vec![context("ERROR"), lint], ..gh(PINNED, &[]) }.replies();
-    let (reply, events) = call(&mut given(linked_task(), vec![("7", red)]), "merge 7", "");
+    let (reply, events) = call(&mut given(linked_task(), vec![("7", red)]), &["merge", "7"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("red check gates") && !reply.text.contains("lint"), "{}", reply.text);
 }
@@ -459,11 +465,16 @@ fn merge_reads_required_checks_from_recorded_gh_json_and_ignores_unrequired_ones
 fn merge_reports_a_failed_protection_lookup_or_unreadable_gh_json_as_a_port_failure() {
     let failed = Gh { required: Err("gh api: HTTP 404"), ..gh(PINNED, &[Outcome::Green]) }.replies();
     let garbled = GhReplies { view: "{".to_owned(), ..pull(PINNED, &[Outcome::Green]) };
-    [(failed, "HTTP 404"), (garbled, "gh pr view")].into_iter().for_each(|(replies, why)| {
+    [
+        (failed, "error: gh api: HTTP 404\n"),
+        (garbled, "error: gh pr view: EOF while parsing an object at line 1 column 1\n"),
+    ]
+    .into_iter()
+    .for_each(|(replies, why)| {
         let mut ports = given(linked_task(), vec![("7", replies)]);
-        let (reply, events) = call(&mut ports, "merge 7", "");
+        let (reply, events) = call(&mut ports, &["merge", "7"], "");
         assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
-        assert!(reply.text.contains("error:") && reply.text.contains(why), "{}", reply.text);
+        assert_eq!(reply.text, why);
         assert!(ports.github.merged.is_empty());
     });
 }
@@ -472,7 +483,7 @@ fn merge_reports_a_failed_protection_lookup_or_unreadable_gh_json_as_a_port_fail
 fn merge_records_a_pr_already_merged_at_the_pinned_head_without_merging_again() {
     let landed = Gh { state: "MERGED", ..gh(PINNED, &[Outcome::Green]) }.replies();
     let mut ports = given(linked_task(), vec![("7", landed)]);
-    let (reply, events) = call(&mut ports, "merge 7", "");
+    let (reply, events) = call(&mut ports, &["merge", "7"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![merged_outside("7", 3), done("task-1")]));
     assert!(ports.github.merged.is_empty());
 }
@@ -484,7 +495,7 @@ fn link_waits_while_github_still_reports_the_previous_head_then_pins_the_pushed_
     let lagging = VecDeque::from([pull(PINNED, &[]), pull(PINNED, &[]), pull(MOVED, &[])]);
     ports.github.earlier.borrow_mut().insert(id("7"), lagging);
     let start = ports.clock.now();
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert_eq!(events, vec![Event::Linked { task: id("task-1"), pr: id("7"), pin: id(MOVED) }]);
     assert!(ports.github.earlier.borrow()[&id::<PrNumber>("7")].is_empty());
@@ -496,7 +507,7 @@ fn link_refuses_naming_both_commits_when_github_never_reports_the_pushed_head_be
     let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
     ports.git.branches.insert(id("task-1"), id(MOVED));
     let start = ports.clock.now();
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     for why in [PINNED, MOVED, "push has not landed", "git push origin task-1"] {
         assert!(reply.text.contains(why), "{}", reply.text);
@@ -511,7 +522,7 @@ fn link_retries_a_transient_github_error_until_it_reports_the_pushed_head() {
     let flaky = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
     ports.github.earlier.borrow_mut().insert(id("7"), VecDeque::from([pull(PINNED, &[]), flaky.clone(), flaky]));
     let start = ports.clock.now();
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert_eq!(events, vec![Event::Linked { task: id("task-1"), pr: id("7"), pin: id(MOVED) }]);
     assert!(ports.clock.now() > start && ports.clock.now() < start.advanced(60));
@@ -522,9 +533,9 @@ fn link_fails_with_the_github_error_when_it_lasts_until_the_deadline() {
     let down = GhReplies { required: Err(PortError::new("gh api: HTTP 502")), ..pull(PINNED, &[]) };
     let mut ports = given(claimed_task(), vec![("7", down)]);
     let start = ports.clock.now();
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
-    assert!(reply.text.contains("error:") && reply.text.contains("HTTP 502"), "{}", reply.text);
+    assert_eq!(reply.text, "error: gh api: HTTP 502\n");
     assert_eq!(ports.clock.now(), start.advanced(60));
 }
 
@@ -533,7 +544,7 @@ fn link_refuses_with_the_next_step_when_there_is_no_local_branch_for_the_task() 
     let mut ports = given(claimed_task(), vec![("7", pull(PINNED, &[]))]);
     ports.git.branches.clear();
     let start = ports.clock.now();
-    let (reply, events) = call(&mut ports, "link task-1 7", "");
+    let (reply, events) = call(&mut ports, &["link", "task-1", "7"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("no local branch task-1"), "{}", reply.text);
     assert!(reply.text.contains("git push origin task-1"), "{}", reply.text);
@@ -550,7 +561,7 @@ fn link_refuses_another_branch_another_base_a_pr_linked_elsewhere_or_an_unclaime
         (vec![opened("task-1")], gh(PINNED, &[]), "only a claimed task can be linked"),
     ];
     cases.into_iter().for_each(|(events, replies, why)| {
-        let (reply, added) = call(&mut given(events, vec![("7", replies.replies())]), "link task-1 7", "");
+        let (reply, added) = call(&mut given(events, vec![("7", replies.replies())]), &["link", "task-1", "7"], "");
         assert_eq!((reply.code, added), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
@@ -582,25 +593,25 @@ fn parallel_agent_starts_through_the_jsonl_log_spend_one_lease_once() {
 #[test]
 fn unknown_or_malformed_commands_answer_with_usage() {
     [
-        "",
-        "frobnicate",
-        "claim task-1",
-        "claim one --agent alice",
-        "merge seven",
-        "open",
-        "hook stop",
-        "escape gap",
-        "escape gap --pr seven merged",
-        "resolve escape-1",
-        "resolve escape-1 --historical",
-        "resolve escape-1 --historical --correcting",
-        "verdict task-1 maybe",
-        "retire task-1",
-        "claim task-1 --self bob",
+        &[][..],
+        &["frobnicate"][..],
+        &["claim", "task-1"][..],
+        &["claim", "one", "--agent", "alice"][..],
+        &["merge", "seven"][..],
+        &["open"][..],
+        &["hook", "stop"][..],
+        &["escape", "gap"][..],
+        &["escape", "gap", "--pr", "seven", "merged"][..],
+        &["resolve", "escape-1"][..],
+        &["resolve", "escape-1", "--historical"][..],
+        &["resolve", "escape-1", "--historical", "--correcting"][..],
+        &["verdict", "task-1", "maybe"][..],
+        &["retire", "task-1"][..],
+        &["claim", "task-1", "--self", "bob"][..],
     ]
     .into_iter()
     .for_each(|args| {
-        let refused = Call::parse(&words(args), String::new).unwrap_err();
+        let refused = Call::parse(&command(args), String::new).unwrap_err();
         assert_eq!(refused.code, Code::Failed);
         assert!(refused.text.contains("usage:"), "{}", refused.text);
     });
@@ -617,27 +628,27 @@ fn hook_allows_bash_without_touching_the_log_even_when_the_log_is_corrupt_or_can
     };
     ["gh pr merge 7", "git push origin main", "claude -p hi", "meta status"].into_iter().for_each(|command| {
         let allowed = Answer { text: ALLOW.to_owned(), code: Code::Done };
-        assert_eq!(call(&mut corrupt(), "hook pre-tool-use", &bash(command)), (allowed.clone(), Vec::new()));
-        assert_eq!(call(&mut unopenable(), "hook pre-tool-use", &bash(command)).0, allowed, "{command}");
+        assert_eq!(call(&mut corrupt(), &["hook", "pre-tool-use"], &bash(command)), (allowed.clone(), Vec::new()));
+        assert_eq!(call(&mut unopenable(), &["hook", "pre-tool-use"], &bash(command)).0, allowed, "{command}");
     });
 }
 
 #[test]
 fn a_corrupt_or_unopenable_log_still_records_escapes_but_denies_agent_starts() {
     let corrupt = || vec![claimed("task-1")];
-    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "escape gap log is corrupt", "");
+    let (reply, events) = call(&mut given(corrupt(), Vec::new()), &["escape", "gap", "log", "is", "corrupt"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped("gap", "log is corrupt")]));
     let repair = "Next: meta escape <kind> <reason>, then repair memory log";
     let (reply, events) = hook(corrupt(), &agent("lease-1"));
     assert_eq!(events, Vec::new());
     assert!(reply.text.contains(DENY) && reply.text.contains("fail closed"), "{}", reply.text);
     assert!(reply.text.contains(repair), "{}", reply.text);
-    let (reply, events) = call(&mut given(corrupt(), Vec::new()), "status", "");
+    let (reply, events) = call(&mut given(corrupt(), Vec::new()), &["status"], "");
     assert_eq!((reply.code, events), (Code::Failed, Vec::new()));
     assert!(reply.text.contains("memory log record 1") && reply.text.contains(repair), "{}", reply.text);
     let mut unopenable = given(claimed_task(), Vec::new());
     unopenable.log.broken = Some(PortError::new("cannot open the log"));
-    let (reply, _) = call(&mut unopenable, "hook pre-tool-use", &agent("lease-1"));
+    let (reply, _) = call(&mut unopenable, &["hook", "pre-tool-use"], &agent("lease-1"));
     assert!(reply.text.contains(DENY) && reply.text.contains("cannot open the log"), "{}", reply.text);
 }
 
@@ -651,7 +662,7 @@ fn status_counts_a_pr_merged_through_meta_and_logged_as_through_meta_only() {
     let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
     let mut ports = given(history, Vec::new());
     ports.github.listed = Some(Ok(listed(&[7])));
-    let (reply, events) = call(&mut ports, "status", "");
+    let (reply, events) = call(&mut ports, &["status"], "");
     assert_eq!(events, Vec::new());
     let expected = ["P1 merges through meta: 1 of 1", "P1 merged outside meta: 0 (0 missing from the log)"];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -662,7 +673,7 @@ fn status_counts_a_pr_merged_on_github_but_missing_from_the_log_as_merged_outsid
     let history = [linked_task(), vec![merged("7", 1), done("task-1")]].concat();
     let mut ports = given(history, Vec::new());
     ports.github.listed = Some(Ok(listed(&[7, 12, 13])));
-    let (reply, events) = call(&mut ports, "status", "");
+    let (reply, events) = call(&mut ports, &["status"], "");
     let latched = vec![falsified("P1", Measure::UnrecordedBypasses, "unrecorded bypasses 2")];
     assert_eq!((reply.code, events), (Code::Done, latched));
     let expected = ["P1 merges through meta: 1 of 3", "P1 merged outside meta: 2 (2 missing from the log)"];
@@ -675,7 +686,7 @@ fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_cannot_
     failures.into_iter().for_each(|listed| {
         let mut ports = given(claimed_task(), Vec::new());
         ports.github.listed = listed;
-        let (reply, events) = call(&mut ports, "status", "");
+        let (reply, events) = call(&mut ports, &["status"], "");
         assert_eq!((reply.code, events), (Code::Done, Vec::new()));
         assert!(reply.text.contains("P1 merges: unavailable, GitHub merged list unreadable"), "{}", reply.text);
         assert!(reply.text.contains("open tasks") && reply.text.contains("P2 open escapes"), "{}", reply.text);
@@ -687,12 +698,12 @@ fn status_reports_the_reconciliation_as_unavailable_when_the_merged_list_may_be_
     let full = |count: u64| listed(&(1..=count).collect::<Vec<_>>());
     let mut ports = given(claimed_task(), Vec::new());
     ports.github.listed = Some(Ok(full(1001)));
-    let (reply, events) = call(&mut ports, "status", "");
+    let (reply, events) = call(&mut ports, &["status"], "");
     assert_eq!((reply.code, events), (Code::Done, Vec::new()));
     assert!(reply.text.contains("P1 merges: unavailable") && reply.text.contains("truncated"), "{}", reply.text);
     let mut ports = given(claimed_task(), Vec::new());
     ports.github.listed = Some(Ok(full(1000)));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(reply.text.contains("P1 merged outside meta: 1000"), "{}", reply.text);
 }
 
@@ -758,7 +769,7 @@ fn agent_ran(tool: &str, description: &str, agent: &str) -> String {
 }
 
 fn after(events: Vec<Event>, input: &str) -> (Answer, Vec<Event>) {
-    call(&mut given(events, Vec::new()), "hook post-tool-use", input)
+    call(&mut given(events, Vec::new()), &["hook", "post-tool-use"], input)
 }
 
 fn bound() -> Vec<Event> {
@@ -766,7 +777,7 @@ fn bound() -> Vec<Event> {
 }
 
 fn status_of(events: Vec<Event>) -> String {
-    let (reply, added) = call(&mut given(events, Vec::new()), "status", "");
+    let (reply, added) = call(&mut given(events, Vec::new()), &["status"], "");
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(added.iter().all(|event| matches!(event, Event::Falsified { .. })), "{added:?}");
     reply.text
@@ -780,7 +791,7 @@ fn escape_of_a_listed_kind_records_escaped_and_prints_its_id_the_open_count_and_
         vec![resolved("escape-1", "task-1")],
     ]
     .concat();
-    let (reply, events) = call(&mut given(history, Vec::new()), "escape gap no self-claim", "");
+    let (reply, events) = call(&mut given(history, Vec::new()), &["escape", "gap", "no", "self-claim"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped("gap", "no self-claim")]));
     let expected = ["escape-4 recorded: [gap] no self-claim", "open escapes: 3", "repeats of kind gap: 2"];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -788,21 +799,24 @@ fn escape_of_a_listed_kind_records_escaped_and_prints_its_id_the_open_count_and_
 
 #[test]
 fn escape_of_an_unknown_kind_is_refused_and_lists_the_kinds() {
-    ["hook too strict", "unclassified old text"].into_iter().for_each(|args| {
-        let (reply, events) = call(&mut given(Vec::new(), Vec::new()), &format!("escape {args}"), "");
-        assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
-        let listed = ["is not an escape kind", "- gap: real work needed", "source: fixture: gap", "- outside-merge:"];
-        assert!(listed.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
-    });
+    [&["escape", "hook", "too", "strict"][..], &["escape", "unclassified", "old", "text"]].into_iter().for_each(
+        |args| {
+            let (reply, events) = call(&mut given(Vec::new(), Vec::new()), args, "");
+            assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
+            let listed =
+                ["is not an escape kind", "- gap: real work needed", "source: fixture: gap", "- outside-merge:"];
+            assert!(listed.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
+        },
+    );
 }
 
 #[test]
 fn resolve_against_a_done_task_records_resolved_and_the_escape_no_longer_counts_as_open() {
     let history = [finished_task(), vec![escaped("gap", "no retire"), escaped("gap", "no review")]].concat();
     let mut ports = given(history, Vec::new());
-    let (reply, events) = call(&mut ports, "resolve escape-1 task-1", "");
+    let (reply, events) = call(&mut ports, &["resolve", "escape-1", "task-1"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![resolved("escape-1", "task-1")]));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
     assert!(reply.text.contains("P2 open escapes: 1 (0 closed as historical);"), "{}", reply.text);
     assert!(!reply.text.contains("escape-1"), "{}", reply.text);
@@ -812,18 +826,18 @@ fn resolve_against_a_done_task_records_resolved_and_the_escape_no_longer_counts_
 fn resolve_is_refused_with_the_reason_when_the_task_is_not_done_or_the_escape_is_resolved_or_unknown() {
     let escapes = || vec![escaped("gap", "no retire")];
     let cases = [
-        ([claimed_task(), escapes()].concat(), "escape-1 task-1", "only against a done task"),
+        ([claimed_task(), escapes()].concat(), ["escape-1", "task-1"], "only against a done task"),
         (
             [finished_task(), escapes(), vec![resolved("escape-1", "task-1")]].concat(),
-            "escape-1 task-1",
+            ["escape-1", "task-1"],
             "already resolved",
         ),
-        ([finished_task(), escapes()].concat(), "escape-2 task-1", "escape-2 is unknown"),
-        ([finished_task(), escapes()].concat(), "escape-0 task-1", "escape-0 is unknown"),
-        ([finished_task(), escapes()].concat(), "escape-1 task-9", "task-9 is unknown"),
+        ([finished_task(), escapes()].concat(), ["escape-2", "task-1"], "escape-2 is unknown"),
+        ([finished_task(), escapes()].concat(), ["escape-0", "task-1"], "escape-0 is unknown"),
+        ([finished_task(), escapes()].concat(), ["escape-1", "task-9"], "task-9 is unknown"),
     ];
     cases.into_iter().for_each(|(history, args, why)| {
-        let (reply, events) = call(&mut given(history, Vec::new()), &format!("resolve {args}"), "");
+        let (reply, events) = call(&mut given(history, Vec::new()), &["resolve", args[0], args[1]], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
@@ -837,7 +851,7 @@ fn escapes_logged_before_kinds_fold_as_unclassified_beside_old_denied_and_lease_
     assert_eq!(records[2].event, unclassified("bootstrap: agent started without a lease (meta does not exist yet)"));
     let mut ports = given(Vec::new(), Vec::new());
     ports.log.records = records;
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     let expected = [
         "escape-1 [unclassified] bootstrap: agent started",
         "escape-2 [unclassified] no retire command",
@@ -845,13 +859,13 @@ fn escapes_logged_before_kinds_fold_as_unclassified_beside_old_denied_and_lease_
         "P2 open escapes: 2 (0 closed as historical); most repeats of one kind: 0",
     ];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    let (reply, events) = call(&mut ports, "resolve escape-1 task-1", "");
+    let (reply, events) = call(&mut ports, &["resolve", "escape-1", "task-1"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![resolved("escape-1", "task-1")]));
 }
 
 #[test]
 fn claim_self_of_an_open_task_records_claimed_by_the_lead_with_no_lease_and_prints_the_brief() {
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --self", "");
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--self"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![self_claimed("task-1")]));
     let brief = ["task-1: Fix the hook", "lease: none", "setup:", "rules:", "fixture: identity"];
     assert!(brief.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
@@ -869,7 +883,7 @@ fn claim_self_of_an_open_task_records_claimed_by_the_lead_with_no_lease_and_prin
 
 #[test]
 fn claim_self_of_a_task_claimed_by_an_agent_is_refused() {
-    let (reply, events) = call(&mut given(claimed_task(), Vec::new()), "claim task-1 --self", "");
+    let (reply, events) = call(&mut given(claimed_task(), Vec::new()), &["claim", "task-1", "--self"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("already claimed by alice"), "{}", reply.text);
 }
@@ -881,15 +895,15 @@ fn retire_of_an_open_or_claimed_task_not_linked_to_an_open_pr_records_retired_an
     cases.into_iter().for_each(|(history, pull)| {
         let pulls = pull.into_iter().map(|replies| ("7", replies)).collect();
         let mut ports = given(history, pulls);
-        let (reply, events) = call(&mut ports, "retire task-1 moot after #5", "");
+        let (reply, events) = call(&mut ports, &["retire", "task-1", "moot", "after", "#5"], "");
         let retired = Event::Retired { task: id("task-1"), reason: id("moot after #5") };
         assert_eq!((reply.code, events), (Code::Done, vec![retired]), "{}", reply.text);
-        let (status, _) = call(&mut ports, "status", "");
+        let (status, _) = call(&mut ports, &["status"], "");
         assert!(status.text.contains("open tasks\n  (none)\n"), "{}", status.text);
         assert!(status.text.contains("live leases\n  (none)\n"), "{}", status.text);
     });
     let open = given(linked_task(), vec![("7", pull(PINNED, &[]))]);
-    let (reply, events) = call(&mut { open }, "retire task-1 moot", "");
+    let (reply, events) = call(&mut { open }, &["retire", "task-1", "moot"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("#7 is linked and open"), "{}", reply.text);
 }
@@ -897,16 +911,16 @@ fn retire_of_an_open_or_claimed_task_not_linked_to_an_open_pr_records_retired_an
 #[test]
 fn defer_of_an_open_task_records_deferred_and_lists_it_under_deferred() {
     let mut ports = given(vec![opened("task-1")], Vec::new());
-    let (reply, events) = call(&mut ports, "defer task-1 after stage 2", "");
+    let (reply, events) = call(&mut ports, &["defer", "task-1", "after", "stage", "2"], "");
     let deferred = Event::Deferred { task: id("task-1"), reason: id("after stage 2") };
     assert_eq!((reply.code, events), (Code::Done, vec![deferred]));
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     assert!(
         status.text.contains("open tasks\n  (none)\ndeferred\n  task-1 deferred (after stage 2)"),
         "{}",
         status.text
     );
-    let (reply, events) = call(&mut given(claimed_task(), Vec::new()), "defer task-1 later", "");
+    let (reply, events) = call(&mut given(claimed_task(), Vec::new()), &["defer", "task-1", "later"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
 }
 
@@ -914,11 +928,11 @@ fn defer_of_an_open_task_records_deferred_and_lists_it_under_deferred() {
 fn undefer_of_a_deferred_task_records_undeferred_and_opens_it_again() {
     let history = vec![opened("task-1"), Event::Deferred { task: id("task-1"), reason: id("later") }];
     let mut ports = given(history, Vec::new());
-    let (reply, events) = call(&mut ports, "undefer task-1", "");
+    let (reply, events) = call(&mut ports, &["undefer", "task-1"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![Event::Undeferred { task: id("task-1") }]));
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     assert!(status.text.contains("open tasks\n  task-1 open") && status.text.contains("deferred\n  (none)"));
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "undefer task-1", "");
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), &["undefer", "task-1"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
 }
 
@@ -926,19 +940,20 @@ fn undefer_of_a_deferred_task_records_undeferred_and_opens_it_again() {
 fn review_of_a_task_linked_to_an_open_pr_leases_and_prints_an_unprimed_brief_with_the_review_rule() {
     let history = [linked_task(), vec![used("lease-1")]].concat();
     let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
-    let (reply, events) = call(&mut ports, "review task-1 --agent rev", "");
+    let (reply, events) = call(&mut ports, &["review", "task-1", "--agent", "rev"], "");
     let expected = vec![review_leased_until("lease-2", MOVED, FIXTURE_REVIEW_DEADLINE)];
     assert_eq!((reply.code, events), (Code::Done, expected), "{}", reply.text);
     let brief = ["review: #7 for task-1", "agent: rev", "lease: lease-2", "goal:", "constraints:", "review-gates"];
     assert!(brief.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     assert!(status.text.contains("lease-2 for task-1"), "{}", status.text);
     let refusals = [
         (claimed_task(), pull(PINNED, &[]), "only a task linked to an open PR"),
         (linked_task(), Gh { state: "CLOSED", ..gh(PINNED, &[]) }.replies(), "#7 is not open"),
     ];
     refusals.into_iter().for_each(|(history, replies, why)| {
-        let (reply, events) = call(&mut given(history, vec![("7", replies)]), "review task-1 --agent rev", "");
+        let (reply, events) =
+            call(&mut given(history, vec![("7", replies)]), &["review", "task-1", "--agent", "rev"], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
@@ -947,15 +962,15 @@ fn review_of_a_task_linked_to_an_open_pr_leases_and_prints_an_unprimed_brief_wit
 #[test]
 fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_latest_verdict_per_linked_pr() {
     let reviewed = |verdict: &str| Event::Reviewed { lease: id("lease-2"), verdict: id(verdict) };
-    let (reply, events) = call(&mut given(linked_task(), Vec::new()), "verdict task-1 pass", "");
+    let (reply, events) = call(&mut given(linked_task(), Vec::new()), &["verdict", "task-1", "pass"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     let unused = [linked_task(), vec![review_leased("lease-2", PINNED)]].concat();
-    let (reply, _) = call(&mut given(unused.clone(), Vec::new()), "verdict task-1 pass", "");
+    let (reply, _) = call(&mut given(unused.clone(), Vec::new()), &["verdict", "task-1", "pass"], "");
     assert!(reply.code == Code::Refused && reply.text.contains("awaits a verdict"), "{}", reply.text);
     let mut ports = given([unused, vec![used("lease-2")]].concat(), Vec::new());
-    let (reply, events) = call(&mut ports, "verdict task-1 fail", "");
+    let (reply, events) = call(&mut ports, &["verdict", "task-1", "fail"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![reviewed("fail")]));
-    let (reply, _) = call(&mut ports, "verdict task-1 pass", "");
+    let (reply, _) = call(&mut ports, &["verdict", "task-1", "pass"], "");
     assert_eq!(reply.code, Code::Refused);
     let later = vec![
         review_leased("lease-3", MOVED),
@@ -963,7 +978,7 @@ fn verdict_after_a_used_review_lease_records_reviewed_and_status_shows_the_lates
         Event::Reviewed { lease: id("lease-3"), verdict: id("pass") },
     ];
     ports.log.records.extend(later.into_iter().map(|event| Record { at: Timestamp::from_unix_seconds(3), event }));
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     let line = format!("latest review verdict per linked PR\n  #7 task-1: pass at {MOVED}\n");
     assert!(status.text.contains(&line), "{}", status.text);
 }
@@ -1029,7 +1044,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
     let rough = [finished_task(), gaps.collect(), opened_and_merged.collect()].concat();
     let mut ports = given(rough, Vec::new());
     ports.github.listed = Some(Ok(listed(&[1, 7, 8, 9])));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     let falsified = [
         "P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;",
         "P2 Gaps get fixed, not bypassed: FALSIFIED; observed open escapes 4, most repeats of one escape kind 3;",
@@ -1040,7 +1055,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
         at: Timestamp::from_unix_seconds(3),
         event: escaped_pr("outside-merge", "1", "merged by hand"),
     });
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
         reply.text.contains(
             "P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"
@@ -1049,7 +1064,7 @@ fn status_shows_each_prediction_with_its_observed_value_its_registered_expectati
         reply.text
     );
     ports.github.listed = Some(Err(PortError::new("gh is down")));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(
         reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable"),
         "{}",
@@ -1067,7 +1082,7 @@ fn status_falsifies_p1_for_each_pr_merged_outside_meta_that_no_outside_merge_esc
     let p1 = |escapes: Vec<Event>| {
         let mut ports = given([history.clone(), escapes].concat(), Vec::new());
         ports.github.listed = Some(Ok(listed(&[7, 8, 12])));
-        call(&mut ports, "status", "").0.text
+        call(&mut ports, &["status"], "").0.text
     };
     let cases = [
         (Vec::new(), "FALSIFIED; observed unrecorded bypasses 2;"),
@@ -1091,12 +1106,12 @@ fn status_falsifies_p1_for_each_pr_merged_outside_meta_that_no_outside_merge_esc
 #[test]
 fn escape_of_a_kind_that_names_a_merged_pr_records_the_pr_and_any_other_kind_refuses_one() {
     let mut ports = given(Vec::new(), Vec::new());
-    let (reply, events) = call(&mut ports, "escape outside-merge --pr 12 merged by hand", "");
+    let (reply, events) = call(&mut ports, &["escape", "outside-merge", "--pr", "12", "merged", "by", "hand"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped_pr("outside-merge", "12", "merged by hand")]));
     assert!(reply.text.contains("escape-1 recorded: [outside-merge] #12 merged by hand"), "{}", reply.text);
     let refusals = [
-        ("escape outside-merge merged by hand", "outside-merge names the PR merged outside meta"),
-        ("escape gap --pr 12 no retire", "gap names no PR"),
+        (&["escape", "outside-merge", "merged", "by", "hand"][..], "outside-merge names the PR merged outside meta"),
+        (&["escape", "gap", "--pr", "12", "no", "retire"], "gap names no PR"),
     ];
     refusals.into_iter().for_each(|(args, why)| {
         let (reply, events) = call(&mut given(Vec::new(), Vec::new()), args, "");
@@ -1134,7 +1149,7 @@ fn post_hook_records_the_agent_id_started_on_a_used_lease() {
 fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_can_be_read() {
     let mut ports = given(Vec::new(), Vec::new());
     ports.git.files.clear();
-    let (reply, events) = call(&mut ports, "escape gap no retire", "");
+    let (reply, events) = call(&mut ports, &["escape", "gap", "no", "retire"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![escaped("gap", "no retire")]), "{}", reply.text);
     ports.git.local.clear();
     let unchecked = |kind: &str, reason: &str| Event::Escaped {
@@ -1143,15 +1158,15 @@ fn escape_reads_its_kinds_without_git_and_records_an_unchecked_kind_when_none_ca
         pr: None,
         checked: Checked::Unchecked,
     };
-    let (reply, events) = call(&mut ports, "escape gap no review", "");
+    let (reply, events) = call(&mut ports, &["escape", "gap", "no", "review"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![unchecked("gap", "no review")]));
     let why = ["escape-2 recorded: [gap] no review", "kind unchecked: no local self/escapes.toml"];
     assert!(why.iter().all(|part| reply.text.contains(part)), "{}", reply.text);
-    let (reply, events) = call(&mut ports, "escape gpa typo kept as given", "");
+    let (reply, events) = call(&mut ports, &["escape", "gpa", "typo", "kept", "as", "given"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![unchecked("gpa", "typo kept as given")]));
-    let (reply, events) = call(&mut ports, "escape unclassified old text", "");
+    let (reply, events) = call(&mut ports, &["escape", "unclassified", "old", "text"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()), "{}", reply.text);
-    let status = call(&mut ports, "status", "").0.text;
+    let status = call(&mut ports, &["status"], "").0.text;
     assert!(status.contains("escape-2 [gap, unchecked] no review"), "{status}");
 }
 
@@ -1162,7 +1177,7 @@ fn escape_is_recorded_even_when_the_jsonl_log_does_not_parse() {
     std::fs::write(&path, "not a record\n").unwrap();
     let Ports { git, github, clock, .. } = given(Vec::new(), Vec::new());
     let mut ports = Ports { log: JsonlLog::at(path.clone()), git, github, clock };
-    let reply = answer(parsed("escape gap log is garbled"), &mut ports);
+    let reply = answer(parsed(&["escape", "gap", "log", "is", "garbled"]), &mut ports);
     let text = std::fs::read_to_string(&path).unwrap();
     assert_eq!(reply.code, Code::Done, "{}", reply.text);
     assert!(reply.text.contains("id and counts unavailable"), "{}", reply.text);
@@ -1194,7 +1209,7 @@ impl Log for Lagging {
 fn escape_prints_the_id_it_gets_inside_the_locked_append() {
     let Ports { log, git, github, clock } = given(vec![escaped("gap", "one"), escaped("gap", "two")], Vec::new());
     let mut ports = Ports { log: Lagging(log), git, github, clock };
-    let reply = answer(parsed("escape gap three"), &mut ports);
+    let reply = answer(parsed(&["escape", "gap", "three"]), &mut ports);
     let expected = ["escape-3 recorded: [gap] three", "open escapes: 3", "repeats of kind gap: 2"];
     assert!(expected.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
 }
@@ -1219,7 +1234,7 @@ fn status_shows_a_prediction_without_a_falsifier_as_undecided() {
     let unfalsifiable = "[[prediction]]\nid = \"P9\"\nhypothesis = \"Untestable\"\nmeasure = \"m\"\n\
                          expected = \"e\"\nfalsified_by = \"f\"\n";
     ports.git.files.insert(SelfFile::Predictions, unfalsifiable.to_owned());
-    let status = call(&mut ports, "status", "").0.text;
+    let status = call(&mut ports, &["status"], "").0.text;
     assert!(status.contains("P9 Untestable: UNDECIDED; no falsifier registered;"), "{status}");
 }
 
@@ -1228,7 +1243,7 @@ fn claim_by_an_agent_of_a_self_claimed_task_is_refused() {
     let self_claimed_task = || vec![opened("task-1"), self_claimed("task-1")];
     let histories = [self_claimed_task(), [self_claimed_task(), vec![linked("task-1", "7")]].concat()];
     histories.into_iter().for_each(|history| {
-        let (reply, events) = call(&mut given(history, Vec::new()), "claim task-1 --agent bob", "");
+        let (reply, events) = call(&mut given(history, Vec::new()), &["claim", "task-1", "--agent", "bob"], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains("self-claimed"), "{}", reply.text);
     });
@@ -1237,7 +1252,7 @@ fn claim_by_an_agent_of_a_self_claimed_task_is_refused() {
 #[test]
 fn retire_of_a_deferred_task_is_refused() {
     let history = vec![opened("task-1"), Event::Deferred { task: id("task-1"), reason: id("later") }];
-    let (reply, events) = call(&mut given(history, Vec::new()), "retire task-1 moot", "");
+    let (reply, events) = call(&mut given(history, Vec::new()), &["retire", "task-1", "moot"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("only an open or claimed task can be retired"), "{}", reply.text);
 }
@@ -1254,15 +1269,15 @@ fn unclassified(count: usize) -> Vec<Event> {
 fn status_latches_each_falsification_once_and_shows_it_after_the_reading_recovers() {
     let gaps = |count: usize| (0..count).map(|number| escaped("gap", &format!("gap {number}"))).collect::<Vec<_>>();
     let mut ports = given(gaps(3), Vec::new());
-    let (reply, added) = call(&mut ports, "status", "");
+    let (reply, added) = call(&mut ports, &["status"], "");
     let repeats = "most repeats of one escape kind 2";
     assert_eq!((reply.code, added), (Code::Done, vec![falsified("P2", Measure::RepeatsOfOneKind, repeats)]));
     assert!(reply.text.contains(&format!("falsified at unix 2 ({repeats})")), "{}", reply.text);
-    let (reply, added) = call(&mut ports, "status", "");
+    let (reply, added) = call(&mut ports, &["status"], "");
     assert_eq!(added, Vec::new(), "{}", reply.text);
     assert!(reply.text.contains(&format!("falsified at unix 2 ({repeats})")), "{}", reply.text);
     ports.log.records.extend(gaps(3).into_iter().map(|event| Record { at: Timestamp::from_unix_seconds(3), event }));
-    let (_, added) = call(&mut ports, "status", "");
+    let (_, added) = call(&mut ports, &["status"], "");
     assert_eq!(added, vec![falsified("P2", Measure::OpenEscapes, "open escapes 6")]);
 }
 
@@ -1270,11 +1285,11 @@ fn status_latches_each_falsification_once_and_shows_it_after_the_reading_recover
 fn status_keeps_a_latched_falsification_when_resolving_escapes_makes_the_prediction_hold_again() {
     let at = |seconds: u64, event: Event| Record { at: Timestamp::from_unix_seconds(seconds), event };
     let mut ports = given([finished_task(), unclassified(6)].concat(), Vec::new());
-    let (reply, added) = call(&mut ports, "status", "");
+    let (reply, added) = call(&mut ports, &["status"], "");
     let open = "open escapes 6";
     assert_eq!(added, vec![falsified("P2", Measure::OpenEscapes, open)], "{}", reply.text);
     ports.log.records.extend([1, 2, 3].map(|number| at(3, resolved(&format!("escape-{number}"), "task-1"))));
-    let (reply, added) = call(&mut ports, "status", "");
+    let (reply, added) = call(&mut ports, &["status"], "");
     assert_eq!(added, Vec::new(), "{}", reply.text);
     let holds = "P2 Gaps get fixed, not bypassed: holds; observed open escapes 3, most repeats of one escape kind 0;";
     assert!(reply.text.contains(holds), "{}", reply.text);
@@ -1313,13 +1328,13 @@ const ONE_OFF: &str = "bootstrap, meta did not exist yet";
 #[test]
 fn resolve_historical_closes_an_open_escape_with_no_task_and_it_no_longer_counts_as_open() {
     let mut ports = given(vec![escaped("gap", "no retire"), escaped("gap", "no review")], Vec::new());
-    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF}"), "");
+    let (reply, events) = call(&mut ports, &["resolve", "escape-1", "--historical", ONE_OFF], "");
     assert_eq!((reply.code, events), (Code::Done, vec![historical("escape-1", ONE_OFF)]));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(reply.text.contains("open escapes: 1\n  escape-2 [gap] no review\n"), "{}", reply.text);
     assert!(reply.text.contains("P2 open escapes: 1 (1 closed as historical);"), "{}", reply.text);
     assert!(!reply.text.contains("escape-1"), "{}", reply.text);
-    let (reply, _) = call(&mut ports, "escape gap again", "");
+    let (reply, _) = call(&mut ports, &["escape", "gap", "again"], "");
     assert!(reply.text.contains("open escapes: 2"), "{}", reply.text);
 }
 
@@ -1349,8 +1364,7 @@ fn resolve_historical_is_refused_on_a_resolved_or_historical_or_unknown_escape_w
     ];
     cases.into_iter().for_each(|(history, why)| {
         let args = if why.contains("unknown") { "escape-2" } else { "escape-1" };
-        let (reply, events) =
-            call(&mut given(history, Vec::new()), &format!("resolve {args} --historical {ONE_OFF}"), "");
+        let (reply, events) = call(&mut given(history, Vec::new()), &["resolve", args, "--historical", ONE_OFF], "");
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
@@ -1360,14 +1374,14 @@ fn resolve_historical_is_refused_on_a_resolved_or_historical_or_unknown_escape_w
 fn resolve_historical_correcting_moves_a_task_resolution_to_historical_and_status_shows_both() {
     let history = [finished_task(), vec![escaped("gap", "no retire"), resolved("escape-1", "task-1")]].concat();
     let mut ports = given(history, Vec::new());
-    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+    let (reply, events) = call(&mut ports, &["resolve", "escape-1", "--historical", ONE_OFF, "--correcting"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![corrected("escape-1", ONE_OFF)]));
     assert!(ports.log.records.iter().any(|record| record.event == resolved("escape-1", "task-1")));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     let shown = format!("escape-1 resolved against task-1, corrected to historical: {ONE_OFF}");
     assert!(reply.text.contains(&shown) && reply.text.contains("open escapes: 0"), "{}", reply.text);
     assert!(reply.text.contains("P2 open escapes: 0 (1 closed as historical);"), "{}", reply.text);
-    let (reply, events) = call(&mut ports, &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+    let (reply, events) = call(&mut ports, &["resolve", "escape-1", "--historical", ONE_OFF, "--correcting"], "");
     assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
     assert!(reply.text.contains("corrected to historical"), "{}", reply.text);
 }
@@ -1382,8 +1396,11 @@ fn resolve_historical_correcting_is_refused_on_an_open_or_historical_escape() {
         ),
     ];
     cases.into_iter().for_each(|(history, why)| {
-        let (reply, events) =
-            call(&mut given(history, Vec::new()), &format!("resolve escape-1 --historical {ONE_OFF} --correcting"), "");
+        let (reply, events) = call(
+            &mut given(history, Vec::new()),
+            &["resolve", "escape-1", "--historical", ONE_OFF, "--correcting"],
+            "",
+        );
         assert_eq!((reply.code, events), (Code::Refused, Vec::new()));
         assert!(reply.text.contains(why), "{}", reply.text);
     });
@@ -1403,7 +1420,7 @@ fn p1_still_counts_an_outside_merge_escape_that_names_a_pr_when_it_is_resolved_h
         let history = [finished_task(), outside.clone(), named(), closing].concat();
         let mut ports = given(history, Vec::new());
         ports.github.listed = Some(Ok(listed(&[7, 8])));
-        let (reply, _) = call(&mut ports, "status", "");
+        let (reply, _) = call(&mut ports, &["status"], "");
         assert!(reply.text.contains("P1 The loop is used: UNDECIDED; observed unrecorded bypasses unavailable (agent starts without a lease are not observable"), "{}", reply.text);
     });
 }
@@ -1418,7 +1435,7 @@ fn a_log_that_resolves_historically_twice_or_corrects_a_non_task_resolution_does
         [finished_task(), one(), vec![resolved("escape-1", "task-1"), historical("escape-1", "a")]].concat(),
     ];
     bad.into_iter().for_each(|history| {
-        let (reply, _) = call(&mut given(history, Vec::new()), "status", "");
+        let (reply, _) = call(&mut given(history, Vec::new()), &["status"], "");
         assert_eq!(reply.code, Code::Failed, "{}", reply.text);
     });
 }
@@ -1431,40 +1448,51 @@ const FIXTURE_REVIEW_DEADLINE: u64 = 2 + 15 * 60;
 
 #[test]
 fn claim_and_review_set_the_deadline_from_the_role_default_in_self_roles_and_the_brief_prints_it() {
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice", "");
+    let (reply, events) =
+        call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--agent", "alice"], "");
     assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", FIXTURE_WORK_DEADLINE)]);
     let line = format!("deadline: unix {FIXTURE_WORK_DEADLINE}, report or stop by then\n");
     assert!(reply.text.contains(&line), "{}", reply.text);
     let history = [linked_task(), vec![used("lease-1")]].concat();
-    let (reply, events) = call(&mut given(history, vec![("7", pull(MOVED, &[]))]), "review task-1 --agent rev", "");
+    let (reply, events) =
+        call(&mut given(history, vec![("7", pull(MOVED, &[]))]), &["review", "task-1", "--agent", "rev"], "");
     assert_eq!(events, vec![review_leased_until("lease-2", MOVED, FIXTURE_REVIEW_DEADLINE)]);
     let line = format!("deadline: unix {FIXTURE_REVIEW_DEADLINE}, report or stop by then\n");
     assert!(reply.text.contains(&line), "{}", reply.text);
     let mut unreadable = given(vec![opened("task-1")], Vec::new());
     unreadable.git.files.remove(&SelfFile::Roles);
-    let (reply, events) = call(&mut unreadable, "claim task-1 --agent alice", "");
+    let (reply, events) = call(&mut unreadable, &["claim", "task-1", "--agent", "alice"], "");
     assert_eq!((reply.code, events), (Code::Failed, Vec::new()), "{}", reply.text);
     assert!(reply.text.contains("self/roles.toml"), "{}", reply.text);
 }
 
 #[test]
 fn claim_and_review_take_a_deadline_override_in_minutes_and_self_claims_get_no_deadline() {
-    let (reply, events) =
-        call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --agent alice --deadline 10", "");
+    let (reply, events) = call(
+        &mut given(vec![opened("task-1")], Vec::new()),
+        &["claim", "task-1", "--agent", "alice", "--deadline", "10"],
+        "",
+    );
     assert_eq!(events, vec![claimed("task-1"), leased_until("lease-1", "task-1", 2 + 600)]);
     assert!(reply.text.contains("deadline: unix 602, report or stop by then"), "{}", reply.text);
     let history = [linked_task(), vec![used("lease-1")]].concat();
     let mut ports = given(history, vec![("7", pull(MOVED, &[]))]);
-    let (_, events) = call(&mut ports, "review task-1 --agent rev --deadline 5", "");
+    let (_, events) = call(&mut ports, &["review", "task-1", "--agent", "rev", "--deadline", "5"], "");
     assert_eq!(events, vec![review_leased_until("lease-2", MOVED, 2 + 300)]);
-    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), "claim task-1 --self", "");
+    let (reply, events) = call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--self"], "");
     assert_eq!((reply.code, events), (Code::Done, vec![self_claimed("task-1")]));
     assert!(reply.text.contains("deadline: none"), "{}", reply.text);
-    let malformed = ["claim task-1 --self --deadline 10", "claim task-1 --agent a --deadline 0"];
-    let more = ["claim task-1 --agent a --deadline 1.5", "review task-1 --agent a --deadline x"];
+    let malformed = [
+        &["claim", "task-1", "--self", "--deadline", "10"][..],
+        &["claim", "task-1", "--agent", "a", "--deadline", "0"],
+    ];
+    let more = [
+        &["claim", "task-1", "--agent", "a", "--deadline", "1.5"][..],
+        &["review", "task-1", "--agent", "a", "--deadline", "x"],
+    ];
     malformed.into_iter().chain(more).for_each(|args| {
-        let reply = Call::parse(&words(args), String::new).unwrap_err();
-        assert!(reply.code == Code::Failed && reply.text.contains("usage:"), "{args}: {}", reply.text);
+        let reply = Call::parse(&command(args), String::new).unwrap_err();
+        assert!(reply.code == Code::Failed && reply.text.contains("usage:"), "{args:?}: {}", reply.text);
     });
 }
 
@@ -1475,19 +1503,19 @@ fn the_started_record_carries_the_deadline_counted_from_the_start_time() {
             .concat();
     let mut ports = given(history, Vec::new());
     ports.clock.pause(Span::of_seconds(100));
-    let (reply, events) = call(&mut ports, "hook post-tool-use", &agent_ran("Agent", "lease-1", AGENT_ID));
+    let (reply, events) = call(&mut ports, &["hook", "post-tool-use"], &agent_ran("Agent", "lease-1", AGENT_ID));
     let deadline = Some(Timestamp::from_unix_seconds(102 + 2700));
     let started = Event::Started { lease: id("lease-1"), agent: id(AGENT_ID), deadline };
     assert_eq!((reply.text.as_str(), events), (ALLOW, vec![started]));
     ports.clock.pause(Span::of_seconds(2750 - 102));
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     assert!(
         status.text.contains("overdue leases (flagged)\n  (none)\n"),
         "past the lease's own deadline: {}",
         status.text
     );
     ports.clock.pause(Span::of_seconds(2803 - 2750));
-    let (status, _) = call(&mut ports, "status", "");
+    let (status, _) = call(&mut ports, &["status"], "");
     let flagged = format!("lease-1 for task-1: agent {AGENT_ID}, deadline unix {}\n", 102 + 2700);
     assert!(status.text.contains(&flagged), "{}", status.text);
 }
@@ -1567,7 +1595,7 @@ fn status_falsifies_p1_for_each_outside_start_escape_and_hook_denials_never_coun
     });
     let mut ports = given([finished_task(), vec![start("no lease")]].concat(), Vec::new());
     ports.github.listed = Some(Err(PortError::new("gh is down")));
-    let (reply, _) = call(&mut ports, "status", "");
+    let (reply, _) = call(&mut ports, &["status"], "");
     assert!(reply.text.contains("P1 The loop is used: FALSIFIED; observed unrecorded bypasses 1;"), "{}", reply.text);
     assert!(reply.text.contains("bypassed, from outside-start escapes: 1;"), "{}", reply.text);
 }

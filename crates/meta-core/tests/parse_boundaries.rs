@@ -1,9 +1,10 @@
 //! The string-twiddling ban (`clippy.toml`, owner 2026-10-30) is a coarse speed bump, set once for
-//! the workspace. This test keeps its one way out visible. Three rules:
+//! the workspace. This test keeps its one way out visible. Four rules:
 //! 1. every crate manifest has `lints.workspace = true`;
 //! 2. `allow(clippy::disallowed_methods)` appears only in files registered in
 //!    `self/parse-boundaries.toml`, once per file;
 //! 3. no manifest overrides the lint: the workspace sets it to `deny` and no crate sets it.
+//! 4. `meta-testkit` is listed only under `[dev-dependencies]`, so no production code uses it.
 
 use meta_core::Reason;
 use meta_testkit::Scratch;
@@ -118,6 +119,37 @@ fn clippy_lint(manifest: &toml::Table, table: &str) -> Option<toml::Value> {
     lints.get("clippy")?.get("disallowed_methods").cloned()
 }
 
+/// The plain and build dependency tables of one scope, with their names.
+fn scope_tables<'a>(scope: &str, source: &'a toml::Table) -> Vec<(String, &'a toml::Table)> {
+    ["dependencies", "build-dependencies"]
+        .into_iter()
+        .filter_map(|kind| Some((format!("{scope}{kind}"), source.get(kind)?.as_table()?)))
+        .collect()
+}
+
+/// The non-dev dependency tables of a manifest, with their names: plain and build, and per target.
+fn dependency_tables(manifest: &toml::Table) -> Vec<(String, &toml::Table)> {
+    let mut found = scope_tables("", manifest);
+    let targets = manifest.get("target").and_then(toml::Value::as_table).into_iter().flatten();
+    for (name, target) in targets {
+        found.extend(scope_tables(&format!("[target.{name}]."), target.as_table().unwrap()));
+    }
+    found
+}
+
+/// The tables other than `dev-dependencies` that depend on `meta-testkit`, by key or by `package`.
+fn testkit_outside_dev(manifest: &toml::Table) -> Vec<String> {
+    dependency_tables(manifest)
+        .into_iter()
+        .filter(|(_, table)| {
+            table.iter().any(|(key, value)| {
+                key == "meta-testkit" || value.get("package").and_then(toml::Value::as_str) == Some("meta-testkit")
+            })
+        })
+        .map(|(name, _)| name)
+        .collect()
+}
+
 fn violations(tree: &Tree, registry: &Registry) -> Vec<String> {
     let mut found = Vec::new();
     for (path, text) in tree {
@@ -132,6 +164,11 @@ fn violations(tree: &Tree, registry: &Registry) -> Vec<String> {
                 if clippy_lint(&manifest, "crate").is_some() {
                     found.push(format!("{shown}: sets clippy::disallowed_methods itself"));
                 }
+                found.extend(
+                    testkit_outside_dev(&manifest)
+                        .into_iter()
+                        .map(|table| format!("{shown}: lists meta-testkit in {table}, not only [dev-dependencies]")),
+                );
                 if manifest.contains_key("workspace") && clippy_lint(&manifest, "workspace") != Some("deny".into()) {
                     found.push(format!("{shown}: workspace does not set clippy::disallowed_methods = \"deny\""));
                 }
@@ -165,7 +202,7 @@ const REGISTERED: &str = "[[boundary]]\npath = \"a/src/p.rs\"\nreason = \"r\"\ns
 const ALLOW: &str = "#![allow(clippy::disallowed_methods)]\nfn f() {}\n";
 
 #[test]
-fn the_workspace_keeps_the_three_rules() {
+fn the_workspace_keeps_the_four_rules() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut files = Tree::new();
     read_tree(&root, &root, &mut files);
@@ -241,4 +278,31 @@ fn a_registry_source_is_an_owner_date_with_words_or_a_failure() {
     ]
     .map(entry);
     assert_eq!(parsed, [true, true, false, false, false, false, false, false, false]);
+}
+
+#[test]
+fn meta_testkit_is_a_dev_dependency_only() {
+    let dev = "[package]\nname = \"a\"\n[lints]\nworkspace = true\n[dev-dependencies]\nmeta-testkit.workspace = true\n";
+    let plain = format!("{GOOD_MANIFEST}[dependencies]\nmeta-testkit.workspace = true\n");
+    let build = format!("{GOOD_MANIFEST}[build-dependencies]\nmeta-testkit = {{ path = \"x\" }}\n");
+    let renamed = format!("{GOOD_MANIFEST}[dependencies]\nkit = {{ package = \"meta-testkit\", path = \"x\" }}\n");
+    let targeted = format!("{GOOD_MANIFEST}[target.'cfg(unix)'.dependencies]\nmeta-testkit.workspace = true\n");
+    let declared = format!("{ROOT}[workspace.dependencies]\nmeta-testkit = {{ path = \"x\" }}\n");
+    let files = tree(&[
+        ("dev/Cargo.toml", dev),
+        ("plain/Cargo.toml", &plain),
+        ("build/Cargo.toml", &build),
+        ("renamed/Cargo.toml", &renamed),
+        ("targeted/Cargo.toml", &targeted),
+        ("Cargo.toml", &declared),
+    ]);
+    assert_eq!(
+        violations(&files, &registry("")),
+        [
+            "build/Cargo.toml: lists meta-testkit in build-dependencies, not only [dev-dependencies]",
+            "plain/Cargo.toml: lists meta-testkit in dependencies, not only [dev-dependencies]",
+            "renamed/Cargo.toml: lists meta-testkit in dependencies, not only [dev-dependencies]",
+            "targeted/Cargo.toml: lists meta-testkit in [target.cfg(unix)].dependencies, not only [dev-dependencies]",
+        ]
+    );
 }
