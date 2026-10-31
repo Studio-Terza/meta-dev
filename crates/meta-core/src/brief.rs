@@ -98,10 +98,10 @@ impl WorkerReviewText<'_> {
         let (view, diff, checkout) = (ReviewCopy::VIEW, ReviewCopy::DIFF, ReviewCopy::CHECKOUT);
         format!(
             "review: {pr} for {task}\n\
-             task text, in full: {title}\n\
+             task title: {title}\n\
              agent: {agent}\n\
              deadline: {deadline_line}\n\
-             goal: find what is wrong with {pr} at head {head}, judged against the task text above and the rules below.\n\
+             goal: find what is wrong with {pr} at head {head}, judged against the task title above and the rules below.\n\
              constraints:\n  \
              - the change is in this directory, as read at head {head}: {view} holds gh pr view and {diff} holds gh pr diff. \
              {checkout}/ holds the whole repository at that head, read-only, with no git data and each symlink as a file that holds its target. \

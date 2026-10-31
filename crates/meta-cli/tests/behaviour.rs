@@ -3524,7 +3524,7 @@ fn worker_start_uses_the_lease_records_the_worker_and_starts_one_session_with_th
     let [plan] = ports.sessions.started.as_slice() else { panic!("one session: {:?}", ports.sessions.started) };
     let args = plan.arguments();
     let (brief, flags) = (&args[1], &args[2..]);
-    assert!(brief.contains("review: #1 for task-1\ntask text, in full: "), "{brief}");
+    assert!(brief.contains("review: #1 for task-1\ntask title: "), "{brief}");
     assert!(brief.contains(&format!("deadline: unix {WORKER_DEADLINE}, report or stop by then")), "{brief}");
     assert!(brief.contains(&format!("#1 at head {PINNED}")) && brief.contains("pr-view.json"), "{brief}");
     assert!(brief.contains("pr.diff") && brief.contains("structured output"), "{brief}");
@@ -3719,7 +3719,7 @@ fn worker_start_whose_checkout_cannot_be_fetched_fails_says_the_lease_stands_and
 }
 
 #[test]
-fn worker_start_refused_inside_the_lock_or_unable_to_start_still_drops_its_stage() {
+fn worker_start_unable_to_start_the_session_still_drops_its_stage() {
     let mut ports = ready(review_task(1));
     ports.sessions.broken_start = Some(PortError::new("no claude here"));
     assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Failed);
@@ -3727,15 +3727,15 @@ fn worker_start_refused_inside_the_lock_or_unable_to_start_still_drops_its_stage
 }
 
 #[test]
-fn a_worker_brief_carries_the_whole_task_text_however_long() {
+fn a_worker_brief_carries_the_whole_task_title_however_long() {
     let text = "Review workers get a read-only checkout; the brief carries it all, down to this last clause";
     let opened = Event::Opened { task: id("task-1"), title: id(text) };
     let events = [vec![opened], review_task(1)[1..].to_vec()].concat();
     let mut ports = ready(events);
     assert_eq!(call(&mut ports, &["worker", "start", "lease-2"], "").0.code, Code::Done);
     let brief = ports.sessions.started[0].arguments().swap_remove(1);
-    assert!(brief.contains(&format!("task text, in full: {text}\n")), "{brief}");
-    assert!(brief.contains("judged against the task text above"), "{brief}");
+    assert!(brief.contains(&format!("task title: {text}\n")), "{brief}");
+    assert!(brief.contains("judged against the task title above"), "{brief}");
 }
 
 #[test]

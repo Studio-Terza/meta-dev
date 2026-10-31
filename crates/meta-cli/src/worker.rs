@@ -21,19 +21,20 @@ fn limits<L: Log, G: Git>(log: &L, git: &G) -> Result<Workers, Failure> {
     }
 }
 
-pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
+pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions, C: Clock>(
     lease: LeaseId,
     log: &mut L,
     git: &G,
     github: &H,
     sessions: &mut S,
+    clock: &C,
     build: &Build,
-    at: Timestamp,
 ) -> Answer {
     let mut guard = Guard::default();
     if let Err(unverified) = guard.at(log.standing(), git, build) {
         return Answer::failed(Failure::Refused(unverified.into()));
     }
+    let at = clock.now();
     let place = log.place();
     // Asked before any git or network call, so that a refusal costs nothing.
     let inputs = folded(log.read(), &place).and_then(|ledger| {
@@ -60,6 +61,8 @@ pub(super) fn start<L: Log, G: Git, H: GitHub, S: Sessions>(
         Ok(inputs) => inputs,
         Err(failure) => return Answer::failed(failure),
     };
+    // Taken after the checkout is staged, so that a slow fetch does not come off the worker's deadline.
+    let at = clock.now();
     // The session starts inside the lock: the lease and the limit hold until it is recorded, and a
     // session that fails to start leaves the lease unused.
     let outcome = log.transact(|now, records| {

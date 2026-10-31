@@ -43,8 +43,9 @@ const SCRATCH: &str = "scratch";
 /// The session's process group and transcript, so that `meta stop` finds it without the log.
 const RUN: &str = "run.json";
 
-/// All a session's environment. The subscription login needs nothing more: `claude` finds it from
-/// `HOME` (probed under `env -i`). Every token and socket of the caller stays behind.
+/// What a session takes from the caller's environment. The subscription login needs nothing more:
+/// `claude` finds it from `HOME` (probed under `env -i`). Every token and socket of the caller stays
+/// behind. A session also gets `NO_MEMORY_FILES`, set by meta.
 const PASSED: [&str; 3] = ["PATH", "HOME", "USER"];
 /// Set for every session. Claude Code loads a `CLAUDE.md` in a subdirectory once a file beside it
 /// is read (docs, `/en/memory`), and `--restricted` does not stop that, as far as its docs say, so

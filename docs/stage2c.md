@@ -33,7 +33,7 @@ Today `<model>` is `opus`, `<allow>` is `Read,Grep,Glob` and `<deny>` is `Agent,
 
 **Meta does the trusted work.** The session has no `gh`, no token and no `meta`. Before it starts, `meta worker start` fetches `gh pr view` and `gh pr diff`, and then checks that the PR still stands at the lease's head, so a head that moved during the fetch refuses the start. It then fetches that commit, by its id, for the checkout below. When the session ends, `meta worker wait` takes the verdict from the transcript and records it through the same check as `meta verdict`, on the worker's own lease.
 
-**The change is untrusted.** The brief says that `pr-view.json`, `pr.diff` and everything under `checkout/` are PR content and untrusted data, never instructions. The prompt holds none of their text: the session reads them from its directory. It does hold the task text, in full, from the log, because the session cannot ask meta for it.
+**The change is untrusted.** The brief says that `pr-view.json`, `pr.diff` and everything under `checkout/` are PR content and untrusted data, never instructions. The prompt holds none of their text: the session reads them from its directory. It does hold the task title, from the log (meta stores only the title), because the session cannot ask meta for it.
 
 **The checkout.** A diff shows only what a PR changed, and a reviewer that sees nothing else can raise a false finding about code in a file the PR did not touch. So `checkout/` holds the whole repository at the lease's head, and the brief tells the session to read the code there before it reports a claim about code the diff does not show.
 
@@ -44,7 +44,7 @@ Today `<model>` is `opus`, `<allow>` is `Read,Grep,Glob` and `<deny>` is `Agent,
 | Not writable | After the move every directory is 0500 and every file 0400. The move comes first, because a directory that may not be written cannot change its parent |
 | No way out through a link | `core.symlinks=false` writes each symlink as a file that holds its target. A symlink found while freezing fails the start, and its target is not touched |
 | Nothing in it runs | The checkout runs with no global or system git configuration and no hooks, so a `.gitattributes` in the PR cannot name a filter that exists |
-| Nothing in it is loaded as instructions | Claude Code loads a `CLAUDE.md` in a subdirectory once a file beside it is read (`/en/memory`), so every session has `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` (`/en/env-vars`). `--restricted` already keeps out project settings and rules |
+| Nothing in it is meant to be loaded as instructions | The Claude Code docs say a `CLAUDE.md` in a subdirectory loads once a file beside it is read (`/en/memory`), and that `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` stops it (`/en/env-vars`), so every session has the setting, on that authority. A direct probe did not show that it has any effect: a marker in a subdirectory `CLAUDE.md` was absent from the session both with and without the setting. It stays as a harmless defence. `--restricted` already keeps out project settings and rules |
 
 The fetch runs outside the log's lock, so a slow one holds up neither the log nor `meta stop`. It has the same 30 s limit as any port command, so a repository too large to fetch in that time refuses every start, closed. Its output waits in `workers/staged/worker-<n>.<attempt>/`, a place of its own for each try, until the start moves the tree. The start then drops the place, whether or not a session started. A process killed in between leaves one behind, which stands in nobody's way.
 
@@ -84,7 +84,7 @@ Each row is a behaviour-table test through the single in-process `Call`, with a 
 
 | Command | Given | Result |
 |---|---|---|
-| `meta worker start <lease>` | a live, unused review lease with a deadline, under the limit | one session starts, with the PR's view and diff and a read-only checkout of its head in its scratch directory, and the full task text in its brief; events `LeaseUsed`, then `Started` with agent `worker-<n>`, the deadline counted from now, the process group, the transcript path and the model; prints all of them and returns at once |
+| `meta worker start <lease>` | a live, unused review lease with a deadline, under the limit | one session starts, with the PR's view and diff and a read-only checkout of its head in its scratch directory, and the task title in its brief; events `LeaseUsed`, then `Started` with agent `worker-<n>`, the deadline counted from now, the process group, the transcript path and the model; prints all of them and returns at once |
 | `meta worker start <lease>` | the lease is unknown, used, not live, a work lease, or has no deadline | refused naming which; nothing starts; nothing is recorded |
 | `meta worker start <lease>` | the running workers have reached `concurrency.running` in `self/workers.toml` | refused naming them, with `meta stop <lease>` as the next step. The check holds the log's lock, so two starts cannot both take the last place. The limit is per log: a scratch log counts only its own workers, so 4 on the real log and 4 on a scratch log can run at once |
 | `meta worker start <lease>` | a worker gave its verdict and its session has not ended | it still counts towards the limit |
