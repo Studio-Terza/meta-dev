@@ -44,11 +44,13 @@ pub trait Log {
     /// What the side file holds, read leniently; no side file holds nothing. An error means the
     /// file as a whole could not be read.
     fn set_aside_escapes(&self) -> Result<UnverifiedEscapes, PortError>;
-    /// Holds the log exclusively from read to append. `decide` gets the records, or why they do not
-    /// parse; the records it returns are appended. A log that cannot be opened or locked is an error.
+    /// Holds the log exclusively from read to append. `decide` gets the log's standing as read
+    /// inside the lock (from its first record, so a marking that landed after `standing` was read
+    /// shows), and the records, or why they do not parse; the records it returns are appended. A
+    /// log that cannot be opened or locked is an error.
     fn transact<T>(
         &mut self,
-        decide: impl FnOnce(Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
+        decide: impl FnOnce(Standing, Result<Vec<Record>, PortError>) -> (Vec<Record>, T),
     ) -> Result<T, PortError>;
 }
 

@@ -3,6 +3,8 @@
 //! why there is no clean commit instead. The binary reads these with `option_env!` (see `host.rs`);
 //! the logic is in `stamp.rs`, where it is tested.
 
+#[path = "git_env.rs"]
+mod git_env;
 #[path = "stamp.rs"]
 mod stamp;
 

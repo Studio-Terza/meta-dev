@@ -22,6 +22,15 @@ enum Stamp {
 pub struct Unverified {
     why: Why,
     standing: Standing,
+    aim: Aim,
+}
+
+/// What the build was refused: appending to the log, or marking it as the real log. The way out
+/// differs: a scratch data dir leads away from appending to a real log, never from marking one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Aim {
+    Append,
+    Mark,
 }
 
 /// A branch build (a commit not on main, edits to tracked files, or an ancestry that cannot be
@@ -70,7 +79,24 @@ impl Build {
                 Err(error) => Why::Branch(format!("cannot tell whether {commit} is on origin/main: {error}")),
             },
         };
-        Err(Unverified { why, standing })
+        Err(Unverified { why, standing, aim: Aim::Append })
+    }
+
+    /// Whether this build may mark a log as the real log: only a build from a commit on main may,
+    /// whatever the log's standing now.
+    pub fn verify_marking<E: fmt::Display>(
+        &self,
+        on_main: impl FnOnce(&Sha) -> Result<bool, E>,
+    ) -> Result<(), Unverified> {
+        self.verify(Standing::Real, on_main).map_err(|unverified| Unverified { aim: Aim::Mark, ..unverified })
+    }
+}
+
+impl Unverified {
+    /// The same refusal for a log that turned out to stand so.
+    #[must_use]
+    pub fn at(self, standing: Standing) -> Self {
+        Self { standing, ..self }
     }
 }
 
@@ -80,9 +106,12 @@ impl fmt::Display for Unverified {
             Why::Branch(why) => write!(formatter, "you are running a branch build ({why}); "),
             Why::Unstamped(why) => write!(formatter, "this build carries no commit ({why}); "),
         }?;
-        formatter.write_str(match self.standing {
-            Standing::MarkedElsewhere => "this log is marked as the real log; use a main build.",
-            Standing::Scratch | Standing::AwaitingMark | Standing::Real => {
+        formatter.write_str(match (self.aim, self.standing) {
+            (Aim::Mark, _) => {
+                "only a build from a commit on main may mark a log as the real log. Next: use a main build."
+            }
+            (Aim::Append, Standing::MarkedElsewhere) => "this log is marked as the real log; use a main build.",
+            (Aim::Append, Standing::Scratch | Standing::AwaitingMark | Standing::Real) => {
                 "only a build from a commit on main may write the real log. \
                  Next: use a main build, or set XDG_DATA_HOME to a scratch data dir."
             }

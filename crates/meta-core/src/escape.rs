@@ -3,7 +3,7 @@ use crate::ids::{EscapeId, EscapeKind, PrNumber, Reason, TaskId, Timestamp};
 use crate::ledger::Ledger;
 use crate::merges::Unreached;
 use crate::reply::{Accepted, Refusal};
-use crate::set_aside::UnverifiedEscape;
+use crate::set_aside::{UnverifiedEscape, one_line};
 use crate::spec::{SelfFile, Unreadable};
 use crate::task::Progress;
 use serde::{Deserialize, Serialize};
@@ -122,8 +122,10 @@ pub(crate) enum RepeatKey<'a> {
 impl std::fmt::Display for RepeatKey<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Kind(kind) => write!(formatter, "{kind}"),
-            Self::Unclassified(reason) => write!(formatter, "{} \"{reason}\"", EscapeKind::unclassified()),
+            Self::Kind(kind) => formatter.write_str(&one_line(&kind.to_string())),
+            Self::Unclassified(reason) => {
+                write!(formatter, "{} \"{}\"", EscapeKind::unclassified(), one_line(&reason.to_string()))
+            }
             Self::Unlisted => formatter.write_str("kinds not on main, unchecked"),
         }
     }

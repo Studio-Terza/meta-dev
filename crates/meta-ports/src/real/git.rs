@@ -1,4 +1,5 @@
-use super::command::{decides, run, run_found};
+use super::command::{decides_with, run, run_found};
+use super::git_env::scrub;
 use super::log::home;
 use crate::{Git, PortError};
 use meta_core::{Origin, SelfFile, Sha, TaskId};
@@ -48,6 +49,11 @@ impl GitCli {
     /// Whether `commit` is an ancestor of origin/main in the clone at `repo`, by its local refs. A
     /// binary must stay in the clone it was built in; when that clone is gone it cannot answer.
     pub fn ancestry(repo: &Path, commit: &Sha) -> Result<bool, PortError> {
+        Self::ancestry_inheriting(repo, commit, &[])
+    }
+
+    /// `ancestry` as a caller whose environment holds `inherited` gets it.
+    fn ancestry_inheriting(repo: &Path, commit: &Sha, inherited: &[(&str, &str)]) -> Result<bool, PortError> {
         if !repo.is_dir() {
             return Err(PortError::new(format!(
                 "the clone this binary was built in, {}, has moved or been removed; rebuild meta in a clone that stays put",
@@ -56,7 +62,11 @@ impl GitCli {
         }
         let repo = repo.display().to_string();
         let commit = commit.to_string();
-        decides("git", &["-C", &repo, "merge-base", "--is-ancestor", &commit, "refs/remotes/origin/main"])
+        let args = ["-C", &repo, "merge-base", "--is-ancestor", &commit, "refs/remotes/origin/main"];
+        decides_with("git", &args, |command| {
+            command.envs(inherited.iter().copied());
+            scrub(command);
+        })
     }
 
     /// The tip of exactly the branch `refs/heads/<task>` in the repository at `repo`; a branch that
@@ -152,6 +162,23 @@ mod tests {
         let answers = [&main, &branch, &unknown].map(|sha| GitCli::ancestry(&repo, sha));
         assert_eq!(answers[..2], [Ok(true), Ok(false)]);
         assert!(answers[2].is_err(), "{:?}", answers[2]);
+    }
+
+    #[test]
+    fn the_ancestry_check_ignores_variables_inherited_from_the_caller() {
+        let repo = Scratch::new("ancestry-env");
+        let other = Scratch::new("ancestry-env-other");
+        let at = repo.display().to_string();
+        let git = |args: &[&str]| run("git", &[&["-C", at.as_str()], args].concat()).unwrap();
+        git(&["init", "--quiet"]);
+        let identity = ["-c", "user.name=meta", "-c", "user.email=meta@example.invalid", "-c", "commit.gpgsign=false"];
+        git(&[&identity[..], &["commit", "--quiet", "--allow-empty", "-m", "main"]].concat());
+        let main = git(&["log", "-1", "--format=format:%H"]).parse::<Sha>().unwrap();
+        git(&["update-ref", "refs/remotes/origin/main", &main.to_string()]);
+        run("git", &["init", "--quiet", &other.display().to_string()]).unwrap();
+        let elsewhere = other.join(".git").display().to_string();
+        let inherited = [("GIT_DIR", elsewhere.as_str()), ("GIT_WORK_TREE", elsewhere.as_str())];
+        assert_eq!(GitCli::ancestry_inheriting(&repo, &main, &inherited), Ok(true));
     }
 
     #[test]
