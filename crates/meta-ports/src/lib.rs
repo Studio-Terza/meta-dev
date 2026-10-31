@@ -2,8 +2,8 @@ pub mod memory;
 pub mod real;
 
 use meta_core::{
-    Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span, Standing,
-    TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
+    Binary, Build, Cleared, Malformed, Marking, Origin, PrNumber, Pull, Record, SelfFile, Sha, SideLine, Span,
+    Standing, TaskId, Timestamp, UnverifiedEscape, UnverifiedEscapes, Updating,
 };
 use std::fmt;
 
@@ -70,6 +70,8 @@ pub trait Log {
 
 pub trait Git {
     fn origin(&self) -> Result<Origin, PortError>;
+    /// The absolute path of the running meta binary, which briefs name for `meta link` and `meta verdict`.
+    fn binary(&self) -> Result<Binary, PortError>;
     /// A data file under `self/` as it stands on main.
     fn read(&self, file: SelfFile) -> Result<String, PortError>;
     /// A data file under `self/` without git or network: the working tree's copy, else the copy

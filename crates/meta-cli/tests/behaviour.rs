@@ -15,6 +15,8 @@ const RULES: &str = include_str!("fixtures/rules.toml");
 const KINDS: &str = include_str!("fixtures/escapes.toml");
 const PREDICTIONS: &str = include_str!("fixtures/predictions.toml");
 const ROLES: &str = include_str!("fixtures/roles.toml");
+/// The recorded absolute path of the running binary; no real machine path is ever used.
+const BINARY: &str = "/recorded/main/meta";
 const ORIGIN: &str = "https://github.com/Studio-Terza/meta-dev.git";
 const REPO: &str = "Studio-Terza/meta-dev";
 const PINNED: &str = "aaaaaaa";
@@ -160,6 +162,7 @@ fn given(events: Vec<Event>, pulls: Vec<(&str, GhReplies)>) -> Memory {
         },
         git: RecordedGit {
             origin: id(ORIGIN),
+            binary: id(BINARY),
             files: self_files(),
             local: self_files(),
             branches: BTreeMap::from([(id("task-1"), id(PINNED))]),
@@ -1148,13 +1151,12 @@ fn review_brief_tells_the_reviewer_to_record_its_verdict_with_a_main_build_and_w
     let (reply, _) =
         call(&mut given(linked_task(), vec![("7", pull(PINNED, &[]))]), &["review", "task-1", "--agent", "rev"], "");
     let wanted = [
-        "meta verdict task-1 pass|fail",
         "main build",
-        "git worktree add --detach ../task-1-main origin/main",
-        "../task-1-main/target/release/meta verdict task-1 pass|fail",
+        "/recorded/main/meta verdict task-1 pass|fail",
         "lease: lease-2 (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you",
     ];
     assert!(wanted.iter().all(|line| reply.text.contains(line)), "{}", reply.text);
+    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
 }
 
 #[test]
@@ -1886,13 +1888,9 @@ fn mark_real_log_puts_the_marker_first_once_and_only_from_a_main_build() {
 #[test]
 fn claim_brief_tells_the_agent_to_link_with_a_main_build_and_keep_branch_builds_on_a_scratch_log() {
     let (reply, _) = call(&mut given(vec![opened("task-1")], Vec::new()), &["claim", "task-1", "--agent", "alice"], "");
-    let steps = [
-        "git worktree add --detach ../task-1-main origin/main",
-        "cargo build --release --manifest-path ../task-1-main/Cargo.toml --target-dir ../task-1-main/target",
-        "../task-1-main/target/release/meta link task-1 <pr>",
-        "XDG_DATA_HOME set to a scratch dir",
-    ];
+    let steps = ["/recorded/main/meta link task-1 <pr>", "XDG_DATA_HOME set to a scratch dir"];
     assert!(steps.iter().all(|step| reply.text.contains(step)), "{}", reply.text);
+    assert!(["worktree", "cargo"].iter().all(|word| !reply.text.contains(word)), "{}", reply.text);
 }
 
 const SIDE_FILE: &str = "escapes.unverified.jsonl";

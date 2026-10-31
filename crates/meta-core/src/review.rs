@@ -1,6 +1,6 @@
 use crate::brief::ReviewText;
 use crate::event::Event;
-use crate::ids::{AgentName, LeaseId, PrNumber, Sha, TaskId, Timestamp, Title, Verdict};
+use crate::ids::{AgentName, Binary, LeaseId, PrNumber, Sha, TaskId, Timestamp, Title, Verdict};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::pull::{Pull, PullState};
@@ -110,7 +110,7 @@ impl Reviewing {
     }
 
     /// The review brief and its lease, which ends at `deadline`.
-    pub fn brief(self, pull: &Pull, rules: &Rules, deadline: Timestamp) -> Result<Accepted, Refusal> {
+    pub fn brief(self, pull: &Pull, binary: &Binary, rules: &Rules, deadline: Timestamp) -> Result<Accepted, Refusal> {
         let Self { task, title, agent, lease, pr } = self;
         if pull.state() != PullState::Open {
             return Err(Refusal::because(format!("{pr} is not open; only an open PR can be reviewed.")));
@@ -127,6 +127,7 @@ impl Reviewing {
             lease,
             deadline_line: &deadline_line,
             head: &head,
+            binary,
             rules,
         }
         .text();

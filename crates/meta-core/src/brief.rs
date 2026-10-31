@@ -1,4 +1,4 @@
-use crate::ids::{LeaseId, Origin, PrNumber, Sha, TaskId, Title};
+use crate::ids::{Binary, LeaseId, Origin, PrNumber, Sha, TaskId, Title};
 use crate::lease::{Deadline, LeaseSlot, Purpose};
 use crate::ledger::Ledger;
 use crate::reply::{Accepted, Refusal};
@@ -11,32 +11,35 @@ pub(crate) fn lease_line(lease: LeaseId) -> String {
 }
 
 /// The brief of a work lease; the claim that issued it and `meta brief` print it the same way.
-pub(crate) fn work_text(
-    task: TaskId,
-    title: &Title,
-    who: &str,
-    lease_line: &str,
-    deadline_line: &str,
-    origin: &Origin,
-    rules: &Rules,
-) -> String {
-    format!(
-        "task: {task}: {title}\n\
-         agent: {who}\n\
-         lease: {lease_line}\n\
-         deadline: {deadline_line}\n\
-         setup:\n  \
-         1. git clone {origin} {task}\n  \
-         2. cd {task} && git switch -c {task} origin/main\n  \
-         3. set the git identity that rule identity names\n  \
-         4. push, then open the PR with gh pr create\n  \
-         5. build meta from main, because only a main build writes the real log: \
-         git worktree add --detach ../{task}-main origin/main && \
-         cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target\n  \
-         6. from this clone, which holds the branch: ../{task}-main/target/release/meta link {task} <pr>\n  \
-         A meta built from your branch writes only a scratch log: run it with XDG_DATA_HOME set to a scratch dir.\n\
-         rules:\n{rules}"
-    )
+pub(crate) struct WorkText<'a> {
+    pub(crate) task: TaskId,
+    pub(crate) title: &'a Title,
+    pub(crate) who: &'a str,
+    pub(crate) lease_line: &'a str,
+    pub(crate) deadline_line: &'a str,
+    pub(crate) origin: &'a Origin,
+    pub(crate) binary: &'a Binary,
+    pub(crate) rules: &'a Rules,
+}
+
+impl WorkText<'_> {
+    pub(crate) fn text(&self) -> String {
+        let Self { task, title, who, lease_line, deadline_line, origin, binary, rules } = self;
+        format!(
+            "task: {task}: {title}\n\
+             agent: {who}\n\
+             lease: {lease_line}\n\
+             deadline: {deadline_line}\n\
+             setup:\n  \
+             1. git clone {origin} {task}\n  \
+             2. cd {task} && git switch -c {task} origin/main\n  \
+             3. set the git identity that rule identity names\n  \
+             4. push, then open the PR with gh pr create\n  \
+             5. from this clone, which holds the branch, run this main build, which writes the real log; build nothing: {binary} link {task} <pr>\n  \
+             A meta built from your branch writes only a scratch log: run it with XDG_DATA_HOME set to a scratch dir.\n\
+             rules:\n{rules}"
+        )
+    }
 }
 
 /// The brief of a review lease; the review that issued it and `meta brief` print it the same way.
@@ -48,12 +51,13 @@ pub(crate) struct ReviewText<'a> {
     pub(crate) lease: LeaseId,
     pub(crate) deadline_line: &'a str,
     pub(crate) head: &'a Sha,
+    pub(crate) binary: &'a Binary,
     pub(crate) rules: &'a Rules,
 }
 
 impl ReviewText<'_> {
     pub(crate) fn text(&self) -> String {
-        let Self { pr, task, title, agent, lease, deadline_line, head, rules } = self;
+        let Self { pr, task, title, agent, lease, deadline_line, head, binary, rules } = self;
         let digits = pr.digits();
         let lease_line = format!(
             "{lease} (for the lead: put it in the Agent description; it works once. Reviewer: nothing for you to do with this line)"
@@ -67,10 +71,8 @@ impl ReviewText<'_> {
              constraints:\n  \
              - read the change with gh pr view {digits} and gh pr diff {digits}; push, comment, approve and merge nothing\n  \
              - report each finding with its file, line and evidence, then a verdict: pass or fail\n  \
-             - finish by recording the verdict yourself: meta verdict {task} pass|fail, run with a main build, because only a main build writes the real log. \
-             To get one: git worktree add --detach ../{task}-main origin/main && \
-             cargo build --release --manifest-path ../{task}-main/Cargo.toml --target-dir ../{task}-main/target, \
-             then ../{task}-main/target/release/meta verdict {task} pass|fail. \
+             - finish by recording the verdict yourself with this main build, which writes the real log; build nothing: \
+             {binary} verdict {task} pass|fail. \
              meta refuses the verdict if {pr} no longer has head {head}; then report that and stop\n\
              rules:\n{rules}"
         )
@@ -137,11 +139,21 @@ impl Ledger {
 
 impl Reissue {
     /// The brief the lease's own claim or review printed; no event.
-    pub fn brief(self, origin: &Origin, rules: &Rules) -> Accepted {
+    pub fn brief(self, origin: &Origin, binary: &Binary, rules: &Rules) -> Accepted {
         let Self { task, title, who, lease, deadline, purpose } = self;
         let deadline_line = deadline.brief_line();
         let text = match purpose {
-            Purpose::Work => work_text(task, &title, &who, &lease_line(lease), &deadline_line, origin, rules),
+            Purpose::Work => WorkText {
+                task,
+                title: &title,
+                who: &who,
+                lease_line: &lease_line(lease),
+                deadline_line: &deadline_line,
+                origin,
+                binary,
+                rules,
+            }
+            .text(),
             Purpose::Review { pr, head } => ReviewText {
                 pr,
                 task,
@@ -150,6 +162,7 @@ impl Reissue {
                 lease,
                 deadline_line: &deadline_line,
                 head: &head,
+                binary,
                 rules,
             }
             .text(),

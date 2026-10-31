@@ -46,9 +46,9 @@ pub use event::{Attempt, Event, Record, Route};
 pub use head::{Head, Marking, Standing};
 pub use hook::{AgentStart, Binding, Hook, Phase, Resume};
 pub use ids::{
-    AgentId, AgentName, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Minutes, Observed,
-    Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId, Timestamp, Title,
-    Verdict,
+    AgentId, AgentName, Binary, Branch, CheckName, Claimant, EscapeId, EscapeKind, LeaseId, Malformed, Minutes,
+    Observed, Origin, OwnerAnswer, OwnerQuestion, PrNumber, PredictionId, Reason, RunCount, Sha, Span, TaskId,
+    Timestamp, Title, Verdict,
 };
 pub use imported::Imported;
 pub use importing::Importing;
