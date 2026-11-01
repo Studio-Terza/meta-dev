@@ -1,19 +1,19 @@
 [toolchain]
-warn = 30
-block = 60
+warn = 8
+block = 10
 
 [clippy]
-warn = 30
-block = 60
+warn = 8
+block = 11
 
 [test-compile]
-warn = 60
-block = 120
+warn = 10
+block = 14
 
 [test-run]
-warn = 10
-block = 20
+warn = 1.5
+block = 2.5
 
 [lint]
-warn = 10
-block = 20
+warn = 1.2
+block = 2
