@@ -1,0 +1,12 @@
+free functions are not allowed; make them associated functions or methods:
+src/free.rs:1: fn helper
+src/free.rs:3: fn nested
+src/nested.rs:4: fn helper
+src/nested.rs:9: fn hidden
+function names say what the function does:
+src/allowed.rs:3: fn check names nothing; say what it does
+src/free.rs:1: fn helper names nothing; say what it does
+src/nested.rs:4: fn helper names nothing; say what it does
+tests go through public APIs:
+src/allowed.rs:3: test code in src; move it to the package's tests directory and call the public API from there
+src/required.rs:4: test code in src; move it to the package's tests directory and call the public API from there

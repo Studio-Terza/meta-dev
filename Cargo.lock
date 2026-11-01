@@ -346,7 +346,6 @@ name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "ra-ap-rustc_lexer",
  "syn 2.0.119",
@@ -537,6 +536,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "golden",
  "lint-bool-methods",
  "lint-const-shape",
  "lint-core",

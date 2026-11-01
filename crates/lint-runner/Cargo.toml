@@ -46,6 +46,7 @@ lint-type-shape = { path = "../lint-type-shape" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 
 [dev-dependencies]
+golden = { path = "../golden" }
 lint-fixtures = { path = "../lint-fixtures" }
 tempfile.workspace = true
 

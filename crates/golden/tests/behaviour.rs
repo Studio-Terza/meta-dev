@@ -38,8 +38,10 @@ impl Fixture {
         fs::read_to_string(self.path())
     }
 
-    fn holding(text: &str) -> Option<Self> {
-        Self::with_recorded(text).ok()
+    fn recorded_through_the_api(text: &str) -> Option<Self> {
+        let fixture = Self::new().ok()?;
+        fixture.golden().verify_in(Mode::Record, text).ok()?;
+        Some(fixture)
     }
 }
 
@@ -89,7 +91,7 @@ table!(
 roundtrip!(
     any_text_is_recorded_exactly,
     any::<String>(),
-    Fixture::holding,
+    |text: &String| Fixture::recorded_through_the_api(text),
     |fixture: &Option<Fixture>| fixture.as_ref()?.text().ok(),
     Some
 );

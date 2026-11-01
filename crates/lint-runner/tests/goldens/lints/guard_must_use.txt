@@ -1,0 +1,2 @@
+guard types are #[must_use]:
+src/unmarked.rs:1: Lock implements Drop; mark it #[must_use]

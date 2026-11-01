@@ -1,0 +1,10 @@
+two functions on one type with the same signature hide a missing type or type parameter:
+src/same.rs:3: left, right share the signature A::(&self) -> u8; distinguish the types they take or return
+a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:
+src/different.rs:4: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/same.rs:4: numeric literal outside a const item; name it as a const so it can be found and tuned
+primitives appear only at a type's boundary:
+src/different.rs:3: bare u8 in left; name what it counts with a newtype
+src/different.rs:4: bare u16 in right; name what it counts with a newtype
+src/same.rs:3: bare u8 in left; name what it counts with a newtype
+src/same.rs:4: bare u8 in right; name what it counts with a newtype

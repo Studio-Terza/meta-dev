@@ -1,0 +1,4 @@
+a struct with no logic of its own that one other file consumes is a parameter bag:
+exporter/src/inner.rs:2: Unused only carries values into one other file; give it the logic that consumes it
+a crate exports exactly what another crate uses:
+exporter/src/lib.rs:2: Unused is exported but no other crate names it; export it when a user appears

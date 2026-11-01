@@ -1,0 +1,9 @@
+free functions are not allowed; make them associated functions or methods:
+src/said.rs:1: fn parse_header
+src/vague.rs:1: fn get
+two functions on one type with the same signature hide a missing type or type parameter:
+src/vague.rs:4: handle, go share the signature A::(&self); distinguish the types they take or return
+function names say what the function does:
+src/vague.rs:1: fn get names nothing; say what it does
+src/vague.rs:4: fn handle names nothing; say what it does
+src/vague.rs:5: fn go names nothing; say what it does

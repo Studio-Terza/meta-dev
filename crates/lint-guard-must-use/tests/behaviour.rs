@@ -7,12 +7,10 @@ const UNMARKED: &str = "pub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut
 const UNMARKED_ENUM: &str = "enum Lock {\n    Held,\n}\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const GENERIC: &str = "struct Lock<'a, T>(&'a T);\nimpl<T> Drop for Lock<'_, T> {\n    fn drop(&mut self) {}\n}\n";
 const QUALIFIED: &str = "struct Lock;\nimpl std::ops::Drop for inner::Lock {\n    fn drop(&mut self) {}\n}\n";
-const MARKED: &str = "#[must_use]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const MARKED_REASON: &str = "#[must_use = \"held until dropped\"]\nenum Lock {\n    Held,\n}\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const OTHER_ATTRIBUTE: &str = "#[derive(Debug)]\nstruct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const IN_MODULE: &str =
     "mod inner {\n    struct Lock;\n    impl Drop for Lock {\n        fn drop(&mut self) {}\n    }\n}\n";
-const NO_DROP: &str = "struct Lock;\nimpl Clone for Lock {\n    fn clone(&self) -> Lock {\n        Lock\n    }\n}\n";
 const INHERENT: &str = "struct Lock;\nimpl Lock {\n    fn drop(&mut self) {}\n}\n";
 const DROP_OF_REFERENCE: &str = "struct Lock;\nimpl Drop for &Lock {\n    fn drop(&mut self) {}\n}\n";
 const TEST_TYPE: &str = "impl Drop for Lock {\n    fn drop(&mut self) {}\n}\n#[cfg(test)]\nstruct Lock;\n";
@@ -22,7 +20,6 @@ const TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    struct Lock;\n    impl Drop for Lock {\n        fn drop(&mut self) {}\n    }\n}\n";
 
 laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
-    [Source::new("a.rs", UNMARKED)] => ["a.rs:1"],
     [Source::new("a.rs", UNMARKED_ENUM)] => ["a.rs:1"],
     [Source::new("a.rs", GENERIC)] => ["a.rs:1"],
     [Source::new("a.rs", QUALIFIED)] => ["a.rs:1"],
@@ -32,9 +29,7 @@ laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
 ]);
 
 laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMustUse>, [
-    [Source::new("a.rs", MARKED)] => NONE,
     [Source::new("a.rs", MARKED_REASON)] => NONE,
-    [Source::new("a.rs", NO_DROP)] => NONE,
     [Source::new("a.rs", INHERENT)] => NONE,
     [Source::new("a.rs", DROP_OF_REFERENCE)] => NONE,
     [Source::new("a.rs", TEST_TYPE)] => NONE,
@@ -43,9 +38,3 @@ laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMust
     [Source::new("a.rs", TEST_MODULE)] => NONE,
     [Source::new("x/tests/a.rs", UNMARKED)] => NONE,
 ]);
-
-#[test]
-fn the_message_names_the_guard() {
-    let shown = Sources::report::<GuardMustUse>(&[Source::new("a.rs", UNMARKED)]).to_string();
-    assert!(shown.contains("Lock implements Drop; mark it #[must_use]"));
-}

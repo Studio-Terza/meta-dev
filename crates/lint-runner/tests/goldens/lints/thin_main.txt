@@ -1,0 +1,4 @@
+a binary is a thin main over its library:
+src/bin/attributed.rs:4: main.rs holds only fn main and imports; move this into the library
+src/bin/tool.rs:3: main.rs holds only fn main and imports; move this into the library
+src/main.rs:3: main.rs holds only fn main and imports; move this into the library

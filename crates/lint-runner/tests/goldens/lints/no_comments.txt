@@ -1,0 +1,9 @@
+comments are not allowed in this repository:
+src/commented.rs:2: comment
+src/commented.rs:3: comment
+free functions are not allowed; make them associated functions or methods:
+src/commented.rs:1: fn a
+src/commented.rs:3: fn b
+function names say what the function does:
+src/commented.rs:1: fn a names nothing; say what it does
+src/commented.rs:3: fn b names nothing; say what it does

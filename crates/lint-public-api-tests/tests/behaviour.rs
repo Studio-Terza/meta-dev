@@ -1,4 +1,3 @@
-use lint_core::Lint;
 use lint_public_api_tests::PublicApiTests;
 
 use lint_fixtures::{Case, Source, Sources};
@@ -21,7 +20,10 @@ const PEEK: &str = "#[path = \"../src/internal.rs\"]\nmod internal;\n";
 const NESTED_PEEK: &str = "mod m {\n    #[path = \"../../src/internal.rs\"]\n    mod internal;\n}\n";
 const SIBLING: &str = "#[path = \"common/mod.rs\"]\nmod common;\n";
 
-const CASES: [Case; 18] = [
+const PLAIN_MACRO: &str = "macro_rules! plain {\n    () => {};\n}\nplain!();\n";
+const OUTSIDE_THE_PACKAGE: &str = "#[path = \"../../src/internal.rs\"]\nmod internal;\n";
+
+const CASES: [Case; 20] = [
     Case::new("inline module", &[Source::new("src/a.rs", MODULE)], &["src/a.rs:3"]),
     Case::new("module file", &[Source::new("src/a.rs", MODULE_FILE)], &["src/a.rs:2"]),
     Case::new("combined condition", &[Source::new("src/a.rs", COMBINED)], &["src/a.rs:2"]),
@@ -40,16 +42,11 @@ const CASES: [Case; 18] = [
     Case::new("path into src", &[Source::new("tests/a.rs", PEEK)], &["tests/a.rs:2"]),
     Case::new("path into src from a module", &[Source::new("tests/a.rs", NESTED_PEEK)], &["tests/a.rs:3"]),
     Case::new("path to a helper", &[Source::new("tests/a.rs", SIBLING)], &[]),
+    Case::new("macro with no test", &[Source::new("src/a.rs", PLAIN_MACRO)], &[]),
+    Case::new("path outside the package", &[Source::new("tests/a.rs", OUTSIDE_THE_PACKAGE)], &[]),
 ];
 
 #[test]
 fn test_code_in_src_is_flagged() {
     assert_eq!(Sources::mismatches::<PublicApiTests>(&CASES), Vec::<String>::new());
-}
-
-#[test]
-fn the_message_names_the_fix() {
-    let report = PublicApiTests::report(&[Sources::file("src/a.rs", MODULE)]);
-    assert!(report.violations().iter().all(|violation| violation.message().contains("tests directory")));
-    assert!(!report.is_clean());
 }

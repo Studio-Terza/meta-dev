@@ -21,7 +21,7 @@ const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\nenum A {}\n";
 const SPLIT_TYPES: &str = "struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
 const UNRELATED_MACRO: &str = "fn t() {\n    vec![A];\n}\n";
 
-const CASES: [Case; 17] = [
+const CASES: [Case; 16] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
@@ -36,7 +36,6 @@ const CASES: [Case; 17] = [
     Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:1"]),
     Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:1"]),
     Case::new("to and from of different forms", &[Source::new("src/a.rs", MISMATCHED_FORMS)], &[]),
-    Case::new("hand-written order", &[Source::new("src/a.rs", ORDER)], &["src/a.rs:1"]),
     Case::new("hand-written equality", &[Source::new("src/a.rs", EQUALITY)], &["src/a.rs:1"]),
     Case::new("derived order", &[Source::new("src/a.rs", DERIVED_ORDER)], &[]),
     Case::new("roundtrip in a test", &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ROUNDTRIP)], &[]),

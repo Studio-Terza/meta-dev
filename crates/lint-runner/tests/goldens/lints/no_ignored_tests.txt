@@ -1,0 +1,9 @@
+every test runs:
+tests/ignored.rs:2: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
+tests/ignored.rs:5: test skipped by an attribute; remove the attribute and make the test pass, or delete the test
+tests/off.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
+tests/other.rs:1: test target switched off in Cargo.toml; remove `test = false` and make the tests pass
+tests differ by more than their literals:
+tests/off.rs:2: test t differs from v only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!
+tests/on.rs:2: test t differs from v only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!
+tests/other.rs:2: test t differs from v only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!

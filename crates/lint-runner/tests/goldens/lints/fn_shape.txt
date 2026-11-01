@@ -1,0 +1,40 @@
+free functions are not allowed; make them associated functions or methods:
+src/deep.rs:1: fn f
+src/locals.rs:1: fn f
+src/locals.rs:5: fn h
+src/narrow.rs:1: fn f
+src/shallow.rs:1: fn f
+src/wide.rs:1: fn f
+control flow is an expression; every branch yields the value the function returns:
+src/deep.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/deep.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/deep.rs:4: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/shallow.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/shallow.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+hairy control flow; booleans and tuples become types, nesting becomes methods:
+src/deep.rs:4: control flow nested deeper than 2 levels; lift the inner part into a method
+src/locals.rs:2: boolean local; inline a one-use condition or make a mode a type
+src/locals.rs:3: boolean local; inline a one-use condition or make a mode a type
+src/locals.rs:6: tuple literal bound to a local; name it as a struct
+src/locals.rs:7: tuple accumulator in a fold; give the accumulator a type
+src/wide.rs:1: more than 4 parameters; group the ones that travel together into a struct
+function names say what the function does:
+src/deep.rs:1: fn f names nothing; say what it does
+src/locals.rs:1: fn f names nothing; say what it does
+src/locals.rs:5: fn h names nothing; say what it does
+src/narrow.rs:1: fn f names nothing; say what it does
+src/shallow.rs:1: fn f names nothing; say what it does
+src/wide.rs:1: fn f names nothing; say what it does
+a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:
+src/locals.rs:6: numeric literal outside a const item; name it as a const so it can be found and tuned
+primitives appear only at a type's boundary:
+src/locals.rs:1: bare u8 in f; name what it counts with a newtype
+src/narrow.rs:1: bare u8 in f; name what it counts with a newtype
+src/narrow.rs:1: bare u8 in f; name what it counts with a newtype
+src/narrow.rs:1: bare u8 in f; name what it counts with a newtype
+src/narrow.rs:1: bare u8 in f; name what it counts with a newtype
+src/wide.rs:1: bare u8 in f; name what it counts with a newtype
+src/wide.rs:1: bare u8 in f; name what it counts with a newtype
+src/wide.rs:1: bare u8 in f; name what it counts with a newtype
+src/wide.rs:1: bare u8 in f; name what it counts with a newtype
+src/wide.rs:1: bare u8 in f; name what it counts with a newtype

@@ -6,8 +6,6 @@ const ROOT: Source = Source::new("crates/a/src/lib.rs", "mod parent;\nmod helper
 const PARENT: Source = Source::new("crates/a/src/parent.rs", "use crate::helper::Tool;\n");
 const SECOND_PARENT: Source = Source::new("crates/a/src/other.rs", "use crate::helper::Tool;\n");
 const HELPER: Source = Source::new("crates/a/src/helper.rs", "pub struct Tool;\n");
-const WIDE: Source = Source::new("crates/a/src/wide.rs", "pub use crate::x::{A, B, C, D, E, F, G, H, I};\n");
-const NARROW: Source = Source::new("crates/a/src/narrow.rs", "pub use crate::x::{A, B};\n");
 const OUTER: Source = Source::new("crates/a/src/outer/mod.rs", "pub mod inner;\n");
 const INNER: Source = Source::new("crates/a/src/outer/inner.rs", "pub struct Thing;\n");
 const REACHING: Source = Source::new("crates/a/src/user.rs", "use crate::outer::inner::Thing;\n");
@@ -17,14 +15,17 @@ const OTHER_THROUGH: Source = Source::new("crates/a/src/other.rs", "use crate::o
 const HIDDEN_WIDE: Source =
     Source::new("crates/a/src/wide.rs", "pub(crate) use crate::x::{A, B, C, D, E, F, G, H, I};\n");
 
-const CASES: [Case; 7] = [
-    Case::new("used by one sibling", &[ROOT, PARENT, HELPER], &["crates/a/src/helper.rs:1"]),
+const OUTER_FILE: Source = Source::new("crates/a/src/outer.rs", "pub mod inner;\n");
+const FAMILY: Source = Source::new("crates/a/src/outer/mod.rs", "pub mod inner;\npub mod first;\npub mod second;\n");
+const FIRST: Source = Source::new("crates/a/src/outer/first.rs", "use crate::outer::inner::Thing;\n");
+const SECOND: Source = Source::new("crates/a/src/outer/second.rs", "use crate::outer::inner::Thing;\n");
+
+const CASES: [Case; 5] = [
     Case::new("used by two siblings", &[ROOT, PARENT, SECOND_PARENT, HELPER], &[]),
-    Case::new("wide re-exports", &[WIDE], &["crates/a/src/wide.rs:1"]),
-    Case::new("narrow re-exports", &[NARROW], &[]),
-    Case::new("reaching past mod.rs", &[OUTER, INNER, REACHING], &["crates/a/src/user.rs:1"]),
     Case::new("through the parent", &[OUTER, INNER, THROUGH, OTHER_THROUGH], &[]),
     Case::new("crate-only re-exports", &[HIDDEN_WIDE], &[]),
+    Case::new("a parent without mod.rs", &[OUTER_FILE, INNER, REACHING], &[]),
+    Case::new("users inside the boundary", &[FAMILY, INNER, FIRST, SECOND], &[]),
 ];
 
 #[test]

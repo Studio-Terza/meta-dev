@@ -21,6 +21,6 @@ impl Conductance {
 
 impl fmt::Display for Conductance {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{:.3}", self.0)
+        write!(formatter, "{:.3}", self.0.abs())
     }
 }

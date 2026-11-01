@@ -1,0 +1,8 @@
+primitives appear only at a type's boundary:
+src/three.rs:5: bare u8 in show; name what it counts with a newtype
+src/three.rs:8: bare u8 in show; name what it counts with a newtype
+src/three.rs:11: bare u8 in show; name what it counts with a newtype
+src/two.rs:4: bare u8 in view; name what it counts with a newtype
+src/two.rs:7: bare u8 in view; name what it counts with a newtype
+one public method shape on many types is a missing trait; extract the trait:
+src/three.rs:5: fn show(& self) -> u8 on A, B, C

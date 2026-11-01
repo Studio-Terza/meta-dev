@@ -1,0 +1,2 @@
+tests differ by more than their literals:
+tests/behaviour.rs:6: test b differs from a only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!

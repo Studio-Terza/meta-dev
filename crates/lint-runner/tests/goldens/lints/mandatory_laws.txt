@@ -1,0 +1,2 @@
+conversions and orders have laws:
+src/order.rs:1: `B` has a hand-written Ord or PartialEq; add a `laws::law!` in a test that names it

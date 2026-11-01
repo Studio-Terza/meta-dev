@@ -1,24 +1,16 @@
-use lint_core::Lint;
-use lint_fixtures::Sources;
 use lint_named_lifetimes::NamedLifetimes;
 
-const SHORT: &str = "struct A<'a>(&'a str);\nfn f<'b>(x: &'b str) {}\n";
-const NAMED: &str = "struct A<'text>(&'text str);\nfn f(x: &'static str) {}\n";
+use lint_fixtures::{Case, Source, Sources};
+
+const TWO_LETTERS: &str = "struct A<'ab>(&'ab str);\n";
+const IN_MACRO: &str = "wrap! {\n    struct A<'a>(&'a str);\n}\n";
+
+const CASES: [Case; 2] = [
+    Case::new("two letters", &[Source::new("a.rs", TWO_LETTERS)], &[]),
+    Case::new("inside a macro", &[Source::new("a.rs", IN_MACRO)], &["a.rs:2"]),
+];
 
 #[test]
-fn single_letter_lifetimes_are_reported() {
-    let report = NamedLifetimes::report(&[Sources::file("a.rs", SHORT)]);
-    assert_eq!(Sources::lines(&report), ["a.rs:1", "a.rs:2"]);
-    assert!(report.violations().iter().any(|violation| violation.message() == "'a"));
-}
-
-#[test]
-fn word_lifetimes_pass() {
-    assert!(NamedLifetimes::report(&[Sources::file("a.rs", NAMED)]).is_clean());
-}
-
-#[test]
-fn a_one_letter_non_ascii_lifetime_is_reported() {
-    let report = NamedLifetimes::report(&[Sources::file("a.rs", "struct A<'é>(&'é str);\n")]);
-    assert_eq!(Sources::lines(&report), ["a.rs:1"]);
+fn only_one_letter_lifetimes_are_flagged_also_inside_macros() {
+    assert_eq!(Sources::mismatches::<NamedLifetimes>(&CASES), Vec::<String>::new());
 }

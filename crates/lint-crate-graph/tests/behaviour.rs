@@ -165,6 +165,7 @@ fn a_renamed_import_and_a_module_path_both_link() {
     };
     assert_eq!(flagged(renamed, "P0, P1, P2, P3, P4"), CLEAN);
     assert_eq!(flagged(by_path, "a::A0, a::A1, a::A2, a::A3, a::A4"), CLEAN);
+    assert_eq!(flagged("use crate::a::{self};\n", "a::A0, a::A1, a::A2, a::A3, a::A4"), CLEAN);
 }
 
 #[test]
@@ -187,4 +188,41 @@ fn items_declared_by_a_macro_call_are_judged() {
     let groups = format!("{}{}", Items::chain("A", GROUP), Items::chain("B", GROUP));
     let wrapped = format!("macro_rules! wrap {{ ($($item:item)*) => {{ $($item)* }} }}\nwrap! {{\n{groups}}}\n");
     assert_eq!(Items::flagged(&[Sources::file(ONE, &wrapped)]), FLAGGED);
+}
+
+const IMPORTS: &str = "use elsewhere::{A0, A1, A2, A3, A4};";
+
+#[test]
+fn imports_inside_items_still_hide_links() {
+    let holders = [
+        format!("pub struct Holder;\nimpl Holder {{\n    fn hold() {{\n        {IMPORTS}\n    }}\n}}\n"),
+        format!("pub fn hold() {{\n    {IMPORTS}\n}}\n"),
+        format!("mod holder {{\n    {IMPORTS}\n}}\n"),
+    ];
+    assert_eq!(holders.map(|holder| Items::joined(&holder, JOINED)), [FLAGGED; 3]);
+}
+
+#[test]
+fn a_path_rooted_elsewhere_is_not_a_link() {
+    let join = "pub struct Join(other::A0, other::A1, other::A2, other::A3, other::A4, B0, B1, B2, B3, B4);\n";
+    assert_eq!(Items::joined("", join), FLAGGED);
+}
+
+#[test]
+fn every_kind_of_item_is_a_node() {
+    let kinds = "pub enum A0 { Next(A1) }\npub trait A1: A2 {}\npub fn A2(next: A3) {}\npub type A3 = A4;\npub const A4: u8 = 1;\n";
+    let statics =
+        "pub static A0: A1 = A1(A2);\npub struct A1(A2);\npub struct A2(A3);\npub struct A3(A4);\npub struct A4;\n";
+    let moduled = format!("mod inner {{\n{}}}\n", Items::chain("A", GROUP));
+    let groups = [kinds, statics, &moduled].map(|group| format!("{group}{}", Items::chain("B", GROUP)));
+    let flagged = groups.map(|text| Items::flagged(&[Sources::file(ONE, &text)]));
+    assert_eq!(flagged, [FLAGGED; 3]);
+}
+
+#[test]
+fn links_inside_impls_count_unless_the_impl_is_test_code() {
+    let groups = format!("{}{}pub struct Join;\n", Items::chain("A", GROUP), Items::chain("B", GROUP));
+    let join = "impl Join {\n    fn take(items: (A0, A1, A2, A3, A4), others: (B0, B1, B2, B3, B4)) {}\n}\n";
+    assert_eq!(Items::flagged(&[Sources::file(ONE, &format!("{groups}{join}"))]), CLEAN);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, &format!("{groups}#[cfg(test)]\n{join}"))]), FLAGGED);
 }

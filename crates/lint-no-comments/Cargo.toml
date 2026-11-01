@@ -11,8 +11,5 @@ lint-layout = { path = "../lint-layout" }
 rustc_lexer.workspace = true
 syn.workspace = true
 
-[dev-dependencies]
-lint-fixtures = { path = "../lint-fixtures" }
-
 [lints]
 workspace = true
