@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModulePath};
+use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -18,7 +18,7 @@ use reexport_count::ReexportCount;
 use users::Users;
 
 pub struct ModuleTree {
-    modules: Vec<ModulePath>,
+    modules: ModuleIndex,
     users: Users,
     deep_uses: Vec<Violation>,
     reexports: BTreeMap<ModulePath, ReexportCount>,
@@ -27,7 +27,7 @@ pub struct ModuleTree {
 impl From<&[&SourceFile]> for ModuleTree {
     fn from(files: &[&SourceFile]) -> ModuleTree {
         let empty = ModuleTree {
-            modules: files.iter().map(|file| ModulePath::of_file(file)).collect(),
+            modules: ModuleIndex::from(files.iter().map(|file| ModulePath::of_file(file)).collect::<Vec<_>>()),
             users: Users::default(),
             deep_uses: Vec::new(),
             reexports: BTreeMap::new(),
@@ -49,6 +49,7 @@ impl ModuleTree {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count: *count, most })
             });
         self.modules
+            .modules()
             .iter()
             .filter_map(|module| {
                 self.home_of(module)
@@ -68,7 +69,7 @@ impl ModuleTree {
     fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
-                let used = ModulePath::deepest_module_containing(&self.modules, &target, module);
+                let used = self.modules.deepest_containing(&target, module);
                 self.users.record(used.cloned(), module);
                 self.deep_uses.extend(target.crosses_directory_boundary(module, &self.modules).then(|| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })

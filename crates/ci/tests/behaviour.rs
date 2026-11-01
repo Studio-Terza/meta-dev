@@ -21,7 +21,7 @@ const EMPTY_NOTES: &str = "skipped: CARGO_SCOPE is empty, so the steps that use 
 const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n\
     skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
-const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
+const BUILD: [&str; 9] = ["build", "--locked", "-q", "--profile", "tools", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 

@@ -41,7 +41,7 @@ jobs:
           key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
+        run: cargo run --locked -q --bin ci -- tools target/tools "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - name: fmt
@@ -100,7 +100,7 @@ jobs:
           key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
+        run: cargo run --locked -q --bin ci -- tools target/tools "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - uses: taiki-e/install-action@v2
