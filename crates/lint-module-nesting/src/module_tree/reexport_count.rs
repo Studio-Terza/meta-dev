@@ -1,10 +1,9 @@
-use std::fmt;
-
 use syn::{Item, UseTree, Visibility};
 
 use lint_core::Most;
+use newtype::Display;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReexportCount(usize);
 
 impl ReexportCount {
@@ -30,11 +29,5 @@ impl ReexportCount {
             UseTree::Group(group) => group.items.iter().map(Self::leaves).sum(),
             UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => 1,
         }
-    }
-}
-
-impl fmt::Display for ReexportCount {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}", self.0)
     }
 }

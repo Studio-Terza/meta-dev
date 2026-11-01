@@ -1,12 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Path, Token, Type};
-
-mod keyword {
-    syn::custom_keyword!(check);
-    syn::custom_keyword!(error);
-}
+use syn::{Path, Type};
 
 pub struct Check {
     function: Path,
@@ -14,14 +8,8 @@ pub struct Check {
 }
 
 impl Check {
-    const ATTRIBUTE: &str = "newtype";
-
-    pub fn declared(attributes: &[Attribute]) -> syn::Result<Option<Check>> {
-        attributes
-            .iter()
-            .find(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
-            .map(Attribute::parse_args)
-            .transpose()
+    pub fn new(function: Path, error: Type) -> Check {
+        Check { function, error }
     }
 
     pub fn function(&self) -> &Path {
@@ -40,17 +28,5 @@ impl Check {
                 |value| <Self as ::newtype::Validated>::try_new(value).ok(),
             )
         }
-    }
-}
-
-impl Parse for Check {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Check> {
-        input.parse::<keyword::check>()?;
-        input.parse::<Token![=]>()?;
-        let function = input.parse()?;
-        input.parse::<Token![,]>()?;
-        input.parse::<keyword::error>()?;
-        input.parse::<Token![=]>()?;
-        Ok(Check { function, error: input.parse()? })
     }
 }

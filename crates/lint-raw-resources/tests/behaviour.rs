@@ -14,7 +14,17 @@ const IN_MACRO: &str = "fn f() {\n    println!(\"{:?}\", std::env::temp_dir());\
 const IN_TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(x: u8) {\n        std::mem::forget(x);\n    }\n}\n";
 const OWN_FORGET: &str =
     "fn forget(x: u8) {}\nfn f(cache: Cache) {\n    forget(1);\n    cache.forget();\n    Cache::forget(1);\n}\n";
-const INLINE_PORTS: &str = "mod ports {\n    fn f(x: u8) {\n        std::mem::forget(x);\n    }\n}\n";
+const GUARDED: &str = "pub struct Wipe;\nimpl Drop for Wipe {\n    fn drop(&mut self) {\n        let _ = std::fs::remove_dir_all(\"x\");\n    }\n}\n";
+const INLINE_PORTS: &str = "mod ports {\n    pub struct Guard;\n    impl Guard {\n        pub fn leak(x: u8) {\n            std::mem::forget(x);\n        }\n    }\n    impl Drop for Guard {\n        fn drop(&mut self) {}\n    }\n}\n";
+const BARE_IN_PORTS: &str = "mod ports {\n    pub struct Wipe;\n    impl Wipe {\n        pub fn all() {\n            let _ = std::fs::remove_dir_all(\"x\");\n        }\n    }\n}\n";
+const RE_EXPORTED: &str = "mod ports {\n    pub use std::fs::remove_dir_all;\n    pub use std::process::Command;\n}\npub struct A;\nimpl A {\n    pub fn run() {\n        let _ = ports::remove_dir_all(\"x\");\n    }\n}\n";
+const USE_AFTER: &str = "fn f(x: u8) {\n    forget(x);\n}\nuse std::mem::forget;\n";
+const MACRO_GUARD: &str =
+    "fn f() {\n    matches!(std::fs::remove_dir_all(\"x\"), Err(e) if e.raw_os_error().is_some());\n}\n";
+const MACRO_RULES: &str = "macro_rules! wipe {\n    () => {\n        std::fs::remove_dir_all(\"x\")\n    };\n}\n";
+const REPEAT_MACRO: &str = "fn f() {\n    vec![std::env::temp_dir(); 2];\n}\n";
+const TYPE_ALIAS_CALL: &str = "use std::mem;\nfn f(x: u8) {\n    let leak = mem::forget::<u8>;\n    leak(x);\n}\n";
+const SIBLING_IMPORT: &str = "mod a {\n    pub use std::mem::forget;\n}\nmod b {\n    fn forget(_x: u8) {}\n    pub fn f() {\n        forget(1);\n    }\n}\n";
 const INLINE_OTHER: &str = "mod adapters {\n    fn f(x: u8) {\n        std::mem::forget(x);\n    }\n}\n";
 
 laws::table!(raw_calls_are_flagged, Sources::flagged::<RawResources>, [
@@ -29,11 +39,20 @@ laws::table!(raw_calls_are_flagged, Sources::flagged::<RawResources>, [
     [Source::new("a.rs", IN_TEST_MODULE)] => ["a.rs:4"],
     [Source::new("x/tests/run.rs", QUALIFIED)] => ["x/tests/run.rs:2"],
     [Source::new("a.rs", INLINE_OTHER)] => ["a.rs:3"],
+    [Source::new("a.rs", BARE_IN_PORTS)] => ["a.rs:5"],
+    [Source::new("crates/x/src/ports.rs", QUALIFIED)] => ["crates/x/src/ports.rs:2"],
+    [Source::new("a.rs", RE_EXPORTED)] => ["a.rs:8"],
+    [Source::new("a.rs", USE_AFTER)] => ["a.rs:2"],
+    [Source::new("a.rs", MACRO_GUARD)] => ["a.rs:2"],
+    [Source::new("a.rs", MACRO_RULES)] => ["a.rs:3"],
+    [Source::new("a.rs", REPEAT_MACRO)] => ["a.rs:2"],
+    [Source::new("a.rs", TYPE_ALIAS_CALL)] => ["a.rs:3"],
 ]);
 
 laws::table!(other_calls_and_ports_are_not, Sources::flagged::<RawResources>, [
     [Source::new("a.rs", OWN_FORGET)] => NONE,
     [Source::new("a.rs", INLINE_PORTS)] => NONE,
-    [Source::new("crates/x/src/ports/run.rs", QUALIFIED)] => NONE,
-    [Source::new("crates/x/src/ports.rs", QUALIFIED)] => NONE,
+    [Source::new("a.rs", SIBLING_IMPORT)] => NONE,
+    [Source::new("crates/x/src/ports/run.rs", GUARDED)] => NONE,
+    [Source::new("crates/x/src/ports.rs", GUARDED)] => NONE,
 ]);

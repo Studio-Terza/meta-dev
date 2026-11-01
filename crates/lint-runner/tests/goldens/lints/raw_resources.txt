@@ -19,6 +19,7 @@ src/imported.rs:2: bare u8 in f; name what it counts with a newtype
 src/ports.rs:1: bare u8 in f; name what it counts with a newtype
 only ports touch raw resources:
 src/imported.rs:3: calls std::mem::forget; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
+src/ports.rs:2: calls std::mem::forget outside a guard; in a port, put it in an impl of a type that implements Drop
 src/qualified.rs:2: calls std::fs::remove_dir_all; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
 src/renamed.rs:3: calls std::env::temp_dir; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
 fails

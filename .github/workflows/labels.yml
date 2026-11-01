@@ -18,7 +18,7 @@ jobs:
       - name: golden changes carry golden-change
         shell: bash
         run: |
-          changed=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select(.filename | test("(^|/)tests/goldens/")) | .filename')
+          changed=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select([.filename, (.previous_filename // "")] | any(test("(^|/)tests/goldens/"))) | .filename')
           labels=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
           if [ -n "$changed" ] && ! grep -qx golden-change <<<"$labels"; then
             echo "$changed"
@@ -28,7 +28,7 @@ jobs:
       - name: new scenarios carry new-scenario
         shell: bash
         run: |
-          added=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select(.status == "added") | select(.filename | test("(^|/)tests/(fixtures|e2e)/")) | .filename')
+          added=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select(.filename | test("(^|/)tests/(fixtures|e2e)/")) | select(.status == "added" or .status == "copied" or (.status == "renamed" and ((.previous_filename // "") | test("(^|/)tests/(fixtures|e2e)/") | not))) | .filename')
           labels=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
           if [ -n "$added" ] && ! grep -qx new-scenario <<<"$labels"; then
             echo "$added"

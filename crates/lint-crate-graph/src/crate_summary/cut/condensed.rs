@@ -15,7 +15,7 @@ use link::Link;
 use lint_core::Least;
 use lint_item_graph::Traversal;
 use lint_item_graph::{ItemGraph, NodeIndex};
-use newtype::{Counter, Newtype};
+use newtype::Counter;
 use spectrum::{Spectrum, Weight};
 
 #[derive(Debug)]

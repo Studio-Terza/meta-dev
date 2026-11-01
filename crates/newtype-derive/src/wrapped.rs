@@ -1,17 +1,19 @@
 mod check;
 mod only_field;
+mod settings;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, parse_quote};
+use syn::{DeriveInput, WherePredicate, parse_quote};
 
 use check::Check;
 use only_field::OnlyField;
+use settings::Settings;
 
 pub struct Wrapped {
     input: DeriveInput,
     field: OnlyField,
-    check: Option<Check>,
+    settings: Settings,
 }
 
 impl Wrapped {
@@ -24,20 +26,39 @@ impl Wrapped {
         let (implemented, arguments, bounds) = self.input.generics.split_for_impl();
         let member = self.field.member();
         let inner = self.field.inner();
-        match &self.check {
-            None => quote! {
-                impl #implemented ::newtype::Newtype for #name #arguments #bounds {
-                    type Inner = #inner;
+        match self.settings.checking() {
+            None => {
+                let zero = self.field.counts().then(|| {
+                    quote! {
+                        #[must_use]
+                        pub const fn zero() -> Self {
+                            Self { #member: 0 }
+                        }
+                    }
+                });
+                quote! {
+                    impl #implemented #name #arguments #bounds {
+                        #[must_use]
+                        pub const fn new(inner: #inner) -> Self {
+                            Self { #member: inner }
+                        }
 
-                    fn new(inner: Self::Inner) -> Self {
-                        Self { #member: inner }
+                        #zero
                     }
 
-                    fn into_inner(self) -> Self::Inner {
-                        self.#member
+                    impl #implemented ::newtype::Newtype for #name #arguments #bounds {
+                        type Inner = #inner;
+
+                        fn new(inner: Self::Inner) -> Self {
+                            Self { #member: inner }
+                        }
+
+                        fn into_inner(self) -> Self::Inner {
+                            self.#member
+                        }
                     }
                 }
-            },
+            }
             Some(check) => {
                 let function = check.function();
                 let error = check.error();
@@ -62,20 +83,50 @@ impl Wrapped {
 
     pub fn arbitrary(mut self) -> TokenStream {
         let name = &self.input.ident;
-        let inner = self.field.inner();
-        let predicates = &mut self.input.generics.make_where_clause().predicates;
-        predicates.push(parse_quote!(#inner: ::proptest::arbitrary::Arbitrary + 'static));
-        predicates.push(parse_quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Strategy: 'static));
+        let inner = self.field.inner().clone();
+        let chosen = self.settings.strategy().cloned();
+        let required: Vec<WherePredicate> = match chosen {
+            None => vec![
+                parse_quote!(Self: ::core::fmt::Debug),
+                parse_quote!(#inner: ::proptest::arbitrary::Arbitrary + 'static),
+                parse_quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Strategy: 'static),
+            ],
+            Some(_) => vec![parse_quote!(Self: ::core::fmt::Debug), parse_quote!(Self: 'static)],
+        };
+        self.input.generics.make_where_clause().predicates.extend(required);
         let (implemented, arguments, bounds) = self.input.generics.split_for_impl();
-        let strategy = self.check.as_ref().map_or_else(Self::plain_strategy, |_| Check::strategy());
+        let mapped = self.settings.checking().map_or_else(Self::plain_strategy, |_| Check::strategy());
+        let (parameters, source) = match chosen {
+            Some(strategy) => (quote!(()), quote!(let _ = parameters; let inner = #strategy;)),
+            None => (
+                quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Parameters),
+                quote!(let inner = ::proptest::arbitrary::any_with::<#inner>(parameters);),
+            ),
+        };
         quote! {
             impl #implemented ::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
-                type Parameters = <#inner as ::proptest::arbitrary::Arbitrary>::Parameters;
+                type Parameters = #parameters;
                 type Strategy = ::proptest::strategy::BoxedStrategy<Self>;
 
                 fn arbitrary_with(parameters: Self::Parameters) -> Self::Strategy {
-                    let inner = ::proptest::arbitrary::any_with::<#inner>(parameters);
-                    ::proptest::strategy::Strategy::boxed(#strategy)
+                    #source
+                    ::proptest::strategy::Strategy::boxed(#mapped)
+                }
+            }
+        }
+    }
+
+    pub fn display(self) -> TokenStream {
+        let name = &self.input.ident;
+        let inner = self.field.inner();
+        let member = self.field.member();
+        let mut generics = self.input.generics.clone();
+        generics.make_where_clause().predicates.push(parse_quote!(#inner: ::core::fmt::Display));
+        let (implemented, arguments, bounds) = generics.split_for_impl();
+        quote! {
+            impl #implemented ::core::fmt::Display for #name #arguments #bounds {
+                fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    ::core::fmt::Display::fmt(&self.#member, formatter)
                 }
             }
         }
@@ -89,8 +140,8 @@ impl Wrapped {
 
     fn parsed(tokens: TokenStream) -> syn::Result<Wrapped> {
         let input: DeriveInput = syn::parse2(tokens)?;
-        let check = Check::declared(&input.attrs)?;
+        let settings = Settings::declared(&input.attrs)?;
         let field = OnlyField::found_in(&input)?;
-        Ok(Wrapped { input, field, check })
+        Ok(Wrapped { input, field, settings })
     }
 }

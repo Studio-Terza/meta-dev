@@ -1,6 +1,6 @@
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use newtype::{Counter, Newtype, Validated};
+use newtype::{Counter, Display, Newtype, Validated};
 use newtype_derive::Arbitrary;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,10 +31,53 @@ impl Word {
     }
 }
 
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(check = Small::check, error = Empty, strategy = 0u128..1000)]
+struct Small(u128);
+
+impl Small {
+    fn check(number: &u128) -> Result<(), Empty> {
+        if *number < 1000 { Ok(()) } else { Err(Empty) }
+    }
+}
+
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(check = Digest::check, error = Empty, strategy = "[0-9a-f]{40}")]
+struct Digest(String);
+
+impl Digest {
+    fn check(text: &str) -> Result<(), Empty> {
+        if text.len() == 40 { Ok(()) } else { Err(Empty) }
+    }
+}
+
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+#[newtype(strategy = Strategies::even())]
+struct Even(u32);
+
+struct Strategies;
+
+impl Strategies {
+    fn even() -> impl laws::proptest::strategy::Strategy<Value = u32> {
+        laws::proptest::strategy::Strategy::prop_map(0u32..100, |half| half * 2)
+    }
+}
+
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
+struct Many<Item>(Vec<Item>);
+
+#[derive(Newtype, Display)]
+struct Shown(u32);
+
+#[derive(Newtype, Display)]
+struct Tagged<Tag>(Tag);
+
 struct Pairs;
 
 impl Pairs {
     const LARGEST: Rounds = Rounds(usize::MAX);
+    const THREE: Rounds = Rounds::new(3);
+    const NONE: Rounds = Rounds::zero();
 
     fn counts(rounds: &[Rounds]) -> Vec<usize> {
         rounds.iter().copied().map(Counter::count).collect()
@@ -95,4 +138,37 @@ fn counters_saturate_at_the_largest() {
 fn nothing_counted_is_zero() {
     assert_eq!(Rounds::zero(), Rounds::new(0));
     assert_eq!(Rounds::total(std::iter::empty()), Rounds::zero());
+}
+
+laws::law!(a_narrow_check_with_its_own_strategy_generates, any::<Small>(), small, {
+    prop_assert!(Small::check(&small.into_inner()).is_ok());
+});
+
+laws::law!(a_formatted_string_with_its_own_strategy_generates, any::<Digest>(), digest, {
+    prop_assert!(Digest::check(&digest.into_inner()).is_ok());
+});
+
+laws::law!(a_plain_newtype_takes_its_own_strategy, any::<Even>(), even, {
+    prop_assert_eq!(even.into_inner() % 2, 0);
+});
+
+laws::law!(a_generic_field_that_is_not_the_bare_parameter_generates, any::<Many<u8>>(), many, {
+    prop_assert_eq!(Many::new(many.clone().into_inner()), many);
+});
+
+laws::roundtrip!(
+    a_derived_display_prints_the_inner_value,
+    any::<u32>(),
+    |number: &u32| Shown::new(*number).to_string(),
+    |text: &String| text.parse::<u32>().ok(),
+    Some
+);
+
+laws::law!(a_generic_display_follows_its_parameter, any::<char>(), tag, {
+    prop_assert_eq!(Tagged::new(tag).to_string(), tag.to_string());
+});
+
+#[test]
+fn derived_constructors_build_constants() {
+    assert_eq!((Pairs::THREE.count(), Pairs::NONE.count()), (3, 0));
 }
