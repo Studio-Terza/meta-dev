@@ -1,16 +1,16 @@
 use serde::Deserialize;
 
-use super::label::Label;
 use crate::cli::command::step::seconds::Seconds;
+use text_lines::OneLine;
 
 #[derive(Debug, Deserialize)]
 pub struct Unit {
-    name: Label,
+    name: OneLine,
     duration: Seconds,
 }
 
 impl Unit {
-    pub(super) fn label(&self) -> &Label {
+    pub(super) fn label(&self) -> &OneLine {
         &self.name
     }
 

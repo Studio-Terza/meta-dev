@@ -5,18 +5,18 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use super::label::Label;
 use super::unit::Unit;
 use crate::cli::command::step::seconds::Seconds;
 use entry::Entry;
 use rows::Rows;
+use text_lines::OneLine;
 
 #[derive(Debug)]
 pub struct Listing(Vec<Entry>);
 
 impl Listing {
     pub(super) fn totalled(units: &[Unit]) -> Listing {
-        let totals = units.iter().fold(BTreeMap::<Label, Seconds>::new(), |mut totals, unit| {
+        let totals = units.iter().fold(BTreeMap::<OneLine, Seconds>::new(), |mut totals, unit| {
             let total = totals.entry(unit.label().clone()).or_default();
             *total = [*total, unit.took()].into_iter().sum();
             totals

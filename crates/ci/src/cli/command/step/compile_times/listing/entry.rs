@@ -1,17 +1,17 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use super::super::label::Label;
 use crate::cli::command::step::seconds::Seconds;
+use text_lines::OneLine;
 
 #[derive(Debug, PartialEq)]
 pub(super) struct Entry {
-    label: Label,
+    label: OneLine,
     seconds: Seconds,
 }
 
 impl Entry {
-    pub(super) fn new(label: Label, seconds: Seconds) -> Entry {
+    pub(super) fn new(label: OneLine, seconds: Seconds) -> Entry {
         Entry { label, seconds }
     }
 
