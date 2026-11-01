@@ -1,0 +1,20 @@
+[package]
+name = "lint-walk-similarity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
+newtype = { path = "../newtype" }
+type-facts = { path = "../type-facts" }
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

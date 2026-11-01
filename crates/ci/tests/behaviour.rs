@@ -436,6 +436,64 @@ fn a_report_is_appended_to_the_summary_under_its_name_or_said_to_be_missing() ->
     Ok(())
 }
 
+struct Timings {
+    answer: Answer,
+    stored: String,
+}
+
+struct Page;
+
+impl Page {
+    fn with(units: &str) -> String {
+        format!("<html>\nconst OTHER = [];\nconst UNIT_DATA = [{units}\n];\nconst CONCURRENCY_DATA = [];\n</html>\n")
+    }
+
+    fn unit(name: &str, duration: &str) -> String {
+        format!("{{\"i\": 0, \"name\": \"{name}\", \"mode\": \"todo\", \"duration\": {duration}, \"sections\": null}}")
+    }
+
+    fn timed(page: &str) -> Result<Timings, Box<dyn Error>> {
+        let scratch = Scratch::new()?;
+        scratch.write("page.html", page)?;
+        let answer =
+            Answer::to(&Fake::new(), &["compile-times", &scratch.file("page.html"), &scratch.file("report.txt")]);
+        Ok(Timings { answer, stored: scratch.read("report.txt") })
+    }
+}
+
+#[test]
+fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
+    let Timings { answer, stored } = Page::timed(&page)?;
+    let expected = "compile time per crate, seconds, longest first, 2.25 in all:\n2.00 zzz\n0.25 aaa\n";
+    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected.to_owned(), err: String::new() });
+    assert_eq!(stored, expected);
+    Ok(())
+}
+
+#[test]
+fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Box<dyn Error>> {
+    let units: Vec<String> = (0..31).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
+    let answer = Page::timed(&Page::with(&units.join(",")))?.answer;
+    assert_eq!(answer.out.matches(char::from(10)).count(), 31);
+    assert!(answer.out.contains("compile time per crate, seconds, longest first, 31.00 in all:\n"));
+    Ok(())
+}
+
+#[test]
+fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> {
+    for page in ["<html></html>", "const UNIT_DATA = nope;", "const UNIT_DATA = [{\"name\": 3}];"] {
+        let Timings { answer, stored } = Page::timed(page)?;
+        assert_eq!(answer.exit, ExitCode::FAILURE, "{page}");
+        assert!(answer.err.contains("no unit timings in"), "{page}");
+        assert_eq!((answer.out.as_str(), stored.as_str()), ("", ""));
+    }
+    let scratch = Scratch::new()?;
+    let missing = Answer::to(&Fake::new(), &["compile-times", &scratch.file("none.html"), &scratch.file("report.txt")]);
+    assert_eq!(missing.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
 #[test]
 fn a_program_the_scope_needs_that_cannot_start_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
@@ -486,6 +544,9 @@ laws::table!(
         ["reach", "metadata.json", "push"] => true,
         ["reach", "metadata.json", "push", "env"] => true,
         ["reach", "metadata.json", "push", "env", "sum", "extra"] => true,
+        ["compile-times"] => true,
+        ["compile-times", "page.html"] => true,
+        ["compile-times", "page.html", "report.txt", "extra"] => true,
         ["history"] => true,
         ["history", "metadata.json"] => true,
         ["history", "metadata.json", "history.tsv"] => true,

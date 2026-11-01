@@ -30,6 +30,8 @@ jobs:
       LIMITS: ${{ github.workspace }}/target/ci/limits.txt
       ELEGANCE: ${{ github.workspace }}/target/ci/elegance.txt
       HISTORY: ${{ github.workspace }}/target/ci/history.tsv
+      TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
+      COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +55,7 @@ jobs:
         run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $CARGO_SCOPE -- -D warnings'
       - name: test compile
         if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run $CARGO_SCOPE'
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $CARGO_SCOPE'
       - name: fuzz targets clippy
         if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
@@ -88,6 +90,12 @@ jobs:
       - name: elegance summary
         if: github.ref == 'refs/heads/main' && always()
         run: '"$TOOLS/ci" summarize "$ELEGANCE" "$GITHUB_STEP_SUMMARY"'
+      - name: compile times
+        if: github.ref == 'refs/heads/main'
+        run: '"$TOOLS/ci" compile-times "$TIMINGS" "$COMPILE_TIMES"'
+      - name: compile times summary
+        if: github.ref == 'refs/heads/main' && always()
+        run: '"$TOOLS/ci" summarize "$COMPILE_TIMES" "$GITHUB_STEP_SUMMARY"'
       - name: history restore
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/restore@v4

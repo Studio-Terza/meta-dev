@@ -3,8 +3,9 @@ use std::iter::Sum;
 use std::time::Duration;
 
 use newtype::Newtype;
+use serde::Deserialize;
 
-#[derive(Newtype, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Newtype, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Seconds(f64);
 
 impl From<Duration> for Seconds {
