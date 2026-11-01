@@ -74,5 +74,5 @@ test compile, test run and lint. `ci/timed.sh` times a stage; the test run is th
 times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
-on `ubuntu-latest`: block just above the slowest run, warn just above the median. The owner sets them;
-an agent does not raise them. No cache is used: caching was measured and did not pay for its save time.
+on `ubuntu-latest`: block just above the slowest run, warn just above the median.
+No cache is used: caching was measured and did not pay for its save time.
