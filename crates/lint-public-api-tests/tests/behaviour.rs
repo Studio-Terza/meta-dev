@@ -13,7 +13,15 @@ const LAW: &str = "laws::table!(t, f, [1 => 2]);\n";
 const DEFINED: &str = "macro_rules! m {\n    () => {\n        #[test]\n        fn t() {}\n    };\n}\n";
 const PLAIN: &str = "mod inner {\n    fn f() {}\n}\n";
 
-const CASES: [Case; 11] = [
+const PROPTEST: &str = "proptest::proptest! {\n    #[test]\n    fn t(a in 0..2) {}\n}\n";
+const EMITTER: &str = "macro_rules! check {\n    ($name:ident) => {\n        #[test]\n        fn $name() {}\n    };\n}\ncheck!(private_internals);\n";
+const RSTEST: &str = "#[rstest::rstest]\nfn t() {}\n";
+const SCHEMA: &str = "diesel::table! {\n    users (id) {\n        id -> Int4,\n    }\n}\n";
+const PEEK: &str = "#[path = \"../src/internal.rs\"]\nmod internal;\n";
+const NESTED_PEEK: &str = "mod m {\n    #[path = \"../../src/internal.rs\"]\n    mod internal;\n}\n";
+const SIBLING: &str = "#[path = \"common/mod.rs\"]\nmod common;\n";
+
+const CASES: [Case; 18] = [
     Case::new("inline module", &[Source::new("src/a.rs", MODULE)], &["src/a.rs:3"]),
     Case::new("module file", &[Source::new("src/a.rs", MODULE_FILE)], &["src/a.rs:2"]),
     Case::new("combined condition", &[Source::new("src/a.rs", COMBINED)], &["src/a.rs:2"]),
@@ -25,6 +33,13 @@ const CASES: [Case; 11] = [
     Case::new("plain module", &[Source::new("src/a.rs", PLAIN)], &[]),
     Case::new("test in tests", &[Source::new("tests/a.rs", BARE_TEST)], &[]),
     Case::new("law in tests", &[Source::new("tests/a.rs", LAW)], &[]),
+    Case::new("proptest block", &[Source::new("src/a.rs", PROPTEST)], &["src/a.rs:1"]),
+    Case::new("macro that emits a test", &[Source::new("src/a.rs", EMITTER)], &["src/a.rs:7"]),
+    Case::new("rstest", &[Source::new("src/a.rs", RSTEST)], &["src/a.rs:2"]),
+    Case::new("foreign table macro", &[Source::new("src/schema.rs", SCHEMA)], &[]),
+    Case::new("path into src", &[Source::new("tests/a.rs", PEEK)], &["tests/a.rs:2"]),
+    Case::new("path into src from a module", &[Source::new("tests/a.rs", NESTED_PEEK)], &["tests/a.rs:3"]),
+    Case::new("path to a helper", &[Source::new("tests/a.rs", SIBLING)], &[]),
 ];
 
 #[test]

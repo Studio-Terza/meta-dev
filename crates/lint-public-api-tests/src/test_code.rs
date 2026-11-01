@@ -1,22 +1,27 @@
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemMod, Macro};
 
-use lint_core::{LineNumber, TestMarks, Walk};
+use std::collections::BTreeSet;
 
-#[derive(Debug, Default)]
-pub(crate) struct TestCode {
+use lint_core::{LineNumber, Macros, Name, TestMarks, Walk};
+
+#[derive(Debug)]
+pub(crate) struct TestCode<'emitters> {
+    emitters: &'emitters BTreeSet<Name>,
     lines: Vec<LineNumber>,
 }
 
-impl TestCode {
-    pub(crate) fn lines_in(file: &syn::File) -> Vec<LineNumber> {
-        let mut code = TestCode::default();
+impl<'emitters> TestCode<'emitters> {
+    const DEFINITION: &'static str = "macro_rules";
+
+    pub(crate) fn lines_in(file: &syn::File, emitters: &'emitters BTreeSet<Name>) -> Vec<LineNumber> {
+        let mut code = TestCode { emitters, lines: Vec::new() };
         code.visit_file(file);
         code.lines
     }
 }
 
-impl<'ast> Visit<'ast> for TestCode {
+impl<'ast> Visit<'ast> for TestCode<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
             Walk::Entered => visit::visit_item_mod(self, module),
@@ -30,6 +35,12 @@ impl<'ast> Visit<'ast> for TestCode {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        self.lines.extend(TestMarks::is_law(invocation).then(|| LineNumber::from(invocation.bang_token.span)));
+        self.lines.extend(
+            (TestMarks::is_law(invocation)
+                || (!invocation.path.is_ident(Self::DEFINITION)
+                    && Macros::attributes(invocation).iter().any(TestMarks::is_test))
+                || invocation.path.get_ident().is_some_and(|name| self.emitters.contains(&Name::from(name))))
+            .then(|| LineNumber::from(invocation.bang_token.span)),
+        );
     }
 }

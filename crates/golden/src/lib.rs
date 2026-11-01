@@ -11,6 +11,6 @@ pub use mode::Mode;
 #[macro_export]
 macro_rules! golden {
     ($name:expr, $actual:expr $(,)?) => {
-        $crate::Golden::in_package(env!("CARGO_MANIFEST_DIR"), $name).verify($actual)
+        $crate::Golden::in_running_package($name).and_then(|golden| golden.verify($actual))
     };
 }

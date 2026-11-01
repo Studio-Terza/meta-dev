@@ -27,6 +27,8 @@ pub enum Failure {
     UnknownValue { value: OsString },
     #[error("{} is refused in CI; record locally and commit the diff", Mode::VARIABLE)]
     RecordInCi,
+    #[error("CARGO_MANIFEST_DIR is not set; run goldens through `cargo test`")]
+    NoPackage,
 }
 
 impl fmt::Debug for Failure {

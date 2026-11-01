@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -9,6 +10,7 @@ pub struct Golden(PathBuf);
 
 impl Golden {
     const DIRECTORY: &'static str = "tests/goldens";
+    const PACKAGE_VARIABLE: &'static str = "CARGO_MANIFEST_DIR";
 
     #[must_use]
     pub fn located_at(path: impl Into<PathBuf>) -> Self {
@@ -20,11 +22,15 @@ impl Golden {
         Self(package.as_ref().join(Self::DIRECTORY).join(name))
     }
 
+    pub fn in_running_package(name: impl AsRef<Path>) -> Result<Self, Failure> {
+        env::var_os(Self::PACKAGE_VARIABLE).map(|package| Self::in_package(package, name)).ok_or(Failure::NoPackage)
+    }
+
     pub fn verify(&self, actual: &str) -> Result<(), Failure> {
         self.verify_in(Mode::current()?, actual)
     }
 
-    pub fn verify_in(&self, mode: Mode, actual: &str) -> Result<(), Failure> {
+    fn verify_in(&self, mode: Mode, actual: &str) -> Result<(), Failure> {
         match mode {
             Mode::Check => {
                 let recorded = fs::read_to_string(&self.0).map_err(|source| self.unread(source))?;

@@ -29,7 +29,8 @@ impl Fixture {
 
     fn with_recorded(text: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let fixture = Self::new()?;
-        fixture.golden().verify_in(Mode::Record, text)?;
+        fs::create_dir_all(fixture.directory.path().join("nested"))?;
+        fs::write(fixture.path(), text)?;
         Ok(fixture)
     }
 
@@ -44,14 +45,14 @@ impl Fixture {
 
 #[test]
 fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
-    Fixture::with_recorded("same\n")?.golden().verify_in(Mode::Check, "same\n")?;
+    Fixture::with_recorded("same\n")?.golden().verify("same\n")?;
     Ok(())
 }
 
 #[test]
 fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    assert!(matches!(fixture.golden().verify_in(Mode::Check, "new\n"), Err(Failure::Differs { .. })));
+    assert!(matches!(fixture.golden().verify("new\n"), Err(Failure::Differs { .. })));
     assert_eq!(fixture.text()?, "old\n");
     Ok(())
 }
@@ -59,17 +60,8 @@ fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), B
 #[test]
 fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    assert!(matches!(fixture.golden().verify_in(Mode::Check, "new\n"), Err(Failure::Missing { .. })));
+    assert!(matches!(fixture.golden().verify("new\n"), Err(Failure::Missing { .. })));
     assert!(!fixture.path().exists());
-    Ok(())
-}
-
-#[test]
-fn recording_mode_replaces_the_golden() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = Fixture::with_recorded("old\n")?;
-    fixture.golden().verify_in(Mode::Record, "new\n")?;
-    assert_eq!(fixture.text()?, "new\n");
-    fixture.golden().verify_in(Mode::Check, "new\n")?;
     Ok(())
 }
 
@@ -77,7 +69,7 @@ fn recording_mode_replaces_the_golden() -> Result<(), Box<dyn std::error::Error>
 fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("")?;
     fs::write(fixture.path(), [0xff, 0xfe])?;
-    assert!(matches!(fixture.golden().verify_in(Mode::Check, ""), Err(Failure::Unreadable { .. })));
+    assert!(matches!(fixture.golden().verify(""), Err(Failure::Unreadable { .. })));
     Ok(())
 }
 
@@ -105,7 +97,7 @@ roundtrip!(
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    let printed = fixture.golden().verify_in(Mode::Check, "new\n").map_err(|failure| format!("{failure:?}"));
+    let printed = fixture.golden().verify("new\n").map_err(|failure| format!("{failure:?}"));
     let wanted = format!(
         "{}: output differs from the golden\n@ first change at line 1; - golden, + actual\n- \"old\\n\"\n+ \"new\\n\"\n\nif this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
         fixture.path().display()

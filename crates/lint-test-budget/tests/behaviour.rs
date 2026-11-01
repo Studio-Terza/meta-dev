@@ -6,6 +6,7 @@ use lint_test_budget::{Count, CrateBudget, TestBudget};
 
 const SHIPPED: &str = "pub struct A;\npub struct B;\n";
 const WITH_MODULE: &str = "pub struct A;\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n";
+const NESTED: &str = "#[cfg(test)]\nmod a {\n    mod b {\n        #[test]\n        fn t() {}\n    }\n}\n";
 const TESTS: &str = "#[test]\nfn a() {}\n#[tokio::test]\nfn b() {}\nfn helper() {}\n";
 const LAWS: &str = "laws::table!(a, f, [1 => 2]);\nroundtrip!(b, s, e, d);\nlaws::idempotent!(c, s, f);\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(x in 0..2) {}\n    #[test]\n    fn b(x in 0..2) {}\n}\n";
@@ -47,6 +48,18 @@ fn shipped_lines_are_not_test_lines() {
 fn an_inline_test_module_counts_as_test_lines() {
     let files = [Sources::file("crates/a/src/lib.rs", WITH_MODULE)];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 6, 5)));
+}
+
+#[test]
+fn nested_test_modules_count_their_lines_once() {
+    let files = [Sources::file("crates/a/src/lib.rs", NESTED)];
+    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 7, 7)));
+}
+
+#[test]
+fn a_build_script_belongs_to_its_package() {
+    let files = [Sources::file("crates/a/src/lib.rs", SHIPPED), Sources::file("crates/a/build.rs", SHIPPED)];
+    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(0, 2, 4, 0)));
 }
 
 #[test]

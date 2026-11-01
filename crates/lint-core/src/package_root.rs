@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use crate::crate_root::CrateRoot;
 use crate::manifest::Manifest;
 use crate::name::Name;
+use crate::untested::Untested;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PackageRoot {
     root: CrateRoot,
     features: Vec<Name>,
+    untested: Untested,
 }
 
 impl PackageRoot {
@@ -19,12 +21,13 @@ impl PackageRoot {
         PackageRoot {
             root: CrateRoot::of_manifest(directory, manifest.as_ref()),
             features: manifest.as_ref().map(Manifest::feature_names).unwrap_or_default(),
+            untested: manifest.as_ref().map(Manifest::untested_targets).unwrap_or_default(),
         }
     }
 
     #[must_use]
     pub fn unplaced(root: CrateRoot) -> PackageRoot {
-        PackageRoot { root, features: Vec::new() }
+        PackageRoot { root, features: Vec::new(), untested: Untested::default() }
     }
 
     #[must_use]
@@ -35,6 +38,11 @@ impl PackageRoot {
     #[must_use]
     pub fn features(&self) -> &[Name] {
         &self.features
+    }
+
+    #[must_use]
+    pub fn untested(&self) -> &Untested {
+        &self.untested
     }
 
     #[must_use]
