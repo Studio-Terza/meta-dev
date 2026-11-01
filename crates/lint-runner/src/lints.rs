@@ -20,6 +20,7 @@ use lint_no_free_fns::NoFreeFns;
 use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
+use lint_no_plaintext::NoPlaintext;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
@@ -62,6 +63,7 @@ impl Lints {
             NoForwarders::report(files),
             NoNumbersInBinaries::report(files),
             NoParameterBags::report(files),
+            NoPlaintext::report(files),
             PrimitiveBoundary::report(files),
             PrivateFns::report(files),
             ProcessStarters::report(files),

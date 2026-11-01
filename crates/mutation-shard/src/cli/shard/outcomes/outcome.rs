@@ -11,11 +11,12 @@ use named::Named;
 use test_log::{TestLog, TestName};
 
 use crate::cli::shard::mutant_result::MutantResult;
+use crate::cli::shard::verdict::Verdict;
 
 #[derive(Debug, Deserialize)]
 pub struct Outcome {
     scenario: Scenario,
-    summary: String,
+    summary: Verdict,
     log_path: Option<PathBuf>,
     #[serde(default)]
     phase_results: Vec<Phase>,
@@ -45,7 +46,7 @@ impl Outcome {
             Scenario::Mutant(named) => {
                 let mut title = String::new();
                 write!(title, "{named}").ok();
-                Some(MutantResult::new(title, self.summary.clone(), self.log(directory).failed()))
+                Some(MutantResult::new(title, self.summary, self.log(directory).failed()))
             }
             Scenario::Baseline => None,
         }

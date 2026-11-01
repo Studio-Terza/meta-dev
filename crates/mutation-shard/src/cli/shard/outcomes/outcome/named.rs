@@ -1,12 +1,14 @@
 use std::fmt;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use text_lines::OneLine;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Named {
-    name: Option<String>,
-    file: Option<String>,
-    replacement: Option<String>,
+    name: Option<OneLine>,
+    file: Option<PathBuf>,
+    replacement: Option<OneLine>,
 }
 
 impl Named {
@@ -15,13 +17,13 @@ impl Named {
 
 impl fmt::Display for Named {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.name.as_deref().filter(|name| !name.is_empty()) {
-            Some(name) => formatter.write_str(name),
+        match self.name.as_ref().filter(|name| !AsRef::<str>::as_ref(name).is_empty()) {
+            Some(name) => name.fmt(formatter),
             None => write!(
                 formatter,
                 "{}: {}",
-                self.file.as_deref().unwrap_or(Self::UNKNOWN_FILE),
-                self.replacement.as_deref().unwrap_or_default()
+                self.file.as_deref().unwrap_or(Path::new(Self::UNKNOWN_FILE)).display(),
+                self.replacement.as_ref().map(ToString::to_string).unwrap_or_default()
             ),
         }
     }
