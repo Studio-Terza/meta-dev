@@ -11,5 +11,8 @@ syn.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

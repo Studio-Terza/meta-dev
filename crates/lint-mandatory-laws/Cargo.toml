@@ -1,0 +1,20 @@
+[package]
+name = "lint-mandatory-laws"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+proc-macro2.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+lint-reader = { path = "../lint-reader" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

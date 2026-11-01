@@ -13,27 +13,29 @@ inside its package, so the verdict does not depend on where the checkout lives.
 Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enum_predicates,
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
-no_parameter_bags, primitive_boundary, private_fns, process_starters, public_surface,
-repeated_methods, state_graph, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
+no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
+repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 near_duplicate_tests.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
 It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`
-(`bool_methods`), with the headline naming the alternatives; that list is report only too, so it is outside
-the lints above and never changes the exit code.
+(`bool_methods`), with the headline naming the alternatives, and public methods that form a pair such as
+`start` and `stop` (`paired_apis`), with the headline saying to write a guard. Those lists are report only too,
+so they are outside the lints above and never change the exit code.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
 settings, and there is no per-repository configuration, switch or baseline. Where something is sometimes
-legitimate, the lint gates where by naming convention: starting a process (`process_starters`) is allowed only
-in a crate whose name ends in `ports` or a module named `ports`, and casts (`const_shape`), bare numbers
+legitimate, the lint gates where by naming convention: starting a process (`process_starters`) and calling
+`fs::remove_dir_all`, `mem::forget` or `env::temp_dir` (`raw_resources`) are allowed only in a crate whose name
+ends in `ports` or a module named `ports`, and casts (`const_shape`), bare numbers
 (`named_numbers`) and bare primitives (`primitive_boundary`) only in a module named `bits`. Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` (the report-only list), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits) and `newtype-derive` (their derives). Crates
+library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits) and `newtype-derive` (their derives). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -102,6 +104,42 @@ only generates values its check admits. The using crate needs `proptest` as a de
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
 are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and a
 hand-written constructor on three types still fails.
+
+## Guards
+
+A guard is a type that implements `Drop`. `guard_must_use` fails a guard without `#[must_use]`.
+
+## Lifecycles
+
+`states!` declares a lifecycle as a graph, in a module of its own.
+
+    states::states! {
+        pub mod pr {
+            start Working { review -> Reviewing, abandon -> Abandoned }
+            state Reviewing { approve -> Merged, rework -> Working }
+            terminal Merged {}
+            terminal Abandoned {}
+        }
+    }
+
+    fn run<'id>(pr: pr::Working<'id>) -> pr::Finished<'id> {
+        pr.review().approve().finish()
+    }
+
+    pr::Working::scope(run);
+
+Each state is a `#[must_use]` type, and each edge a method that consumes it. `finish` exists on terminal states
+only, and it is the only way to get `Finished`. `scope` gives the closure a fresh invariant brand `'id`, as
+`GhostCell` does, and the closure must return `Finished` of that brand. A path that drops the state has no
+witness to return, so it does not compile. A path that diverges, by panic or endless loop, returns nothing and
+is not caught.
+
+The `compile_fail` doctests in `crates/states/src/compile_fail.md` prove this. `cargo test` runs them, and no
+test code starts a process, though rustdoc itself runs `rustc` for each one. Stable rustdoc does not check the
+error codes in them.
+
+`state_graph` reads each `states!` graph in shipped code. Every state must be reachable from a `start` state and
+reach a `terminal` state, and a terminal state has no outgoing edges. A graph it cannot read fails.
 
 ## Mutants
 
