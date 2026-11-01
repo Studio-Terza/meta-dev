@@ -74,6 +74,14 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn the_process_entry_point_fails_on_a_violation() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    assert_eq!(Cli::from_args(std::iter::once(OsString::from(root.path()))).run(), ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", DIRTY)?;

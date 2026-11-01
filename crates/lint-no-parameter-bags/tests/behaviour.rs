@@ -13,10 +13,11 @@ const SECOND_USER: Source = Source::new("crates/a/src/second.rs", "fn walk(optio
 const PRIVATE_BAG: Source = Source::new("crates/a/src/bag.rs", "struct Options {\n    depth: u8,\n}\n");
 const EXPORTED_BAG: Source = Source::new("crates/a/src/bag.rs", "pub struct Options {\n    pub depth: u8,\n}\n");
 const ROOT: Source = Source::new("crates/a/src/lib.rs", "mod bag;\npub use bag::Options;\n");
+const PRIVATE_ROOT: Source = Source::new("crates/a/src/lib.rs", "mod bag;\nuse bag::Options;\n");
 const INNER_USER: Source = Source::new("crates/a/src/first.rs", "fn run(options: Options) {}\n");
 const OTHER_CRATE_USER: Source = Source::new("crates/b/src/lib.rs", "fn run(options: Options) {}\n");
 
-const CASES: [Case; 7] = [
+const CASES: [Case; 8] = [
     Case::new("one consumer", &[BAG, FIRST_USER], &["crates/a/src/bag.rs:1"]),
     Case::new("two consumers", &[BAG, FIRST_USER, SECOND_USER], &[]),
     Case::new("own logic", &[WITH_LOGIC, FIRST_USER], &[]),
@@ -26,6 +27,7 @@ const CASES: [Case; 7] = [
         &["crates/a/src/bag.rs:1"],
     ),
     Case::new("exported from the library root", &[EXPORTED_BAG, ROOT], &[]),
+    Case::new("imported but not exported", &[EXPORTED_BAG, PRIVATE_ROOT], &["crates/a/src/bag.rs:1"]),
     Case::new("exported and used elsewhere", &[EXPORTED_BAG, ROOT, INNER_USER, OTHER_CRATE_USER], &[]),
     Case::new("no consumer", &[BAG], &[]),
 ];
