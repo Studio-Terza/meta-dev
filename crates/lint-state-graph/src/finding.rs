@@ -6,9 +6,9 @@ use syn::{Member, Visibility};
 
 use super::edge_scan::{Edge, EdgeCount};
 use lint_core::Most;
-use lint_core::Name;
 use lint_core::Site;
 use lint_core::TypeName;
+use lint_layout::Name;
 
 pub enum Finding {
     TupleHoldsVertex,

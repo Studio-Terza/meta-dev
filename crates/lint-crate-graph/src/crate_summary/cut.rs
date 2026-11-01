@@ -7,8 +7,9 @@ use std::fmt;
 
 use crate::crate_summary::cut::conductance::Conductance;
 use condensed::{Condensed, TangleIndex};
-use lint_core::{Least, Name};
+use lint_core::Least;
 use lint_item_graph::{ItemGraph, NodeIndex};
+use lint_layout::Name;
 use split::Split;
 
 #[derive(Clone, Debug, PartialEq)]

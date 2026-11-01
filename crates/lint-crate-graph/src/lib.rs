@@ -2,7 +2,8 @@ mod crate_summary;
 
 use std::collections::BTreeMap;
 
-use lint_core::{CrateFile, Lint, Report, SourceFile};
+use lint_core::{Lint, Report, SourceFile};
+use lint_placement::CrateFile;
 
 use crate_summary::CrateSummary;
 use lint_item_graph::ItemGraph;

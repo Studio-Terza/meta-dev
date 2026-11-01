@@ -1,6 +1,7 @@
 use std::fmt;
 
-use lint_core::{Failure, Report};
+use lint_core::Report;
+use lint_layout::Failure;
 
 #[derive(Debug)]
 pub enum Outcome {

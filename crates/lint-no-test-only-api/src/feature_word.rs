@@ -1,4 +1,4 @@
-use lint_core::{Name, Whole};
+use lint_layout::{Name, Whole};
 
 #[derive(Debug)]
 pub(crate) struct FeatureWord;

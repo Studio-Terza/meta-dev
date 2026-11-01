@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use syn::Ident;
 use syn::visit::Visit;
 
-use lint_core::Name;
 use lint_core::SourceFile;
+use lint_layout::Name;
 
 #[derive(Default)]
 pub struct NameUses(BTreeSet<Name>);

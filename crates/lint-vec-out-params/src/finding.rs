@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lint_core::Name;
+use lint_layout::Name;
 
 pub enum Finding {
     VecOut { name: Name },

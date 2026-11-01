@@ -10,7 +10,8 @@ use std::iter;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
-use lint_core::{Lint, PackageRoot, Report, Site, SourceFile, Violation};
+use lint_core::{Lint, Report, Site, SourceFile, Violation};
+use lint_placement::PackageRoot;
 use test_features::TestFeatures;
 
 #[derive(Debug)]

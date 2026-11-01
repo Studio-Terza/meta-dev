@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 
 use syn::{Expr, ExprLit, Item, ItemMod, Lit};
 
-use crate::failure::Failure;
-use crate::name::Name;
-use crate::walk::Walk;
+use lint_core::Walk;
+use lint_layout::Failure;
+use lint_layout::Name;
 
 pub use child::Child;
 use declaration::Declaration;

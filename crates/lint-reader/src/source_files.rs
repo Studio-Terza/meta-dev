@@ -1,22 +1,20 @@
 mod modules;
-mod roots;
 mod scope;
 mod test_modules;
-mod tree;
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::crate_file::CrateFile;
-use crate::failure::Failure;
-use crate::readout::Readout;
-use crate::source_file::SourceFile;
+use lint_core::Readout;
+use lint_core::SourceFile;
+use lint_layout::Failure;
+use lint_placement::CrateFile;
+use lint_roots::Roots;
+use lint_roots::Tree;
 use modules::Modules;
-use roots::Roots;
 use scope::Scope;
 use test_modules::TestModules;
-use tree::Tree;
 
 #[derive(Debug, Default)]
 pub struct SourceFiles {

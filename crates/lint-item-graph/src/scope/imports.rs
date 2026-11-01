@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use lint_core::{Name, UsePath};
+use lint_layout::{Name, UsePath};
 
 use super::import::Import;
 

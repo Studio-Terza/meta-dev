@@ -3,7 +3,8 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemMod, Macro};
 
-use lint_core::{Macros, TestMarks, Walk};
+use lint_core::{Macros, Walk};
+use lint_layout::TestMarks;
 
 use crate::count::Count;
 use crate::crate_budget::CrateBudget;

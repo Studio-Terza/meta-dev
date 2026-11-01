@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use syn::{Item, ItemMod};
 
-use crate::name::Name;
-use crate::role::Role;
 use crate::source_file::SourceFile;
+use lint_layout::Name;
+use lint_placement::Role;
 
 #[derive(Debug)]
 pub struct BinaryFiles(BTreeSet<PathBuf>);

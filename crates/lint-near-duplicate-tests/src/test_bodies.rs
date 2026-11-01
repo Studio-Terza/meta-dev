@@ -1,7 +1,8 @@
 use syn::ItemFn;
 use syn::visit::{self, Visit};
 
-use lint_core::{LineNumber, Name, Site, SourceFile, TestMarks};
+use lint_core::{Site, SourceFile};
+use lint_layout::{LineNumber, Name, TestMarks};
 
 use crate::body_shape::BodyShape;
 use crate::test_body::TestBody;

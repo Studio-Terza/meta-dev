@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use lint_core::SourceFiles;
+use lint_reader::SourceFiles;
 use lint_test_budget::TestBudget;
 
 use crate::{Lints, Outcome};

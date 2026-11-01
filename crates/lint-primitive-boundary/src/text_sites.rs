@@ -4,12 +4,12 @@ use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 
 use super::finding::Finding;
-use lint_core::LineNumber;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_core::{Name, Whole};
+use lint_layout::LineNumber;
+use lint_layout::{Name, Whole};
 
 #[derive(Default)]
 pub struct TextSites {

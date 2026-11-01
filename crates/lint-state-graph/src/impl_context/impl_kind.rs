@@ -1,5 +1,5 @@
-use lint_core::Name;
 use lint_core::TypeName;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImplKind {

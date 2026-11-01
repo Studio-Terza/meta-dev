@@ -14,7 +14,7 @@ use super::callee::Callee;
 use super::forwarder::Forwarder;
 use super::workspace_types::WorkspaceTypes;
 use lint_core::Walk;
-use lint_core::{Casing, Name};
+use lint_layout::{Casing, Name};
 
 pub struct Forwarders<'types> {
     types: &'types WorkspaceTypes,

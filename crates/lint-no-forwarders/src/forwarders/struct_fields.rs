@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use syn::{Field, GenericArgument, GenericParam, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
 
-use lint_core::Name;
+use lint_layout::Name;
 
 pub struct StructFields {
     generics: Vec<Name>,

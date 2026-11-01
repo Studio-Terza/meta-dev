@@ -5,12 +5,12 @@ use lint_core::Lint;
 use syn::visit::Visit;
 use syn::{Ident, ItemFn, Path};
 
-use lint_core::LineNumber;
-use lint_core::Name;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct NoFreeFns;

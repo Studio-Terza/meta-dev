@@ -28,7 +28,7 @@ in a crate whose name ends in `ports` or a module named `ports`, and casts (`con
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
-Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), one `lint-<name>` crate
+Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-fixtures` (shared test sources), `lint-runner` (the runner
 library), `lint` (the binary), `golden` (golden files for tests) and `laws` (law macros for tests). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of

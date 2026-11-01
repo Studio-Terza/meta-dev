@@ -1,5 +1,5 @@
-use crate::failure::Failure;
 use crate::source_file::SourceFile;
+use lint_layout::Failure;
 
 #[derive(Debug, Default)]
 pub struct Readout {

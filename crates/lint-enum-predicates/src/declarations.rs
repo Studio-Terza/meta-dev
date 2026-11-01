@@ -1,7 +1,9 @@
 use syn::visit::Visit;
 use syn::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
-use lint_core::{Macros, ModulePath, Name, SourceFile};
+use lint_core::{Macros, SourceFile};
+use lint_layout::Name;
+use lint_placement::ModulePath;
 
 use super::{Declaration, Kind};
 

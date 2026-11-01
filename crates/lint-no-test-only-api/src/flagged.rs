@@ -1,6 +1,7 @@
 use std::path::Path;
 
-use lint_core::{LineNumber, Site, Violation};
+use lint_core::{Site, Violation};
+use lint_layout::LineNumber;
 
 use crate::finding::Finding;
 

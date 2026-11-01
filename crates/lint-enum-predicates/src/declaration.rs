@@ -1,4 +1,5 @@
-use lint_core::{CrateRoot, ModulePath, Name};
+use lint_layout::Name;
+use lint_placement::{CrateRoot, ModulePath};
 
 use super::Kind;
 

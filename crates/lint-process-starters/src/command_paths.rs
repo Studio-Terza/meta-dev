@@ -4,7 +4,8 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprCall, ExprMethodCall, Ident, ItemMod, ItemUse, Macro, Token, UseTree};
 
-use lint_core::{Gate, LineNumber, SourceFile};
+use lint_core::{Gate, SourceFile};
+use lint_layout::LineNumber;
 
 #[derive(Debug, Default)]
 pub(crate) struct CommandPaths {

@@ -7,11 +7,11 @@ use finding::Finding;
 use lint_core::Lint;
 use name_uses::NameUses;
 
-use lint_core::Name;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct NoParameterBags;

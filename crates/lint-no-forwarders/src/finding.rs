@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::callee::Callee;
-use lint_core::Name;
+use lint_layout::Name;
 
 pub enum Finding {
     Forwards { name: Name, callee: Callee },

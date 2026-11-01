@@ -3,7 +3,8 @@ use std::path::{Component, Path, PathBuf};
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprLit, ItemMod, Lit};
 
-use lint_core::{LineNumber, Name, SourceFile};
+use lint_core::SourceFile;
+use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
 pub(crate) struct PathReach {

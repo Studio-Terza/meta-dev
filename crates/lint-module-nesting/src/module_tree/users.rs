@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::module_path::ModulePath;
 use lint_core::SourceFile;
-use lint_core::UseEdges;
+use lint_layout::UseEdges;
 
 #[derive(Default)]
 pub struct Users(BTreeMap<ModulePath, BTreeSet<ModulePath>>);

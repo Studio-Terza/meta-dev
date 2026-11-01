@@ -1,6 +1,6 @@
 use syn::{Expr, ExprStruct, ImplItemFn, Stmt};
 
-use lint_core::Name;
+use lint_layout::Name;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MethodShape {

@@ -5,7 +5,8 @@ mod test_body;
 use std::collections::BTreeMap;
 
 use body_shape::BodyShape;
-use lint_core::{Lint, PackageRoot, Report, SourceFile, Violation};
+use lint_core::{Lint, Report, SourceFile, Violation};
+use lint_placement::PackageRoot;
 use test_bodies::TestBodies;
 use test_body::TestBody;
 

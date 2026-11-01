@@ -1,7 +1,7 @@
 use std::fmt;
 
-use lint_core::Name;
-use lint_core::UsePath;
+use lint_layout::Name;
+use lint_layout::UsePath;
 
 pub enum Finding {
     BarePrimitive { primitive: Name, context: Name },

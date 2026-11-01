@@ -2,8 +2,9 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-use lint_core::{Lint, SourceFiles};
+use lint_core::Lint;
 use lint_no_ignored_tests::NoIgnoredTests;
+use lint_reader::SourceFiles;
 
 use lint_fixtures::{Case, Source, Sources};
 

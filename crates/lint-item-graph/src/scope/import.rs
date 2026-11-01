@@ -1,4 +1,4 @@
-use lint_core::{Name, UsePath};
+use lint_layout::{Name, UsePath};
 
 #[derive(Debug)]
 pub struct Import {

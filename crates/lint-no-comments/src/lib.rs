@@ -1,11 +1,11 @@
 use lint_core::Lint;
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 
-use lint_core::LineNumber;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct NoComments;

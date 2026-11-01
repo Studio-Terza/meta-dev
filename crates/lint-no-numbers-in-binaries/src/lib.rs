@@ -3,12 +3,12 @@ use syn::visit::Visit;
 use syn::{ItemMod, LitFloat, LitInt};
 
 use lint_core::BinaryFiles;
-use lint_core::LineNumber;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
 use lint_named_numbers::NamedNumbers;
 
 #[derive(Debug)]

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use super::tree::Tree;
-use crate::crate_file::CrateFile;
+use lint_placement::CrateFile;
+use lint_roots::Tree;
 
 #[derive(Debug)]
 pub struct Scope<'tree> {

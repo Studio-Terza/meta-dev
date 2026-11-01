@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
 quote.workspace = true
 syn.workspace = true
 

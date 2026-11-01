@@ -4,7 +4,8 @@ mod path_tokens;
 
 use std::collections::BTreeSet;
 
-use lint_core::{Name, UsePath, Walk};
+use lint_core::Walk;
+use lint_layout::{Name, UsePath};
 use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};

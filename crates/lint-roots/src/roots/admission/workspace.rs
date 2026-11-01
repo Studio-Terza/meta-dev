@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::failure::Failure;
-use crate::manifest::Manifest;
-use crate::source_files::roots::directory::Directory;
+use crate::roots::directory::Directory;
+use lint_layout::Failure;
+use lint_layout::Manifest;
 
 #[derive(Debug)]
 pub struct Workspace {

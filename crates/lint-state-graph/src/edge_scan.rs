@@ -15,12 +15,12 @@ use super::declarations::Declarations;
 use super::finding::Finding;
 use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::{ImplContext, ImplKind};
-use lint_core::Name;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::Name;
 
 pub struct EdgeScan<'scan> {
     declarations: &'scan Declarations,

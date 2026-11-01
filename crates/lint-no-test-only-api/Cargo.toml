@@ -7,12 +7,15 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
 lint-fixtures = { path = "../lint-fixtures" }
+lint-reader = { path = "../lint-reader" }
 tempfile.workspace = true
 
 [lints]

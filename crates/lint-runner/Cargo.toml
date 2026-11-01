@@ -7,6 +7,8 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-reader = { path = "../lint-reader" }
+lint-layout = { path = "../lint-layout" }
 lint-const-shape = { path = "../lint-const-shape" }
 lint-crate-graph = { path = "../lint-crate-graph" }
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }

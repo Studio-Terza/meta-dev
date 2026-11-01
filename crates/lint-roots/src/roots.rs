@@ -9,9 +9,9 @@ use package::Package;
 
 pub use target::Target;
 
-use super::tree::Tree;
-use crate::failure::Failure;
-use crate::manifest::Manifest;
+use crate::tree::Tree;
+use lint_layout::Failure;
+use lint_layout::Manifest;
 
 #[derive(Debug)]
 pub struct Roots;

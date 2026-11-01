@@ -1,8 +1,9 @@
 use std::error::Error;
 use std::fs;
 
-use lint_core::{Lint, SourceFiles, Violation};
+use lint_core::{Lint, Violation};
 use lint_no_test_only_api::NoTestOnlyApi;
+use lint_reader::SourceFiles;
 
 use lint_fixtures::{Case, Source, Sources};
 

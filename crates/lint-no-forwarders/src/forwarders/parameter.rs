@@ -1,7 +1,7 @@
 use syn::{FnArg, Ident, Pat, Path};
 
 use super::struct_fields::StructFields;
-use lint_core::Name;
+use lint_layout::Name;
 
 pub struct Parameter {
     name: Name,

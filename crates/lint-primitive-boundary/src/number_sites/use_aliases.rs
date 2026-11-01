@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use syn::visit::Visit;
 use syn::{ItemUse, Path, UseTree};
 
-use lint_core::Name;
-use lint_core::UsePath;
+use lint_layout::Name;
+use lint_layout::UsePath;
 
 #[derive(Default)]
 pub struct UseAliases(BTreeMap<Name, UsePath>);

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lint_core::Name;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub(super) struct Finding {
