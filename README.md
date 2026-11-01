@@ -51,7 +51,7 @@ about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits) and `newtype-derive` (their derives). Crates
+library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate) and `reach` (what a change can affect). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -109,13 +109,36 @@ only: it does not check who added a label.
 
 ## CI wall-time limits
 
-`ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: toolchain, clippy,
-test compile, test run and lint. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
+`ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
+test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
+by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
+that main reports. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
 times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
 No cache is used: caching was measured and did not pay for its save time.
+
+## Reach
+
+A pull request pays only for what it can affect. `ci/reach.sh` lists the files the pull request changes and
+gives them to `reach`, with the output of `cargo metadata --no-deps`:
+
+    reach affected <metadata> [<changed file>...]
+    reach fan-in <metadata>
+
+A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
+normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
+that covers `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`, `.cargo/`, `.github/`, `ci/`, the
+files of a deleted crate and anything not yet known. A file `reach` cannot place fails closed.
+
+`affected` prints the share of crates reached and the scopes CI uses, and the run summary of each pull
+request shows them. Clippy, the tests and mutants run on that scope, and are skipped when nothing is
+reached. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
+cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
+
+`fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
+is the measure of tangle, so the report on main prints it.
 
 ## Newtypes
 
@@ -191,9 +214,10 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 ## Mutants
 
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
-request changes, and tests each mutant with the whole workspace, because shared crates are tested through
-the crates that use them (`.cargo/mutants.toml`). A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
+tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
 
-`mutants.yml` runs every mutant once a week, in eight shards, or on request. It reports in the run
+`mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
+workspace (`.cargo/mutants.toml`). It reports in the run
 summary and the shard artifacts. Missed mutants do not fail it; a shard fails only if the run itself
 fails. No push starts it and no push cancels it.
