@@ -26,7 +26,8 @@ impl Unquoted {
     }
 
     pub(super) fn first_of(&self, symbols: &[&'static str]) -> Option<&'static str> {
-        symbols.iter().copied().find(|symbol| self.0.contains(*symbol))
+        let shown = self.to_string();
+        symbols.iter().copied().find(|symbol| shown.contains(*symbol))
     }
 }
 
