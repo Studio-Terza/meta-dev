@@ -1,0 +1,14 @@
+[package]
+name = "body-shape"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-layout = { path = "../lint-layout" }
+newtype = { path = "../newtype" }
+proc-macro2.workspace = true
+
+[lints]
+workspace = true
