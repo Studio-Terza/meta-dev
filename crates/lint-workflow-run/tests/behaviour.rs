@@ -51,7 +51,7 @@ impl Checked {
     }
 
     fn of_length(length: &Length) -> usize {
-        Self::at(WORKFLOW, &format!("run: {}\n", "a".repeat(length.0))).len()
+        Self::at(WORKFLOW, &format!("run: '{}'\n", "a".repeat(length.0))).len()
     }
 }
 
@@ -82,6 +82,8 @@ laws::table!(
         "run: case a\n" => Checked::keyword("case"),
         "run: [ -n a ]\n" => Checked::keyword("["),
         "run: [[ -n a ]]\n" => Checked::keyword("[["),
+        "run: 'if'\n" => Checked::keyword("if"),
+        "run: \"[ x ]\"\n" => Checked::keyword("["),
         "run: iffy\n" => Vec::<String>::new(),
         "run: |\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
         "run: |-\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],

@@ -920,7 +920,21 @@ fn a_tee_writes_to_both_and_stops_at_the_first_failure() -> Result<(), Box<dyn E
     let mut full: [u8; 2] = [0; 2];
     let mut limited = Tee::new(Vec::new(), full.as_mut_slice());
     assert!(limited.write(b"abc").is_err());
+    assert!(Tee::new(Vec::new(), Unflushable).flush().is_err());
+    assert!(Tee::new(Unflushable, Vec::new()).flush().is_err());
     Ok(())
+}
+
+struct Unflushable;
+
+impl Write for Unflushable {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Err(io::Error::other("stuck"))
+    }
 }
 
 #[derive(Debug)]

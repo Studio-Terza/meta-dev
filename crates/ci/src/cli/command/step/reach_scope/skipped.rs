@@ -16,7 +16,7 @@ impl TryFrom<&str> for Skipped {
     fn try_from(line: &str) -> Result<Skipped, NotSkipped> {
         line.char_indices()
             .last()
-            .filter(|(at, last)| *last == Self::EMPTY && *at > 0)
+            .filter(|(_, last)| *last == Self::EMPTY)
             .and_then(|(at, _)| line.get(..at))
             .map(|name| Skipped(name.to_owned()))
             .ok_or(NotSkipped)

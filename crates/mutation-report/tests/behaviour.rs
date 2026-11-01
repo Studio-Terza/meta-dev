@@ -56,6 +56,16 @@ fn macro_without_call() {
 }
 
 #[test]
+fn mention_without_call() {
+    golden! nothing
+}
+
+#[test]
+fnord() {
+    golden!(\"q\");
+}
+
+#[test]
 fn unicode_ünder_score() {
     golden!(\"u\");
 }
