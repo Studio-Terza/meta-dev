@@ -1,14 +1,18 @@
 use lint_core::Lint;
-use lint_fixtures::Sources;
+use lint_fixtures::{Case, Source, Sources};
 use lint_thin_main::ThinMain;
 
 const FAT: &str = "use std::fmt;\nfn main() {}\nstruct Extra;\n";
 const THIN: &str = "use std::fmt;\nfn main() {}\n";
 
+const BINARY_ROOTS: [Case; 2] = [
+    Case::new("main", &[Source::new("crates/x/src/main.rs", FAT)], &["crates/x/src/main.rs:3"]),
+    Case::new("bin directory", &[Source::new("src/bin/tool.rs", FAT)], &["src/bin/tool.rs:3"]),
+];
+
 #[test]
 fn logic_in_a_binary_root_is_reported() {
-    let report = ThinMain::report(&[Sources::file("crates/x/src/main.rs", FAT)]);
-    assert_eq!(Sources::lines(&report), ["crates/x/src/main.rs:3"]);
+    assert_eq!(Sources::mismatches::<ThinMain>(&BINARY_ROOTS), Vec::<String>::new());
 }
 
 #[test]
@@ -19,12 +23,6 @@ fn a_thin_main_passes() {
 #[test]
 fn files_other_than_the_binary_root_are_not_checked() {
     assert!(ThinMain::report(&[Sources::file("src/lib.rs", FAT)]).is_clean());
-}
-
-#[test]
-fn bin_directory_roots_are_checked() {
-    let report = ThinMain::report(&[Sources::file("src/bin/tool.rs", FAT)]);
-    assert_eq!(Sources::lines(&report), ["src/bin/tool.rs:3"]);
 }
 
 #[test]

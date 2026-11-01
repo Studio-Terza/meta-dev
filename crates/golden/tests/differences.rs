@@ -1,6 +1,18 @@
 use std::ffi::OsStr;
 
-use golden::{Difference, Failure, Mode, golden};
+use golden::{Difference, Failure, Golden, Mode, golden};
+
+struct Row {
+    golden: &'static str,
+    recorded: &'static str,
+    actual: &'static str,
+}
+
+impl Row {
+    const fn new(golden: &'static str, recorded: &'static str, actual: &'static str) -> Row {
+        Row { golden, recorded, actual }
+    }
+}
 
 struct Shown;
 
@@ -11,6 +23,12 @@ impl Shown {
         Difference::between(recorded, actual)
             .map_or(Self::NO_DIFFERENCE.to_owned(), |difference| difference.to_string())
     }
+
+    fn golden_mismatch(row: &Row) -> String {
+        Golden::in_package(env!("CARGO_MANIFEST_DIR"), row.golden)
+            .verify(&Self::between(row.recorded, row.actual))
+            .map_or_else(|failure| failure.to_string(), |()| String::new())
+    }
 }
 
 #[test]
@@ -20,30 +38,17 @@ fn a_changed_line_shows_its_context() -> Result<(), Failure> {
     golden!("changed_line.diff", &Shown::between(recorded, actual))
 }
 
-#[test]
-fn a_missing_final_newline_is_visible() -> Result<(), Failure> {
-    golden!("final_newline.diff", &Shown::between("same\n", "same"))
-}
-
-#[test]
-fn trailing_space_and_carriage_returns_are_visible() -> Result<(), Failure> {
-    golden!("invisible.diff", &Shown::between("a\nb\n", "a \r\nb\n"))
-}
-
-#[test]
-fn added_lines_appear_only_on_the_actual_side() -> Result<(), Failure> {
-    golden!("added.diff", &Shown::between("a\nc\n", "a\nb\nc\n"))
-}
-
-#[test]
-fn a_repeated_line_is_not_counted_twice() -> Result<(), Failure> {
-    golden!("repeated.diff", &Shown::between("a\na\n", "a\n"))
-}
-
-#[test]
-fn an_empty_golden_shows_every_actual_line() -> Result<(), Failure> {
-    golden!("empty.diff", &Shown::between("", "a\nb\n"))
-}
+laws::table!(
+    each_difference_matches_its_golden,
+    Shown::golden_mismatch,
+    [
+        Row::new("final_newline.diff", "same\n", "same") => "",
+        Row::new("invisible.diff", "a\nb\n", "a \r\nb\n") => "",
+        Row::new("added.diff", "a\nc\n", "a\nb\nc\n") => "",
+        Row::new("repeated.diff", "a\na\n", "a\n") => "",
+        Row::new("empty.diff", "", "a\nb\n") => "",
+    ]
+);
 
 #[test]
 fn a_refused_recording_says_how_to_record() -> Result<(), Failure> {
