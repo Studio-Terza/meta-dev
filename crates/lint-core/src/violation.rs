@@ -17,11 +17,6 @@ impl Violation {
     pub fn site(&self) -> &Site {
         &self.site
     }
-
-    #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
 }
 
 impl fmt::Display for Violation {

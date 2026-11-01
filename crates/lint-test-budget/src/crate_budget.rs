@@ -30,7 +30,7 @@ impl CrateBudget {
     const LINE_END: char = '\n';
 
     fn measured(file: &SourceFile, share: TestShare) -> CrateBudget {
-        let lines = Count::new(file.text().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
+        let lines = Count::new(file.text().as_ref().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
         let scan = TestScan::measured(file.syntax());
         CrateBudget {
             files: Count::new(1),

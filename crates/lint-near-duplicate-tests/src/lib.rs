@@ -5,10 +5,10 @@ mod test_body;
 use std::collections::BTreeMap;
 
 use body_shape::BodyShape;
-use lint_core::Lint;
 use lint_core::Report;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::{Headline, Lint};
 use lint_placement::PackageRoot;
 use test_bodies::TestBodies;
 use test_body::TestBody;
@@ -46,7 +46,7 @@ impl NearDuplicateTests {
 impl Lint for NearDuplicateTests {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "tests differ by more than their literals",
+            Headline::new("tests differ by more than their literals"),
             Self::grouped(files).values().flat_map(|group| Self::repeats(group)).collect(),
         )
     }

@@ -13,8 +13,6 @@ pub use erasure::Erasure;
 pub struct MethodShape {
     name: Name,
     signature: String,
-    owner: String,
-    body: String,
 }
 
 impl MethodShape {
@@ -35,22 +33,12 @@ impl MethodShape {
         MethodShape {
             name: Name::from(&signature.ident),
             signature: format!("{}({}){output}", erasure.spelled(&signature.generics), inputs.join(", ")),
-            owner: String::new(),
-            body: String::new(),
         }
-    }
-
-    #[must_use]
-    pub fn implementing(self, owner: &impl ToTokens, body: &impl ToTokens, erasure: &Erasure) -> MethodShape {
-        MethodShape { owner: erasure.spelled(owner).to_string(), body: erasure.spelled(body).to_string(), ..self }
     }
 }
 
 impl fmt::Display for MethodShape {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "fn {}{}", self.name, self.signature)?;
-        Some(&self.owner)
-            .filter(|owner| !owner.is_empty())
-            .map_or(Ok(()), |owner| write!(formatter, " in impl {owner}"))
+        write!(formatter, "fn {}{}", self.name, self.signature)
     }
 }

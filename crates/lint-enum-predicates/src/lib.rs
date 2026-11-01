@@ -13,7 +13,7 @@ use predicates::Predicates;
 use syn::visit::Visit;
 use syn::{Type, TypePath};
 
-use lint_core::{Report, SourceFile, Violation};
+use lint_core::{Headline, Report, SourceFile, Violation};
 use lint_layout::Name;
 use lint_placement::ModulePath;
 
@@ -26,7 +26,9 @@ impl Lint for EnumPredicates {
     fn report(files: &[SourceFile]) -> Report {
         let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
         Report::new(
-            "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
+            Headline::new(
+                "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
+            ),
             files.iter().flat_map(|file| predicates.violations(file)).collect(),
         )
     }

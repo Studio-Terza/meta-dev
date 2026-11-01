@@ -1,6 +1,6 @@
 use lint_named_numbers::NamedNumbers;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const LITERAL: &str = "fn f() -> u32 {\n    42\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f() -> u32 {\n        42\n    }\n}\n";
@@ -25,42 +25,99 @@ const FEATURE_ONLY: &str =
     "#[cfg(feature = \"proptest\")]\nmod support {\n    pub fn f() -> u32 {\n        42\n    }\n}\n";
 
 const CASES: [Case; 17] = [
-    Case::new("static", &[Source::new("a.rs", STATIC)], &["a.rs:1", "a.rs:1", "a.rs:1"]),
-    Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &[]),
     Case::new(
-        "support module",
-        &[Source::new("src/lib.rs", SUPPORT_MODULE), Source::new("src/fixtures.rs", LITERAL)],
-        &[],
-    ),
-    Case::new("test or feature ships", &[Source::new("a.rs", FEATURE_SUPPORT)], &["a.rs:5"]),
-    Case::new("test and platform", &[Source::new("a.rs", TEST_ONLY_ALL)], &[]),
-    Case::new("feature only ships", &[Source::new("a.rs", FEATURE_ONLY)], &["a.rs:4"]),
-    Case::new("negative unit in a pattern", &[Source::new("a.rs", NEGATIVE_PATTERN)], &[]),
-    Case::new("negative unit in an expression", &[Source::new("a.rs", NEGATIVE_EXPRESSION)], &[]),
-    Case::new("negative number in a pattern", &[Source::new("a.rs", NEGATIVE_PATTERN_OTHER)], &["a.rs:3"]),
-    Case::new("bits module file", &[Source::new("crates/x/src/bits/mask.rs", LITERAL)], &[]),
-    Case::new("bits module root", &[Source::new("crates/x/src/bits.rs", LITERAL)], &[]),
-    Case::new("inline bits module", &[Source::new("a.rs", INLINE_BITS)], &[]),
-    Case::new("inline other module", &[Source::new("a.rs", INLINE_OTHER)], &["a.rs:3"]),
-    Case::new(
-        "other module file",
-        &[Source::new("crates/x/src/masks/mask.rs", LITERAL)],
-        &["crates/x/src/masks/mask.rs:2"],
-    ),
-    Case::new("method", &[Source::new("a.rs", METHOD)], &["a.rs:4"]),
-    Case::new(
-        "support module of a module",
-        &[Source::new("src/a.rs", SUPPORT_MODULE), Source::new("src/a/fixtures.rs", LITERAL)],
-        &[],
+        Title::new("static"),
+        &[Source::new(Located::new("a.rs"), Text::new(STATIC))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1"]),
     ),
     Case::new(
-        "plain module",
-        &[Source::new("src/lib.rs", PLAIN_MODULE), Source::new("src/fixtures.rs", LITERAL)],
-        &["src/fixtures.rs:2"],
+        Title::new("test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("support module"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("src/fixtures.rs"), Text::new(LITERAL)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("test or feature ships"),
+        &[Source::new(Located::new("a.rs"), Text::new(FEATURE_SUPPORT))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("test and platform"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_ONLY_ALL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("feature only ships"),
+        &[Source::new(Located::new("a.rs"), Text::new(FEATURE_ONLY))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("negative unit in a pattern"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEGATIVE_PATTERN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("negative unit in an expression"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEGATIVE_EXPRESSION))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("negative number in a pattern"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEGATIVE_PATTERN_OTHER))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("bits module file"),
+        &[Source::new(Located::new("crates/x/src/bits/mask.rs"), Text::new(LITERAL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("bits module root"),
+        &[Source::new(Located::new("crates/x/src/bits.rs"), Text::new(LITERAL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inline bits module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BITS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inline other module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_OTHER))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("other module file"),
+        &[Source::new(Located::new("crates/x/src/masks/mask.rs"), Text::new(LITERAL))],
+        Flagged::new(&["crates/x/src/masks/mask.rs:2"]),
+    ),
+    Case::new(Title::new("method"), &[Source::new(Located::new("a.rs"), Text::new(METHOD))], Flagged::new(&["a.rs:4"])),
+    Case::new(
+        Title::new("support module of a module"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("src/a/fixtures.rs"), Text::new(LITERAL)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("plain module"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(PLAIN_MODULE)),
+            Source::new(Located::new("src/fixtures.rs"), Text::new(LITERAL)),
+        ],
+        Flagged::new(&["src/fixtures.rs:2"]),
     ),
 ];
 
 #[test]
 fn numbers_outside_const_items_are_flagged() {
-    assert_eq!(Sources::mismatches::<NamedNumbers>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<NamedNumbers>(&CASES), Lines::default());
 }

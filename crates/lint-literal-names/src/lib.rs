@@ -1,7 +1,7 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use syn::visit::Visit;
 use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, TraitItemFn};
 
@@ -13,7 +13,7 @@ use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
-use lint_layout::{Name, Whole};
+use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub struct LiteralNames;
@@ -21,7 +21,7 @@ pub struct LiteralNames;
 impl Lint for LiteralNames {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "function names say what the function does",
+            Headline::new("function names say what the function does"),
             files
                 .iter()
                 .filter(|file| file.is_shipped())
@@ -40,7 +40,7 @@ impl Lint for LiteralNames {
 
 impl LiteralNames {
     const SHORTEST: Least = Least::new(3);
-    const VAGUE: [&'static str; 24] = [
+    const VAGUE: [Word<'static>; 24] = words![
         "with", "from", "into", "for", "get", "set", "make", "check", "build", "create", "init", "process", "handle",
         "helper", "util", "data", "value", "item", "thing", "execute", "perform", "update", "compute", "manage",
     ];

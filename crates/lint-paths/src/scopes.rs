@@ -3,7 +3,7 @@ mod scope;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::module::Module;
-use lint_layout::{Name, UsePath};
+use lint_layout::{Name, UsePath, Word};
 use scope::Scope;
 
 #[derive(Debug, Default)]
@@ -37,7 +37,7 @@ impl Scopes {
         })
     }
 
-    pub(crate) fn renamed_to(&self, finals: &[&str]) -> Vec<Name> {
+    pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> Vec<Name> {
         self.scopes.values().flat_map(|scope| scope.renamed_to(finals)).collect()
     }
 

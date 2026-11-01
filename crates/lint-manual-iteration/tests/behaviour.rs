@@ -1,6 +1,6 @@
 use lint_manual_iteration::ManualIteration;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    fn f(items: Vec<u8>) {\n        let mut walk = items.iter();\n    }\n}\n";
@@ -19,18 +19,46 @@ const COMPUTED_RECEIVER: &str =
     "fn f(items: Vec<u8>, out: &mut Vec<u8>) {\n    for item in items {\n        out().push(item);\n    }\n}\n";
 
 const CASES: [Case; 9] = [
-    Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &[]),
-    Case::new("inside a macro", &[Source::new("a.rs", GENERATED)], &["a.rs:4"]),
-    Case::new("test fn", &[Source::new("a.rs", TEST_FN)], &[]),
-    Case::new("inline module", &[Source::new("a.rs", INLINE)], &["a.rs:3"]),
-    Case::new("method", &[Source::new("a.rs", METHOD)], &["a.rs:4"]),
-    Case::new("default method", &[Source::new("a.rs", DEFAULT_METHOD)], &["a.rs:3"]),
-    Case::new("both branches", &[Source::new("a.rs", BOTH_BRANCHES)], &[]),
-    Case::new("other method", &[Source::new("a.rs", OTHER_METHOD)], &[]),
-    Case::new("computed receiver", &[Source::new("a.rs", COMPUTED_RECEIVER)], &[]),
+    Case::new(
+        Title::new("test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(GENERATED))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(Title::new("test fn"), &[Source::new(Located::new("a.rs"), Text::new(TEST_FN))], Flagged::new(&[])),
+    Case::new(
+        Title::new("inline module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(Title::new("method"), &[Source::new(Located::new("a.rs"), Text::new(METHOD))], Flagged::new(&["a.rs:4"])),
+    Case::new(
+        Title::new("default method"),
+        &[Source::new(Located::new("a.rs"), Text::new(DEFAULT_METHOD))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("both branches"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOTH_BRANCHES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("other method"),
+        &[Source::new(Located::new("a.rs"), Text::new(OTHER_METHOD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("computed receiver"),
+        &[Source::new(Located::new("a.rs"), Text::new(COMPUTED_RECEIVER))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
 fn iterators_driven_by_hand_are_flagged() {
-    assert_eq!(Sources::mismatches::<ManualIteration>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<ManualIteration>(&CASES), Lines::default());
 }

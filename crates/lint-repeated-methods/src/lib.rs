@@ -1,7 +1,7 @@
 mod shape_index;
 
 use lint_core::Lint;
-use lint_core::{Most, Report, SourceFile};
+use lint_core::{Headline, Most, Report, SourceFile};
 
 use shape_index::ShapeIndex;
 
@@ -11,7 +11,9 @@ pub struct RepeatedMethods;
 impl Lint for RepeatedMethods {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "one public method shape on many types is a missing trait; extract the trait",
+            Headline::new(
+                "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
+            ),
             ShapeIndex::of_files(&files.iter().filter(|file| file.is_shipped()).collect::<Vec<_>>())
                 .repeated(Self::TYPES_PER_SHAPE),
         )

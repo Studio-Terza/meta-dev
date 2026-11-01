@@ -1,6 +1,6 @@
 use lint_no_ignored_tests::NoIgnoredTests;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const SKIPPED: &str = "#[rstest]\n#[skip]\nfn t() {}\n";
 const CONDITIONAL_IGNORE: &str = "#[test]\n#[cfg_attr(miri, ignore)]\nfn t() {}\n";
@@ -21,24 +21,84 @@ const TEST_ONLY: &str = "#[cfg(test)]\nmod m {\n    #[test]\n    fn t() {}\n}\n"
 const OTHER_ATTRIBUTE: &str = "#[test]\n#[serde(skip)]\nfn t() {}\n";
 
 const CASES: [Case; 15] = [
-    Case::new("skipped", &[Source::new("tests/a.rs", SKIPPED)], &["tests/a.rs:2"]),
-    Case::new("conditional ignore", &[Source::new("tests/a.rs", CONDITIONAL_IGNORE)], &["tests/a.rs:2"]),
-    Case::new("conditional test", &[Source::new("tests/a.rs", CONDITIONAL_TEST)], &["tests/a.rs:2"]),
-    Case::new("ignored law", &[Source::new("tests/a.rs", LAW)], &["tests/a.rs:2"]),
-    Case::new("conditional law", &[Source::new("tests/a.rs", CONDITIONAL_LAW)], &["tests/a.rs:2"]),
-    Case::new("ignored proptest", &[Source::new("tests/a.rs", PROPTEST)], &["tests/a.rs:3"]),
-    Case::new("should panic runs", &[Source::new("tests/a.rs", RUNS)], &[]),
-    Case::new("conditional helper", &[Source::new("src/a.rs", CONDITIONAL_HELPER)], &[]),
-    Case::new("derive helper", &[Source::new("src/a.rs", DERIVE_HELPER)], &[]),
-    Case::new("nested skip word", &[Source::new("src/a.rs", SERDE)], &[]),
-    Case::new("gated module", &[Source::new("tests/a.rs", GATED_MODULE)], &["tests/a.rs:1"]),
-    Case::new("gated file", &[Source::new("tests/a.rs", GATED_FILE)], &["tests/a.rs:1"]),
-    Case::new("gated and test", &[Source::new("tests/a.rs", GATED_AND_TEST)], &["tests/a.rs:2"]),
-    Case::new("test only module", &[Source::new("tests/a.rs", TEST_ONLY)], &[]),
-    Case::new("skip inside another attribute", &[Source::new("tests/a.rs", OTHER_ATTRIBUTE)], &[]),
+    Case::new(
+        Title::new("skipped"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(SKIPPED))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("conditional ignore"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(CONDITIONAL_IGNORE))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("conditional test"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(CONDITIONAL_TEST))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("ignored law"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(LAW))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("conditional law"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(CONDITIONAL_LAW))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("ignored proptest"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(PROPTEST))],
+        Flagged::new(&["tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("should panic runs"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(RUNS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("conditional helper"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(CONDITIONAL_HELPER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("derive helper"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DERIVE_HELPER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("nested skip word"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("gated module"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GATED_MODULE))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("gated file"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GATED_FILE))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("gated and test"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GATED_AND_TEST))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("test only module"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(TEST_ONLY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("skip inside another attribute"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(OTHER_ATTRIBUTE))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
 fn skipped_tests_are_flagged() {
-    assert_eq!(Sources::mismatches::<NoIgnoredTests>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<NoIgnoredTests>(&CASES), Lines::default());
 }

@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use lint_core::SourceFile;
 use lint_layout::UsePath;
-use lint_layout::{Name, Whole};
+use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateRoot;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -27,7 +27,7 @@ impl ModulePath {
     const MODULE_FILE: &'static str = "mod.rs";
     const CRATE: &'static str = "crate";
     const SUPER: &'static str = "super";
-    const ANCHORS: [&'static str; 3] = ["crate", "super", "self"];
+    const ANCHORS: [Word<'static>; 3] = words!["crate", "super", "self"];
 
     pub fn of_file(file: &SourceFile) -> ModulePath {
         ModulePath {

@@ -6,7 +6,7 @@ use syn::visit::Visit;
 use syn::{ItemMod, Macro};
 
 use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
-use lint_layout::Name;
+use lint_layout::{Name, Word};
 
 use graph::Graph;
 
@@ -22,7 +22,7 @@ impl<'scan> DeclaredGraphs<'scan> {
     pub fn violations(file: &'scan SourceFile) -> Vec<Violation> {
         let mut graphs = DeclaredGraphs {
             path: file.path(),
-            names: MacroAliases::in_file(file.syntax(), Self::MACRO),
+            names: MacroAliases::in_file(file.syntax(), Word::new(Self::MACRO)),
             violations: Vec::new(),
         };
         graphs.visit_file(file.syntax());

@@ -5,7 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use golden::Golden;
+use golden::{Golden, Output};
 use lint_runner::Cli;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
@@ -69,6 +69,6 @@ impl Corpus {
     fn difference(fixture: &Path) -> Result<Option<String>, Box<dyn Error>> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
         let golden = Golden::in_running_package(format!("lints/{name}.txt"))?;
-        Ok(golden.verify(&Self::output(fixture)?).err().map(|failure| format!("{failure:?}")))
+        Ok(golden.verify(Output::new(&Self::output(fixture)?)).err().map(|failure| format!("{failure:?}")))
     }
 }

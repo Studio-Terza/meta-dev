@@ -1,7 +1,7 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use syn::visit::Visit;
 
 use syn::{Ident, LifetimeParam};
@@ -19,7 +19,7 @@ pub struct NamedLifetimes;
 impl Lint for NamedLifetimes {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "lifetimes are named with a word, never a letter",
+            Headline::new("lifetimes are named with a word, never a letter"),
             files
                 .iter()
                 .flat_map(|file| {

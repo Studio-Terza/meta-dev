@@ -2,7 +2,7 @@ mod crate_summary;
 
 use std::collections::BTreeMap;
 
-use lint_core::{Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_placement::CrateFile;
 
 use crate_summary::CrateSummary;
@@ -21,7 +21,7 @@ impl Lint for CrateGraph {
             },
         );
         Report::new(
-            "a crate whose items form one big cycle or two loosely linked groups is split",
+            Headline::new("a crate whose items form one big cycle or two loosely linked groups is split"),
             crates
                 .into_iter()
                 .flat_map(|(crate_file, files)| {

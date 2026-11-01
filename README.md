@@ -131,10 +131,12 @@ the inner value.
 
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
-are named methods. Derived code is not in the source, so `repeated_methods` does not see it. A
-hand-written constructor on three types still fails, whatever their inner types are (an argument of the inner type
-counts as `Inner`), and so does the same body of an operator, `Display`, `From`, `Default`, `Sum`, `AsRef`, `Deref` or
-`FromStr` impl on three newtypes.
+are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
+count the impl of a trait (an operator, `Display`, `From`, `AsRef`, `FromStr`). A hand-written constructor or other
+public method of one shape on three types still fails, whatever their inner types are (an argument of the inner type
+counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
+
+Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
 ## Guards
 

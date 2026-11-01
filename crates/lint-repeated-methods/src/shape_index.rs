@@ -1,4 +1,3 @@
-mod boilerplate;
 mod inners;
 mod method_shape;
 mod placed;
@@ -13,7 +12,6 @@ use syn::{ImplItem, ItemImpl, ItemMod, Type, Visibility};
 use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
 use lint_layout::{LineNumber, Name};
 
-use boilerplate::Boilerplate;
 use inners::Inners;
 use method_shape::{Erasure, MethodShape};
 use placed::Placed;
@@ -73,14 +71,6 @@ impl ShapeIndex {
             .filter_map(|member| match (member, &item.trait_) {
                 (ImplItem::Fn(function), None) if !matches!(function.vis, Visibility::Inherited) => {
                     Some((function, MethodShape::described(&function.sig, &erasure)))
-                }
-                (ImplItem::Fn(function), Some((_, path, _)))
-                    if self.inners.inner_of(&self_type).is_some() && Boilerplate::names(path) =>
-                {
-                    Some((
-                        function,
-                        MethodShape::described(&function.sig, &erasure).implementing(path, &function.block, &erasure),
-                    ))
                 }
                 _ => None,
             })

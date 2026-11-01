@@ -2,7 +2,7 @@ mod command_paths;
 
 pub use command_paths::{CommandPaths, Scope};
 use lint_core::Lint;
-use lint_core::{Report, SourceFile, Violation};
+use lint_core::{Headline, Report, SourceFile, Violation};
 
 #[derive(Debug)]
 pub struct ProcessStarters;
@@ -10,7 +10,7 @@ pub struct ProcessStarters;
 impl Lint for ProcessStarters {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "only ports start processes",
+            Headline::new("only ports start processes"),
             CommandPaths::across(files, Scope::OutsidePorts)
                 .into_iter()
                 .map(|site| {

@@ -1,5 +1,5 @@
 use lint_core::Violation;
-use lint_layout::UsePath;
+use lint_layout::{UsePath, Word, words};
 use lint_paths::{Cover, Ground, Use};
 
 use super::Finding;
@@ -8,8 +8,9 @@ use super::Finding;
 pub struct RawPaths;
 
 impl RawPaths {
-    pub const FINALS: [&'static str; 3] = ["remove_dir_all", "forget", "temp_dir"];
-    const RAW: [[&'static str; 2]; 3] = [["fs", "remove_dir_all"], ["mem", "forget"], ["env", "temp_dir"]];
+    pub const FINALS: [Word<'static>; 3] = words!["remove_dir_all", "forget", "temp_dir"];
+    const RAW: [[Word<'static>; 2]; 3] =
+        [words!["fs", "remove_dir_all"], words!["mem", "forget"], words!["env", "temp_dir"]];
 
     pub fn found(uses: &[Use]) -> Vec<Violation> {
         uses.iter()

@@ -3,13 +3,15 @@ use syn::{Attribute, Macro, PathSegment, Token};
 
 use crate::name::Name;
 use crate::whole::Whole;
+use crate::word::Word;
+use crate::words;
 
 #[derive(Debug)]
 pub struct TestMarks;
 
 impl TestMarks {
-    const ATTRIBUTE: [&'static str; 3] = ["test", "rstest", "test_case"];
-    const LAWS: [&'static str; 4] = ["law", "roundtrip", "idempotent", "table"];
+    const ATTRIBUTE: [Word<'static>; 3] = words!["test", "rstest", "test_case"];
+    const LAWS: [Word<'static>; 4] = words!["law", "roundtrip", "idempotent", "table"];
     const LAW_CRATE: &'static str = "laws";
 
     #[must_use]
@@ -29,7 +31,7 @@ impl TestMarks {
             && segments.first().is_some_and(|first| segments.len() == 1 || first.ident == Self::LAW_CRATE)
     }
 
-    fn ends_in(segments: &Punctuated<PathSegment, Token![::]>, words: &[&str]) -> bool {
+    fn ends_in(segments: &Punctuated<PathSegment, Token![::]>, words: &[Word<'_>]) -> bool {
         segments.last().is_some_and(|segment| Name::from(&segment.ident).matches::<Whole>(words))
     }
 }
