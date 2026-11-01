@@ -4,6 +4,7 @@ mod target_directory;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
 use crate::module_path::ModulePath;
 use crate::role::Role;
@@ -20,6 +21,7 @@ pub struct Placement {
 impl Placement {
     const TARGET_DIRECTORIES: [&'static str; 3] = ["tests", "examples", "benches"];
     const SOURCE_DIRECTORY: &'static str = "src";
+    const LIBRARY_FILE: &'static str = "lib.rs";
 
     #[must_use]
     pub fn locate(path: &Path) -> Placement {
@@ -47,6 +49,15 @@ impl Placement {
     #[must_use]
     pub fn role(&self) -> Role {
         self.role
+    }
+
+    #[must_use]
+    pub fn crate_file(&self, file: &Path) -> CrateFile {
+        let source = self.crate_root.directory().join(Self::SOURCE_DIRECTORY);
+        CrateFile::from(match self.role {
+            Role::Other if file.starts_with(&source) => source.join(Self::LIBRARY_FILE),
+            Role::Other | Role::LibraryRoot | Role::BinaryRoot | Role::Target => file.to_path_buf(),
+        })
     }
 
     fn named_ancestor<'path>(path: &'path Path, accepted: &[&str]) -> Option<&'path Path> {

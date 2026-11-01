@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::crate_file::CrateFile;
 use crate::failure::Failure;
 use crate::readout::Readout;
 use crate::source_file::SourceFile;
@@ -41,8 +42,9 @@ impl SourceFiles {
             Err(tree.without_sources())
         } else {
             Ok(roots.into_iter().fold(self, |reading, root| {
-                let scope = Scope::new(tree, root.package());
+                let package = root.package().to_path_buf();
                 let file = root.into_file();
+                let scope = Scope::new(tree, &package, CrateFile::from(tree.display(&file)));
                 let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
                 reading.file(&scope, &file, &children)
             }))
@@ -57,7 +59,8 @@ impl SourceFiles {
         let shown = scope.tree().display(file);
         let read = fs::read_to_string(file)
             .map_err(|source| Failure::Io { path: shown.clone(), source })
-            .and_then(|text| SourceFile::parse_at(shown, scope.package(), file, text));
+            .and_then(|text| SourceFile::parse_at(shown, scope.package(), file, text))
+            .map(|parsed| parsed.in_crate_file(scope.crate_file().clone()));
         match read {
             Ok(parsed) => self.parsed(scope, file, children_directory, parsed),
             Err(failure) => SourceFiles { readout: self.readout.with_failure(failure), ..self },

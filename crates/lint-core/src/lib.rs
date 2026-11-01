@@ -1,5 +1,6 @@
 mod binary_files;
 mod casing;
+mod crate_file;
 mod crate_name;
 mod crate_root;
 mod failure;
@@ -30,6 +31,7 @@ mod whole;
 
 pub use binary_files::BinaryFiles;
 pub use casing::Casing;
+pub use crate_file::CrateFile;
 pub use crate_name::CrateName;
 pub use crate_root::CrateRoot;
 pub use failure::Failure;

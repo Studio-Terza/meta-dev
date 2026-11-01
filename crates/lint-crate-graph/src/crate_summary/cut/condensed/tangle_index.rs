@@ -7,6 +7,12 @@ impl From<usize> for TangleIndex {
     }
 }
 
+impl From<TangleIndex> for usize {
+    fn from(tangle: TangleIndex) -> usize {
+        tangle.0
+    }
+}
+
 impl TangleIndex {
     pub fn index(self) -> usize {
         self.0
