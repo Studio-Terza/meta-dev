@@ -11,11 +11,11 @@ struct Sample;
 
 impl Sample {
     fn names(text: &&str) -> String {
-        TestLog::from(*text).names().into_iter().map(|name| ["<", &name, ">"].concat()).collect()
+        TestLog::from(*text).names().into_iter().map(|name| ["<", &name.to_string(), ">"].concat()).collect()
     }
 
     fn failed(text: &&str) -> String {
-        TestLog::from(*text).failed().into_iter().map(|name| ["<", &name, ">"].concat()).collect()
+        TestLog::from(*text).failed().into_iter().map(|name| ["<", &name.to_string(), ">"].concat()).collect()
     }
 }
 

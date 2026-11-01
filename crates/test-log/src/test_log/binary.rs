@@ -14,7 +14,7 @@ impl Binary {
     const CLOSE: char = ')';
     const SLASH: char = '/';
 
-    pub fn label(&self) -> &str {
+    pub(crate) fn label(&self) -> &str {
         &self.0
     }
 

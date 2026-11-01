@@ -88,6 +88,22 @@ fn a_tree_of_rust_and_configuration_passes() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_workflow_run_step_with_shell_logic_fails_the_run() -> Result<(), Box<dyn Error>> {
+    let checkout = Checkout::new()?;
+    checkout.write(".github/workflows/ci.yml", "jobs:\n  a:\n    steps:\n      - run: cargo test | tee out\n")?;
+    let run = checkout.checked();
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("a workflow run step is a short command; logic lives in Rust:\n"));
+    assert!(
+        run.err.contains(&format!(
+            "{}:4: a run step uses the shell operator |",
+            checkout.shown(".github/workflows/ci.yml")
+        ))
+    );
+    Ok(())
+}
+
+#[test]
 fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write(".github/scripts/matrix.py", "print(1)\n")?;

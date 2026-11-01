@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use super::binary::Binary;
+use super::test_name::TestName;
 use super::unmatched::Unmatched;
 use super::verdict::Verdict;
 
@@ -17,8 +18,8 @@ impl TestResult {
     const FAILED: &'static str = "FAILED";
     const JOIN: &'static str = " :: ";
 
-    pub fn key(&self, binary: Option<&Binary>) -> String {
-        format!("{}{}{}", binary.map(Binary::label).unwrap_or_default(), Self::JOIN, self.name)
+    pub fn key(&self, binary: Option<&Binary>) -> TestName {
+        TestName::new(format!("{}{}{}", binary.map(Binary::label).unwrap_or_default(), Self::JOIN, self.name))
     }
 
     pub fn verdict(&self) -> Verdict {

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use named::Named;
-use test_log::TestLog;
+use test_log::{TestLog, TestName};
 
 use crate::cli::shard::mutant_result::MutantResult;
 
@@ -32,7 +32,7 @@ enum Scenario {
 }
 
 impl Outcome {
-    pub fn baseline(&self, directory: &Path) -> Option<Vec<String>> {
+    pub(crate) fn baseline(&self, directory: &Path) -> Option<Vec<TestName>> {
         match self.scenario {
             Scenario::Baseline => Some(self.log(directory).names().into_iter().collect()),
             Scenario::Mutant(_) => None,

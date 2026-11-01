@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
 use super::binary::Binary;
+use super::test_name::TestName;
 use super::test_result::TestResult;
 use super::verdict::Verdict;
 
 #[derive(Debug, Default)]
 pub struct Reading {
     binary: Option<Binary>,
-    results: BTreeMap<String, Verdict>,
+    results: BTreeMap<TestName, Verdict>,
 }
 
 impl Reading {
@@ -22,7 +23,7 @@ impl Reading {
         self
     }
 
-    pub fn into_results(self) -> BTreeMap<String, Verdict> {
+    pub(crate) fn into_results(self) -> BTreeMap<TestName, Verdict> {
         self.results
     }
 }

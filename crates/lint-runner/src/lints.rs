@@ -33,6 +33,7 @@ use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
 use lint_type_shape::TypeShape;
 use lint_vec_out_params::VecOutParams;
+use lint_workflow_run::WorkflowRun;
 
 use crate::Outcome;
 
@@ -80,8 +81,10 @@ impl Lints {
 
     #[must_use]
     pub fn checked(mut readout: Readout) -> Outcome {
-        let reports =
-            Self::reports(readout.files()).into_iter().chain([RustOnly::report(readout.repo_files())]).collect();
+        let reports = Self::reports(readout.files())
+            .into_iter()
+            .chain([RustOnly::report(readout.repo_files()), WorkflowRun::report(readout.repo_files())])
+            .collect();
         Outcome::from_reports(reports, readout.take_failures())
     }
 }

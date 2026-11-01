@@ -18,7 +18,14 @@ impl RepoFile {
     }
 
     #[must_use]
-    pub fn lies_under(&self, directory: &str) -> bool {
-        self.inside.parent().is_some_and(|parents| parents.components().any(|part| part.as_os_str() == directory))
+    pub fn lies_under(&self, directory: &Path) -> bool {
+        self.inside
+            .parent()
+            .is_some_and(|parents| parents.components().any(|part| part.as_os_str() == directory.as_os_str()))
+    }
+
+    #[must_use]
+    pub fn below(&self, directory: &Path) -> Option<&Path> {
+        self.inside.strip_prefix(directory).ok()
     }
 }

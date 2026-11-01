@@ -10,15 +10,15 @@ pub struct RecordedMutant {
 }
 
 impl RecordedMutant {
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn has_summary(&self, summary: &str) -> bool {
+    pub(crate) fn has_summary(&self, summary: &str) -> bool {
         self.summary == summary
     }
 
-    pub fn failed(&self) -> &[String] {
+    pub(crate) fn failed(&self) -> &[String] {
         &self.failed
     }
 }

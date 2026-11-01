@@ -1,13 +1,14 @@
 #[derive(Debug)]
 pub struct Lines<'text>(&'text str);
 
-impl<'text> Lines<'text> {
-    const BREAK: char = '\n';
-
-    #[must_use]
-    pub fn over(text: &'text str) -> Lines<'text> {
+impl<'text> From<&'text str> for Lines<'text> {
+    fn from(text: &'text str) -> Lines<'text> {
         Lines(text)
     }
+}
+
+impl Lines<'_> {
+    const BREAK: char = '\n';
 }
 
 impl<'text> Iterator for Lines<'text> {

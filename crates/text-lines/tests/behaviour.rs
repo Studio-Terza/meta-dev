@@ -4,7 +4,7 @@ struct Sample;
 
 impl Sample {
     fn bracketed(text: &&str) -> String {
-        Lines::over(text).map(|line| ["<", line, ">"].concat()).collect()
+        Lines::from(*text).map(|line| ["<", line, ">"].concat()).collect()
     }
 }
 

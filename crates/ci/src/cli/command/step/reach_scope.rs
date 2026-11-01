@@ -26,7 +26,7 @@ impl ReachScope {
             Self::asked(ports, &Invocation::new("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"]))?;
         let arguments = [OsString::from(Self::AFFECTED), self.metadata.clone().into_os_string()]
             .into_iter()
-            .chain(Lines::over(&changed).map(OsString::from));
+            .chain(Lines::from(changed.as_str()).map(OsString::from));
         let mut report = Vec::new();
         let mut refusal = Vec::new();
         if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {

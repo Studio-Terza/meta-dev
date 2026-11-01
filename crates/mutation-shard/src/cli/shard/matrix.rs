@@ -2,18 +2,19 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
+use test_log::TestName;
 
 use super::mutant_result::MutantResult;
 use crate::cli::shard::failure::Failure;
 
 #[derive(Debug, Serialize)]
 pub struct Matrix {
-    baseline: Vec<String>,
+    baseline: Vec<TestName>,
     mutants: Vec<MutantResult>,
 }
 
 impl Matrix {
-    pub fn new(baseline: Vec<String>, mutants: Vec<MutantResult>) -> Matrix {
+    pub(crate) fn new(baseline: Vec<TestName>, mutants: Vec<MutantResult>) -> Matrix {
         Matrix { baseline, mutants }
     }
 

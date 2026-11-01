@@ -9,7 +9,7 @@ pub struct Section<'items> {
 }
 
 impl<'items> Section<'items> {
-    pub fn new(title: &'static str, items: &'items [String]) -> Section<'items> {
+    pub(crate) fn new(title: &'static str, items: &'items [String]) -> Section<'items> {
         Section { title, items }
     }
 }

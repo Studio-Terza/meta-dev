@@ -37,7 +37,7 @@ impl Step for LibtestSeconds {
         let text =
             fs::read_to_string(&self.output).map_err(|source| Failure::Io { path: self.output.clone(), source })?;
         let total: Seconds =
-            Lines::over(&text).filter_map(|line| line.parse::<Finished>().ok()).map(Finished::seconds).sum();
+            Lines::from(text.as_str()).filter_map(|line| line.parse::<Finished>().ok()).map(Finished::seconds).sum();
         self.measured.append(&self.stage, total).map(|()| Exit::Success)
     }
 }

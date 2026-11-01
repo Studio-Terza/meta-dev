@@ -20,7 +20,7 @@ impl ShardMatrix {
         serde_json::from_str(&text).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })
     }
 
-    pub fn baseline(&self) -> &[String] {
+    pub(crate) fn baseline(&self) -> &[String] {
         &self.baseline
     }
 

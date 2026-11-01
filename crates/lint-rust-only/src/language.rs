@@ -89,7 +89,7 @@ impl Language {
     }
 
     #[must_use]
-    pub fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Language::Python => "Python",
             Language::Shell => "shell",

@@ -5,6 +5,7 @@ use std::path::Path;
 
 use outcome::Outcome;
 use serde::Deserialize;
+use test_log::TestName;
 
 use super::mutant_result::MutantResult;
 use crate::cli::shard::failure::Failure;
@@ -23,7 +24,7 @@ impl Outcomes {
         serde_json::from_str(&text).map_err(|source| Failure::Parse { path, source })
     }
 
-    pub fn baseline(&self, directory: &Path) -> Vec<String> {
+    pub(crate) fn baseline(&self, directory: &Path) -> Vec<TestName> {
         self.outcomes.iter().filter_map(|outcome| outcome.baseline(directory)).flatten().collect()
     }
 

@@ -45,6 +45,7 @@ lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
+lint-workflow-run = { path = "../lint-workflow-run" }
 
 [dev-dependencies]
 golden = { path = "../golden" }

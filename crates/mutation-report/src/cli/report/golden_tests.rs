@@ -27,7 +27,7 @@ impl GoldenTests {
         })
     }
 
-    pub fn names(&self) -> &BTreeSet<String> {
+    pub(crate) fn names(&self) -> &BTreeSet<String> {
         &self.0
     }
 

@@ -15,7 +15,7 @@ impl GoldenTest {
     const OPEN: char = '(';
     const UNDERSCORE: char = '_';
 
-    pub fn into_name(self) -> String {
+    pub(crate) fn into_name(self) -> String {
         self.0
     }
 

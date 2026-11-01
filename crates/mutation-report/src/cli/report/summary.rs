@@ -26,7 +26,11 @@ impl Summary {
     const TIMEOUT: &'static str = "Timeout";
     const SCOPE: &'static str = "::";
 
-    pub fn from_results(baseline: &BTreeSet<String>, mutants: &[RecordedMutant], golden: &BTreeSet<String>) -> Summary {
+    pub(crate) fn from_results(
+        baseline: &BTreeSet<String>,
+        mutants: &[RecordedMutant],
+        golden: &BTreeSet<String>,
+    ) -> Summary {
         let killers: BTreeSet<&String> = mutants.iter().flat_map(RecordedMutant::failed).collect();
         Summary {
             mutants: Count::items_in(mutants),
@@ -39,7 +43,7 @@ impl Summary {
         }
     }
 
-    pub fn json(&self) -> Result<String, serde_json::Error> {
+    pub(crate) fn json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
 
