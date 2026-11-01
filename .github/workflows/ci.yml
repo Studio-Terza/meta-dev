@@ -26,6 +26,7 @@ jobs:
       - name: test
         run: cargo test
       - name: lint
+        shell: bash
         run: cargo run -p lint -- . | tee "$RUNNER_TEMP/budget.txt"
       - name: report
         if: github.ref == 'refs/heads/main' && always()

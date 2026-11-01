@@ -7,11 +7,16 @@ const TWO: &str = "struct A;\nstruct B;\nimpl A {\n    pub fn show(&self) -> u8 
 const PRIVATE: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn show(&self) -> u8 { 1 }\n}\nimpl B {\n    fn show(&self) -> u8 { 1 }\n}\nimpl C {\n    fn show(&self) -> u8 { 1 }\n}\n";
 const TRAIT_IMPLS: &str = "struct A;\nstruct B;\nstruct C;\nimpl Tr for A {\n    fn show(&self) -> u8 { 1 }\n}\nimpl Tr for B {\n    fn show(&self) -> u8 { 1 }\n}\nimpl Tr for C {\n    fn show(&self) -> u8 { 1 }\n}\n";
 
-const CASES: [Case; 4] = [
+const DERIVED: &str = "#[derive(Newtype)]\npub struct A(u8);\n#[derive(Newtype)]\npub struct B(u8);\n#[derive(Newtype)]\npub struct C(u8);\n";
+const CONSTRUCTORS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u8) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u8) -> Self { C(inner) }\n}\n";
+
+const CASES: [Case; 6] = [
     Case::new("three types", &[Source::new("a.rs", THREE)], &["a.rs:5"]),
     Case::new("two types", &[Source::new("a.rs", TWO)], &[]),
     Case::new("private methods", &[Source::new("a.rs", PRIVATE)], &[]),
     Case::new("trait impls", &[Source::new("a.rs", TRAIT_IMPLS)], &[]),
+    Case::new("derived newtypes", &[Source::new("a.rs", DERIVED)], &[]),
+    Case::new("hand-written constructors", &[Source::new("a.rs", CONSTRUCTORS)], &["a.rs:5"]),
 ];
 
 #[test]

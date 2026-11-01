@@ -6,6 +6,7 @@ use std::ops::Add;
 
 use lint_core::SourceFile;
 use lint_process_starters::{CommandPaths, Scope};
+use newtype::{Counter, Newtype};
 
 use count::Count;
 use test_scan::TestScan;
@@ -29,12 +30,12 @@ impl CrateBudget {
     const LINE_END: char = '\n';
 
     fn measured(file: &SourceFile, share: TestShare) -> CrateBudget {
-        let lines = Count::from(file.text().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
+        let lines = Count::new(file.text().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
         let scan = TestScan::measured(file.syntax());
         CrateBudget {
-            files: Count::from(1),
+            files: Count::new(1),
             lines,
-            starts: Count::from(CommandPaths::found(file, Scope::Everywhere).len()),
+            starts: Count::new(CommandPaths::found(file, Scope::Everywhere).len()),
             test_lines: match share {
                 TestShare::InlineModules => scan.test_lines,
                 TestShare::WholeFile => lines,
@@ -59,11 +60,11 @@ impl Add for CrateBudget {
 
     fn add(self, other: CrateBudget) -> CrateBudget {
         CrateBudget {
-            tests: self.tests + other.tests,
-            files: self.files + other.files,
-            lines: self.lines + other.lines,
-            test_lines: self.test_lines + other.test_lines,
-            starts: self.starts + other.starts,
+            tests: self.tests.plus(other.tests),
+            files: self.files.plus(other.files),
+            lines: self.lines.plus(other.lines),
+            test_lines: self.test_lines.plus(other.test_lines),
+            starts: self.starts.plus(other.starts),
         }
     }
 }

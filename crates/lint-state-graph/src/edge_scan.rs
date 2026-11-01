@@ -7,6 +7,7 @@ pub use edge_count::EdgeCount;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use newtype::Newtype;
 use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
 
@@ -57,7 +58,7 @@ impl<'scan> EdgeScan<'scan> {
                 let site = (*names.values().min()?).clone();
                 Some(Violation::new(
                     site,
-                    Finding::CrowdedVertex { source: source.clone(), edges: EdgeCount::from(names.len()), most },
+                    Finding::CrowdedVertex { source: source.clone(), edges: EdgeCount::new(names.len()), most },
                 ))
             });
         let structural: Vec<Violation> = duplicates.chain(crowded).collect();
