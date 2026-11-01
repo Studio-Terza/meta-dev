@@ -4,7 +4,7 @@ mod step;
 use std::ffi::OsString;
 use std::io::Write;
 
-use step::github::{Labels, Show, Summarize, WallTimes};
+use step::github::{Labels, Show, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
@@ -27,6 +27,7 @@ pub enum Command {
     Show(Show),
     Summarize(Summarize),
     Labels(Labels),
+    StageIssues(StageIssues),
     ShardSummary(ShardSummary),
     Matrix(Matrix),
 }
@@ -46,6 +47,7 @@ impl Command {
     const SHOW: &'static str = "show";
     const SUMMARIZE: &'static str = "summarize";
     const LABELS: &'static str = "labels";
+    const STAGE_ISSUES: &'static str = "stage-issues";
     const SHARD_SUMMARY: &'static str = "shard-summary";
     const MATRIX: &'static str = "matrix";
 
@@ -67,6 +69,7 @@ impl Command {
             Some(Self::SHOW) => Show::from_arguments(&rest).map(Command::Show),
             Some(Self::SUMMARIZE) => Summarize::from_arguments(&rest).map(Command::Summarize),
             Some(Self::LABELS) => Labels::from_arguments(&rest).map(Command::Labels),
+            Some(Self::STAGE_ISSUES) => StageIssues::from_arguments(&rest).map(Command::StageIssues),
             Some(Self::SHARD_SUMMARY) => ShardSummary::from_arguments(&rest).map(Command::ShardSummary),
             Some(Self::MATRIX) => Matrix::from_arguments(&rest).map(Command::Matrix),
             _ => Err(Failure::Usage),
@@ -89,6 +92,7 @@ impl Command {
             Command::Show(step) => step.carry_out(ports, out),
             Command::Summarize(step) => step.carry_out(ports, out),
             Command::Labels(step) => step.carry_out(ports, out),
+            Command::StageIssues(step) => step.carry_out(ports, out),
             Command::ShardSummary(step) => step.carry_out(ports, out),
             Command::Matrix(step) => step.carry_out(ports, out),
         }

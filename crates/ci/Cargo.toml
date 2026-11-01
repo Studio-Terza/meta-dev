@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+gate-limits = { path = "../gate-limits" }
 newtype = { path = "../newtype" }
 mutation-report = { path = "../mutation-report" }
 reach = { path = "../reach" }

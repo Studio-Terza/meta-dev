@@ -17,12 +17,16 @@ use skipped::Skipped;
 pub struct ReachScope {
     metadata: Journal,
     event: String,
+    base: String,
     environment: Journal,
     summary: Journal,
 }
 
 impl ReachScope {
     const PULL_REQUEST: &'static str = "pull_request";
+    const AFFECTED: &'static str = "affected";
+    const WIDENED: &'static str = "widened";
+    const MAIN: &'static str = "main";
     const WHOLE_WORKSPACE: &'static str = "CARGO_SCOPE=--workspace\n";
 
     fn recorded(&self, report: &str, out: &mut impl Write) -> Result<(), Failure> {
@@ -39,9 +43,10 @@ impl ReachScope {
 impl Step for ReachScope {
     fn from_arguments(arguments: &[OsString]) -> Result<ReachScope, Failure> {
         match arguments {
-            [metadata, event, environment, summary] => Ok(ReachScope {
+            [metadata, event, base, environment, summary] => Ok(ReachScope {
                 metadata: Journal::file(Path::new(metadata)),
                 event: event.to_str().ok_or(Failure::Usage)?.to_owned(),
+                base: base.to_str().ok_or(Failure::Usage)?.to_owned(),
                 environment: Journal::file(Path::new(environment)),
                 summary: Journal::file(Path::new(summary)),
             }),
@@ -55,10 +60,10 @@ impl Step for ReachScope {
             &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
         )?;
         self.metadata.replace(&metadata)?;
-        let report = if self.event == Self::PULL_REQUEST {
-            Changed::affected(&self.metadata, ports)?
-        } else {
-            Self::WHOLE_WORKSPACE.to_owned()
+        let report = match (self.event == Self::PULL_REQUEST, self.base == Self::MAIN) {
+            (true, false) => Changed::answered(Self::AFFECTED, &self.metadata, ports)?,
+            (true, true) => Changed::answered(Self::WIDENED, &self.metadata, ports)?,
+            (false, _) => Self::WHOLE_WORKSPACE.to_owned(),
         };
         self.recorded(&report, out).map(|()| Exit::Success)
     }
