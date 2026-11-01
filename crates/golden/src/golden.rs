@@ -14,11 +14,6 @@ impl Golden {
     const DIRECTORY: &'static str = "tests/goldens";
     const PACKAGE_VARIABLE: &'static str = "CARGO_MANIFEST_DIR";
 
-    #[must_use]
-    pub fn located_at(path: impl Into<PathBuf>) -> Self {
-        Self(path.into())
-    }
-
     pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Result<Self, Failure> {
         let name = name.as_ref();
         name.components()

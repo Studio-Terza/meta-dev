@@ -30,6 +30,7 @@ impl Manifest {
     const SOURCE_EXTENSION: &'static str = "rs";
     const MAIN_FILE: &'static str = "main.rs";
     const TARGET_LISTS: [&'static str; 4] = ["test", "bin", "example", "bench"];
+    const TESTED_LISTS: [&'static str; 3] = ["test", "bin", "bench"];
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
@@ -106,7 +107,7 @@ impl Manifest {
     #[must_use]
     pub fn untested_targets(&self) -> Untested {
         let library = self.table.get(Self::LIBRARY).into_iter();
-        let listed = Self::TARGET_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
+        let listed = Self::TESTED_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
         Untested::new(
             library
                 .chain(listed.flatten())

@@ -27,7 +27,117 @@ const INLINE: &str = "mod inner {\n    #[cfg(test)]\n    pub fn f() {}\n}\n";
 const ALLOW_FEATURE: &str = "#[allow(feature = \"test-utils\")]\nfn f() {}\n";
 const OTHER_KEY: &str = "#[cfg(target_os = \"test-utils\")]\nfn f() {}\n";
 
-const CASES: [Case; 22] = [
+const STAGED: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> A {\n        A\n    }\n}\n";
+const STAGED_TEST: &str = "fn t() {\n    A::staged();\n}\n";
+const STAGED_SHIPPED: &str = "fn run() {\n    A::staged();\n}\n";
+const STAGED_MACRO: &str = "fn run() {\n    show!(A::staged());\n}\n";
+const STAGED_INLINE_TEST: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> A {\n        A\n    }\n}\n#[cfg(test)]\nmod tests {\n    fn t() {\n        super::A::staged();\n    }\n}\n";
+const STOPPED: &str = "pub enum Clock {\n    Live,\n    Stopped,\n}\n";
+const STOPPED_TEST: &str = "fn t() {\n    Clock::Stopped;\n}\n";
+const STOPPED_SHIPPED: &str = "fn run() -> Clock {\n    Clock::Stopped\n}\n";
+const PRIVATE_STAGED: &str = "struct A;\nimpl A {\n    fn staged() -> A {\n        A\n    }\n}\n";
+const TRAIT_STAGED: &str = "pub struct A;\nimpl Default for A {\n    fn default() -> A {\n        A\n    }\n}\n";
+const DEFAULT_TEST: &str = "fn t() {\n    A::default();\n}\n";
+const FREE_FN: &str = "pub fn staged() {}\n";
+const GETTER: &str = "pub struct A;\nimpl A {\n    pub fn staged(&self) -> u8 {\n        1\n    }\n}\n";
+const OPTION_CONSTRUCTOR: &str =
+    "pub struct A;\nimpl A {\n    pub fn staged() -> Option<A> {\n        None\n    }\n}\n";
+const FREE_TEST: &str = "fn t() {\n    staged();\n}\n";
+
+const CASES: [Case; 34] = [
+    Case::new(
+        Title::new("constructor only tests call"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STAGED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("constructor with a shipped caller"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STAGED)),
+            Source::new(Located::new("src/b.rs"), Text::new(STAGED_SHIPPED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor called inside a macro"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STAGED)),
+            Source::new(Located::new("src/b.rs"), Text::new(STAGED_MACRO)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor nobody calls"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(STAGED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor called in a test module"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(STAGED_INLINE_TEST))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("variant only tests name"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STOPPED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STOPPED_TEST)),
+        ],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("variant with a shipped user"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STOPPED)),
+            Source::new(Located::new("src/b.rs"), Text::new(STOPPED_SHIPPED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STOPPED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("private constructor"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(PRIVATE_STAGED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("trait method only tests call"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(TRAIT_STAGED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(DEFAULT_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("free fn only tests call"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(FREE_FN)),
+            Source::new(Located::new("tests/a.rs"), Text::new(FREE_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("method with a receiver only tests call"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(GETTER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(FREE_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor returning an option"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(OPTION_CONSTRUCTOR)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
     Case::new(
         Title::new("gated crate fn"),
         &[Source::new(Located::new("src/a.rs"), Text::new(GATED_CRATE_FN))],

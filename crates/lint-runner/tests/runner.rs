@@ -512,6 +512,19 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Box<dyn Error>> {
+    let declared = [("example", "examples/e.rs", true), ("test", "tests/e.rs", false)];
+    declared.iter().try_for_each(|(kind, file, clean)| {
+        let root = tempfile::tempdir()?;
+        let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
+        Trees::write(root.path(), "Cargo.toml", &table)?;
+        Trees::write(root.path(), file, CLEAN)?;
+        assert_eq!(Trees::reported(root.path()).is_clean(), *clean, "{kind}");
+        Ok(())
+    })
+}
+
+#[test]
 fn a_conditional_path_attribute_leads_to_the_file_read_too() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
