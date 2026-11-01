@@ -3,6 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use golden::{Difference, Failure, Golden, Mode, golden};
+use laws::proptest;
+use laws::{roundtrip, table};
+use proptest::prelude::any;
 use tempfile::TempDir;
 
 struct Fixture {
@@ -32,6 +35,10 @@ impl Fixture {
 
     fn text(&self) -> Result<String, std::io::Error> {
         fs::read_to_string(self.path())
+    }
+
+    fn holding(text: &str) -> Option<Self> {
+        Self::with_recorded(text).ok()
     }
 }
 
@@ -74,18 +81,26 @@ fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn s
     Ok(())
 }
 
-#[test]
-fn recording_is_chosen_only_by_the_exact_value_outside_ci() {
-    let on = Some(OsStr::new("1"));
-    let ci = Some(OsStr::new("true"));
-    let chosen = |record, ci| Mode::chosen(record, ci).ok();
-    assert_eq!(chosen(None, None), Some(Mode::Check));
-    assert_eq!(chosen(None, ci), Some(Mode::Check));
-    assert_eq!(chosen(on, None), Some(Mode::Record));
-    assert_eq!(chosen(on, ci), None);
-    assert_eq!(chosen(Some(OsStr::new("0")), None), None);
-    assert_eq!(chosen(Some(OsStr::new("")), None), None);
-}
+table!(
+    recording_is_chosen_only_by_the_exact_value_outside_ci,
+    |(record, ci): &(Option<&str>, Option<&str>)| Mode::chosen(record.map(OsStr::new), ci.map(OsStr::new)).ok(),
+    [
+        (None, None) => Some(Mode::Check),
+        (None, Some("true")) => Some(Mode::Check),
+        (Some("1"), None) => Some(Mode::Record),
+        (Some("1"), Some("true")) => None,
+        (Some("0"), None) => None,
+        (Some(""), None) => None,
+    ]
+);
+
+roundtrip!(
+    any_text_is_recorded_exactly,
+    any::<String>(),
+    Fixture::holding,
+    |fixture: &Option<Fixture>| fixture.as_ref()?.text().ok(),
+    Some
+);
 
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
