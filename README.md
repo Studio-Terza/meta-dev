@@ -66,3 +66,13 @@ row and names the first broken row, without generated input. Attributes before t
 
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
+
+## Mutants
+
+The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
+request changes, and tests each mutant with the whole workspace, because shared crates are tested through
+the crates that use them (`.cargo/mutants.toml`). A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+
+`mutants.yml` runs every mutant once a week, in eight shards, or on request. It reports in the run
+summary and the shard artifacts. Missed mutants do not fail it; a shard fails only if the run itself
+fails. No push starts it and no push cancels it.
