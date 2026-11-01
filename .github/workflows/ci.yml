@@ -23,24 +23,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: measured
         run: echo "MEASURED=$RUNNER_TEMP/measured.toml" >> "$GITHUB_ENV"
       - name: toolchain
-        run: ci/timed.sh toolchain rustup toolchain install
+        run: rustup toolchain install
+      - name: reach
+        run: ci/reach.sh | tee -a "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"
       - name: fmt
         run: cargo fmt --check
       - name: clippy
-        run: ci/timed.sh clippy cargo clippy --all-targets -- -D warnings
+        if: env.CARGO_SCOPE != ''
+        run: ci/timed.sh clippy cargo clippy --all-targets $CARGO_SCOPE -- -D warnings
       - name: test compile
-        run: ci/timed.sh test-compile cargo test --no-run
+        if: env.CARGO_SCOPE != ''
+        run: ci/timed.sh test-compile cargo test --no-run $CARGO_SCOPE
       - name: test run
+        if: env.CARGO_SCOPE != ''
         run: |
-          cargo test | tee "$RUNNER_TEMP/test.txt"
+          cargo test $CARGO_SCOPE | tee "$RUNNER_TEMP/test.txt"
           ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
       - name: lint
         shell: bash
         run: ci/timed.sh lint cargo run --bin lint -- . | tee "$RUNNER_TEMP/budget.txt"
       - name: limits
+        if: github.ref == 'refs/heads/main'
         run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
       - name: report
         if: github.ref == 'refs/heads/main' && always()
@@ -56,6 +64,7 @@ jobs:
           echo "measured stages, seconds:"
           cat "$MEASURED"
           cat "$RUNNER_TEMP/limits.txt"
+          cargo run -q --bin reach -- fan-in "$RUNNER_TEMP/metadata.json"
 
   mutants:
     if: github.event_name == 'pull_request'
@@ -66,14 +75,19 @@ jobs:
           fetch-depth: 2
       - name: toolchain
         run: rustup toolchain install
+      - name: reach
+        run: ci/reach.sh | tee -a "$GITHUB_ENV"
       - uses: taiki-e/install-action@v2
+        if: env.MUTANTS_SCOPE != ''
         with:
           tool: cargo-mutants@27.1.0
       - name: changed lines
+        if: env.MUTANTS_SCOPE != ''
         run: git diff --no-renames HEAD^1 HEAD -- '*.rs' > "$RUNNER_TEMP/changed.diff"
       - name: mutants in changed lines
+        if: env.MUTANTS_SCOPE != ''
         run: |
           status=0
-          cargo mutants --in-diff "$RUNNER_TEMP/changed.diff" --output "$RUNNER_TEMP" --jobs 2 --colors never || status=$?
+          cargo mutants --in-diff "$RUNNER_TEMP/changed.diff" $MUTANTS_SCOPE --output "$RUNNER_TEMP" --jobs 2 --colors never || status=$?
           if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
           if [ -s "$RUNNER_TEMP/mutants.out/missed.txt" ]; then exit 2; fi

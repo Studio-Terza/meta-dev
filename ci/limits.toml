@@ -1,7 +1,3 @@
-[toolchain]
-warn = 10
-block = 15
-
 [clippy]
 warn = 11
 block = 16
