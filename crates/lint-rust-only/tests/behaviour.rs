@@ -158,7 +158,6 @@ fn rust_and_configuration_files_pass() {
         "data.json",
         "noextension",
         ".hidden",
-        "x.py.txt",
         "scripts.py/data.txt",
     ] {
         assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
@@ -265,10 +264,18 @@ fn an_extensionless_file_without_a_foreign_shebang_passes() {
 }
 
 #[test]
-fn a_shebang_in_a_file_with_an_extension_is_left_to_the_extension() {
+fn a_foreign_shebang_in_a_file_with_a_data_extension_fails_but_a_rust_attribute_passes() {
     let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+    let root = checkout.path().display().to_string();
     fs::write(checkout.path().join("notes.txt"), "#!/bin/bash\n").ok();
-    assert_eq!(Checked::within(&checkout.path().display().to_string(), "notes.txt"), Vec::<String>::new());
+    fs::write(checkout.path().join("lib.rs"), "#!/usr/bin/env python3\n").ok();
+    fs::write(checkout.path().join("inner.txt"), "#![allow(dead_code)]\n").ok();
+    assert_eq!(
+        Checked::within(&root, "notes.txt"),
+        [format!("{root}/notes.txt:1: interpreted script source outside assets; {REWRITE}")]
+    );
+    assert_eq!(Checked::within(&root, "lib.rs"), Vec::<String>::new());
+    assert_eq!(Checked::within(&root, "inner.txt"), Vec::<String>::new());
 }
 
 #[test]
@@ -293,5 +300,114 @@ fn a_file_merely_named_vendor_still_fails() {
     assert_eq!(
         Checked::one("tools/vendor.py"),
         [format!("tools/vendor.py:1: Python source outside assets; {REWRITE}")]
+    );
+}
+
+#[test]
+fn a_source_extension_hidden_behind_another_extension_is_still_source() {
+    for (path, name) in [
+        ("ios/Tests.swift.txt", "Swift"),
+        ("tools/run.py.bak", "Python"),
+        ("tools/run.SH.txt", "shell"),
+        ("tools/run.go.orig", "Go"),
+        ("tools/run.js.disabled", "JavaScript"),
+    ] {
+        let fix = if name == "JavaScript" { MOVE } else { REWRITE };
+        assert_eq!(Checked::one(path), [format!("{path}:1: {name} source outside assets; {fix}")], "{path}");
+    }
+}
+
+#[test]
+fn a_double_extension_that_hides_no_source_passes() {
+    for path in ["data.tar.gz", "notes.txt.bak", "report.final.txt", "scripts.py/data.txt", "a.rs.txt", "x.min.json"] {
+        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
+    }
+}
+
+#[test]
+fn test_code_of_any_language_passes_below_platform() {
+    for path in [
+        "platform/tests/Run.swift",
+        "ios/platform/UITests/Flow.swift",
+        "platform/ios/BashoUITests/Flow.swift",
+        "platform/ios/FlowTests.swift",
+        "platform/android/test/Flow.kt",
+        "platform/tests/helper.py",
+    ] {
+        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
+    }
+}
+
+#[test]
+fn code_below_platform_that_is_not_test_code_fails() {
+    for (path, name) in
+        [("platform/ios/App.swift", "Swift"), ("x/platform/run.sh", "shell"), ("platform/Testing.py", "Python")]
+    {
+        assert_eq!(
+            Checked::one(path),
+            [format!("{path}:1: {name} source below platform is not test code; {REWRITE}")],
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn only_a_directory_named_exactly_platform_counts() {
+    for path in ["platforms/tests/Run.swift", "my-platform/tests/run.sh", "platform.d/tests/run.py", "tests/run.py"] {
+        assert_eq!(Checked::one(path).len(), 1, "{path}");
+    }
+}
+
+#[test]
+fn a_file_whose_content_is_source_fails_whatever_its_name() {
+    for (name, text, language) in [
+        ("Flow.txt", "import XCTest\n\nfinal class Flow: XCTestCase {}\n", "Swift"),
+        ("ui", "import SwiftUI\n", "Swift"),
+        ("tool", "import os\nimport sys\n", "Python"),
+        ("tool.txt", "def main():\n    pass\n", "Python"),
+        ("tool.dat", "from pathlib import Path\nimport os\n", "Python"),
+        ("deploy", "set -euo pipefail\n", "shell"),
+        ("deploy.txt", "if [ -f x ]; then\n  echo hi\nfi\n", "shell"),
+        ("deploy.cfg", "for f in a b; do\n  echo $f\ndone\n", "shell"),
+        ("main.txt", "#include <stdio.h>\n", "C"),
+    ] {
+        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+        let root = checkout.path().display().to_string();
+        fs::write(checkout.path().join(name), text).ok();
+        assert_eq!(
+            Checked::within(&root, name),
+            [format!("{root}/{name}:1: {language} source outside assets; {REWRITE}")],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn ordinary_text_and_data_pass() {
+    for (name, text) in [
+        ("notes.txt", "We must import the data from the old system.\nThen we are done.\n"),
+        ("notes.md", "# Title\n\n```python\nimport os\ndef main():\n    pass\n```\n\n```sh\nset -e\n```\n"),
+        ("data.json", "{\"def\": \"x(y):\"}\n"),
+        ("config.toml", "[package]\nname = \"x\"\n"),
+        ("flow.yml", "run: |\n  import os\n  def f():\n"),
+        ("log.txt", "import duty\nfi\n"),
+        ("blob.bin", "import os\u{0}import sys\n"),
+        ("empty.txt", ""),
+        ("poem", "Roses are red\nimport this\n"),
+    ] {
+        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+        fs::write(checkout.path().join(name), text).ok();
+        assert_eq!(Checked::within(&checkout.path().display().to_string(), name), Vec::<String>::new(), "{name}");
+    }
+}
+
+#[test]
+fn source_by_content_below_platform_tests_passes() {
+    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+    fs::create_dir_all(checkout.path().join("platform/UITests")).ok();
+    fs::write(checkout.path().join("platform/UITests/Flow.txt"), "import XCTest\n").ok();
+    assert_eq!(
+        Checked::within(&checkout.path().display().to_string(), "platform/UITests/Flow.txt"),
+        Vec::<String>::new()
     );
 }

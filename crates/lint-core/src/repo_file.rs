@@ -25,6 +25,13 @@ impl RepoFile {
     }
 
     #[must_use]
+    pub fn beneath_named(&self, directory: &Path) -> Option<PathBuf> {
+        let mut parts = self.inside.components();
+        parts.by_ref().find(|part| part.as_os_str() == directory.as_os_str())?;
+        Some(parts.as_path().to_path_buf())
+    }
+
+    #[must_use]
     pub fn below(&self, directory: &Path) -> Option<&Path> {
         self.inside.strip_prefix(directory).ok()
     }

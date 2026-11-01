@@ -16,3 +16,11 @@ impl ScanBytes {
         String::from_utf8(line).ok()
     }
 }
+
+impl ScanBytes {
+    pub(crate) fn bytes(self, path: &Path) -> Option<Vec<u8>> {
+        let mut bytes = Vec::new();
+        File::open(path).ok()?.take(self.into_inner()).read_to_end(&mut bytes).ok()?;
+        Some(bytes)
+    }
+}
