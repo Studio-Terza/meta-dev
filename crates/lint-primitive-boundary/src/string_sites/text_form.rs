@@ -4,6 +4,7 @@ use std::fmt;
 pub enum TextForm {
     Owned,
     Borrowed,
+    Unsized,
 }
 
 impl fmt::Display for TextForm {
@@ -11,6 +12,7 @@ impl fmt::Display for TextForm {
         match self {
             TextForm::Owned => formatter.write_str("String"),
             TextForm::Borrowed => formatter.write_str("&str"),
+            TextForm::Unsized => formatter.write_str("str"),
         }
     }
 }

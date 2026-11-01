@@ -4,6 +4,8 @@ use std::process::ExitCode;
 use reach::Cli;
 
 const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
+const PATCHED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/patched.json");
+const ROOTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/rooted.json");
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
@@ -34,6 +36,11 @@ impl Answer {
 
     fn reached_by(changed: &[&str]) -> String {
         let arguments = ["affected", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
+    fn reached_in(metadata: &str, changed: &[&str]) -> String {
+        let arguments = ["affected", metadata].iter().chain(changed).copied().collect::<Vec<&str>>();
         Answer::to(&arguments).out
     }
 
@@ -69,7 +76,6 @@ laws::table!(
     [
         ["crates/tested-through/tests/behaviour.rs"] => Answer::crates(&["tested-through"]),
         ["crates/middle/compile_fail.md"] => Answer::crates(&["middle", "tested-through"]),
-        ["crates/core/Cargo.toml"] => Answer::crates(&["core", "middle", "tested-through"]),
         ["crates/leaf/a.rs", "crates/middle/b.rs"] => Answer::crates(&["leaf", "middle", "tested-through"]),
         ["crates/leaf/a.rs", "README.md"] => Answer::crates(&["leaf"]),
     ]
@@ -81,6 +87,8 @@ laws::table!(
     [
         ["Cargo.toml"] => Answer::crates(&ALL),
         ["Cargo.lock"] => Answer::crates(&ALL),
+        ["crates/core/Cargo.toml"] => Answer::crates(&ALL),
+        ["crates/leaf/Cargo.toml"] => Answer::crates(&ALL),
         ["rust-toolchain.toml"] => Answer::crates(&ALL),
         ["clippy.toml"] => Answer::crates(&ALL),
         [".cargo/mutants.toml"] => Answer::crates(&ALL),
@@ -90,6 +98,24 @@ laws::table!(
         ["README.md", "Cargo.lock"] => Answer::crates(&ALL),
     ]
 );
+
+#[test]
+fn a_dependency_served_by_a_patch_is_still_an_edge() {
+    let reached = Answer::reached_in(PATCHED, &["crates/a/src/lib.rs"]);
+    assert_eq!(
+        reached,
+        "REACH=2 of 2 crates\nCARGO_SCOPE=-p a -p b\nMUTANTS_SCOPE=--test-package=a --test-package=b\n"
+    );
+}
+
+#[test]
+fn a_package_at_the_workspace_root_does_not_own_every_path() {
+    let everything =
+        "REACH=2 of 2 crates\nCARGO_SCOPE=-p leaf -p root\nMUTANTS_SCOPE=--test-package=leaf --test-package=root\n";
+    for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
+        assert_eq!(Answer::reached_in(ROOTED, &[changed]), everything, "{changed}");
+    }
+}
 
 laws::table!(
     documents_outside_the_crates_reach_nothing,

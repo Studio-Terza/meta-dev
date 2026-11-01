@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use rank::Rank;
 use sighting::Sighting;
 use sightings::Sightings;
-use use_aliases::UseAliases;
+pub use use_aliases::UseAliases;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;

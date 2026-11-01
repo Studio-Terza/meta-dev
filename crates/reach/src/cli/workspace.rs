@@ -26,12 +26,15 @@ impl FromStr for Workspace {
 
     fn from_str(metadata: &str) -> Result<Workspace, Failure> {
         let metadata: Metadata = serde_json::from_str(metadata)?;
-        Ok(Workspace { directories: metadata.directories()?, dependents: metadata.dependents() })
+        let directories = metadata.directories()?;
+        let dependents = metadata.dependents(&directories.keys().cloned().collect());
+        Ok(Workspace { directories, dependents })
     }
 }
 
 impl Workspace {
     const INERT: [&'static str; 2] = ["README.md", "specs"];
+    const MANIFEST: &'static str = "Cargo.toml";
 
     pub fn reached(&self, changed: &[PathBuf]) -> Reached {
         Reached::new(
@@ -48,14 +51,26 @@ impl Workspace {
     }
 
     fn touched(&self, path: &Path) -> BTreeSet<CrateName> {
-        let owners: BTreeSet<CrateName> = self
+        if path.file_name().is_some_and(|name| name == Self::MANIFEST) {
+            self.everything()
+        } else {
+            self.owned(path).into_iter().collect()
+        }
+    }
+
+    fn everything(&self) -> BTreeSet<CrateName> {
+        self.directories.keys().cloned().collect()
+    }
+
+    fn owned(&self, path: &Path) -> Vec<CrateName> {
+        let owners: Vec<CrateName> = self
             .directories
             .iter()
-            .filter(|(_, directory)| path.starts_with(directory))
+            .filter(|(_, directory)| !directory.as_os_str().is_empty() && path.starts_with(directory))
             .map(|(name, _)| name.clone())
             .collect();
         if owners.is_empty() && !Self::INERT.iter().any(|inert| path.starts_with(inert)) {
-            self.directories.keys().cloned().collect()
+            self.everything().into_iter().collect()
         } else {
             owners
         }

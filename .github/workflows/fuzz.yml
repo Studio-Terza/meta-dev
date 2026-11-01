@@ -25,7 +25,7 @@ jobs:
       - name: fuzz the runner for FUZZ_SECONDS
         env:
           FUZZ_CRASHES: ${{ runner.temp }}/crashes
-        run: cargo test -p fuzz --features campaign --test fuzz
+        run: cargo test --locked -p fuzz --features campaign --test fuzz
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
