@@ -66,3 +66,13 @@ row and names the first broken row, without generated input. Attributes before t
 
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
+
+## CI wall-time limits
+
+`ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: toolchain, clippy,
+test compile, test run and lint. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
+times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
+each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
+but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
+on `ubuntu-latest`: block just above the slowest run, warn just above the median.
+No cache is used: caching was measured and did not pay for its save time.

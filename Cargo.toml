@@ -15,6 +15,7 @@ rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174.0" }
 quote = "1.0.40"
 syn = { version = "2.0.119", features = ["extra-traits", "full", "parsing", "visit"] }
 tempfile = "3.27.0"
+serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.20"
 toml = "1.1.8"
 

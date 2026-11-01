@@ -1,0 +1,29 @@
+use std::fmt;
+
+use crate::gate::limit::Limit;
+use crate::gate::seconds::Seconds;
+use crate::gate::verdict::Verdict;
+
+#[derive(Debug)]
+pub struct Finding {
+    stage: String,
+    measured: Seconds,
+    limit: Limit,
+    verdict: Verdict,
+}
+
+impl Finding {
+    pub fn new(stage: String, measured: Seconds, limit: Limit) -> Finding {
+        Finding { stage, measured, limit, verdict: limit.judge(measured) }
+    }
+
+    pub fn blocks(&self) -> bool {
+        self.verdict == Verdict::Block
+    }
+}
+
+impl fmt::Display for Finding {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {} took {}, {}", self.verdict, self.stage, self.measured, self.limit)
+    }
+}
