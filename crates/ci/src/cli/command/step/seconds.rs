@@ -15,7 +15,7 @@ impl From<Duration> for Seconds {
 
 impl Sum for Seconds {
     fn sum<Items: Iterator<Item = Seconds>>(items: Items) -> Seconds {
-        Seconds(items.map(|seconds| seconds.0).sum())
+        items.fold(Seconds::default(), |total, seconds| Seconds(total.0 + seconds.0))
     }
 }
 

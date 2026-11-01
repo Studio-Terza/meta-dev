@@ -35,6 +35,7 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "newtype",
  "reach",
  "tempfile",
@@ -711,6 +712,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "newtype",
  "serde",
  "serde_json",
@@ -722,6 +724,7 @@ dependencies = [
 name = "mutation-shard"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "serde",
  "serde_json",
  "tempfile",
@@ -966,12 +969,16 @@ dependencies = [
 name = "test-log"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "text-lines",
 ]
 
 [[package]]
 name = "text-lines"
 version = "0.1.0"
+dependencies = [
+ "laws",
+]
 
 [[package]]
 name = "thiserror"

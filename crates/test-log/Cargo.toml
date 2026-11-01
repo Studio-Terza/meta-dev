@@ -8,5 +8,8 @@ publish.workspace = true
 [dependencies]
 text-lines = { path = "../text-lines" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

@@ -12,6 +12,7 @@ text-lines = { path = "../text-lines" }
 thiserror.workspace = true
 
 [dev-dependencies]
+laws = { path = "../laws" }
 tempfile.workspace = true
 
 [lints]
