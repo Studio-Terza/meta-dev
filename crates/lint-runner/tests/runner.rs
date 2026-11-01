@@ -21,6 +21,7 @@ const MODULES: &str = "mod one;\nmod two;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
+const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -629,4 +630,36 @@ fn deep_but_ordinary_nesting_is_still_linted() -> Result<(), Box<dyn Error>> {
     assert_eq!(run.failures(), 0);
     assert!(run.err.contains("src/lib.rs:2"));
     Ok(())
+}
+
+#[test]
+fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Error>> {
+    let (open, close) = ("(".repeat(MIDDLING_NESTING), ")".repeat(MIDDLING_NESTING));
+    let (angle, shut) = ("A<".repeat(MIDDLING_NESTING), ">".repeat(MIDDLING_NESTING));
+    let cases = [
+        (format!("fn render_page() {{ let a = {open}1{close}; let b = {open}1{close}; }}\n"), 0),
+        (format!("fn render_page(a: {angle}u8{shut}, b: {angle}u8{shut}) {{}}\n"), 0),
+        (format!("fn render_page(a: {angle}u8;{angle}u8) {{}}\n"), 0),
+        (format!("fn render_page() {{ let a = {open}){}; }}\n", "(".repeat(SHALLOW_NESTING)), 1),
+        (
+            format!(
+                "fn render_page(a: {angle}u8{}{}) {{}}\n",
+                "->".repeat(SHALLOW_NESTING),
+                "A<".repeat(SHALLOW_NESTING)
+            ),
+            1,
+        ),
+        (format!("fn render_page(a: {angle}{}) {{}}\n", ">".repeat(SHALLOW_NESTING) + &angle), 1),
+    ];
+    cases.iter().try_for_each(|(source, failures)| {
+        let root = Trees::package()?;
+        Trees::write(root.path(), "src/lib.rs", source)?;
+        assert_eq!(
+            Trees::reported(root.path()).err.matches("nested more than").count(),
+            *failures,
+            "{}",
+            &source[..source.len().min(40)]
+        );
+        Ok(())
+    })
 }

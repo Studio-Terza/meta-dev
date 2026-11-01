@@ -57,6 +57,7 @@ const TRAIT_TEXT_CONST: &str = "pub trait T {\n    const NAME: &'static str;\n  
 const ALIASED_TEXT: &str = "type Label = String;\npub fn f(x: Label) {}\n";
 const ALIASED_UNSIZED: &str = "type Label = str;\npub fn f(x: &Label) {}\n";
 const ALIASED_NUMBER: &str = "type Label = other::Thing;\npub fn f(x: Label) {}\n";
+const ALIASED_QUALIFIED: &str = "type Label = <A>::String;\npub fn f(x: Label) {}\n";
 const ALIASED_PRIVATE: &str = "type Label = String;\nfn f(x: Label) {}\n";
 const PUBLIC_FIELD: &str = "pub struct A {\n    pub name: String,\n}\n";
 const PRIVATE_FIELD: &str = "pub struct A {\n    name: String,\n}\n";
@@ -91,7 +92,7 @@ const BORROW_IMPL: &str = "pub struct A(Name);\nimpl std::borrow::Borrow<str> fo
 const AS_REF_HELPER: &str = "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        \"\"\n    }\n}\nimpl A {\n    fn g(&self) {\n        self.0.trim();\n    }\n}\n";
 const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 86] = [
+const CASES: [Case; 87] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -341,6 +342,11 @@ const CASES: [Case; 86] = [
     Case::new(
         Title::new("an alias of another type in a public signature"),
         &[Source::new(Located::new("a.rs"), Text::new(ALIASED_NUMBER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a qualified path that ends in String is not text"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
         Flagged::new(&[]),
     ),
     Case::new(
