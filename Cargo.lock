@@ -247,6 +247,7 @@ dependencies = [
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "proc-macro2",
  "syn 2.0.119",
  "thiserror",
@@ -261,6 +262,19 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-mandatory-laws"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "lint-reader",
+ "proc-macro2",
+ "syn 2.0.119",
+ "tempfile",
 ]
 
 [[package]]
@@ -526,6 +540,7 @@ dependencies = [
  "lint-guard-must-use",
  "lint-layout",
  "lint-literal-names",
+ "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
  "lint-named-lifetimes",

@@ -1,0 +1,37 @@
+name: labels
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: golden changes carry golden-change
+        shell: bash
+        run: |
+          changed=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select(.filename | test("(^|/)tests/goldens/")) | .filename')
+          labels=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
+          if [ -n "$changed" ] && ! grep -qx golden-change <<<"$labels"; then
+            echo "$changed"
+            echo "::error::this PR changes goldens; a person reviews the change and adds the label golden-change"
+            exit 1
+          fi
+      - name: new scenarios carry new-scenario
+        shell: bash
+        run: |
+          added=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | select(.status == "added") | select(.filename | test("(^|/)tests/(fixtures|e2e)/")) | .filename')
+          labels=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
+          if [ -n "$added" ] && ! grep -qx new-scenario <<<"$labels"; then
+            echo "$added"
+            echo "::error::this PR adds files under tests/fixtures or tests/e2e; a person reviews the scenario and adds the label new-scenario"
+            exit 1
+          fi
