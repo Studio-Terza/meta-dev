@@ -23,6 +23,11 @@ impl CrateRoot {
     }
 
     #[must_use]
+    pub fn directory(&self) -> &Path {
+        &self.directory
+    }
+
+    #[must_use]
     pub fn directory_name(&self) -> Option<&OsStr> {
         self.directory.file_name()
     }

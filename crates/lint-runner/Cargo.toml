@@ -1,0 +1,41 @@
+[package]
+name = "lint-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-const-shape = { path = "../lint-const-shape" }
+lint-crate-graph = { path = "../lint-crate-graph" }
+lint-distinct-signatures = { path = "../lint-distinct-signatures" }
+lint-enum-predicates = { path = "../lint-enum-predicates" }
+lint-expression-flow = { path = "../lint-expression-flow" }
+lint-fn-shape = { path = "../lint-fn-shape" }
+lint-literal-names = { path = "../lint-literal-names" }
+lint-manual-iteration = { path = "../lint-manual-iteration" }
+lint-module-nesting = { path = "../lint-module-nesting" }
+lint-named-lifetimes = { path = "../lint-named-lifetimes" }
+lint-named-numbers = { path = "../lint-named-numbers" }
+lint-no-comments = { path = "../lint-no-comments" }
+lint-no-forwarders = { path = "../lint-no-forwarders" }
+lint-no-free-fns = { path = "../lint-no-free-fns" }
+lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
+lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
+lint-primitive-boundary = { path = "../lint-primitive-boundary" }
+lint-private-fns = { path = "../lint-private-fns" }
+lint-process-starters = { path = "../lint-process-starters" }
+lint-public-surface = { path = "../lint-public-surface" }
+lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-state-graph = { path = "../lint-state-graph" }
+lint-thin-main = { path = "../lint-thin-main" }
+lint-type-shape = { path = "../lint-type-shape" }
+lint-vec-out-params = { path = "../lint-vec-out-params" }
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

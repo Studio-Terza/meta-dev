@@ -73,7 +73,17 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 name = "lint"
 version = "0.1.0"
 dependencies = [
- "lints",
+ "lint-runner",
+]
+
+[[package]]
+name = "lint-const-shape"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -88,15 +98,273 @@ dependencies = [
 ]
 
 [[package]]
-name = "lints"
+name = "lint-crate-graph"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-fixtures",
  "proc-macro2",
  "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-distinct-signatures"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-enum-predicates"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-expression-flow"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-fixtures"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+]
+
+[[package]]
+name = "lint-fn-shape"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-literal-names"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-manual-iteration"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-module-nesting"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-named-lifetimes"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-named-numbers"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-comments"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
  "ra-ap-rustc_lexer",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-forwarders"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-free-fns"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-numbers-in-binaries"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-named-numbers",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-parameter-bags"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-primitive-boundary"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-private-fns"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-process-starters"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-public-surface"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-repeated-methods"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-runner"
+version = "0.1.0"
+dependencies = [
+ "lint-const-shape",
+ "lint-core",
+ "lint-crate-graph",
+ "lint-distinct-signatures",
+ "lint-enum-predicates",
+ "lint-expression-flow",
+ "lint-fixtures",
+ "lint-fn-shape",
+ "lint-literal-names",
+ "lint-manual-iteration",
+ "lint-module-nesting",
+ "lint-named-lifetimes",
+ "lint-named-numbers",
+ "lint-no-comments",
+ "lint-no-forwarders",
+ "lint-no-free-fns",
+ "lint-no-numbers-in-binaries",
+ "lint-no-parameter-bags",
+ "lint-primitive-boundary",
+ "lint-private-fns",
+ "lint-process-starters",
+ "lint-public-surface",
+ "lint-repeated-methods",
+ "lint-state-graph",
+ "lint-thin-main",
+ "lint-type-shape",
+ "lint-vec-out-params",
  "tempfile",
+]
+
+[[package]]
+name = "lint-state-graph"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-thin-main"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-type-shape"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-vec-out-params"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
 ]
 
 [[package]]
