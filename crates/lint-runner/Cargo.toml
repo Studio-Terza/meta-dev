@@ -39,6 +39,7 @@ lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
 lint-raw-resources = { path = "../lint-raw-resources" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }

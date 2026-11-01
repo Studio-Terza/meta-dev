@@ -607,12 +607,20 @@ dependencies = [
  "lint-raw-resources",
  "lint-reader",
  "lint-repeated-methods",
+ "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",
  "lint-thin-main",
  "lint-type-shape",
  "lint-vec-out-params",
  "tempfile",
+]
+
+[[package]]
+name = "lint-rust-only"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
 ]
 
 [[package]]
