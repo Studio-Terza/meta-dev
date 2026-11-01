@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::{Difference, Failure, Mode};
 
@@ -18,12 +18,17 @@ impl Golden {
     }
 
     #[must_use]
-    pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Self {
-        Self(package.as_ref().join(Self::DIRECTORY).join(name))
+    pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Result<Self, Failure> {
+        let name = name.as_ref();
+        name.components()
+            .all(|part| matches!(part, Component::Normal(_)))
+            .then(|| Self(package.as_ref().join(Self::DIRECTORY).join(name)))
+            .ok_or_else(|| Failure::Escapes { name: name.to_path_buf() })
     }
 
     pub fn in_running_package(name: impl AsRef<Path>) -> Result<Self, Failure> {
-        env::var_os(Self::PACKAGE_VARIABLE).map(|package| Self::in_package(package, name)).ok_or(Failure::NoPackage)
+        let package = env::var_os(Self::PACKAGE_VARIABLE).ok_or(Failure::NoPackage)?;
+        Self::in_package(package, name)
     }
 
     pub fn verify(&self, actual: &str) -> Result<(), Failure> {

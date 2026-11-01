@@ -44,7 +44,17 @@ const CASES: [Case; 14] = [
     ),
 ];
 
-const PACKAGES: [(&str, usize); 4] = [("meta-ports", 0), ("ports", 0), ("meta-support", 1), ("meta-run", 1)];
+const PACKAGES: [(&str, usize); 9] = [
+    ("meta-ports", 0),
+    ("ports", 0),
+    ("meta_ports", 0),
+    ("meta-support", 1),
+    ("meta-run", 1),
+    ("meta-reports", 1),
+    ("transports", 1),
+    ("exports", 1),
+    ("supports", 1),
+];
 
 #[test]
 fn starting_a_process_is_flagged() {

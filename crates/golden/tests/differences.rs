@@ -26,7 +26,7 @@ impl Shown {
 
     fn golden_mismatch(row: &Row) -> String {
         Golden::in_package(env!("CARGO_MANIFEST_DIR"), row.golden)
-            .verify(&Self::between(row.recorded, row.actual))
+            .and_then(|golden| golden.verify(&Self::between(row.recorded, row.actual)))
             .map_or_else(|failure| failure.to_string(), |()| String::new())
     }
 }

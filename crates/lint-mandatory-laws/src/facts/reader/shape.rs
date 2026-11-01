@@ -1,0 +1,65 @@
+use syn::{Ident, ImplItem, ItemEnum, ItemImpl, ItemStruct, Type};
+
+mod derives;
+
+use super::super::profile::Profile;
+use crate::subject::Subject;
+use derives::Derives;
+use lint_core::Site;
+use lint_core::SourceFile;
+use lint_layout::LineNumber;
+use lint_layout::Name;
+use lint_layout::Whole;
+
+#[derive(Debug)]
+pub(crate) struct Shape;
+
+impl Shape {
+    const TRAITS: [&'static str; 6] = ["Display", "FromStr", "Serialize", "Deserialize", "Ord", "PartialEq"];
+    const METHODS: [&'static str; 2] = ["encode", "decode"];
+    const LEADS: [&'static str; 2] = ["to", "from"];
+
+    pub(crate) fn of_struct(file: &SourceFile, item: &ItemStruct) -> Profile {
+        Self::declared(file, &item.ident, Derives::named(&item.attrs))
+    }
+
+    pub(crate) fn of_enum(file: &SourceFile, item: &ItemEnum) -> Profile {
+        Self::declared(file, &item.ident, Derives::named(&item.attrs))
+    }
+
+    pub(crate) fn of_impl(file: &SourceFile, item: &ItemImpl) -> Option<Profile> {
+        Self::owner(&item.self_ty).map(|owner| Self::declared(file, owner, Self::implemented(item)))
+    }
+
+    fn declared(file: &SourceFile, owner: &Ident, facts: Vec<Name>) -> Profile {
+        let site = Site::new(file.path(), LineNumber::from(owner.span()));
+        Profile::declared(Subject::new(file, Name::from(owner)), site, facts)
+    }
+
+    fn owner(ty: &Type) -> Option<&Ident> {
+        match ty {
+            Type::Path(path) => path.path.segments.last().map(|last| &last.ident),
+            _ => None,
+        }
+    }
+
+    fn implemented(item: &ItemImpl) -> Vec<Name> {
+        let implemented =
+            item.trait_.iter().filter_map(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
+        implemented.filter(|name| name.matches::<Whole>(&Self::TRAITS)).chain(Self::conversions(&item.items)).collect()
+    }
+
+    fn conversions(members: &[ImplItem]) -> Vec<Name> {
+        members
+            .iter()
+            .filter_map(|member| match member {
+                ImplItem::Fn(function) => Some(Name::from(&function.sig.ident)),
+                _ => None,
+            })
+            .filter(|method| {
+                method.matches::<Whole>(&Self::METHODS)
+                    || method.words().first().is_some_and(|first| first.matches::<Whole>(&Self::LEADS))
+            })
+            .collect()
+    }
+}

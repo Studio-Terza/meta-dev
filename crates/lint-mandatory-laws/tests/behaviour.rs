@@ -21,7 +21,18 @@ const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\nenum A {}\n";
 const SPLIT_TYPES: &str = "struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
 const UNRELATED_MACRO: &str = "fn t() {\n    vec![A];\n}\n";
 
-const CASES: [Case; 17] = [
+const TITLE_ONLY: &str = "laws::roundtrip!(A, any::<u8>(), B::encode, B::decode);\n";
+const BOTH_PAIRS: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
+const CODED_ROUNDTRIP: &str = "laws::roundtrip!(coded, any::<A>(), A::encode, A::decode);\n";
+const TEXT_ROUNDTRIP: &str = "laws::roundtrip!(text, any::<A>(), ToString::to_string, A::from_str);\n";
+const DISPLAY_FILE: &str = "impl std::fmt::Display for crate::A {}\n";
+const FROM_STR_FILE: &str = "impl std::str::FromStr for crate::A {}\n";
+const CONDITIONAL_SERDE: &str = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]\npub struct A;\n";
+const CODEC: &str = "struct A;\ntrait Codec {\n    fn encode(&self);\n    fn decode();\n}\nimpl Codec for A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
+const KEY: &str = "pub struct Key;\nimpl Key {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
+const KEY_ROUNDTRIP: &str = "laws::roundtrip!(key_recovers, any::<Key>(), Key::encode, Key::decode);\n";
+
+const CASES: [Case; 27] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
@@ -50,6 +61,61 @@ const CASES: [Case; 17] = [
         "law for another type",
         &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", OTHER_TYPE)],
         &["src/a.rs:1"],
+    ),
+    Case::new(
+        "the title is not a mention",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", TITLE_ONLY)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "one roundtrip does not cover two pairs",
+        &[Source::new("src/a.rs", BOTH_PAIRS), Source::new("tests/a.rs", CODED_ROUNDTRIP)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "a roundtrip for each pair",
+        &[
+            Source::new("src/a.rs", BOTH_PAIRS),
+            Source::new("tests/a.rs", CODED_ROUNDTRIP),
+            Source::new("tests/b.rs", TEXT_ROUNDTRIP),
+        ],
+        &[],
+    ),
+    Case::new(
+        "the text roundtrip alone leaves the methods bare",
+        &[Source::new("src/a.rs", BOTH_PAIRS), Source::new("tests/a.rs", TEXT_ROUNDTRIP)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "a law in another package",
+        &[
+            Source::new("crates/one/src/lib.rs", KEY),
+            Source::new("crates/two/src/lib.rs", KEY),
+            Source::new("crates/two/tests/t.rs", KEY_ROUNDTRIP),
+        ],
+        &["crates/one/src/lib.rs:1"],
+    ),
+    Case::new(
+        "a law in each package",
+        &[
+            Source::new("crates/one/src/lib.rs", KEY),
+            Source::new("crates/one/tests/t.rs", KEY_ROUNDTRIP),
+            Source::new("crates/two/src/lib.rs", KEY),
+            Source::new("crates/two/tests/t.rs", KEY_ROUNDTRIP),
+        ],
+        &[],
+    ),
+    Case::new(
+        "a pair split across files",
+        &[Source::new("src/a.rs", DISPLAY_FILE), Source::new("src/b.rs", FROM_STR_FILE)],
+        &["src/a.rs:1"],
+    ),
+    Case::new("serde behind cfg_attr", &[Source::new("src/a.rs", CONDITIONAL_SERDE)], &["src/a.rs:2"]),
+    Case::new("a codec trait", &[Source::new("src/a.rs", CODEC)], &["src/a.rs:1"]),
+    Case::new(
+        "a codec trait with a roundtrip",
+        &[Source::new("src/a.rs", CODEC), Source::new("tests/a.rs", CODED_ROUNDTRIP)],
+        &[],
     ),
 ];
 
