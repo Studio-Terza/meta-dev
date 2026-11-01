@@ -37,6 +37,11 @@ laws::table!(
             => vec!["a.rs:3".to_owned()],
         "fn f() {\n    vec![std::fs::remove_dir_all(\"x\"); 2];\n}\n" => vec!["a.rs:2".to_owned()],
         "fn f() {\n    cache.remove_dir_all();\n}\n" => Vec::<String>::new(),
+        "fn f() {\n    <std::fs as Tr>::remove_dir_all(\"x\");\n}\n" => Vec::<String>::new(),
+        "use std::fs::remove_dir_all;\nfn f(cache: u8) {\n    vec![cache.remove_dir_all()];\n}\n"
+            => Vec::<String>::new(),
+        "use std::fs::remove_dir_all;\nfn f() {\n    vec![1, remove_dir_all(\"x\")];\n}\n"
+            => vec!["a.rs:3".to_owned()],
         "mod a {\n    pub use std::fs::remove_dir_all;\n}\nmod b {\n    fn remove_dir_all(_x: u8) {}\n    fn f() {\n        remove_dir_all(1);\n    }\n}\n"
             => Vec::<String>::new(),
     ]
@@ -72,4 +77,11 @@ fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
         .map(|used| (used.ground(), used.cover()))
         .collect();
     assert_eq!(seen, vec![(Ground::Ports, Cover::Guarded), (Ground::Ports, Cover::Bare), (Ground::Open, Cover::Bare)]);
+}
+
+#[test]
+fn a_module_with_no_file_of_its_own_is_entered() {
+    let root = Sources::file("crates/x/src/lib.rs", "mod a;\nfn f() {\n    a::b::remove_dir_all(\"x\");\n}\n");
+    let nested = Sources::file("crates/x/src/a/b.rs", "pub use std::fs::remove_dir_all;\n");
+    assert_eq!(Reads::spelled(&[root, nested]), vec!["crates/x/src/lib.rs:3".to_owned()]);
 }

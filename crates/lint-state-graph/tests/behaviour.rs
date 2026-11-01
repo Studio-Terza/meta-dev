@@ -32,6 +32,7 @@ const NO_START: &str =
     "states! {\n    mod door {\n        state Open { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
 const NO_TERMINAL: &str = "states! {\n    mod door {\n        start Open {}\n    }\n}\n";
 const UNKNOWN_KIND: &str = "states! {\n    mod door {\n        begin Open {}\n    }\n}\n";
+const OTHER_RENAME: &str = "use other::thing as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
 const NOT_A_GRAPH: &str = "fn f() {\n    states!(1 + 1);\n}\n";
 const IN_TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    states! {\n        mod door {\n            begin Open {}\n        }\n    }\n}\n";
@@ -64,6 +65,7 @@ laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
     [Source::new("a.rs", IN_TEST_MODULE)] => NONE,
     [Source::new("x/tests/a.rs", UNREACHABLE)] => NONE,
     [Source::new("a.rs", OTHER_MACRO)] => NONE,
+    [Source::new("a.rs", OTHER_RENAME)] => NONE,
     [Source::new("a.rs", THE_DEFINITION)] => NONE,
 ]);
 

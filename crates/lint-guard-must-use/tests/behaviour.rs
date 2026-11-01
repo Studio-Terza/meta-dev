@@ -21,6 +21,8 @@ const TEST_IMPL: &str = "struct Lock;\n#[cfg(test)]\nimpl Drop for Lock {\n    f
 const TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    struct Lock;\n    impl Drop for Lock {\n        fn drop(&mut self) {}\n    }\n}\n";
 
+const OTHER_CONDITIONAL: &str =
+    "#[cfg_attr(all(), derive(Debug))]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const PLAIN: &str = "pub struct Lock;\n";
 const CONDITIONAL_MARK: &str =
     "#[cfg_attr(all(), must_use)]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
@@ -38,6 +40,7 @@ laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
     [Source::new("crates/x/src/a.rs", DROP_IMPL), Source::new("crates/x/src/b.rs", PLAIN)] => ["crates/x/src/b.rs:1"],
     [Source::new("a.rs", ALIASED)] => ["a.rs:1"],
     [Source::new("a.rs", UNION)] => ["a.rs:1"],
+    [Source::new("a.rs", OTHER_CONDITIONAL)] => ["a.rs:2"],
 ]);
 
 laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMustUse>, [

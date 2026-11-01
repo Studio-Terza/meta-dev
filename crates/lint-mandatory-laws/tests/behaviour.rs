@@ -32,7 +32,14 @@ const CODEC: &str = "struct A;\ntrait Codec {\n    fn encode(&self);\n    fn dec
 const KEY: &str = "pub struct Key;\nimpl Key {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const KEY_ROUNDTRIP: &str = "laws::roundtrip!(key_recovers, any::<Key>(), Key::encode, Key::decode);\n";
 
-const CASES: [Case; 27] = [
+const HALF_ROUNDTRIP: &str = "laws::roundtrip!(half, any::<A>(), A::encode, other);\n";
+const FOREIGN_ROUNDTRIP: &str = "other::roundtrip!(foreign, any::<A>(), A::encode, A::decode);\n";
+const LAW_NAMING_BOTH: &str = "laws::law!(both, any::<A>(), value, { A::decode(&value.encode()) });\n";
+const ENCODE_ONLY: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
+const DECODE_ONLY: &str = "struct A;\nimpl A {\n    fn decode() {}\n}\n";
+const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
+
+const CASES: [Case; 34] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
@@ -117,6 +124,29 @@ const CASES: [Case; 27] = [
         &[Source::new("src/a.rs", CODEC), Source::new("tests/a.rs", CODED_ROUNDTRIP)],
         &[],
     ),
+    Case::new(
+        "a roundtrip naming one method",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", HALF_ROUNDTRIP)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "a roundtrip from another crate",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", FOREIGN_ROUNDTRIP)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "a plain law naming both methods",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", LAW_NAMING_BOTH)],
+        &["src/a.rs:1"],
+    ),
+    Case::new("encode alone", &[Source::new("src/a.rs", ENCODE_ONLY)], &[]),
+    Case::new("decode alone", &[Source::new("src/a.rs", DECODE_ONLY)], &[]),
+    Case::new("derive-like attribute under cfg_attr", &[Source::new("src/a.rs", OTHER_ATTRIBUTE_LIST)], &[]),
+    Case::new(
+        "a roundtrip for the right type only",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", OTHER_TYPE)],
+        &["src/a.rs:1"],
+    ),
 ];
 
 const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
@@ -138,6 +168,7 @@ fn the_message_names_the_fix() {
     let pair = MandatoryLaws::report(&[Sources::file("src/a.rs", ENCODING)]);
     let order = MandatoryLaws::report(&[Sources::file("src/a.rs", ORDER)]);
     assert!(pair.violations().iter().all(|violation| violation.message().contains("laws::roundtrip!")));
+    assert!(pair.violations().iter().all(|violation| violation.message().contains("`encode` and `decode`")));
     assert!(order.violations().iter().all(|violation| violation.message().contains("laws::law!")));
     assert!(!pair.is_clean() && !order.is_clean());
 }

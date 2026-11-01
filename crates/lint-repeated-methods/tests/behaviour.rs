@@ -17,7 +17,12 @@ const SHOWN_DIFFERENTLY: &str = "pub struct A(usize);\npub struct B(usize);\npub
 const ARITHMETIC_TWICE: &str = "pub struct A(usize);\npub struct B(usize);\npub struct C(usize);\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A { A(self.0 + other.0) }\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B { B(self.0 + other.0) }\n}\n";
 const NOT_NEWTYPES: &str = "pub struct A;\npub struct B(u8, u8);\npub struct C { a: u8, b: u8 }\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A { other }\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B { other }\n}\nimpl Add for C {\n    type Output = C;\n    fn add(self, other: C) -> C { other }\n}\n";
 
-const CASES: [Case; 12] = [
+const TWO_FIELDS_NAMED: &str = "pub struct A { a: u8, b: u8 }\npub struct B { a: u8, b: u8 }\npub struct C { a: u8, b: u8 }\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A { other }\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B { other }\n}\nimpl Add for C {\n    type Output = C;\n    fn add(self, other: C) -> C { other }\n}\n";
+const TWO_FIELDS_TUPLE: &str = "pub struct A(u8, u8);\npub struct B(u8, u8);\npub struct C(u8, u8);\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A { other }\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B { other }\n}\nimpl Add for C {\n    type Output = C;\n    fn add(self, other: C) -> C { other }\n}\n";
+const OTHER_TRAIT: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl Tr for A {\n    fn go(self) -> u8 { 1 }\n}\nimpl Tr for B {\n    fn go(self) -> u8 { 1 }\n}\nimpl Tr for C {\n    fn go(self) -> u8 { 1 }\n}\n";
+const DIFFERENT_PARAMS: &str = "pub struct A;\npub struct B;\npub struct C;\nimpl A {\n    pub fn f(&self, x: Foo) {}\n}\nimpl B {\n    pub fn f(&self, x: Bar) {}\n}\nimpl C {\n    pub fn f(&self, x: Baz) {}\n}\n";
+
+const CASES: [Case; 16] = [
     Case::new("three types", &[Source::new("a.rs", THREE)], &["a.rs:5"]),
     Case::new("two types", &[Source::new("a.rs", TWO)], &[]),
     Case::new("private methods", &[Source::new("a.rs", PRIVATE)], &[]),
@@ -30,9 +35,21 @@ const CASES: [Case; 12] = [
     Case::new("different Display bodies", &[Source::new("a.rs", SHOWN_DIFFERENTLY)], &[]),
     Case::new("arithmetic on two newtypes", &[Source::new("a.rs", ARITHMETIC_TWICE)], &[]),
     Case::new("arithmetic on types that are not newtypes", &[Source::new("a.rs", NOT_NEWTYPES)], &[]),
+    Case::new("arithmetic on named structs of two fields", &[Source::new("a.rs", TWO_FIELDS_NAMED)], &[]),
+    Case::new("arithmetic on tuple structs of two fields", &[Source::new("a.rs", TWO_FIELDS_TUPLE)], &[]),
+    Case::new("the same body of a trait outside the list", &[Source::new("a.rs", OTHER_TRAIT)], &[]),
+    Case::new("methods that differ in their parameters", &[Source::new("a.rs", DIFFERENT_PARAMS)], &[]),
 ];
 
 #[test]
 fn one_method_shape_on_many_types_is_flagged() {
     assert_eq!(Sources::mismatches::<RepeatedMethods>(&CASES), Vec::<String>::new());
+}
+
+#[test]
+fn a_trait_impl_message_names_the_trait_and_an_inherent_one_does_not() {
+    let arithmetic = Sources::report::<RepeatedMethods>(&[Source::new("a.rs", ARITHMETIC)]).to_string();
+    let constructors = Sources::report::<RepeatedMethods>(&[Source::new("a.rs", CONSTRUCTORS)]).to_string();
+    assert!(arithmetic.contains("in impl Add on A, B, C"));
+    assert!(!constructors.contains("in impl"));
 }

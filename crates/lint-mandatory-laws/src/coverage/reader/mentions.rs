@@ -12,14 +12,15 @@ impl Mentions {
     const SEPARATOR: char = ',';
 
     pub(crate) fn beyond_title(tokens: TokenStream, kind: Kind) -> BTreeSet<Name> {
-        let trees: Vec<TokenTree> = tokens.into_iter().collect();
-        let title =
-            trees.iter().position(|tree| matches!(tree, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR));
-        let skipped = match kind {
-            Kind::Roundtrip | Kind::Law => title.map_or(0, |end| end + 1),
-            Kind::Proptest | Kind::Other => 0,
-        };
-        Self::named(trees.into_iter().skip(skipped))
+        match kind {
+            Kind::Roundtrip | Kind::Law => Self::named(
+                tokens
+                    .into_iter()
+                    .skip_while(|tree| !matches!(tree, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
+                    .skip(1),
+            ),
+            Kind::Proptest | Kind::Other => Self::named(tokens.into_iter()),
+        }
     }
 
     fn named(trees: impl Iterator<Item = TokenTree>) -> BTreeSet<Name> {
