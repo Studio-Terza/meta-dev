@@ -21,4 +21,20 @@ settings. Files under `tests`, `examples` and `benches` are checked only by the 
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (reports, sites, violations, source files), `lints` (the lints and runner),
-`lint` (the binary).
+`lint` (the binary), `golden` (golden files for tests).
+
+## Goldens
+
+A golden is a recorded output of a public API, kept at `tests/goldens/<name>` in the package.
+
+    #[test]
+    fn report_is_stable() -> Result<(), golden::Failure> {
+        golden::golden!("report.txt", &render_report())
+    }
+
+`cargo test` only compares. It fails on a difference or a missing golden, and it writes nothing. The
+failure names the file and shows a diff in which each line is quoted, so a change in whitespace or line
+endings is visible. The diff is one hunk, from the first changed line to the last.
+
+To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
+`GOLDEN_RECORD` fails, and so does recording when `CI` is set.
