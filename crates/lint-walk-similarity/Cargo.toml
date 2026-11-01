@@ -16,9 +16,5 @@ lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 type-facts = { path = "../type-facts" }
 
-[dev-dependencies]
-lint-fixtures = { path = "../lint-fixtures" }
-laws = { path = "../laws" }
-
 [lints]
 workspace = true

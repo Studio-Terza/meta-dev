@@ -15,9 +15,5 @@ lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 saphyr = "0.3.3"
 
-[dev-dependencies]
-laws = { path = "../laws" }
-tempfile.workspace = true
-
 [lints]
 workspace = true
