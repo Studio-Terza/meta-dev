@@ -6,6 +6,7 @@ mod reached;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use crate::cli::failure::Failure;
 use crate_count::CrateCount;
@@ -20,13 +21,17 @@ pub struct Workspace {
     dependents: BTreeMap<CrateName, BTreeSet<CrateName>>,
 }
 
-impl Workspace {
-    const INERT: [&'static str; 2] = ["README.md", "specs"];
+impl FromStr for Workspace {
+    type Err = Failure;
 
-    pub fn parse(metadata: &str) -> Result<Workspace, Failure> {
+    fn from_str(metadata: &str) -> Result<Workspace, Failure> {
         let metadata: Metadata = serde_json::from_str(metadata)?;
         Ok(Workspace { directories: metadata.directories()?, dependents: metadata.dependents() })
     }
+}
+
+impl Workspace {
+    const INERT: [&'static str; 2] = ["README.md", "specs"];
 
     pub fn reached(&self, changed: &[PathBuf]) -> Reached {
         Reached::new(

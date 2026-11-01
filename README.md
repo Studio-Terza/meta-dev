@@ -183,10 +183,12 @@ the inner value.
 
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
-are named methods. Derived code is not in the source, so `repeated_methods` does not see it. A
-hand-written constructor on three types still fails, whatever their inner types are (an argument of the inner type
-counts as `Inner`), and so does the same body of an operator, `Display`, `From`, `Default`, `Sum`, `AsRef`, `Deref` or
-`FromStr` impl on three newtypes.
+are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
+count the impl of a trait (an operator, `Display`, `From`, `AsRef`, `FromStr`). A hand-written constructor or other
+public method of one shape on three types still fails, whatever their inner types are (an argument of the inner type
+counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
+
+Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
 ## Guards
 
@@ -240,9 +242,9 @@ fails. No push starts it and no push cancels it.
 
 ## Fuzzing
 
-The `fuzz` crate feeds the runner arbitrary bytes, arbitrary valid syntax, damaged valid syntax, deep nesting and long chains, and fails when the runner panics or overflows its stack. It is a workspace member but not a default member, so `cargo test`, `cargo clippy` and the PR gates never run it. It uses proptest rather than cargo-fuzz, which needs a nightly toolchain: proptest runs on the pinned stable toolchain, generates valid syntax from strategies, shrinks a failing input, and the targets need no coverage feedback to find a panic in a lint written over `syn`.
+The `fuzz` crate feeds the runner arbitrary bytes, arbitrary valid syntax, damaged valid syntax, deep nesting and long chains, and fails when the runner panics or overflows its stack. Its test target needs the `campaign` feature, so `cargo test --workspace` and the PR gates never build or run it; only the `fuzz` workflow does. It uses proptest rather than cargo-fuzz, which needs a nightly toolchain: proptest runs on the pinned stable toolchain, generates valid syntax from strategies, shrinks a failing input, and the targets need no coverage feedback to find a panic in a lint written over `syn`.
 
-    FUZZ_SECONDS=60 FUZZ_CRASHES=/some/dir cargo test -p fuzz --test fuzz
+    FUZZ_SECONDS=60 FUZZ_CRASHES=/some/dir cargo test -p fuzz --features campaign --test fuzz
 
 Each target runs for `FUZZ_SECONDS` seconds (default 5) with fresh random seeds. With `FUZZ_CRASHES` set, the input being run is first written to `<target>-pending.rs` and `<target>-pending.role`, so an abort that no test can catch still leaves its input behind; a panic also leaves the shrunk input as `<target>-<role>-<hash>.rs`. The `fuzz` workflow runs every day on main for 15 minutes, fails the run on a crash and uploads that directory. A crash found becomes a named test in the crate that owns the fix, with the input kept in its `tests` directory.
 

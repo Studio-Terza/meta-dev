@@ -2,6 +2,8 @@ mod suffix;
 
 use syn::ItemMod;
 
+use lint_layout::Word;
+
 use crate::source_file::SourceFile;
 use suffix::Suffix;
 
@@ -19,7 +21,7 @@ impl Gate {
     pub fn admits(&self, file: &SourceFile) -> bool {
         let placement = file.placement();
         self.package_suffix.is_some_and(|suffix| {
-            placement.crate_root().package().is_some_and(|package| package.matches::<Suffix>(&[suffix]))
+            placement.crate_root().package().is_some_and(|package| package.matches::<Suffix>(&[Word::new(suffix)]))
         }) || placement.module().segments().iter().any(|segment| *segment == self.module)
     }
 

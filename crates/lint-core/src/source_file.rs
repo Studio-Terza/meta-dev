@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use lint_layout::Failure;
 use lint_layout::LineNumber;
+use lint_layout::SourceText;
 use lint_placement::CrateFile;
 use lint_placement::Placement;
 use lint_placement::Role;
@@ -12,7 +13,7 @@ pub struct SourceFile {
     located: PathBuf,
     placement: Placement,
     crate_file: CrateFile,
-    text: String,
+    text: SourceText,
     syntax: syn::File,
     test_modules: Vec<SourceFile>,
 }
@@ -20,19 +21,19 @@ pub struct SourceFile {
 impl SourceFile {
     const MANIFEST: &'static str = "Cargo.toml";
 
-    pub fn parse(path: impl Into<PathBuf>, text: String) -> Result<Self, Failure> {
+    pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
         let path = path.into();
         let placement = Placement::locate(&path);
         let located = path.clone();
         Self::parse_placed(path, located, placement, text)
     }
 
-    pub fn parse_at(path: PathBuf, package: &Path, located: &Path, text: String) -> Result<Self, Failure> {
+    pub fn parse_at(path: PathBuf, package: &Path, located: &Path, text: SourceText) -> Result<Self, Failure> {
         Self::parse_placed(path, located.to_path_buf(), Placement::within(package, located), text)
     }
 
-    fn parse_placed(path: PathBuf, located: PathBuf, placement: Placement, text: String) -> Result<Self, Failure> {
-        let syntax = syn::parse_file(&text).map_err(|source| Failure::Parse {
+    fn parse_placed(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
+        let syntax = syn::parse_file(text.as_ref()).map_err(|source| Failure::Parse {
             path: path.clone(),
             line: LineNumber::from(source.span()),
             source,
@@ -89,7 +90,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> &SourceText {
         &self.text
     }
 

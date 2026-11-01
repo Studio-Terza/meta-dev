@@ -1,13 +1,14 @@
 use lint_core::Lint;
 use lint_enum_predicates::EnumPredicates;
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const IMPL_ONLY: &str = "impl Mode {\n    fn is_a(&self) -> bool { true }\n}\n";
 const DECLARES: &str = "pub enum Mode { A }\n";
 
 #[test]
 fn an_enum_in_another_crate_does_not_count() {
-    let files = [Sources::file("x/src/mode.rs", DECLARES), Sources::file("y/src/impls.rs", IMPL_ONLY)];
+    let files =
+        [Sources::file("x/src/mode.rs", Text::new(DECLARES)), Sources::file("y/src/impls.rs", Text::new(IMPL_ONLY))];
     assert!(EnumPredicates::report(&files).is_clean());
 }
 
@@ -18,13 +19,17 @@ const STATUS_STRUCT: &str = "pub struct Status;\nimpl Status {\n    pub fn ok(&s
 
 #[test]
 fn integration_tests_are_separate_crates() {
-    let files = [Sources::file("x/tests/a.rs", SHARED_TEST_NAME), Sources::file("y/tests/b.rs", OTHER_TEST_CRATE)];
+    let files = [
+        Sources::file("x/tests/a.rs", Text::new(SHARED_TEST_NAME)),
+        Sources::file("y/tests/b.rs", Text::new(OTHER_TEST_CRATE)),
+    ];
     assert!(EnumPredicates::report(&files).is_clean());
 }
 
 #[test]
 fn a_struct_sharing_an_enums_name_in_another_module_passes() {
-    let files = [Sources::file("x/src/a.rs", STATUS_ENUM), Sources::file("x/src/b.rs", STATUS_STRUCT)];
+    let files =
+        [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
     assert!(EnumPredicates::report(&files).is_clean());
 }
 
@@ -37,14 +42,34 @@ const IMPL_IN_MACRO: &str =
     "enum Mode { A }\nwrap! {\n    impl Mode {\n        fn is_a(&self) -> bool { true }\n    }\n}\n";
 
 const CASES: [Case; 5] = [
-    Case::new("same name in the next module", &[Source::new("a.rs", SAME_NAME_NEARBY)], &["a.rs:7"]),
-    Case::new("a path to a struct", &[Source::new("a.rs", PATH_TO_A_STRUCT)], &[]),
-    Case::new("a union of that name", &[Source::new("a.rs", A_UNION_ALSO_NAMED)], &[]),
-    Case::new("enum inside a macro", &[Source::new("a.rs", ENUM_IN_MACRO)], &["a.rs:5"]),
-    Case::new("impl inside a macro", &[Source::new("a.rs", IMPL_IN_MACRO)], &["a.rs:4"]),
+    Case::new(
+        Title::new("same name in the next module"),
+        &[Source::new(Located::new("a.rs"), Text::new(SAME_NAME_NEARBY))],
+        Flagged::new(&["a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("a path to a struct"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATH_TO_A_STRUCT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a union of that name"),
+        &[Source::new(Located::new("a.rs"), Text::new(A_UNION_ALSO_NAMED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("enum inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(ENUM_IN_MACRO))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("impl inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(IMPL_IN_MACRO))],
+        Flagged::new(&["a.rs:4"]),
+    ),
 ];
 
 #[test]
 fn a_name_resolves_to_the_nearest_declaration() {
-    assert_eq!(Sources::mismatches::<EnumPredicates>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<EnumPredicates>(&CASES), Lines::default());
 }

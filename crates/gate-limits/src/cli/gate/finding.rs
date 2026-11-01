@@ -3,17 +3,18 @@ use std::fmt;
 use crate::cli::gate::limit::Limit;
 use crate::cli::gate::seconds::Seconds;
 use crate::cli::gate::verdict::Verdict;
+use crate::cli::stage::Stage;
 
 #[derive(Debug)]
 pub struct Finding {
-    stage: String,
+    stage: Stage,
     measured: Seconds,
     limit: Limit,
     verdict: Verdict,
 }
 
 impl Finding {
-    pub fn new(stage: String, measured: Seconds, limit: Limit) -> Finding {
+    pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
         Finding { stage, measured, limit, verdict: limit.judge(measured) }
     }
 

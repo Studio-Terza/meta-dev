@@ -39,3 +39,5 @@ pub use type_homes::TypeHomes;
 pub use type_name::TypeName;
 pub use violation::Violation;
 pub use walk::Walk;
+
+pub use lint_layout::{Headline, SourceText};

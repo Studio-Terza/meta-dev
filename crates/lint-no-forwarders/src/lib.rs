@@ -7,7 +7,7 @@ mod workspace_types;
 use finding::Finding;
 use forwarder::Forwarder;
 use forwarders::Forwarders;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use syn::visit::Visit;
 use workspace_types::WorkspaceTypes;
 
@@ -26,7 +26,7 @@ impl Lint for NoForwarders {
         let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
         let types = WorkspaceTypes::from(shipped.as_slice());
         Report::new(
-            "methods do their own work, they do not forward to another type of ours",
+            Headline::new("methods do their own work, they do not forward to another type of ours"),
             shipped
                 .iter()
                 .flat_map(|file| {

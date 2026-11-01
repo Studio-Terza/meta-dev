@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-use lint_layout::Name;
 use lint_layout::Whole;
+use lint_layout::{Name, Word, words};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum ShapeToken {
@@ -12,7 +12,7 @@ pub(super) enum ShapeToken {
 
 impl ShapeToken {
     const MINUS: char = '-';
-    const LITERAL_WORDS: [&str; 2] = ["true", "false"];
+    const LITERAL_WORDS: [Word<'static>; 2] = words!["true", "false"];
 
     pub(super) fn normalized(tokens: TokenStream) -> Vec<ShapeToken> {
         let shaped: Vec<ShapeToken> = tokens.into_iter().flat_map(Self::of_tree).collect();

@@ -3,6 +3,7 @@ use std::fmt;
 use syn::Path;
 
 use crate::name::Name;
+use crate::word::Word;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UsePath(Vec<Name>);
@@ -26,7 +27,7 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn ends_with<const LENGTH: usize>(&self, tail: &[&str; LENGTH]) -> bool {
+    pub fn ends_with<const LENGTH: usize>(&self, tail: &[Word<'_>; LENGTH]) -> bool {
         self.0.len() >= LENGTH
             && self.0.iter().rev().zip(tail.iter().rev()).all(|(segment, spelled)| segment == spelled)
     }
@@ -37,7 +38,7 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn spells(&self, segments: &[&str]) -> bool {
+    pub fn spells(&self, segments: &[Word<'_>]) -> bool {
         self.0.len() == segments.len() && self.0.iter().zip(segments).all(|(segment, spelled)| segment == spelled)
     }
 

@@ -10,11 +10,11 @@ use std::iter;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
-use lint_core::Lint;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::{Headline, Lint};
 use lint_placement::PackageRoot;
 use test_features::TestFeatures;
 
@@ -44,7 +44,7 @@ impl Lint for NoTestOnlyApi {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
         Report::new(
-            "shipped code has no test-only API",
+            Headline::new("shipped code has no test-only API"),
             files
                 .iter()
                 .flat_map(Self::in_source)

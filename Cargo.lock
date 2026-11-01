@@ -93,6 +93,7 @@ dependencies = [
 name = "gate-limits"
 version = "0.1.0"
 dependencies = [
+ "newtype",
  "serde",
  "thiserror",
  "toml",
@@ -246,6 +247,7 @@ version = "0.1.0"
 dependencies = [
  "laws",
  "lint-core",
+ "newtype",
 ]
 
 [[package]]

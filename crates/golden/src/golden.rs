@@ -3,7 +3,9 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use crate::{Difference, Failure, Mode};
+use newtype::Newtype;
+
+use crate::{Difference, Failure, Mode, Output};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Golden(PathBuf);
@@ -30,15 +32,15 @@ impl Golden {
         Self::in_package(package, name)
     }
 
-    pub fn verify(&self, actual: &str) -> Result<(), Failure> {
+    pub fn verify(&self, actual: Output<'_>) -> Result<(), Failure> {
         self.verify_in(Mode::current()?, actual)
     }
 
-    pub fn verify_in(&self, mode: Mode, actual: &str) -> Result<(), Failure> {
+    pub fn verify_in(&self, mode: Mode, actual: Output<'_>) -> Result<(), Failure> {
         match mode {
             Mode::Check => {
                 let recorded = fs::read_to_string(&self.0).map_err(|source| self.unread(source))?;
-                Difference::between(&recorded, actual).map_or(Ok(()), |difference| {
+                Difference::between(Output::new(&recorded), actual).map_or(Ok(()), |difference| {
                     Err(Failure::Differs { path: self.0.clone(), difference: Box::new(difference) })
                 })
             }
@@ -46,8 +48,9 @@ impl Golden {
         }
     }
 
-    fn written(&self, actual: &str) -> io::Result<()> {
-        fs::create_dir_all(self.0.parent().unwrap_or(Path::new(""))).and_then(|()| fs::write(&self.0, actual))
+    fn written(&self, actual: Output<'_>) -> io::Result<()> {
+        fs::create_dir_all(self.0.parent().unwrap_or(Path::new("")))
+            .and_then(|()| fs::write(&self.0, actual.into_inner()))
     }
 
     fn unread(&self, source: io::Error) -> Failure {

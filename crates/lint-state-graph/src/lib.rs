@@ -11,7 +11,7 @@ use declarations::Declarations;
 use declared_graphs::DeclaredGraphs;
 use edge_scan::EdgeScan;
 use field_visibility::FieldVisibility;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use variant_matches::VariantMatches;
 
 use lint_core::Most;
@@ -30,7 +30,7 @@ impl Lint for StateGraph {
             edges
         });
         Report::new(
-            "state graph violated",
+            Headline::new("state graph violated"),
             files
                 .iter()
                 .flat_map(|file| {

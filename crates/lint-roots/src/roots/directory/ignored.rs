@@ -2,6 +2,7 @@ use std::path::Path;
 
 use lint_layout::Name;
 use lint_layout::Prefix;
+use lint_layout::Word;
 
 use super::Directory;
 
@@ -18,7 +19,7 @@ impl Ignored {
 
     const BUILD_DIRECTORY: &'static str = "target";
     const MANIFEST: &'static str = "Cargo.toml";
-    const HIDDEN: &'static str = ".";
+    const HIDDEN: Word<'static> = Word::new(".");
     const VERSION_CONTROL: &'static str = ".git";
 
     pub fn applying_to(self, directory: &Directory) -> Option<Ignored> {

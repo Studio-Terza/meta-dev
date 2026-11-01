@@ -6,7 +6,7 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{Item, ItemFn};
 
-use lint_core::{Report, Site, SourceFile, Violation};
+use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 use lint_placement::Role;
 
@@ -16,7 +16,7 @@ pub struct ThinMain;
 impl Lint for ThinMain {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "a binary is a thin main over its library",
+            Headline::new("a binary is a thin main over its library"),
             files
                 .iter()
                 .filter(|file| file.placement().role() == Role::BinaryRoot)

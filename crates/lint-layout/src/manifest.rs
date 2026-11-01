@@ -132,7 +132,7 @@ impl Manifest {
             .collect()
     }
 
-    fn workspace_strings(&self, key: &str) -> Vec<String> {
+    fn workspace_strings(&self, key: &str) -> Vec<Name> {
         self.table
             .get(Self::WORKSPACE)
             .and_then(|workspace| workspace.get(key))
@@ -140,7 +140,7 @@ impl Manifest {
             .into_iter()
             .flatten()
             .filter_map(Value::as_str)
-            .map(str::to_owned)
+            .map(Name::from)
             .collect()
     }
 }
