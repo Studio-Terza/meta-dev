@@ -13,6 +13,9 @@ const LEAF_REPORT: &str = "REACH=1 of 5 crates\nCARGO_SCOPE=-p leaf\nMUTANTS_SCO
 const TWO_REPORT: &str = "REACH=2 of 5 crates\nCARGO_SCOPE=-p middle -p tested-through\n\
     MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
 const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n";
+const HISTORY_LEAF: &str = "reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
+const HISTORY_CORE: &str = "reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
+const HISTORY_NONE: &str = "reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not:\n\
     2 core\n1 middle\n0 leaf\n0 serde-user\n0 tested-through\n";
 
@@ -36,6 +39,11 @@ impl Answer {
 
     fn reached_by(changed: &[&str]) -> String {
         let arguments = ["affected", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
+    fn history_by(changed: &[&str]) -> String {
+        let arguments = ["history", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
         Answer::to(&arguments).out
     }
 
@@ -131,9 +139,9 @@ laws::table!(
     every_unusable_input_fails_closed_and_says_why,
     Answer::refused,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
         ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
     ]
 );
@@ -143,6 +151,16 @@ fn fan_in_counts_every_crate_a_crate_reaches_most_first() {
     let answer = Answer::to(&["fan-in", WORKSPACE]);
     assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: FAN_IN_REPORT.to_owned(), err: String::new() });
 }
+
+laws::table!(
+    a_history_line_gives_the_reach_and_every_fan_in,
+    Answer::history_by,
+    [
+        ["crates/leaf/src/lib.rs"] => HISTORY_LEAF,
+        ["crates/core/src/lib.rs"] => HISTORY_CORE,
+        ["README.md"] => HISTORY_NONE,
+    ]
+);
 
 #[test]
 fn metadata_that_cannot_be_read_or_parsed_is_refused() {

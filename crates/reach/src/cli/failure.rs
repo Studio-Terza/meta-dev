@@ -11,6 +11,8 @@ pub enum Failure {
     Parse(#[from] serde_json::Error),
     #[error("{manifest} is not inside the workspace", manifest = manifest.display())]
     Outside { manifest: PathBuf },
-    #[error("usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>")]
+    #[error(
+        "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>"
+    )]
     Usage,
 }
