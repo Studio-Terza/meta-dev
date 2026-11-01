@@ -44,6 +44,6 @@ impl Cli {
     fn workspace(metadata: &Path) -> Result<Workspace, Failure> {
         let text =
             fs::read_to_string(metadata).map_err(|source| Failure::Read { path: metadata.to_path_buf(), source })?;
-        Workspace::parse(&text)
+        text.parse()
     }
 }

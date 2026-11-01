@@ -1,4 +1,4 @@
-use lint_layout::{Name, Prefix};
+use lint_layout::{Name, Word};
 
 #[derive(Debug)]
 pub struct Pair {
@@ -17,7 +17,6 @@ impl Pair {
     ];
 
     pub fn partner(&self, method: &Name) -> Option<Name> {
-        let rest = method.spelled().get(self.opening.len()..).filter(|_| method.matches::<Prefix>(&[self.opening]))?;
-        Some(Name::from([self.closing, rest].concat().as_str()))
+        method.without_prefix(Word::new(self.opening)).map(|rest| rest.prefixed(Word::new(self.closing)))
     }
 }

@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use lint_core::Readout;
 use lint_core::SourceFile;
+use lint_core::{Readout, SourceText};
 use lint_layout::Failure;
 use lint_placement::CrateFile;
 use lint_roots::Roots;
@@ -56,6 +56,7 @@ impl SourceFiles {
     fn opened(self, scope: &Scope<'_>, file: &Path, children_directory: &Path) -> SourceFiles {
         let shown = scope.tree().display(file);
         let read = fs::read_to_string(file)
+            .map(SourceText::new)
             .map_err(|source| Failure::Io { path: shown.clone(), source })
             .and_then(|text| SourceFile::parse_at(shown, scope.package(), file, text))
             .map(|parsed| parsed.in_crate_file(scope.crate_file().clone()));

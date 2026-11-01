@@ -4,7 +4,7 @@ use lint_core::Lint;
 use module_tree::ModuleTree;
 
 use lint_core::SourceFile;
-use lint_core::{Most, Report};
+use lint_core::{Headline, Most, Report};
 
 #[derive(Debug)]
 pub struct ModuleNesting;
@@ -14,7 +14,7 @@ impl Lint for ModuleNesting {
         let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
         let tree = ModuleTree::from(shipped.as_slice());
         Report::new(
-            "modules nest by use: a file used only inside one sibling belongs inside it",
+            Headline::new("modules nest by use: a file used only inside one sibling belongs inside it"),
             tree.violations().collect(),
         )
     }

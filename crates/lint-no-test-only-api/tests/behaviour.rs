@@ -1,6 +1,6 @@
 use lint_no_test_only_api::NoTestOnlyApi;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const GATED_FN: &str = "#[cfg(test)]\npub fn f() {}\n";
 const GATED_CRATE_FN: &str = "#[cfg(test)]\npub(crate) fn f() {}\n";
@@ -28,25 +28,81 @@ const ALLOW_FEATURE: &str = "#[allow(feature = \"test-utils\")]\nfn f() {}\n";
 const OTHER_KEY: &str = "#[cfg(target_os = \"test-utils\")]\nfn f() {}\n";
 
 const CASES: [Case; 22] = [
-    Case::new("gated crate fn", &[Source::new("src/a.rs", GATED_CRATE_FN)], &["src/a.rs:2"]),
-    Case::new("gated any ships elsewhere", &[Source::new("src/a.rs", GATED_ANY)], &[]),
-    Case::new("gated method", &[Source::new("src/a.rs", GATED_METHOD)], &["src/a.rs:4"]),
-    Case::new("gated impl", &[Source::new("src/a.rs", GATED_IMPL)], &["src/a.rs:4"]),
-    Case::new("gated field", &[Source::new("src/a.rs", GATED_FIELD)], &["src/a.rs:3"]),
-    Case::new("not test", &[Source::new("src/a.rs", NOT_TEST)], &[]),
-    Case::new("hidden method", &[Source::new("src/a.rs", HIDDEN_METHOD)], &["src/a.rs:4"]),
-    Case::new("hidden private", &[Source::new("src/a.rs", HIDDEN_PRIVATE)], &[]),
-    Case::new("doc string", &[Source::new("src/a.rs", DOCUMENTED)], &[]),
-    Case::new("gated in tests", &[Source::new("tests/a.rs", GATED_FN)], &[]),
-    Case::new("feature in any", &[Source::new("src/a.rs", ANY_FEATURE)], &["src/a.rs:1"]),
-    Case::new("feature in cfg_attr", &[Source::new("src/a.rs", FEATURE_ATTRIBUTE)], &["src/a.rs:1"]),
-    Case::new("feature in cfg macro", &[Source::new("src/a.rs", FEATURE_MACRO)], &["src/a.rs:2"]),
-    Case::new("feature in tests", &[Source::new("tests/a.rs", FEATURE)], &["tests/a.rs:1"]),
-    Case::new("other feature", &[Source::new("src/a.rs", OTHER_FEATURE)], &[]),
     Case::new(
-        "every kind of item",
-        &[Source::new("src/a.rs", EVERY_KIND)],
-        &[
+        Title::new("gated crate fn"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_CRATE_FN))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("gated any ships elsewhere"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_ANY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("gated method"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_METHOD))],
+        Flagged::new(&["src/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("gated impl"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_IMPL))],
+        Flagged::new(&["src/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("gated field"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_FIELD))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(Title::new("not test"), &[Source::new(Located::new("src/a.rs"), Text::new(NOT_TEST))], Flagged::new(&[])),
+    Case::new(
+        Title::new("hidden method"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(HIDDEN_METHOD))],
+        Flagged::new(&["src/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("hidden private"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(HIDDEN_PRIVATE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("doc string"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DOCUMENTED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("gated in tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GATED_FN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("feature in any"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(ANY_FEATURE))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("feature in cfg_attr"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(FEATURE_ATTRIBUTE))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("feature in cfg macro"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(FEATURE_MACRO))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("feature in tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(FEATURE))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("other feature"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_FEATURE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("every kind of item"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(EVERY_KIND))],
+        Flagged::new(&[
             "src/a.rs:2",
             "src/a.rs:4",
             "src/a.rs:6",
@@ -56,17 +112,37 @@ const CASES: [Case; 22] = [
             "src/a.rs:14",
             "src/a.rs:16",
             "src/a.rs:18",
-        ],
+        ]),
     ),
-    Case::new("impl members", &[Source::new("src/a.rs", MEMBERS)], &["src/a.rs:4", "src/a.rs:6"]),
-    Case::new("a doc alias", &[Source::new("src/a.rs", ALIAS)], &[]),
-    Case::new("hidden in another attribute", &[Source::new("src/a.rs", OTHER_LIST)], &[]),
-    Case::new("inline module", &[Source::new("src/a.rs", INLINE)], &["src/a.rs:3"]),
-    Case::new("feature in another attribute", &[Source::new("src/a.rs", ALLOW_FEATURE)], &[]),
-    Case::new("another cfg key", &[Source::new("src/a.rs", OTHER_KEY)], &[]),
+    Case::new(
+        Title::new("impl members"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(MEMBERS))],
+        Flagged::new(&["src/a.rs:4", "src/a.rs:6"]),
+    ),
+    Case::new(Title::new("a doc alias"), &[Source::new(Located::new("src/a.rs"), Text::new(ALIAS))], Flagged::new(&[])),
+    Case::new(
+        Title::new("hidden in another attribute"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_LIST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inline module"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(INLINE))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("feature in another attribute"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(ALLOW_FEATURE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("another cfg key"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_KEY))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
 fn test_only_api_is_flagged() {
-    assert_eq!(Sources::mismatches::<NoTestOnlyApi>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<NoTestOnlyApi>(&CASES), Lines::default());
 }

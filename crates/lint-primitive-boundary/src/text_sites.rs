@@ -9,7 +9,7 @@ use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_layout::{Name, Whole};
+use lint_layout::{Name, Whole, Word, words};
 use owner::Owner;
 use sighting::Sighting;
 
@@ -21,8 +21,8 @@ pub struct TextSites {
 }
 
 impl TextSites {
-    const DOOR_TRAITS: [&str; 3] = ["FromStr", "TryFrom", "Display"];
-    const INSPECTING: [&str; 8] = [
+    const DOOR_TRAITS: [Word<'static>; 3] = words!["FromStr", "TryFrom", "Display"];
+    const INSPECTING: [Word<'static>; 8] = words![
         "split_whitespace",
         "split_once",
         "trim",
@@ -32,7 +32,7 @@ impl TextSites {
         "char_indices",
         "split_at_checked",
     ];
-    const PRODUCING: [&str; 2] = ["to_string", "push_str"];
+    const PRODUCING: [Word<'static>; 2] = words!["to_string", "push_str"];
 
     pub fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut sites = TextSites::default();

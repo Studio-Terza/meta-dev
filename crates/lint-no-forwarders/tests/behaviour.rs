@@ -1,6 +1,6 @@
 use lint_no_forwarders::NoForwarders;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    struct Inner;\n    impl Inner {\n        fn work(&self) -> u8 { 1 }\n    }\n    struct Outer { inner: Inner }\n    impl Outer {\n        fn work(&self) -> u8 {\n            self.inner.work()\n        }\n    }\n}\n";
 
@@ -35,32 +35,124 @@ const BORROWED_GENERIC_FIELD: &str = "struct Inner;\nstruct Outer<'text, T> { in
 const INLINE: &str = "mod inner {\n    struct Inner;\n    struct Outer;\n    impl Outer {\n        fn pass(&self, inner: Inner) -> u8 {\n            inner.work()\n        }\n    }\n}\n";
 
 const CASES: [Case; 23] = [
-    Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &[]),
-    Case::new("a parameter passed on", &[Source::new("a.rs", ARGUMENT)], &["a.rs:8"]),
-    Case::new("a borrowed parameter passed on", &[Source::new("a.rs", BORROWED_ARGUMENT)], &["a.rs:8"]),
-    Case::new("a field of a parameter passed on", &[Source::new("a.rs", FIELD_ARGUMENT)], &["a.rs:8"]),
-    Case::new("a constant argument", &[Source::new("a.rs", CONSTANT_ARGUMENT)], &[]),
-    Case::new("own method", &[Source::new("a.rs", OWN_METHOD)], &["a.rs:4"]),
-    Case::new("method of a parameter", &[Source::new("a.rs", PARAMETER)], &["a.rs:4"]),
-    Case::new("method of a borrowed parameter", &[Source::new("a.rs", BORROWED_PARAMETER)], &["a.rs:4"]),
-    Case::new("method of a foreign parameter", &[Source::new("a.rs", FOREIGN_PARAMETER)], &[]),
-    Case::new("a pattern parameter", &[Source::new("a.rs", PATTERN_PARAMETER)], &[]),
-    Case::new("field of a parameter", &[Source::new("a.rs", FIELD_OF_A_PARAMETER)], &[]),
-    Case::new("associated call passing a parameter", &[Source::new("a.rs", ASSOCIATED_ARGUMENT)], &["a.rs:4"]),
-    Case::new("associated call passing a constant", &[Source::new("a.rs", ASSOCIATED_CONSTANT)], &[]),
-    Case::new("own associated call", &[Source::new("a.rs", OWN_ASSOCIATED)], &["a.rs:4"]),
-    Case::new("a variant constructor", &[Source::new("a.rs", VARIANT)], &[]),
-    Case::new("a foreign owner", &[Source::new("a.rs", FOREIGN_OWNER)], &[]),
-    Case::new("an enum owner", &[Source::new("a.rs", ENUM_OWNER)], &["a.rs:4"]),
-    Case::new("a trait owner", &[Source::new("a.rs", TRAIT_OWNER)], &["a.rs:4"]),
-    Case::new("a generic field", &[Source::new("a.rs", GENERIC_FIELD)], &["a.rs:4"]),
-    Case::new("a generic field of a foreign type", &[Source::new("a.rs", FOREIGN_GENERIC_FIELD)], &[]),
-    Case::new("a plain field of a generic struct", &[Source::new("a.rs", PLAIN_FIELD_OF_A_GENERIC)], &["a.rs:4"]),
-    Case::new("a borrowed generic field", &[Source::new("a.rs", BORROWED_GENERIC_FIELD)], &["a.rs:4"]),
-    Case::new("inline module", &[Source::new("a.rs", INLINE)], &["a.rs:5"]),
+    Case::new(
+        Title::new("test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a parameter passed on"),
+        &[Source::new(Located::new("a.rs"), Text::new(ARGUMENT))],
+        Flagged::new(&["a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("a borrowed parameter passed on"),
+        &[Source::new(Located::new("a.rs"), Text::new(BORROWED_ARGUMENT))],
+        Flagged::new(&["a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("a field of a parameter passed on"),
+        &[Source::new(Located::new("a.rs"), Text::new(FIELD_ARGUMENT))],
+        Flagged::new(&["a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("a constant argument"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTANT_ARGUMENT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("own method"),
+        &[Source::new(Located::new("a.rs"), Text::new(OWN_METHOD))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("method of a parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(PARAMETER))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("method of a borrowed parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(BORROWED_PARAMETER))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("method of a foreign parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_PARAMETER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a pattern parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATTERN_PARAMETER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("field of a parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(FIELD_OF_A_PARAMETER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("associated call passing a parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(ASSOCIATED_ARGUMENT))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("associated call passing a constant"),
+        &[Source::new(Located::new("a.rs"), Text::new(ASSOCIATED_CONSTANT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("own associated call"),
+        &[Source::new(Located::new("a.rs"), Text::new(OWN_ASSOCIATED))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a variant constructor"),
+        &[Source::new(Located::new("a.rs"), Text::new(VARIANT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a foreign owner"),
+        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_OWNER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an enum owner"),
+        &[Source::new(Located::new("a.rs"), Text::new(ENUM_OWNER))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a trait owner"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_OWNER))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a generic field"),
+        &[Source::new(Located::new("a.rs"), Text::new(GENERIC_FIELD))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a generic field of a foreign type"),
+        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_GENERIC_FIELD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a plain field of a generic struct"),
+        &[Source::new(Located::new("a.rs"), Text::new(PLAIN_FIELD_OF_A_GENERIC))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a borrowed generic field"),
+        &[Source::new(Located::new("a.rs"), Text::new(BORROWED_GENERIC_FIELD))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("inline module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE))],
+        Flagged::new(&["a.rs:5"]),
+    ),
 ];
 
 #[test]
 fn methods_that_only_forward_to_another_type_of_ours_are_flagged() {
-    assert_eq!(Sources::mismatches::<NoForwarders>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<NoForwarders>(&CASES), Lines::default());
 }

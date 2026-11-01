@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -15,7 +15,7 @@ use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
-use lint_layout::{Name, Whole};
+use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub struct ManualIteration;
@@ -23,14 +23,14 @@ pub struct ManualIteration;
 impl Lint for ManualIteration {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "iterators are driven by combinators, not by hand",
+            Headline::new("iterators are driven by combinators, not by hand"),
             files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
         )
     }
 }
 
 impl ManualIteration {
-    const ITERATOR_CONSTRUCTORS: [&str; 16] = [
+    const ITERATOR_CONSTRUCTORS: [Word<'static>; 16] = words![
         "iter",
         "iter_mut",
         "into_iter",
@@ -48,7 +48,7 @@ impl ManualIteration {
         "filter",
         "peekable",
     ];
-    const ACCUMULATORS: [&str; 4] = ["push", "extend", "insert", "push_str"];
+    const ACCUMULATORS: [Word<'static>; 4] = words!["push", "extend", "insert", "push_str"];
 
     fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut iterations = Iterations { path: file.path(), violations: Vec::new() };

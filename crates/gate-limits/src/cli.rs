@@ -1,5 +1,8 @@
+mod contents;
+mod document;
 mod failure;
 mod gate;
+mod stage;
 
 use std::ffi::OsString;
 use std::fs;
@@ -7,6 +10,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use contents::Contents;
 use failure::Failure;
 use gate::Gate;
 
@@ -46,7 +50,7 @@ impl Cli {
     }
 
     fn gate(&self) -> Result<Gate, Failure> {
-        Gate::judge(&Self::read(&self.limits)?, &Self::read(&self.measured)?)
+        Gate::judge(Contents::new(&Self::read(&self.limits)?), Contents::new(&Self::read(&self.measured)?))
     }
 
     fn read(path: &Path) -> Result<String, Failure> {

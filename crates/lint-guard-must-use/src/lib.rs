@@ -3,7 +3,7 @@ mod guards;
 
 use finding::Finding;
 use guards::Guards;
-use lint_core::{Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile};
 
 #[derive(Debug)]
 pub struct GuardMustUse;
@@ -15,6 +15,6 @@ impl Lint for GuardMustUse {
             guards.scan(file);
             guards
         });
-        Report::new("guard types are #[must_use]", guards.violations())
+        Report::new(Headline::new("guard types are #[must_use]"), guards.violations())
     }
 }

@@ -83,9 +83,9 @@ fn exactly_on_a_level_is_within_it() -> io::Result<()> {
 const REFUSALS: [[&str; 4]; 6] = [
     ["unmeasured", LIMITS, "test-run = 1", "was not measured"],
     ["unlimited", LIMITS, "test-run = 1\nclippy = 1\nlint = 1", "no usable limit"],
-    ["not-a-number", LIMITS, "test-run = \"fast\"\nclippy = 1", "cannot parse"],
+    ["not-a-number", LIMITS, "test-run = \"fast\"\nclippy = 1", "cannot parse measured"],
     ["warn-above-block", "[test-run]\nwarn = 6\nblock = 5\n", "test-run = 1", "no usable limit"],
-    ["no-block", "[test-run]\nwarn = 1\n", "test-run = 1", "cannot parse"],
+    ["no-block", "[test-run]\nwarn = 1\n", "test-run = 1", "cannot parse limits"],
     ["empty", "", "", "no stage has a limit"],
 ];
 
