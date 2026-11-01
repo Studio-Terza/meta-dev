@@ -3,8 +3,11 @@ use syn::{ItemFn, ItemMod, Macro};
 
 use std::collections::BTreeSet;
 
-use lint_core::{Macros, Walk};
-use lint_layout::{LineNumber, Name, TestMarks};
+use lint_core::Macros;
+use lint_core::Walk;
+use lint_layout::LineNumber;
+use lint_layout::Name;
+use lint_layout::TestMarks;
 
 #[derive(Debug)]
 pub(crate) struct TestCode<'emitters> {

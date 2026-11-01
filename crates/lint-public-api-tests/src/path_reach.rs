@@ -4,7 +4,8 @@ use syn::visit::{self, Visit};
 use syn::{Expr, ExprLit, ItemMod, Lit};
 
 use lint_core::SourceFile;
-use lint_layout::{LineNumber, Name};
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub(crate) struct PathReach {

@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use lint_core::SourceFile;
 use lint_fixtures::Sources;
-use lint_placement::{CrateName, CrateRoot};
+use lint_placement::CrateName;
+use lint_placement::CrateRoot;
 use lint_test_budget::{Count, CrateBudget, TestBudget};
 
 const SHIPPED: &str = "pub struct A;\npub struct B;\n";

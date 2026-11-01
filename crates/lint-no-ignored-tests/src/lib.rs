@@ -1,6 +1,10 @@
 mod skip_marks;
 
-use lint_core::{Lint, Report, Site, SourceFile, Violation};
+use lint_core::Lint;
+use lint_core::Report;
+use lint_core::Site;
+use lint_core::SourceFile;
+use lint_core::Violation;
 use skip_marks::SkipMarks;
 
 #[derive(Debug)]
