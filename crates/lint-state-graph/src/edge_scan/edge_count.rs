@@ -1,13 +1,9 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EdgeCount(usize);
+use newtype::Newtype;
 
-impl From<usize> for EdgeCount {
-    fn from(edges: usize) -> EdgeCount {
-        EdgeCount(edges)
-    }
-}
+#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EdgeCount(usize);
 
 impl fmt::Display for EdgeCount {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

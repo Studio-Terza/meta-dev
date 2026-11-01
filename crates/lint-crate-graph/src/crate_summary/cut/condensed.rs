@@ -15,6 +15,7 @@ use link::Link;
 use lint_core::Least;
 use lint_item_graph::Traversal;
 use lint_item_graph::{ItemGraph, NodeIndex};
+use newtype::{Counter, Newtype};
 use spectrum::{Spectrum, Weight};
 
 #[derive(Debug)]
@@ -49,7 +50,7 @@ impl Condensed {
             rows
         });
         Condensed {
-            sizes: tangles.iter().map(|members| ItemCount::of_len(members.len())).collect(),
+            sizes: tangles.iter().map(|members| ItemCount::new(members.len())).collect(),
             rows,
             origins: (0..tangles.len()).map(TangleIndex::from).collect(),
         }
@@ -89,7 +90,7 @@ impl Condensed {
     }
 
     pub fn items(&self, side: &BTreeSet<TangleIndex>) -> ItemCount {
-        side.iter().map(|tangle| self.size(*tangle)).sum()
+        ItemCount::total(side.iter().map(|tangle| self.size(*tangle)))
     }
 
     pub fn size(&self, tangle: TangleIndex) -> ItemCount {

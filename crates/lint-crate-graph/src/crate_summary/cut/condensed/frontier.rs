@@ -5,6 +5,7 @@ use super::spectrum::Weight;
 use super::tangle_index::TangleIndex;
 use crate::crate_summary::cut::conductance::Conductance;
 use crate::crate_summary::item_count::ItemCount;
+use newtype::Counter;
 
 #[derive(Debug)]
 pub struct Frontier<'condensed> {
@@ -37,7 +38,7 @@ impl<'condensed> Frontier<'condensed> {
         let outward = weight(&|target| *target != tangle && !self.inside.contains(target));
         self.crossing = self.crossing + outward - inward;
         self.volume = self.volume + weight(&|_| true);
-        self.items = self.items + self.condensed.size(tangle);
+        self.items = self.items.plus(self.condensed.size(tangle));
         self.inside.insert(tangle);
     }
 
