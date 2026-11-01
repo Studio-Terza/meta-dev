@@ -28,7 +28,7 @@ impl<'text> Command<'text> {
                 (setting == Key::Shell)
                     .then(|| self.foreign_shell())
                     .flatten()
-                    .map(|word| Finding::Interpreter { name: word.to_owned() })
+                    .map(|word| Finding::Interpreter { name: word.rendered() })
             })
     }
 
@@ -36,7 +36,7 @@ impl<'text> Command<'text> {
         Some(self.0.count()).filter(|characters| *characters > Self::LIMIT)
     }
 
-    fn foreign_shell(self) -> Option<&'text str> {
+    fn foreign_shell(self) -> Option<Text<'text>> {
         self.0.first_word_outside(&Self::SHELLS)
     }
 

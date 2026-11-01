@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::Path;
 
 use crate::characters::Characters;
@@ -39,10 +40,14 @@ impl<'text> Text<'text> {
         self.0.chars().next()
     }
 
-    pub(crate) fn first_word_outside(self, known: &[&str]) -> Option<&'text str> {
+    pub(crate) fn first_word_outside(self, known: &[&str]) -> Option<Text<'text>> {
         let start = self.without_leading_blanks();
         let end = start.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.len(), |(at, _)| at);
-        start.get(..end).filter(|word| !word.is_empty() && !known.contains(word))
+        start.get(..end).filter(|word| !word.is_empty() && !known.contains(word)).map(Text)
+    }
+
+    pub(crate) fn rendered(self) -> String {
+        format!("{self}")
     }
 
     pub(crate) fn count(self) -> Characters {
@@ -77,5 +82,11 @@ impl<'text> Text<'text> {
 
     pub(crate) fn spans_lines(self) -> bool {
         self.0.contains('\n')
+    }
+}
+
+impl fmt::Display for Text<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
     }
 }

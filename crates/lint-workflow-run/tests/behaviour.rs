@@ -136,6 +136,9 @@ laws::table!(
         "defaults:\n  run:\n    # always bash\n    shell: bash\n" => Vec::<String>::new(),
         "defaults:\n  run:\n\n    shell: bash\n" => Vec::<String>::new(),
         "defaults:\n  run:\n    shell: bash\nrun: |\n  x\n  y\n" => vec![format!("{WORKFLOW}:4: {SPANS}")],
+        "- shell: python {0}\n  run: cargo test\n" => vec![format!(
+            "{WORKFLOW}:1: a shell setting names python, which is not a shell; use a shell and put the logic in a Rust command"
+        )],
         "run: cargo test   \n" => Vec::<String>::new(),
         "    run:   cargo test\n" => Vec::<String>::new(),
         "run: 'a'\n" => Vec::<String>::new(),
