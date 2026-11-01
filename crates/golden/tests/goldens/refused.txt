@@ -1,0 +1,2 @@
+GOLDEN_RECORD="yes" is not a value; GOLDEN_RECORD=1 records, unset checks
+GOLDEN_RECORD is refused in CI; record locally and commit the diff

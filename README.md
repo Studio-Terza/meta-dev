@@ -21,4 +21,36 @@ settings. Files under `tests`, `examples` and `benches` are checked only by the 
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (reports, sites, violations, source files), `lints` (the lints and runner),
-`lint` (the binary).
+`lint` (the binary), `golden` (golden files for tests), `laws` (law macros for tests).
+
+## Goldens
+
+A golden is a recorded output of a public API, kept at `tests/goldens/<name>` in the package.
+
+    #[test]
+    fn report_is_stable() -> Result<(), golden::Failure> {
+        golden::golden!("report.txt", &render_report())
+    }
+
+`cargo test` only compares. It fails on a difference or a missing golden, and it writes nothing. The
+failure names the file and shows a diff in which each line is quoted, so a change in whitespace or line
+endings is visible. The diff is one hunk, from the first changed line to the last.
+
+To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
+`GOLDEN_RECORD` fails, and so does recording when `CI` is set.
+
+## Laws
+
+A law states a property in one line and generates one `#[test]`. The strategy is a proptest strategy,
+`laws::proptest` is the re-export, and functions take their input by reference.
+
+    laws::roundtrip!(hex_recovers_the_number, any::<u32>(), Hex::render, Hex::parse, Ok);
+    laws::idempotent!(sorting_twice_changes_nothing, vec(any::<u8>(), 0..32), Numbers::sorted);
+    laws::table!(hex_examples, Hex::parse, ["ff" => Ok(255), "0" => Ok(0)]);
+
+`roundtrip!` checks `decode(encode(value)) == wrap(value)`; `wrap` is optional, and `Ok` or `Some` suits
+a fallible decode. `idempotent!` checks `f(f(value)) == f(value)`. `table!` checks each `input => want`
+row and names the first broken row, without generated input. Attributes before the name go on the test.
+
+Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
+alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.

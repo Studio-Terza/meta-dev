@@ -1,0 +1,9 @@
+@ first change at line 5; - golden, + actual
+  "two\n"
+  "three\n"
+  "four\n"
+- "five\n"
++ "FIVE\n"
+  "six\n"
+  "seven\n"
+  "eight\n"

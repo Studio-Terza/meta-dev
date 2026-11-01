@@ -1,0 +1,4 @@
+@ first change at line 1; - golden, + actual
+- "a\n"
++ "a \r\n"
+  "b\n"
