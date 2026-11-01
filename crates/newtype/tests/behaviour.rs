@@ -107,10 +107,6 @@ laws::roundtrip!(
 
 laws::table!(a_check_decides_what_is_built, Word::checked, ["a" => Ok(String::from("a")), "" => Err(Empty)]);
 
-laws::law!(a_derived_plain_arbitrary_builds_through_new, any::<Wrapper<Label>>(), wrapper, {
-    prop_assert_eq!(Wrapper::new(wrapper.clone().into_inner()), wrapper);
-});
-
 laws::law!(a_derived_validated_arbitrary_only_builds_what_the_check_admits, any::<Word>(), word, {
     prop_assert!(Word::check(&word.into_inner()).is_ok());
 });

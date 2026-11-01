@@ -1,0 +1,51 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 0 of 26 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/casts.rs:1: fn f
+src/casts.rs:2: fn g
+src/loops.rs:1: fn f
+src/macros.rs:1: fn show
+src/walks.rs:1: fn f
+src/walks.rs:5: fn g
+casts live in const fns or bits modules, and const loops walk slices:
+src/casts.rs:1: as cast outside a const fn; use From, TryFrom, or an EnumMap
+src/contexts.rs:2: counter loop in const context; walk a slice with while let [head, rest @ ..]
+src/loops.rs:3: counter loop in const context; walk a slice with while let [head, rest @ ..]
+src/loops.rs:4: open loop in const context; walk a slice with while let or recurse
+src/loops.rs:5: for loop in const context
+src/macros.rs:2: as cast outside a const fn; use From, TryFrom, or an EnumMap
+control flow is an expression; every branch yields the value the function returns:
+src/contexts.rs:2: while loop; drive an iterator with combinators, const fns excepted
+src/contexts.rs:2: compound assignment to a local; build the value in one expression or give its type an updater method
+src/walks.rs:5: for loop; drive the iterator with combinators, const fns excepted
+function names say what the function does:
+src/casts.rs:1: fn f names nothing; say what it does
+src/casts.rs:2: fn g names nothing; say what it does
+src/loops.rs:1: fn f names nothing; say what it does
+src/walks.rs:1: fn f names nothing; say what it does
+src/walks.rs:5: fn g names nothing; say what it does
+a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:
+src/contexts.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/loops.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/loops.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/walks.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
+primitives appear only at a type's boundary:
+src/casts.rs:1: bare u8 in f; name what it counts with a newtype
+src/casts.rs:1: bare u32 in f; name what it counts with a newtype
+src/casts.rs:2: bare u8 in g; name what it counts with a newtype
+src/casts.rs:2: bare u32 in g; name what it counts with a newtype
+src/contexts.rs:1: bare u32 in ; name what it counts with a newtype
+src/contexts.rs:1: bare u32 in ; name what it counts with a newtype
+src/contexts.rs:2: bare u32 in ; name what it counts with a newtype
+src/contexts.rs:3: bare u32 in X; name what it counts with a newtype
+src/contexts.rs:4: bare u8 in b; name what it counts with a newtype
+src/contexts.rs:4: usize in b is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/contexts.rs:5: usize in E is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/macros.rs:1: bare u8 in show; name what it counts with a newtype
+src/macros.rs:2: format handles text outside a door; parse in FromStr or render in Display
+src/walks.rs:1: bare u8 in f; name what it counts with a newtype
+state graph violated:
+src/contexts.rs:4: field b of A is pub; struct fields are private
+fails

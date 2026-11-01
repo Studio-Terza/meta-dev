@@ -7,9 +7,6 @@ use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 use lint_fixtures::{Case, Source, Sources};
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
-const QUALIFIED: &str = "fn f() {\n    std::process::Command::new(\"ls\").spawn();\n}\n";
-const RENAMED: &str = "use std::process::Command as Run;\nfn f() {\n    Run::new(\"ls\").output();\n}\n";
-const BUILT_ONLY: &str = "use std::process::Command;\nfn f() -> Command {\n    Command::new(\"ls\")\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    use std::process::Command;\n    fn f() {\n        Command::new(\"ls\").status();\n    }\n}\n";
 
@@ -18,6 +15,20 @@ const ALIASED: &str = "use std::process as p;\nfn f() {\n    p::Command::new(\"l
 const INLINE_PORTS: &str =
     "mod ports {\n    use std::process::Command;\n    pub fn f() {\n        Command::new(\"ls\").status();\n    }\n}\n";
 const INLINE_OTHER: &str = "mod adapters {\n    use std::process::Command;\n    pub fn f() {\n        Command::new(\"ls\").status();\n    }\n}\n";
+
+const IN_MACRO: &str = "fn f() {\n    println!(\"{:?}\", std::process::Command::new(\"ls\").status());\n}\n";
+const SPLIT_CHAIN: &str =
+    "use std::process::Command;\nfn f() {\n    Command::new(\"ls\")\n        .arg(\"x\")\n        .status();\n}\n";
+const CONFIGURED_ONLY: &str =
+    "use std::process::Command;\nfn f() {\n    Command::new(\"ls\")\n        .arg(\"x\");\n}\n";
+const FOREIGN_RENAME: &str = "use clap::Command as Run;\nfn f() {\n    Run::new(\"ls\").status();\n}\n";
+const OTHER_RENAME: &str = "use std::process::Stdio as Run;\nfn f() {\n    Run::new(\"ls\").status();\n}\n";
+const GLOB: &str = "use std::process::*;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
+const FOREIGN_GLOB: &str = "use clap::*;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
+const THREE_SEGMENTS: &str = "fn f() {\n    a::b::c(\"ls\").status();\n}\n";
+const OTHER_TYPE: &str = "fn f() {\n    process::Other::new(\"ls\").status();\n}\n";
+const NEW_OF_ANOTHER: &str = "fn f() {\n    a::b::new(\"ls\").status();\n}\n";
+const OTHER_CONSTRUCTOR: &str = "fn f() {\n    process::Command::other(\"ls\").status();\n}\n";
 
 const USE_AFTER: &str = "fn f() {\n    Command::new(\"ls\").status();\n}\nuse std::process::Command;\n";
 const SELF_RENAMED: &str = "use std::process::{self as p};\nfn f() {\n    p::Command::new(\"ls\").status();\n}\n";
@@ -35,12 +46,7 @@ const THROUGH_PORTS: &str =
     "mod ports {\n    pub use std::process::Command;\n}\npub fn f() {\n    ports::Command::new(\"ls\").status();\n}\n";
 const SIBLING_IMPORT: &str = "mod a {\n    pub use std::process::Command;\n}\nmod b {\n    pub struct Command;\n    impl Command {\n        pub fn new(_x: u8) {}\n    }\n    pub fn f() {\n        Command::new(1);\n    }\n}\n";
 
-const CASES: [Case; 25] = [
-    Case::new("imported", &[Source::new("a.rs", IMPORTED)], &["a.rs:3"]),
-    Case::new("qualified", &[Source::new("a.rs", QUALIFIED)], &["a.rs:2"]),
-    Case::new("renamed", &[Source::new("a.rs", RENAMED)], &["a.rs:3"]),
-    Case::new("built only", &[Source::new("a.rs", BUILT_ONLY)], &["a.rs:3"]),
-    Case::new("other command", &[Source::new("a.rs", OTHER_COMMAND)], &[]),
+const CASES: [Case; 31] = [
     Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &["a.rs:5"]),
     Case::new("integration test", &[Source::new("tests/spawns.rs", IMPORTED)], &["tests/spawns.rs:3"]),
     Case::new("module alias", &[Source::new("a.rs", ALIASED)], &["a.rs:3"]),
@@ -73,6 +79,17 @@ const CASES: [Case; 25] = [
         &[Source::new("crates/x/tests/ports.rs", IMPORTED)],
         &["crates/x/tests/ports.rs:3"],
     ),
+    Case::new("inside a macro argument", &[Source::new("a.rs", IN_MACRO)], &["a.rs:2"]),
+    Case::new("a chain over lines", &[Source::new("a.rs", SPLIT_CHAIN)], &["a.rs:3"]),
+    Case::new("a chain with no start", &[Source::new("a.rs", CONFIGURED_ONLY)], &["a.rs:3"]),
+    Case::new("a foreign renamed Command", &[Source::new("a.rs", FOREIGN_RENAME)], &[]),
+    Case::new("another renamed process type", &[Source::new("a.rs", OTHER_RENAME)], &[]),
+    Case::new("a process glob", &[Source::new("a.rs", GLOB)], &["a.rs:3"]),
+    Case::new("a foreign glob", &[Source::new("a.rs", FOREIGN_GLOB)], &[]),
+    Case::new("three segments", &[Source::new("a.rs", THREE_SEGMENTS)], &[]),
+    Case::new("another process type", &[Source::new("a.rs", OTHER_TYPE)], &[]),
+    Case::new("new of another path", &[Source::new("a.rs", NEW_OF_ANOTHER)], &[]),
+    Case::new("another Command constructor", &[Source::new("a.rs", OTHER_CONSTRUCTOR)], &[]),
 ];
 
 const PACKAGES: [(&str, usize); 9] = [

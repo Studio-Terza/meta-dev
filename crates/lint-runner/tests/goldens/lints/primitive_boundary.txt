@@ -1,0 +1,33 @@
+test budget, report only:
+corpus: 0 tests in 7 files, 0 of 34 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/bare.rs:1: fn f
+src/newtype.rs:2: fn f
+src/sizes.rs:1: fn f
+src/text.rs:1: fn f
+src/wire.rs:2: fn f
+src/wire.rs:3: fn g
+function names say what the function does:
+src/bare.rs:1: fn f names nothing; say what it does
+src/newtype.rs:2: fn f names nothing; say what it does
+src/sizes.rs:1: fn f names nothing; say what it does
+src/text.rs:1: fn f names nothing; say what it does
+src/wire.rs:2: fn f names nothing; say what it does
+src/wire.rs:3: fn g names nothing; say what it does
+a struct with no logic of its own that one other file consumes is a parameter bag:
+src/sizes.rs:2: A only carries values into one other file; give it the logic that consumes it
+primitives appear only at a type's boundary:
+src/bare.rs:1: bare u32 in f; name what it counts with a newtype
+src/bare.rs:1: bare f64 in f; name what it counts with a newtype
+src/sizes.rs:1: usize in f is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/sizes.rs:1: usize in f is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/sizes.rs:4: usize in total is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/text.rs:2: trim handles text outside a door; parse in FromStr or render in Display
+src/text.rs:3: from handles text outside a door; parse in FromStr or render in Display
+src/text.rs:4: format handles text outside a door; parse in FromStr or render in Display
+src/text.rs:5: to_string handles text outside a door; parse in FromStr or render in Display
+src/wire.rs:2: serde_json::Value in f is a wire form; parse it into a type at the door
+src/wire.rs:3: serde_json::Value in g is a wire form; parse it into a type at the door
+fails

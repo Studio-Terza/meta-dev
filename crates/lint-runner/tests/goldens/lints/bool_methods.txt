@@ -1,0 +1,9 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 6 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+src/lib.rs:3: fn is_on -> bool
+src/lib.rs:4: fn has_power -> bool
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+two functions on one type with the same signature hide a missing type or type parameter:
+src/lib.rs:3: is_on, has_power, is_off share the signature Switch::(&self) -> bool; distinguish the types they take or return
+fails

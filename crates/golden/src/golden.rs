@@ -34,7 +34,7 @@ impl Golden {
         self.verify_in(Mode::current()?, actual)
     }
 
-    fn verify_in(&self, mode: Mode, actual: &str) -> Result<(), Failure> {
+    pub fn verify_in(&self, mode: Mode, actual: &str) -> Result<(), Failure> {
         match mode {
             Mode::Check => {
                 let recorded = fs::read_to_string(&self.0).map_err(|source| self.unread(source))?;

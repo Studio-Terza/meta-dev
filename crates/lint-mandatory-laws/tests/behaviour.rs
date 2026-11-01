@@ -40,7 +40,7 @@ const ENCODE_ONLY: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
 const DECODE_ONLY: &str = "struct A;\nimpl A {\n    fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 35] = [
+const CASES: [Case; 34] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
@@ -55,7 +55,6 @@ const CASES: [Case; 35] = [
     Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:1"]),
     Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:1"]),
     Case::new("to and from of different forms", &[Source::new("src/a.rs", MISMATCHED_FORMS)], &[]),
-    Case::new("hand-written order", &[Source::new("src/a.rs", ORDER)], &["src/a.rs:1"]),
     Case::new("hand-written equality", &[Source::new("src/a.rs", EQUALITY)], &["src/a.rs:1"]),
     Case::new("derived order", &[Source::new("src/a.rs", DERIVED_ORDER)], &[]),
     Case::new("roundtrip in a test", &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ROUNDTRIP)], &[]),

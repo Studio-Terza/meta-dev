@@ -1,0 +1,1 @@
+fn walk(shared: Shared) {}

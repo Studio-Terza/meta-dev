@@ -1,0 +1,10 @@
+pub struct A0(A1);
+pub struct A1(A2);
+pub struct A2(A3);
+pub struct A3(A4);
+pub struct A4;
+pub struct B0(B1);
+pub struct B1(B2);
+pub struct B2(B3);
+pub struct B3(B4);
+pub struct B4;

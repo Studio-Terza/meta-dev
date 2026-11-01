@@ -15,18 +15,21 @@ const GLOB_USER: Source = Source::new("crates/b/src/lib.rs", "use a::*;\n");
 const CRATE_ONLY: Source =
     Source::new("crates/a/src/lib.rs", "mod inner;\npub use inner::Used;\npub(crate) use inner::Hidden;\n");
 
+const OTHER_GLOB: Source = Source::new("crates/c/src/lib.rs", "use a::*;\n");
+const SELF_GLOB: Source = Source::new("crates/a/src/inner.rs", "use a::*;\n");
+
 const TEST_USER: Source = Source::new("crates/a/tests/api.rs", "use a::Unused;\n");
 const TEST_USER_ALL: Source = Source::new("crates/a/tests/api.rs", "use a::{Used, Unused};\n");
 
 const CASES: [Case; 11] = [
-    Case::new("one name used", &[EXPORTER, USER], &["crates/a/src/lib.rs:2"]),
-    Case::new("both names used", &[EXPORTER, PATH_USER], &[]),
     Case::new("no dependent", &[LONELY], &[]),
     Case::new("used by itself", &[EXPORTER, USER, SELF_USER], &["crates/a/src/lib.rs:2"]),
     Case::new("named by its binary", &[EXPORTER, USER, BINARY], &[]),
     Case::new("exporter alone", &[EXPORTER], &[]),
     Case::new("named in a macro", &[EXPORTER, MACRO_USER], &[]),
     Case::new("named by a glob", &[EXPORTER, GLOB_USER], &[]),
+    Case::new("a glob in a third crate", &[EXPORTER, USER, OTHER_GLOB], &[]),
+    Case::new("a glob of its own crate", &[EXPORTER, USER, SELF_GLOB], &["crates/a/src/lib.rs:2"]),
     Case::new("named only by its own tests", &[EXPORTER, USER, TEST_USER], &["crates/a/src/lib.rs:2"]),
     Case::new("named by tests and another crate", &[EXPORTER, PATH_USER, TEST_USER_ALL], &[]),
     Case::new("crate-only import", &[CRATE_ONLY, USER], &[]),
