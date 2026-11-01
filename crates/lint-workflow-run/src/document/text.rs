@@ -1,4 +1,3 @@
-use std::fmt;
 use std::path::Path;
 
 use crate::characters::Characters;
@@ -78,11 +77,5 @@ impl<'text> Text<'text> {
 
     pub(crate) fn spans_lines(self) -> bool {
         self.0.contains('\n')
-    }
-}
-
-impl fmt::Display for Text<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.0)
     }
 }
