@@ -31,8 +31,8 @@ legitimate, the lint gates where by naming convention: starting a process (`proc
 ends in the word `ports` (`meta-ports`, not `meta-reports`) or a module named `ports`. Both lints read paths through
 `use` items in any order, renames, type aliases, glob imports, re-exports across the files of a crate, qualified
 `<T>::f` calls and macro bodies, so `matches!(..., Ok(s) if s.success())` is read like any other call. Inside `ports`,
-a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Casts (`const_shape`), bare numbers
-(`named_numbers`) and bare primitives (`primitive_boundary`) only in a module named `bits`. Files under
+a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. In a module named `bits` only: casts (`const_shape`), bare numbers
+(`named_numbers`) and bare primitives (`primitive_boundary`). Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
