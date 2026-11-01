@@ -17,10 +17,21 @@ const LAW: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(value in any::<A>()) {}\n}\n";
 const OTHER_TYPE: &str = "laws::roundtrip!(b, any::<B>(), B::encode, B::decode);\n";
 
-const CASES: [Case; 14] = [
+const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\nenum A {}\n";
+const SPLIT_TYPES: &str = "struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
+const UNRELATED_MACRO: &str = "fn t() {\n    vec![A];\n}\n";
+
+const CASES: [Case; 17] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
+    Case::new("serde enum", &[Source::new("src/a.rs", SERDE_ENUM)], &["src/a.rs:2"]),
+    Case::new("pair split across types", &[Source::new("src/a.rs", SPLIT_TYPES)], &[]),
+    Case::new(
+        "unrelated macro",
+        &[Source::new("src/a.rs", ORDER), Source::new("tests/a.rs", UNRELATED_MACRO)],
+        &["src/a.rs:1"],
+    ),
     Case::new("serialize alone", &[Source::new("src/a.rs", SERDE_ONE)], &[]),
     Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:1"]),
     Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:1"]),

@@ -32,7 +32,7 @@ impl Profile {
 
     pub(crate) fn merged(mut self, other: Profile) -> Profile {
         self.facts.extend(other.facts);
-        Profile { line: self.line.min(other.line), ..self }
+        self
     }
 
     pub(crate) fn obligations(&self, path: &Path) -> Vec<Obligation> {
