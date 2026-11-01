@@ -17,9 +17,8 @@ impl CrateRoot {
     }
 
     #[must_use]
-    pub fn of_package(directory: &Path) -> CrateRoot {
-        let package = Manifest::read(directory).ok().flatten().and_then(|manifest| manifest.package_name());
-        CrateRoot { directory: directory.to_path_buf(), package }
+    pub fn of_manifest(directory: &Path, manifest: Option<&Manifest>) -> CrateRoot {
+        CrateRoot { directory: directory.to_path_buf(), package: manifest.and_then(Manifest::package_name) }
     }
 
     #[must_use]

@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "autocfg"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
+
+[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13,6 +19,32 @@ name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
+
+[[package]]
+name = "chacha20"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "rand_core",
+]
+
+[[package]]
+name = "core_detect"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+
+[[package]]
+name = "cpufeatures"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "equivalent"
@@ -45,6 +77,16 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi",
+ "rand_core",
+]
+
+[[package]]
+name = "golden"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -61,6 +103,13 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "laws"
+version = "0.1.0"
+dependencies = [
+ "proptest",
 ]
 
 [[package]]
@@ -209,6 +258,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-near-duplicate-tests"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -237,6 +297,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-no-ignored-tests"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+ "tempfile",
+]
+
+[[package]]
 name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
@@ -253,6 +324,18 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-test-only-api"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "tempfile",
 ]
 
 [[package]]
@@ -281,6 +364,15 @@ dependencies = [
  "lint-fixtures",
  "syn 2.0.119",
  "tempfile",
+]
+
+[[package]]
+name = "lint-public-api-tests"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -320,17 +412,22 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-near-duplicate-tests",
  "lint-no-comments",
  "lint-no-forwarders",
  "lint-no-free-fns",
+ "lint-no-ignored-tests",
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
+ "lint-no-test-only-api",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
+ "lint-public-api-tests",
  "lint-public-surface",
  "lint-repeated-methods",
  "lint-state-graph",
+ "lint-test-budget",
  "lint-thin-main",
  "lint-type-shape",
  "lint-vec-out-params",
@@ -344,6 +441,17 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-test-budget"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 
@@ -389,6 +497,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "num-traits"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,6 +518,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "proptest"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8530004ccb15eae51c7e40009fbe317f341f804db54dc033eec1c50be28cfa0"
+dependencies = [
+ "bitflags",
+ "chacha20",
+ "core_detect",
+ "num-traits",
+ "rand",
+ "rand_xorshift",
+ "regex-syntax",
+ "unarray",
 ]
 
 [[package]]
@@ -428,6 +561,37 @@ dependencies = [
  "unicode-ident",
  "unicode-properties",
 ]
+
+[[package]]
+name = "rand"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
+dependencies = [
+ "getrandom",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+
+[[package]]
+name = "rand_xorshift"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60aa6af80be32871323012e02e6e65f8a7cc7890931ae421d217ad8fe0df2ccf"
+dependencies = [
+ "rand_core",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rustix"
@@ -564,6 +728,12 @@ name = "toml_writer"
 version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
+
+[[package]]
+name = "unarray"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
 name = "unicode-ident"
