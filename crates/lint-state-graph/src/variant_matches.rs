@@ -10,6 +10,7 @@ use syn::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, 
 
 use super::declarations::Declarations;
 use super::finding::Finding;
+use lint_core::Home;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -20,12 +21,14 @@ use lint_layout::Name;
 pub struct VariantMatches<'scan> {
     declarations: &'scan Declarations,
     path: &'scan Path,
+    home: Home,
     violations: Vec<Violation>,
 }
 
 impl<'scan> VariantMatches<'scan> {
     pub fn violations(file: &'scan SourceFile, declarations: &'scan Declarations) -> Vec<Violation> {
-        let mut matches = VariantMatches { declarations, path: file.path(), violations: Vec::new() };
+        let mut matches =
+            VariantMatches { declarations, path: file.path(), home: Home::containing(file), violations: Vec::new() };
         matches.visit_file(file.syntax());
         matches.violations
     }
@@ -33,7 +36,7 @@ impl<'scan> VariantMatches<'scan> {
     fn foreign_variant(&self, pat: &Pat) -> Option<Name> {
         VariantPaths::in_pat(pat)
             .into_iter()
-            .find(|enum_name| self.declarations.is_foreign_sum_type(enum_name, self.path))
+            .find(|enum_name| self.declarations.is_foreign_sum_type(enum_name, &self.home))
     }
 
     fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation {

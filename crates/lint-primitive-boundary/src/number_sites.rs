@@ -13,8 +13,8 @@ use use_aliases::UseAliases;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType,
-    Signature, TraitItemConst, TypePath,
+    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Pat,
+    PatType, Signature, TraitItemConst, TypePath,
 };
 
 use super::finding::Finding;
@@ -171,6 +171,16 @@ impl<'ast> Visit<'ast> for NumberSites {
     fn visit_signature(&mut self, signature: &'ast Signature) {
         self.context = Name::from(&signature.ident);
         syn::visit::visit_signature(self, signature);
+    }
+
+    fn visit_pat_type(&mut self, typed: &'ast PatType) {
+        let signature = self.context.clone();
+        self.context = match &*typed.pat {
+            Pat::Ident(bound) => Name::from(&bound.ident),
+            _ => signature.clone(),
+        };
+        syn::visit::visit_type(self, &typed.ty);
+        self.context = signature;
     }
 
     fn visit_type_path(&mut self, path: &'ast TypePath) {

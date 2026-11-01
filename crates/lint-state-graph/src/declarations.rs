@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
-
 use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
 
+use lint_core::DeclaredType;
+use lint_core::Home;
 use lint_core::SourceFile;
+use lint_core::TypeHomes;
 use lint_core::TypeName;
 use lint_core::Walk;
 use lint_layout::Name;
@@ -13,15 +14,16 @@ use lint_layout::Name;
 pub struct Declarations {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
-    enum_homes: BTreeMap<Name, BTreeSet<PathBuf>>,
-    sum_types: BTreeSet<Name>,
-    path: PathBuf,
+    homes: TypeHomes,
+    sum_types: BTreeSet<DeclaredType>,
+    reading: Home,
 }
 
 impl From<&[&SourceFile]> for Declarations {
     fn from(files: &[&SourceFile]) -> Declarations {
-        let declarations = files.iter().fold(Declarations::default(), |mut declarations, file| {
-            file.path().clone_into(&mut declarations.path);
+        let seeded = Declarations { homes: TypeHomes::declared_in(files), ..Declarations::default() };
+        let declarations = files.iter().fold(seeded, |declarations, file| {
+            let mut declarations = Declarations { reading: Home::containing(file), ..declarations };
             declarations.visit_file(file.syntax());
             declarations
         });
@@ -40,8 +42,9 @@ impl Declarations {
         self.vertices.contains(name)
     }
 
-    pub fn is_foreign_sum_type(&self, enum_name: &Name, path: &Path) -> bool {
-        self.sum_types.contains(enum_name) && self.enum_homes.get(enum_name).is_some_and(|homes| !homes.contains(path))
+    pub fn is_foreign_sum_type(&self, enum_name: &Name, from: &Home) -> bool {
+        let declared = self.homes.resolve(enum_name, from);
+        self.sum_types.contains(&declared) && declared.home() != from
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {
@@ -53,9 +56,8 @@ impl Declarations {
     }
 
     fn record_enum(&mut self, item: &ItemEnum) {
-        let name = Name::from(&item.ident);
-        self.enum_homes.entry(name.clone()).or_default().insert(self.path.clone());
-        self.sum_types.extend(Self::is_sum_type(item).then_some(name));
+        let declared = DeclaredType::new(self.reading.clone(), Name::from(&item.ident));
+        self.sum_types.extend(Self::is_sum_type(item).then_some(declared));
     }
 
     fn is_sum_type(item: &ItemEnum) -> bool {

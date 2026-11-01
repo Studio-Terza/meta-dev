@@ -24,7 +24,14 @@ const TWO_FIELDS_TUPLE: &str = "pub struct A(u8, u8);\npub struct B(u8, u8);\npu
 const OTHER_TRAIT: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl Tr for A {\n    fn go(self) -> u8 { 1 }\n}\nimpl Tr for B {\n    fn go(self) -> u8 { 1 }\n}\nimpl Tr for C {\n    fn go(self) -> u8 { 1 }\n}\n";
 const DIFFERENT_PARAMS: &str = "pub struct A;\npub struct B;\npub struct C;\nimpl A {\n    pub fn f(&self, x: Foo) {}\n}\nimpl B {\n    pub fn f(&self, x: Bar) {}\n}\nimpl C {\n    pub fn f(&self, x: Baz) {}\n}\n";
 
-const CASES: [Case; 17] = [
+const SHOW_ON_A: &str = "struct A;\nimpl A {\n    pub fn show(&self) -> u8 { 1 }\n}\n";
+const SHOW_ON_B: &str = "struct B;\nimpl B {\n    pub fn show(&self) -> u8 { 1 }\n}\n";
+const WRAPPED_A: Source = Source::new("crates/x/src/a.rs", "pub struct A(u8);\n");
+const WRAPPED_B: Source = Source::new("crates/x/src/b.rs", "pub struct B(u16);\n");
+const WRAPPED_C: Source = Source::new("crates/x/src/c.rs", "pub struct C(u32);\n");
+const CONSTRUCTORS_ELSEWHERE: &str = "impl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
+
+const CASES: [Case; 20] = [
     Case::new("private methods", &[Source::new("a.rs", PRIVATE)], &[]),
     Case::new("trait impls", &[Source::new("a.rs", TRAIT_IMPLS)], &[]),
     Case::new("derived newtypes", &[Source::new("a.rs", DERIVED)], &[]),
@@ -42,6 +49,21 @@ const CASES: [Case; 17] = [
     Case::new("arithmetic on tuple structs of two fields", &[Source::new("a.rs", TWO_FIELDS_TUPLE)], &[]),
     Case::new("the same body of a trait outside the list", &[Source::new("a.rs", OTHER_TRAIT)], &[]),
     Case::new("methods that differ in their parameters", &[Source::new("a.rs", DIFFERENT_PARAMS)], &[]),
+    Case::new(
+        "two types of one name and a third",
+        &[Source::new("a.rs", SHOW_ON_A), Source::new("b.rs", SHOW_ON_B), Source::new("c.rs", SHOW_ON_A)],
+        &["a.rs:3"],
+    ),
+    Case::new(
+        "constructors in another file of the crate",
+        &[WRAPPED_A, WRAPPED_B, WRAPPED_C, Source::new("crates/x/src/impls.rs", CONSTRUCTORS_ELSEWHERE)],
+        &["crates/x/src/impls.rs:2"],
+    ),
+    Case::new(
+        "constructors in another crate",
+        &[WRAPPED_A, WRAPPED_B, WRAPPED_C, Source::new("crates/y/src/lib.rs", CONSTRUCTORS_ELSEWHERE)],
+        &["crates/y/src/lib.rs:2"],
+    ),
 ];
 
 #[test]
