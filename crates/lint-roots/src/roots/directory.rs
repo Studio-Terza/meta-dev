@@ -1,20 +1,17 @@
+mod ignored;
+
 use std::io;
 use std::path::{Path, PathBuf};
 
 use lint_layout::Failure;
-use lint_layout::Name;
-use lint_layout::Prefix;
-use lint_layout::Word;
 use newtype::Newtype;
+
+use ignored::Ignored;
 
 #[derive(Newtype, Debug)]
 pub struct Directory(PathBuf);
 
 impl Directory {
-    const BUILD_DIRECTORY: &'static str = "target";
-    const MANIFEST: &'static str = "Cargo.toml";
-    const HIDDEN: Word<'static> = Word::new(".");
-
     #[must_use]
     pub fn is_real(path: &Path) -> bool {
         std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
@@ -38,16 +35,25 @@ impl Directory {
             .into_iter()
             .filter(|entry| Self::is_real(entry))
             .map(Directory)
-            .filter(|directory| !directory.is_skipped())
+            .filter(|directory| !directory.is_skipped(&Ignored::FOR_PACKAGES))
             .try_fold(vec![self], |found, directory| Ok(found.into_iter().chain(directory.tree()?).collect()))
     }
 
-    fn is_skipped(&self) -> bool {
-        self.0.file_name().is_some_and(|name| {
-            Name::from(name).matches::<Prefix>(&[Self::HIDDEN])
-                || (name == Self::BUILD_DIRECTORY
-                    && self.0.parent().is_some_and(|parent| parent.join(Self::MANIFEST).is_file()))
+    pub fn files(self) -> Result<Vec<PathBuf>, Failure> {
+        self.entries()?.into_iter().try_fold(Vec::new(), |found, entry| {
+            let below = Directory(entry.clone());
+            Ok(if !Self::is_real(&entry) {
+                found.into_iter().chain([entry]).collect()
+            } else if below.is_skipped(&Ignored::FOR_FILES) {
+                found
+            } else {
+                found.into_iter().chain(below.files()?).collect()
+            })
         })
+    }
+
+    fn is_skipped(&self, ignored: &[Ignored]) -> bool {
+        ignored.iter().any(|rule| rule.applying_to(self).is_some())
     }
 }
 

@@ -39,11 +39,13 @@ lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
 lint-raw-resources = { path = "../lint-raw-resources" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
+lint-workflow-run = { path = "../lint-workflow-run" }
 
 [dev-dependencies]
 golden = { path = "../golden" }

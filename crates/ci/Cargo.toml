@@ -1,0 +1,20 @@
+[package]
+name = "ci"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+newtype = { path = "../newtype" }
+mutation-report = { path = "../mutation-report" }
+reach = { path = "../reach" }
+text-lines = { path = "../text-lines" }
+thiserror.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+tempfile.workspace = true
+
+[lints]
+workspace = true
