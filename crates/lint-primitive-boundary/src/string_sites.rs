@@ -6,7 +6,8 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
     Block, Field, ForeignItemFn, ImplItemConst, ImplItemFn, ImplItemType, ItemConst, ItemEnum, ItemFn, ItemImpl,
-    ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, TypePath, Visibility,
+    ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, TraitItemConst, TraitItemFn, TraitItemType,
+    TypePath, Visibility,
 };
 
 use super::finding::Finding;
@@ -81,7 +82,22 @@ impl<'ast> Visit<'ast> for StringSites {
         }
     }
 
-    fn visit_item_trait(&mut self, _: &'ast ItemTrait) {}
+    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
+        self.context = Name::from(&item.ident);
+        Some(item)
+            .filter(|item| Self::exposed(&item.vis))
+            .iter()
+            .for_each(|item| syn::visit::visit_item_trait(self, item));
+    }
+
+    fn visit_trait_item_const(&mut self, _: &'ast TraitItemConst) {}
+
+    fn visit_trait_item_type(&mut self, _: &'ast TraitItemType) {}
+
+    fn visit_trait_item_fn(&mut self, item: &'ast TraitItemFn) {
+        self.context = Name::from(&item.sig.ident);
+        self.visit_signature(&item.sig);
+    }
 
     fn visit_block(&mut self, _: &'ast Block) {}
 

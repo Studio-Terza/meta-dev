@@ -60,3 +60,6 @@ tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[package.metadata.reach]
+reads = ["crates"]

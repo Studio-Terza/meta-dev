@@ -8,6 +8,9 @@ const TRAIT_IMPLS: &str = "struct A;\nstruct B;\nstruct C;\nimpl Tr for A {\n   
 const DERIVED: &str = "#[derive(Newtype)]\npub struct A(u8);\n#[derive(Newtype)]\npub struct B(u8);\n#[derive(Newtype)]\npub struct C(u8);\n";
 const CONSTRUCTORS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u8) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u8) -> Self { C(inner) }\n}\n";
 
+const CONST_CONSTRUCTORS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub const fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub const fn new(inner: u8) -> Self { B(inner) }\n}\nimpl C {\n    pub const fn new(inner: u8) -> Self { C(inner) }\n}\n";
+const CONST_METHODS: &str = "pub struct A(u8);\npub struct B(u8);\npub struct C(u8);\nimpl A {\n    pub const fn zero() -> Self { A(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl B {\n    pub const fn zero() -> Self { B(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\nimpl C {\n    pub const fn zero() -> Self { C(0) }\n    pub fn show(&self) -> u8 { self.0 }\n}\n";
+
 const OWN_TYPE: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn join(&self, other: A) -> A { other }\n}\nimpl B {\n    pub fn join(&self, other: B) -> B { other }\n}\nimpl C {\n    pub fn join(&self, other: C) -> C { other }\n}\n";
 const DIFFERENT_RETURNS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    pub fn show(&self) -> u8 { 1 }\n}\nimpl B {\n    pub fn show(&self) -> u16 { 1 }\n}\nimpl C {\n    pub fn show(&self) -> u32 { 1 }\n}\n";
 const INLINE: &str = "mod inner {\n    struct A;\n    struct B;\n    struct C;\n    impl A {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl B {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl C {\n        pub fn show(&self) -> u8 { 1 }\n    }\n}\n";
@@ -25,7 +28,7 @@ const WRAPPED_B: Source = Source::new(Located::new("crates/x/src/b.rs"), Text::n
 const WRAPPED_C: Source = Source::new(Located::new("crates/x/src/c.rs"), Text::new("pub struct C(u32);\n"));
 const CONSTRUCTORS_ELSEWHERE: &str = "impl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
 
-const CASES: [Case; 14] = [
+const CASES: [Case; 16] = [
     Case::new(
         Title::new("private methods"),
         &[Source::new(Located::new("a.rs"), Text::new(PRIVATE))],
@@ -45,6 +48,16 @@ const CASES: [Case; 14] = [
         Title::new("hand-written constructors"),
         &[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTORS))],
         Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("const constructors cannot come from a trait"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONST_CONSTRUCTORS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a const fn is exempt and a plain method beside it is not"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONST_METHODS))],
+        Flagged::new(&["a.rs:6"]),
     ),
     Case::new(
         Title::new("own type erased"),

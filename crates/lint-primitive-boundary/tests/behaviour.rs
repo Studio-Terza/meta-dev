@@ -51,6 +51,13 @@ const METHOD_TEXT_PARAM: &str = "pub struct A;\nimpl A {\n    pub fn f(&self, x:
 const METHOD_PRIVATE_TEXT: &str = "pub struct A;\nimpl A {\n    fn f(&self, x: &str) {}\n}\n";
 const FROM_STR: &str = "pub struct A;\nimpl FromStr for A {\n    type Err = E;\n    fn from_str(text: &str) -> Result<A, E> {\n        g()\n    }\n}\n";
 const TRAIT_TEXT: &str = "pub trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
+const TRAIT_TEXT_DEFAULT: &str = "pub trait T {\n    fn f(&self, x: &str) {\n        g(x)\n    }\n}\n";
+const TRAIT_PRIVATE_TEXT: &str = "trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
+const TRAIT_TEXT_CONST: &str = "pub trait T {\n    const NAME: &'static str;\n    type Label = String;\n}\n";
+const ALIASED_TEXT: &str = "type Label = String;\npub fn f(x: Label) {}\n";
+const ALIASED_UNSIZED: &str = "type Label = str;\npub fn f(x: &Label) {}\n";
+const ALIASED_NUMBER: &str = "type Label = other::Thing;\npub fn f(x: Label) {}\n";
+const ALIASED_PRIVATE: &str = "type Label = String;\nfn f(x: Label) {}\n";
 const PUBLIC_FIELD: &str = "pub struct A {\n    pub name: String,\n}\n";
 const PRIVATE_FIELD: &str = "pub struct A {\n    name: String,\n}\n";
 const TUPLE_FIELD: &str = "pub struct A(pub String);\n";
@@ -84,7 +91,7 @@ const BORROW_IMPL: &str = "pub struct A(Name);\nimpl std::borrow::Borrow<str> fo
 const AS_REF_HELPER: &str = "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        \"\"\n    }\n}\nimpl A {\n    fn g(&self) {\n        self.0.trim();\n    }\n}\n";
 const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 79] = [
+const CASES: [Case; 86] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -302,8 +309,43 @@ const CASES: [Case; 79] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("text in a trait declaration"),
+        Title::new("text in a public trait declaration"),
         &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT))],
+        Flagged::new(&["a.rs:2", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in a default method of a public trait"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT_DEFAULT))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in a private trait declaration"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_PRIVATE_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in a trait constant and associated type"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT_CONST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text behind a type alias in a public signature"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_TEXT))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("unsized text behind a type alias"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_UNSIZED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("an alias of another type in a public signature"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_NUMBER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text behind a type alias in a private signature"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_PRIVATE))],
         Flagged::new(&[]),
     ),
     Case::new(
