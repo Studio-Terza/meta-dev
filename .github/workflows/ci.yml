@@ -45,21 +45,26 @@ jobs:
         run: cargo fmt --check
       - name: clippy
         if: env.CARGO_SCOPE != ''
-        run: ci/timed.sh clippy cargo clippy --all-targets $CARGO_SCOPE -- -D warnings
+        run: ci/timed.sh clippy cargo clippy --locked --all-targets $CARGO_SCOPE -- -D warnings
       - name: test compile
         if: env.CARGO_SCOPE != ''
-        run: ci/timed.sh test-compile cargo test --no-run $CARGO_SCOPE
+        run: ci/timed.sh test-compile cargo test --locked --no-run $CARGO_SCOPE
+      - name: fuzz targets
+        if: env.CARGO_SCOPE == '--workspace' || contains(env.CARGO_SCOPE, '-p fuzz')
+        run: |
+          cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
+          cargo test --locked -p fuzz --features campaign --test fuzz --no-run
       - name: test run
         if: env.CARGO_SCOPE != ''
         run: |
-          cargo test $CARGO_SCOPE | tee "$RUNNER_TEMP/test.txt"
+          cargo test --locked $CARGO_SCOPE | tee "$RUNNER_TEMP/test.txt"
           ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
       - name: lint
         shell: bash
         run: ci/timed.sh lint "$TOOLS/lint" . | tee "$RUNNER_TEMP/budget.txt"
       - name: limits
         if: github.ref == 'refs/heads/main'
-        run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
+        run: cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
       - name: report
         if: github.ref == 'refs/heads/main' && always()
         env:
@@ -74,7 +79,7 @@ jobs:
           echo "measured stages, seconds:"
           cat "$MEASURED"
           cat "$RUNNER_TEMP/limits.txt"
-          cargo run -q --bin reach -- fan-in "$RUNNER_TEMP/metadata.json"
+          cargo run --locked -q --bin reach -- fan-in "$RUNNER_TEMP/metadata.json"
 
   mutants:
     if: github.event_name == 'pull_request'

@@ -43,6 +43,7 @@ src/spellings.rs:1: bare u8 in f; name what it counts with a newtype
 src/spellings.rs:3: bare u8 in R; name what it counts with a newtype
 src/spellings.rs:4: bare u8 in P; name what it counts with a newtype
 src/spellings.rs:4: bare u8 in P; name what it counts with a newtype
+src/spellings.rs:1: bare String in f; give the text a newtype, with Display at the render edge and FromStr at the parse edge
 src/tuples.rs:1: bare u8 in f; name what it counts with a newtype
 src/tuples.rs:1: bare u8 in f; name what it counts with a newtype
 src/tuples.rs:2: bare u8 in g; name what it counts with a newtype

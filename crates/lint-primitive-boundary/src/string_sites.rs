@@ -5,11 +5,12 @@ use std::path::PathBuf;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    Block, Field, ImplItemConst, ImplItemFn, ImplItemType, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMod, ItemStatic,
-    ItemStruct, ItemTrait, ItemType, Type, TypePath, TypeReference, Visibility,
+    Block, Field, ForeignItemFn, ImplItemConst, ImplItemFn, ImplItemType, ItemConst, ItemEnum, ItemFn, ItemImpl,
+    ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, TypePath, Visibility,
 };
 
 use super::finding::Finding;
+use super::number_sites::UseAliases;
 use lint_core::Gate;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -17,17 +18,28 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
+use lint_layout::{Word, words};
 pub use text_form::TextForm;
 
 pub struct StringSites {
     path: PathBuf,
+    aliases: UseAliases,
     context: Name,
     found: Vec<Violation>,
 }
 
 impl StringSites {
+    const OWNED: [&'static [Word<'static>]; 3] =
+        [&words!["String"], &words!["std", "string", "String"], &words!["alloc", "string", "String"]];
+    const UNSIZED: [Word<'static>; 1] = words!["str"];
+
     pub fn exposed_in(file: &SourceFile) -> Vec<Violation> {
-        let mut sites = StringSites { path: file.path().to_owned(), context: Name::default(), found: Vec::new() };
+        let mut sites = StringSites {
+            path: file.path().to_owned(),
+            aliases: UseAliases::in_file(file.syntax()),
+            context: Name::default(),
+            found: Vec::new(),
+        };
         sites.visit_file(file.syntax());
         sites.found
     }
@@ -37,8 +49,16 @@ impl StringSites {
         self.found.push(Violation::new(site, Finding::BareText { form, context: self.context.clone() }));
     }
 
-    fn is_named(path: &TypePath, word: &str) -> bool {
-        path.qself.is_none() && path.path.is_ident(word)
+    fn form_of(&self, path: &TypePath) -> Option<TextForm> {
+        Some(path).filter(|path| path.qself.is_none()).map(|path| self.aliases.resolve(&path.path)).and_then(
+            |spelled| {
+                Self::OWNED
+                    .iter()
+                    .find(|owned| spelled.spells(owned))
+                    .map(|_| TextForm::Owned)
+                    .or_else(|| spelled.spells(&Self::UNSIZED).then_some(TextForm::Unsized))
+            },
+        )
     }
 
     fn exposed(visibility: &Visibility) -> bool {
@@ -85,8 +105,19 @@ impl<'ast> Visit<'ast> for StringSites {
         Self::exposed(&item.vis).then_some(&item.sig).iter().for_each(|sig| self.visit_signature(sig));
     }
 
+    fn visit_item_union(&mut self, item: &'ast ItemUnion) {
+        self.context = Name::from(&item.ident);
+        item.fields.named.iter().filter(|field| Self::exposed(&field.vis)).for_each(|field| self.visit_field(field));
+    }
+
+    fn visit_foreign_item_fn(&mut self, item: &'ast ForeignItemFn) {
+        self.context = Name::from(&item.sig.ident);
+        Self::exposed(&item.vis).then_some(&item.sig).iter().for_each(|sig| self.visit_signature(sig));
+    }
+
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         self.context = Name::from(&item.ident);
+        Self::exposed(&item.vis).then_some(&item.generics).iter().for_each(|generics| self.visit_generics(generics));
         item.fields.iter().filter(|field| Self::exposed(&field.vis)).for_each(|field| self.visit_field(field));
     }
 
@@ -103,20 +134,10 @@ impl<'ast> Visit<'ast> for StringSites {
         syn::visit::visit_type(self, &field.ty);
     }
 
-    fn visit_type_reference(&mut self, reference: &'ast TypeReference) {
-        match &*reference.elem {
-            Type::Path(path) if Self::is_named(path, "str") => {
-                self.sighted(TextForm::Borrowed, LineNumber::from(reference.span()));
-            }
-            _ => syn::visit::visit_type_reference(self, reference),
-        }
-    }
-
     fn visit_type_path(&mut self, path: &'ast TypePath) {
-        if Self::is_named(path, "String") {
-            self.sighted(TextForm::Owned, LineNumber::from(path.span()));
-        } else {
-            syn::visit::visit_type_path(self, path);
+        match self.form_of(path) {
+            Some(form) => self.sighted(form, LineNumber::from(path.span())),
+            None => syn::visit::visit_type_path(self, path),
         }
     }
 }
