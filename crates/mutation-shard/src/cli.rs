@@ -12,8 +12,8 @@ pub struct Cli;
 impl Cli {
     #[must_use]
     pub fn answer(arguments: impl Iterator<Item = OsString>, err: &mut impl Write) -> ExitCode {
-        let arguments: Vec<OsString> = arguments.collect();
-        match Shard::from_arguments(&arguments).and_then(|step| step.write_matrix()) {
+        let given: Vec<OsString> = arguments.collect();
+        match Shard::from_arguments(&given).and_then(|step| step.write_matrix()) {
             Ok(()) => ExitCode::SUCCESS,
             Err(failure) => {
                 writeln!(err, "{failure}").ok();

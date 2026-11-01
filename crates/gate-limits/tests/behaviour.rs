@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -28,10 +29,17 @@ impl Run {
     }
 
     fn reported(name: &str, limits: &str, measured: &str) -> io::Result<Reported> {
+        Self::reported_only(name, limits, measured, &[])
+    }
+
+    fn reported_only(name: &str, limits: &str, measured: &str, only: &[&str]) -> io::Result<Reported> {
         let limits = Self::fixture(&format!("{name}-limits.toml"), limits)?;
         let measured = Self::fixture(&format!("{name}-measured.toml"), measured)?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Self::cli(&limits, &measured).report_to(&mut out, &mut err);
+        let named = [limits.as_os_str().to_owned(), measured.as_os_str().to_owned()]
+            .into_iter()
+            .chain(only.iter().map(OsString::from));
+        let exit = Cli::from_args(named).report_to(&mut out, &mut err);
         Ok(Reported {
             exit,
             out: String::from_utf8(out).map_err(io::Error::other)?,
@@ -150,5 +158,27 @@ fn limits_that_cannot_be_judged_list_nothing() -> io::Result<()> {
     let limits = Run::fixture("none-limits.toml", LIMITS)?;
     let measured = Run::fixture("none-measured.toml", "clippy = 10")?;
     assert!(Run::cli(&limits, &measured).past_warn().is_err());
+    Ok(())
+}
+
+#[test]
+fn named_stages_are_judged_alone_so_a_job_can_judge_the_stages_it_timed() -> io::Result<()> {
+    let run = Run::reported_only("named", LIMITS, "test-run = 4", &["test-run"])?;
+    assert_eq!(run.out, "WARN: test-run took 4s, warn above 3s, block above 5s\n");
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Result<()> {
+    let unmeasured = Run::reported_only("named-unmeasured", LIMITS, "", &["test-run"])?;
+    assert_eq!(unmeasured.exit, ExitCode::FAILURE);
+    assert!(unmeasured.err.contains("was not measured"), "{}", unmeasured.err);
+    let unknown = Run::reported_only("named-unknown", LIMITS, "test-run = 1", &["test-run", "typo"])?;
+    assert_eq!(unknown.exit, ExitCode::FAILURE);
+    assert!(unknown.err.contains("stage typo was asked for but has no limit"), "{}", unknown.err);
+    let stray = Run::reported_only("named-stray", LIMITS, "test-run = 1\nclippy = 1", &["test-run"])?;
+    assert_eq!(stray.exit, ExitCode::FAILURE);
+    assert!(stray.err.contains("no usable limit"), "{}", stray.err);
     Ok(())
 }

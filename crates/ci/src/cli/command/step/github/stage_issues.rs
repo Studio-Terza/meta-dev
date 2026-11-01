@@ -19,7 +19,7 @@ pub struct StageIssues {
 impl Step for StageIssues {
     fn from_arguments(arguments: &[OsString]) -> Result<StageIssues, Failure> {
         match arguments {
-            [_, _] => Ok(StageIssues { limits: gate_limits::Cli::from_args(arguments.iter().cloned()) }),
+            [_, _, ..] => Ok(StageIssues { limits: gate_limits::Cli::from_args(arguments.iter().cloned()) }),
             _ => Err(Failure::Usage),
         }
     }

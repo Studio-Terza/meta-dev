@@ -19,7 +19,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: toolchain
-        run: rustup toolchain install
+      - uses: ./.github/actions/toolchain
       - name: golden and scenario files carry their labels
         run: cargo run --locked -q --bin ci -- labels "$GITHUB_BASE_REF" ${{ github.event.pull_request.number }}

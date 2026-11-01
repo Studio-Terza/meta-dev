@@ -9,6 +9,16 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
+  TOOLS: ${{ github.workspace }}/target/ci/tools
+  MEASURED: ${{ github.workspace }}/target/ci/measured.toml
+  METADATA: ${{ github.workspace }}/target/ci/metadata.json
+  TESTLOG: ${{ github.workspace }}/target/ci/test.txt
+  BUDGET: ${{ github.workspace }}/target/ci/budget.txt
+  LIMITS: ${{ github.workspace }}/target/ci/limits.txt
+  ELEGANCE: ${{ github.workspace }}/target/ci/elegance.txt
+  HISTORY: ${{ github.workspace }}/target/ci/history.tsv
+  TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
+  COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
 
 permissions:
   contents: read
@@ -19,85 +29,99 @@ defaults:
     shell: bash
 
 jobs:
-  gates:
+  clippy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
       issues: write
     env:
-      TOOLS: ${{ github.workspace }}/target/ci/tools
-      MEASURED: ${{ github.workspace }}/target/ci/measured.toml
-      METADATA: ${{ github.workspace }}/target/ci/metadata.json
-      TESTLOG: ${{ github.workspace }}/target/ci/test.txt
-      BUDGET: ${{ github.workspace }}/target/ci/budget.txt
-      LIMITS: ${{ github.workspace }}/target/ci/limits.txt
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: "true"
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
-      ELEGANCE: ${{ github.workspace }}/target/ci/elegance.txt
-      HISTORY: ${{ github.workspace }}/target/ci/history.tsv
-      TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
-      COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: toolchain
-        run: rustup toolchain install
+      - uses: ./.github/actions/toolchain
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: rui314/setup-mold@v1
-      - name: tools key
-        id: key
-        run: cargo run --locked -q --profile tools --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
-        id: tools
-        with:
-          path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
-      - name: tools
-        if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
-      - name: reach
-        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+      - uses: ./.github/actions/tools
       - name: fmt
         run: cargo fmt --check
       - name: clippy
         if: env.CARGO_SCOPE != ''
         run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $CARGO_SCOPE -- -D warnings'
-      - name: test compile
-        if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $CARGO_SCOPE'
       - name: fuzz targets clippy
         if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
-      - name: fuzz targets compile
-        if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
-        run: cargo test --locked -p fuzz --features campaign --test fuzz --no-run
+      - uses: ./.github/actions/judge
+        with:
+          stages: clippy
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/toolchain
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/tools
+      - name: test compile
+        if: env.CARGO_SCOPE != ''
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $CARGO_SCOPE'
       - name: test run
         if: env.CARGO_SCOPE != ''
         run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked $CARGO_SCOPE'
       - name: test run seconds
         if: env.CARGO_SCOPE != ''
         run: '"$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$TESTLOG"'
+      - uses: ./.github/actions/judge
+        with:
+          stages: test-compile test-run
+      - name: compile times
+        if: github.ref == 'refs/heads/main'
+        run: '"$TOOLS/ci" compile-times "$TIMINGS" "$COMPILE_TIMES"'
+      - name: compile times summary
+        if: github.ref == 'refs/heads/main' && always()
+        run: '"$TOOLS/ci" summarize "$COMPILE_TIMES" "$GITHUB_STEP_SUMMARY"'
+
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/toolchain
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: rui314/setup-mold@v1
+      - uses: ./.github/actions/tools
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
-      - name: limits
-        if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
-        run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED"'
-      - name: step times
+      - name: budget
         if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: '"$TOOLS/ci" wall-times "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_JOB"'
-      - name: report
-        if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
-        run: '"$TOOLS/ci" show "$BUDGET" ci/limits.toml "$MEASURED" "$LIMITS"'
-      - name: stage issues
-        if: github.ref == 'refs/heads/main' && always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: '"$TOOLS/ci" stage-issues ci/limits.toml "$MEASURED"'
+        run: '"$TOOLS/ci" show "$BUDGET"'
+      - uses: ./.github/actions/judge
+        with:
+          stages: lint
       - name: fan-in
         if: github.ref == 'refs/heads/main' && always()
         run: '"$TOOLS/reach" fan-in "$METADATA"'
@@ -107,12 +131,6 @@ jobs:
       - name: elegance summary
         if: github.ref == 'refs/heads/main' && always()
         run: '"$TOOLS/ci" summarize "$ELEGANCE" "$GITHUB_STEP_SUMMARY"'
-      - name: compile times
-        if: github.ref == 'refs/heads/main'
-        run: '"$TOOLS/ci" compile-times "$TIMINGS" "$COMPILE_TIMES"'
-      - name: compile times summary
-        if: github.ref == 'refs/heads/main' && always()
-        run: '"$TOOLS/ci" summarize "$COMPILE_TIMES" "$GITHUB_STEP_SUMMARY"'
       - name: history restore
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/restore@v4
@@ -140,27 +158,13 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     env:
-      TOOLS: ${{ github.workspace }}/target/ci/tools
-      METADATA: ${{ github.workspace }}/target/ci/metadata.json
+      CARGO_PROFILE_DEV_OPT_LEVEL: "0"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: toolchain
-        run: rustup toolchain install
-      - name: tools key
-        id: key
-        run: cargo run --locked -q --profile tools --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
-        id: tools
-        with:
-          path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
-      - name: tools
-        if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
-      - name: reach
-        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/tools
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:

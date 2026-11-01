@@ -22,7 +22,7 @@ const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS
     skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
 const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
-const BUILD: [&str; 9] = ["build", "--locked", "-q", "--profile", "tools", "--bin", "reach", "--bin", "lint"];
+const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 
@@ -562,7 +562,6 @@ laws::table!(
         ["reach", "metadata.json", "push", "main", "env", "sum", "extra"] => true,
         ["stage-issues"] => true,
         ["stage-issues", "limits.toml"] => true,
-        ["stage-issues", "limits.toml", "measured.toml", "extra"] => true,
         ["compile-times"] => true,
         ["compile-times", "page.html"] => true,
         ["compile-times", "page.html", "report.txt", "extra"] => true,
@@ -973,6 +972,17 @@ fn a_stage_that_already_has_an_open_issue_updates_that_issue_and_not_a_look_alik
     let fake = Fake::answering(vec![Reply::to("gh issue", listed)]);
     Answer::to(&fake, &arguments);
     assert_eq!(fake.calls.borrow().last(), Some(&Gh::call(&["issue", "edit", "7", "--body", CLIPPY_BODY])));
+    Ok(())
+}
+
+#[test]
+fn stages_named_after_the_files_are_the_only_ones_judged() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let mut arguments = Gh::stage_issues(&scratch, "clippy = 12\n")?;
+    arguments.push("clippy".to_owned());
+    let fake = Fake::answering(vec![Reply::to("gh issue", "[]")]);
+    assert_eq!(Answer::to(&fake, &arguments).exit, ExitCode::SUCCESS);
+    assert_eq!(fake.calls.borrow().len(), 2);
     Ok(())
 }
 
