@@ -6,6 +6,7 @@ pub struct OnlyField {
 }
 
 impl OnlyField {
+    const COUNT: &str = "usize";
     const REFUSED: &str = "a newtype is a struct with exactly one field";
 
     pub fn found_in(input: &DeriveInput) -> syn::Result<OnlyField> {
@@ -22,6 +23,10 @@ impl OnlyField {
 
     pub fn inner(&self) -> &Type {
         &self.inner
+    }
+
+    pub fn counts(&self) -> bool {
+        matches!(&self.inner, Type::Path(path) if path.qself.is_none() && path.path.is_ident(Self::COUNT))
     }
 
     fn among(fields: &Fields) -> Option<OnlyField> {

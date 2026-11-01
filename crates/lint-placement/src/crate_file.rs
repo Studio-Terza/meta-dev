@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CrateFile(PathBuf);
 
 impl From<PathBuf> for CrateFile {

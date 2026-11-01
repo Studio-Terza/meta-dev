@@ -1,12 +1,10 @@
-#[derive(Debug)]
+use newtype::Newtype;
+
+#[derive(Newtype, Debug)]
 pub struct TextLines<'text>(&'text str);
 
-impl<'text> TextLines<'text> {
+impl TextLines<'_> {
     const BREAK: char = '\n';
-
-    pub fn new(text: &'text str) -> Self {
-        Self(text)
-    }
 }
 
 impl<'text> Iterator for TextLines<'text> {
