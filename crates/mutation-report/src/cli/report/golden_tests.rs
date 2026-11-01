@@ -9,6 +9,7 @@ use std::str::FromStr;
 
 use golden_test::GoldenTest;
 use rust_files::RustFiles;
+use text_lines::LossyText;
 
 use crate::cli::report::failure::Failure;
 
@@ -22,8 +23,8 @@ impl GoldenTests {
 
     pub fn under(sources: &Path) -> Result<GoldenTests, Failure> {
         RustFiles::below(&sources.join(Self::CRATES))?.iter().try_fold(GoldenTests::default(), |found, file| {
-            let text = fs::read_to_string(file).map_err(|source| Failure::Io { path: file.clone(), source })?;
-            Ok(found.merged(text.parse().unwrap_or_default()))
+            let bytes = fs::read(file).map_err(|source| Failure::Io { path: file.clone(), source })?;
+            Ok(found.merged(LossyText::from(bytes.as_slice()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
         })
     }
 

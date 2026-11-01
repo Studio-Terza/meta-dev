@@ -27,8 +27,13 @@ impl ReachScope {
     const WHOLE_WORKSPACE: &'static str = "CARGO_SCOPE=--workspace\n";
 
     fn affected(&self, ports: &impl Ports) -> Result<String, Failure> {
-        let changed =
-            Self::asked(ports, &Invocation::new("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"]))?;
+        let changed = Self::asked(
+            ports,
+            &Invocation::new(
+                "git",
+                ["-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"],
+            ),
+        )?;
         let arguments = [OsString::from(Self::AFFECTED), self.metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(Lines::from(changed.as_str()).map(OsString::from));

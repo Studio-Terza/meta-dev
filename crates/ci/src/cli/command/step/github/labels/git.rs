@@ -12,6 +12,7 @@ pub struct Git<'ports, Host: Ports> {
 impl<'ports, Host: Ports> Git<'ports, Host> {
     const REMOTE: &'static str = "origin/";
     const HEAD: &'static str = "HEAD";
+    const LITERAL_PATHS: &'static str = "core.quotePath=false";
 
     pub(crate) fn with_ports(ports: &'ports Host) -> Git<'ports, Host> {
         Git { ports }
@@ -21,7 +22,16 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         let fork = self.fork_point(base)?;
         let listed = self.asked(&Invocation::new(
             "git",
-            ["diff", "--name-status", "--find-renames", "--find-copies", fork.as_str(), Self::HEAD],
+            [
+                "-c",
+                Self::LITERAL_PATHS,
+                "diff",
+                "--name-status",
+                "--find-renames",
+                "--find-copies",
+                fork.as_str(),
+                Self::HEAD,
+            ],
         ))?;
         Ok(Lines::from(listed.as_str()).filter_map(|line| line.parse::<Change>().ok()).collect())
     }

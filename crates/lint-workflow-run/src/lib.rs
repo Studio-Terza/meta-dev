@@ -46,12 +46,12 @@ impl WorkflowRun {
         lines
             .iter()
             .enumerate()
-            .filter_map(|(index, line)| Self::violation(file, index, line, lines.get(index + 1).copied()))
+            .filter_map(|(index, line)| Self::violation(file, index, line, lines.get(index + 1..).unwrap_or_default()))
             .collect()
     }
 
-    fn violation(file: &RepoFile, index: usize, line: &str, next: Option<&str>) -> Option<Violation> {
-        let finding = line.parse::<RunStep>().ok()?.finding(next)?;
+    fn violation(file: &RepoFile, index: usize, line: &str, following: &[&str]) -> Option<Violation> {
+        let finding = line.parse::<RunStep>().ok()?.finding(following)?;
         Some(Violation::new(Site::new(file.shown(), LineNumber::from(index + 1)), finding))
     }
 }
