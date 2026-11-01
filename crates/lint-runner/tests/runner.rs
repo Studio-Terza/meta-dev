@@ -14,7 +14,7 @@ use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const LINT_COUNT: usize = 29;
+const LINT_COUNT: usize = 30;
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
