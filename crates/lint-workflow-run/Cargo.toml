@@ -9,6 +9,7 @@ publish.workspace = true
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
+text-lines = { path = "../text-lines" }
 
 [dev-dependencies]
 laws = { path = "../laws" }

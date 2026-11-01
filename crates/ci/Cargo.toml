@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 newtype = { path = "../newtype" }
+mutation-report = { path = "../mutation-report" }
 reach = { path = "../reach" }
 text-lines = { path = "../text-lines" }
 thiserror.workspace = true

@@ -1,9 +1,11 @@
+use std::fs::{self, File};
 use std::io;
 use std::num::NonZeroU8;
-use std::process::{Command, ExitStatus};
+use std::path::Path;
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::Instant;
 
-use super::{Exit, Invocation, Ports, Run};
+use super::{Exit, Invocation, Ports, Run, Tee};
 
 #[derive(Debug)]
 pub struct System;
@@ -44,5 +46,16 @@ impl Ports for System {
         } else {
             Err(io::Error::other(String::from_utf8(output.stderr).unwrap_or_default()))
         }
+    }
+
+    fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {
+        let started = Instant::now();
+        log.parent().map_or(Ok(()), fs::create_dir_all)?;
+        let mut tee = Tee::new(io::stdout(), File::create(log)?);
+        let mut child = Self::command(invocation).stdout(Stdio::piped()).spawn()?;
+        let copied = child.stdout.take().map_or(Ok(0), |mut stdout| io::copy(&mut stdout, &mut tee));
+        let status = child.wait()?;
+        copied?;
+        Ok(Run::new(Self::exit_of(status), started.elapsed()))
     }
 }

@@ -36,6 +36,7 @@ name = "ci"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "mutation-report",
  "newtype",
  "reach",
  "tempfile",
@@ -708,6 +709,7 @@ dependencies = [
  "lint-layout",
  "newtype",
  "tempfile",
+ "text-lines",
 ]
 
 [[package]]

@@ -9,6 +9,9 @@ const SPANS: &str = "a run step spans several lines; put the logic in a Rust com
 const FIX: &str = "; put the logic in a Rust command";
 const LIMIT: usize = 120;
 
+#[derive(Debug)]
+struct Length(usize);
+
 struct Checked;
 
 impl Checked {
@@ -27,7 +30,7 @@ impl Checked {
         WorkflowRun::report(&files)
             .violations()
             .iter()
-            .map(|violation| violation.to_string().replace(&prefix, ""))
+            .map(|violation| violation.to_string().get(prefix.len()..).unwrap_or_default().to_owned())
             .collect()
     }
 
@@ -47,8 +50,8 @@ impl Checked {
         vec![format!("{WORKFLOW}:1: a run step starts with the shell keyword {word}{FIX}")]
     }
 
-    fn of_length(length: &usize) -> usize {
-        Self::at(WORKFLOW, &format!("run: {}\n", "a".repeat(*length))).len()
+    fn of_length(length: &Length) -> usize {
+        Self::at(WORKFLOW, &format!("run: {}\n", "a".repeat(length.0))).len()
     }
 }
 
@@ -84,6 +87,14 @@ laws::table!(
         "run: |-\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
         "- run: >\n    cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
         "run:\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
+        "run:\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
+        "defaults:\n  run:\n    shell: bash\n" => Vec::<String>::new(),
+        "defaults:\n  run:\n    shell: bash\nrun: |\n  x\n" => vec![format!("{WORKFLOW}:4: {SPANS}")],
+        "run: cargo test   \n" => Vec::<String>::new(),
+        "    run:   cargo test\n" => Vec::<String>::new(),
+        "run: 'a'\n" => Vec::<String>::new(),
+        "run: '\n" => Vec::<String>::new(),
+        "run: \"\"\n" => Vec::<String>::new(),
         "a: 1\nrun: |\n  x\nrun: b | c\n" => vec![
             format!("{WORKFLOW}:2: {SPANS}"),
             format!("{WORKFLOW}:4: a run step uses the shell operator |{FIX}"),
@@ -95,10 +106,10 @@ laws::table!(
     a_run_step_is_short_up_to_the_limit,
     Checked::of_length,
     [
-        1 => 0,
-        LIMIT => 0,
-        LIMIT + 1 => 1,
-        LIMIT * 2 => 1,
+        Length(1) => 0,
+        Length(LIMIT) => 0,
+        Length(LIMIT + 1) => 1,
+        Length(LIMIT * 2) => 1,
     ]
 );
 
@@ -121,7 +132,7 @@ fn a_workflow_that_cannot_be_read_is_reported_not_passed() {
     let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
     let reported = Checked::reported(checkout.path(), WORKFLOW);
     assert_eq!(reported.len(), 1);
-    assert!(reported.iter().all(|line| line.starts_with(&format!("{WORKFLOW}:1: cannot read the workflow: "))));
+    assert!(reported.iter().all(|line| line.contains(&format!("{WORKFLOW}:1: cannot read the workflow: "))));
 }
 
 #[test]

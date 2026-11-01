@@ -1,10 +1,16 @@
+mod refusal;
+
 use std::io;
 use std::path::PathBuf;
+
+pub use refusal::Refusal;
+
+use crate::cli::ports::Invocation;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci reach <metadata file> <event>"
+        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci reach <metadata file> <event> <environment file> <summary file> | ci tools <built directory> <tools directory> | ci mutants-shard <shard> <output directory> | ci mutants-changed <diff file> <output directory> [<scope>...] | ci wall-times <repository> <run> <job> | ci show <file>... | ci labels <base branch> <pull request> | ci shard-summary <shards directory> <summary file> | ci matrix <shards directory> <sources directory> <output directory> <summary file>"
     )]
     Usage,
     #[error("cannot use {path}: {source}", path = path.display())]
@@ -14,5 +20,13 @@ pub enum Failure {
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
     #[error("reach failed: {0}")]
-    Reach(String),
+    Reach(Refusal),
+    #[error("the mutation matrix failed: {0}")]
+    Matrix(Refusal),
+}
+
+impl Failure {
+    pub(crate) fn starting(invocation: &Invocation) -> impl FnOnce(io::Error) -> Failure + '_ {
+        move |source| Failure::Program { program: invocation.program().to_owned(), source }
+    }
 }
