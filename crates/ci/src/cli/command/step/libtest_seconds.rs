@@ -36,8 +36,13 @@ impl Step for LibtestSeconds {
     fn carry_out(&self, _ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
         let text =
             fs::read_to_string(&self.output).map_err(|source| Failure::Io { path: self.output.clone(), source })?;
-        let total: Seconds =
-            Lines::from(text.as_str()).filter_map(|line| line.parse::<Finished>().ok()).map(Finished::seconds).sum();
-        self.measured.append(&self.stage, total).map(|()| Exit::Success)
+        let results: Vec<Finished> =
+            Lines::from(text.as_str()).filter_map(|line| line.parse::<Finished>().ok()).collect();
+        let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
+        (!results.is_empty())
+            .then_some(total)
+            .ok_or_else(|| Failure::NoTestResult { path: self.output.clone() })
+            .and_then(|total| self.measured.append(&self.stage, total))
+            .map(|()| Exit::Success)
     }
 }

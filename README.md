@@ -59,17 +59,18 @@ five or more, or whose cycle spans more than 40 items; its conductance floor is 
 
 `rust_only` fails a source file in another language: the file name has the extension of Python, shell, Batch,
 PowerShell, Perl, Ruby, PHP, Lua, Go, Java, Kotlin, Scala, Swift, Objective-C, C, C++, C#, Dart, Haskell, Elixir,
-Erlang, Clojure, OCaml, F#, R, Julia, Groovy, Zig, JavaScript, TypeScript, HTML, CSS, Vue or Svelte, in any case. Web
-assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte) pass below a directory named `assets`, anywhere under the checked
-path, and nothing else passes there or elsewhere. The message names the fix: rewrite the file in Rust, or for a web
+Erlang, Clojure, OCaml, F#, R, Julia, Groovy, Zig, awk, sed, Tcl, Nix, make, notebooks, Vim script, Lisp, Scheme, Racket,
+Nim, Visual Basic, Solidity, assembly, D, Pascal, Fortran, Crystal, V, Arduino, Starlark, JavaScript, TypeScript, HTML,
+CSS, Vue, Svelte or Astro, in any case. Web assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte, Astro) pass below a
+directory named `assets`, anywhere under the checked path; any other language fails there too. The message names the fix: rewrite the file in Rust, or for a web
 language, move it under `assets` if it is a web asset. The lint reads every file under the path, hidden directories
 included, so `.github/` is checked. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
 (`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
 
 `workflow_run` keeps logic out of YAML. In a file under `.github/workflows`, a `run:` step must be one line of at most
-120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick or `$(`, and not start with
-`if`, `for`, `while`, `until`, `case`, `[` or `[[`. A `run:` that opens a block (`|`, `>` or an empty value followed
-by text) fails. A workflow file the lint cannot read fails too. There is no allow-list: anything longer is a Rust
+120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick, `$(` or a `${` expansion with
+a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. A `run:` that opens a
+block (`|`, `>` or an empty value followed by text; comments and blank lines between are skipped) fails. A workflow file the lint cannot read fails too. There is no allow-list: anything longer is a Rust
 command.
 
 The CI helpers are Rust too, and workflows only call them. `ci` has these commands:

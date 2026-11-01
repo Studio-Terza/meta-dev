@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use text_lines::LossyText;
 
 use named::Named;
 use test_log::{TestLog, TestName};
@@ -56,8 +57,8 @@ impl Outcome {
             .chain(self.phase_results.iter().filter_map(|phase| phase.log_path.as_ref()))
             .map(|path| directory.join(path))
             .find(|path| path.is_file())
-            .and_then(|path| fs::read_to_string(path).ok())
-            .map(|text| TestLog::from(text.as_str()))
+            .and_then(|path| fs::read(path).ok())
+            .map(|bytes| TestLog::from(LossyText::from(bytes.as_slice()).as_ref()))
             .unwrap_or_default()
     }
 }

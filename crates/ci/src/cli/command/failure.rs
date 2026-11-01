@@ -15,6 +15,8 @@ pub enum Failure {
     Usage,
     #[error("cannot use {path}: {source}", path = path.display())]
     Io { path: PathBuf, source: io::Error },
+    #[error("no libtest result line in {path}; the test output format may have changed", path = path.display())]
+    NoTestResult { path: PathBuf },
     #[error("cannot run {program}: {source}", program = program.to_string_lossy())]
     Program { program: std::ffi::OsString, source: io::Error },
     #[error("cannot write the report: {0}")]

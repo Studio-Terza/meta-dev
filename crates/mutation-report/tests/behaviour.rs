@@ -130,14 +130,14 @@ impl Checkout {
         self.0.path().join(name)
     }
 
-    fn write(&self, name: &str, text: &str) -> Result<(), io::Error> {
+    fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
         let file = self.path(name);
         fs::create_dir_all(file.parent().unwrap_or(Path::new("")))?;
         fs::write(file, text)
     }
 
     fn shard(&self, name: &str, matrix: &Value) -> Result<(), io::Error> {
-        self.write(&format!("shards/{name}/matrix.json"), &matrix.to_string())
+        self.write(&format!("shards/{name}/matrix.json"), matrix.to_string())
     }
 
     fn report(&self) -> Answer {
@@ -240,6 +240,16 @@ fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
     assert_eq!(checkout.report_of("shards", "bare").exit, ExitCode::SUCCESS);
     assert_eq!(checkout.markdown(), EMPTY_REPORT);
     assert_eq!(checkout.field("mutants"), json!(0));
+    Ok(())
+}
+
+#[test]
+fn a_source_file_with_a_byte_that_is_not_utf8_does_not_stop_the_report() -> Result<(), Box<dyn Error>> {
+    let checkout = Checkout::new()?;
+    checkout.write("sources/crates/foo/tests/crash/input.rs", b"\xff\xfe")?;
+    checkout.shard("shard-0", &json!({ "baseline": [], "mutants": [] }))?;
+    assert_eq!(checkout.report().exit, ExitCode::SUCCESS);
+    assert_eq!(checkout.field("golden_tests"), json!(7));
     Ok(())
 }
 
