@@ -43,7 +43,7 @@ impl ModuleTree {
         let crowded = self
             .reexports
             .iter()
-            .filter(|(module, _)| module.segment_length() > 0)
+            .filter(|(module, _)| module.segment_length() != 0)
             .filter(move |(_, count)| count.exceeds(most))
             .map(move |(module, count)| {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count: *count, most })

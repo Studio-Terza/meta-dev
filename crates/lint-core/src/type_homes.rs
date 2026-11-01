@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{ItemEnum, ItemMod, ItemStruct, ItemUnion};
+use syn::{ItemEnum, ItemMod, ItemStruct};
 
 use lint_layout::Name;
 
@@ -58,10 +58,6 @@ impl<'ast> Visit<'ast> for TypeHomes {
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || self.declare(Name::from(&item.ident)));
-    }
-
-    fn visit_item_union(&mut self, item: &'ast ItemUnion) {
         Walk::enter(&item.attrs, || self.declare(Name::from(&item.ident)));
     }
 }
