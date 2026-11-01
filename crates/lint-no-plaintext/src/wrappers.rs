@@ -5,7 +5,6 @@ use std::collections::BTreeSet;
 use lint_core::SourceFile;
 use lint_layout::Name;
 
-use crate::text_mention::TextMention;
 use definitions::Definitions;
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -28,12 +27,6 @@ impl Wrappers {
     }
 
     fn widened(&self, definitions: &Definitions) -> Wrappers {
-        Wrappers {
-            plain: definitions
-                .single_fields()
-                .filter(|field| TextMention::in_type(field.ty(), self))
-                .map(|field| field.name().clone())
-                .collect(),
-        }
+        Wrappers { plain: definitions.plain_among(self) }
     }
 }

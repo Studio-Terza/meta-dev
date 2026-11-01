@@ -4,4 +4,4 @@ mod one_line;
 
 pub use lines::Lines;
 pub use lossy_text::LossyText;
-pub use one_line::{NotOneLine, OneLine};
+pub use one_line::OneLine;

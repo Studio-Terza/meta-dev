@@ -1,5 +1,5 @@
 mod conversions;
-mod single_field;
+mod shape;
 
 use std::collections::BTreeSet;
 
@@ -10,12 +10,14 @@ use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
 
 use crate::attributes::Attributes;
+use crate::wrappers::Wrappers;
 use conversions::Conversions;
-pub use single_field::SingleField;
+use shape::Shape;
 
 #[derive(Default)]
 pub struct Definitions {
-    single_fields: Vec<SingleField>,
+    shapes: Vec<Shape>,
+    names: BTreeSet<Name>,
     validated: BTreeSet<Name>,
 }
 
@@ -29,8 +31,15 @@ impl Definitions {
         })
     }
 
-    pub fn single_fields(&self) -> impl Iterator<Item = &SingleField> {
-        self.single_fields.iter().filter(|field| !self.validated.contains(field.name()))
+    pub fn plain_among(&self, settled: &Wrappers) -> BTreeSet<Name> {
+        self.names
+            .iter()
+            .filter(|name| {
+                !self.validated.contains(*name)
+                    && self.shapes.iter().filter(|shape| shape.answers_to(name)).all(|shape| shape.holds_text(settled))
+            })
+            .cloned()
+            .collect()
     }
 
     fn only_field(item: &ItemStruct) -> Option<&Field> {
@@ -62,11 +71,14 @@ impl<'ast> Visit<'ast> for Definitions {
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         Walk::enter(&item.attrs, || {
-            self.single_fields.extend(
+            let name = Name::from(&item.ident);
+            self.shapes.push(Shape::new(
+                name.clone(),
                 Self::only_field(item)
                     .filter(|_| Attributes::flattened_from(&item.attrs).validation().is_none())
-                    .map(|field| SingleField::new(Name::from(&item.ident), field.ty.clone())),
-            );
+                    .map(|field| field.ty.clone()),
+            ));
+            self.names.insert(name);
         });
     }
 

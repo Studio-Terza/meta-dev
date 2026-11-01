@@ -50,7 +50,8 @@ impl Summary {
         let mut names: Vec<String> = mutants
             .iter()
             .filter(|mutant| mutant.has_summary(summary))
-            .map(|mutant| mutant.name().to_owned())
+            .map(RecordedMutant::name)
+            .map(ToString::to_string)
             .collect();
         names.sort();
         names

@@ -15,8 +15,8 @@ pub struct RecordedMutant {
 }
 
 impl RecordedMutant {
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_ref()
+    pub(crate) fn name(&self) -> &OneLine {
+        &self.name
     }
 
     pub(crate) fn has_summary(&self, summary: Verdict) -> bool {

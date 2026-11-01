@@ -1,7 +1,7 @@
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_no_plaintext::NoPlaintext;
 
-const CASES: [Case; 53] = [
+const CASES: [Case; 56] = [
     Case::new(
         Title::new("string field"),
         &[Source::new(Located::new("a.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n"))],
@@ -360,6 +360,33 @@ const CASES: [Case; 53] = [
             ),
         )],
         Flagged::new(&["a.rs:9"]),
+    ),
+    Case::new(
+        Title::new("same name validated elsewhere"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
+            Source::new(Located::new("b.rs"), Text::new("#[serde(try_from = \"String\")]\nstruct Id(String);\n")),
+            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("same name with another shape"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
+            Source::new(Located::new("b.rs"), Text::new("struct Id(u8, u8);\n")),
+            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("same name plain twice"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
+            Source::new(Located::new("b.rs"), Text::new("struct Id(String);\n")),
+            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
+        ],
+        Flagged::new(&["c.rs:3"]),
     ),
     Case::new(
         Title::new("two fields are not a newtype"),
