@@ -280,10 +280,12 @@ fn a_shebang_below_a_directory_named_assets_still_fails() {
 }
 
 #[test]
-fn any_file_below_a_directory_named_vendor_passes() {
-    for path in ["vendor/run.py", "third/vendor/deep/app.js", "vendor/x.sh", "site/vendor/app.css"] {
-        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
-    }
+fn vendored_code_of_any_language_is_not_the_repositorys_logic() {
+    let vendored: Vec<RepoFile> = ["vendor/run.py", "third/vendor/deep/app.js", "vendor/x.sh", "site/vendor/app.css"]
+        .into_iter()
+        .map(|path| RepoFile::new(path, path))
+        .collect();
+    assert_eq!(Checked::report(&vendored), Vec::<String>::new());
 }
 
 #[test]
