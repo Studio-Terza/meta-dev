@@ -1,0 +1,35 @@
+name: fuzz
+
+on:
+  schedule:
+    - cron: "43 4 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  FUZZ_SECONDS: "900"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain
+        run: rustup toolchain install
+      - name: fuzz the runner for FUZZ_SECONDS
+        env:
+          FUZZ_CRASHES: ${{ runner.temp }}/crashes
+        run: cargo test -p fuzz --test fuzz
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: crashes
+          path: ${{ runner.temp }}/crashes
+          if-no-files-found: ignore
+          retention-days: 90
