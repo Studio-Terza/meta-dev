@@ -1,0 +1,66 @@
+name: exp
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gates:
+    name: gates-${{ matrix.cache }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cache: [none, rustcache, rustcache-mold, sccache-mold]
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain-cache
+        if: matrix.cache != 'none'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rustup/toolchains
+            ~/.rustup/settings.toml
+            ~/.rustup/update-hashes
+          key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+      - name: toolchain
+        run: rustup toolchain install
+      - name: mold
+        if: contains(matrix.cache, 'mold')
+        uses: rui314/setup-mold@v1
+      - name: mold-flags
+        if: contains(matrix.cache, 'mold')
+        run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
+      - name: rust-cache
+        if: startsWith(matrix.cache, 'rustcache')
+        uses: Swatinem/rust-cache@v2
+      - name: sccache
+        if: startsWith(matrix.cache, 'sccache')
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: sccache-env
+        if: startsWith(matrix.cache, 'sccache')
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+      - name: fmt
+        run: cargo fmt --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: test-compile
+        run: cargo test --no-run
+      - name: test-run
+        run: cargo test | tee "$RUNNER_TEMP/test.txt"
+      - name: test-sum
+        run: awk '/^test result/ { for (i = 1; i <= NF; i++) if ($i == "in") total += $(i + 1) } END { print "libtest seconds:", total }' "$RUNNER_TEMP/test.txt"
+      - name: lint
+        run: cargo run -p lint -- .
+      - name: sccache-stats
+        if: startsWith(matrix.cache, 'sccache') && always()
+        run: sccache --show-stats
