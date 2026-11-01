@@ -1,8 +1,4 @@
-use std::path::{Path, PathBuf};
-
 use lint_core::{Lint, Readout, Report, SourceFile};
-use lint_layout::Failure;
-use lint_reader::SourceFiles;
 
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
@@ -79,14 +75,6 @@ impl Lints {
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
         ]
-    }
-
-    pub fn check_root(root: &Path) -> Result<Outcome, Failure> {
-        Self::check_all(&[root.to_path_buf()])
-    }
-
-    pub fn check_all(roots: &[PathBuf]) -> Result<Outcome, Failure> {
-        SourceFiles::read_all(roots).map(Self::checked)
     }
 
     #[must_use]

@@ -6,7 +6,7 @@ mod verdict;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use crate::failure::Failure;
+use crate::cli::failure::Failure;
 use finding::Finding;
 use limit::Limit;
 use seconds::Seconds;

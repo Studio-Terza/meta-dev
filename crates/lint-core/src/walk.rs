@@ -48,11 +48,13 @@ impl Walk {
 
     fn of_nested(list: &MetaList, nested: &Punctuated<Meta, Token![,]>) -> Walk {
         let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
-        if list.path.is_ident("all") || list.path.is_ident("any") {
-            Self::skipped_by_any(walks.into_iter())
+        let skipped = |walk: &Walk| *walk == Walk::Skipped;
+        let judged = if list.path.is_ident("all") {
+            walks.iter().any(skipped)
         } else {
-            Walk::Entered
-        }
+            list.path.is_ident("any") && !walks.is_empty() && walks.iter().all(skipped)
+        };
+        if judged { Walk::Skipped } else { Walk::Entered }
     }
 
     fn skipped_by_any(walks: impl Iterator<Item = Walk>) -> Walk {

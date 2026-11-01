@@ -43,7 +43,7 @@ impl Lint for NamedNumbers {
 }
 
 impl NamedNumbers {
-    const UNITS: &[&str] = &["0", "1", "0.0", "1.0"];
+    const UNITS: &[&str] = &["0", "1", "0.0", "1.0", "-1", "-1.0"];
 
     #[must_use]
     pub fn is_unit(digits: &str) -> bool {

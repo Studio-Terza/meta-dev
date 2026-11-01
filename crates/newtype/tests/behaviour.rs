@@ -1,6 +1,7 @@
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use newtype::{Arbitrary, Counter, Newtype, Validated};
+use newtype::{Counter, Newtype, Validated};
+use newtype_derive::Arbitrary;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 struct Rounds(usize);

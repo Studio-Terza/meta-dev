@@ -2,8 +2,8 @@ use std::fmt;
 
 use serde::Deserialize;
 
-use crate::gate::seconds::Seconds;
-use crate::gate::verdict::Verdict;
+use crate::cli::gate::seconds::Seconds;
+use crate::cli::gate::verdict::Verdict;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub struct Limit {
