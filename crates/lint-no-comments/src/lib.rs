@@ -28,9 +28,9 @@ impl Lint for NoComments {
 
 impl NoComments {
     fn comment_lines(source: &str) -> Vec<LineNumber> {
-        let shebang = strip_shebang(source).unwrap_or(0);
-        tokenize(source.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes)
-            .scan(shebang, |offset, token| {
+        let skipped = strip_shebang(source).unwrap_or(0);
+        tokenize(source.get(skipped..).unwrap_or_default(), FrontmatterAllowed::Yes)
+            .scan(skipped, |offset, token| {
                 let start = *offset;
                 *offset += usize::try_from(token.len).ok()?;
                 Some((start, token.kind))
