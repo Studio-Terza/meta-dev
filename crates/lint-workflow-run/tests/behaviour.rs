@@ -84,6 +84,7 @@ laws::table!(
         "run: [[ -n a ]]\n" => Checked::keyword("[["),
         "run: 'if'\n" => Checked::keyword("if"),
         "run: \"[ x ]\"\n" => Checked::keyword("["),
+        "run: 'if a\"\n" => Vec::<String>::new(),
         "run: iffy\n" => Vec::<String>::new(),
         "run: |\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
         "run: |-\n  cargo test\n" => vec![format!("{WORKFLOW}:1: {SPANS}")],
