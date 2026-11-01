@@ -6,7 +6,7 @@ use syn::{ItemFn, ItemMod, Macro};
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_layout::TestMarks;
-use newtype::{Counter, Newtype};
+use newtype::Counter;
 
 use super::CrateBudget;
 use super::count::Count;

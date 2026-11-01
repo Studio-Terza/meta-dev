@@ -1,0 +1,38 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 0 of 30 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/accumulating.rs:1: fn f
+src/counter.rs:1: fn f
+src/filtered.rs:1: fn f
+src/mutable.rs:1: fn f
+src/working.rs:1: fn f
+a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules:
+src/accumulating.rs:1: fn f
+src/filtered.rs:1: fn f
+control flow is an expression; every branch yields the value the function returns:
+src/accumulating.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/counter.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/filtered.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/filtered.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/working.rs:2: for loop; drive the iterator with combinators, const fns excepted
+function names say what the function does:
+src/accumulating.rs:1: fn f names nothing; say what it does
+src/counter.rs:1: fn f names nothing; say what it does
+src/filtered.rs:1: fn f names nothing; say what it does
+src/mutable.rs:1: fn f names nothing; say what it does
+src/working.rs:1: fn f names nothing; say what it does
+iterators are driven by combinators, not by hand:
+src/accumulating.rs:2: loop that only accumulates; extend or collect from an iterator instead
+src/filtered.rs:2: loop that only accumulates; extend or collect from an iterator instead
+src/mutable.rs:2: mutable iterator local; drive it with combinators such as format, collect, or fold
+primitives appear only at a type's boundary:
+src/accumulating.rs:1: bare u8 in f; name what it counts with a newtype
+src/accumulating.rs:1: bare u8 in f; name what it counts with a newtype
+src/counter.rs:1: bare u8 in f; name what it counts with a newtype
+src/filtered.rs:1: bare u8 in f; name what it counts with a newtype
+src/filtered.rs:1: bare u8 in f; name what it counts with a newtype
+src/mutable.rs:1: bare u8 in f; name what it counts with a newtype
+src/working.rs:1: bare u8 in f; name what it counts with a newtype
+fails

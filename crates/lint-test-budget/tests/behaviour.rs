@@ -12,6 +12,7 @@ const NESTED: &str = "#[cfg(test)]\nmod a {\n    mod b {\n        #[test]\n     
 const TESTS: &str = "#[test]\nfn a() {}\n#[tokio::test]\nfn b() {}\nfn helper() {}\n";
 const STARTS: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\nmod ports {\n    fn g() {\n        std::process::Command::new(\"ls\").spawn();\n    }\n}\n";
 const LAWS: &str = "laws::table!(a, f, [1 => 2]);\nroundtrip!(b, s, e, d);\nlaws::idempotent!(c, s, f);\n";
+const OTHER_MACRO: &str = "wrap! {\n    #[test]\n    fn a() {}\n}\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(x in 0..2) {}\n    #[test]\n    fn b(x in 0..2) {}\n}\n";
 
 struct Budgets;
@@ -42,6 +43,7 @@ laws::table!(
         TESTS => Some(Budgets::counted(2, 1, 5, 5)),
         LAWS => Some(Budgets::counted(3, 1, 3, 3)),
         PROPTEST => Some(Budgets::counted(2, 1, 6, 6)),
+        OTHER_MACRO => Some(Budgets::counted(0, 1, 4, 4)),
     ]
 );
 

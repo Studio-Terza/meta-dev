@@ -424,3 +424,69 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
     assert_eq!(Trees::crate_graph_lines(root.path())?, [named]);
     Ok(())
 }
+
+#[test]
+fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<dyn Error>> {
+    let layouts = [
+        ("mod outer {\n    mod inner;\n}\n", "src/outer/inner.rs"),
+        ("#[path = \"elsewhere/place.rs\"]\nmod renamed;\n", "src/elsewhere/place.rs"),
+    ];
+    layouts.iter().try_for_each(|(library, module)| {
+        let root = Trees::package()?;
+        Trees::write(root.path(), "src/lib.rs", library)?;
+        Trees::write(root.path(), module, DIRTY)?;
+        assert_eq!(Trees::reported(root.path()).violations(), 2);
+        Ok(())
+    })
+}
+
+#[test]
+fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;
+    Trees::write(root.path(), "nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
+    Trees::write(root.path(), "nested/src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_package_inside_a_package_is_its_own_package() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    Trees::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    Trees::write(root.path(), "inner/src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
+fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    ["target/package/copy", ".cache/copy"].iter().try_for_each(|copy| {
+        Trees::write(root.path(), &format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
+        Trees::write(root.path(), &format!("{copy}/src/lib.rs"), DIRTY)
+    })?;
+    assert!(Trees::reported(root.path()).is_clean());
+    Ok(())
+}
+
+#[test]
+fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    Trees::write(root.path(), "one/Cargo.toml", MANIFEST)?;
+    Trees::write(root.path(), "one/src/lib.rs", CLEAN)?;
+    assert!(Trees::reported(root.path()).is_clean());
+    Ok(())
+}
+
+#[test]
+fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    fs::create_dir(root.path().join("Cargo.toml"))?;
+    assert!(Trees::reported(root.path()).err.contains("Cargo.toml"));
+    Ok(())
+}

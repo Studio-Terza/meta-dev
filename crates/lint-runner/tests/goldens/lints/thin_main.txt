@@ -1,0 +1,9 @@
+test budget, report only:
+corpus: 0 tests in 5 files, 0 of 12 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+a binary is a thin main over its library:
+src/bin/attributed.rs:4: main.rs holds only fn main and imports; move this into the library
+src/bin/tool.rs:3: main.rs holds only fn main and imports; move this into the library
+src/main.rs:3: main.rs holds only fn main and imports; move this into the library
+fails

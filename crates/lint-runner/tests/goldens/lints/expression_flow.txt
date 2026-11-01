@@ -1,0 +1,57 @@
+test budget, report only:
+corpus: 0 tests in 8 files, 0 of 57 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/dropped.rs:1: fn f
+src/early.rs:1: fn f
+src/lonely.rs:1: fn f
+src/loops.rs:1: fn f
+src/loops.rs:6: fn g
+src/mutated.rs:1: fn f
+src/reassigned.rs:1: fn f
+src/reassigned.rs:6: fn g
+src/tail.rs:1: fn f
+control flow is an expression; every branch yields the value the function returns:
+src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/early.rs:3: early return; make the value the tail expression or exit through ? on a Result
+src/lonely.rs:2: if or match whose value is dropped; let it produce the value the function returns
+src/lonely.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/loops.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/loops.rs:3: while loop; drive an iterator with combinators, const fns excepted
+src/loops.rs:4: loop; drive an iterator with combinators, const fns excepted
+src/loops.rs:7: for loop; drive the iterator with combinators, const fns excepted
+src/loops.rs:9: break; fold with ControlFlow or find the element with an iterator
+src/loops.rs:11: continue; filter the iterator instead
+src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
+src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
+src/reassigned.rs:8: compound assignment to a local; build the value in one expression or give its type an updater method
+function names say what the function does:
+src/dropped.rs:1: fn f names nothing; say what it does
+src/early.rs:1: fn f names nothing; say what it does
+src/lonely.rs:1: fn f names nothing; say what it does
+src/loops.rs:1: fn f names nothing; say what it does
+src/loops.rs:6: fn g names nothing; say what it does
+src/mutated.rs:1: fn f names nothing; say what it does
+src/reassigned.rs:1: fn f names nothing; say what it does
+src/reassigned.rs:6: fn g names nothing; say what it does
+src/tail.rs:1: fn f names nothing; say what it does
+a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:
+src/early.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/early.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/loops.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/reassigned.rs:3: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/reassigned.rs:8: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/tail.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+primitives appear only at a type's boundary:
+src/dropped.rs:1: bare u8 in f; name what it counts with a newtype
+src/early.rs:1: bare u8 in f; name what it counts with a newtype
+src/early.rs:1: bare u8 in f; name what it counts with a newtype
+src/mutated.rs:1: bare u8 in f; name what it counts with a newtype
+src/reassigned.rs:1: bare u8 in f; name what it counts with a newtype
+src/reassigned.rs:6: bare u8 in g; name what it counts with a newtype
+src/tail.rs:1: bare u8 in f; name what it counts with a newtype
+fails

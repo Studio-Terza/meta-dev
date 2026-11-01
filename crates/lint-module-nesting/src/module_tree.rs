@@ -43,7 +43,7 @@ impl ModuleTree {
         let crowded = self
             .reexports
             .iter()
-            .filter(|(module, _)| !module.segments().is_empty())
+            .filter(|(module, _)| module.segment_length() != 0)
             .filter(move |(_, count)| count.exceeds(most))
             .map(move |(module, count)| {
                 Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count: *count, most })
@@ -87,7 +87,7 @@ impl ModuleTree {
             .all(|user| user.relates::<InsideSibling>(module))
             .then(|| {
                 let homes: BTreeSet<ModulePath> =
-                    outsiders.iter().map(|user| user.truncated_to_length(module.segments().len())).collect();
+                    outsiders.iter().map(|user| user.truncated_to_length(module.segment_length())).collect();
                 (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
             })
             .flatten()

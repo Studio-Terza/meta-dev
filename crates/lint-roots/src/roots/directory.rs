@@ -4,19 +4,15 @@ use std::path::{Path, PathBuf};
 use lint_layout::Failure;
 use lint_layout::Name;
 use lint_layout::Prefix;
+use newtype::Newtype;
 
-#[derive(Debug)]
+#[derive(Newtype, Debug)]
 pub struct Directory(PathBuf);
 
 impl Directory {
     const BUILD_DIRECTORY: &'static str = "target";
     const MANIFEST: &'static str = "Cargo.toml";
     const HIDDEN: &'static str = ".";
-
-    #[must_use]
-    pub fn new(path: PathBuf) -> Directory {
-        Directory(path)
-    }
 
     #[must_use]
     pub fn is_real(path: &Path) -> bool {

@@ -47,11 +47,26 @@ impl ForeignReferences {
 
     fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {
         match tree {
-            UseTree::Path(path) => self.walk(Some(first.unwrap_or(&path.ident)), &path.tree),
+            UseTree::Path(path) => {
+                first
+                    .is_none()
+                    .then_some(&path.ident)
+                    .into_iter()
+                    .for_each(|crate_ident| self.record_modules(crate_ident, &path.tree));
+                self.walk(Some(first.unwrap_or(&path.ident)), &path.tree);
+            }
             UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(first, item)),
             UseTree::Name(name) => self.record(first, &name.ident),
             UseTree::Rename(rename) => self.record(first, &rename.ident),
             UseTree::Glob(_) => self.record_glob(first),
+        }
+    }
+
+    fn record_modules(&mut self, first: &Ident, tree: &UseTree) {
+        match tree {
+            UseTree::Path(path) => self.record(Some(first), &path.ident),
+            UseTree::Group(group) => group.items.iter().for_each(|item| self.record_modules(first, item)),
+            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => {}
         }
     }
 

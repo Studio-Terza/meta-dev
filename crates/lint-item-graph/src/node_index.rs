@@ -7,12 +7,6 @@ impl From<usize> for NodeIndex {
     }
 }
 
-impl From<NodeIndex> for usize {
-    fn from(node: NodeIndex) -> usize {
-        node.0
-    }
-}
-
 impl NodeIndex {
     #[must_use]
     pub fn index(self) -> usize {
