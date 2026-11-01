@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use number_sites::NumberSites;
 use text_sites::TextSites;
 
+use lint_core::Gate;
 use lint_core::Report;
 use lint_core::SourceFile;
 use lint_core::SupportModules;
@@ -23,7 +24,13 @@ impl Lint for PrimitiveBoundary {
             files
                 .iter()
                 .filter(|file| file.is_shipped() && !support.contains(&file.path().to_owned()))
-                .flat_map(|file| NumberSites::violations(file).into_iter().chain(TextSites::violations(file)))
+                .flat_map(|file| {
+                    Some(file)
+                        .filter(|file| !Gate::BITS.admits(file))
+                        .into_iter()
+                        .flat_map(NumberSites::violations)
+                        .chain(TextSites::violations(file))
+                })
                 .collect(),
         )
     }

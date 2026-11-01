@@ -18,6 +18,7 @@ use syn::{
 };
 
 use super::finding::Finding;
+use lint_core::Gate;
 use lint_core::LineNumber;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -115,8 +116,8 @@ impl NumberSites {
 impl<'ast> Visit<'ast> for NumberSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
+            Walk::Entered if !Gate::BITS.names(module) => syn::visit::visit_item_mod(self, module),
+            Walk::Entered | Walk::Skipped => {}
         }
     }
 
