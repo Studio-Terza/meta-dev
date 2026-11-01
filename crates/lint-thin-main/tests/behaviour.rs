@@ -16,7 +16,7 @@ fn logic_in_a_binary_root_is_reported() {
 }
 
 #[test]
-fn a_thin_main_passes_clean() {
+fn a_thin_main_passes() {
     assert!(ThinMain::report(&[Sources::file("src/main.rs", THIN)]).is_clean());
 }
 
