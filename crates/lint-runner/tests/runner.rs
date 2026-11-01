@@ -14,8 +14,9 @@ use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const LINT_COUNT: usize = 29;
+const LINT_COUNT: usize = 31;
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
+const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -55,6 +56,7 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
 fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", PREDICATE)?;
+    Trees::write(root.path(), "src/paired.rs", PAIRED)?;
     assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
     assert_eq!(Trees::exit_code(root.path()), ExitCode::SUCCESS);
     Ok(())

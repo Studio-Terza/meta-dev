@@ -1,0 +1,18 @@
+[package]
+name = "lint-paired-apis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+syn.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true
