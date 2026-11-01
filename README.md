@@ -162,8 +162,9 @@ fixtures that are already on it.
 ## CI wall-time limits
 
 `ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
-test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
-by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
+test run and lint. The levels assume a full run, so they apply on main and on pull requests into main; a pull request into
+another branch is not judged by them. A stage above its warn level on main opens, or updates, one GitHub issue titled
+with the stage name (`ci stage-issues`), so creep becomes a work item before it blocks. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
 that main reports. `ci timed` times a stage; the test run is the sum of the `finished in`
 times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
@@ -191,7 +192,7 @@ request shows them. Clippy, the tests and mutants run on that scope, and are ski
 reached. A skip is not silent: for each scope that is empty, `ci reach` prints `skipped: <scope> is empty, so the
 steps that use it do not run` in the step and in the run summary, and `ci mutants-changed` prints that mutants were
 skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
-cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
+cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
 is the measure of tangle, so the report on main prints it.

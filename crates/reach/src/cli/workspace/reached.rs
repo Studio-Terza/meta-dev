@@ -16,18 +16,31 @@ impl fmt::Display for Share {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Cargo {
+    Reached,
+    Workspace,
+}
+
 #[derive(Debug)]
 pub struct Reached {
     crates: BTreeSet<CrateName>,
     total: CrateCount,
+    cargo: Cargo,
 }
 
 impl Reached {
     const CARGO_FLAG: &'static str = "-p ";
     const MUTANTS_FLAG: &'static str = "--test-package=";
+    const WORKSPACE_FLAG: &'static str = "--workspace";
 
     pub fn new(crates: BTreeSet<CrateName>, total: CrateCount) -> Reached {
-        Reached { crates, total }
+        Reached { crates, total, cargo: Cargo::Reached }
+    }
+
+    #[must_use]
+    pub fn widened(self) -> Reached {
+        Reached { cargo: Cargo::Workspace, ..self }
     }
 
     pub fn share(&self) -> Share {
@@ -42,7 +55,11 @@ impl Reached {
 impl fmt::Display for Reached {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "REACH={} of {} crates", self.crates.len(), self.total)?;
-        writeln!(formatter, "CARGO_SCOPE={}", self.flags(Self::CARGO_FLAG))?;
+        let scope = match self.cargo {
+            Cargo::Reached => self.flags(Self::CARGO_FLAG),
+            Cargo::Workspace => Self::WORKSPACE_FLAG.to_owned(),
+        };
+        writeln!(formatter, "CARGO_SCOPE={scope}")?;
         writeln!(formatter, "MUTANTS_SCOPE={}", self.flags(Self::MUTANTS_FLAG))
     }
 }
