@@ -1,0 +1,61 @@
+[package]
+name = "lint-suite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+lint-bool-methods = { path = "../lint-bool-methods" }
+lint-complexity = { path = "../lint-complexity" }
+lint-const-shape = { path = "../lint-const-shape" }
+lint-core = { path = "../lint-core" }
+lint-crate-graph = { path = "../lint-crate-graph" }
+lint-distinct-signatures = { path = "../lint-distinct-signatures" }
+lint-enum-predicates = { path = "../lint-enum-predicates" }
+lint-expression-flow = { path = "../lint-expression-flow" }
+lint-fixtures = { path = "../lint-fixtures" }
+lint-fn-shape = { path = "../lint-fn-shape" }
+lint-guard-must-use = { path = "../lint-guard-must-use" }
+lint-layout = { path = "../lint-layout" }
+lint-literal-names = { path = "../lint-literal-names" }
+lint-mandatory-laws = { path = "../lint-mandatory-laws" }
+lint-manual-iteration = { path = "../lint-manual-iteration" }
+lint-module-nesting = { path = "../lint-module-nesting" }
+lint-named-lifetimes = { path = "../lint-named-lifetimes" }
+lint-named-numbers = { path = "../lint-named-numbers" }
+lint-near-duplicate-tests = { path = "../lint-near-duplicate-tests" }
+lint-no-forwarders = { path = "../lint-no-forwarders" }
+lint-no-free-fns = { path = "../lint-no-free-fns" }
+lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
+lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
+lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
+lint-no-plaintext = { path = "../lint-no-plaintext" }
+lint-no-test-only-api = { path = "../lint-no-test-only-api" }
+lint-paired-apis = { path = "../lint-paired-apis" }
+lint-paths = { path = "../lint-paths" }
+lint-placement = { path = "../lint-placement" }
+lint-primitive-boundary = { path = "../lint-primitive-boundary" }
+lint-private-fns = { path = "../lint-private-fns" }
+lint-process-starters = { path = "../lint-process-starters" }
+lint-public-api-tests = { path = "../lint-public-api-tests" }
+lint-public-surface = { path = "../lint-public-surface" }
+lint-raw-resources = { path = "../lint-raw-resources" }
+lint-reader = { path = "../lint-reader" }
+lint-repeated-bodies = { path = "../lint-repeated-bodies" }
+lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-rust-only = { path = "../lint-rust-only" }
+lint-state-graph = { path = "../lint-state-graph" }
+lint-test-budget = { path = "../lint-test-budget" }
+lint-thin-main = { path = "../lint-thin-main" }
+lint-type-graph = { path = "../lint-type-graph" }
+lint-type-shape = { path = "../lint-type-shape" }
+lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
+lint-vec-out-params = { path = "../lint-vec-out-params" }
+lint-walk-similarity = { path = "../lint-walk-similarity" }
+lint-workflow-run = { path = "../lint-workflow-run" }
+laws = { path = "../laws" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

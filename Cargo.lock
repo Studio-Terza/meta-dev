@@ -216,7 +216,6 @@ name = "lint-bool-methods"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -225,9 +224,7 @@ dependencies = [
 name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -239,7 +236,6 @@ name = "lint-const-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -262,7 +258,6 @@ name = "lint-crate-graph"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
@@ -274,7 +269,6 @@ name = "lint-distinct-signatures"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "quote",
  "syn 2.0.119",
@@ -285,7 +279,6 @@ name = "lint-enum-predicates"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -296,7 +289,6 @@ name = "lint-expression-flow"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -316,7 +308,6 @@ name = "lint-fn-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -326,9 +317,7 @@ dependencies = [
 name = "lint-guard-must-use"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "syn 2.0.119",
@@ -362,7 +351,6 @@ name = "lint-literal-names"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -372,12 +360,9 @@ name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
- "lint-reader",
  "proc-macro2",
  "syn 2.0.119",
- "tempfile",
 ]
 
 [[package]]
@@ -385,7 +370,6 @@ name = "lint-manual-iteration"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -396,7 +380,6 @@ name = "lint-module-nesting"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -408,7 +391,6 @@ name = "lint-named-lifetimes"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -418,7 +400,6 @@ name = "lint-named-numbers"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -428,7 +409,6 @@ name = "lint-near-duplicate-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -451,7 +431,6 @@ name = "lint-no-forwarders"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -461,7 +440,6 @@ name = "lint-no-free-fns"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -471,12 +449,9 @@ name = "lint-no-ignored-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
- "lint-reader",
  "proc-macro2",
  "syn 2.0.119",
- "tempfile",
 ]
 
 [[package]]
@@ -484,7 +459,6 @@ name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-named-numbers",
  "syn 2.0.119",
@@ -495,7 +469,6 @@ name = "lint-no-parameter-bags"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -506,7 +479,6 @@ name = "lint-no-plaintext"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -516,23 +488,18 @@ name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
- "lint-reader",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
- "tempfile",
 ]
 
 [[package]]
 name = "lint-paired-apis"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-paths",
  "syn 2.0.119",
@@ -542,9 +509,7 @@ dependencies = [
 name = "lint-paths"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -564,7 +529,6 @@ name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -574,7 +538,6 @@ name = "lint-private-fns"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -584,10 +547,8 @@ name = "lint-process-starters"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-paths",
- "tempfile",
 ]
 
 [[package]]
@@ -595,7 +556,6 @@ name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -605,7 +565,6 @@ name = "lint-public-surface"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "syn 2.0.119",
@@ -615,9 +574,7 @@ dependencies = [
 name = "lint-raw-resources"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-paths",
 ]
@@ -639,7 +596,6 @@ version = "0.1.0"
 dependencies = [
  "body-shape",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "newtype",
  "proc-macro2",
@@ -652,7 +608,6 @@ name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "quote",
@@ -728,16 +683,13 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "newtype",
- "tempfile",
 ]
 
 [[package]]
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "newtype",
  "quote",
@@ -745,12 +697,66 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-test-budget"
+name = "lint-suite"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "lint-bool-methods",
+ "lint-complexity",
+ "lint-const-shape",
  "lint-core",
+ "lint-crate-graph",
+ "lint-distinct-signatures",
+ "lint-enum-predicates",
+ "lint-expression-flow",
  "lint-fixtures",
+ "lint-fn-shape",
+ "lint-guard-must-use",
+ "lint-layout",
+ "lint-literal-names",
+ "lint-mandatory-laws",
+ "lint-manual-iteration",
+ "lint-module-nesting",
+ "lint-named-lifetimes",
+ "lint-named-numbers",
+ "lint-near-duplicate-tests",
+ "lint-no-forwarders",
+ "lint-no-free-fns",
+ "lint-no-ignored-tests",
+ "lint-no-numbers-in-binaries",
+ "lint-no-parameter-bags",
+ "lint-no-plaintext",
+ "lint-no-test-only-api",
+ "lint-paired-apis",
+ "lint-paths",
+ "lint-placement",
+ "lint-primitive-boundary",
+ "lint-private-fns",
+ "lint-process-starters",
+ "lint-public-api-tests",
+ "lint-public-surface",
+ "lint-raw-resources",
+ "lint-reader",
+ "lint-repeated-bodies",
+ "lint-repeated-methods",
+ "lint-rust-only",
+ "lint-state-graph",
+ "lint-test-budget",
+ "lint-thin-main",
+ "lint-type-graph",
+ "lint-type-shape",
+ "lint-unconsumed-traits",
+ "lint-vec-out-params",
+ "lint-walk-similarity",
+ "lint-workflow-run",
+ "tempfile",
+]
+
+[[package]]
+name = "lint-test-budget"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-process-starters",
@@ -764,7 +770,6 @@ name = "lint-thin-main"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -775,9 +780,7 @@ dependencies = [
 name = "lint-type-graph"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
@@ -790,7 +793,6 @@ name = "lint-type-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -801,7 +803,6 @@ name = "lint-unconsumed-traits"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -811,7 +812,6 @@ name = "lint-vec-out-params"
 version = "0.1.0"
 dependencies = [
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -820,9 +820,7 @@ dependencies = [
 name = "lint-walk-similarity"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
- "lint-fixtures",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -833,12 +831,10 @@ dependencies = [
 name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
- "laws",
  "lint-core",
  "lint-layout",
  "newtype",
  "saphyr",
- "tempfile",
 ]
 
 [[package]]

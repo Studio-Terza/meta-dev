@@ -18,9 +18,5 @@ lint-process-starters = { path = "../lint-process-starters" }
 proc-macro2.workspace = true
 syn.workspace = true
 
-[dev-dependencies]
-lint-fixtures = { path = "../lint-fixtures" }
-laws = { path = "../laws" }
-
 [lints]
 workspace = true

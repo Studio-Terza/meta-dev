@@ -16,9 +16,5 @@ lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 syn.workspace = true
 
-[dev-dependencies]
-lint-fixtures = { path = "../lint-fixtures" }
-laws = { path = "../laws" }
-
 [lints]
 workspace = true
