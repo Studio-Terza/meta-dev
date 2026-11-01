@@ -1,0 +1,20 @@
+[package]
+name = "lint-near-duplicate-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true

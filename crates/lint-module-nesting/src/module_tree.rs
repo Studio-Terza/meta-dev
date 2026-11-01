@@ -11,9 +11,9 @@ use module_path::{Ancestor, InsideSibling, ModulePath};
 
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::UseEdges;
-use lint_core::UsePath;
 use lint_core::Violation;
+use lint_layout::UseEdges;
+use lint_layout::UsePath;
 use reexport_count::ReexportCount;
 use users::Users;
 

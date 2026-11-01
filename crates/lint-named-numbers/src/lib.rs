@@ -5,7 +5,6 @@ use syn::visit::Visit;
 use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
 use lint_core::Gate;
-use lint_core::LineNumber;
 use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
@@ -13,6 +12,7 @@ use lint_core::SourceFile;
 use lint_core::SupportModules;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct NamedNumbers;

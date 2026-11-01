@@ -1,5 +1,5 @@
-use crate::matching::Matching;
-use crate::name::Name;
+use lint_layout::Matching;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct Suffix;

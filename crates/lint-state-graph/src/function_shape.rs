@@ -10,9 +10,9 @@ use syn::{FnArg, ImplItemFn, Type};
 
 use super::declarations::Declarations;
 use super::impl_context::ImplContext;
-use lint_core::LineNumber;
 use lint_core::Site;
 use lint_core::TypeName;
+use lint_layout::LineNumber;
 
 pub struct FunctionShape {
     site: Site,

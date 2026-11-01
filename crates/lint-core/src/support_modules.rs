@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use syn::ItemMod;
 use syn::visit::Visit;
 
-use crate::name::Name;
 use crate::source_file::SourceFile;
 use crate::walk::Walk;
+use lint_layout::Name;
 
 #[derive(Debug, Default)]
 pub struct SupportModules {

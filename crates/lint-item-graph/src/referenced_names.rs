@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use quote::ToTokens;
 use syn::{Attribute, Item, Type};
 
-use lint_core::Name;
 use lint_core::Walk;
+use lint_layout::Name;
 
 use crate::scope::Scope;
 use macro_items::MacroItems;

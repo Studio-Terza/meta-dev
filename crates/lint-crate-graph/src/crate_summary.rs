@@ -2,7 +2,8 @@ mod cut;
 mod item_count;
 mod tangle;
 
-use lint_core::{CrateFile, Least, Most, Site, Violation};
+use lint_core::{Least, Most, Site, Violation};
+use lint_placement::CrateFile;
 
 use cut::Cut;
 use lint_item_graph::ItemGraph;

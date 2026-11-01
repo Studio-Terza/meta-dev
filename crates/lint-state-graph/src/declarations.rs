@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
 
-use lint_core::Name;
 use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Walk;
+use lint_layout::Name;
 
 #[derive(Default)]
 pub struct Declarations {

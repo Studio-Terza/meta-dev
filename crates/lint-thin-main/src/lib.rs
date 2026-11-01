@@ -6,7 +6,9 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::{Item, ItemFn};
 
-use lint_core::{LineNumber, Report, Role, Site, SourceFile, Violation};
+use lint_core::{Report, Site, SourceFile, Violation};
+use lint_layout::LineNumber;
+use lint_placement::Role;
 
 #[derive(Debug)]
 pub struct ThinMain;

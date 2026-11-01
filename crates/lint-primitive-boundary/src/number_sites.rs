@@ -19,13 +19,13 @@ use syn::{
 
 use super::finding::Finding;
 use lint_core::Gate;
-use lint_core::LineNumber;
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::UsePath;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_core::{LoweredInfix, Name, Whole};
+use lint_layout::LineNumber;
+use lint_layout::UsePath;
+use lint_layout::{LoweredInfix, Name, Whole};
 
 pub struct NumberSites {
     path: PathBuf,

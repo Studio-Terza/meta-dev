@@ -6,7 +6,8 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, PathArguments, PathSegment, Signature, Type, TypePath};
 
-use lint_core::{LineNumber, Macros, Name, Report, Site, SourceFile, Violation, Walk};
+use lint_core::{Macros, Report, Site, SourceFile, Violation, Walk};
+use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
 pub struct VecOutParams<'file> {

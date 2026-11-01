@@ -7,6 +7,8 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
 proc-macro2.workspace = true
 syn.workspace = true
 

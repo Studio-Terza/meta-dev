@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Type, Visibility};
 
-use lint_core::{LineNumber, Most, Name, Site, SourceFile, Violation, Walk};
+use lint_core::{Most, Site, SourceFile, Violation, Walk};
+use lint_layout::{LineNumber, Name};
 
 use method_shape::MethodShape;
 use repeated_shape::RepeatedShape;

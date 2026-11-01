@@ -1,5 +1,5 @@
-use lint_core::LineNumber;
-use lint_core::Name;
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Candidate {
