@@ -21,6 +21,17 @@ impl UsePath {
     }
 
     #[must_use]
+    pub fn rest(&self) -> UsePath {
+        UsePath(self.0.iter().skip(1).cloned().collect())
+    }
+
+    #[must_use]
+    pub fn ends_with<const LENGTH: usize>(&self, tail: &[&str; LENGTH]) -> bool {
+        self.0.len() >= LENGTH
+            && self.0.iter().rev().zip(tail.iter().rev()).all(|(segment, spelled)| segment == spelled)
+    }
+
+    #[must_use]
     pub fn first(&self) -> Option<&Name> {
         self.0.first()
     }

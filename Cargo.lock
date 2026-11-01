@@ -433,6 +433,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-paths"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
@@ -467,7 +480,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "syn 2.0.119",
+ "lint-paths",
  "tempfile",
 ]
 
@@ -500,7 +513,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
- "syn 2.0.119",
+ "lint-paths",
 ]
 
 [[package]]

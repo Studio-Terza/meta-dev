@@ -24,17 +24,17 @@ impl Facts {
         self.profiles.values().flat_map(|profile| profile.unmet(coverage)).collect()
     }
 
-    fn read(mut self, file: &SourceFile) -> Facts {
-        Reader::read(file).into_iter().for_each(|profile| self.add(profile));
-        self
+    fn read(self, file: &SourceFile) -> Facts {
+        Reader::read(file).into_iter().fold(self, Facts::added)
     }
 
-    fn add(&mut self, profile: Profile) {
+    fn added(mut self, profile: Profile) -> Facts {
         let subject = profile.subject().clone();
         let merged = match self.profiles.remove(&subject) {
             Some(earlier) => earlier.merged(profile),
             None => profile,
         };
         self.profiles.insert(subject, merged);
+        self
     }
 }

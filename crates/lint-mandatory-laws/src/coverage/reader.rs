@@ -27,7 +27,7 @@ impl<'ast> Visit<'ast> for Reader {
         let kind = Kind::of_macro(invocation);
         let mentions = Mentions::beyond_title(invocation.tokens.clone(), kind);
         let law = Law::new(self.package.clone(), kind, mentions);
-        self.laws.extend(Some(law).filter(|_| kind != Kind::Other));
+        self.laws.extend((kind != Kind::Other).then_some(law));
         visit::visit_macro(self, invocation);
     }
 }

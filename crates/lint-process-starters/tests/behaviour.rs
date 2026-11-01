@@ -19,7 +19,23 @@ const INLINE_PORTS: &str =
     "mod ports {\n    use std::process::Command;\n    pub fn f() {\n        Command::new(\"ls\").status();\n    }\n}\n";
 const INLINE_OTHER: &str = "mod adapters {\n    use std::process::Command;\n    pub fn f() {\n        Command::new(\"ls\").status();\n    }\n}\n";
 
-const CASES: [Case; 14] = [
+const USE_AFTER: &str = "fn f() {\n    Command::new(\"ls\").status();\n}\nuse std::process::Command;\n";
+const SELF_RENAMED: &str = "use std::process::{self as p};\nfn f() {\n    p::Command::new(\"ls\").status();\n}\n";
+const FUNCTION_VALUE: &str = "fn f() {\n    let make = std::process::Command::new;\n    make(\"ls\").status();\n}\n";
+const TYPE_ALIAS: &str = "type C = std::process::Command;\nfn f() {\n    C::new(\"ls\").status();\n}\n";
+const ROOT_EXPORT: &str = "pub use std::process::Command;\nmod user;\n";
+const RE_EXPORTED: &str = "pub fn f() {\n    crate::Command::new(\"ls\").status();\n}\n";
+const QUALIFIED_SELF: &str = "fn f() {\n    <std::process::Command>::new(\"ls\").status();\n}\n";
+const MACRO_GUARD: &str =
+    "fn f() {\n    matches!(std::process::Command::new(\"ls\").status(), Ok(s) if s.success());\n}\n";
+const MACRO_RULES: &str =
+    "macro_rules! go {\n    () => {\n        std::process::Command::new(\"ls\").status()\n    };\n}\n";
+const REPEAT_MACRO: &str = "fn f() {\n    vec![std::process::Command::new(\"ls\").status().is_ok(); 2];\n}\n";
+const THROUGH_PORTS: &str =
+    "mod ports {\n    pub use std::process::Command;\n}\npub fn f() {\n    ports::Command::new(\"ls\").status();\n}\n";
+const SIBLING_IMPORT: &str = "mod a {\n    pub use std::process::Command;\n}\nmod b {\n    pub struct Command;\n    impl Command {\n        pub fn new(_x: u8) {}\n    }\n    pub fn f() {\n        Command::new(1);\n    }\n}\n";
+
+const CASES: [Case; 25] = [
     Case::new("imported", &[Source::new("a.rs", IMPORTED)], &["a.rs:3"]),
     Case::new("qualified", &[Source::new("a.rs", QUALIFIED)], &["a.rs:2"]),
     Case::new("renamed", &[Source::new("a.rs", RENAMED)], &["a.rs:3"]),
@@ -37,6 +53,21 @@ const CASES: [Case; 14] = [
         &[Source::new("crates/x/src/support/run.rs", IMPORTED)],
         &["crates/x/src/support/run.rs:3"],
     ),
+    Case::new("use after the code", &[Source::new("a.rs", USE_AFTER)], &["a.rs:2"]),
+    Case::new("self renamed", &[Source::new("a.rs", SELF_RENAMED)], &["a.rs:3"]),
+    Case::new("function value", &[Source::new("a.rs", FUNCTION_VALUE)], &["a.rs:2"]),
+    Case::new("type alias", &[Source::new("a.rs", TYPE_ALIAS)], &["a.rs:3"]),
+    Case::new(
+        "re-export in the crate root",
+        &[Source::new("crates/x/src/lib.rs", ROOT_EXPORT), Source::new("crates/x/src/user.rs", RE_EXPORTED)],
+        &["crates/x/src/user.rs:2"],
+    ),
+    Case::new("qualified self", &[Source::new("a.rs", QUALIFIED_SELF)], &["a.rs:2"]),
+    Case::new("macro guard", &[Source::new("a.rs", MACRO_GUARD)], &["a.rs:2"]),
+    Case::new("macro_rules body", &[Source::new("a.rs", MACRO_RULES)], &["a.rs:3"]),
+    Case::new("repeat macro", &[Source::new("a.rs", REPEAT_MACRO)], &["a.rs:2"]),
+    Case::new("re-export through ports", &[Source::new("a.rs", THROUGH_PORTS)], &["a.rs:5"]),
+    Case::new("import in a sibling module", &[Source::new("a.rs", SIBLING_IMPORT)], &[]),
     Case::new(
         "ports in a test target",
         &[Source::new("crates/x/tests/ports.rs", IMPORTED)],

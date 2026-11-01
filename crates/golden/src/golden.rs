@@ -17,7 +17,6 @@ impl Golden {
         Self(path.into())
     }
 
-    #[must_use]
     pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Result<Self, Failure> {
         let name = name.as_ref();
         name.components()

@@ -1,78 +1,33 @@
-use std::collections::BTreeMap;
-
-use syn::visit::{self, Visit};
-use syn::{ExprPath, Ident, ItemMod, ItemUse, Macro, UseTree};
-
-use lint_core::{Gate, Macros, Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name, UsePath};
+use lint_core::Violation;
+use lint_layout::UsePath;
+use lint_paths::{Cover, Ground, Use};
 
 use super::Finding;
 
-pub struct RawPaths<'file> {
-    file: &'file SourceFile,
-    imports: BTreeMap<Name, UsePath>,
-    globs: Vec<UsePath>,
-    found: Vec<Violation>,
-}
+#[derive(Debug)]
+pub struct RawPaths;
 
-impl RawPaths<'_> {
-    const RAW: [(&str, &str); 3] = [("fs", "remove_dir_all"), ("mem", "forget"), ("env", "temp_dir")];
-    const SELF: &str = "self";
+impl RawPaths {
+    const RAW: [[&'static str; 2]; 3] = [["fs", "remove_dir_all"], ["mem", "forget"], ["env", "temp_dir"]];
 
-    pub fn found(file: &SourceFile) -> Vec<Violation> {
-        let mut paths = RawPaths { file, imports: BTreeMap::new(), globs: Vec::new(), found: Vec::new() };
-        paths.visit_file(file.syntax());
-        paths.found
+    pub fn found(uses: &[Use]) -> Vec<Violation> {
+        uses.iter()
+            .filter_map(|used| {
+                Self::raw(used).and_then(|path| Self::finding(used, path)).map(|finding| (used, finding))
+            })
+            .map(|(used, finding)| Violation::new(used.place().clone(), finding))
+            .collect()
     }
 
-    fn imported(&mut self, prefix: &UsePath, tree: &UseTree) {
-        match tree {
-            UseTree::Path(path) => self.imported(&prefix.extended(Name::from(&path.ident)), &path.tree),
-            UseTree::Name(name) => self.bound(prefix, &name.ident, None),
-            UseTree::Rename(name) => self.bound(prefix, &name.ident, Some(&name.rename)),
-            UseTree::Glob(_) => self.globs.push(prefix.clone()),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.imported(prefix, item)),
+    fn raw(used: &Use) -> Option<&UsePath> {
+        Self::RAW.iter().find_map(|tail| used.spelling(tail))
+    }
+
+    fn finding(used: &Use, path: &UsePath) -> Option<Finding> {
+        match (used.ground(), used.cover()) {
+            (Ground::Open, _) => Some(Finding::OutsidePorts(path.clone())),
+            (Ground::Ports, Cover::Bare) => Some(Finding::OutsideGuard(path.clone())),
+            (Ground::Ports, Cover::Guarded) => None,
         }
-    }
-
-    fn bound(&mut self, prefix: &UsePath, ident: &Ident, rename: Option<&Ident>) {
-        let target = if ident == Self::SELF { prefix.clone() } else { prefix.extended(Name::from(ident)) };
-        let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
-        self.imports.extend(local.map(|local| (local, target)));
-    }
-
-    fn expansions(&self, path: &UsePath) -> Vec<UsePath> {
-        let first = path.first().cloned().unwrap_or_default();
-        let imported = self.imports.get(&first).map(|root| path.rerooted(root));
-        let globbed = self.globs.iter().map(|glob| path.rerooted(&glob.extended(first.clone())));
-        globbed.chain(imported).chain(Some(path.clone())).collect()
-    }
-
-    fn is_raw(path: &UsePath) -> bool {
-        matches!(path.segments(), [.., module, function]
-            if Self::RAW.iter().any(|(raw_module, raw_function)| module == raw_module && function == raw_function))
-    }
-}
-
-impl<'ast> Visit<'ast> for RawPaths<'_> {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Some(module).filter(|module| !Gate::PORTS.names(module)).into_iter().for_each(|module| {
-            visit::visit_item_mod(self, module);
-        });
-    }
-
-    fn visit_item_use(&mut self, item: &'ast ItemUse) {
-        self.imported(&UsePath::default(), &item.tree);
-    }
-
-    fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
-        let raw = self.expansions(&UsePath::from(&expression.path)).into_iter().find(Self::is_raw);
-        let line = expression.path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let site = line.map(|line| Site::new(self.file.path(), line));
-        self.found.extend(site.zip(raw).map(|(site, path)| Violation::new(site, Finding::from(path))));
-    }
-
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }
