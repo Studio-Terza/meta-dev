@@ -164,9 +164,13 @@ fn the_directories_above_the_checkout_do_not_count() {
 #[test]
 fn findings_come_in_the_order_given() {
     let files = ["b.sh", "a.py", "c.rs"].map(|path| RepoFile::new(path, path));
-    let lines = Checked::report(&files);
-    assert_eq!(lines.len(), 2);
-    assert!(lines.first().is_some_and(|line| line.starts_with("b.sh:1")));
+    assert_eq!(
+        Checked::report(&files),
+        [
+            format!("b.sh:1: shell source outside assets; {REWRITE}"),
+            format!("a.py:1: Python source outside assets; {REWRITE}"),
+        ]
+    );
 }
 
 #[test]

@@ -1,0 +1,12 @@
+[package]
+name = "test-log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+text-lines = { path = "../text-lines" }
+
+[lints]
+workspace = true

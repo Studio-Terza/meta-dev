@@ -83,8 +83,9 @@ impl Language {
 
     #[must_use]
     pub fn detect(path: &Path) -> Option<Language> {
-        let extension = path.extension().and_then(OsStr::to_str)?.to_ascii_lowercase();
-        Self::ALL.iter().copied().find(|language| language.extensions().contains(&extension.as_str()))
+        let extension = path.extension().map(OsStr::to_ascii_lowercase)?;
+        let extension = extension.to_str()?;
+        Self::ALL.iter().copied().find(|language| language.extensions().contains(&extension))
     }
 
     #[must_use]
