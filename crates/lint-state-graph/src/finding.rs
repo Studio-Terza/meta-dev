@@ -21,6 +21,10 @@ pub enum Finding {
     CrowdedVertex { source: TypeName, edges: EdgeCount, most: Most },
     ExposedField { field: Member, owner: Name, visibility: Visibility },
     ForeignMatch { enum_name: Name },
+    UnreadableGraph,
+    UnreachableState { state: TypeName },
+    NoTerminalAhead { state: TypeName },
+    TerminalHasEdges { state: TypeName },
 }
 
 impl fmt::Display for Finding {
@@ -61,6 +65,12 @@ impl fmt::Display for Finding {
             Finding::ForeignMatch { enum_name } => {
                 write!(formatter, "match on {enum_name} outside its file; dispatch through a trait")
             }
+            Finding::UnreadableGraph => formatter.write_str("states! graph cannot be read, so it cannot be checked"),
+            Finding::UnreachableState { state } => {
+                write!(formatter, "state {state} cannot be reached from a start state")
+            }
+            Finding::NoTerminalAhead { state } => write!(formatter, "state {state} cannot reach a terminal state"),
+            Finding::TerminalHasEdges { state } => write!(formatter, "terminal state {state} has outgoing edges"),
         }
     }
 }

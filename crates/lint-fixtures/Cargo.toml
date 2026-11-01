@@ -8,5 +8,8 @@ publish.workspace = true
 [dependencies]
 lint-core = { path = "../lint-core" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

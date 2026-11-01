@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use lint_bool_methods::BoolMethods;
 use lint_core::Lint;
+use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
 use lint_test_budget::TestBudget;
 
@@ -25,7 +26,14 @@ impl Cli {
     pub fn run(&self) -> ExitCode {
         match SourceFiles::read_all(&self.roots).map(|readout| {
             let files = readout.files();
-            write!(io::stdout(), "{}{}", TestBudget::measured(files), BoolMethods::report(files)).ok();
+            write!(
+                io::stdout(),
+                "{}{}{}",
+                TestBudget::measured(files),
+                BoolMethods::report(files),
+                PairedApis::report(files)
+            )
+            .ok();
             Lints::checked(readout)
         }) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,

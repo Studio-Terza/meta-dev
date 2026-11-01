@@ -206,6 +206,7 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
 ]
 
@@ -217,6 +218,17 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-guard-must-use"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
  "syn 2.0.119",
 ]
 
@@ -387,6 +399,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-paired-apis"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
@@ -447,6 +470,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-raw-resources"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
@@ -489,6 +523,7 @@ dependencies = [
  "lint-expression-flow",
  "lint-fixtures",
  "lint-fn-shape",
+ "lint-guard-must-use",
  "lint-layout",
  "lint-literal-names",
  "lint-manual-iteration",
@@ -503,11 +538,13 @@ dependencies = [
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
  "lint-no-test-only-api",
+ "lint-paired-apis",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
  "lint-public-api-tests",
  "lint-public-surface",
+ "lint-raw-resources",
  "lint-reader",
  "lint-repeated-methods",
  "lint-state-graph",
@@ -522,6 +559,7 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
@@ -745,6 +783,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7523beb55eece201a2356bee0bbca0d1ab466c14c07703b2e0ee6d42cb0c2c"
 dependencies = [
  "serde_core",
+]
+
+[[package]]
+name = "states"
+version = "0.1.0"
+dependencies = [
+ "laws",
 ]
 
 [[package]]

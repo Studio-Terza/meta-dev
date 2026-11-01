@@ -1,4 +1,5 @@
 mod declarations;
+mod declared_graphs;
 mod edge_scan;
 mod field_visibility;
 mod finding;
@@ -7,6 +8,7 @@ mod impl_context;
 mod variant_matches;
 
 use declarations::Declarations;
+use declared_graphs::DeclaredGraphs;
 use edge_scan::EdgeScan;
 use field_visibility::FieldVisibility;
 use lint_core::Lint;
@@ -32,7 +34,10 @@ impl Lint for StateGraph {
             files
                 .iter()
                 .flat_map(|file| {
-                    FieldVisibility::violations(file).into_iter().chain(VariantMatches::violations(file, &declarations))
+                    FieldVisibility::violations(file)
+                        .into_iter()
+                        .chain(VariantMatches::violations(file, &declarations))
+                        .chain(DeclaredGraphs::violations(file))
                 })
                 .chain(edges.violations())
                 .collect(),
