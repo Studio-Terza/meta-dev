@@ -10,6 +10,7 @@ mod wanted;
 
 use collector::Collector;
 use lint_core::SourceFile;
+use lint_layout::Word;
 use resolver::Resolver;
 use walker::Walker;
 use wanted::Wanted;
@@ -24,7 +25,7 @@ pub struct Paths;
 
 impl Paths {
     #[must_use]
-    pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[&str]) -> Vec<Use> {
+    pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use> {
         let files: Vec<&SourceFile> = files.into_iter().collect();
         let scopes = Collector::collect(&files);
         let resolver = Resolver::over(&scopes);

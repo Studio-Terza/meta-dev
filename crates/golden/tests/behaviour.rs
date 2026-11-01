@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 
-use golden::{Difference, Failure, Golden, Mode, golden};
+use golden::{Difference, Failure, Golden, Mode, Output, golden};
 use laws::proptest;
 use laws::{roundtrip, table};
 use proptest::prelude::any;
@@ -38,21 +38,23 @@ impl Fixture {
         fs::read_to_string(self.path())
     }
 
-    fn holding(text: &str) -> Option<Self> {
-        Self::with_recorded(text).ok()
+    fn recorded_through_the_api(text: &str) -> Option<Self> {
+        let fixture = Self::new().ok()?;
+        fixture.golden().verify_in(Mode::Record, Output::new(text)).ok()?;
+        Some(fixture)
     }
 }
 
 #[test]
 fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
-    Fixture::with_recorded("same\n")?.golden().verify("same\n")?;
+    Fixture::with_recorded("same\n")?.golden().verify(Output::new("same\n"))?;
     Ok(())
 }
 
 #[test]
 fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    assert!(matches!(fixture.golden().verify("new\n"), Err(Failure::Differs { .. })));
+    assert!(matches!(fixture.golden().verify(Output::new("new\n")), Err(Failure::Differs { .. })));
     assert_eq!(fixture.text()?, "old\n");
     Ok(())
 }
@@ -60,7 +62,7 @@ fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), B
 #[test]
 fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    assert!(matches!(fixture.golden().verify("new\n"), Err(Failure::Missing { .. })));
+    assert!(matches!(fixture.golden().verify(Output::new("new\n")), Err(Failure::Missing { .. })));
     assert!(!fixture.path().exists());
     Ok(())
 }
@@ -69,7 +71,7 @@ fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Er
 fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("")?;
     fs::write(fixture.path(), [0xff, 0xfe])?;
-    assert!(matches!(fixture.golden().verify(""), Err(Failure::Unreadable { .. })));
+    assert!(matches!(fixture.golden().verify(Output::new("")), Err(Failure::Unreadable { .. })));
     Ok(())
 }
 
@@ -89,7 +91,7 @@ table!(
 roundtrip!(
     any_text_is_recorded_exactly,
     any::<String>(),
-    Fixture::holding,
+    |text: &String| Fixture::recorded_through_the_api(text),
     |fixture: &Option<Fixture>| fixture.as_ref()?.text().ok(),
     Some
 );
@@ -97,7 +99,7 @@ roundtrip!(
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    let printed = fixture.golden().verify("new\n").map_err(|failure| format!("{failure:?}"));
+    let printed = fixture.golden().verify(Output::new("new\n")).map_err(|failure| format!("{failure:?}"));
     let wanted = format!(
         "{}: output differs from the golden\n@ first change at line 1; - golden, + actual\n- \"old\\n\"\n+ \"new\\n\"\n\nif this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
         fixture.path().display()
@@ -129,7 +131,7 @@ table!(
 
 #[test]
 fn equal_texts_have_no_difference() {
-    assert_eq!(Difference::between("a\nb\n", "a\nb\n"), None);
+    assert_eq!(Difference::between(Output::new("a\nb\n"), Output::new("a\nb\n")), None);
 }
 
 #[test]

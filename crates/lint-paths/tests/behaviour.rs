@@ -1,14 +1,15 @@
 use lint_core::SourceFile;
-use lint_fixtures::Sources;
+use lint_fixtures::{Sources, Text};
+use lint_layout::{Word, words};
 use lint_paths::{Cover, Ground, Paths};
 
-const TARGET: [&str; 2] = ["fs", "remove_dir_all"];
+const TARGET: [Word<'static>; 2] = words!["fs", "remove_dir_all"];
 
 struct Reads;
 
 impl Reads {
     fn spelled(files: &[SourceFile]) -> Vec<String> {
-        Paths::read(files, &["remove_dir_all"])
+        Paths::read(files, &words!["remove_dir_all"])
             .iter()
             .filter(|used| used.spelling(&TARGET).is_some())
             .map(|used| used.place().to_string())
@@ -16,7 +17,7 @@ impl Reads {
     }
 
     fn of_one(text: &&str) -> Vec<String> {
-        Self::spelled(&[Sources::file("a.rs", text)])
+        Self::spelled(&[Sources::file("a.rs", Text::new(text))])
     }
 }
 
@@ -57,23 +58,23 @@ fn import_cycles_end() {
 
 #[test]
 fn a_re_export_in_the_crate_root_reaches_other_files() {
-    let root = Sources::file("crates/x/src/lib.rs", "pub use std::fs::remove_dir_all;\nmod user;\n");
-    let user = Sources::file("crates/x/src/user.rs", "fn f() {\n    crate::remove_dir_all(\"x\");\n}\n");
+    let root = Sources::file("crates/x/src/lib.rs", Text::new("pub use std::fs::remove_dir_all;\nmod user;\n"));
+    let user = Sources::file("crates/x/src/user.rs", Text::new("fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"));
     assert_eq!(Reads::spelled(&[root, user]), vec!["crates/x/src/user.rs:2".to_owned()]);
 }
 
 #[test]
 fn the_same_name_in_another_crate_is_not_a_re_export() {
-    let one = Sources::file("crates/one/src/lib.rs", "pub use std::fs::remove_dir_all;\n");
-    let two = Sources::file("crates/two/src/lib.rs", "fn f() {\n    crate::remove_dir_all(\"x\");\n}\n");
+    let one = Sources::file("crates/one/src/lib.rs", Text::new("pub use std::fs::remove_dir_all;\n"));
+    let two = Sources::file("crates/two/src/lib.rs", Text::new("fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"));
     assert_eq!(Reads::spelled(&[one, two]), Vec::<String>::new());
 }
 
 #[test]
 fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
     let text = "mod ports {\n    pub struct G;\n    impl Drop for G {\n        fn drop(&mut self) {\n            std::fs::remove_dir_all(\"x\");\n        }\n    }\n    pub fn bare() {\n        std::fs::remove_dir_all(\"x\");\n    }\n}\nfn open() {\n    std::fs::remove_dir_all(\"x\");\n}\n";
-    let file = Sources::file("a.rs", text);
-    let seen: Vec<(Ground, Cover)> = Paths::read(&[file], &["remove_dir_all"])
+    let file = Sources::file("a.rs", Text::new(text));
+    let seen: Vec<(Ground, Cover)> = Paths::read(&[file], &words!["remove_dir_all"])
         .iter()
         .filter(|used| used.spelling(&TARGET).is_some())
         .map(|used| (used.ground(), used.cover()))
@@ -83,14 +84,15 @@ fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
 
 #[test]
 fn a_module_with_no_file_of_its_own_is_entered() {
-    let root = Sources::file("crates/x/src/lib.rs", "mod a;\nfn f() {\n    a::b::remove_dir_all(\"x\");\n}\n");
-    let nested = Sources::file("crates/x/src/a/b.rs", "pub use std::fs::remove_dir_all;\n");
+    let root =
+        Sources::file("crates/x/src/lib.rs", Text::new("mod a;\nfn f() {\n    a::b::remove_dir_all(\"x\");\n}\n"));
+    let nested = Sources::file("crates/x/src/a/b.rs", Text::new("pub use std::fs::remove_dir_all;\n"));
     assert_eq!(Reads::spelled(&[root, nested]), vec!["crates/x/src/lib.rs:3".to_owned()]);
 }
 
 laws::table!(
     only_paths_that_can_reach_the_wanted_names_are_kept,
-    |text: &&str| Paths::read(&[Sources::file("a.rs", text)], &["remove_dir_all"]).len(),
+    |text: &&str| Paths::read(&[Sources::file("a.rs", Text::new(text))], &words!["remove_dir_all"]).len(),
     [
         "fn f(x: u8) {\n    Vec::new();\n    x;\n    std::fs::remove_dir_all(\"x\");\n}\n" => 1,
         "use std::fs::remove_dir_all as wipe;\nfn f() {\n    wipe(\"x\");\n    other(1);\n}\n" => 1,

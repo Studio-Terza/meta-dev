@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -23,7 +23,7 @@ pub struct TypeShape;
 impl Lint for TypeShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "types carry their meaning: no bool fields, no tuples in signatures, no String errors",
+            Headline::new("types carry their meaning: no bool fields, no tuples in signatures, no String errors"),
             files.iter().flat_map(Self::violations).collect(),
         )
     }

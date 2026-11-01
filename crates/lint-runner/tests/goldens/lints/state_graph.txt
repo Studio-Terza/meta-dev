@@ -1,0 +1,34 @@
+test budget, report only:
+corpus: 0 tests in 10 files, 0 of 91 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/area.rs:1: fn area
+two functions on one type with the same signature hide a missing type or type parameter:
+src/duplicate.rs:2: open, force share the signature Closed::(self) -> Open; distinguish the types they take or return
+function names say what the function does:
+src/crowded.rs:2: fn a names nothing; say what it does
+src/crowded.rs:3: fn b names nothing; say what it does
+src/crowded.rs:4: fn c names nothing; say what it does
+src/crowded.rs:5: fn d names nothing; say what it does
+src/crowded.rs:6: fn e names nothing; say what it does
+src/crowded.rs:7: fn f names nothing; say what it does
+src/crowded.rs:8: fn g names nothing; say what it does
+primitives appear only at a type's boundary:
+src/area.rs:1: bare u8 in area; name what it counts with a newtype
+src/exposed.rs:2: bare u8 in depth; name what it counts with a newtype
+src/exposed.rs:3: bare u8 in hidden; name what it counts with a newtype
+src/shape.rs:2: bare u8 in Shape; name what it counts with a newtype
+state graph violated:
+src/area.rs:3: match on Shape outside its file; dispatch through a trait
+src/broken.rs:4: state Ajar cannot be reached from a start state
+src/broken.rs:5: terminal state Shut has outgoing edges
+src/broken.rs:11: state Ajar cannot reach a terminal state
+src/broken.rs:12: state Stuck cannot reach a terminal state
+src/broken.rs:16: states! graph cannot be read, so it cannot be checked
+src/exposed.rs:2: field depth of A is pub; struct fields are private
+src/edges.rs:5: is a hidden edge Open -> Ajar; edges are pub
+src/edges.rs:8: takes &mut self on vertex Open; transitions consume self
+src/duplicate.rs:2: Closed -> Open has 2 edges, at most one allowed: force at src/duplicate.rs:5, open at src/duplicate.rs:2
+src/crowded.rs:2: Ajar has 7 edges leaving it, at most 4 allowed
+fails

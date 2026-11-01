@@ -1,8 +1,8 @@
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Meta, Path, Token};
 
-use lint_layout::Name;
 use lint_layout::Whole;
+use lint_layout::{Name, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct Derives;
@@ -10,7 +10,7 @@ pub(crate) struct Derives;
 impl Derives {
     const DERIVE: &'static str = "derive";
     const CONDITIONAL: &'static str = "cfg_attr";
-    const SERDE: [&'static str; 2] = ["Serialize", "Deserialize"];
+    const SERDE: [Word<'static>; 2] = words!["Serialize", "Deserialize"];
 
     pub(crate) fn named(attributes: &[Attribute]) -> Vec<Name> {
         attributes

@@ -1,16 +1,17 @@
 use std::fmt;
 
 use crate::violation::Violation;
+use lint_layout::Headline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Report {
-    headline: &'static str,
+    headline: Headline,
     violations: Vec<Violation>,
 }
 
 impl Report {
     #[must_use]
-    pub fn new(headline: &'static str, violations: Vec<Violation>) -> Report {
+    pub fn new(headline: Headline, violations: Vec<Violation>) -> Report {
         Report { headline, violations }
     }
 

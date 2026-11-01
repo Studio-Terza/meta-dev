@@ -24,6 +24,6 @@ impl TestBody {
     }
 
     pub(crate) fn repeating(&self, first: &TestBody) -> Violation {
-        Violation::new(self.site.clone(), Finding::new(self.name.clone(), first.name.clone()))
+        Violation::new(self.site.clone(), Finding::new(&self.name, &first.name))
     }
 }

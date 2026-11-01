@@ -1,0 +1,15 @@
+{"workspace_root": "/w", "packages": [
+  {"name": "core", "manifest_path": "/w/crates/core/Cargo.toml", "dependencies": [
+    {"name": "serde", "path": null}
+  ]},
+  {"name": "middle", "manifest_path": "/w/crates/middle/Cargo.toml", "dependencies": [
+    {"name": "core", "path": "/w/crates/core"}
+  ]},
+  {"name": "tested-through", "manifest_path": "/w/crates/tested-through/Cargo.toml", "dependencies": [
+    {"name": "middle", "path": "/w/crates/middle", "kind": "dev"}
+  ]},
+  {"name": "serde-user", "manifest_path": "/w/crates/serde-user/Cargo.toml", "dependencies": [
+    {"name": "serde"}
+  ]},
+  {"name": "leaf", "manifest_path": "/w/crates/leaf/Cargo.toml", "dependencies": []}
+]}

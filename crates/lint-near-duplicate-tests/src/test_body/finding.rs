@@ -9,8 +9,8 @@ pub(super) struct Finding {
 }
 
 impl Finding {
-    pub(super) fn new(repeat: Name, first: Name) -> Finding {
-        Finding { repeat, first }
+    pub(super) fn new(repeat: &Name, first: &Name) -> Finding {
+        Finding { repeat: repeat.clone(), first: first.clone() }
     }
 }
 

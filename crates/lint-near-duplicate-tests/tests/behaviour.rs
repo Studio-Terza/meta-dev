@@ -1,9 +1,7 @@
-use lint_core::Lint;
 use lint_near_duplicate_tests::NearDuplicateTests;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
-const LITERALS: &str = "#[test]\nfn a() {\n    assert_eq!(f(1, \"x\"), true);\n}\n#[test]\nfn b() {\n    assert_eq!(f(2, \"y\"), false);\n}\n";
 const IDENTICAL: &str = "#[test]\nfn a() {\n    g();\n}\n#[test]\nfn b() {\n    g();\n}\n";
 const NESTED: &str = "#[test]\nfn a() {\n    if h() {\n        f(1);\n    }\n}\n#[test]\nfn b() {\n    if h() {\n        f(2);\n    }\n}\n";
 const INLINE_MODULES: &str = "mod m {\n    #[test]\n    fn a() {\n        f(1);\n    }\n}\nmod n {\n    #[test]\n    fn b() {\n        f(2);\n    }\n}\n";
@@ -21,41 +19,83 @@ const ASYNC: &str =
 const SIGNED: &str =
     "#[test]\nfn a() {\n    assert_eq!(h(1), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(-1), 1);\n}\n";
 
+const GATED: &str = "#[test]\n#[cfg(unix)]\nfn a() {\n    f(1);\n}\n#[test]\n#[cfg(unix)]\nfn b() {\n    f(2);\n}\n";
+
 const CASES: [Case; 13] = [
-    Case::new("literals differ", &[Source::new("tests/a.rs", LITERALS)], &["tests/a.rs:6"]),
-    Case::new("identical", &[Source::new("tests/a.rs", IDENTICAL)], &["tests/a.rs:6"]),
-    Case::new("nested literals differ", &[Source::new("tests/a.rs", NESTED)], &["tests/a.rs:8"]),
-    Case::new("across modules", &[Source::new("tests/a.rs", INLINE_MODULES)], &["tests/a.rs:9"]),
-    Case::new("three alike", &[Source::new("tests/a.rs", THREE)], &["tests/a.rs:6", "tests/a.rs:10"]),
-    Case::new("other call", &[Source::new("tests/a.rs", OTHER_CALL)], &[]),
-    Case::new("should panic differs", &[Source::new("tests/a.rs", SHOULD_PANIC)], &[]),
-    Case::new("both panic", &[Source::new("tests/a.rs", PANICS)], &[]),
-    Case::new("async tests", &[Source::new("tests/a.rs", ASYNC)], &[]),
-    Case::new("signed literal", &[Source::new("tests/a.rs", SIGNED)], &["tests/a.rs:6"]),
-    Case::new("helpers are not tests", &[Source::new("tests/a.rs", HELPERS)], &[]),
     Case::new(
-        "across files of a crate",
-        &[Source::new("crates/a/tests/x.rs", FIRST_FILE), Source::new("crates/a/tests/y.rs", SECOND_FILE)],
-        &["crates/a/tests/y.rs:3"],
+        Title::new("identical"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(IDENTICAL))],
+        Flagged::new(&["tests/a.rs:6"]),
     ),
     Case::new(
-        "across crates",
-        &[Source::new("crates/a/tests/x.rs", FIRST_FILE), Source::new("crates/b/tests/x.rs", SECOND_FILE)],
-        &[],
+        Title::new("nested literals differ"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(NESTED))],
+        Flagged::new(&["tests/a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("across modules"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(INLINE_MODULES))],
+        Flagged::new(&["tests/a.rs:9"]),
+    ),
+    Case::new(
+        Title::new("three alike"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(THREE))],
+        Flagged::new(&["tests/a.rs:6", "tests/a.rs:10"]),
+    ),
+    Case::new(
+        Title::new("other call"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(OTHER_CALL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("should panic differs"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(SHOULD_PANIC))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("both panic"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(PANICS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("async tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(ASYNC))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("signed literal"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(SIGNED))],
+        Flagged::new(&["tests/a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("helpers are not tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(HELPERS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("across files of a crate"),
+        &[
+            Source::new(Located::new("crates/a/tests/x.rs"), Text::new(FIRST_FILE)),
+            Source::new(Located::new("crates/a/tests/y.rs"), Text::new(SECOND_FILE)),
+        ],
+        Flagged::new(&["crates/a/tests/y.rs:3"]),
+    ),
+    Case::new(
+        Title::new("across crates"),
+        &[
+            Source::new(Located::new("crates/a/tests/x.rs"), Text::new(FIRST_FILE)),
+            Source::new(Located::new("crates/b/tests/x.rs"), Text::new(SECOND_FILE)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("gated alike"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GATED))],
+        Flagged::new(&["tests/a.rs:8"]),
     ),
 ];
 
 #[test]
 fn tests_differing_only_in_literals_are_flagged() {
-    assert_eq!(Sources::mismatches::<NearDuplicateTests>(&CASES), Vec::<String>::new());
-}
-
-#[test]
-fn the_message_names_the_fix() {
-    let report = NearDuplicateTests::report(&[Sources::file("tests/a.rs", IDENTICAL)]);
-    assert!(report.violations().iter().all(|violation| {
-        let message = violation.message();
-        message.contains("table!") && message.contains("law macro")
-    }));
-    assert!(!report.is_clean());
+    assert_eq!(Sources::mismatches::<NearDuplicateTests>(&CASES), Lines::default());
 }

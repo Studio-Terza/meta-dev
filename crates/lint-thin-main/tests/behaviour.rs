@@ -1,33 +1,48 @@
-use lint_core::Lint;
-use lint_fixtures::{Case, Source, Sources};
 use lint_thin_main::ThinMain;
 
-const FAT: &str = "use std::fmt;\nfn main() {}\nstruct Extra;\n";
-const THIN: &str = "use std::fmt;\nfn main() {}\n";
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
-const BINARY_ROOTS: [Case; 2] = [
-    Case::new("main", &[Source::new("crates/x/src/main.rs", FAT)], &["crates/x/src/main.rs:3"]),
-    Case::new("bin directory", &[Source::new("src/bin/tool.rs", FAT)], &["src/bin/tool.rs:3"]),
+const ATTRIBUTED: &str = "#[allow(unused)]\nfn helper() {}\n#[allow(unused)]\nenum E {}\n#[allow(unused)]\nmod m {}\n#[allow(unused)]\nimpl A {}\n#[allow(unused)]\ntrait T {}\n#[allow(unused)]\nconst C: u8 = 1;\n#[allow(unused)]\nstatic S: u8 = 1;\n#[allow(unused)]\ntype Y = u8;\nfn main() {}\n";
+const FAT: &str = "use std::fmt;\nfn main() {}\nstruct Extra;\n";
+
+const CASES: [Case; 5] = [
+    Case::new(
+        Title::new("each item on its keyword line"),
+        &[Source::new(Located::new("src/main.rs"), Text::new(ATTRIBUTED))],
+        Flagged::new(&[
+            "src/main.rs:2",
+            "src/main.rs:4",
+            "src/main.rs:6",
+            "src/main.rs:8",
+            "src/main.rs:10",
+            "src/main.rs:12",
+            "src/main.rs:14",
+            "src/main.rs:16",
+        ]),
+    ),
+    Case::new(
+        Title::new("a library file"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(FAT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a module named main"),
+        &[Source::new(Located::new("src/tools/main.rs"), Text::new(FAT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a bin directory root"),
+        &[Source::new(Located::new("src/bin/tool/main.rs"), Text::new(FAT))],
+        Flagged::new(&["src/bin/tool/main.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a file beside a bin directory root"),
+        &[Source::new(Located::new("src/bin/tool/helper.rs"), Text::new(FAT))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
-fn logic_in_a_binary_root_is_reported() {
-    assert_eq!(Sources::mismatches::<ThinMain>(&BINARY_ROOTS), Vec::<String>::new());
-}
-
-#[test]
-fn a_thin_main_passes() {
-    assert!(ThinMain::report(&[Sources::file("src/main.rs", THIN)]).is_clean());
-}
-
-#[test]
-fn files_other_than_the_binary_root_are_not_checked() {
-    assert!(ThinMain::report(&[Sources::file("src/lib.rs", FAT)]).is_clean());
-}
-
-#[test]
-fn an_item_is_reported_on_its_own_line_not_its_attribute_line() {
-    let attributed = "#[derive(Debug)]\n#[allow(dead_code)]\nstruct Extra;\nfn main() {}\n";
-    let report = ThinMain::report(&[Sources::file("src/main.rs", attributed)]);
-    assert_eq!(Sources::lines(&report), ["src/main.rs:3"]);
+fn logic_is_reported_at_its_keyword_in_binary_roots_only() {
+    assert_eq!(Sources::mismatches::<ThinMain>(&CASES), Lines::default());
 }

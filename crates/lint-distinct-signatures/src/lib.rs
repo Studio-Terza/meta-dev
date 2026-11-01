@@ -9,7 +9,7 @@ use syn::Ident;
 use syn::visit::Visit;
 
 use lint_core::Lint;
-use lint_core::{Report, Site, SourceFile, Violation};
+use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ pub struct DistinctSignatures;
 impl Lint for DistinctSignatures {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "two functions on one type with the same signature hide a missing type or type parameter",
+            Headline::new("two functions on one type with the same signature hide a missing type or type parameter"),
             files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
         )
     }

@@ -23,8 +23,8 @@ impl TestBudget {
     }
 
     #[must_use]
-    pub fn of_crate(&self, name: &CrateName) -> Option<String> {
-        self.0.get(name).map(ToString::to_string)
+    pub fn of_crate(&self, name: &CrateName) -> Option<CrateBudget> {
+        self.0.get(name).copied()
     }
 }
 

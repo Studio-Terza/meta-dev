@@ -6,6 +6,8 @@ use syn::Ident;
 
 use crate::casing::Casing;
 use crate::matching::Matching;
+use crate::word::Word;
+use newtype::Newtype;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(String);
@@ -17,18 +19,37 @@ impl Name {
     }
 
     #[must_use]
-    pub fn matches<Rule: Matching>(&self, words: &[&str]) -> bool {
-        words.iter().any(|word| Rule::holds(self, word))
+    pub fn matches<Rule: Matching>(&self, words: &[Word<'_>]) -> bool {
+        words.iter().any(|word| Rule::holds(self, *word))
     }
 
-    #[must_use]
-    pub fn spelled(&self) -> &str {
+    pub(crate) fn spelled(&self) -> &str {
         &self.0
     }
 
     #[must_use]
-    pub fn lowered(&self) -> String {
-        self.0.chars().flat_map(char::to_lowercase).collect()
+    pub fn lowered(&self) -> Name {
+        Name(self.0.chars().flat_map(char::to_lowercase).collect())
+    }
+
+    #[must_use]
+    pub fn contains(&self, word: Word<'_>) -> bool {
+        self.0.contains(word.into_inner())
+    }
+
+    #[must_use]
+    pub fn prefixed(&self, word: Word<'_>) -> Name {
+        Name([word.into_inner(), &self.0].concat())
+    }
+
+    #[must_use]
+    pub fn without_prefix(&self, word: Word<'_>) -> Option<Name> {
+        let spelled = word.into_inner();
+        self.0
+            .get(..spelled.len())
+            .filter(|head| *head == spelled)
+            .and_then(|_| self.0.get(spelled.len()..))
+            .map(Name::from)
     }
 
     #[must_use]
@@ -65,6 +86,12 @@ impl From<&str> for Name {
     }
 }
 
+impl PartialEq<Word<'_>> for Name {
+    fn eq(&self, word: &Word<'_>) -> bool {
+        self.0 == word.into_inner()
+    }
+}
+
 impl PartialEq<&str> for Name {
     fn eq(&self, text: &&str) -> bool {
         self.0 == *text
@@ -80,6 +107,12 @@ impl AsRef<Path> for Name {
 impl PartialEq<Ident> for Name {
     fn eq(&self, ident: &Ident) -> bool {
         *ident == self.0
+    }
+}
+
+impl From<Word<'_>> for Name {
+    fn from(word: Word<'_>) -> Name {
+        Name(word.into_inner().to_owned())
     }
 }
 

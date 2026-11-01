@@ -1,7 +1,7 @@
 mod finding;
 
 use finding::Finding;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use syn::visit::Visit;
 use syn::{Ident, ItemFn, Path};
 
@@ -18,7 +18,7 @@ pub struct NoFreeFns;
 impl Lint for NoFreeFns {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "free functions are not allowed; make them associated functions or methods",
+            Headline::new("free functions are not allowed; make them associated functions or methods"),
             files
                 .iter()
                 .flat_map(|file| {

@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::visit::Visit;
@@ -23,7 +23,7 @@ pub struct ConstShape;
 impl Lint for ConstShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "casts live in const fns or bits modules, and const loops walk slices",
+            Headline::new("casts live in const fns or bits modules, and const loops walk slices"),
             files.iter().flat_map(Self::violations).collect(),
         )
     }

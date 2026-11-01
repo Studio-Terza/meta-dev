@@ -1,0 +1,22 @@
+[package]
+name = "fuzz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+campaign = []
+
+[[test]]
+name = "fuzz"
+path = "tests/fuzz/main.rs"
+required-features = ["campaign"]
+
+[dev-dependencies]
+lint-runner = { path = "../crates/lint-runner" }
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

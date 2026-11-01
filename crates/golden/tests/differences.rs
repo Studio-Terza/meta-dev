@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use golden::{Difference, Failure, Golden, Mode, golden};
+use golden::{Difference, Failure, Golden, Mode, Output, golden};
 
 struct Row {
     golden: &'static str,
@@ -20,13 +20,13 @@ impl Shown {
     const NO_DIFFERENCE: &str = "no difference\n";
 
     fn between(recorded: &str, actual: &str) -> String {
-        Difference::between(recorded, actual)
+        Difference::between(Output::new(recorded), Output::new(actual))
             .map_or(Self::NO_DIFFERENCE.to_owned(), |difference| difference.to_string())
     }
 
     fn golden_mismatch(row: &Row) -> String {
         Golden::in_package(env!("CARGO_MANIFEST_DIR"), row.golden)
-            .and_then(|golden| golden.verify(&Self::between(row.recorded, row.actual)))
+            .and_then(|golden| golden.verify(Output::new(&Self::between(row.recorded, row.actual))))
             .map_or_else(|failure| failure.to_string(), |()| String::new())
     }
 }

@@ -1,0 +1,9 @@
+[package]
+name = "corpus"
+[[test]]
+name = "off"
+test = false
+[[test]]
+name = "other"
+path = "tests/other.rs"
+test = false

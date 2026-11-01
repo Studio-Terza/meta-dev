@@ -1,0 +1,7 @@
+test budget, report only:
+corpus: 3 tests in 2 files, 12 of 12 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+tests differ by more than their literals:
+tests/behaviour.rs:6: test b differs from a only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!
+fails

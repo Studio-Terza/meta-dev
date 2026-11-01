@@ -1,4 +1,4 @@
-use lint_fixtures::{Source, Sources};
+use lint_fixtures::{Located, Source, Sources, Text};
 use lint_paired_apis::PairedApis;
 
 const NONE: [&str; 0] = [];
@@ -28,36 +28,36 @@ const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    impl A {\n        pub 
 const TEST_TRAIT: &str = "#[cfg(test)]\ntrait Port {\n    fn open(&self);\n    fn close(&self);\n}\n";
 
 laws::table!(paired_methods_are_listed, Sources::flagged::<PairedApis>, [
-    [Source::new("a.rs", START_STOP)] => ["a.rs:3"],
-    [Source::new("a.rs", LOCK_UNLOCK)] => ["a.rs:3"],
-    [Source::new("a.rs", OPEN_CLOSE)] => ["a.rs:4"],
-    [Source::new("a.rs", CLAIM_RELEASE)] => ["a.rs:3"],
-    [Source::new("a.rs", ACQUIRE_RELEASE)] => ["a.rs:3"],
-    [Source::new("a.rs", BEGIN_END)] => ["a.rs:3"],
-    [Source::new("a.rs", SUFFIXED)] => ["a.rs:3"],
-    [Source::new("a.rs", IN_TRAIT)] => ["a.rs:2"],
-    [Source::new("a.rs", IN_MODULE)] => ["a.rs:3"],
-    [Source::new("a.rs", SPLIT_BLOCKS)] => ["a.rs:2"],
-    [Source::new("crates/x/src/lib.rs", "mod a;\nmod b;\n"), Source::new("crates/x/src/a.rs", "impl A {\n    pub fn open(&self) {}\n}\n"), Source::new("crates/x/src/b.rs", "impl A {\n    pub fn close(&self) {}\n}\n")] => ["crates/x/src/a.rs:2"],
+    [Source::new(Located::new("a.rs"), Text::new(START_STOP))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(LOCK_UNLOCK))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(OPEN_CLOSE))] => ["a.rs:4"],
+    [Source::new(Located::new("a.rs"), Text::new(CLAIM_RELEASE))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(ACQUIRE_RELEASE))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(BEGIN_END))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(SUFFIXED))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(IN_TRAIT))] => ["a.rs:2"],
+    [Source::new(Located::new("a.rs"), Text::new(IN_MODULE))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(SPLIT_BLOCKS))] => ["a.rs:2"],
+    [Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod a;\nmod b;\n")), Source::new(Located::new("crates/x/src/a.rs"), Text::new("impl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/x/src/b.rs"), Text::new("impl A {\n    pub fn close(&self) {}\n}\n"))] => ["crates/x/src/a.rs:2"],
 ]);
 
 laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
-    [Source::new("a.rs", ALONE)] => NONE,
-    [Source::new("a.rs", OTHER_SUFFIX)] => NONE,
-    [Source::new("a.rs", HALF_PRIVATE)] => NONE,
-    [Source::new("a.rs", TWO_BLOCKS)] => NONE,
-    [Source::new("crates/one/src/lib.rs", "impl A {\n    pub fn open(&self) {}\n}\n"), Source::new("crates/two/src/lib.rs", "impl A {\n    pub fn close(&self) {}\n}\n")] => NONE,
-    [Source::new("a.rs", TRAIT_IMPL)] => NONE,
-    [Source::new("a.rs", TRAIT_CONSTS)] => NONE,
-    [Source::new("a.rs", IMPL_CONSTS)] => NONE,
-    [Source::new("a.rs", TEST_IMPL)] => NONE,
-    [Source::new("a.rs", TEST_MODULE)] => NONE,
-    [Source::new("a.rs", TEST_TRAIT)] => NONE,
-    [Source::new("x/tests/a.rs", START_STOP)] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(ALONE))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_SUFFIX))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(HALF_PRIVATE))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TWO_BLOCKS))] => NONE,
+    [Source::new(Located::new("crates/one/src/lib.rs"), Text::new("impl A {\n    pub fn open(&self) {}\n}\n")), Source::new(Located::new("crates/two/src/lib.rs"), Text::new("impl A {\n    pub fn close(&self) {}\n}\n"))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TRAIT_IMPL))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TRAIT_CONSTS))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(IMPL_CONSTS))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TEST_IMPL))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(TEST_TRAIT))] => NONE,
+    [Source::new(Located::new("x/tests/a.rs"), Text::new(START_STOP))] => NONE,
 ]);
 
 #[test]
 fn the_message_says_to_write_a_guard() {
-    let shown = Sources::report::<PairedApis>(&[Source::new("a.rs", SUFFIXED)]).to_string();
+    let shown = Sources::report::<PairedApis>(&[Source::new(Located::new("a.rs"), Text::new(SUFFIXED))]).to_string();
     assert!(["guard", "fn start_server pairs with fn stop_server"].iter().all(|word| shown.contains(word)));
 }

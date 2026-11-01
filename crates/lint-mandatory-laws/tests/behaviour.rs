@@ -1,5 +1,5 @@
 use lint_core::Lint;
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_mandatory_laws::MandatoryLaws;
 
 const TEXT_PAIR: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
@@ -40,118 +40,234 @@ const ENCODE_ONLY: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
 const DECODE_ONLY: &str = "struct A;\nimpl A {\n    fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 35] = [
-    Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
-    Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
-    Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
-    Case::new("serde enum", &[Source::new("src/a.rs", SERDE_ENUM)], &["src/a.rs:2"]),
-    Case::new("pair split across types", &[Source::new("src/a.rs", SPLIT_TYPES)], &[]),
+const CASES: [Case; 34] = [
     Case::new(
-        "unrelated macro",
-        &[Source::new("src/a.rs", ORDER), Source::new("tests/a.rs", UNRELATED_MACRO)],
-        &["src/a.rs:1"],
-    ),
-    Case::new("serialize alone", &[Source::new("src/a.rs", SERDE_ONE)], &[]),
-    Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:1"]),
-    Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:1"]),
-    Case::new("to and from of different forms", &[Source::new("src/a.rs", MISMATCHED_FORMS)], &[]),
-    Case::new("hand-written order", &[Source::new("src/a.rs", ORDER)], &["src/a.rs:1"]),
-    Case::new("hand-written equality", &[Source::new("src/a.rs", EQUALITY)], &["src/a.rs:1"]),
-    Case::new("derived order", &[Source::new("src/a.rs", DERIVED_ORDER)], &[]),
-    Case::new("roundtrip in a test", &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ROUNDTRIP)], &[]),
-    Case::new("law covers order", &[Source::new("src/a.rs", ORDER), Source::new("tests/a.rs", LAW)], &[]),
-    Case::new(
-        "proptest covers equality",
-        &[Source::new("src/a.rs", EQUALITY), Source::new("tests/a.rs", PROPTEST)],
-        &[],
+        Title::new("display and from_str"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(TEXT_PAIR))],
+        Flagged::new(&["src/a.rs:1"]),
     ),
     Case::new(
-        "law for another type",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", OTHER_TYPE)],
-        &["src/a.rs:1"],
+        Title::new("display alone"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DISPLAY_ONLY))],
+        Flagged::new(&[]),
     ),
     Case::new(
-        "the title is not a mention",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", TITLE_ONLY)],
-        &["src/a.rs:1"],
+        Title::new("serde pair"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_PAIR))],
+        Flagged::new(&["src/a.rs:2"]),
     ),
     Case::new(
-        "one roundtrip does not cover two pairs",
-        &[Source::new("src/a.rs", BOTH_PAIRS), Source::new("tests/a.rs", CODED_ROUNDTRIP)],
-        &["src/a.rs:1"],
+        Title::new("serde enum"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_ENUM))],
+        Flagged::new(&["src/a.rs:2"]),
     ),
     Case::new(
-        "a roundtrip for each pair",
+        Title::new("pair split across types"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(SPLIT_TYPES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("unrelated macro"),
         &[
-            Source::new("src/a.rs", BOTH_PAIRS),
-            Source::new("tests/a.rs", CODED_ROUNDTRIP),
-            Source::new("tests/b.rs", TEXT_ROUNDTRIP),
+            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(UNRELATED_MACRO)),
         ],
-        &[],
+        Flagged::new(&["src/a.rs:1"]),
     ),
     Case::new(
-        "the text roundtrip alone leaves the methods bare",
-        &[Source::new("src/a.rs", BOTH_PAIRS), Source::new("tests/a.rs", TEXT_ROUNDTRIP)],
-        &["src/a.rs:1"],
+        Title::new("serialize alone"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(SERDE_ONE))],
+        Flagged::new(&[]),
     ),
     Case::new(
-        "a law in another package",
+        Title::new("encode and decode"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(ENCODING))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("to and from"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(FORMS))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("to and from of different forms"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(MISMATCHED_FORMS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("hand-written equality"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(EQUALITY))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("derived order"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DERIVED_ORDER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("roundtrip in a test"),
         &[
-            Source::new("crates/one/src/lib.rs", KEY),
-            Source::new("crates/two/src/lib.rs", KEY),
-            Source::new("crates/two/tests/t.rs", KEY_ROUNDTRIP),
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(ROUNDTRIP)),
         ],
-        &["crates/one/src/lib.rs:1"],
+        Flagged::new(&[]),
     ),
     Case::new(
-        "a law in each package",
+        Title::new("law covers order"),
         &[
-            Source::new("crates/one/src/lib.rs", KEY),
-            Source::new("crates/one/tests/t.rs", KEY_ROUNDTRIP),
-            Source::new("crates/two/src/lib.rs", KEY),
-            Source::new("crates/two/tests/t.rs", KEY_ROUNDTRIP),
+            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(LAW)),
         ],
-        &[],
+        Flagged::new(&[]),
     ),
     Case::new(
-        "a pair split across files",
-        &[Source::new("src/a.rs", DISPLAY_FILE), Source::new("src/b.rs", FROM_STR_FILE)],
-        &["src/a.rs:1"],
-    ),
-    Case::new("serde behind cfg_attr", &[Source::new("src/a.rs", CONDITIONAL_SERDE)], &["src/a.rs:2"]),
-    Case::new("a codec trait", &[Source::new("src/a.rs", CODEC)], &["src/a.rs:1"]),
-    Case::new(
-        "a codec trait with a roundtrip",
-        &[Source::new("src/a.rs", CODEC), Source::new("tests/a.rs", CODED_ROUNDTRIP)],
-        &[],
+        Title::new("proptest covers equality"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(EQUALITY)),
+            Source::new(Located::new("tests/a.rs"), Text::new(PROPTEST)),
+        ],
+        Flagged::new(&[]),
     ),
     Case::new(
-        "a roundtrip naming one method",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", HALF_ROUNDTRIP)],
-        &["src/a.rs:1"],
+        Title::new("law for another type"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(OTHER_TYPE)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
     ),
     Case::new(
-        "a roundtrip from another crate",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", FOREIGN_ROUNDTRIP)],
-        &["src/a.rs:1"],
+        Title::new("the title is not a mention"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(TITLE_ONLY)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
     ),
     Case::new(
-        "a plain law naming both methods",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", LAW_NAMING_BOTH)],
-        &["src/a.rs:1"],
+        Title::new("one roundtrip does not cover two pairs"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
     ),
     Case::new(
-        "a title with an attribute",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ATTRIBUTED_TITLE)],
-        &["src/a.rs:1"],
+        Title::new("a roundtrip for each pair"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
+            Source::new(Located::new("tests/b.rs"), Text::new(TEXT_ROUNDTRIP)),
+        ],
+        Flagged::new(&[]),
     ),
-    Case::new("encode alone", &[Source::new("src/a.rs", ENCODE_ONLY)], &[]),
-    Case::new("decode alone", &[Source::new("src/a.rs", DECODE_ONLY)], &[]),
-    Case::new("derive-like attribute under cfg_attr", &[Source::new("src/a.rs", OTHER_ATTRIBUTE_LIST)], &[]),
     Case::new(
-        "a roundtrip for the right type only",
-        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", OTHER_TYPE)],
-        &["src/a.rs:1"],
+        Title::new("the text roundtrip alone leaves the methods bare"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(BOTH_PAIRS)),
+            Source::new(Located::new("tests/a.rs"), Text::new(TEXT_ROUNDTRIP)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a law in another package"),
+        &[
+            Source::new(Located::new("crates/one/src/lib.rs"), Text::new(KEY)),
+            Source::new(Located::new("crates/two/src/lib.rs"), Text::new(KEY)),
+            Source::new(Located::new("crates/two/tests/t.rs"), Text::new(KEY_ROUNDTRIP)),
+        ],
+        Flagged::new(&["crates/one/src/lib.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a law in each package"),
+        &[
+            Source::new(Located::new("crates/one/src/lib.rs"), Text::new(KEY)),
+            Source::new(Located::new("crates/one/tests/t.rs"), Text::new(KEY_ROUNDTRIP)),
+            Source::new(Located::new("crates/two/src/lib.rs"), Text::new(KEY)),
+            Source::new(Located::new("crates/two/tests/t.rs"), Text::new(KEY_ROUNDTRIP)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a pair split across files"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(DISPLAY_FILE)),
+            Source::new(Located::new("src/b.rs"), Text::new(FROM_STR_FILE)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("serde behind cfg_attr"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(CONDITIONAL_SERDE))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a codec trait"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(CODEC))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a codec trait with a roundtrip"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(CODEC)),
+            Source::new(Located::new("tests/a.rs"), Text::new(CODED_ROUNDTRIP)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a roundtrip naming one method"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(HALF_ROUNDTRIP)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a roundtrip from another crate"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(FOREIGN_ROUNDTRIP)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a plain law naming both methods"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(LAW_NAMING_BOTH)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a title with an attribute"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(ATTRIBUTED_TITLE)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("encode alone"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(ENCODE_ONLY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("decode alone"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DECODE_ONLY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("derive-like attribute under cfg_attr"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_ATTRIBUTE_LIST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a roundtrip for the right type only"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ENCODING)),
+            Source::new(Located::new("tests/a.rs"), Text::new(OTHER_TYPE)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
     ),
 ];
 
@@ -159,22 +275,24 @@ const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\
 
 #[test]
 fn missing_laws_are_flagged() {
-    assert_eq!(Sources::mismatches::<MandatoryLaws>(&CASES), Vec::<String>::new());
+    assert_eq!(Sources::mismatches::<MandatoryLaws>(&CASES), Lines::default());
 }
 
 #[test]
 fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
-    let report =
-        MandatoryLaws::report(&[Sources::file("src/a.rs", ENCODING), Sources::file("tests/a.rs", LAW_FOR_PAIR)]);
+    let report = MandatoryLaws::report(&[
+        Sources::file("src/a.rs", Text::new(ENCODING)),
+        Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR)),
+    ]);
     assert!(!report.is_clean());
 }
 
 #[test]
 fn the_message_names_the_fix() {
-    let pair = MandatoryLaws::report(&[Sources::file("src/a.rs", ENCODING)]);
-    let order = MandatoryLaws::report(&[Sources::file("src/a.rs", ORDER)]);
-    assert!(pair.violations().iter().all(|violation| violation.message().contains("laws::roundtrip!")));
-    assert!(pair.violations().iter().all(|violation| violation.message().contains("`encode` and `decode`")));
-    assert!(order.violations().iter().all(|violation| violation.message().contains("laws::law!")));
+    let pair = MandatoryLaws::report(&[Sources::file("src/a.rs", Text::new(ENCODING))]);
+    let order = MandatoryLaws::report(&[Sources::file("src/a.rs", Text::new(ORDER))]);
+    assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
+    assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
+    assert!(order.violations().iter().all(|violation| violation.to_string().contains("laws::law!")));
     assert!(!pair.is_clean() && !order.is_clean());
 }

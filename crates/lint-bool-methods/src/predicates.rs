@@ -4,7 +4,7 @@ use syn::visit::Visit;
 use syn::{Ident, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, Type, Visibility};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_layout::{LineNumber, Name, Prefix};
+use lint_layout::{LineNumber, Name, Prefix, Word, words};
 
 use super::Finding;
 use members::Members;
@@ -15,7 +15,7 @@ pub struct Predicates<'file> {
 }
 
 impl Predicates<'_> {
-    const PREFIXES: [&'static str; 2] = ["is_", "has_"];
+    const PREFIXES: [Word<'static>; 2] = words!["is_", "has_"];
 
     pub fn of_file(file: &SourceFile) -> Vec<Violation> {
         let mut scan = Predicates { file, found: Vec::new() };

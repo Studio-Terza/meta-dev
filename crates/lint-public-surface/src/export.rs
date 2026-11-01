@@ -1,4 +1,4 @@
-use syn::{Item, ItemUse, UseTree, Visibility};
+use syn::{Item, ItemMod, ItemUse, UseTree, Visibility};
 
 use lint_core::SourceFile;
 use lint_layout::LineNumber;
@@ -18,7 +18,10 @@ impl Export {
         (file.placement().role() == Role::LibraryRoot)
             .then(|| CrateName::from(file.placement().crate_root()))
             .map_or_else(Vec::new, |crate_name| {
-                Self::reexports(file).flat_map(|used| Self::leaves(&crate_name, &used.tree)).collect()
+                Self::reexports(file)
+                    .flat_map(|used| Self::leaves(&crate_name, &used.tree))
+                    .chain(Self::modules(file).map(|module| Self::of_module(&crate_name, module)))
+                    .collect()
             })
     }
 
@@ -27,6 +30,21 @@ impl Export {
             Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Some(used),
             _ => None,
         })
+    }
+
+    fn modules(file: &SourceFile) -> impl Iterator<Item = &ItemMod> {
+        file.syntax().items.iter().filter_map(|item| match item {
+            Item::Mod(module) if matches!(module.vis, Visibility::Public(_)) => Some(module),
+            _ => None,
+        })
+    }
+
+    fn of_module(crate_name: &CrateName, module: &ItemMod) -> Export {
+        Export {
+            crate_name: crate_name.clone(),
+            name: Name::from(&module.ident),
+            line: LineNumber::from(module.ident.span()),
+        }
     }
 
     pub fn crate_name(&self) -> &CrateName {

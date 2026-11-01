@@ -3,7 +3,7 @@ use std::fs;
 
 use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
-use lint_fixtures::Sources;
+use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
 use lint_runner::Cli;
 
@@ -15,6 +15,7 @@ const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
+const LONG_CHAIN_LINKS: usize = 20_000;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -131,7 +132,7 @@ impl Trees {
         lines.concat()
     }
 
-    fn crate_graph_lines(root: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    fn crate_graph_lines(root: &Path) -> Result<Lines, Box<dyn Error>> {
         let readout = SourceFiles::read(root)?;
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
@@ -410,7 +411,7 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
     Trees::write(root.path(), "src/lib.rs", &Trees::chain("A", 5))?;
     let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
     Trees::write(root.path(), "src/main.rs", &main)?;
-    assert_eq!(Trees::crate_graph_lines(root.path())?, Vec::<String>::new());
+    assert_eq!(Trees::crate_graph_lines(root.path())?, Lines::default());
     Ok(())
 }
 
@@ -421,6 +422,108 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
     Trees::write(root.path(), "code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
     Trees::write(root.path(), "code/a.rs", &Trees::chain("B", 5))?;
     let named = format!("{}:1", root.path().join("code/lib.rs").display());
-    assert_eq!(Trees::crate_graph_lines(root.path())?, [named]);
+    assert_eq!(Trees::crate_graph_lines(root.path())?, [named.as_str()]);
+    Ok(())
+}
+
+#[test]
+fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<dyn Error>> {
+    let layouts = [
+        ("mod outer {\n    mod inner;\n}\n", "src/outer/inner.rs"),
+        ("#[path = \"elsewhere/place.rs\"]\nmod renamed;\n", "src/elsewhere/place.rs"),
+    ];
+    layouts.iter().try_for_each(|(library, module)| {
+        let root = Trees::package()?;
+        Trees::write(root.path(), "src/lib.rs", library)?;
+        Trees::write(root.path(), module, DIRTY)?;
+        assert_eq!(Trees::reported(root.path()).violations(), 2);
+        Ok(())
+    })
+}
+
+#[test]
+fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
+    let declared = [
+        ("[[test]]\nname = \"x\"\npath = \"check/x.rs\"\n", "check/x.rs"),
+        ("[[example]]\nname = \"e\"\npath = \"alt/e.rs\"\n", "alt/e.rs"),
+        ("[[bench]]\nname = \"b\"\npath = \"alt/b.rs\"\n", "alt/b.rs"),
+        ("[[bin]]\nname = \"c\"\npath = \"alt/c.rs\"\n", "alt/c.rs"),
+    ];
+    declared.iter().try_for_each(|(table, file)| {
+        let root = tempfile::tempdir()?;
+        Trees::write(root.path(), "Cargo.toml", &format!("{MANIFEST}{table}"))?;
+        Trees::write(root.path(), file, DIRTY)?;
+        assert_eq!(Trees::reported(root.path()).violations(), 2, "{file}");
+        Ok(())
+    })
+}
+
+#[test]
+fn a_conditional_path_attribute_leads_to_the_file_read_too() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
+    Trees::write(root.path(), "src/a.rs", CLEAN)?;
+    Trees::write(root.path(), "src/b.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;
+    Trees::write(root.path(), "nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
+    Trees::write(root.path(), "nested/src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_package_inside_a_package_is_its_own_package() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    Trees::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    Trees::write(root.path(), "inner/src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
+fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    ["target/package/copy", ".cache/copy"].iter().try_for_each(|copy| {
+        Trees::write(root.path(), &format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
+        Trees::write(root.path(), &format!("{copy}/src/lib.rs"), DIRTY)
+    })?;
+    assert!(Trees::reported(root.path()).is_clean());
+    Ok(())
+}
+
+#[test]
+fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    Trees::write(root.path(), "one/Cargo.toml", MANIFEST)?;
+    Trees::write(root.path(), "one/src/lib.rs", CLEAN)?;
+    assert!(Trees::reported(root.path()).is_clean());
+    Ok(())
+}
+
+#[test]
+fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    fs::create_dir(root.path().join("Cargo.toml"))?;
+    assert!(Trees::reported(root.path()).err.contains("Cargo.toml"));
+    Ok(())
+}
+
+#[test]
+fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
+    let run = Trees::reported(root.path());
+    assert!(run.err.contains("src/lib.rs:1"));
     Ok(())
 }

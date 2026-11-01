@@ -1,0 +1,151 @@
+use std::ffi::OsString;
+use std::process::ExitCode;
+
+use reach::Cli;
+
+const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
+const PATCHED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/patched.json");
+const ROOTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/rooted.json");
+const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
+const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
+const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
+const LEAF_REPORT: &str = "REACH=1 of 5 crates\nCARGO_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
+const TWO_REPORT: &str = "REACH=2 of 5 crates\nCARGO_SCOPE=-p middle -p tested-through\n\
+    MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
+const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n";
+const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not:\n\
+    2 core\n1 middle\n0 leaf\n0 serde-user\n0 tested-through\n";
+
+#[derive(Debug, PartialEq)]
+struct Answer {
+    exit: ExitCode,
+    out: String,
+    err: String,
+}
+
+impl Answer {
+    fn to(arguments: &[&str]) -> Answer {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let exit = Cli::answer(arguments.iter().map(OsString::from), &mut out, &mut err);
+        Answer {
+            exit,
+            out: String::from_utf8(out).unwrap_or_default(),
+            err: String::from_utf8(err).unwrap_or_default(),
+        }
+    }
+
+    fn reached_by(changed: &[&str]) -> String {
+        let arguments = ["affected", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
+    fn reached_in(metadata: &str, changed: &[&str]) -> String {
+        let arguments = ["affected", metadata].iter().chain(changed).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
+    fn crates(names: &[&str]) -> String {
+        let flags = |flag: &str| names.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ");
+        format!(
+            "REACH={} of 5 crates\nCARGO_SCOPE={}\nMUTANTS_SCOPE={}\n",
+            names.len(),
+            flags("-p "),
+            flags("--test-package=")
+        )
+    }
+
+    fn refused(arguments: &[&str]) -> String {
+        let answer = Answer::to(arguments);
+        if answer.exit == ExitCode::FAILURE && answer.out.is_empty() { answer.err } else { String::new() }
+    }
+}
+
+laws::table!(
+    a_report_gives_the_share_and_both_scopes,
+    Answer::reached_by,
+    [
+        ["crates/leaf/src/lib.rs"] => LEAF_REPORT,
+        ["crates/middle/src/lib.rs"] => TWO_REPORT,
+        ["README.md"] => EMPTY_REPORT,
+    ]
+);
+
+laws::table!(
+    a_change_reaches_its_crate_and_every_crate_depending_on_it,
+    Answer::reached_by,
+    [
+        ["crates/tested-through/tests/behaviour.rs"] => Answer::crates(&["tested-through"]),
+        ["crates/middle/compile_fail.md"] => Answer::crates(&["middle", "tested-through"]),
+        ["crates/leaf/a.rs", "crates/middle/b.rs"] => Answer::crates(&["leaf", "middle", "tested-through"]),
+        ["crates/leaf/a.rs", "README.md"] => Answer::crates(&["leaf"]),
+    ]
+);
+
+laws::table!(
+    a_change_to_a_file_of_no_crate_reaches_everything,
+    Answer::reached_by,
+    [
+        ["Cargo.toml"] => Answer::crates(&ALL),
+        ["Cargo.lock"] => Answer::crates(&ALL),
+        ["crates/core/Cargo.toml"] => Answer::crates(&ALL),
+        ["crates/leaf/Cargo.toml"] => Answer::crates(&ALL),
+        ["rust-toolchain.toml"] => Answer::crates(&ALL),
+        ["clippy.toml"] => Answer::crates(&ALL),
+        [".cargo/mutants.toml"] => Answer::crates(&ALL),
+        [".github/workflows/ci.yml"] => Answer::crates(&ALL),
+        ["ci/limits.toml"] => Answer::crates(&ALL),
+        ["crates/deleted/src/lib.rs"] => Answer::crates(&ALL),
+        ["README.md", "Cargo.lock"] => Answer::crates(&ALL),
+    ]
+);
+
+#[test]
+fn a_dependency_served_by_a_patch_is_still_an_edge() {
+    let reached = Answer::reached_in(PATCHED, &["crates/a/src/lib.rs"]);
+    assert_eq!(
+        reached,
+        "REACH=2 of 2 crates\nCARGO_SCOPE=-p a -p b\nMUTANTS_SCOPE=--test-package=a --test-package=b\n"
+    );
+}
+
+#[test]
+fn a_package_at_the_workspace_root_does_not_own_every_path() {
+    let everything =
+        "REACH=2 of 2 crates\nCARGO_SCOPE=-p leaf -p root\nMUTANTS_SCOPE=--test-package=leaf --test-package=root\n";
+    for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
+        assert_eq!(Answer::reached_in(ROOTED, &[changed]), everything, "{changed}");
+    }
+}
+
+laws::table!(
+    documents_outside_the_crates_reach_nothing,
+    Answer::reached_by,
+    [
+        ["README.md"] => EMPTY_REPORT,
+        ["specs/segmentation.md"] => EMPTY_REPORT,
+        [] => EMPTY_REPORT,
+    ]
+);
+
+laws::table!(
+    every_unusable_input_fails_closed_and_says_why,
+    Answer::refused,
+    [
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
+    ]
+);
+
+#[test]
+fn fan_in_counts_every_crate_a_crate_reaches_most_first() {
+    let answer = Answer::to(&["fan-in", WORKSPACE]);
+    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: FAN_IN_REPORT.to_owned(), err: String::new() });
+}
+
+#[test]
+fn metadata_that_cannot_be_read_or_parsed_is_refused() {
+    assert!(Answer::refused(&["fan-in", "/no/such/metadata.json"]).contains("cannot read /no/such/metadata.json"));
+    assert!(Answer::refused(&["affected", BROKEN]).contains("cannot parse cargo metadata"));
+}

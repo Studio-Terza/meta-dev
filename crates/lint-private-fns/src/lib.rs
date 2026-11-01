@@ -1,6 +1,6 @@
 mod finding;
 
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use std::collections::BTreeMap;
 
 use finding::Finding;
@@ -23,7 +23,7 @@ pub struct PrivateFns;
 impl Lint for PrivateFns {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "too many private fns; a type's logic belongs in its interface or in more types",
+            Headline::new("too many private fns; a type's logic belongs in its interface or in more types"),
             files
                 .iter()
                 .filter(|file| file.is_shipped())

@@ -1,4 +1,3 @@
-mod boilerplate;
 mod inners;
 mod method_shape;
 mod placed;
@@ -10,10 +9,9 @@ use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Type, Visibility};
 
-use lint_core::{Most, Site, SourceFile, Violation, Walk};
+use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
 use lint_layout::{LineNumber, Name};
 
-use boilerplate::Boilerplate;
 use inners::Inners;
 use method_shape::{Erasure, MethodShape};
 use placed::Placed;
@@ -21,15 +19,21 @@ use repeated_shape::RepeatedShape;
 
 #[derive(Debug, Default)]
 pub struct ShapeIndex {
-    shapes: BTreeMap<MethodShape, BTreeMap<Name, Site>>,
+    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType, Site>>,
     inners: Inners,
+    homes: TypeHomes,
+    home: Home,
     file: PathBuf,
 }
 
 impl ShapeIndex {
     #[must_use]
     pub fn of_files(files: &[&SourceFile]) -> ShapeIndex {
-        let index = ShapeIndex { inners: Inners::gathered_from(files), ..ShapeIndex::default() };
+        let index = ShapeIndex {
+            inners: Inners::gathered_from(files),
+            homes: TypeHomes::declared_in(files),
+            ..ShapeIndex::default()
+        };
         files.iter().fold(index, |index, file| index.reading(file))
     }
 
@@ -47,7 +51,7 @@ impl ShapeIndex {
     }
 
     fn reading(self, file: &SourceFile) -> ShapeIndex {
-        let mut index = ShapeIndex { file: file.path().to_path_buf(), ..self };
+        let mut index = ShapeIndex { file: file.path().to_path_buf(), home: Home::containing(file), ..self };
         index.visit_file(file.syntax());
         index
     }
@@ -59,21 +63,14 @@ impl ShapeIndex {
         }
     }
 
-    fn placed(&self, item: &ItemImpl, self_type: &Name) -> Vec<Placed> {
-        let erasure = Erasure::around(self_type, self.inners.inner_of(self_type));
+    fn placed(&self, item: &ItemImpl, written: &Name) -> Vec<Placed> {
+        let self_type = self.homes.resolve(written, &self.home);
+        let erasure = Erasure::around(written, self.inners.inner_of(&self_type));
         item.items
             .iter()
             .filter_map(|member| match (member, &item.trait_) {
                 (ImplItem::Fn(function), None) if !matches!(function.vis, Visibility::Inherited) => {
                     Some((function, MethodShape::described(&function.sig, &erasure)))
-                }
-                (ImplItem::Fn(function), Some((_, path, _)))
-                    if self.inners.inner_of(self_type).is_some() && Boilerplate::names(path) =>
-                {
-                    Some((
-                        function,
-                        MethodShape::described(&function.sig, &erasure).implementing(path, &function.block, &erasure),
-                    ))
                 }
                 _ => None,
             })

@@ -5,7 +5,7 @@ mod root_exports;
 
 use bag_candidates::BagCandidates;
 use finding::Finding;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use name_uses::NameUses;
 use root_exports::RootExports;
 
@@ -24,7 +24,7 @@ impl Lint for NoParameterBags {
         let uses: Vec<NameUses> = shipped.iter().map(|file| NameUses::in_file(file)).collect();
         let exports = RootExports::in_files(&shipped);
         Report::new(
-            "a struct with no logic of its own that one other file consumes is a parameter bag",
+            Headline::new("a struct with no logic of its own that one other file consumes is a parameter bag"),
             shipped
                 .iter()
                 .zip(&uses)

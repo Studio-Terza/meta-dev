@@ -1,0 +1,26 @@
+test budget, report only:
+corpus: 0 tests in 8 files, 4 of 33 lines, 6 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/built_only.rs:2: fn f
+src/imported.rs:2: fn f
+src/other_command.rs:2: fn f
+src/ports.rs:2: fn f
+src/qualified.rs:1: fn f
+src/renamed.rs:2: fn f
+tests/spawns.rs:2: fn f
+function names say what the function does:
+src/built_only.rs:2: fn f names nothing; say what it does
+src/imported.rs:2: fn f names nothing; say what it does
+src/other_command.rs:2: fn f names nothing; say what it does
+src/ports.rs:2: fn f names nothing; say what it does
+src/qualified.rs:1: fn f names nothing; say what it does
+src/renamed.rs:2: fn f names nothing; say what it does
+only ports start processes:
+src/built_only.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/imported.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/qualified.rs:2: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+src/renamed.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+tests/spawns.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+fails

@@ -1,10 +1,10 @@
 mod skip_marks;
 
-use lint_core::Lint;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::{Headline, Lint};
 use skip_marks::SkipMarks;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ impl NoIgnoredTests {
 impl Lint for NoIgnoredTests {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "every test runs",
+            Headline::new("every test runs"),
             files
                 .iter()
                 .flat_map(|file| {

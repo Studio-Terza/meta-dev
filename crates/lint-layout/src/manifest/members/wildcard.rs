@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use crate::matching::Matching;
 use crate::name::Name;
+use crate::word::Word;
+use newtype::Newtype;
 
 #[derive(Debug)]
 pub struct Wildcard(Vec<char>);
@@ -32,8 +34,8 @@ impl FromStr for Wildcard {
 }
 
 impl Matching for Wildcard {
-    fn holds(name: &Name, pattern: &str) -> bool {
-        let letters = pattern.parse::<Wildcard>();
+    fn holds(name: &Name, pattern: Word<'_>) -> bool {
+        let letters = pattern.into_inner().parse::<Wildcard>();
         let spelled = name.spelled().parse::<Wildcard>();
         letters.iter().zip(&spelled).any(|(wanted, found)| Self::agrees(&wanted.0, &found.0))
     }

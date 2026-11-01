@@ -1,6 +1,6 @@
 mod fn_body;
 
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use std::collections::BTreeMap;
 
 use fn_body::FnBody;
@@ -31,7 +31,7 @@ pub struct ExpressionFlow;
 impl Lint for ExpressionFlow {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "control flow is an expression; every branch yields the value the function returns",
+            Headline::new("control flow is an expression; every branch yields the value the function returns"),
             files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
         )
     }

@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 
 use lint_core::Report;
@@ -13,11 +13,11 @@ pub struct NoComments;
 impl Lint for NoComments {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "comments are not allowed in this repository",
+            Headline::new("comments are not allowed in this repository"),
             files
                 .iter()
                 .flat_map(|file| {
-                    Self::comment_lines(file.text())
+                    Self::comment_lines(file.text().as_ref())
                         .into_iter()
                         .map(move |line| Violation::new(Site::new(file.path(), line), "comment"))
                 })

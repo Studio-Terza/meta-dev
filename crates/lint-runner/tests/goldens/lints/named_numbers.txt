@@ -1,0 +1,26 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 0 of 23 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/float.rs:1: fn f
+src/in_macro.rs:1: fn f
+src/literal.rs:1: fn f
+src/units.rs:1: fn f
+function names say what the function does:
+src/float.rs:1: fn f names nothing; say what it does
+src/in_macro.rs:1: fn f names nothing; say what it does
+src/literal.rs:1: fn f names nothing; say what it does
+src/units.rs:1: fn f names nothing; say what it does
+a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:
+src/float.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/in_macro.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+src/literal.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
+primitives appear only at a type's boundary:
+src/float.rs:1: bare f64 in f; name what it counts with a newtype
+src/literal.rs:1: bare u32 in f; name what it counts with a newtype
+src/named.rs:1: bare u32 in LIMIT; name what it counts with a newtype
+src/named.rs:4: bare u32 in SIZE; name what it counts with a newtype
+src/named.rs:6: bare u8 in TABLE; name what it counts with a newtype
+src/units.rs:1: bare u32 in f; name what it counts with a newtype
+fails

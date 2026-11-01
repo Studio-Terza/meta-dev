@@ -8,13 +8,13 @@ use std::path::PathBuf;
 use rank::Rank;
 use sighting::Sighting;
 use sightings::Sightings;
-use use_aliases::UseAliases;
+pub use use_aliases::UseAliases;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType,
-    Signature, TraitItemConst, TypePath,
+    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Pat,
+    PatType, Signature, TraitItemConst, TypePath,
 };
 
 use super::finding::Finding;
@@ -25,38 +25,40 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::UsePath;
-use lint_layout::{LoweredInfix, Name, Whole};
+use lint_layout::{LoweredInfix, Name, Whole, Word, words};
 
 pub struct NumberSites {
     path: PathBuf,
     aliases: UseAliases,
     context: Name,
+    parameter: Option<Name>,
     newtypes: Vec<Name>,
     sightings: Sightings,
 }
 
 impl NumberSites {
-    const PRIMITIVES: [&'static str; 12] =
-        ["u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64"];
-    const SIZES: [&'static str; 2] = ["usize", "isize"];
-    const WIRE_TYPES: [&'static [&'static str]; 9] = [
-        &["serde_json", "Value"],
-        &["toml", "Value"],
-        &["serde_yaml", "Value"],
-        &["rust_decimal", "Decimal"],
-        &["bigdecimal", "BigDecimal"],
-        &["num_bigint", "BigInt"],
-        &["num_bigint", "BigUint"],
-        &["std", "any", "Any"],
-        &["core", "any", "Any"],
+    const PRIMITIVES: [Word<'static>; 12] =
+        words!["u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64"];
+    const SIZES: [Word<'static>; 2] = words!["usize", "isize"];
+    const WIRE_TYPES: [&'static [Word<'static>]; 9] = [
+        &words!["serde_json", "Value"],
+        &words!["toml", "Value"],
+        &words!["serde_yaml", "Value"],
+        &words!["rust_decimal", "Decimal"],
+        &words!["bigdecimal", "BigDecimal"],
+        &words!["num_bigint", "BigInt"],
+        &words!["num_bigint", "BigUint"],
+        &words!["std", "any", "Any"],
+        &words!["core", "any", "Any"],
     ];
-    const SIZE_WORDS: [&'static str; 6] = ["length", "len", "capacity", "size", "bytes", "index"];
+    const SIZE_WORDS: [Word<'static>; 6] = words!["length", "len", "capacity", "size", "bytes", "index"];
 
     pub fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut sites = NumberSites {
             path: file.path().to_owned(),
             aliases: UseAliases::in_file(file.syntax()),
             context: Name::default(),
+            parameter: None,
             newtypes: Vec::new(),
             sightings: Sightings::default(),
         };
@@ -68,7 +70,7 @@ impl NumberSites {
         Self::WIRE_TYPES.iter().any(|wire| path.spells(wire))
     }
 
-    fn is_named(path: &TypePath, names: &[&str]) -> bool {
+    fn is_named(path: &TypePath, names: &[Word<'_>]) -> bool {
         path.qself.is_none() && path.path.get_ident().is_some_and(|ident| Name::from(ident).matches::<Whole>(names))
     }
 
@@ -85,6 +87,7 @@ impl NumberSites {
 
     fn sighting(&self, path: &TypePath) -> Option<Sighting> {
         let wire = self.aliases.resolve(&path.path);
+        let sized_by = self.parameter.as_ref().unwrap_or(&self.context);
         let site = Site::new(&self.path, LineNumber::from(path.path.span()));
         if Self::is_named(path, &Self::PRIMITIVES) {
             Some(Sighting::new(
@@ -102,11 +105,8 @@ impl NumberSites {
                 Rank::Number,
                 Violation::new(site, Finding::WireForm { wire, context: self.context.clone() }),
             ))
-        } else if Self::is_named(path, &Self::SIZES) && !self.context.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
-            Some(Sighting::new(
-                Rank::Size,
-                Violation::new(site, Finding::UnnamedSize { context: self.context.clone() }),
-            ))
+        } else if Self::is_named(path, &Self::SIZES) && !sized_by.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
+            Some(Sighting::new(Rank::Size, Violation::new(site, Finding::UnnamedSize { context: sized_by.clone() })))
         } else {
             None
         }
@@ -171,6 +171,16 @@ impl<'ast> Visit<'ast> for NumberSites {
     fn visit_signature(&mut self, signature: &'ast Signature) {
         self.context = Name::from(&signature.ident);
         syn::visit::visit_signature(self, signature);
+    }
+
+    fn visit_pat_type(&mut self, typed: &'ast PatType) {
+        let outer = self.parameter.take();
+        self.parameter = match &*typed.pat {
+            Pat::Ident(bound) => Some(Name::from(&bound.ident)),
+            _ => None,
+        };
+        syn::visit::visit_type(self, &typed.ty);
+        self.parameter = outer;
     }
 
     fn visit_type_path(&mut self, path: &'ast TypePath) {

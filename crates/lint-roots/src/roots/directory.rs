@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use lint_layout::Failure;
 use lint_layout::Name;
 use lint_layout::Prefix;
+use lint_layout::Word;
 use newtype::Newtype;
 
 #[derive(Newtype, Debug)]
@@ -12,7 +13,7 @@ pub struct Directory(PathBuf);
 impl Directory {
     const BUILD_DIRECTORY: &'static str = "target";
     const MANIFEST: &'static str = "Cargo.toml";
-    const HIDDEN: &'static str = ".";
+    const HIDDEN: Word<'static> = Word::new(".");
 
     #[must_use]
     pub fn is_real(path: &Path) -> bool {

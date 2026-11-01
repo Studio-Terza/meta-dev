@@ -1,0 +1,20 @@
+test budget, report only:
+corpus: 0 tests in 5 files, 0 of 13 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+free functions are not allowed; make them associated functions or methods:
+src/feature.rs:2: fn f
+src/gated.rs:2: fn f
+src/gated.rs:4: fn g
+src/hidden.rs:2: fn f
+src/plain.rs:1: fn f
+function names say what the function does:
+src/feature.rs:2: fn f names nothing; say what it does
+src/hidden.rs:2: fn f names nothing; say what it does
+src/plain.rs:1: fn f names nothing; say what it does
+shipped code has no test-only API:
+src/feature.rs:1: test feature test-utils; remove the feature and test through the API every build has
+src/gated.rs:2: visible item gated on test; remove the gate and test through the real public API
+src/hidden.rs:2: #[doc(hidden)] on a visible item; document it as real API, or make it private
+Cargo.toml:1: test feature test-utils; remove the feature and test through the API every build has
+fails

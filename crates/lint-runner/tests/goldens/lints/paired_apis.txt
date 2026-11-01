@@ -1,0 +1,8 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 5 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+src/lib.rs:3: fn open pairs with fn close
+two functions on one type with the same signature hide a missing type or type parameter:
+src/lib.rs:3: open, close share the signature Door::(&self); distinguish the types they take or return
+fails

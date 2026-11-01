@@ -1,7 +1,6 @@
-use lint_core::Lint;
 use lint_public_api_tests::PublicApiTests;
 
-use lint_fixtures::{Case, Source, Sources};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const MODULE: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n";
 const MODULE_FILE: &str = "#[cfg(test)]\nmod tests;\n";
@@ -21,43 +20,125 @@ const PEEK: &str = "#[path = \"../src/internal.rs\"]\nmod internal;\n";
 const NESTED_PEEK: &str = "mod m {\n    #[path = \"../../src/internal.rs\"]\n    mod internal;\n}\n";
 const SIBLING: &str = "#[path = \"common/mod.rs\"]\nmod common;\n";
 
+const PLAIN_MACRO: &str = "macro_rules! plain {\n    () => {};\n}\nplain!();\n";
+const OUTSIDE_THE_PACKAGE: &str = "#[path = \"../../src/internal.rs\"]\nmod internal;\n";
+
 const FEATURE_MODULE: &str = "#[cfg(any(test, feature = \"proptest\"))]\nmod support {\n    pub fn f() {}\n}\n";
 const ANY_TESTS: &str = "#[cfg(any(test, all(test, unix)))]\nmod tests {}\n";
 
 const NEVER: &str = "#[cfg(any())]\nmod never {}\n";
 
-const CASES: [Case; 21] = [
-    Case::new("inline module", &[Source::new("src/a.rs", MODULE)], &["src/a.rs:3"]),
-    Case::new("module file", &[Source::new("src/a.rs", MODULE_FILE)], &["src/a.rs:2"]),
-    Case::new("combined condition", &[Source::new("src/a.rs", COMBINED)], &["src/a.rs:2"]),
-    Case::new("test or feature ships", &[Source::new("src/a.rs", FEATURE_MODULE)], &[]),
-    Case::new("every alternative is test only", &[Source::new("src/a.rs", ANY_TESTS)], &["src/a.rs:2"]),
-    Case::new("empty any", &[Source::new("src/a.rs", NEVER)], &[]),
-    Case::new("not test", &[Source::new("src/a.rs", NOT_TEST)], &[]),
-    Case::new("bare test", &[Source::new("src/a.rs", BARE_TEST)], &["src/a.rs:2"]),
-    Case::new("nested test", &[Source::new("src/a.rs", NESTED)], &["src/a.rs:3"]),
-    Case::new("law in src", &[Source::new("src/a.rs", LAW)], &["src/a.rs:1"]),
-    Case::new("macro definition", &[Source::new("src/a.rs", DEFINED)], &[]),
-    Case::new("plain module", &[Source::new("src/a.rs", PLAIN)], &[]),
-    Case::new("test in tests", &[Source::new("tests/a.rs", BARE_TEST)], &[]),
-    Case::new("law in tests", &[Source::new("tests/a.rs", LAW)], &[]),
-    Case::new("proptest block", &[Source::new("src/a.rs", PROPTEST)], &["src/a.rs:1"]),
-    Case::new("macro that emits a test", &[Source::new("src/a.rs", EMITTER)], &["src/a.rs:7"]),
-    Case::new("rstest", &[Source::new("src/a.rs", RSTEST)], &["src/a.rs:2"]),
-    Case::new("foreign table macro", &[Source::new("src/schema.rs", SCHEMA)], &[]),
-    Case::new("path into src", &[Source::new("tests/a.rs", PEEK)], &["tests/a.rs:2"]),
-    Case::new("path into src from a module", &[Source::new("tests/a.rs", NESTED_PEEK)], &["tests/a.rs:3"]),
-    Case::new("path to a helper", &[Source::new("tests/a.rs", SIBLING)], &[]),
+const CASES: [Case; 23] = [
+    Case::new(
+        Title::new("inline module"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(MODULE))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("module file"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(MODULE_FILE))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("combined condition"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(COMBINED))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("test or feature ships"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(FEATURE_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("every alternative is test only"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(ANY_TESTS))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(Title::new("empty any"), &[Source::new(Located::new("src/a.rs"), Text::new(NEVER))], Flagged::new(&[])),
+    Case::new(Title::new("not test"), &[Source::new(Located::new("src/a.rs"), Text::new(NOT_TEST))], Flagged::new(&[])),
+    Case::new(
+        Title::new("bare test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(BARE_TEST))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("nested test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(NESTED))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("law in src"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(LAW))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("macro definition"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(DEFINED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("plain module"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(PLAIN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("test in tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(BARE_TEST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("law in tests"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(LAW))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("proptest block"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(PROPTEST))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("macro that emits a test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(EMITTER))],
+        Flagged::new(&["src/a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("rstest"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(RSTEST))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("foreign table macro"),
+        &[Source::new(Located::new("src/schema.rs"), Text::new(SCHEMA))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("path into src"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(PEEK))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("path into src from a module"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(NESTED_PEEK))],
+        Flagged::new(&["tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("path to a helper"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(SIBLING))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("macro with no test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(PLAIN_MACRO))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("path outside the package"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(OUTSIDE_THE_PACKAGE))],
+        Flagged::new(&[]),
+    ),
 ];
 
 #[test]
 fn test_code_in_src_is_flagged() {
-    assert_eq!(Sources::mismatches::<PublicApiTests>(&CASES), Vec::<String>::new());
-}
-
-#[test]
-fn the_message_names_the_fix() {
-    let report = PublicApiTests::report(&[Sources::file("src/a.rs", MODULE)]);
-    assert!(report.violations().iter().all(|violation| violation.message().contains("tests directory")));
-    assert!(!report.is_clean());
+    assert_eq!(Sources::mismatches::<PublicApiTests>(&CASES), Lines::default());
 }

@@ -2,7 +2,20 @@
 
 Source lints for Rust repositories, run through one binary.
 
-    cargo run -p lint -- <path>
+    lint <path>
+
+## Install
+
+Install the runner from a tag of this repository, with the tag as the version pin:
+
+    cargo install --git https://github.com/Studio-Terza/meta-dev --tag v0.1.0 --locked lint
+
+This puts the binary `lint` in `~/.cargo/bin`. Change the tag to change the version; a new tag is a new
+version, and nothing updates on its own. `--locked` builds with the dependency versions in `Cargo.lock`.
+The build needs Rust 1.99.0 or newer. The runner is not on crates.io and is not published there.
+The install has no configuration file and the runner reads none.
+
+In a checkout of this repository, `cargo run -p lint -- <path>` does the same without installing.
 
 The runner finds the packages under the path (a directory with a `Cargo.toml` holding `[package]`,
 listed by its workspace when one encloses it; hidden directories and `target` are skipped), reads each
@@ -38,7 +51,7 @@ about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits) and `newtype-derive` (their derives). Crates
+library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate) and `reach` (what a change can affect). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -59,6 +72,11 @@ A golden name stays inside `tests/goldens`: `golden!("../x")` or an absolute nam
 
 To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
 `GOLDEN_RECORD` fails, and so does recording when `CI` is set.
+
+The lints have one golden each, in `crates/lint-runner/tests/goldens/lints/<lint>.txt`. It records what the
+runner prints for the package in `crates/lint-runner/tests/fixtures/<lint>`, and the test runs the runner from
+a temporary copy of that package. The copy turns each `manifest.toml` into a `Cargo.toml`. A fixture has no
+`Cargo.toml` of its own, so a run over this repository does not read it.
 
 ## Laws
 
@@ -91,13 +109,36 @@ only: it does not check who added a label.
 
 ## CI wall-time limits
 
-`ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: toolchain, clippy,
-test compile, test run and lint. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
+`ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
+test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
+by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
+that main reports. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
 times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
 No cache is used: caching was measured and did not pay for its save time.
+
+## Reach
+
+A pull request pays only for what it can affect. `ci/reach.sh` lists the files the pull request changes and
+gives them to `reach`, with the output of `cargo metadata --no-deps`:
+
+    reach affected <metadata> [<changed file>...]
+    reach fan-in <metadata>
+
+A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
+normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
+that covers `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`, `.cargo/`, `.github/`, `ci/`, the
+files of a deleted crate and anything not yet known. A file `reach` cannot place fails closed.
+
+`affected` prints the share of crates reached and the scopes CI uses, and the run summary of each pull
+request shows them. Clippy, the tests and mutants run on that scope, and are skipped when nothing is
+reached. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
+cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
+
+`fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
+is the measure of tangle, so the report on main prints it.
 
 ## Newtypes
 
@@ -126,10 +167,12 @@ the inner value.
 
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
-are named methods. Derived code is not in the source, so `repeated_methods` does not see it. A
-hand-written constructor on three types still fails, whatever their inner types are (an argument of the inner type
-counts as `Inner`), and so does the same body of an operator, `Display`, `From`, `Default`, `Sum`, `AsRef`, `Deref` or
-`FromStr` impl on three newtypes.
+are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
+count the impl of a trait (an operator, `Display`, `From`, `AsRef`, `FromStr`). A hand-written constructor or other
+public method of one shape on three types still fails, whatever their inner types are (an argument of the inner type
+counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
+
+Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
 ## Guards
 
@@ -173,9 +216,20 @@ reach a `terminal` state, and a terminal state has no outgoing edges. A graph it
 ## Mutants
 
 The `mutants` job in `ci.yml` runs on each pull request. It applies `cargo mutants` to the lines the pull
-request changes, and tests each mutant with the whole workspace, because shared crates are tested through
-the crates that use them (`.cargo/mutants.toml`). A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
+request changes, and tests each mutant with the crates the pull request reaches, because shared crates are
+tested through the crates that use them. A mutant that no test catches fails the job. A mutant that makes the tests hang counts as caught, because no test can show more.
 
-`mutants.yml` runs every mutant once a week, in eight shards, or on request. It reports in the run
+`mutants.yml` runs every mutant once a week, in eight shards, or on request, each against the whole
+workspace (`.cargo/mutants.toml`). It reports in the run
 summary and the shard artifacts. Missed mutants do not fail it; a shard fails only if the run itself
 fails. No push starts it and no push cancels it.
+
+## Fuzzing
+
+The `fuzz` crate feeds the runner arbitrary bytes, arbitrary valid syntax, damaged valid syntax, deep nesting and long chains, and fails when the runner panics or overflows its stack. Its test target needs the `campaign` feature, so `cargo test --workspace` and the PR gates never build or run it; only the `fuzz` workflow does. It uses proptest rather than cargo-fuzz, which needs a nightly toolchain: proptest runs on the pinned stable toolchain, generates valid syntax from strategies, shrinks a failing input, and the targets need no coverage feedback to find a panic in a lint written over `syn`.
+
+    FUZZ_SECONDS=60 FUZZ_CRASHES=/some/dir cargo test -p fuzz --features campaign --test fuzz
+
+Each target runs for `FUZZ_SECONDS` seconds (default 5) with fresh random seeds. With `FUZZ_CRASHES` set, the input being run is first written to `<target>-pending.rs` and `<target>-pending.role`, so an abort that no test can catch still leaves its input behind; a panic also leaves the shrunk input as `<target>-<role>-<hash>.rs`. The `fuzz` workflow runs every day on main for 15 minutes, fails the run on a crash and uploads that directory. A crash found becomes a named test in the crate that owns the fix, with the input kept in its `tests` directory.
+
+Found so far: a method chain of ten thousand links overflowed the stack of the main thread, because `syn` prints and walks a left-nested tree recursively. `Cli::report_to` now does its work on a thread with a 256 MiB stack, which is address space and not memory, and `a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack` holds it.

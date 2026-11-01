@@ -6,10 +6,10 @@ use syn::{Attribute, ItemFn, ItemMod, Macro, Meta, MetaList};
 
 use gate::Gate;
 use lint_core::Macros;
-use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_layout::TestMarks;
 use lint_layout::Whole;
+use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug, Default)]
 pub(crate) struct SkipMarks {
@@ -19,7 +19,7 @@ pub(crate) struct SkipMarks {
 
 impl SkipMarks {
     const CONDITIONAL_ATTRIBUTE: &str = "cfg_attr";
-    const SKIPPING: [&str; 2] = ["ignore", "skip"];
+    const SKIPPING: [Word<'static>; 2] = words!["ignore", "skip"];
 
     pub(crate) fn lines_in(file: &syn::File) -> Vec<LineNumber> {
         let mut marks = SkipMarks::default();
