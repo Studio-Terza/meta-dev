@@ -132,3 +132,11 @@ fn a_provided_method_decides_the_walk_by_its_trait_arity_and_return() {
     let other = "struct A;\nimpl Tr for A {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) -> A { A }\n}\nstruct B;\nimpl Tr for B {\n    fn a(&self) {}\n    fn b(&self, x: u8) {}\n    fn c(&self) -> A { A }\n}\n";
     assert_eq!(Candidates::lines(format!("{LOCAL_TRAIT}{other}")).len(), 0);
 }
+
+#[test]
+fn tuple_structs_of_one_field_are_distinct_nodes_on_purpose_and_never_candidates() {
+    let one = |name: &str| format!("struct {name}(u8);\nimpl {name} {{\n{FOUR}\n}}\n");
+    assert_eq!(Candidates::lines(one("A") + &one("B")).len(), 0);
+    let two = |name: &str| format!("struct {name}(u8, u8);\nimpl {name} {{\n{FOUR}\n}}\n");
+    assert_eq!(Candidates::lines(two("A") + &two("B")).len(), 1);
+}

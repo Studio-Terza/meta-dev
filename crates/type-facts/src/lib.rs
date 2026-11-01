@@ -2,6 +2,7 @@ mod arity;
 mod facts;
 mod implementation;
 mod method;
+mod shape;
 mod trait_fact;
 mod type_fact;
 
@@ -9,5 +10,6 @@ pub use arity::Arity;
 pub use facts::Facts;
 pub use implementation::Implementation;
 pub use method::Method;
+pub use shape::Shape;
 pub use trait_fact::TraitFact;
 pub use type_fact::TypeFact;

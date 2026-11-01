@@ -2,7 +2,7 @@ use lint_core::{Site, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use type_facts::{Facts, TypeFact};
+use type_facts::{Facts, Shape, TypeFact};
 
 struct Described;
 
@@ -147,4 +147,14 @@ fn a_type_name_declared_twice_in_one_crate_is_not_declared_once() {
         .map(|found| format!("{}:{}", AsRef::<CrateName>::as_ref(found), AsRef::<Name>::as_ref(found)))
         .collect();
     assert_eq!(once, ["x:B", "y:B", "y:A"]);
+}
+
+#[test]
+fn a_tuple_struct_of_one_field_is_a_newtype_shape_and_nothing_else_is() {
+    let facts = Described::facts(&[Described::file(
+        "a.rs",
+        "struct A(u8);\nstruct B(u8, u8);\nstruct C { x: u8 }\nstruct D;\nenum E { X(u8) }\nstruct F(pub Vec<u8>);\n",
+    )]);
+    let shapes: Vec<Shape> = facts.types().iter().map(TypeFact::shape).collect();
+    assert_eq!(shapes, [Shape::OneField, Shape::Other, Shape::Other, Shape::Other, Shape::Other, Shape::OneField]);
 }

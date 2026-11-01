@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use lint_core::{Least, Site};
 use lint_layout::{Name, Whole, Word, words};
-use type_facts::TypeFact;
+use type_facts::{Shape, TypeFact};
 
 use step::Step;
 
@@ -21,6 +21,7 @@ impl<'facts> Walk<'facts> {
     pub(crate) fn walked(found: &'facts TypeFact, local: &BTreeSet<Name>) -> Option<Walk<'facts>> {
         let steps: BTreeSet<Step> = Step::walked_by(found, local).into_iter().collect();
         (!found.derives().iter().any(|name| name.matches::<Whole>(&Self::EXCLUDED_DERIVE))
+            && found.shape() == Shape::Other
             && Self::SMALLEST.allows(steps.len()))
         .then_some(Walk { found, steps })
     }

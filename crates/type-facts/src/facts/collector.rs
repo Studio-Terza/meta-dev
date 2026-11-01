@@ -3,8 +3,8 @@ mod spelled;
 
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Ident, ImplItem, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, ReturnType, Signature,
-    punctuated::Punctuated,
+    Attribute, Fields, Ident, ImplItem, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, ReturnType,
+    Signature, punctuated::Punctuated,
 };
 
 use lint_core::{Site, SourceFile, Walk};
@@ -14,6 +14,7 @@ use lint_placement::CrateName;
 use crate::arity::Arity;
 use crate::implementation::Implementation;
 use crate::method::Method;
+use crate::shape::Shape;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
 use impl_block::ImplBlock;
@@ -76,9 +77,10 @@ impl<'file> Collector<'file> {
         Method::new(Name::from(&signature.ident), Arity::new(signature.inputs.len()), returns)
     }
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident) {
+    fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape) {
         let found =
-            TypeFact::declared(self.krate.clone(), Name::from(name), self.site(name), Self::derives(attributes));
+            TypeFact::declared(self.krate.clone(), Name::from(name), self.site(name), Self::derives(attributes))
+                .shaped(shape);
         self.types.extend((Walk::outside_tests(attributes) == Walk::Entered).then_some(found));
     }
 }
@@ -89,11 +91,15 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_struct(&mut self, found: &'ast ItemStruct) {
-        self.declared(&found.attrs, &found.ident);
+        let shape = match &found.fields {
+            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Shape::OneField,
+            _ => Shape::Other,
+        };
+        self.declared(&found.attrs, &found.ident, shape);
     }
 
     fn visit_item_enum(&mut self, found: &'ast ItemEnum) {
-        self.declared(&found.attrs, &found.ident);
+        self.declared(&found.attrs, &found.ident, Shape::Other);
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {

@@ -4,6 +4,7 @@ use lint_placement::CrateName;
 
 use crate::implementation::Implementation;
 use crate::method::Method;
+use crate::shape::Shape;
 
 #[derive(Clone, Debug)]
 pub struct TypeFact {
@@ -11,13 +12,19 @@ pub struct TypeFact {
     name: Name,
     site: Site,
     derives: Vec<Name>,
+    shape: Shape,
     methods: Vec<Method>,
     implementations: Vec<Implementation>,
 }
 
 impl TypeFact {
     pub(crate) fn declared(krate: CrateName, name: Name, site: Site, derives: Vec<Name>) -> TypeFact {
-        TypeFact { krate, name, site, derives, methods: Vec::new(), implementations: Vec::new() }
+        TypeFact { krate, name, site, derives, shape: Shape::Other, methods: Vec::new(), implementations: Vec::new() }
+    }
+
+    pub(crate) fn shaped(mut self, shape: Shape) -> TypeFact {
+        self.shape = shape;
+        self
     }
 
     pub(crate) fn with_methods(mut self, found: impl IntoIterator<Item = Method>) -> TypeFact {
@@ -32,6 +39,11 @@ impl TypeFact {
 
     pub(crate) fn is_named_like(&self, other: &TypeFact) -> bool {
         self.krate == other.krate && self.name == other.name
+    }
+
+    #[must_use]
+    pub fn shape(&self) -> Shape {
+        self.shape
     }
 
     #[must_use]
