@@ -1,4 +1,5 @@
 mod modules;
+mod repo_files;
 mod scope;
 mod test_modules;
 
@@ -13,6 +14,7 @@ use lint_placement::CrateFile;
 use lint_roots::Roots;
 use lint_roots::Tree;
 use modules::Modules;
+use repo_files::RepoFiles;
 use scope::Scope;
 use test_modules::TestModules;
 
@@ -39,7 +41,9 @@ impl SourceFiles {
         if roots.is_empty() {
             Err(tree.without_sources())
         } else {
-            Ok(roots.into_iter().fold(self, |reading, root| {
+            let repo_files = RepoFiles::under(tree)?;
+            let started = SourceFiles { readout: self.readout.with_repo_files(repo_files), ..self };
+            Ok(roots.into_iter().fold(started, |reading, root| {
                 let package = root.package().to_path_buf();
                 let file = root.into_file();
                 let scope = Scope::new(tree, &package, CrateFile::from(tree.display(&file)));

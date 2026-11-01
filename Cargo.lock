@@ -32,6 +32,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ci"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "newtype",
+ "reach",
+ "tempfile",
+ "text-lines",
+ "thiserror",
+]
+
+[[package]]
 name = "core_detect"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -607,12 +619,20 @@ dependencies = [
  "lint-raw-resources",
  "lint-reader",
  "lint-repeated-methods",
+ "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",
  "lint-thin-main",
  "lint-type-shape",
  "lint-vec-out-params",
  "tempfile",
+]
+
+[[package]]
+name = "lint-rust-only"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
 ]
 
 [[package]]
@@ -687,6 +707,30 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "mutation-report"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "newtype",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "mutation-shard"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "test-log",
+ "thiserror",
+]
 
 [[package]]
 name = "newtype"
@@ -919,6 +963,21 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys",
+]
+
+[[package]]
+name = "test-log"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "text-lines",
+]
+
+[[package]]
+name = "text-lines"
+version = "0.1.0"
+dependencies = [
+ "laws",
 ]
 
 [[package]]

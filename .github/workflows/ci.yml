@@ -35,28 +35,31 @@ jobs:
         id: tools
         with:
           path: ${{ runner.temp }}/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: ci/tools.sh
+        run: |
+          cargo build -q --bin reach --bin lint --bin ci
+          mkdir -p "$TOOLS"
+          cp target/debug/reach target/debug/lint target/debug/ci "$TOOLS"
       - name: reach
-        run: ci/reach.sh | tee -a "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"
+        run: '"$TOOLS/ci" reach "$RUNNER_TEMP/metadata.json" "$GITHUB_EVENT_NAME" | tee -a "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - name: fmt
         run: cargo fmt --check
       - name: clippy
         if: env.CARGO_SCOPE != ''
-        run: ci/timed.sh clippy cargo clippy --all-targets $CARGO_SCOPE -- -D warnings
+        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --all-targets $CARGO_SCOPE -- -D warnings'
       - name: test compile
         if: env.CARGO_SCOPE != ''
-        run: ci/timed.sh test-compile cargo test --no-run $CARGO_SCOPE
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --no-run $CARGO_SCOPE'
       - name: test run
         if: env.CARGO_SCOPE != ''
         run: |
           cargo test $CARGO_SCOPE | tee "$RUNNER_TEMP/test.txt"
-          ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
+          "$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$RUNNER_TEMP/test.txt"
       - name: lint
         shell: bash
-        run: ci/timed.sh lint "$TOOLS/lint" . | tee "$RUNNER_TEMP/budget.txt"
+        run: '"$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" . | tee "$RUNNER_TEMP/budget.txt"'
       - name: limits
         if: github.ref == 'refs/heads/main'
         run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
@@ -91,12 +94,15 @@ jobs:
         id: tools
         with:
           path: ${{ runner.temp }}/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: ci/tools.sh
+        run: |
+          cargo build -q --bin reach --bin lint --bin ci
+          mkdir -p "$TOOLS"
+          cp target/debug/reach target/debug/lint target/debug/ci "$TOOLS"
       - name: reach
-        run: ci/reach.sh | tee -a "$GITHUB_ENV"
+        run: '"$TOOLS/ci" reach "$RUNNER_TEMP/metadata.json" "$GITHUB_EVENT_NAME" | tee -a "$GITHUB_ENV"'
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:

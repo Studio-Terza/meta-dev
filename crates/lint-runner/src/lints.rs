@@ -28,6 +28,7 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
+use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
 use lint_type_shape::TypeShape;
@@ -79,7 +80,8 @@ impl Lints {
 
     #[must_use]
     pub fn checked(mut readout: Readout) -> Outcome {
-        let reports = Self::reports(readout.files());
+        let reports =
+            Self::reports(readout.files()).into_iter().chain([RustOnly::report(readout.repo_files())]).collect();
         Outcome::from_reports(reports, readout.take_failures())
     }
 }

@@ -28,7 +28,7 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-near_duplicate_tests, mandatory_laws.
+near_duplicate_tests, mandatory_laws, rust_only.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -50,10 +50,26 @@ a raw call must sit in an impl of a type that implements `Drop`: the guard that 
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate) and `reach` (what a change can affect). Crates
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-runner` (the runner
+library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
+
+## Rust only
+
+`rust_only` fails a source file in another language: the file name has the extension of Python, shell, Batch,
+PowerShell, Perl, Ruby, PHP, Lua, Go, Java, Kotlin, Scala, Swift, Objective-C, C, C++, C#, Dart, Haskell, Elixir,
+Erlang, Clojure, OCaml, F#, R, Julia, Groovy, Zig, JavaScript, TypeScript, HTML, CSS, Vue or Svelte, in any case. Web
+assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte) pass below a directory named `assets`, anywhere under the checked
+path, and nothing else passes there or elsewhere. The message names the fix: rewrite the file in Rust, or for a web
+language, move it under `assets` if it is a web asset. The lint reads every file under the path, hidden directories
+included, so `.github/` is checked. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
+(`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
+
+The CI helpers are Rust too: `ci` times stages, sums libtest seconds and finds the reach scope; `mutation-shard` and
+`mutation-report` read the cargo-mutants output (`ci timed`, `ci libtest-seconds`, `ci reach`,
+`mutation-shard <mutants.out> <out.json>`, `mutation-report <shards> <sources> <report.md> <report.json>`). `ci` starts
+processes only in its `ports` module.
 
 ## Goldens
 
@@ -112,8 +128,8 @@ only: it does not check who added a label.
 `ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
 test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
 by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
-that main reports. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
-times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
+that main reports. `ci timed` times a stage; the test run is the sum of the `finished in`
+times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
@@ -121,7 +137,7 @@ No cache is used: caching was measured and did not pay for its save time.
 
 ## Reach
 
-A pull request pays only for what it can affect. `ci/reach.sh` lists the files the pull request changes and
+A pull request pays only for what it can affect. `ci reach` lists the files the pull request changes and
 gives them to `reach`, with the output of `cargo metadata --no-deps`:
 
     reach affected <metadata> [<changed file>...]

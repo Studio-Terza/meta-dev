@@ -35,7 +35,7 @@ jobs:
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
       - name: which tests failed per mutant
         if: always()
-        run: python3 -I .github/scripts/mutation_matrix.py shard "$RUNNER_TEMP/mutants.out" "$RUNNER_TEMP/mutants.out/matrix.json"
+        run: cargo run -q --bin mutation-shard -- "$RUNNER_TEMP/mutants.out" "$RUNNER_TEMP/mutants.out/matrix.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -52,6 +52,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: toolchain
+        run: rustup toolchain install
       - uses: actions/download-artifact@v4
         with:
           pattern: shard-*
@@ -69,7 +71,7 @@ jobs:
       - name: matrix
         run: |
           mkdir matrix
-          python3 -I .github/scripts/mutation_matrix.py report shards . matrix/report.md matrix/report.json
+          cargo run -q --bin mutation-report -- shards . matrix/report.md matrix/report.json
           cat matrix/report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
