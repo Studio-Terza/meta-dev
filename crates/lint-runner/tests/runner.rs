@@ -3,7 +3,7 @@ use std::fs;
 
 use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
-use lint_fixtures::Sources;
+use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
 use lint_runner::Cli;
 
@@ -131,7 +131,7 @@ impl Trees {
         lines.concat()
     }
 
-    fn crate_graph_lines(root: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    fn crate_graph_lines(root: &Path) -> Result<Lines, Box<dyn Error>> {
         let readout = SourceFiles::read(root)?;
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
@@ -410,7 +410,7 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
     Trees::write(root.path(), "src/lib.rs", &Trees::chain("A", 5))?;
     let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
     Trees::write(root.path(), "src/main.rs", &main)?;
-    assert_eq!(Trees::crate_graph_lines(root.path())?, Vec::<String>::new());
+    assert_eq!(Trees::crate_graph_lines(root.path())?, Lines::default());
     Ok(())
 }
 
@@ -421,7 +421,7 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
     Trees::write(root.path(), "code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
     Trees::write(root.path(), "code/a.rs", &Trees::chain("B", 5))?;
     let named = format!("{}:1", root.path().join("code/lib.rs").display());
-    assert_eq!(Trees::crate_graph_lines(root.path())?, [named]);
+    assert_eq!(Trees::crate_graph_lines(root.path())?, [named.as_str()]);
     Ok(())
 }
 

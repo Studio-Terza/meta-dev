@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use std::path::PathBuf;
 
 use syn::visit::Visit;
@@ -12,7 +12,7 @@ use lint_core::SourceFile;
 use lint_core::SupportModules;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_layout::LineNumber;
+use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug)]
 pub struct NamedNumbers;
@@ -21,7 +21,9 @@ impl Lint for NamedNumbers {
     fn report(files: &[SourceFile]) -> Report {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         Report::new(
-            "a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item",
+            Headline::new(
+                "a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item",
+            ),
             files
                 .iter()
                 .filter(|file| {
@@ -43,14 +45,14 @@ impl Lint for NamedNumbers {
 }
 
 impl NamedNumbers {
-    const UNITS: &[&str] = &["0", "1", "0.0", "1.0", "-1", "-1.0"];
+    const UNITS: &[Word<'static>] = &words!["0", "1", "0.0", "1.0", "-1", "-1.0"];
 
     #[must_use]
-    pub fn is_unit(digits: &str) -> bool {
+    pub fn is_unit(digits: Word<'_>) -> bool {
         Self::UNITS.contains(&digits)
     }
 
-    fn unnamed(digits: &str, line: LineNumber) -> Option<LineNumber> {
+    fn unnamed(digits: Word<'_>, line: LineNumber) -> Option<LineNumber> {
         (!Self::is_unit(digits)).then_some(line)
     }
 }
@@ -86,10 +88,10 @@ impl<'ast> Visit<'ast> for Numbers {
     }
 
     fn visit_lit_int(&mut self, literal: &'ast LitInt) {
-        self.0.extend(NamedNumbers::unnamed(literal.base10_digits(), LineNumber::from(literal.span())));
+        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
     }
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.0.extend(NamedNumbers::unnamed(literal.base10_digits(), LineNumber::from(literal.span())));
+        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
     }
 }

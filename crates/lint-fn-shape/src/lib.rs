@@ -2,7 +2,7 @@ mod finding;
 mod nesting_depth;
 
 use finding::Finding;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -21,7 +21,7 @@ use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
-use lint_layout::{Name, Prefix, Whole};
+use lint_layout::{Name, Prefix, Whole, Word, words};
 
 use nesting_depth::NestingDepth;
 
@@ -31,15 +31,15 @@ pub struct FnShape;
 impl Lint for FnShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "hairy control flow; booleans and tuples become types, nesting becomes methods",
+            Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods"),
             files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
         )
     }
 }
 
 impl FnShape {
-    const BOOLEAN_METHODS: &[&str] = &["contains", "all", "any", "starts_with", "ends_with", "eq", "ne"];
-    const BOOLEAN_PREFIXES: [&str; 2] = ["is_", "has_"];
+    const BOOLEAN_METHODS: &[Word<'static>] = &words!["contains", "all", "any", "starts_with", "ends_with", "eq", "ne"];
+    const BOOLEAN_PREFIXES: [Word<'static>; 2] = words!["is_", "has_"];
     const NESTING: Most = Most::new(2);
     const PARAMETERS: Most = Most::new(4);
 

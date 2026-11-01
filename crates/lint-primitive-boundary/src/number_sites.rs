@@ -25,7 +25,7 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::UsePath;
-use lint_layout::{LoweredInfix, Name, Whole};
+use lint_layout::{LoweredInfix, Name, Whole, Word, words};
 
 pub struct NumberSites {
     path: PathBuf,
@@ -37,21 +37,21 @@ pub struct NumberSites {
 }
 
 impl NumberSites {
-    const PRIMITIVES: [&'static str; 12] =
-        ["u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64"];
-    const SIZES: [&'static str; 2] = ["usize", "isize"];
-    const WIRE_TYPES: [&'static [&'static str]; 9] = [
-        &["serde_json", "Value"],
-        &["toml", "Value"],
-        &["serde_yaml", "Value"],
-        &["rust_decimal", "Decimal"],
-        &["bigdecimal", "BigDecimal"],
-        &["num_bigint", "BigInt"],
-        &["num_bigint", "BigUint"],
-        &["std", "any", "Any"],
-        &["core", "any", "Any"],
+    const PRIMITIVES: [Word<'static>; 12] =
+        words!["u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64"];
+    const SIZES: [Word<'static>; 2] = words!["usize", "isize"];
+    const WIRE_TYPES: [&'static [Word<'static>]; 9] = [
+        &words!["serde_json", "Value"],
+        &words!["toml", "Value"],
+        &words!["serde_yaml", "Value"],
+        &words!["rust_decimal", "Decimal"],
+        &words!["bigdecimal", "BigDecimal"],
+        &words!["num_bigint", "BigInt"],
+        &words!["num_bigint", "BigUint"],
+        &words!["std", "any", "Any"],
+        &words!["core", "any", "Any"],
     ];
-    const SIZE_WORDS: [&'static str; 6] = ["length", "len", "capacity", "size", "bytes", "index"];
+    const SIZE_WORDS: [Word<'static>; 6] = words!["length", "len", "capacity", "size", "bytes", "index"];
 
     pub fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut sites = NumberSites {
@@ -70,7 +70,7 @@ impl NumberSites {
         Self::WIRE_TYPES.iter().any(|wire| path.spells(wire))
     }
 
-    fn is_named(path: &TypePath, names: &[&str]) -> bool {
+    fn is_named(path: &TypePath, names: &[Word<'_>]) -> bool {
         path.qself.is_none() && path.path.get_ident().is_some_and(|ident| Name::from(ident).matches::<Whole>(names))
     }
 

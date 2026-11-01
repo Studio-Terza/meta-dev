@@ -6,9 +6,13 @@ mod verdict;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use crate::cli::contents::Contents;
+use crate::cli::document::Document;
 use crate::cli::failure::Failure;
+use crate::cli::stage::Stage;
 use finding::Finding;
 use limit::Limit;
+use newtype::Newtype;
 use seconds::Seconds;
 
 #[derive(Debug)]
@@ -17,18 +21,15 @@ pub struct Gate {
 }
 
 impl Gate {
-    const LIMITS_FILE: &'static str = "limits";
-    const MEASURED_FILE: &'static str = "measured";
-
-    pub fn judge(limits: &str, measured: &str) -> Result<Gate, Failure> {
-        let limits: BTreeMap<String, Limit> =
-            toml::from_str(limits).map_err(|source| Failure::Parse { file: Self::LIMITS_FILE, source })?;
-        let measured: BTreeMap<String, Seconds> =
-            toml::from_str(measured).map_err(|source| Failure::Parse { file: Self::MEASURED_FILE, source })?;
+    pub fn judge(limits: Contents<'_>, measured: Contents<'_>) -> Result<Gate, Failure> {
+        let limits: BTreeMap<Stage, Limit> =
+            toml::from_str(limits.into_inner()).map_err(|source| Failure::Parse { file: Document::Limits, source })?;
+        let measured: BTreeMap<Stage, Seconds> = toml::from_str(measured.into_inner())
+            .map_err(|source| Failure::Parse { file: Document::Measured, source })?;
         limits
             .keys()
             .chain(measured.keys())
-            .collect::<BTreeSet<&String>>()
+            .collect::<BTreeSet<&Stage>>()
             .into_iter()
             .map(|stage| Self::finding(stage, limits.get(stage), measured.get(stage)))
             .collect::<Result<Vec<Finding>, Failure>>()
@@ -40,11 +41,11 @@ impl Gate {
         self.findings.iter().any(Finding::blocks)
     }
 
-    fn finding(stage: &str, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
+    fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
         let limit =
-            limit.filter(|limit| limit.is_ordered()).ok_or_else(|| Failure::Unlimited { stage: stage.to_owned() })?;
-        let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.to_owned() })?;
-        Ok(Finding::new(stage.to_owned(), *measured, *limit))
+            limit.filter(|limit| limit.is_ordered()).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
+        let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
+        Ok(Finding::new(stage.clone(), *measured, *limit))
     }
 }
 

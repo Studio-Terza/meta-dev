@@ -7,17 +7,17 @@ use crate::subject::Subject;
 use derives::Derives;
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_layout::Whole;
+use lint_layout::{LineNumber, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct Shape;
 
 impl Shape {
-    const TRAITS: [&'static str; 6] = ["Display", "FromStr", "Serialize", "Deserialize", "Ord", "PartialEq"];
-    const METHODS: [&'static str; 2] = ["encode", "decode"];
-    const LEADS: [&'static str; 2] = ["to", "from"];
+    const TRAITS: [Word<'static>; 6] = words!["Display", "FromStr", "Serialize", "Deserialize", "Ord", "PartialEq"];
+    const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
+    const LEADS: [Word<'static>; 2] = words!["to", "from"];
 
     pub(crate) fn of_struct(file: &SourceFile, item: &ItemStruct) -> Profile {
         Self::declared(file, &item.ident, Derives::named(&item.attrs))

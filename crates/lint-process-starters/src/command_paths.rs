@@ -1,4 +1,5 @@
 use lint_core::{Site, SourceFile};
+use lint_layout::{Word, words};
 use lint_paths::{Ground, Paths, Use};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -12,8 +13,8 @@ pub enum Scope {
 pub struct CommandPaths;
 
 impl CommandPaths {
-    const FINALS: [&'static str; 1] = ["new"];
-    const STARTER: [&'static str; 3] = ["process", "Command", "new"];
+    const FINALS: [Word<'static>; 1] = words!["new"];
+    const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
 
     #[must_use]
     pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site> {

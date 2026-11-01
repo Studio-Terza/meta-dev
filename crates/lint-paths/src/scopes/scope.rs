@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lint_layout::{Name, UsePath, Whole};
+use lint_layout::{Name, UsePath, Whole, Word};
 
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
@@ -17,7 +17,7 @@ impl Scope {
         self.globs.push(prefix);
     }
 
-    pub(crate) fn renamed_to(&self, finals: &[&str]) -> Vec<Name> {
+    pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> Vec<Name> {
         self.imports
             .iter()
             .filter(|(_, target)| target.segments().last().is_some_and(|last| last.matches::<Whole>(finals)))

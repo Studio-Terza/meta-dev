@@ -1,7 +1,7 @@
 use crate::cover::Cover;
 use crate::ground::Ground;
 use lint_core::Site;
-use lint_layout::UsePath;
+use lint_layout::{UsePath, Word};
 
 #[derive(Clone, Debug)]
 pub struct Use {
@@ -22,7 +22,7 @@ impl Use {
     }
 
     #[must_use]
-    pub fn spelling<const LENGTH: usize>(&self, tail: &[&str; LENGTH]) -> Option<&UsePath> {
+    pub fn spelling<const LENGTH: usize>(&self, tail: &[Word<'_>; LENGTH]) -> Option<&UsePath> {
         self.candidates.iter().find(|candidate| candidate.ends_with(tail))
     }
 

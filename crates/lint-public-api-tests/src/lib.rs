@@ -3,11 +3,11 @@ mod path_reach;
 mod test_code;
 
 use emitters::Emitters;
-use lint_core::Lint;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::{Headline, Lint};
 use path_reach::PathReach;
 use test_code::TestCode;
 
@@ -24,7 +24,7 @@ impl Lint for PublicApiTests {
         let syntax: Vec<&syn::File> = files.iter().map(SourceFile::syntax).collect();
         let emitters = Emitters::defined_in(&syntax);
         Report::new(
-            "tests go through public APIs",
+            Headline::new("tests go through public APIs"),
             files
                 .iter()
                 .flat_map(|file| {

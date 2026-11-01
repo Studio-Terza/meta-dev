@@ -2,7 +2,10 @@ mod text_lines;
 
 use std::fmt;
 
+use newtype::Newtype;
 use text_lines::TextLines;
+
+use crate::Output;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Difference {
@@ -17,11 +20,12 @@ impl Difference {
     const CONTEXT_LEN: usize = 3;
 
     #[must_use]
-    pub fn between(recorded: &str, actual: &str) -> Option<Self> {
-        (recorded != actual).then(|| {
-            let lines = |text| TextLines::new(text).collect::<Vec<_>>();
-            Self::of_lines(&lines(recorded), &lines(actual))
-        })
+    pub fn between(recorded: Output<'_>, actual: Output<'_>) -> Option<Self> {
+        (recorded != actual).then(|| Self::of_lines(&Self::lines(recorded), &Self::lines(actual)))
+    }
+
+    fn lines(text: Output<'_>) -> Vec<&str> {
+        TextLines::new(text.into_inner()).collect()
     }
 
     fn of_lines(recorded: &[&str], actual: &[&str]) -> Self {

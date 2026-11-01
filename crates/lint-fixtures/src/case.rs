@@ -1,20 +1,22 @@
+use crate::flagged::Flagged;
 use crate::source::Source;
+use crate::title::Title;
 
 #[derive(Debug)]
 pub struct Case {
-    name: &'static str,
+    name: Title,
     sources: &'static [Source],
-    flagged: &'static [&'static str],
+    flagged: Flagged,
 }
 
 impl Case {
     #[must_use]
-    pub const fn new(name: &'static str, sources: &'static [Source], flagged: &'static [&'static str]) -> Case {
+    pub const fn new(name: Title, sources: &'static [Source], flagged: Flagged) -> Case {
         Case { name, sources, flagged }
     }
 
     #[must_use]
-    pub const fn name(&self) -> &'static str {
+    pub const fn name(&self) -> Title {
         self.name
     }
 
@@ -24,7 +26,7 @@ impl Case {
     }
 
     #[must_use]
-    pub const fn flagged(&self) -> &'static [&'static str] {
+    pub const fn flagged(&self) -> Flagged {
         self.flagged
     }
 }

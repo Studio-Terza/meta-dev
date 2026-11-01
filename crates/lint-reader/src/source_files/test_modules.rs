@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::modules::{Child, Modules};
 use super::scope::Scope;
-use lint_core::SourceFile;
+use lint_core::{SourceFile, SourceText};
 
 #[derive(Debug, Default)]
 pub struct TestModules {
@@ -28,6 +28,7 @@ impl TestModules {
 
     fn opened(self, scope: &Scope<'_>, file: &Path, children_directory: &Path) -> TestModules {
         let parsed = fs::read_to_string(file)
+            .map(SourceText::new)
             .ok()
             .and_then(|text| SourceFile::parse_at(scope.tree().display(file), scope.package(), file, text).ok());
         match parsed {

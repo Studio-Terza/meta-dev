@@ -1,4 +1,4 @@
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 use syn::visit::Visit;
 use syn::{ItemMod, LitFloat, LitInt};
 
@@ -8,7 +8,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_layout::LineNumber;
+use lint_layout::{LineNumber, Word};
 use lint_named_numbers::NamedNumbers;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ impl Lint for NoNumbersInBinaries {
     fn report(files: &[SourceFile]) -> Report {
         let binaries = BinaryFiles::collect(files);
         Report::new(
-            "a binary is wiring: a number it needs is a setting in its config file",
+            Headline::new("a binary is wiring: a number it needs is a setting in its config file"),
             files
                 .iter()
                 .filter(|file| binaries.contains(file.path()))
@@ -49,10 +49,14 @@ impl<'ast> Visit<'ast> for Numbers {
     }
 
     fn visit_lit_int(&mut self, literal: &'ast LitInt) {
-        self.0.extend((!NamedNumbers::is_unit(literal.base10_digits())).then(|| LineNumber::from(literal.span())));
+        self.0.extend(
+            (!NamedNumbers::is_unit(Word::new(literal.base10_digits()))).then(|| LineNumber::from(literal.span())),
+        );
     }
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.0.extend((!NamedNumbers::is_unit(literal.base10_digits())).then(|| LineNumber::from(literal.span())));
+        self.0.extend(
+            (!NamedNumbers::is_unit(Word::new(literal.base10_digits()))).then(|| LineNumber::from(literal.span())),
+        );
     }
 }

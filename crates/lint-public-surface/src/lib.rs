@@ -5,7 +5,7 @@ mod foreign_references;
 use export::Export;
 use finding::Finding;
 use foreign_references::ForeignReferences;
-use lint_core::Lint;
+use lint_core::{Headline, Lint};
 
 use lint_core::BinaryFiles;
 
@@ -26,7 +26,7 @@ impl Lint for PublicSurface {
             .map(|file| ForeignReferences::in_file(file, &binaries))
             .fold(ForeignReferences::default(), ForeignReferences::absorb);
         Report::new(
-            "a crate exports exactly what another crate uses",
+            Headline::new("a crate exports exactly what another crate uses"),
             files
                 .iter()
                 .flat_map(|file| {

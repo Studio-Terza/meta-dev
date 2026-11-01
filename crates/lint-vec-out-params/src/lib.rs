@@ -6,7 +6,7 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{FnArg, GenericArgument, ItemImpl, ItemMod, PathArguments, PathSegment, Signature, Type, TypePath};
 
-use lint_core::{Macros, Report, Site, SourceFile, Violation, Walk};
+use lint_core::{Headline, Macros, Report, Site, SourceFile, Violation, Walk};
 use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
@@ -18,7 +18,9 @@ pub struct VecOutParams<'file> {
 impl Lint for VecOutParams<'_> {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",
+            Headline::new(
+                "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",
+            ),
             files
                 .iter()
                 .flat_map(|file| {

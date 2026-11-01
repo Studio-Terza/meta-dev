@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::string_sites::TextForm;
 use lint_layout::Name;
 use lint_layout::UsePath;
 
@@ -8,6 +9,7 @@ pub enum Finding {
     WireForm { wire: UsePath, context: Name },
     UnnamedSize { context: Name },
     TextOutsideDoor { handler: Name },
+    BareText { form: TextForm, context: Name },
 }
 
 impl fmt::Display for Finding {
@@ -22,6 +24,10 @@ impl fmt::Display for Finding {
             Finding::UnnamedSize { context } => write!(
                 formatter,
                 "usize in {context} is neither a length nor an index; a count gets a newtype, a size says so in its name"
+            ),
+            Finding::BareText { form, context } => write!(
+                formatter,
+                "bare {form} in {context}; give the text a newtype, with Display at the render edge and FromStr at the parse edge"
             ),
             Finding::TextOutsideDoor { handler } => {
                 write!(formatter, "{handler} handles text outside a door; parse in FromStr or render in Display")
