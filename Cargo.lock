@@ -526,6 +526,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-process-starters",
  "proc-macro2",
  "syn 2.0.119",
 ]

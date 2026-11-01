@@ -1,6 +1,6 @@
 mod command_paths;
 
-use command_paths::CommandPaths;
+pub use command_paths::{CommandPaths, Scope};
 use lint_core::{Gate, Lint};
 use lint_core::{Report, Site, SourceFile, Violation};
 
@@ -15,7 +15,7 @@ impl Lint for ProcessStarters {
                 .iter()
                 .filter(|file| !Gate::PORTS.admits(file))
                 .flat_map(|file| {
-                    CommandPaths::found(file).into_iter().map(move |line| {
+                    CommandPaths::found(file, Scope::OutsidePorts).into_iter().map(move |line| {
                         Violation::new(
                             Site::new(file.path(), line),
                             "starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports",
