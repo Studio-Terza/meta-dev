@@ -62,10 +62,11 @@ const TEXT_CONST: &str =
 const TEXT_ASSOCIATED: &str = "pub struct A;\nimpl A {\n    pub const NAME: &str = \"a\";\n}\n";
 const TEXT_IN_BODY: &str = "pub fn f() {\n    pub fn g(x: &str) {}\n}\n";
 const FOREIGN_PATHS: &str = "pub fn f(x: other::String, y: &other::str) {}\n";
+const INLINE_TEXT_MODULE: &str = "mod inner {\n    pub fn f(x: &str) {}\n}\n";
 const PORTS_MODULE: &str = "mod ports {\n    pub fn f(x: &str) {}\n}\n";
 const TEXT_TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    pub fn f(x: &str) {}\n}\n";
 
-const CASES: [Case; 61] = [
+const CASES: [Case; 62] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -336,6 +337,11 @@ const CASES: [Case; 61] = [
         Title::new("text spelled through another path"),
         &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_PATHS))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an inline module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_TEXT_MODULE))],
+        Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
         Title::new("an inline ports module"),

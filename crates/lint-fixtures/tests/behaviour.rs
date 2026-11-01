@@ -16,3 +16,8 @@ laws::table!(a_case_mismatches_only_when_its_lines_differ, Sources::mismatches::
     [Case::new(Title::new("wanted"), SOURCES, Flagged::new(&["a.rs:1"]))] => Lines::default(),
     [Case::new(Title::new("unwanted"), SOURCES, Flagged::new(&[]))] => ["unwanted (a.rs ) flagged [\"a.rs:1\"]"],
 ]);
+
+#[test]
+fn lines_are_not_equal_to_other_lines() {
+    assert_ne!(Sources::flagged::<EveryFile>(SOURCES), ["b.rs:1"]);
+}
