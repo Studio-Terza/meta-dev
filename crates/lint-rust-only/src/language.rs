@@ -1,11 +1,11 @@
+mod content;
 mod fix;
-mod shebang;
 
 use std::ffi::OsStr;
 use std::path::Path;
 
+use content::Content;
 pub(crate) use fix::Fix;
-use shebang::Shebang;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -129,15 +129,24 @@ impl Language {
         Language::Script,
     ];
 
+    const RUST: &'static str = "rs";
+
     #[must_use]
     pub fn detect(path: &Path) -> Option<Language> {
-        match path.extension().map(OsStr::to_ascii_lowercase) {
-            Some(extension) => {
-                let extension = extension.to_str()?;
-                Self::ALL.iter().copied().find(|language| language.extensions().contains(&extension))
-            }
-            None => Shebang::read_from(path).filter(Shebang::is_foreign).map(|_| Language::Script),
-        }
+        Some(path)
+            .filter(|path| !path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case(Self::RUST)))
+            .and_then(|path| {
+                path.extension()
+                    .and_then(Self::by_extension)
+                    .or_else(|| path.file_stem().map(Path::new).and_then(Path::extension).and_then(Self::by_extension))
+                    .or_else(|| Content::language_of(path))
+            })
+    }
+
+    fn by_extension(extension: &OsStr) -> Option<Language> {
+        let lowered = extension.to_ascii_lowercase();
+        let known = lowered.to_str()?;
+        Self::ALL.iter().copied().find(|language| language.extensions().contains(&known))
     }
 
     #[must_use]

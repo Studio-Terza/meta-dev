@@ -46,7 +46,7 @@ legitimate, the lint gates where by naming convention: starting a process (`proc
 ends in the word `ports` (`meta-ports`, not `meta-reports`) or a module named `ports`. Both lints read paths through
 `use` items in any order, renames, type aliases, glob imports, re-exports across the files of a crate, qualified
 `<T>::f` calls and macro bodies, so `matches!(..., Ok(s) if s.success())` is read like any other call. Inside `ports`,
-a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. In a module named `bits` only: casts (`const_shape`), bare numbers
+a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Code a platform requires in its own language (XCUITest Swift, say) is allowed only under a directory named `platform`, and only as test code (`rust_only`). In a module named `bits` only: casts (`const_shape`), bare numbers
 (`named_numbers`) and bare primitives (`primitive_boundary`). Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
@@ -74,7 +74,7 @@ Nim, Visual Basic, Solidity, assembly, D, Pascal, Fortran, Crystal, V, Arduino, 
 CSS, Vue, Svelte or Astro, in any case. Web assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte, Astro) pass below a
 directory named `assets`, anywhere under the checked path; any other language fails there too. The message names the fix: rewrite the file in Rust, or for a web
 language, move it under `assets` if it is a web asset. The lint reads every file under the path, hidden directories
-included, so `.github/` is checked. A file with no extension is read for its first line: a `#!` line naming any interpreter other than `rust-script` or `cargo` fails it as an interpreted script. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
+included, so `.github/` is checked. Below a directory named `platform`, source of any language passes only as test code: a directory or file name before its first dot that is `test` or `tests` in any case, or ends in `Test` or `Tests` (`UITests`, `FlowTests.swift`); other code there fails. A renamed or disguised file is source: a double extension that hides a source extension (`run.py.bak`, `Flow.swift.txt`) fails like the source itself, and so does a file whose content is source in any name: a first line `#!` naming any interpreter other than `rust-script` or `cargo` (`#![` is a Rust attribute), or lines at the start of a line that clearly are Python (`def f(...):`, `import`, `from x import y`), Swift (`import XCTest`, `import SwiftUI`, an `XCTestCase` class), shell (`set -e`, `if ...; then`, `for ...; do`) or C (`#include`), weighed so that one clear line or two weak ones suffice. Content is read from the first 8 KiB, and lines inside fenced code blocks of a document are ignored, so prose and data pass. Rust files are not read. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
 (`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
 
 `workflow_run` keeps logic out of YAML. It parses each file under `.github/workflows`, and every `action.yml` or `action.yaml`, as
