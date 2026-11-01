@@ -23,10 +23,10 @@ impl Metadata {
             .collect()
     }
 
-    pub fn dependents(&self) -> BTreeMap<CrateName, BTreeSet<CrateName>> {
+    pub fn dependents(&self, members: &BTreeSet<CrateName>) -> BTreeMap<CrateName, BTreeSet<CrateName>> {
         self.packages
             .iter()
-            .flat_map(|package| package.local_dependencies().map(move |dependency| (dependency, package.name())))
+            .flat_map(|package| package.dependencies_among(members).map(move |dependency| (dependency, package.name())))
             .fold(BTreeMap::new(), |mut dependents, (dependency, name)| {
                 dependents.entry(dependency.clone()).or_insert_with(BTreeSet::new).insert(name.clone());
                 dependents

@@ -442,6 +442,33 @@ fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<
 }
 
 #[test]
+fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
+    let declared = [
+        ("[[test]]\nname = \"x\"\npath = \"check/x.rs\"\n", "check/x.rs"),
+        ("[[example]]\nname = \"e\"\npath = \"alt/e.rs\"\n", "alt/e.rs"),
+        ("[[bench]]\nname = \"b\"\npath = \"alt/b.rs\"\n", "alt/b.rs"),
+        ("[[bin]]\nname = \"c\"\npath = \"alt/c.rs\"\n", "alt/c.rs"),
+    ];
+    declared.iter().try_for_each(|(table, file)| {
+        let root = tempfile::tempdir()?;
+        Trees::write(root.path(), "Cargo.toml", &format!("{MANIFEST}{table}"))?;
+        Trees::write(root.path(), file, DIRTY)?;
+        assert_eq!(Trees::reported(root.path()).violations(), 2, "{file}");
+        Ok(())
+    })
+}
+
+#[test]
+fn a_conditional_path_attribute_leads_to_the_file_read_too() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
+    Trees::write(root.path(), "src/a.rs", CLEAN)?;
+    Trees::write(root.path(), "src/b.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Ok(())
+}
+
+#[test]
 fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;

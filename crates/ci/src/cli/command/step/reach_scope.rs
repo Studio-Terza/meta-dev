@@ -70,8 +70,10 @@ impl Step for ReachScope {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let metadata =
-            Self::asked(ports, &Invocation::new("cargo", ["metadata", "--no-deps", "--format-version", "1"]))?;
+        let metadata = Self::asked(
+            ports,
+            &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
+        )?;
         self.metadata.replace(&metadata)?;
         let report =
             if self.event == Self::PULL_REQUEST { self.affected(ports)? } else { Self::WHOLE_WORKSPACE.to_owned() };

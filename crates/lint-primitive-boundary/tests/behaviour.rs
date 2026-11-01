@@ -65,8 +65,22 @@ const FOREIGN_PATHS: &str = "pub fn f(x: other::String, y: &other::str) {}\n";
 const INLINE_TEXT_MODULE: &str = "mod inner {\n    pub fn f(x: &str) {}\n}\n";
 const PORTS_MODULE: &str = "mod ports {\n    pub fn f(x: &str) {}\n}\n";
 const TEXT_TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    pub fn f(x: &str) {}\n}\n";
+const WIDER_0: &str = "pub fn m(a: std::borrow::Cow<'_, str>) {}\n";
+const WIDER_1: &str = "pub struct A {\n    pub a: Box<str>,\n}\n";
+const WIDER_2: &str = "pub fn m(a: std::sync::Arc<str>) {}\n";
+const WIDER_3: &str = "pub fn m(a: impl AsRef<str>) {}\n";
+const WIDER_4: &str = "pub fn m<T>(a: T)\nwhere\n    T: AsRef<str>,\n{\n}\n";
+const WIDER_5: &str = "pub fn m(a: *const str) {}\n";
+const WIDER_6: &str = "pub fn m(a: std::string::String) {}\n";
+const WIDER_7: &str = "pub fn m(a: alloc::string::String) {}\n";
+const WIDER_8: &str = "use std::string::String as S;\npub fn m(a: S) {}\n";
+const WIDER_9: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
+const WIDER_10: &str = "union U {\n    a: &'static str,\n}\n";
+const WIDER_11: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
+const PUBLIC_UNION: &str = "pub union U {\n    pub a: &'static str,\n}\n";
+const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 62] = [
+const CASES: [Case; 76] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -372,6 +386,76 @@ const CASES: [Case; 62] = [
         Title::new("text beside a Display impl"),
         &[Source::new(Located::new("a.rs"), Text::new(DOOR_AND_TRIM))],
         Flagged::new(&["a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("text in a Cow"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_0))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("text in a box"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_1))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in a shared pointer"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_2))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("text behind AsRef"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_3))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("text behind AsRef in a where clause"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_4))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("text behind a raw pointer"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_5))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a qualified String"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_6))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a String from alloc"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_7))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a renamed String"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_8))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a String as a default type"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_9))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("text in a private union"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_10))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in a private extern block"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDER_11))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in a public union"),
+        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_UNION))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in a public extern function"),
+        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_EXTERN))],
+        Flagged::new(&["a.rs:2"]),
     ),
 ];
 

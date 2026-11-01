@@ -1,0 +1,6 @@
+{"workspace_root": "/w", "packages": [
+  {"name": "a", "manifest_path": "/w/crates/a/Cargo.toml", "dependencies": []},
+  {"name": "b", "manifest_path": "/w/crates/b/Cargo.toml", "dependencies": [
+    {"name": "a", "path": null}
+  ]}
+]}

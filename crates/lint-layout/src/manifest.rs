@@ -25,7 +25,6 @@ impl Manifest {
     const PATH: &'static str = "path";
     const FEATURES: &'static str = "features";
     const LIBRARY: &'static str = "lib";
-    const BINARIES: &'static str = "bin";
     const TEST: &'static str = "test";
     const NAME: &'static str = "name";
     const SOURCE_EXTENSION: &'static str = "rs";
@@ -96,9 +95,9 @@ impl Manifest {
     #[must_use]
     pub fn declared_roots(&self) -> BTreeSet<PathBuf> {
         let library = self.table.get(Self::LIBRARY).into_iter();
-        let binaries = self.table.get(Self::BINARIES).and_then(Value::as_array).into_iter().flatten();
+        let listed = Self::TARGET_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
         library
-            .chain(binaries)
+            .chain(listed.flatten())
             .filter_map(|target| target.get(Self::PATH)?.as_str())
             .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
             .collect()

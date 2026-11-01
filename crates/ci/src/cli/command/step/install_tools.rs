@@ -19,7 +19,7 @@ impl InstallTools {
     fn build_invocation() -> Invocation {
         Invocation::new(
             "cargo",
-            ["build", "-q"].into_iter().chain(Self::PROGRAMS.iter().flat_map(|name| ["--bin", *name])),
+            ["build", "--locked", "-q"].into_iter().chain(Self::PROGRAMS.iter().flat_map(|name| ["--bin", *name])),
         )
     }
 

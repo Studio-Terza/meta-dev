@@ -130,11 +130,11 @@ row and names the first broken row, without generated input. Attributes before t
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
 
-`mandatory_laws` fails a type that has a conversion pair, or a hand-written `Ord` or `PartialEq`, without a law in a
+`mandatory_laws` fails a `pub` type that has a conversion pair, or a hand-written `Ord` or `PartialEq`, without a law in a
 test of the same package that names the type. A pair is `Display` with `FromStr`, `Serialize` with `Deserialize`
 (also behind `cfg_attr`), `encode` with `decode`, or `to_x` with `from_x`, in inherent impls or any trait impl, in one
 file or several. Each pair needs its own `roundtrip!`: one that names the type and, for method pairs, both methods.
-The test title does not count as naming the type.
+The test title does not count as naming the type. Only types in a crate's public API are held to this: a private type's law is exercised through the public behaviour that uses it, and mutation testing covers that.
 
 ## Labels
 

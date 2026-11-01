@@ -1,5 +1,6 @@
 mod dependency;
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -28,7 +29,10 @@ impl Package {
             .ok_or_else(|| Failure::Outside { manifest: self.manifest_path.clone() })
     }
 
-    pub fn local_dependencies(&self) -> impl Iterator<Item = &CrateName> {
-        self.dependencies.iter().filter_map(Dependency::local_name)
+    pub fn dependencies_among<'members>(
+        &'members self,
+        members: &'members BTreeSet<CrateName>,
+    ) -> impl Iterator<Item = &'members CrateName> {
+        self.dependencies.iter().map(Dependency::name).filter(|name| members.contains(*name))
     }
 }

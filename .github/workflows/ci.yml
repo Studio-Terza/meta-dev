@@ -41,20 +41,26 @@ jobs:
           key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/mutation-report/Cargo.toml', 'crates/mutation-report/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run -q --bin ci -- tools target/debug "$TOOLS"
+        run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - name: fmt
         run: cargo fmt --check
       - name: clippy
         if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --all-targets $CARGO_SCOPE -- -D warnings'
+        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $CARGO_SCOPE -- -D warnings'
       - name: test compile
         if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --no-run $CARGO_SCOPE'
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run $CARGO_SCOPE'
+      - name: fuzz targets clippy
+        if: env.CARGO_SCOPE == '--workspace' || contains(env.CARGO_SCOPE, '-p fuzz')
+        run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
+      - name: fuzz targets compile
+        if: env.CARGO_SCOPE == '--workspace' || contains(env.CARGO_SCOPE, '-p fuzz')
+        run: cargo test --locked -p fuzz --features campaign --test fuzz --no-run
       - name: test run
         if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test $CARGO_SCOPE'
+        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked $CARGO_SCOPE'
       - name: test run seconds
         if: env.CARGO_SCOPE != ''
         run: '"$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$TESTLOG"'
@@ -62,7 +68,7 @@ jobs:
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
       - name: limits
         if: github.ref == 'refs/heads/main'
-        run: '"$TOOLS/ci" logged "$LIMITS" cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED"'
+        run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED"'
       - name: step times
         if: github.ref == 'refs/heads/main' && always()
         env:
@@ -94,7 +100,7 @@ jobs:
           key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/mutation-report/Cargo.toml', 'crates/mutation-report/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run -q --bin ci -- tools target/debug "$TOOLS"
+        run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - uses: taiki-e/install-action@v2

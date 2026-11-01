@@ -22,4 +22,4 @@ jobs:
       - name: toolchain
         run: rustup toolchain install
       - name: golden and scenario files carry their labels
-        run: cargo run -q --bin ci -- labels "$GITHUB_BASE_REF" ${{ github.event.pull_request.number }}
+        run: cargo run --locked -q --bin ci -- labels "$GITHUB_BASE_REF" ${{ github.event.pull_request.number }}

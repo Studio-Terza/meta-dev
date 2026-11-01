@@ -21,7 +21,7 @@ const EMPTY_NOTES: &str = "skipped: CARGO_SCOPE is empty, so the steps that use 
 const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n\
     skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
-const BUILD: [&str; 6] = ["build", "-q", "--bin", "reach", "--bin", "lint"];
+const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
 
@@ -347,7 +347,10 @@ fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn E
     );
     assert_eq!(scratch.read("env"), "CARGO_SCOPE=--workspace\n");
     assert_eq!(scratch.read("sum"), "CARGO_SCOPE=--workspace\n");
-    assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["metadata", "--no-deps", "--format-version", "1"])]);
+    assert_eq!(
+        *fake.calls.borrow(),
+        [Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"])]
+    );
     assert_eq!(scratch.read("metadata.json"), METADATA);
     Ok(())
 }
@@ -363,7 +366,7 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
     assert_eq!(
         *fake.calls.borrow(),
         [
-            Invocation::new("cargo", ["metadata", "--no-deps", "--format-version", "1"]),
+            Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
             Invocation::new("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"]),
         ]
     );
