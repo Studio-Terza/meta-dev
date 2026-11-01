@@ -2,33 +2,34 @@ use lint_core::Lint;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_mandatory_laws::MandatoryLaws;
 
-const TEXT_PAIR: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
-const DISPLAY_ONLY: &str = "struct A;\nimpl std::fmt::Display for A {}\n";
-const SERDE_PAIR: &str = "#[derive(Serialize, Deserialize)]\nstruct A;\n";
-const SERDE_ONE: &str = "#[derive(Serialize)]\nstruct A;\n";
-const ENCODING: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
-const FORMS: &str = "struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_hex() {}\n}\n";
-const MISMATCHED_FORMS: &str = "struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_bits() {}\n}\n";
-const ORDER: &str = "struct A;\nimpl Ord for A {}\n";
-const EQUALITY: &str = "struct A;\nimpl PartialEq for A {}\n";
-const DERIVED_ORDER: &str = "#[derive(PartialEq, Ord)]\nstruct A;\n";
+const TEXT_PAIR: &str = "pub struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
+const DISPLAY_ONLY: &str = "pub struct A;\nimpl std::fmt::Display for A {}\n";
+const SERDE_PAIR: &str = "#[derive(Serialize, Deserialize)]\npub struct A;\n";
+const SERDE_ONE: &str = "#[derive(Serialize)]\npub struct A;\n";
+const ENCODING: &str = "pub struct A;\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
+const FORMS: &str = "pub struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_hex() {}\n}\n";
+const MISMATCHED_FORMS: &str = "pub struct A;\nimpl A {\n    fn to_hex(&self) {}\n    fn from_bits() {}\n}\n";
+const ORDER: &str = "pub struct A;\nimpl Ord for A {}\n";
+const EQUALITY: &str = "pub struct A;\nimpl PartialEq for A {}\n";
+const DERIVED_ORDER: &str = "#[derive(PartialEq, Ord)]\npub struct A;\n";
 const ROUNDTRIP: &str = "laws::roundtrip!(a, any::<A>(), A::encode, A::decode);\n";
 const LAW: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(value in any::<A>()) {}\n}\n";
 const OTHER_TYPE: &str = "laws::roundtrip!(b, any::<B>(), B::encode, B::decode);\n";
 
-const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\nenum A {}\n";
-const SPLIT_TYPES: &str = "struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
+const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\npub enum A {}\n";
+const SPLIT_TYPES: &str =
+    "pub struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
 const UNRELATED_MACRO: &str = "fn t() {\n    vec![A];\n}\n";
 
 const TITLE_ONLY: &str = "laws::roundtrip!(A, any::<u8>(), B::encode, B::decode);\n";
-const BOTH_PAIRS: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
+const BOTH_PAIRS: &str = "pub struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
 const CODED_ROUNDTRIP: &str = "laws::roundtrip!(coded, any::<A>(), A::encode, A::decode);\n";
 const TEXT_ROUNDTRIP: &str = "laws::roundtrip!(text, any::<A>(), ToString::to_string, A::from_str);\n";
-const DISPLAY_FILE: &str = "impl std::fmt::Display for crate::A {}\n";
+const DISPLAY_FILE: &str = "pub struct A;\nimpl std::fmt::Display for crate::A {}\n";
 const FROM_STR_FILE: &str = "impl std::str::FromStr for crate::A {}\n";
 const CONDITIONAL_SERDE: &str = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]\npub struct A;\n";
-const CODEC: &str = "struct A;\ntrait Codec {\n    fn encode(&self);\n    fn decode();\n}\nimpl Codec for A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
+const CODEC: &str = "pub struct A;\ntrait Codec {\n    fn encode(&self);\n    fn decode();\n}\nimpl Codec for A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";
 const KEY: &str = "pub struct Key;\nimpl Key {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const KEY_ROUNDTRIP: &str = "laws::roundtrip!(key_recovers, any::<Key>(), Key::encode, Key::decode);\n";
 
@@ -36,11 +37,14 @@ const ATTRIBUTED_TITLE: &str = "laws::roundtrip!(#[allow(unused)] A, any::<u8>()
 const HALF_ROUNDTRIP: &str = "laws::roundtrip!(half, any::<A>(), A::encode, other);\n";
 const FOREIGN_ROUNDTRIP: &str = "other::roundtrip!(foreign, any::<A>(), A::encode, A::decode);\n";
 const LAW_NAMING_BOTH: &str = "laws::law!(both, any::<A>(), value, { A::decode(&value.encode()) });\n";
-const ENCODE_ONLY: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
-const DECODE_ONLY: &str = "struct A;\nimpl A {\n    fn decode() {}\n}\n";
+const ENCODE_ONLY: &str = "pub struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
+const DECODE_ONLY: &str = "pub struct A;\nimpl A {\n    fn decode() {}\n}\n";
+const PRIVATE_TEXT_PAIR: &str = "struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\n";
+const CRATE_ORDER: &str = "pub(crate) struct A;\nimpl Ord for A {}\n";
+const PRIVATE_TYPE_PUBLIC_IMPL: &str = "struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 34] = [
+const CASES: [Case; 37] = [
     Case::new(
         Title::new("display and from_str"),
         &[Source::new(Located::new("src/a.rs"), Text::new(TEXT_PAIR))],
@@ -259,6 +263,21 @@ const CASES: [Case; 34] = [
     Case::new(
         Title::new("derive-like attribute under cfg_attr"),
         &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_ATTRIBUTE_LIST))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a private type with a conversion pair"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(PRIVATE_TEXT_PAIR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a crate-private type with a hand-written order"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(CRATE_ORDER))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a private type with public methods"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(PRIVATE_TYPE_PUBLIC_IMPL))],
         Flagged::new(&[]),
     ),
     Case::new(

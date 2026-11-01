@@ -1,3 +1,4 @@
+mod exposure;
 mod profile;
 mod reader;
 
@@ -6,6 +7,7 @@ use std::collections::BTreeMap;
 use crate::coverage::Coverage;
 use crate::obligation::Obligation;
 use crate::subject::Subject;
+use exposure::Exposure;
 use lint_core::SourceFile;
 use profile::Profile;
 use reader::Reader;
@@ -21,7 +23,11 @@ impl Facts {
     }
 
     pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation> {
-        self.profiles.values().flat_map(|profile| profile.unmet(coverage)).collect()
+        self.profiles
+            .values()
+            .filter(|profile| profile.exposure() == Exposure::Public)
+            .flat_map(|profile| profile.unmet(coverage))
+            .collect()
     }
 
     fn read(self, file: &SourceFile) -> Facts {
