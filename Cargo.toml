@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "UNLICENSED"
+
+[workspace.dependencies]
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174.0" }
+quote = "1.0.40"
+syn = { version = "2.0.119", features = ["extra-traits", "full", "parsing", "visit"] }
+tempfile = "3.27.0"
+thiserror = "2.0.20"
+toml = "1.1.8"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"

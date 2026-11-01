@@ -5,10 +5,21 @@ on:
   push:
     branches: [main]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   gates:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: empty repository
-        run: echo "No code to check."
+      - name: toolchain
+        run: rustup toolchain install
+      - name: fmt
+        run: cargo fmt --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: test
+        run: cargo test
+      - name: lint
+        run: cargo run -p lint -- .
