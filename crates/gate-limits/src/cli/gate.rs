@@ -17,14 +17,14 @@ pub struct Gate {
 }
 
 impl Gate {
-    const LIMITS_FILE: &'static str = "limits";
-    const MEASURED_FILE: &'static str = "measured";
+    const LIMITS_SOURCE: &'static str = "limits";
+    const MEASURED_SOURCE: &'static str = "measured";
 
     pub fn judge(limits: &str, measured: &str) -> Result<Gate, Failure> {
         let limits: BTreeMap<String, Limit> =
-            toml::from_str(limits).map_err(|source| Failure::Parse { file: Self::LIMITS_FILE, source })?;
+            toml::from_str(limits).map_err(|source| Failure::Parse { file: Self::LIMITS_SOURCE, source })?;
         let measured: BTreeMap<String, Seconds> =
-            toml::from_str(measured).map_err(|source| Failure::Parse { file: Self::MEASURED_FILE, source })?;
+            toml::from_str(measured).map_err(|source| Failure::Parse { file: Self::MEASURED_SOURCE, source })?;
         limits
             .keys()
             .chain(measured.keys())
