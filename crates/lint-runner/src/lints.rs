@@ -11,6 +11,7 @@ use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
 use lint_fn_shape::FnShape;
 use lint_literal_names::LiteralNames;
+use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
 use lint_named_lifetimes::NamedLifetimes;
@@ -72,6 +73,7 @@ impl Lints {
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
             NearDuplicateTests::report(files),
+            MandatoryLaws::report(files),
         ]
     }
 

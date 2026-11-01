@@ -17,6 +17,7 @@ lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
 lint-fn-shape = { path = "../lint-fn-shape" }
 lint-literal-names = { path = "../lint-literal-names" }
+lint-mandatory-laws = { path = "../lint-mandatory-laws" }
 lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-module-nesting = { path = "../lint-module-nesting" }
 lint-named-lifetimes = { path = "../lint-named-lifetimes" }
