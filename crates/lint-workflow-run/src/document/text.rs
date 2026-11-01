@@ -54,10 +54,6 @@ impl<'text> Text<'text> {
         Characters::new(self.0.chars().count())
     }
 
-    pub(crate) fn first_inside(self, symbols: &[&'static str]) -> Option<&'static str> {
-        symbols.iter().copied().find(|symbol| self.0.contains(*symbol))
-    }
-
     pub(crate) fn trimmed(self) -> Text<'text> {
         let blanks_gone = self.without_leading_blanks();
         let end = blanks_gone
