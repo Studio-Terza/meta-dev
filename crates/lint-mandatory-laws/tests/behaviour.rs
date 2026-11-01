@@ -12,6 +12,17 @@ const MISMATCHED_FORMS: &str = "pub struct A;\nimpl A {\n    fn to_hex(&self) {}
 const ORDER: &str = "pub struct A;\nimpl Ord for A {}\n";
 const EQUALITY: &str = "pub struct A;\nimpl PartialEq for A {}\n";
 const DERIVED_ORDER: &str = "#[derive(PartialEq, Ord)]\npub struct A;\n";
+const POINTER_EQUALITY: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::rc::Rc::ptr_eq(&self.0, &other.0)\n    }\n}\n";
+const POINTER_FUNCTION: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::ptr::eq(self, other)\n    }\n}\n";
+const POINTER_AND_FIELD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        Rc::ptr_eq(&self.0, &other.0) && self.1 == other.1\n    }\n}\n";
+const POINTER_ORDER: &str = "pub struct A;\nimpl Ord for A {\n    fn cmp(&self, other: &Self) -> Ordering {\n        Rc::ptr_eq(&self.0, &other.0).cmp(&true)\n    }\n}\n";
+const POINTER_METHOD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        self.0.ptr_eq(&other.0)\n    }\n}\n";
+const POINTER_PAREN: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        (Rc::ptr_eq(&self.0, &other.0))\n    }\n}\n";
+const POINTER_ADDR: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        std::ptr::addr_eq(self, other)\n    }\n}\n";
+const OTHER_CALL: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        same(&self.0, &other.0)\n    }\n}\n";
+const OTHER_EQ: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        other::eq(self, other)\n    }\n}\n";
+const OTHER_PTR: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        ptr::read(self)\n    }\n}\n";
+const OTHER_METHOD: &str = "pub struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {\n        self.0.same(&other.0)\n    }\n}\n";
 const ROUNDTRIP: &str = "laws::roundtrip!(a, any::<A>(), A::encode, A::decode);\n";
 const LAW: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(value in any::<A>()) {}\n}\n";
@@ -44,7 +55,62 @@ const CRATE_ORDER: &str = "pub(crate) struct A;\nimpl Ord for A {}\n";
 const PRIVATE_TYPE_PUBLIC_IMPL: &str = "struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 37] = [
+const CASES: [Case; 48] = [
+    Case::new(
+        Title::new("equality by pointer method"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_METHOD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("equality by a parenthesised pointer test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_PAREN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("equality by addr eq"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_ADDR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("equality by another call"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_CALL))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("equality by an eq of another module"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_EQ))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("equality by another ptr function"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_PTR))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("equality by another method"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(OTHER_METHOD))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("equality by pointer"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_EQUALITY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("equality by ptr eq"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_FUNCTION))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("pointer and a field"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_AND_FIELD))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("order from a pointer test"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_ORDER))],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
     Case::new(
         Title::new("display and from_str"),
         &[Source::new(Located::new("src/a.rs"), Text::new(TEXT_PAIR))],

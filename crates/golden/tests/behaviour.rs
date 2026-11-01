@@ -14,22 +14,26 @@ struct Fixture {
 
 impl Fixture {
     const NAME: &str = "nested/output.txt";
+    const GOLDENS: &str = "tests/goldens";
 
     fn new() -> Result<Self, std::io::Error> {
         Ok(Self { directory: TempDir::new()? })
     }
 
     fn path(&self) -> PathBuf {
-        self.directory.path().join(Self::NAME)
+        self.directory.path().join(Self::GOLDENS).join(Self::NAME)
     }
 
     fn golden(&self) -> Golden {
-        Golden::located_at(self.path())
+        match Golden::in_package(self.directory.path(), Self::NAME) {
+            Ok(golden) => golden,
+            Err(failure) => unreachable!("the fixture name stays inside the goldens directory: {failure:?}"),
+        }
     }
 
     fn with_recorded(text: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let fixture = Self::new()?;
-        fs::create_dir_all(fixture.directory.path().join("nested"))?;
+        fs::create_dir_all(fixture.directory.path().join(Self::GOLDENS).join("nested"))?;
         fs::write(fixture.path(), text)?;
         Ok(fixture)
     }
@@ -109,12 +113,11 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn a_golden_in_a_package_lives_under_its_goldens_directory() {
-    assert_eq!(Golden::in_package("/crate", "a.txt").ok(), Some(Golden::located_at("/crate/tests/goldens/a.txt")));
-    assert_eq!(
-        Golden::in_package("/crate", "nested/a.txt").ok(),
-        Some(Golden::located_at("/crate/tests/goldens/nested/a.txt"))
-    );
+fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new()?;
+    fixture.golden().verify_in(Mode::Record, Output::new("placed\n"))?;
+    assert_eq!(fixture.text()?, "placed\n");
+    Ok(())
 }
 
 table!(

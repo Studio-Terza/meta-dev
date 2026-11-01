@@ -49,6 +49,14 @@ a raw call must sit in an impl of a type that implements `Drop`: the guard that 
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
+A check that cannot run under plain `cargo test`, such as one that drives a browser or needs its own time budget,
+goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_ignored_tests` does not read
+`test = false` on an `[[example]]`, since an example is not a test.
+
+`no_test_only_api` also fails a visible `fn` or enum variant that no shipped code names but a test does, even with no
+`cfg(test)` gate or `#[doc(hidden)]`. It matches by name across the files it is given, so a name that shipped code also
+uses elsewhere passes.
+
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
 library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
@@ -134,7 +142,7 @@ row and names the first broken row, without generated input. Attributes before t
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
 
-`mandatory_laws` fails a `pub` type that has a conversion pair, or a hand-written `Ord` or `PartialEq`, without a law in a
+`mandatory_laws` fails a `pub` type that has a conversion pair, or a hand-written `Ord` or `PartialEq` (a `PartialEq` whose `eq` only compares pointers, such as `Rc::ptr_eq` or `ptr::eq`, needs no law), without a law in a
 test of the same package that names the type. A pair is `Display` with `FromStr`, `Serialize` with `Deserialize`
 (also behind `cfg_attr`), `encode` with `decode`, or `to_x` with `from_x`, in inherent impls or any trait impl, in one
 file or several. Each pair needs its own `roundtrip!`: one that names the type and, for method pairs, both methods.

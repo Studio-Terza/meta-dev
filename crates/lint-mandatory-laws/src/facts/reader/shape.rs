@@ -1,6 +1,7 @@
 use syn::{Ident, ImplItem, ItemEnum, ItemImpl, ItemStruct, Type};
 
 mod derives;
+mod pointer_eq;
 
 use super::super::exposure::Exposure;
 use super::super::profile::Profile;
@@ -11,6 +12,7 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_layout::Whole;
 use lint_layout::{LineNumber, Word, words};
+use pointer_eq::PointerEq;
 
 #[derive(Debug)]
 pub(crate) struct Shape;
@@ -18,6 +20,7 @@ pub(crate) struct Shape;
 impl Shape {
     const TRAITS: [Word<'static>; 6] = words!["Display", "FromStr", "Serialize", "Deserialize", "Ord", "PartialEq"];
     const METHODS: [Word<'static>; 2] = words!["encode", "decode"];
+    const EQUALITY: [Word<'static>; 1] = words!["PartialEq"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
 
     pub(crate) fn of_struct(file: &SourceFile, item: &ItemStruct) -> Profile {
@@ -47,7 +50,12 @@ impl Shape {
     fn implemented(item: &ItemImpl) -> Vec<Name> {
         let implemented =
             item.trait_.iter().filter_map(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
-        implemented.filter(|name| name.matches::<Whole>(&Self::TRAITS)).chain(Self::conversions(&item.items)).collect()
+        let by_address = PointerEq::is_whole_impl(item);
+        implemented
+            .filter(|name| name.matches::<Whole>(&Self::TRAITS))
+            .filter(|name| !(by_address && name.matches::<Whole>(&Self::EQUALITY)))
+            .chain(Self::conversions(&item.items))
+            .collect()
     }
 
     fn conversions(members: &[ImplItem]) -> Vec<Name> {
