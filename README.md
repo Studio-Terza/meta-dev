@@ -14,7 +14,11 @@ Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enu
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, primitive_boundary, private_fns, process_starters, public_surface,
-repeated_methods, state_graph, crate_graph.
+repeated_methods, state_graph, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
+near_duplicate_tests.
+
+Every run also prints the test budget: tests, files and lines per package, counting law macros as tests.
+It is report only, no number blocks.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
 settings. Files under `tests`, `examples` and `benches` are checked only by the lints that are not

@@ -32,6 +32,16 @@ impl Name {
     }
 
     #[must_use]
+    pub fn words(&self) -> Vec<Name> {
+        let letters: Vec<char> = self.0.chars().collect();
+        letters
+            .chunk_by(|left, right| left.is_alphanumeric() && right.is_alphanumeric())
+            .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
+            .map(|chunk| Name(chunk.iter().collect()))
+            .collect()
+    }
+
+    #[must_use]
     pub fn casing(&self) -> Casing {
         match self.0.chars().next() {
             Some(first) if first.is_ascii_lowercase() => Casing::Lower,

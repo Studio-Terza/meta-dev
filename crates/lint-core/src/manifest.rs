@@ -21,6 +21,7 @@ impl Manifest {
     const PACKAGE: &'static str = "package";
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
+    const FEATURES: &'static str = "features";
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
     pub fn read(directory: &Path) -> Result<Option<Manifest>, Failure> {
@@ -48,6 +49,17 @@ impl Manifest {
     #[must_use]
     pub fn package_name(&self) -> Option<Name> {
         self.table.get(Self::PACKAGE)?.get("name")?.as_str().map(Name::from)
+    }
+
+    #[must_use]
+    pub fn feature_names(&self) -> Vec<Name> {
+        self.table
+            .get(Self::FEATURES)
+            .and_then(Value::as_table)
+            .into_iter()
+            .flat_map(Table::keys)
+            .map(|name| Name::from(name.as_str()))
+            .collect()
     }
 
     #[must_use]

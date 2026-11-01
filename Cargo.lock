@@ -250,6 +250,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-near-duplicate-tests"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -278,6 +289,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-no-ignored-tests"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-no-numbers-in-binaries"
 version = "0.1.0"
 dependencies = [
@@ -294,6 +315,18 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-no-test-only-api"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "tempfile",
 ]
 
 [[package]]
@@ -316,6 +349,15 @@ dependencies = [
 
 [[package]]
 name = "lint-process-starters"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-public-api-tests"
 version = "0.1.0"
 dependencies = [
  "lint-core",
@@ -360,17 +402,22 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-near-duplicate-tests",
  "lint-no-comments",
  "lint-no-forwarders",
  "lint-no-free-fns",
+ "lint-no-ignored-tests",
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
+ "lint-no-test-only-api",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
+ "lint-public-api-tests",
  "lint-public-surface",
  "lint-repeated-methods",
  "lint-state-graph",
+ "lint-test-budget",
  "lint-thin-main",
  "lint-type-shape",
  "lint-vec-out-params",
@@ -384,6 +431,17 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-test-budget"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 

@@ -1,0 +1,18 @@
+[package]
+name = "lint-test-budget"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+proc-macro2.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+laws = { path = "../laws" }
+
+[lints]
+workspace = true
