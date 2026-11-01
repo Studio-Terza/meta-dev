@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::exposure::Exposure;
 use crate::coverage::Coverage;
 use crate::need::Need;
 use crate::obligation::Obligation;
@@ -12,6 +13,7 @@ use lint_layout::Name;
 pub(crate) struct Profile {
     subject: Subject,
     site: Site,
+    exposure: Exposure,
     facts: BTreeSet<Name>,
 }
 
@@ -22,16 +24,21 @@ impl Profile {
     const TO: &'static str = "to";
     const FROM: &'static str = "from";
 
-    pub(crate) fn declared(subject: Subject, site: Site, facts: Vec<Name>) -> Profile {
-        Profile { subject, site, facts: facts.into_iter().collect() }
+    pub(crate) fn declared(subject: Subject, site: Site, exposure: Exposure, facts: Vec<Name>) -> Profile {
+        Profile { subject, site, exposure, facts: facts.into_iter().collect() }
     }
 
     pub(crate) fn subject(&self) -> &Subject {
         &self.subject
     }
 
+    pub(crate) fn exposure(&self) -> Exposure {
+        self.exposure
+    }
+
     pub(crate) fn merged(mut self, other: Profile) -> Profile {
         self.facts.extend(other.facts);
+        self.exposure = self.exposure.max(other.exposure);
         self
     }
 

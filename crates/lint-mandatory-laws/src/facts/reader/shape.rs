@@ -2,6 +2,7 @@ use syn::{Ident, ImplItem, ItemEnum, ItemImpl, ItemStruct, Type};
 
 mod derives;
 
+use super::super::exposure::Exposure;
 use super::super::profile::Profile;
 use crate::subject::Subject;
 use derives::Derives;
@@ -20,20 +21,20 @@ impl Shape {
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
 
     pub(crate) fn of_struct(file: &SourceFile, item: &ItemStruct) -> Profile {
-        Self::declared(file, &item.ident, Derives::named(&item.attrs))
+        Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
     pub(crate) fn of_enum(file: &SourceFile, item: &ItemEnum) -> Profile {
-        Self::declared(file, &item.ident, Derives::named(&item.attrs))
+        Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
     pub(crate) fn of_impl(file: &SourceFile, item: &ItemImpl) -> Option<Profile> {
-        Self::owner(&item.self_ty).map(|owner| Self::declared(file, owner, Self::implemented(item)))
+        Self::owner(&item.self_ty).map(|owner| Self::declared(file, owner, Exposure::Private, Self::implemented(item)))
     }
 
-    fn declared(file: &SourceFile, owner: &Ident, facts: Vec<Name>) -> Profile {
+    fn declared(file: &SourceFile, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile {
         let site = Site::new(file.path(), LineNumber::from(owner.span()));
-        Profile::declared(Subject::new(file, Name::from(owner)), site, facts)
+        Profile::declared(Subject::new(file, Name::from(owner)), site, exposure, facts)
     }
 
     fn owner(ty: &Type) -> Option<&Ident> {
