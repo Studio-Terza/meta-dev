@@ -1,0 +1,31 @@
+name: judge
+description: Judge the stages this job timed against their limits, and report them
+
+inputs:
+  stages:
+    description: The stages this job timed, separated by spaces
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: limits
+      if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+      shell: bash
+      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" ${{ inputs.stages }}'
+    - name: step times
+      if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: '"$TOOLS/ci" wall-times "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_JOB"'
+    - name: report
+      if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
+      shell: bash
+      run: '"$TOOLS/ci" show ci/limits.toml "$MEASURED" "$LIMITS"'
+    - name: stage issues
+      if: github.ref == 'refs/heads/main' && always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: '"$TOOLS/ci" stage-issues ci/limits.toml "$MEASURED" ${{ inputs.stages }}'

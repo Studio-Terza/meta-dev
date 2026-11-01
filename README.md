@@ -92,9 +92,10 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci logged <log> <program> [<argument>...]                   run a program, copy its output to the log
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
-    ci tools <built directory> <tools directory>                build and copy reach, lint and ci
+    ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
     ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
+    ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
     ci wall-times <repository> <run> <job>                      wall time per step, from the GitHub API
     ci show <file>...                                           print files, and say which are absent
     ci labels <base branch> <pull request>                      the golden-change and new-scenario checks
@@ -166,11 +167,13 @@ test run and lint. The levels assume a full run, so they apply on main and on pu
 another branch is not judged by them. A stage above its warn level on main opens, or updates, one GitHub issue titled
 with the stage name (`ci stage-issues`), so creep becomes a work item before it blocks. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
 that main reports. `ci timed` times a stage; the test run is the sum of the `finished in`
-times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits`, which prints
-each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
+times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits <limits> <measured> [<stage>...]`, which prints
+each stage as ok, WARN or BLOCK and fails when any stage is above its block level. CI runs `clippy`, `test` and `lint`
+as three parallel jobs, and each times and judges only its own stages (`clippy`; `test-compile` and `test-run`; `lint`),
+so a stage is still judged alone; a named stage with no limit, or a limit with no measurement, fails. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
-No cache is used: caching was measured and did not pay for its save time.
+The Rust toolchain, the CI tools (built in the dev profile, so they reuse the test build's compiled crates) and compiled crates (`sccache`) are cached.
 
 ## Reach
 
