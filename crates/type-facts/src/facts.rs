@@ -34,6 +34,11 @@ impl Facts {
     }
 
     #[must_use]
+    pub fn is_declared_once(&self, found: &TypeFact) -> bool {
+        self.types.iter().filter(|other| other.is_named_like(found)).count() == 1
+    }
+
+    #[must_use]
     pub fn traits(&self) -> &[TraitFact] {
         &self.traits
     }

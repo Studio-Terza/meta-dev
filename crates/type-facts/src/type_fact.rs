@@ -30,6 +30,10 @@ impl TypeFact {
         self
     }
 
+    pub(crate) fn is_named_like(&self, other: &TypeFact) -> bool {
+        self.krate == other.krate && self.name == other.name
+    }
+
     #[must_use]
     pub fn derives(&self) -> &[Name] {
         &self.derives

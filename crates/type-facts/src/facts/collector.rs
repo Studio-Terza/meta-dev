@@ -111,12 +111,13 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             })
             .collect();
         let implementation = found.trait_.as_ref().and_then(|(_, path, _)| {
-            path.segments
-                .last()
-                .map(|segment| Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment)))
+            path.segments.last().map(|segment| {
+                Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), methods.clone())
+            })
         });
+        let inherent = implementation.as_ref().map_or(methods, |_| Vec::new());
         let block = Spelled::last_of(&found.self_ty)
-            .map(|target| ImplBlock::new(self.krate.clone(), target, implementation, methods));
+            .map(|target| ImplBlock::new(self.krate.clone(), target, implementation, inherent));
         self.blocks.extend(block.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered));
     }
 }

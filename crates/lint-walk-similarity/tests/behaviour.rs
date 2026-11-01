@@ -106,3 +106,29 @@ fn types_in_different_crates_can_be_candidates_and_test_code_is_left_out() {
     let report = Sources::report::<WalkSimilarity>(&sources);
     assert_eq!(report.violations().len(), 1);
 }
+
+#[test]
+fn a_name_declared_twice_in_a_crate_is_never_a_candidate() {
+    let text = Candidates::typed("A", FOUR) + &Candidates::typed("B", FOUR) + "struct A;\n";
+    assert_eq!(Candidates::lines(text).len(), 0);
+}
+
+const LOCAL_TRAIT: &str = "trait Tr {\n    fn a(&self);\n    fn b(&self);\n    fn c(&self) -> A;\n}\n";
+
+#[test]
+fn methods_of_a_local_trait_impl_join_the_walk_but_those_of_a_foreign_trait_do_not() {
+    let local = format!(
+        "{LOCAL_TRAIT}struct A;\nimpl Tr for A {{\n    fn a(&self) {{}}\n    fn b(&self) {{}}\n    fn c(&self) -> A {{ A }}\n}}\nstruct B;\nimpl Tr for B {{\n    fn a(&self) {{}}\n    fn b(&self) {{}}\n    fn c(&self) -> B {{ B }}\n}}\n"
+    );
+    assert_eq!(Candidates::lines(local).len(), 1);
+    let foreign = "struct A;\nimpl Foreign for A {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) {}\n}\nstruct B;\nimpl Foreign for B {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) {}\n}\n";
+    assert_eq!(Candidates::lines(foreign.to_owned()).len(), 0);
+}
+
+#[test]
+fn a_provided_method_decides_the_walk_by_its_trait_arity_and_return() {
+    let one = "struct A;\nimpl Tr for A {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) -> A { A }\n}\nstruct B;\nimpl Tr for B {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) -> B { B }\n}\n";
+    assert_eq!(Candidates::lines(format!("{LOCAL_TRAIT}{one}")).len(), 1);
+    let other = "struct A;\nimpl Tr for A {\n    fn a(&self) {}\n    fn b(&self) {}\n    fn c(&self) -> A { A }\n}\nstruct B;\nimpl Tr for B {\n    fn a(&self) {}\n    fn b(&self, x: u8) {}\n    fn c(&self) -> A { A }\n}\n";
+    assert_eq!(Candidates::lines(format!("{LOCAL_TRAIT}{other}")).len(), 0);
+}

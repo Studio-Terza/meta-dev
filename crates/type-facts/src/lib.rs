@@ -8,5 +8,6 @@ mod type_fact;
 pub use arity::Arity;
 pub use facts::Facts;
 pub use implementation::Implementation;
+pub use method::Method;
 pub use trait_fact::TraitFact;
 pub use type_fact::TypeFact;

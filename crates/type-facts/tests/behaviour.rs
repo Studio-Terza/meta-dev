@@ -85,7 +85,13 @@ fn trait_impls_keep_the_trait_and_its_first_type_argument() {
     )]);
     let found = Described::only(&facts);
     assert_eq!(Described::implemented(found), ["From<B>", "Display<>", "AsRef<C>", "Tr<D>", "Plain<>"]);
-    assert_eq!(Described::methods(found), ["from/1->A"]);
+    assert_eq!(Described::methods(found), Vec::<String>::new());
+    let provided: Vec<String> = found
+        .implementations()
+        .iter()
+        .flat_map(|each| each.methods().iter().map(|method| AsRef::<Name>::as_ref(method).to_string()))
+        .collect();
+    assert_eq!(provided, ["from"]);
 }
 
 #[test]
@@ -125,4 +131,20 @@ fn test_code_and_target_files_are_left_out() {
     assert_eq!(Described::names(&facts), ["A"]);
     assert_eq!(Described::methods(Described::only(&facts)), Vec::<String>::new());
     assert_eq!(facts.traits().len(), 0);
+}
+
+#[test]
+fn a_type_name_declared_twice_in_one_crate_is_not_declared_once() {
+    let facts = Described::facts(&[
+        Described::file("crates/x/src/lib.rs", "struct A;\nmod m;\nstruct B;\n"),
+        Described::file("crates/x/src/m.rs", "struct A;\n"),
+        Described::file("crates/y/src/lib.rs", "struct B;\nstruct A;\n"),
+    ]);
+    let once: Vec<String> = facts
+        .types()
+        .iter()
+        .filter(|found| facts.is_declared_once(found))
+        .map(|found| format!("{}:{}", AsRef::<CrateName>::as_ref(found), AsRef::<Name>::as_ref(found)))
+        .collect();
+    assert_eq!(once, ["x:B", "y:B", "y:A"]);
 }
