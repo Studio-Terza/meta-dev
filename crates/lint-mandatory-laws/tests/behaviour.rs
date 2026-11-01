@@ -18,15 +18,15 @@ const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(value in any::<A>()) 
 const OTHER_TYPE: &str = "laws::roundtrip!(b, any::<B>(), B::encode, B::decode);\n";
 
 const CASES: [Case; 14] = [
-    Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:2"]),
+    Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
     Case::new("serialize alone", &[Source::new("src/a.rs", SERDE_ONE)], &[]),
-    Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:2"]),
-    Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:2"]),
+    Case::new("encode and decode", &[Source::new("src/a.rs", ENCODING)], &["src/a.rs:1"]),
+    Case::new("to and from", &[Source::new("src/a.rs", FORMS)], &["src/a.rs:1"]),
     Case::new("to and from of different forms", &[Source::new("src/a.rs", MISMATCHED_FORMS)], &[]),
-    Case::new("hand-written order", &[Source::new("src/a.rs", ORDER)], &["src/a.rs:2"]),
-    Case::new("hand-written equality", &[Source::new("src/a.rs", EQUALITY)], &["src/a.rs:2"]),
+    Case::new("hand-written order", &[Source::new("src/a.rs", ORDER)], &["src/a.rs:1"]),
+    Case::new("hand-written equality", &[Source::new("src/a.rs", EQUALITY)], &["src/a.rs:1"]),
     Case::new("derived order", &[Source::new("src/a.rs", DERIVED_ORDER)], &[]),
     Case::new("roundtrip in a test", &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ROUNDTRIP)], &[]),
     Case::new("law covers order", &[Source::new("src/a.rs", ORDER), Source::new("tests/a.rs", LAW)], &[]),
@@ -38,7 +38,7 @@ const CASES: [Case; 14] = [
     Case::new(
         "law for another type",
         &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", OTHER_TYPE)],
-        &["src/a.rs:2"],
+        &["src/a.rs:1"],
     ),
 ];
 
