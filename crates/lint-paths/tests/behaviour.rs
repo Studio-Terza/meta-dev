@@ -38,6 +38,8 @@ laws::table!(
         "fn f() {\n    vec![std::fs::remove_dir_all(\"x\"); 2];\n}\n" => vec!["a.rs:2".to_owned()],
         "fn f() {\n    cache.remove_dir_all();\n}\n" => Vec::<String>::new(),
         "fn f() {\n    <std::fs as Tr>::remove_dir_all(\"x\");\n}\n" => Vec::<String>::new(),
+        "fn f() {\n    <std as fs>::remove_dir_all(\"x\");\n}\n" => Vec::<String>::new(),
+        "use foo::foo;\nfn f() {\n    foo::remove_dir_all(\"x\");\n}\n" => Vec::<String>::new(),
         "use std::fs::remove_dir_all;\nfn f(cache: u8) {\n    vec![cache.remove_dir_all()];\n}\n"
             => Vec::<String>::new(),
         "use std::fs::remove_dir_all;\nfn f() {\n    vec![1, remove_dir_all(\"x\")];\n}\n"

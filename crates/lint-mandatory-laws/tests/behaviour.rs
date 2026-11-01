@@ -32,6 +32,7 @@ const CODEC: &str = "struct A;\ntrait Codec {\n    fn encode(&self);\n    fn dec
 const KEY: &str = "pub struct Key;\nimpl Key {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const KEY_ROUNDTRIP: &str = "laws::roundtrip!(key_recovers, any::<Key>(), Key::encode, Key::decode);\n";
 
+const ATTRIBUTED_TITLE: &str = "laws::roundtrip!(#[allow(unused)] A, any::<u8>(), B::encode, B::decode);\n";
 const HALF_ROUNDTRIP: &str = "laws::roundtrip!(half, any::<A>(), A::encode, other);\n";
 const FOREIGN_ROUNDTRIP: &str = "other::roundtrip!(foreign, any::<A>(), A::encode, A::decode);\n";
 const LAW_NAMING_BOTH: &str = "laws::law!(both, any::<A>(), value, { A::decode(&value.encode()) });\n";
@@ -39,7 +40,7 @@ const ENCODE_ONLY: &str = "struct A;\nimpl A {\n    fn encode(&self) {}\n}\n";
 const DECODE_ONLY: &str = "struct A;\nimpl A {\n    fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 34] = [
+const CASES: [Case; 35] = [
     Case::new("display and from_str", &[Source::new("src/a.rs", TEXT_PAIR)], &["src/a.rs:1"]),
     Case::new("display alone", &[Source::new("src/a.rs", DISPLAY_ONLY)], &[]),
     Case::new("serde pair", &[Source::new("src/a.rs", SERDE_PAIR)], &["src/a.rs:2"]),
@@ -137,6 +138,11 @@ const CASES: [Case; 34] = [
     Case::new(
         "a plain law naming both methods",
         &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", LAW_NAMING_BOTH)],
+        &["src/a.rs:1"],
+    ),
+    Case::new(
+        "a title with an attribute",
+        &[Source::new("src/a.rs", ENCODING), Source::new("tests/a.rs", ATTRIBUTED_TITLE)],
         &["src/a.rs:1"],
     ),
     Case::new("encode alone", &[Source::new("src/a.rs", ENCODE_ONLY)], &[]),
