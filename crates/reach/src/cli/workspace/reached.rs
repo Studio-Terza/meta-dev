@@ -4,6 +4,18 @@ use std::fmt;
 use crate::cli::workspace::crate_count::CrateCount;
 use crate::cli::workspace::crate_name::CrateName;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Share {
+    reached: CrateCount,
+    total: CrateCount,
+}
+
+impl fmt::Display for Share {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} of {}", self.reached, self.total)
+    }
+}
+
 #[derive(Debug)]
 pub struct Reached {
     crates: BTreeSet<CrateName>,
@@ -16,6 +28,10 @@ impl Reached {
 
     pub fn new(crates: BTreeSet<CrateName>, total: CrateCount) -> Reached {
         Reached { crates, total }
+    }
+
+    pub fn share(&self) -> Share {
+        Share { reached: CrateCount::new(self.crates.len()), total: self.total }
     }
 
     fn flags(&self, flag: &str) -> String {

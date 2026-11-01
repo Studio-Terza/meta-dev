@@ -10,13 +10,15 @@ use crate::cli::ports::Invocation;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci reach <metadata file> <event> <environment file> <summary file> | ci tools <built directory> <tools directory> | ci mutants-shard <shard> <output directory> | ci mutants-changed <diff file> <output directory> [<scope>...] | ci wall-times <repository> <run> <job> | ci show <file>... | ci labels <base branch> <pull request> | ci shard-summary <shards directory> <summary file> | ci matrix <shards directory> <sources directory> <output directory> <summary file>"
+        "usage: ci timed <measured file> <stage> <program> [<argument>...] | ci logged <log file> <program> [<argument>...] | ci libtest-seconds <measured file> <stage> <test output> | ci reach <metadata file> <event> <environment file> <summary file> | ci history <metadata file> <history file> <revision> | ci tools <built directory> <tools directory> | ci mutants-shard <shard> <output directory> | ci mutants-changed <diff file> <output directory> [<scope>...] | ci wall-times <repository> <run> <job> | ci compile-times <timings page> <report file> | ci show <file>... | ci summarize <report file> <summary file> | ci labels <base branch> <pull request> | ci shard-summary <shards directory> <summary file> | ci matrix <shards directory> <sources directory> <output directory> <summary file>"
     )]
     Usage,
     #[error("cannot use {path}: {source}", path = path.display())]
     Io { path: PathBuf, source: io::Error },
     #[error("no libtest result line in {path}; the test output format may have changed", path = path.display())]
     NoTestResult { path: PathBuf },
+    #[error("no unit timings in {path}; the cargo timings format may have changed", path = path.display())]
+    NoTimings { path: PathBuf },
     #[error("cannot run {program}: {source}", program = program.to_string_lossy())]
     Program { program: std::ffi::OsString, source: io::Error },
     #[error("cannot write the report: {0}")]

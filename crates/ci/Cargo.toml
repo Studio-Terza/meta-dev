@@ -10,6 +10,8 @@ newtype = { path = "../newtype" }
 mutation-report = { path = "../mutation-report" }
 reach = { path = "../reach" }
 text-lines = { path = "../text-lines" }
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

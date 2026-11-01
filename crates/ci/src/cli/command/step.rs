@@ -1,4 +1,7 @@
+mod changed;
+mod compile_times;
 pub mod github;
+mod history;
 mod install_tools;
 mod journal;
 mod libtest_seconds;
@@ -15,6 +18,8 @@ use std::io::Write;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 
+pub use compile_times::CompileTimes;
+pub use history::History;
 pub use install_tools::InstallTools;
 pub use libtest_seconds::LibtestSeconds;
 pub use logged::Logged;

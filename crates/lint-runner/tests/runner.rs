@@ -15,6 +15,9 @@ const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
+const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n}\n";
+const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
+const MODULES: &str = "mod one;\nmod two;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
@@ -40,7 +43,8 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let listed_by_the_cli = Trees::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
     let listed_by_the_runner = Trees::occurrences(&here.join("src/lints.rs"), "::report(files)")?;
     assert!(listed_by_the_cli < implemented);
-    assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli);
+    let listed_by_elegance = Trees::occurrences(&here.join("src/elegance.rs"), "::report(files)")?;
+    assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli - listed_by_elegance);
     Ok(())
 }
 
@@ -72,6 +76,38 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
     assert!(Trees::reported(root.path()).is_clean());
     assert_eq!(Trees::reported(root.path()).exit, ExitCode::SUCCESS);
     Ok(())
+}
+
+#[test]
+fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", &format!("{DIRTY}{MODULES}"))?;
+    Trees::write(root.path(), "src/one.rs", REPEATED)?;
+    Trees::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
+    let run = Trees::flagged(root.path(), &["--report"]);
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
+    assert!(run.out.contains("2 copies, also at ") && run.out.contains("/src/two.rs:3; "), "{}", run.out);
+    assert_eq!(run.err, "");
+    Ok(())
+}
+
+#[test]
+fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", MODULES)?;
+    Trees::write(root.path(), "src/one.rs", REPEATED)?;
+    Trees::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
+    let run = Trees::flagged(root.path(), &[]);
+    assert!(!run.out.contains("copies"), "{}", run.out);
+    Ok(())
+}
+
+#[test]
+fn the_report_flag_fails_on_an_unreadable_root() {
+    let run = Trees::flagged(Path::new("/no/such/root"), &["--report"]);
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert_ne!(run.err, "");
 }
 
 #[test]
@@ -137,6 +173,17 @@ impl Trees {
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
 
+    fn flagged(root: &Path, flags: &[&str]) -> Printed {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
+        let exit = Cli::from_args(arguments).report_to(&mut out, &mut err);
+        Printed {
+            exit,
+            out: String::from_utf8(out).unwrap_or_default(),
+            err: String::from_utf8(err).unwrap_or_default(),
+        }
+    }
+
     fn reported(root: &Path) -> Reported {
         Self::reported_all(&[root.to_path_buf()])
     }
@@ -147,6 +194,12 @@ impl Trees {
         let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
+}
+
+struct Printed {
+    exit: ExitCode,
+    out: String,
+    err: String,
 }
 
 struct Reported {

@@ -21,6 +21,7 @@ const EMPTY_NOTES: &str = "skipped: CARGO_SCOPE is empty, so the steps that use 
 const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n\
     skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
+const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const BUILD: [&str; 9] = ["build", "--locked", "-q", "--profile", "tools", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
@@ -391,6 +392,109 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn a_history_line_names_the_revision_the_reach_and_every_fan_in_and_is_appended() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("metadata.json", METADATA)?;
+    scratch.write("history.tsv", "older\n")?;
+    let fake = Fake { changed: "crates/leaf/src/lib.rs\n".to_owned(), ..Fake::new() };
+    let arguments = ["history", &scratch.file("metadata.json"), &scratch.file("history.tsv"), "abc123"];
+    let answer = Answer::to(&fake, &arguments);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(answer.out, HISTORY_LINE);
+    Answer::to(&fake, &arguments);
+    assert_eq!(scratch.read("history.tsv"), format!("older\n{HISTORY_LINE}{HISTORY_LINE}"));
+    Ok(())
+}
+
+#[test]
+fn a_history_needs_git_and_readable_metadata_and_a_writable_file() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("metadata.json", METADATA)?;
+    let named = |file: &str| ["history".to_owned(), scratch.file("metadata.json"), scratch.file(file), "r".to_owned()];
+    let git = Answer::to(&Fake::refusing("git"), &named("history.tsv"));
+    assert_eq!((git.exit, git.err.as_str()), (ExitCode::FAILURE, "cannot run git: boom\n"));
+    scratch.write("blocker", "")?;
+    assert_eq!(Answer::to(&Fake::new(), &named("blocker/history.tsv")).exit, ExitCode::FAILURE);
+    let broken = ["history".to_owned(), scratch.file("none.json"), scratch.file("history.tsv"), "r".to_owned()];
+    assert!(Answer::to(&Fake::new(), &broken).err.contains("reach failed: cannot read"));
+    assert_eq!(scratch.read("history.tsv"), "");
+    Ok(())
+}
+
+#[test]
+fn a_report_is_appended_to_the_summary_under_its_name_or_said_to_be_missing() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("report.txt", "found\n")?;
+    scratch.write("summary.md", "# Summary\n")?;
+    let arguments = |report: &str| ["summarize".to_owned(), scratch.file(report), scratch.file("summary.md")];
+    assert_eq!(Answer::to(&Fake::new(), &arguments("report.txt")).exit, ExitCode::SUCCESS);
+    assert_eq!(Answer::to(&Fake::new(), &arguments("absent.txt")).exit, ExitCode::SUCCESS);
+    assert_eq!(
+        scratch.read("summary.md"),
+        format!("# Summary\n{}:\nfound\n{}:\nnot produced\n", scratch.file("report.txt"), scratch.file("absent.txt"))
+    );
+    Ok(())
+}
+
+struct Timings {
+    answer: Answer,
+    stored: String,
+}
+
+struct Page;
+
+impl Page {
+    fn with(units: &str) -> String {
+        format!("<html>\nconst OTHER = [];\nconst UNIT_DATA = [{units}\n];\nconst CONCURRENCY_DATA = [];\n</html>\n")
+    }
+
+    fn unit(name: &str, duration: &str) -> String {
+        format!("{{\"i\": 0, \"name\": \"{name}\", \"mode\": \"todo\", \"duration\": {duration}, \"sections\": null}}")
+    }
+
+    fn timed(page: &str) -> Result<Timings, Box<dyn Error>> {
+        let scratch = Scratch::new()?;
+        scratch.write("page.html", page)?;
+        let answer =
+            Answer::to(&Fake::new(), &["compile-times", &scratch.file("page.html"), &scratch.file("report.txt")]);
+        Ok(Timings { answer, stored: scratch.read("report.txt") })
+    }
+}
+
+#[test]
+fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box<dyn Error>> {
+    let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
+    let Timings { answer, stored } = Page::timed(&page)?;
+    let expected = "compile time per crate, seconds, longest first, 2.25 in all:\n2.00 zzz\n0.25 aaa\n";
+    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected.to_owned(), err: String::new() });
+    assert_eq!(stored, expected);
+    Ok(())
+}
+
+#[test]
+fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(), Box<dyn Error>> {
+    let units: Vec<String> = (0..31).map(|at| Page::unit(&format!("crate{at:02}"), "1.0")).collect();
+    let answer = Page::timed(&Page::with(&units.join(",")))?.answer;
+    assert_eq!(answer.out.matches(char::from(10)).count(), 31);
+    assert!(answer.out.contains("compile time per crate, seconds, longest first, 31.00 in all:\n"));
+    Ok(())
+}
+
+#[test]
+fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> {
+    for page in ["<html></html>", "const UNIT_DATA = nope;", "const UNIT_DATA = [{\"name\": 3}];"] {
+        let Timings { answer, stored } = Page::timed(page)?;
+        assert_eq!(answer.exit, ExitCode::FAILURE, "{page}");
+        assert!(answer.err.contains("no unit timings in"), "{page}");
+        assert_eq!((answer.out.as_str(), stored.as_str()), ("", ""));
+    }
+    let scratch = Scratch::new()?;
+    let missing = Answer::to(&Fake::new(), &["compile-times", &scratch.file("none.html"), &scratch.file("report.txt")]);
+    assert_eq!(missing.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
 fn a_program_the_scope_needs_that_cannot_start_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let cargo = Answer::to(&Fake::refusing("cargo"), &Reach::on(&scratch, "push"));
@@ -440,6 +544,13 @@ laws::table!(
         ["reach", "metadata.json", "push"] => true,
         ["reach", "metadata.json", "push", "env"] => true,
         ["reach", "metadata.json", "push", "env", "sum", "extra"] => true,
+        ["compile-times"] => true,
+        ["compile-times", "page.html"] => true,
+        ["compile-times", "page.html", "report.txt", "extra"] => true,
+        ["history"] => true,
+        ["history", "metadata.json"] => true,
+        ["history", "metadata.json", "history.tsv"] => true,
+        ["history", "metadata.json", "history.tsv", "abc", "extra"] => true,
         ["logged"] => true,
         ["logged", "log.txt"] => true,
         ["tools"] => true,
@@ -454,6 +565,9 @@ laws::table!(
         ["wall-times", "repo", "1"] => true,
         ["wall-times", "repo", "1", "job", "extra"] => true,
         ["show"] => true,
+        ["summarize"] => true,
+        ["summarize", "report.txt"] => true,
+        ["summarize", "report.txt", "summary.md", "extra"] => true,
         ["labels"] => true,
         ["labels", "main"] => true,
         ["labels", "main", "1", "extra"] => true,

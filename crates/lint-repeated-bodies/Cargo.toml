@@ -1,0 +1,21 @@
+[package]
+name = "lint-repeated-bodies"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+body-shape = { path = "../body-shape" }
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+newtype = { path = "../newtype" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true

@@ -13,7 +13,7 @@ pub struct Show {
 }
 
 impl Show {
-    fn shown(file: &Journal, out: &mut impl Write) -> Result<(), Failure> {
+    pub(super) fn shown(file: &Journal, out: &mut impl Write) -> Result<(), Failure> {
         writeln!(out, "{file}:")?;
         Ok(write!(out, "{}", file.read_or("not produced\n")?)?)
     }
