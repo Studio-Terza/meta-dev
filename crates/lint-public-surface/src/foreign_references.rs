@@ -7,7 +7,8 @@ use super::export::Export;
 use lint_core::BinaryFiles;
 use lint_core::Macros;
 use lint_core::SourceFile;
-use lint_core::{CrateName, Name};
+use lint_layout::Name;
+use lint_placement::CrateName;
 
 #[derive(Default)]
 pub struct ForeignReferences {

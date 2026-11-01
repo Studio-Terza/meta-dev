@@ -13,7 +13,9 @@ use predicates::Predicates;
 use syn::visit::Visit;
 use syn::{Type, TypePath};
 
-use lint_core::{ModulePath, Name, Report, SourceFile, Violation};
+use lint_core::{Report, SourceFile, Violation};
+use lint_layout::Name;
+use lint_placement::ModulePath;
 
 #[derive(Debug, Default)]
 pub struct EnumPredicates {

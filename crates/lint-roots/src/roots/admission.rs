@@ -3,8 +3,8 @@ mod workspace;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use crate::failure::Failure;
-use crate::manifest::Manifest;
+use lint_layout::Failure;
+use lint_layout::Manifest;
 use workspace::Workspace;
 
 #[derive(Debug, Default)]

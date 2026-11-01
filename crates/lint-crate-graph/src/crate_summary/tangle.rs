@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::crate_summary::item_count::ItemCount;
-use lint_core::Name;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tangle(Vec<Name>);

@@ -1,6 +1,6 @@
 use lint_const_shape::ConstShape;
 use lint_core::Lint;
-use lint_fixtures::Sources;
+use lint_fixtures::{Case, Source, Sources};
 
 const CAST: &str = "fn f(x: u8) -> u32 { x as u32 }\nconst fn g(x: u8) -> u32 { x as u32 }\n";
 const LOOPS: &str =
@@ -51,4 +51,29 @@ fn const_context_does_not_leak_into_nested_functions() {
 fn statics_trait_consts_lengths_and_discriminants_are_const_context() {
     let report = ConstShape::report(&[Sources::file("a.rs", ITEMS)]);
     assert_eq!(Sources::lines(&report), ["a.rs:2"]);
+}
+
+const BITS_CAST: &str = "fn f(x: u8) -> u32 { x as u32 }\n";
+const INLINE_BITS: &str = "mod bits {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
+const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
+const BITS_LOOP: &str = "mod bits {\n    pub const fn f() {\n        for _ in 0..3 {}\n    }\n}\n";
+const BITS_LEAK: &str = "mod bits {}\nfn f(x: u8) -> u32 { x as u32 }\n";
+
+const CASES: [Case; 7] = [
+    Case::new("bits module file", &[Source::new("crates/x/src/bits/mask.rs", BITS_CAST)], &[]),
+    Case::new("bits module root", &[Source::new("crates/x/src/bits.rs", BITS_CAST)], &[]),
+    Case::new("inline bits module", &[Source::new("a.rs", INLINE_BITS)], &[]),
+    Case::new("inline other module", &[Source::new("a.rs", INLINE_OTHER)], &["a.rs:2"]),
+    Case::new(
+        "other module file",
+        &[Source::new("crates/x/src/masks/mask.rs", BITS_CAST)],
+        &["crates/x/src/masks/mask.rs:1"],
+    ),
+    Case::new("bits keep the loop rule", &[Source::new("a.rs", BITS_LOOP)], &["a.rs:3"]),
+    Case::new("bits do not leak out", &[Source::new("a.rs", BITS_LEAK)], &["a.rs:2"]),
+];
+
+#[test]
+fn casts_are_allowed_only_inside_a_bits_module() {
+    assert_eq!(Sources::mismatches::<ConstShape>(&CASES), Vec::<String>::new());
 }

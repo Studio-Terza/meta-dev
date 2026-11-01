@@ -9,13 +9,13 @@ use syn::{ImplItem, ItemImpl, ItemMod, Macro, Visibility};
 
 use lint_core::Macros;
 use lint_core::Most;
-use lint_core::Name;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct PrivateFns;

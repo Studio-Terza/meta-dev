@@ -8,13 +8,14 @@ use syn::{
     ItemFn, ItemMod, ItemStatic, Macro, TraitItemConst, TraitItemFn, TypeArray, Variant,
 };
 
-use lint_core::LineNumber;
+use lint_core::Gate;
 use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct ConstShape;
@@ -22,7 +23,7 @@ pub struct ConstShape;
 impl Lint for ConstShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "casts live in const fns, and const loops walk slices",
+            "casts live in const fns or bits modules, and const loops walk slices",
             files.iter().flat_map(Self::violations).collect(),
         )
     }
@@ -30,7 +31,12 @@ impl Lint for ConstShape {
 
 impl ConstShape {
     fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut contexts = ConstContexts { path: file.path(), context: Context::Surface, violations: Vec::new() };
+        let mut contexts = ConstContexts {
+            path: file.path(),
+            context: Context::Surface,
+            zone: Zone::of_file(file),
+            violations: Vec::new(),
+        };
         contexts.visit_file(file.syntax());
         contexts.violations
     }
@@ -48,9 +54,26 @@ impl Context {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Zone {
+    Bits,
+    Elsewhere,
+}
+
+impl Zone {
+    fn of_file(file: &SourceFile) -> Zone {
+        if Gate::BITS.admits(file) { Zone::Bits } else { Zone::Elsewhere }
+    }
+
+    fn entering(self, module: &ItemMod) -> Zone {
+        if Gate::BITS.names(module) { Zone::Bits } else { self }
+    }
+}
+
 struct ConstContexts<'scan> {
     path: &'scan Path,
     context: Context,
+    zone: Zone,
     violations: Vec<Violation>,
 }
 
@@ -66,7 +89,7 @@ impl ConstContexts<'_> {
     }
 
     fn cast_finding(&self, cast: &ExprCast) -> Option<Violation> {
-        (self.context == Context::Surface)
+        (self.context == Context::Surface && self.zone == Zone::Elsewhere)
             .then(|| self.violation(cast.as_token.span, "as cast outside a const fn; use From, TryFrom, or an EnumMap"))
     }
 
@@ -78,7 +101,12 @@ impl ConstContexts<'_> {
 impl<'ast> Visit<'ast> for ConstContexts<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
+            Walk::Entered => {
+                let outer = self.zone;
+                self.zone = self.zone.entering(module);
+                syn::visit::visit_item_mod(self, module);
+                self.zone = outer;
+            }
             Walk::Skipped => {}
         }
     }

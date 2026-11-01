@@ -9,7 +9,8 @@ use syn::Ident;
 use syn::visit::Visit;
 
 use lint_core::Lint;
-use lint_core::{LineNumber, Name, Report, Site, SourceFile, Violation};
+use lint_core::{Report, Site, SourceFile, Violation};
+use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]
 pub struct DistinctSignatures;

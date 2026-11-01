@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::modules::{Child, Modules};
 use super::scope::Scope;
-use crate::source_file::SourceFile;
+use lint_core::SourceFile;
 
 #[derive(Debug, Default)]
 pub struct TestModules {

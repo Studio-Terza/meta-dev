@@ -4,7 +4,7 @@ use proc_macro2::{Group, Ident, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::{FnArg, ReturnType, Signature};
 
-use lint_core::Name;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MethodShape {

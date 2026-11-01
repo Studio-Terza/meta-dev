@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
-use lint_core::LineNumber;
+use lint_core::Gate;
 use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
@@ -12,6 +12,7 @@ use lint_core::SourceFile;
 use lint_core::SupportModules;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub struct NamedNumbers;
@@ -20,10 +21,12 @@ impl Lint for NamedNumbers {
     fn report(files: &[SourceFile]) -> Report {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         Report::new(
-            "a number has a name: outside tests, a literal other than 0 and 1 sits in a const item",
+            "a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item",
             files
                 .iter()
-                .filter(|file| file.is_shipped() && !support.contains(&file.path().to_owned()))
+                .filter(|file| {
+                    file.is_shipped() && !Gate::BITS.admits(file) && !support.contains(&file.path().to_owned())
+                })
                 .flat_map(|file| {
                     let mut numbers = Numbers::default();
                     numbers.visit_file(file.syntax());
@@ -58,8 +61,8 @@ struct Numbers(Vec<LineNumber>);
 impl<'ast> Visit<'ast> for Numbers {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
+            Walk::Entered if !Gate::BITS.names(module) => syn::visit::visit_item_mod(self, module),
+            Walk::Entered | Walk::Skipped => {}
         }
     }
 

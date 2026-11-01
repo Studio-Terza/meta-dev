@@ -2,9 +2,10 @@ use std::collections::BTreeSet;
 
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Expr, ExprCall, ExprMethodCall, Ident, ItemUse, Macro, Token, UseTree};
+use syn::{Expr, ExprCall, ExprMethodCall, Ident, ItemMod, ItemUse, Macro, Token, UseTree};
 
-use lint_core::{LineNumber, SourceFile};
+use lint_core::{Gate, SourceFile};
+use lint_layout::LineNumber;
 
 #[derive(Debug, Default)]
 pub(crate) struct CommandPaths {
@@ -81,6 +82,13 @@ impl CommandPaths {
 }
 
 impl<'ast> Visit<'ast> for CommandPaths {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        Some(module)
+            .filter(|module| !Gate::PORTS.names(module))
+            .into_iter()
+            .for_each(|module| visit::visit_item_mod(self, module));
+    }
+
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
         self.imported(&item.tree, false);
     }

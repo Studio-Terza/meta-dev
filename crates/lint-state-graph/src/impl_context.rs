@@ -6,8 +6,8 @@ use syn::{ImplItemFn, ItemImpl, Visibility};
 
 use super::declarations::Declarations;
 use super::function_shape::FunctionShape;
-use lint_core::Name;
 use lint_core::TypeName;
+use lint_layout::Name;
 
 pub struct ImplContext {
     self_type: TypeName,

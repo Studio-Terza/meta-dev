@@ -1,12 +1,10 @@
-mod placement;
-
 use std::path::{Path, PathBuf};
 
-use crate::crate_file::CrateFile;
-use crate::failure::Failure;
-use crate::line_number::LineNumber;
-use crate::role::Role;
-use placement::Placement;
+use lint_layout::Failure;
+use lint_layout::LineNumber;
+use lint_placement::CrateFile;
+use lint_placement::Placement;
+use lint_placement::Role;
 
 #[derive(Debug)]
 pub struct SourceFile {

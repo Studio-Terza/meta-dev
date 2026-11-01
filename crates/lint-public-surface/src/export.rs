@@ -1,10 +1,10 @@
 use syn::{Item, ItemUse, UseTree, Visibility};
 
-use lint_core::CrateName;
-use lint_core::LineNumber;
-use lint_core::Name;
-use lint_core::Role;
 use lint_core::SourceFile;
+use lint_layout::LineNumber;
+use lint_layout::Name;
+use lint_placement::CrateName;
+use lint_placement::Role;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Export {

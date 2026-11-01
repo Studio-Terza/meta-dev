@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::failure::Failure;
+use lint_layout::Failure;
 
 #[derive(Debug)]
 pub struct Tree {

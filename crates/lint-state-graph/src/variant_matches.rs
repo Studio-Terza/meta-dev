@@ -10,12 +10,12 @@ use syn::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, 
 
 use super::declarations::Declarations;
 use super::finding::Finding;
-use lint_core::LineNumber;
-use lint_core::Name;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 pub struct VariantMatches<'scan> {
     declarations: &'scan Declarations,

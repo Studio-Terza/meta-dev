@@ -8,8 +8,8 @@ pub use traversal::Traversal;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lint_core::Name;
 use lint_core::SourceFile;
+use lint_layout::Name;
 use referenced_names::ReferencedNames;
 use scope::Scope;
 

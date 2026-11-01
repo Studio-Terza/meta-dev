@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 
-use crate::name::Name;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModulePath(Vec<Name>);

@@ -5,12 +5,12 @@ use syn::visit::Visit;
 use syn::{Index, ItemMod, ItemStruct, Member, Visibility};
 
 use super::finding::Finding;
-use lint_core::LineNumber;
-use lint_core::Name;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,

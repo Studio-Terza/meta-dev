@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use super::directory::Directory;
 use super::target::Target;
-use crate::failure::Failure;
-use crate::source_files::tree::Tree;
+use crate::tree::Tree;
+use lint_layout::Failure;
 
 #[derive(Debug)]
 pub struct Package {

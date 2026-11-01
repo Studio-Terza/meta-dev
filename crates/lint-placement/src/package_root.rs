@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use crate::crate_root::CrateRoot;
-use crate::manifest::Manifest;
-use crate::name::Name;
-use crate::untested::Untested;
+use lint_layout::Manifest;
+use lint_layout::Name;
+use lint_layout::Untested;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PackageRoot {

@@ -18,13 +18,14 @@ use syn::{
 };
 
 use super::finding::Finding;
-use lint_core::LineNumber;
+use lint_core::Gate;
 use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::UsePath;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_core::{LoweredInfix, Name, Whole};
+use lint_layout::LineNumber;
+use lint_layout::UsePath;
+use lint_layout::{LoweredInfix, Name, Whole};
 
 pub struct NumberSites {
     path: PathBuf,
@@ -115,8 +116,8 @@ impl NumberSites {
 impl<'ast> Visit<'ast> for NumberSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
+            Walk::Entered if !Gate::BITS.names(module) => syn::visit::visit_item_mod(self, module),
+            Walk::Entered | Walk::Skipped => {}
         }
     }
 

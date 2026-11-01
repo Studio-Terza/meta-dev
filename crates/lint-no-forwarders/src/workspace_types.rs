@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use syn::visit::Visit;
 use syn::{ItemEnum, ItemStruct, ItemTrait};
 
-use lint_core::Name;
 use lint_core::SourceFile;
+use lint_layout::Name;
 
 #[derive(Default)]
 pub struct WorkspaceTypes(BTreeSet<Name>);

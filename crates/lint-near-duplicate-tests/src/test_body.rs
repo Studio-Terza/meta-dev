@@ -1,6 +1,8 @@
 mod finding;
 
-use lint_core::{Name, Site, Violation};
+use lint_core::Site;
+use lint_core::Violation;
+use lint_layout::Name;
 
 use crate::body_shape::BodyShape;
 use finding::Finding;

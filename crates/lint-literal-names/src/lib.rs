@@ -5,14 +5,15 @@ use lint_core::Lint;
 use syn::visit::Visit;
 use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, TraitItemFn};
 
-use lint_core::LineNumber;
+use lint_core::Least;
 use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_core::{Least, Name, Whole};
+use lint_layout::LineNumber;
+use lint_layout::{Name, Whole};
 
 #[derive(Debug)]
 pub struct LiteralNames;

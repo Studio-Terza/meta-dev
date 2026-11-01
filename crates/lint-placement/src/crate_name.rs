@@ -3,7 +3,7 @@ use std::fmt;
 use syn::Ident;
 
 use crate::crate_root::CrateRoot;
-use crate::name::Name;
+use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CrateName(Name);

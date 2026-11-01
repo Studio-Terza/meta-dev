@@ -2,7 +2,9 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type};
 
-use lint_core::{LineNumber, Macros, ModulePath, Name, Site, SourceFile, Violation};
+use lint_core::{Macros, Site, SourceFile, Violation};
+use lint_layout::{LineNumber, Name};
+use lint_placement::ModulePath;
 
 use super::{EnumPredicates, Finding};
 

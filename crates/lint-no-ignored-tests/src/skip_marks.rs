@@ -5,7 +5,11 @@ use syn::visit::{self, Visit};
 use syn::{Attribute, ItemFn, ItemMod, Macro, Meta, MetaList};
 
 use gate::Gate;
-use lint_core::{LineNumber, Macros, Name, TestMarks, Whole};
+use lint_core::Macros;
+use lint_layout::LineNumber;
+use lint_layout::Name;
+use lint_layout::TestMarks;
+use lint_layout::Whole;
 
 #[derive(Debug, Default)]
 pub(crate) struct SkipMarks {

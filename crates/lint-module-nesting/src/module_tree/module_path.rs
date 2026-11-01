@@ -11,10 +11,10 @@ pub use same::Same;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use lint_core::CrateRoot;
 use lint_core::SourceFile;
-use lint_core::UsePath;
-use lint_core::{Name, Whole};
+use lint_layout::UsePath;
+use lint_layout::{Name, Whole};
+use lint_placement::CrateRoot;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModulePath {

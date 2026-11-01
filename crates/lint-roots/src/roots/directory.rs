@@ -1,9 +1,9 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::failure::Failure;
-use crate::name::Name;
-use crate::prefix::Prefix;
+use lint_layout::Failure;
+use lint_layout::Name;
+use lint_layout::Prefix;
 
 #[derive(Debug)]
 pub struct Directory(PathBuf);

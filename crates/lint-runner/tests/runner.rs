@@ -1,9 +1,11 @@
 use std::error::Error;
 use std::fs;
 
-use lint_core::{Failure, Lint, SourceFiles};
+use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::Sources;
+use lint_layout::Failure;
+use lint_reader::SourceFiles;
 use lint_runner::{Lints, Outcome};
 
 use std::path::Path;

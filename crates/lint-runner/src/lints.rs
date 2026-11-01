@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use lint_core::{Failure, Lint, Readout, Report, SourceFile, SourceFiles};
+use lint_core::{Lint, Readout, Report, SourceFile};
+use lint_layout::Failure;
+use lint_reader::SourceFiles;
 
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;

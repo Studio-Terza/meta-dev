@@ -2,7 +2,8 @@ use proc_macro2::TokenTree;
 use syn::spanned::Spanned;
 use syn::{Attribute, Field, ImplItem, Item, Meta, MetaList, Visibility};
 
-use lint_core::{LineNumber, Walk};
+use lint_core::Walk;
+use lint_layout::LineNumber;
 
 use crate::finding::Finding;
 use crate::flagged::Flagged;

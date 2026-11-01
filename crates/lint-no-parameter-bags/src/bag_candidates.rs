@@ -9,10 +9,10 @@ use method_shape::MethodShape;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, ItemStruct, Type};
 
-use lint_core::LineNumber;
-use lint_core::Name;
 use lint_core::SourceFile;
 use lint_core::Walk;
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 #[derive(Default)]
 pub struct BagCandidates {

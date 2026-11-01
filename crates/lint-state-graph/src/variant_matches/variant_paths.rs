@@ -1,7 +1,7 @@
 use syn::visit::Visit;
 use syn::{ExprPath, Pat, PatStruct, PatTupleStruct, Path};
 
-use lint_core::Name;
+use lint_layout::Name;
 
 #[derive(Default)]
 pub struct VariantPaths(Vec<Name>);

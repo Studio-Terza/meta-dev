@@ -1,6 +1,6 @@
 use syn::{Attribute, Meta};
 
-use lint_core::LineNumber;
+use lint_layout::LineNumber;
 
 #[derive(Debug)]
 pub(super) struct Gate;

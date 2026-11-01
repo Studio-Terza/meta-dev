@@ -1,8 +1,8 @@
 use std::fmt;
 
 use lint_core::Most;
-use lint_core::Name;
 use lint_core::TypeName;
+use lint_layout::Name;
 
 pub enum Finding {
     TooManyPrivateFns { type_name: TypeName, names: Vec<Name>, most: Most },

@@ -4,7 +4,8 @@ mod crate_budget;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use lint_core::{CrateName, SourceFile};
+use lint_core::SourceFile;
+use lint_placement::CrateName;
 
 pub use count::Count;
 pub use crate_budget::CrateBudget;
