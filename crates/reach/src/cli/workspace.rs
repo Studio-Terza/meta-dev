@@ -4,8 +4,10 @@ mod fan_in;
 mod history;
 mod metadata;
 mod reached;
+mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -16,6 +18,7 @@ use fan_in::FanIn;
 use history::History;
 use metadata::Metadata;
 use reached::Reached;
+use sources::Sources;
 
 #[derive(Debug)]
 pub struct Workspace {
@@ -47,6 +50,22 @@ impl Workspace {
 
     pub fn history(&self, changed: &[PathBuf]) -> History {
         History::new(self.reached(changed), self.fan_in())
+    }
+
+    pub fn sources(&self, roots: &[OsString]) -> Sources {
+        let wanted: BTreeSet<CrateName> = self
+            .directories
+            .keys()
+            .filter(|name| roots.iter().any(|root| root.to_str() == Some(name.to_string().as_str())))
+            .cloned()
+            .collect();
+        Sources::new(
+            self.directories
+                .iter()
+                .filter(|(name, _)| !self.closure(BTreeSet::from([(*name).clone()])).is_disjoint(&wanted))
+                .map(|(_, directory)| directory.clone())
+                .collect(),
+        )
     }
 
     pub fn fan_in(&self) -> FanIn {

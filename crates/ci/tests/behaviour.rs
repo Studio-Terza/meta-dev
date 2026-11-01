@@ -556,6 +556,9 @@ laws::table!(
         ["tools"] => true,
         ["tools", "built"] => true,
         ["tools", "built", "to", "extra"] => true,
+        ["tools-key"] => true,
+        ["tools-key", "metadata.json"] => true,
+        ["tools-key", "metadata.json", "out", "extra"] => true,
         ["mutants-shard"] => true,
         ["mutants-shard", "0/8"] => true,
         ["mutants-shard", "0/8", "out", "extra"] => true,
@@ -648,6 +651,41 @@ fn tools_cannot_go_where_a_file_is_and_cargo_must_start() -> Result<(), Box<dyn 
     assert!(blocked.err.contains("blocker/tools"));
     let refused = Answer::to(&Fake::refusing("cargo"), &["tools", &scratch.file("built"), &scratch.file("tools")]);
     assert_eq!(refused.err, "cannot run cargo: boom\n");
+    Ok(())
+}
+
+const TOOLS_WORKSPACE: &str = r#"{"workspace_root": "/w", "packages": [
+  {"name": "reach", "manifest_path": "/w/crates/reach/Cargo.toml", "dependencies": [{"name": "text-lines"}]},
+  {"name": "lint", "manifest_path": "/w/crates/lint/Cargo.toml", "dependencies": [{"name": "lint-core"}]},
+  {"name": "ci", "manifest_path": "/w/crates/ci/Cargo.toml", "dependencies": [{"name": "reach"}]},
+  {"name": "text-lines", "manifest_path": "/w/crates/text-lines/Cargo.toml", "dependencies": []},
+  {"name": "lint-core", "manifest_path": "/w/crates/lint-core/Cargo.toml", "dependencies": []},
+  {"name": "gate-limits", "manifest_path": "/w/crates/gate-limits/Cargo.toml", "dependencies": [{"name": "ci"}]}
+]}"#;
+const TOOLS_SOURCES: &str = "sources<<TOOLS_SOURCES\n\
+    crates/ci/Cargo.toml\ncrates/ci/src/**\ncrates/lint/Cargo.toml\ncrates/lint/src/**\n\
+    crates/lint-core/Cargo.toml\ncrates/lint-core/src/**\ncrates/reach/Cargo.toml\ncrates/reach/src/**\n\
+    crates/text-lines/Cargo.toml\ncrates/text-lines/src/**\nTOOLS_SOURCES\n";
+
+#[test]
+fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_others() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("out", "KEPT=1\n")?;
+    let fake = Fake { metadata: TOOLS_WORKSPACE.to_owned(), ..Fake::new() };
+    let answer = Answer::to(&fake, &["tools-key", &scratch.file("m/metadata.json"), &scratch.file("out")]);
+    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
+    assert_eq!(scratch.read("out"), format!("KEPT=1\n{TOOLS_SOURCES}"));
+    Ok(())
+}
+
+#[test]
+fn a_tools_key_needs_metadata_cargo_can_give_and_reach_can_read() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = ["tools-key", &scratch.file("metadata.json"), &scratch.file("out")];
+    assert_eq!(Answer::to(&Fake::refusing("cargo"), &arguments).err, "cannot run cargo: boom\n");
+    let broken = Fake { metadata: "not json".to_owned(), ..Fake::new() };
+    assert!(Answer::to(&broken, &arguments).err.contains("reach failed: cannot parse cargo metadata"));
+    assert!(!scratch.path().join("out").exists());
     Ok(())
 }
 

@@ -6,7 +6,7 @@ use std::io::Write;
 
 use step::github::{Labels, Show, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
-use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed};
+use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::{Exit, Ports};
 use failure::Failure;
@@ -20,6 +20,7 @@ pub enum Command {
     CompileTimes(CompileTimes),
     Logged(Logged),
     Tools(InstallTools),
+    ToolsKey(ToolsKey),
     MutantsShard(MutantsShard),
     MutantsChanged(MutantsChanged),
     WallTimes(WallTimes),
@@ -38,6 +39,7 @@ impl Command {
     const COMPILE_TIMES: &'static str = "compile-times";
     const LOGGED: &'static str = "logged";
     const TOOLS: &'static str = "tools";
+    const TOOLS_KEY: &'static str = "tools-key";
     const MUTANTS_SHARD: &'static str = "mutants-shard";
     const MUTANTS_CHANGED: &'static str = "mutants-changed";
     const WALL_TIMES: &'static str = "wall-times";
@@ -58,6 +60,7 @@ impl Command {
             Some(Self::COMPILE_TIMES) => CompileTimes::from_arguments(&rest).map(Command::CompileTimes),
             Some(Self::LOGGED) => Logged::from_arguments(&rest).map(Command::Logged),
             Some(Self::TOOLS) => InstallTools::from_arguments(&rest).map(Command::Tools),
+            Some(Self::TOOLS_KEY) => ToolsKey::from_arguments(&rest).map(Command::ToolsKey),
             Some(Self::MUTANTS_SHARD) => MutantsShard::from_arguments(&rest).map(Command::MutantsShard),
             Some(Self::MUTANTS_CHANGED) => MutantsChanged::from_arguments(&rest).map(Command::MutantsChanged),
             Some(Self::WALL_TIMES) => WallTimes::from_arguments(&rest).map(Command::WallTimes),
@@ -79,6 +82,7 @@ impl Command {
             Command::CompileTimes(step) => step.carry_out(ports, out),
             Command::Logged(step) => step.carry_out(ports, out),
             Command::Tools(step) => step.carry_out(ports, out),
+            Command::ToolsKey(step) => step.carry_out(ports, out),
             Command::MutantsShard(step) => step.carry_out(ports, out),
             Command::MutantsChanged(step) => step.carry_out(ports, out),
             Command::WallTimes(step) => step.carry_out(ports, out),
