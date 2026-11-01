@@ -1,7 +1,8 @@
 use std::error::Error;
 use std::fs;
 
-use lint_core::Failure;
+use lint_core::{Failure, Lint, SourceFiles};
+use lint_crate_graph::CrateGraph;
 use lint_fixtures::Sources;
 use lint_runner::{Lints, Outcome};
 
@@ -61,6 +62,24 @@ impl Trees {
         }
         fs::write(file, text)?;
         Ok(())
+    }
+
+    fn chain(prefix: &str, size: usize) -> String {
+        let lines: Vec<String> = (0..size)
+            .map(|index| {
+                if index + 1 < size {
+                    format!("pub struct {prefix}{index}({prefix}{});\n", index + 1)
+                } else {
+                    format!("pub struct {prefix}{index};\n")
+                }
+            })
+            .collect();
+        lines.concat()
+    }
+
+    fn crate_graph_lines(root: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+        let readout = SourceFiles::read(root)?;
+        Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
 
     fn violation_count(outcome: &Outcome) -> usize {
@@ -306,5 +325,26 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
     Trees::write(root.path(), "crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
     Trees::write(root.path(), "crates/app/src/lib.rs", "pub use engine::Used;\n")?;
     assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
+    Ok(())
+}
+
+#[test]
+fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", &Trees::chain("A", 5))?;
+    let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
+    Trees::write(root.path(), "src/main.rs", &main)?;
+    assert_eq!(Trees::crate_graph_lines(root.path())?, Vec::<String>::new());
+    Ok(())
+}
+
+#[test]
+fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    Trees::write(root.path(), "Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
+    Trees::write(root.path(), "code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
+    Trees::write(root.path(), "code/a.rs", &Trees::chain("B", 5))?;
+    let named = format!("{}:1", root.path().join("code/lib.rs").display());
+    assert_eq!(Trees::crate_graph_lines(root.path())?, [named]);
     Ok(())
 }

@@ -9,6 +9,10 @@ impl ItemCount {
         ItemCount(len)
     }
 
+    pub fn smaller_of(self, total: ItemCount) -> ItemCount {
+        ItemCount(self.0.min(total.0.saturating_sub(self.0)))
+    }
+
     pub fn count(self) -> usize {
         self.0
     }

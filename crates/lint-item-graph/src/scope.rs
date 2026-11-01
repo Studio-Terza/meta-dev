@@ -1,20 +1,22 @@
 mod import;
+mod imports;
 mod path_tokens;
 
 use std::collections::BTreeSet;
 
-use lint_core::{Name, UsePath};
+use lint_core::{Name, UsePath, Walk};
 use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
-use syn::{ItemMod, ItemUse, UseTree};
+use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};
 
 use import::Import;
+use imports::Imports;
 use path_tokens::PathTokens;
 
 #[derive(Debug, Default)]
 pub struct Scope {
     local_roots: BTreeSet<Name>,
-    imports: Vec<Import>,
+    imports: Imports,
 }
 
 impl Scope {
@@ -42,26 +44,22 @@ impl Scope {
     }
 
     fn kept_at_index(&self, path: &PathTokens, index: usize, name: Name) -> Option<Name> {
-        let local = match path.root_index(index) {
-            Some(root) if root == index => !self.is_imported(&name),
-            Some(root) => self.is_local_root(path.tokens().get(root)),
-            None => false,
-        };
-        local.then_some(name)
+        match path.root_index(index) {
+            Some(root) if root == index => self.imports.local_item(&name, &self.local_roots),
+            Some(root) => self.is_local_root(path.tokens().get(root)).then_some(name),
+            None => None,
+        }
     }
 
     fn is_local_root(&self, token: Option<&TokenTree>) -> bool {
         token.is_some_and(|token| match token {
-            TokenTree::Ident(ident) => self.local_roots.contains(&Name::from(ident)),
+            TokenTree::Ident(ident) => {
+                let name = Name::from(ident);
+                self.local_roots.contains(&name)
+                    || (self.imports.holds(&name) && self.imports.local_item(&name, &self.local_roots).is_some())
+            }
             TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => false,
         })
-    }
-
-    fn is_imported(&self, name: &Name) -> bool {
-        self.imports
-            .iter()
-            .filter_map(|import| import.names(name))
-            .any(|path| path.first().is_some_and(|root| !self.local_roots.contains(root)))
     }
 
     fn import(&mut self, prefix: &UsePath, tree: &UseTree) {
@@ -70,13 +68,17 @@ impl Scope {
                 self.import(&prefix.extended(Name::from(&path.ident)), &path.tree);
             }
             UseTree::Name(name) if name.ident == Self::SELF_IMPORT => {
-                self.imports.extend(prefix.segments().last().map(|leaf| Import::new(leaf.clone(), prefix.clone())));
+                prefix
+                    .segments()
+                    .last()
+                    .into_iter()
+                    .for_each(|leaf| self.imports.add(Import::new(leaf.clone(), prefix.clone())));
             }
             UseTree::Name(name) => {
-                self.imports.push(Import::new(Name::from(&name.ident), prefix.extended(Name::from(&name.ident))));
+                self.imports.add(Import::new(Name::from(&name.ident), prefix.extended(Name::from(&name.ident))));
             }
             UseTree::Rename(rename) => {
-                self.imports.push(Import::new(Name::from(&rename.rename), prefix.extended(Name::from(&rename.ident))));
+                self.imports.add(Import::new(Name::from(&rename.rename), prefix.extended(Name::from(&rename.ident))));
             }
             UseTree::Group(group) => group.items.iter().for_each(|item| self.import(prefix, item)),
             UseTree::Glob(_) => {}
@@ -86,11 +88,21 @@ impl Scope {
 
 impl<'ast> Visit<'ast> for Scope {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.local_roots.insert(Name::from(&module.ident));
-        visit::visit_item_mod(self, module);
+        Walk::enter(&module.attrs, || {
+            self.local_roots.insert(Name::from(&module.ident));
+            visit::visit_item_mod(self, module);
+        });
     }
 
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
-        self.import(&UsePath::default(), &item.tree);
+        Walk::enter(&item.attrs, || self.import(&UsePath::default(), &item.tree));
+    }
+
+    fn visit_item_fn(&mut self, item: &'ast ItemFn) {
+        Walk::enter(&item.attrs, || visit::visit_item_fn(self, item));
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || visit::visit_item_impl(self, item));
     }
 }

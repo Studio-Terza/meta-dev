@@ -26,7 +26,10 @@ impl Roots {
         Admission::members_among(manifests)?.iter().try_fold(Vec::new(), |roots, manifest| {
             Ok(roots
                 .into_iter()
-                .chain(Package::in_directory(manifest.directory().to_path_buf()).targets_under(tree)?)
+                .chain(
+                    Package::in_directory(manifest.directory().to_path_buf(), manifest.declared_roots())
+                        .targets_under(tree)?,
+                )
                 .collect())
         })
     }
