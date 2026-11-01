@@ -278,3 +278,20 @@ fn a_shebang_below_a_directory_named_assets_still_fails() {
     fs::write(checkout.path().join("assets/run"), "#!/usr/bin/env node\n").ok();
     assert_eq!(Checked::within(&checkout.path().display().to_string(), "assets/run").len(), 1);
 }
+
+#[test]
+fn vendored_code_of_any_language_is_not_the_repositorys_logic() {
+    let vendored: Vec<RepoFile> = ["vendor/run.py", "third/vendor/deep/app.js", "vendor/x.sh", "site/vendor/app.css"]
+        .into_iter()
+        .map(|path| RepoFile::new(path, path))
+        .collect();
+    assert_eq!(Checked::report(&vendored), Vec::<String>::new());
+}
+
+#[test]
+fn a_file_merely_named_vendor_still_fails() {
+    assert_eq!(
+        Checked::one("tools/vendor.py"),
+        [format!("tools/vendor.py:1: Python source outside assets; {REWRITE}")]
+    );
+}

@@ -21,7 +21,7 @@ pub struct TextSites {
 }
 
 impl TextSites {
-    const DOOR_TRAITS: [Word<'static>; 3] = words!["FromStr", "TryFrom", "Display"];
+    const DOOR_TRAITS: [Word<'static>; 6] = words!["FromStr", "TryFrom", "Display", "AsRef", "Borrow", "Deref"];
     const INSPECTING: [Word<'static>; 8] = words![
         "split_whitespace",
         "split_once",
