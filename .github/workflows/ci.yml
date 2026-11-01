@@ -38,9 +38,9 @@ jobs:
           cargo test | tee "$RUNNER_TEMP/test.txt"
           ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
       - name: lint
-        run: ci/timed.sh lint cargo run -p lint -- . | tee "$RUNNER_TEMP/budget.txt"
+        run: ci/timed.sh lint cargo run --bin lint -- . | tee "$RUNNER_TEMP/budget.txt"
       - name: limits
-        run: cargo run -q -p gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
+        run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
       - name: report
         if: github.ref == 'refs/heads/main' && always()
         env:
