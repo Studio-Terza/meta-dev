@@ -24,25 +24,24 @@ impl Cli {
 
     #[must_use]
     pub fn run(&self) -> ExitCode {
+        self.report_to(&mut io::stdout(), &mut io::stderr())
+    }
+
+    #[must_use]
+    pub fn report_to(&self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match SourceFiles::read_all(&self.roots).map(|readout| {
             let files = readout.files();
-            write!(
-                io::stdout(),
-                "{}{}{}",
-                TestBudget::measured(files),
-                BoolMethods::report(files),
-                PairedApis::report(files)
-            )
-            .ok();
+            write!(out, "{}{}{}", TestBudget::measured(files), BoolMethods::report(files), PairedApis::report(files))
+                .ok();
             Lints::checked(readout)
         }) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
-                eprint!("{violations}");
+                write!(err, "{violations}").ok();
                 ExitCode::FAILURE
             }
             Err(failure) => {
-                eprintln!("{failure}");
+                writeln!(err, "{failure}").ok();
                 ExitCode::FAILURE
             }
         }

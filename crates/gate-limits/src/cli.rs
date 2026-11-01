@@ -1,10 +1,14 @@
+mod failure;
+mod gate;
+
 use std::ffi::OsString;
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use crate::failure::Failure;
-use crate::gate::Gate;
+use failure::Failure;
+use gate::Gate;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -24,13 +28,18 @@ impl Cli {
 
     #[must_use]
     pub fn run(&self) -> ExitCode {
+        self.report_to(&mut io::stdout(), &mut io::stderr())
+    }
+
+    #[must_use]
+    pub fn report_to(&self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match self.gate() {
             Ok(gate) => {
-                print!("{gate}");
+                write!(out, "{gate}").ok();
                 if gate.blocks() { ExitCode::FAILURE } else { ExitCode::SUCCESS }
             }
             Err(failure) => {
-                eprintln!("{failure}");
+                writeln!(err, "{failure}").ok();
                 ExitCode::FAILURE
             }
         }

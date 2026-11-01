@@ -24,12 +24,15 @@ const SIBLING: &str = "#[path = \"common/mod.rs\"]\nmod common;\n";
 const FEATURE_MODULE: &str = "#[cfg(any(test, feature = \"proptest\"))]\nmod support {\n    pub fn f() {}\n}\n";
 const ANY_TESTS: &str = "#[cfg(any(test, all(test, unix)))]\nmod tests {}\n";
 
-const CASES: [Case; 20] = [
+const NEVER: &str = "#[cfg(any())]\nmod never {}\n";
+
+const CASES: [Case; 21] = [
     Case::new("inline module", &[Source::new("src/a.rs", MODULE)], &["src/a.rs:3"]),
     Case::new("module file", &[Source::new("src/a.rs", MODULE_FILE)], &["src/a.rs:2"]),
     Case::new("combined condition", &[Source::new("src/a.rs", COMBINED)], &["src/a.rs:2"]),
     Case::new("test or feature ships", &[Source::new("src/a.rs", FEATURE_MODULE)], &[]),
-    Case::new("every alternative is test only", &[Source::new("src/a.rs", ANY_TESTS)], &[]),
+    Case::new("every alternative is test only", &[Source::new("src/a.rs", ANY_TESTS)], &["src/a.rs:2"]),
+    Case::new("empty any", &[Source::new("src/a.rs", NEVER)], &[]),
     Case::new("not test", &[Source::new("src/a.rs", NOT_TEST)], &[]),
     Case::new("bare test", &[Source::new("src/a.rs", BARE_TEST)], &["src/a.rs:2"]),
     Case::new("nested test", &[Source::new("src/a.rs", NESTED)], &["src/a.rs:3"]),
