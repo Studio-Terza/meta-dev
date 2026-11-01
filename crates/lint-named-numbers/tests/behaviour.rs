@@ -14,7 +14,10 @@ const STATIC: &str = "static TABLE: [u8; 2] = [4, 5];\n";
 
 const FEATURE_SUPPORT: &str = "struct Clock;\n#[cfg(any(test, feature = \"proptest\"))]\nimpl Clock {\n    pub fn range() -> u8 {\n        60\n    }\n}\n";
 
-const CASES: [Case; 9] = [
+const INLINE_BITS: &str = "mod bits {\n    pub fn f() -> u32 {\n        42\n    }\n}\n";
+const INLINE_OTHER: &str = "mod masks {\n    pub fn f() -> u32 {\n        42\n    }\n}\n";
+
+const CASES: [Case; 14] = [
     Case::new("static", &[Source::new("a.rs", STATIC)], &["a.rs:1", "a.rs:1", "a.rs:1"]),
     Case::new("integer", &[Source::new("a.rs", LITERAL)], &["a.rs:2"]),
     Case::new("float", &[Source::new("a.rs", FLOAT)], &["a.rs:2"]),
@@ -28,6 +31,15 @@ const CASES: [Case; 9] = [
         &[],
     ),
     Case::new("test or feature", &[Source::new("a.rs", FEATURE_SUPPORT)], &[]),
+    Case::new("bits module file", &[Source::new("crates/x/src/bits/mask.rs", LITERAL)], &[]),
+    Case::new("bits module root", &[Source::new("crates/x/src/bits.rs", LITERAL)], &[]),
+    Case::new("inline bits module", &[Source::new("a.rs", INLINE_BITS)], &[]),
+    Case::new("inline other module", &[Source::new("a.rs", INLINE_OTHER)], &["a.rs:3"]),
+    Case::new(
+        "other module file",
+        &[Source::new("crates/x/src/masks/mask.rs", LITERAL)],
+        &["crates/x/src/masks/mask.rs:2"],
+    ),
 ];
 
 #[test]

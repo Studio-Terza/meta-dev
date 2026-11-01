@@ -1,7 +1,7 @@
 mod command_paths;
 
 use command_paths::CommandPaths;
-use lint_core::Lint;
+use lint_core::{Gate, Lint};
 use lint_core::{Report, Site, SourceFile, Violation};
 
 #[derive(Debug)]
@@ -10,14 +10,15 @@ pub struct ProcessStarters;
 impl Lint for ProcessStarters {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            "linted code does not start processes",
+            "only ports start processes",
             files
                 .iter()
+                .filter(|file| !Gate::PORTS.admits(file))
                 .flat_map(|file| {
                     CommandPaths::found(file).into_iter().map(move |line| {
                         Violation::new(
                             Site::new(file.path(), line),
-                            "starts a std::process::Command; start processes through a runner outside the linted code",
+                            "starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports",
                         )
                     })
                 })

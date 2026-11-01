@@ -11,6 +11,7 @@ syn.workspace = true
 
 [dev-dependencies]
 lint-fixtures = { path = "../lint-fixtures" }
+tempfile.workspace = true
 
 [lints]
 workspace = true

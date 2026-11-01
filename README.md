@@ -17,7 +17,11 @@ no_parameter_bags, primitive_boundary, private_fns, process_starters, public_sur
 repeated_methods, state_graph, crate_graph.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
-settings. Files under `tests`, `examples` and `benches` are checked only by the lints that are not
+settings, and there is no per-repository configuration, switch or baseline. Where something is sometimes
+legitimate, the lint gates where by naming convention: starting a process (`process_starters`) is allowed only
+in a crate whose name ends in `ports` or a module named `ports`, and casts (`const_shape`), bare numbers
+(`named_numbers`) and bare primitives (`primitive_boundary`) only in a module named `bits`. Files under
+`tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), one `lint-<name>` crate
