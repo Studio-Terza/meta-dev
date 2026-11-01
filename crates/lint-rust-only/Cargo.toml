@@ -7,6 +7,10 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+newtype = { path = "../newtype" }
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

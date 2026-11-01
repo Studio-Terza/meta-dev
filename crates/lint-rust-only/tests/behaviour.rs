@@ -1,3 +1,5 @@
+use std::fs;
+
 use lint_core::RepoFile;
 use lint_rust_only::RustOnly;
 
@@ -221,4 +223,58 @@ fn findings_come_in_the_order_given() {
 fn a_report_with_no_findings_is_clean() {
     assert!(RustOnly::report(&[]).is_clean());
     assert!(!RustOnly::report(&[RepoFile::new("a.sh", "a.sh")]).is_clean());
+}
+
+#[test]
+fn an_extensionless_file_with_a_foreign_shebang_fails() {
+    for first in [
+        "#!/bin/bash",
+        "#!/usr/bin/env python3",
+        "#!/usr/bin/env -S node --flag",
+        "#!/usr/bin/env FOO=1 perl",
+        "#! /bin/sh -e",
+        "#!",
+        "#!/usr/bin/env",
+    ] {
+        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+        fs::write(checkout.path().join("deploy"), format!("{first}\nfor i in a b; do echo $i; done\n")).ok();
+        assert_eq!(
+            Checked::within(&checkout.path().display().to_string(), "deploy"),
+            [format!("{}/deploy:1: interpreted script source outside assets; {REWRITE}", checkout.path().display())],
+            "{first}"
+        );
+    }
+}
+
+#[test]
+fn an_extensionless_file_without_a_foreign_shebang_passes() {
+    for text in [
+        "#!/usr/bin/env rust-script\nfn main() {}\n",
+        "#!/usr/bin/env -S cargo +nightly -Zscript\nfn main() {}\n",
+        "#!/home/me/.cargo/bin/cargo\n",
+        "# not a shebang\n",
+        "echo hi\n",
+        "",
+        " #!/bin/sh\n",
+        "\n#!/bin/sh\n",
+    ] {
+        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+        fs::write(checkout.path().join("tool"), text).ok();
+        assert_eq!(Checked::within(&checkout.path().display().to_string(), "tool"), Vec::<String>::new(), "{text:?}");
+    }
+}
+
+#[test]
+fn a_shebang_in_a_file_with_an_extension_is_left_to_the_extension() {
+    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+    fs::write(checkout.path().join("notes.txt"), "#!/bin/bash\n").ok();
+    assert_eq!(Checked::within(&checkout.path().display().to_string(), "notes.txt"), Vec::<String>::new());
+}
+
+#[test]
+fn a_shebang_below_a_directory_named_assets_still_fails() {
+    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+    fs::create_dir_all(checkout.path().join("assets")).ok();
+    fs::write(checkout.path().join("assets/run"), "#!/usr/bin/env node\n").ok();
+    assert_eq!(Checked::within(&checkout.path().display().to_string(), "assets/run").len(), 1);
 }

@@ -1,9 +1,11 @@
 mod fix;
+mod shebang;
 
 use std::ffi::OsStr;
 use std::path::Path;
 
 pub(crate) use fix::Fix;
+use shebang::Shebang;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -63,6 +65,7 @@ pub enum Language {
     Arduino,
     Starlark,
     Astro,
+    Script,
 }
 
 impl Language {
@@ -123,13 +126,18 @@ impl Language {
         Language::Arduino,
         Language::Starlark,
         Language::Astro,
+        Language::Script,
     ];
 
     #[must_use]
     pub fn detect(path: &Path) -> Option<Language> {
-        let extension = path.extension().map(OsStr::to_ascii_lowercase)?;
-        let extension = extension.to_str()?;
-        Self::ALL.iter().copied().find(|language| language.extensions().contains(&extension))
+        match path.extension().map(OsStr::to_ascii_lowercase) {
+            Some(extension) => {
+                let extension = extension.to_str()?;
+                Self::ALL.iter().copied().find(|language| language.extensions().contains(&extension))
+            }
+            None => Shebang::read_from(path).filter(Shebang::is_foreign).map(|_| Language::Script),
+        }
     }
 
     #[must_use]
@@ -191,6 +199,7 @@ impl Language {
             Language::Arduino => "Arduino",
             Language::Starlark => "Starlark",
             Language::Astro => "Astro",
+            Language::Script => "interpreted script",
         }
     }
 
@@ -266,6 +275,7 @@ impl Language {
             Language::Arduino => &["ino"],
             Language::Starlark => &["bzl"],
             Language::Astro => &["astro"],
+            Language::Script => &[],
         }
     }
 }

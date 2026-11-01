@@ -64,13 +64,16 @@ Nim, Visual Basic, Solidity, assembly, D, Pascal, Fortran, Crystal, V, Arduino, 
 CSS, Vue, Svelte or Astro, in any case. Web assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte, Astro) pass below a
 directory named `assets`, anywhere under the checked path; any other language fails there too. The message names the fix: rewrite the file in Rust, or for a web
 language, move it under `assets` if it is a web asset. The lint reads every file under the path, hidden directories
-included, so `.github/` is checked. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
+included, so `.github/` is checked. A file with no extension is read for its first line: a `#!` line naming any interpreter other than `rust-script` or `cargo` fails it as an interpreted script. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
 (`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
 
-`workflow_run` keeps logic out of YAML. In a file under `.github/workflows`, a `run:` step must be one line of at most
+`workflow_run` keeps logic out of YAML. It parses each file under `.github/workflows`, and every `action.yml` or `action.yaml`, as
+YAML, so how a step is spelled does not matter. The value of a `run` key must be one line of at most
 120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick, `$(` or a `${` expansion with
-a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. A `run:` that opens a
-block (`|`, `>` or an empty value followed by text; comments and blank lines between are skipped) fails. A workflow file the lint cannot read fails too. There is no allow-list: anything longer is a Rust
+a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. A value that holds several lines fails, however it is written. The
+value of a `shell` key gets the same rules and must start with `bash`, `sh`, `pwsh`, `powershell` or `cmd`. A step that uses
+`actions/github-script` fails if it has a `script`. A `uses` that starts with `./` must name a directory with an `action.yml` or `action.yaml`, or a
+workflow file in the checked tree; that action is judged like a workflow. A workflow the lint cannot read or parse fails too. There is no allow-list: anything longer is a Rust
 command.
 
 The CI helpers are Rust too, and workflows only call them. `ci` has these commands:

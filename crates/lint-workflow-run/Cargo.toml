@@ -9,7 +9,7 @@ publish.workspace = true
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
-text-lines = { path = "../text-lines" }
+saphyr = "0.3.3"
 
 [dev-dependencies]
 laws = { path = "../laws" }

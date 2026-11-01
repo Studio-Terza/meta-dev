@@ -9,6 +9,10 @@ pub(crate) enum Finding {
     TooLong { characters: Characters, limit: Characters },
     Operator { symbol: &'static str },
     Control { word: &'static str },
+    Interpreter { name: String },
+    LocalAction { target: String },
+    Script,
+    Unparsable { reason: String },
     Unreadable { source: io::Error },
 }
 
@@ -28,6 +32,18 @@ impl fmt::Display for Finding {
             Finding::Control { word } => {
                 write!(formatter, "a run step starts with the shell keyword {word}; put the logic in a Rust command")
             }
+            Finding::Interpreter { name } => write!(
+                formatter,
+                "a shell setting names {name}, which is not a shell; use a shell and put the logic in a Rust command"
+            ),
+            Finding::LocalAction { target } => {
+                write!(
+                    formatter,
+                    "uses {target} names no action.yml or workflow to check; put the logic in a Rust command"
+                )
+            }
+            Finding::Script => write!(formatter, "a script step holds logic in YAML; put the logic in a Rust command"),
+            Finding::Unparsable { reason } => write!(formatter, "cannot parse the workflow as YAML: {reason}"),
             Finding::Unreadable { source } => write!(formatter, "cannot read the workflow: {source}"),
         }
     }
