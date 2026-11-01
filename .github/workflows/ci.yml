@@ -29,6 +29,16 @@ jobs:
         run: echo "MEASURED=$RUNNER_TEMP/measured.toml" >> "$GITHUB_ENV"
       - name: toolchain
         run: rustup toolchain install
+      - name: tools path
+        run: echo "TOOLS=$RUNNER_TEMP/tools" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        id: tools
+        with:
+          path: ${{ runner.temp }}/tools
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**') }}
+      - name: tools
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: ci/tools.sh
       - name: reach
         run: ci/reach.sh | tee -a "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"
       - name: fmt
@@ -46,7 +56,7 @@ jobs:
           ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
       - name: lint
         shell: bash
-        run: ci/timed.sh lint cargo run --bin lint -- . | tee "$RUNNER_TEMP/budget.txt"
+        run: ci/timed.sh lint "$TOOLS/lint" . | tee "$RUNNER_TEMP/budget.txt"
       - name: limits
         if: github.ref == 'refs/heads/main'
         run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
@@ -75,6 +85,16 @@ jobs:
           fetch-depth: 2
       - name: toolchain
         run: rustup toolchain install
+      - name: tools path
+        run: echo "TOOLS=$RUNNER_TEMP/tools" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        id: tools
+        with:
+          path: ${{ runner.temp }}/tools
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**') }}
+      - name: tools
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: ci/tools.sh
       - name: reach
         run: ci/reach.sh | tee -a "$GITHUB_ENV"
       - uses: taiki-e/install-action@v2
