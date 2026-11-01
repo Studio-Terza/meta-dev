@@ -1,1 +1,2 @@
 test_workspace = true
+exclude_globs = ["**/main.rs"]

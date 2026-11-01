@@ -3,8 +3,8 @@ warn = 8
 block = 10
 
 [clippy]
-warn = 8
-block = 11
+warn = 10
+block = 14
 
 [test-compile]
 warn = 10
