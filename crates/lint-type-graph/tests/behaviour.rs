@@ -36,6 +36,9 @@ laws::table!(
         ["struct A;\n", "1 nodes, 0 edges, density 0.000, largest strongly connected component 1"] => true,
         ["\n\ntrait T {}\nstruct A;\n", "crates/x/src/lib.rs:3: crate x: 2 nodes"] => true,
         ["fn a() {}\n", "crate x"] => false,
+        ["struct A;\nstruct B;\nimpl From<B> for A {}\nimpl AsRef<B> for A {}\n", "2 nodes, 2 edges, density 1.000, largest strongly connected component 2"] => true,
+        ["struct A;\nstruct B;\ntrait Tr {}\nimpl Tr<B> for A {}\nimpl From<A> for B {}\n", "3 nodes, 2 edges"] => true,
+        ["struct Display;\nstruct X;\nimpl fmt::Display for X {}\n", "2 nodes, 0 edges"] => true,
     ]
 );
 

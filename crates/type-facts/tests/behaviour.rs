@@ -158,3 +158,11 @@ fn a_tuple_struct_of_one_field_is_a_newtype_shape_and_nothing_else_is() {
     let shapes: Vec<Shape> = facts.types().iter().map(TypeFact::shape).collect();
     assert_eq!(shapes, [Shape::OneField, Shape::Other, Shape::Other, Shape::Other, Shape::Other, Shape::OneField]);
 }
+
+#[test]
+fn types_and_traits_inside_inline_modules_are_found() {
+    let facts =
+        Described::facts(&[Described::file("a.rs", "mod m { struct A; trait T {} impl A { fn x(&self) {} } }\n")]);
+    assert_eq!(Described::names(&facts), ["A"]);
+    assert_eq!(facts.traits().len(), 1);
+}

@@ -463,9 +463,9 @@ impl Page {
 
 #[test]
 fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box<dyn Error>> {
-    let page = Page::with(&[Page::unit("small", "0.25"), Page::unit("big", "1.5"), Page::unit("big", "0.5")].join(","));
+    let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
     let Timings { answer, stored } = Page::timed(&page)?;
-    let expected = "compile time per crate, seconds, longest first, 2.25 in all:\n2.00 big\n0.25 small\n";
+    let expected = "compile time per crate, seconds, longest first, 2.25 in all:\n2.00 zzz\n0.25 aaa\n";
     assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected.to_owned(), err: String::new() });
     assert_eq!(stored, expected);
     Ok(())
