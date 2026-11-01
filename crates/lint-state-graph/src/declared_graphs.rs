@@ -5,14 +5,14 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ItemMod, Macro};
 
-use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_layout::LineNumber;
+use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
+use lint_layout::Name;
 
-use super::finding::Finding;
 use graph::Graph;
 
 pub struct DeclaredGraphs<'scan> {
     path: &'scan Path,
+    names: MacroAliases,
     violations: Vec<Violation>,
 }
 
@@ -20,19 +20,21 @@ impl<'scan> DeclaredGraphs<'scan> {
     const MACRO: &'static str = "states";
 
     pub fn violations(file: &'scan SourceFile) -> Vec<Violation> {
-        let mut graphs = DeclaredGraphs { path: file.path(), violations: Vec::new() };
+        let mut graphs = DeclaredGraphs {
+            path: file.path(),
+            names: MacroAliases::in_file(file.syntax(), Self::MACRO),
+            violations: Vec::new(),
+        };
         graphs.visit_file(file.syntax());
         graphs.violations
     }
 
-    fn checked(&self, invocation: &Macro) -> Vec<Violation> {
-        invocation.parse_body::<Graph>().map_or_else(
-            |_| {
-                let site = Site::new(self.path, LineNumber::from(invocation.bang_token.span));
-                vec![Violation::new(site, Finding::UnreadableGraph)]
-            },
-            |graph| graph.violations(self.path),
-        )
+    fn found_in(&self, invocation: &Macro) -> Vec<Violation> {
+        if invocation.path.segments.last().is_some_and(|last| self.names.call(&Name::from(&last.ident))) {
+            Graph::checked(invocation, self.path)
+        } else {
+            MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect()
+        }
     }
 }
 
@@ -42,9 +44,7 @@ impl<'ast> Visit<'ast> for DeclaredGraphs<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        let found = Some(invocation)
-            .filter(|invocation| invocation.path.segments.last().is_some_and(|last| last.ident == Self::MACRO))
-            .map(|invocation| self.checked(invocation));
-        self.violations.extend(found.into_iter().flatten());
+        let found = self.found_in(invocation);
+        self.violations.extend(found);
     }
 }

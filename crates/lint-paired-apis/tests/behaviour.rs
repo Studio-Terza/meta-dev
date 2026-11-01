@@ -19,6 +19,7 @@ const OTHER_SUFFIX: &str =
     "pub struct A;\nimpl A {\n    pub fn start_server(&self) {}\n    pub fn stop_client(&self) {}\n}\n";
 const HALF_PRIVATE: &str = "pub struct A;\nimpl A {\n    pub fn start(&self) {}\n    fn stop(&self) {}\n}\n";
 const TWO_BLOCKS: &str = "impl A {\n    pub fn start(&self) {}\n}\nimpl B {\n    pub fn stop(&self) {}\n}\n";
+const SPLIT_BLOCKS: &str = "impl A {\n    pub fn start(&self) {}\n}\nimpl A {\n    pub fn stop(&self) {}\n}\n";
 const TRAIT_IMPL: &str = "impl Port for A {\n    fn open(&self) {}\n    fn close(&self) {}\n}\n";
 const TRAIT_CONSTS: &str = "trait Port {\n    const OPEN: u8;\n    fn open(&self);\n}\n";
 const IMPL_CONSTS: &str = "impl A {\n    const CLOSE: u8 = 1;\n    pub fn open(&self) {}\n}\n";
@@ -36,6 +37,8 @@ laws::table!(paired_methods_are_listed, Sources::flagged::<PairedApis>, [
     [Source::new("a.rs", SUFFIXED)] => ["a.rs:3"],
     [Source::new("a.rs", IN_TRAIT)] => ["a.rs:2"],
     [Source::new("a.rs", IN_MODULE)] => ["a.rs:3"],
+    [Source::new("a.rs", SPLIT_BLOCKS)] => ["a.rs:2"],
+    [Source::new("crates/x/src/lib.rs", "mod a;\nmod b;\n"), Source::new("crates/x/src/a.rs", "impl A {\n    pub fn open(&self) {}\n}\n"), Source::new("crates/x/src/b.rs", "impl A {\n    pub fn close(&self) {}\n}\n")] => ["crates/x/src/a.rs:2"],
 ]);
 
 laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
@@ -43,6 +46,7 @@ laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
     [Source::new("a.rs", OTHER_SUFFIX)] => NONE,
     [Source::new("a.rs", HALF_PRIVATE)] => NONE,
     [Source::new("a.rs", TWO_BLOCKS)] => NONE,
+    [Source::new("crates/one/src/lib.rs", "impl A {\n    pub fn open(&self) {}\n}\n"), Source::new("crates/two/src/lib.rs", "impl A {\n    pub fn close(&self) {}\n}\n")] => NONE,
     [Source::new("a.rs", TRAIT_IMPL)] => NONE,
     [Source::new("a.rs", TRAIT_CONSTS)] => NONE,
     [Source::new("a.rs", IMPL_CONSTS)] => NONE,

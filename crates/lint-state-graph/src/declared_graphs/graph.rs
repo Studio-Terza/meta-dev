@@ -6,17 +6,29 @@ use std::iter;
 use std::path::Path;
 
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Ident, Token, Visibility, braced};
+use syn::{Attribute, Ident, Macro, Token, Visibility, braced};
 
-use lint_core::{TypeName, Violation};
+use lint_core::{Site, TypeName, Violation};
+use lint_layout::LineNumber;
 
 use crate::edge_scan::Edge;
+use crate::finding::Finding;
 use block::Block;
 use kind::Kind;
 
 pub struct Graph(Vec<Block>);
 
 impl Graph {
+    pub fn checked(invocation: &Macro, path: &Path) -> Vec<Violation> {
+        invocation.parse_body::<Graph>().map_or_else(
+            |_| {
+                let site = Site::new(path, LineNumber::from(invocation.bang_token.span));
+                vec![Violation::new(site, Finding::UnreadableGraph)]
+            },
+            |graph| graph.violations(path),
+        )
+    }
+
     pub fn violations(&self, path: &Path) -> Vec<Violation> {
         let edges: Vec<Edge> = self.0.iter().flat_map(Block::edges).collect();
         let reversed: Vec<Edge> = edges.iter().map(Edge::reversed).collect();

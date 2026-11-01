@@ -1,33 +1,33 @@
-use std::collections::BTreeSet;
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::obligation::Obligation;
+use crate::coverage::Coverage;
 use crate::need::Need;
+use crate::obligation::Obligation;
+use crate::pair::Pair;
+use crate::subject::Subject;
 use lint_core::Site;
-use lint_layout::LineNumber;
 use lint_layout::Name;
-use syn::Ident;
 
 #[derive(Debug)]
 pub(crate) struct Profile {
-    owner: Name,
-    line: LineNumber,
+    subject: Subject,
+    site: Site,
     facts: BTreeSet<Name>,
 }
 
 impl Profile {
-    const PAIRS: [(&'static str, &'static str); 3] =
-        [("Display", "FromStr"), ("Serialize", "Deserialize"), ("encode", "decode")];
+    const TRAIT_PAIRS: [(&'static str, &'static str); 2] = [("Display", "FromStr"), ("Serialize", "Deserialize")];
+    const METHOD_PAIR: (&'static str, &'static str) = ("encode", "decode");
     const ORDERS: [&'static str; 2] = ["Ord", "PartialEq"];
     const TO: &'static str = "to";
     const FROM: &'static str = "from";
 
-    pub(crate) fn declared(owner: &Ident, facts: Vec<Name>) -> Profile {
-        Profile { owner: Name::from(owner), line: LineNumber::from(owner.span()), facts: facts.into_iter().collect() }
+    pub(crate) fn declared(subject: Subject, site: Site, facts: Vec<Name>) -> Profile {
+        Profile { subject, site, facts: facts.into_iter().collect() }
     }
 
-    pub(crate) fn owner(&self) -> &Name {
-        &self.owner
+    pub(crate) fn subject(&self) -> &Subject {
+        &self.subject
     }
 
     pub(crate) fn merged(mut self, other: Profile) -> Profile {
@@ -35,13 +35,21 @@ impl Profile {
         self
     }
 
-    pub(crate) fn obligations(&self, path: &Path) -> Vec<Obligation> {
-        let roundtrip = self.has_pair().then_some(Need::Roundtrip);
+    pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation> {
+        let roundtrips = coverage.roundtrips_naming(&self.subject);
+        let methods = self.method_pairs();
+        let spare =
+            roundtrips.iter().filter(|mentions| !methods.iter().any(|pair| pair.witnessed_by(mentions))).count();
+        let unwitnessed = methods.iter().filter(|pair| !roundtrips.iter().any(|mentions| pair.witnessed_by(mentions)));
+        let unspared = self.trait_pairs().into_iter().skip(spare);
         let law = Self::ORDERS.iter().any(|order| self.knows(order)).then_some(Need::Law);
-        roundtrip
-            .into_iter()
-            .chain(law)
-            .map(|need| Obligation::new(self.owner.clone(), Site::new(path, self.line), need))
+        let unlawed = law.filter(|_| !coverage.names(&self.subject));
+        unwitnessed
+            .cloned()
+            .chain(unspared)
+            .map(Need::Roundtrip)
+            .chain(unlawed)
+            .map(|need| Obligation::new(self.subject.clone(), self.site.clone(), need))
             .collect()
     }
 
@@ -49,16 +57,33 @@ impl Profile {
         self.facts.contains(&Name::from(fact))
     }
 
-    fn forms(&self, lead: &str) -> BTreeSet<Vec<Name>> {
-        self.facts
+    fn trait_pairs(&self) -> Vec<Pair> {
+        Self::TRAIT_PAIRS
             .iter()
-            .map(Name::words)
-            .filter_map(|words| words.split_first().filter(|(first, _)| **first == lead).map(|(_, rest)| rest.to_vec()))
+            .filter(|(left, right)| self.knows(left) && self.knows(right))
+            .map(|(left, right)| Pair::new(Name::from(*left), Name::from(*right)))
             .collect()
     }
 
-    fn has_pair(&self) -> bool {
-        Self::PAIRS.iter().any(|(left, right)| self.knows(left) && self.knows(right))
-            || !self.forms(Self::TO).is_disjoint(&self.forms(Self::FROM))
+    fn method_pairs(&self) -> BTreeSet<Pair> {
+        let (encode, decode) = Self::METHOD_PAIR;
+        let coded =
+            (self.knows(encode) && self.knows(decode)).then(|| Pair::new(Name::from(encode), Name::from(decode)));
+        let from = self.forms(Self::FROM);
+        let formed = self
+            .forms(Self::TO)
+            .into_iter()
+            .filter_map(|(rest, to)| from.get(&rest).map(|from| Pair::new(to, from.clone())));
+        coded.into_iter().chain(formed).collect()
+    }
+
+    fn forms(&self, lead: &str) -> BTreeMap<Vec<Name>, Name> {
+        self.facts
+            .iter()
+            .filter_map(|fact| {
+                let words = fact.words();
+                words.split_first().filter(|(first, _)| **first == lead).map(|(_, rest)| (rest.to_vec(), fact.clone()))
+            })
+            .collect()
     }
 }

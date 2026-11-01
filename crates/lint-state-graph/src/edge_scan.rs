@@ -7,7 +7,6 @@ pub use edge_count::EdgeCount;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use newtype::Newtype;
 use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
 

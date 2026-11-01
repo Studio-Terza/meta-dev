@@ -32,11 +32,17 @@ const NO_START: &str =
     "states! {\n    mod door {\n        state Open { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
 const NO_TERMINAL: &str = "states! {\n    mod door {\n        start Open {}\n    }\n}\n";
 const UNKNOWN_KIND: &str = "states! {\n    mod door {\n        begin Open {}\n    }\n}\n";
+const OTHER_RENAME: &str = "use other::thing as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
 const NOT_A_GRAPH: &str = "fn f() {\n    states!(1 + 1);\n}\n";
 const IN_TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    states! {\n        mod door {\n            begin Open {}\n        }\n    }\n}\n";
 const OTHER_MACRO: &str = "fn f() {\n    print!(\"start Open\");\n}\n";
 const THE_DEFINITION: &str = "macro_rules! states {\n    () => {};\n}\n";
+
+const ALIASED: &str = "use states::states as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
+const GROUPED_ALIAS: &str = "use states::{states as lifecycle, other};\nfn f() {\n    lifecycle! {\n        mod door {\n            start Open { shut -> Shut }\n            state Lost {}\n            terminal Shut {}\n        }\n    }\n}\n";
+const BEHIND_CFG_IF: &str = "cfg_if::cfg_if! {\n    if #[cfg(unix)] {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    }\n}\n";
+const BEHIND_MACRO_RULES: &str = "macro_rules! door {\n    () => {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    };\n}\ndoor!();\n";
 
 const CASES: [Case; 8] = [
     Case::new("exposed field", &[Source::new("a.rs", EXPOSED)], &["a.rs:2"]),
@@ -59,6 +65,7 @@ laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
     [Source::new("a.rs", IN_TEST_MODULE)] => NONE,
     [Source::new("x/tests/a.rs", UNREACHABLE)] => NONE,
     [Source::new("a.rs", OTHER_MACRO)] => NONE,
+    [Source::new("a.rs", OTHER_RENAME)] => NONE,
     [Source::new("a.rs", THE_DEFINITION)] => NONE,
 ]);
 
@@ -71,6 +78,10 @@ laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<StateGra
     [Source::new("a.rs", NO_TERMINAL)] => ["a.rs:3"],
     [Source::new("a.rs", UNKNOWN_KIND)] => ["a.rs:1"],
     [Source::new("a.rs", NOT_A_GRAPH)] => ["a.rs:2"],
+    [Source::new("a.rs", ALIASED)] => ["a.rs:5", "a.rs:5"],
+    [Source::new("a.rs", GROUPED_ALIAS)] => ["a.rs:6", "a.rs:6"],
+    [Source::new("a.rs", BEHIND_CFG_IF)] => ["a.rs:6", "a.rs:6"],
+    [Source::new("a.rs", BEHIND_MACRO_RULES)] => ["a.rs:6", "a.rs:6"],
 ]);
 
 #[test]
