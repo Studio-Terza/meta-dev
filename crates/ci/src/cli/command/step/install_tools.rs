@@ -14,7 +14,7 @@ pub struct InstallTools {
 }
 
 impl InstallTools {
-    const PROGRAMS: [&'static str; 3] = ["reach", "lint", "ci"];
+    pub(crate) const PROGRAMS: [&'static str; 3] = ["reach", "lint", "ci"];
 
     fn build_invocation() -> Invocation {
         Invocation::new(

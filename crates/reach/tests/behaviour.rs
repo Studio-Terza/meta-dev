@@ -42,6 +42,11 @@ impl Answer {
         Answer::to(&arguments).out
     }
 
+    fn sources_of(roots: &[&str]) -> String {
+        let arguments = ["sources", WORKSPACE].iter().chain(roots).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
     fn history_by(changed: &[&str]) -> String {
         let arguments = ["history", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
         Answer::to(&arguments).out
@@ -139,9 +144,9 @@ laws::table!(
     every_unusable_input_fails_closed_and_says_why,
     Answer::refused,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>\n",
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
         ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
     ]
 );
@@ -151,6 +156,24 @@ fn fan_in_counts_every_crate_a_crate_reaches_most_first() {
     let answer = Answer::to(&["fan-in", WORKSPACE]);
     assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: FAN_IN_REPORT.to_owned(), err: String::new() });
 }
+
+const SOURCES_OF_MIDDLE: &str =
+    "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/middle/Cargo.toml\ncrates/middle/src/**\n";
+const SOURCES_OF_TESTED_THROUGH: &str = "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/middle/Cargo.toml\n\
+    crates/middle/src/**\ncrates/tested-through/Cargo.toml\ncrates/tested-through/src/**\n";
+
+laws::table!(
+    the_sources_of_roots_are_their_own_and_those_of_every_crate_they_depend_on,
+    Answer::sources_of,
+    [
+        ["middle"] => SOURCES_OF_MIDDLE,
+        ["tested-through"] => SOURCES_OF_TESTED_THROUGH,
+        ["leaf"] => "crates/leaf/Cargo.toml\ncrates/leaf/src/**\n",
+        ["core", "leaf"] => "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/leaf/Cargo.toml\ncrates/leaf/src/**\n",
+        ["absent"] => "",
+        [] => "",
+    ]
+);
 
 laws::table!(
     a_history_line_gives_the_reach_and_every_fan_in,

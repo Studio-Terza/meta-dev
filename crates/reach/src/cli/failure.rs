@@ -12,7 +12,7 @@ pub enum Failure {
     #[error("{manifest} is not inside the workspace", manifest = manifest.display())]
     Outside { manifest: PathBuf },
     #[error(
-        "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata>"
+        "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>..."
     )]
     Usage,
 }

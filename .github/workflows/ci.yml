@@ -43,14 +43,17 @@ jobs:
         run: rustup toolchain install
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: rui314/setup-mold@v1
+      - name: tools key
+        id: key
+        run: cargo run --locked -q --profile tools --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         id: tools
         with:
           path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --bin ci -- tools target/tools "$TOOLS"
+        run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - name: fmt
@@ -136,14 +139,17 @@ jobs:
           fetch-depth: 2
       - name: toolchain
         run: rustup toolchain install
+      - name: tools key
+        id: key
+        run: cargo run --locked -q --profile tools --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         id: tools
         with:
           path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo run --locked -q --bin ci -- tools target/tools "$TOOLS"
+        run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
       - name: reach
         run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - uses: taiki-e/install-action@v2

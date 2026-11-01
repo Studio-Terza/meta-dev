@@ -11,6 +11,7 @@ pub mod mutation;
 mod reach_scope;
 mod seconds;
 mod timed;
+mod tools_key;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -25,6 +26,7 @@ pub use libtest_seconds::LibtestSeconds;
 pub use logged::Logged;
 pub use reach_scope::ReachScope;
 pub use timed::Timed;
+pub use tools_key::ToolsKey;
 
 pub trait Step: Sized {
     fn from_arguments(arguments: &[OsString]) -> Result<Self, Failure>;
