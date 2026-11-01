@@ -192,3 +192,5 @@ The `fuzz` crate feeds the runner arbitrary bytes, arbitrary valid syntax, damag
     FUZZ_SECONDS=60 FUZZ_CRASHES=/some/dir cargo test -p fuzz --test fuzz
 
 Each target runs for `FUZZ_SECONDS` seconds (default 5) with fresh random seeds. With `FUZZ_CRASHES` set, the input being run is first written to `<target>-pending.rs` and `<target>-pending.role`, so an abort that no test can catch still leaves its input behind; a panic also leaves the shrunk input as `<target>-<role>-<hash>.rs`. The `fuzz` workflow runs every day on main for 15 minutes, fails the run on a crash and uploads that directory. A crash found becomes a named test in the crate that owns the fix, with the input kept in its `tests` directory.
+
+Found so far: a method chain of ten thousand links overflowed the stack of the main thread, because `syn` prints and walks a left-nested tree recursively. `Cli::report_to` now does its work on a thread with a 256 MiB stack, which is address space and not memory, and `a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack` holds it.
