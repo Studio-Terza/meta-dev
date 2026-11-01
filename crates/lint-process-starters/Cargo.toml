@@ -1,0 +1,16 @@
+[package]
+name = "lint-process-starters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "lint-no-numbers-in-binaries"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-named-numbers = { path = "../lint-named-numbers" }
+syn.workspace = true
+
+[dev-dependencies]
+lint-fixtures = { path = "../lint-fixtures" }
+
+[lints]
+workspace = true
