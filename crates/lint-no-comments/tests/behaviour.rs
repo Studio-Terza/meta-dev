@@ -6,7 +6,7 @@ const COMMENTED: &str = "fn a() {}\n// line\nfn b() {} /* block */\n";
 const PLAIN: &str = "const TEXT: &str = \"// not a comment\";\n";
 
 #[test]
-fn comments_are_reported_with_their_lines_here() {
+fn comments_are_reported_with_their_lines() {
     let report = NoComments::report(&[Sources::file("a.rs", COMMENTED)]);
     assert_eq!(Sources::lines(&report), ["a.rs:2", "a.rs:3"]);
 }
