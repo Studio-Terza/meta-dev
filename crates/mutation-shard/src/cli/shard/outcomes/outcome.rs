@@ -1,5 +1,6 @@
 mod named;
 
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -41,7 +42,9 @@ impl Outcome {
     pub fn mutant(&self, directory: &Path) -> Option<MutantResult> {
         match &self.scenario {
             Scenario::Mutant(named) => {
-                Some(MutantResult::named(named, self.summary.clone(), self.log(directory).failed()))
+                let mut title = String::new();
+                write!(title, "{named}").ok();
+                Some(MutantResult::new(title, self.summary.clone(), self.log(directory).failed()))
             }
             Scenario::Baseline => None,
         }

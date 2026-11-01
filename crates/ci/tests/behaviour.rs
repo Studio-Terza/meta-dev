@@ -194,6 +194,11 @@ fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Err
     let answer = Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo", "clippy", "--all-targets"]);
     assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["clippy", "--all-targets"])]);
+    let calls = fake.calls.borrow();
+    assert_eq!(
+        calls.first().map(|call| call.arguments().to_vec()),
+        Some(vec![OsString::from("clippy"), OsString::from("--all-targets")])
+    );
     assert_eq!(scratch.read("m.toml"), "clippy = 1.50\n");
     Ok(())
 }
