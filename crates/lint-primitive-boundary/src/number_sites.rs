@@ -85,12 +85,9 @@ impl NumberSites {
         }
     }
 
-    fn sized_by(&self) -> &Name {
-        self.parameter.as_ref().unwrap_or(&self.context)
-    }
-
     fn sighting(&self, path: &TypePath) -> Option<Sighting> {
         let wire = self.aliases.resolve(&path.path);
+        let sized_by = self.parameter.as_ref().unwrap_or(&self.context);
         let site = Site::new(&self.path, LineNumber::from(path.path.span()));
         if Self::is_named(path, &Self::PRIMITIVES) {
             Some(Sighting::new(
@@ -108,11 +105,8 @@ impl NumberSites {
                 Rank::Number,
                 Violation::new(site, Finding::WireForm { wire, context: self.context.clone() }),
             ))
-        } else if Self::is_named(path, &Self::SIZES) && !self.sized_by().matches::<LoweredInfix>(&Self::SIZE_WORDS) {
-            Some(Sighting::new(
-                Rank::Size,
-                Violation::new(site, Finding::UnnamedSize { context: self.sized_by().clone() }),
-            ))
+        } else if Self::is_named(path, &Self::SIZES) && !sized_by.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
+            Some(Sighting::new(Rank::Size, Violation::new(site, Finding::UnnamedSize { context: sized_by.clone() })))
         } else {
             None
         }
