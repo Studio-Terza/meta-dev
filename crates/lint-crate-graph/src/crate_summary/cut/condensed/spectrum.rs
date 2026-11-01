@@ -1,4 +1,8 @@
 use std::iter;
+use std::iter::Sum;
+use std::ops::{Add, Sub};
+
+use super::link::Link;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Weight(f64);
@@ -11,11 +15,37 @@ impl Weight {
     pub fn crossings(self) -> f64 {
         self.0
     }
+
+    pub fn lesser(self, other: Weight) -> Weight {
+        Weight(self.0.min(other.0))
+    }
+}
+
+impl Add for Weight {
+    type Output = Weight;
+
+    fn add(self, other: Weight) -> Weight {
+        Weight(self.0 + other.0)
+    }
+}
+
+impl Sub for Weight {
+    type Output = Weight;
+
+    fn sub(self, other: Weight) -> Weight {
+        Weight(self.0 - other.0)
+    }
+}
+
+impl Sum for Weight {
+    fn sum<Weights: Iterator<Item = Weight>>(weights: Weights) -> Weight {
+        weights.fold(Weight::default(), Add::add)
+    }
 }
 
 #[derive(Debug)]
 pub struct Spectrum<'graph> {
-    weights: &'graph [Vec<Weight>],
+    rows: &'graph [Vec<Link>],
     degrees: Vec<f64>,
 }
 
@@ -25,8 +55,11 @@ impl<'graph> Spectrum<'graph> {
     const STRIDE: f64 = 7.3;
     const OFFSET: f64 = 0.17;
 
-    pub fn new(weights: &'graph [Vec<Weight>]) -> Spectrum<'graph> {
-        Spectrum { weights, degrees: weights.iter().map(|row| row.iter().map(|weight| weight.0).sum()).collect() }
+    pub fn new(rows: &'graph [Vec<Link>]) -> Spectrum<'graph> {
+        Spectrum {
+            rows,
+            degrees: rows.iter().map(|row| row.iter().map(|link| link.weight().crossings()).sum()).collect(),
+        }
     }
 
     pub fn fiedler(&self) -> Vec<f64> {
@@ -40,14 +73,18 @@ impl<'graph> Spectrum<'graph> {
     }
 
     fn lazy_step(&self, vector: &[f64]) -> Vec<f64> {
-        self.weights
+        self.rows
             .iter()
             .zip(vector.iter().zip(&self.degrees))
-            .map(|(weights, (value, degree))| {
-                let spread: f64 = weights
+            .map(|(row, (value, degree))| {
+                let spread: f64 = row
                     .iter()
-                    .zip(vector.iter().zip(&self.degrees))
-                    .map(|(weight, (other, other_degree))| weight.0 * other / (degree * other_degree).sqrt())
+                    .filter_map(|link| {
+                        let other = link.target().index();
+                        Some(
+                            link.weight().crossings() * vector.get(other)? / (degree * self.degrees.get(other)?).sqrt(),
+                        )
+                    })
                     .sum();
                 value + spread
             })

@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -7,7 +8,10 @@ use crate::failure::Failure;
 use crate::source_files::tree::Tree;
 
 #[derive(Debug)]
-pub struct Package(PathBuf);
+pub struct Package {
+    directory: PathBuf,
+    declared: BTreeSet<PathBuf>,
+}
 
 impl Package {
     const ROOT_FILES: [&'static str; 3] = ["build.rs", "src/lib.rs", "src/main.rs"];
@@ -16,20 +20,21 @@ impl Package {
     const SOURCE_EXTENSION: &'static str = "rs";
 
     #[must_use]
-    pub fn in_directory(directory: PathBuf) -> Package {
-        Package(directory)
+    pub fn in_directory(directory: PathBuf, declared: BTreeSet<PathBuf>) -> Package {
+        Package { directory, declared }
     }
 
     pub fn targets_under(&self, tree: &Tree) -> Result<Vec<Target>, Failure> {
         let roots: Vec<PathBuf> =
-            Self::ROOT_FILES.iter().map(|file| self.0.join(file)).filter(|file| file.is_file()).collect();
+            Self::ROOT_FILES.iter().map(|file| self.directory.join(file)).filter(|file| file.is_file()).collect();
+        let roots: Vec<PathBuf> = self.declared.iter().filter(|file| file.is_file()).cloned().chain(roots).collect();
         let files = Self::TARGET_DIRECTORIES.iter().try_fold(roots, |found, directory| {
-            Ok(found.into_iter().chain(Self::crate_roots(&self.0.join(directory))?).collect::<Vec<PathBuf>>())
+            Ok(found.into_iter().chain(Self::crate_roots(&self.directory.join(directory))?).collect::<Vec<PathBuf>>())
         })?;
         Ok(files
             .into_iter()
             .filter(|file| file.starts_with(tree.canonical()))
-            .map(|file| Target::new(self.0.clone(), file))
+            .map(|file| Target::new(self.directory.clone(), file))
             .collect())
     }
 

@@ -152,9 +152,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-fixtures",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "lint-item-graph",
 ]
 
 [[package]]
@@ -200,6 +198,16 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-item-graph"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "proc-macro2",
+ "quote",
  "syn 2.0.119",
 ]
 

@@ -7,9 +7,7 @@ publish.workspace = true
 
 [dependencies]
 lint-core = { path = "../lint-core" }
-proc-macro2.workspace = true
-quote.workspace = true
-syn.workspace = true
+lint-item-graph = { path = "../lint-item-graph" }
 
 [dev-dependencies]
 lint-fixtures = { path = "../lint-fixtures" }

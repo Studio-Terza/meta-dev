@@ -1,3 +1,5 @@
+mod frontier;
+mod link;
 mod spectrum;
 mod tangle_index;
 
@@ -6,14 +8,20 @@ pub use tangle_index::TangleIndex;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::crate_summary::cut::conductance::Conductance;
+use crate::crate_summary::cut::split::Split;
 use crate::crate_summary::item_count::ItemCount;
-use crate::item_graph::{ItemGraph, NodeIndex};
+use frontier::Frontier;
+use link::Link;
+use lint_core::Least;
+use lint_item_graph::Traversal;
+use lint_item_graph::{ItemGraph, NodeIndex};
 use spectrum::{Spectrum, Weight};
 
 #[derive(Debug)]
 pub struct Condensed {
     sizes: Vec<ItemCount>,
-    weights: Vec<Vec<Weight>>,
+    rows: Vec<Vec<Link>>,
+    origins: Vec<TangleIndex>,
 }
 
 impl Condensed {
@@ -34,14 +42,17 @@ impl Condensed {
                 *crossings.entry(pair).or_default() += 1.0;
                 crossings
             });
-        let weights = (0..tangles.len())
-            .map(|row| {
-                (0..tangles.len())
-                    .map(|column| Weight::new(crossings.get(&[row, column]).copied().unwrap_or_default()))
-                    .collect()
-            })
-            .collect();
-        Condensed { sizes: tangles.iter().map(|members| ItemCount::of_len(members.len())).collect(), weights }
+        let rows = crossings.into_iter().fold(vec![Vec::new(); tangles.len()], |mut rows, ([row, column], count)| {
+            rows.get_mut(row)
+                .into_iter()
+                .for_each(|links| links.push(Link::new(TangleIndex::from(column), Weight::new(count))));
+            rows
+        });
+        Condensed {
+            sizes: tangles.iter().map(|members| ItemCount::of_len(members.len())).collect(),
+            rows,
+            origins: (0..tangles.len()).map(TangleIndex::from).collect(),
+        }
     }
 
     pub fn all(&self) -> BTreeSet<TangleIndex> {
@@ -49,21 +60,78 @@ impl Condensed {
     }
 
     pub fn islands(&self) -> Vec<BTreeSet<TangleIndex>> {
-        self.all().into_iter().fold(Vec::new(), |islands: Vec<BTreeSet<TangleIndex>>, tangle| {
-            if islands.iter().any(|island| island.contains(&tangle)) {
-                islands
-            } else {
-                islands.into_iter().chain([self.reached(tangle, BTreeSet::from([tangle]))]).collect()
-            }
-        })
+        let neighbours = |tangle: TangleIndex| self.row(tangle).iter().map(|link| link.target()).collect();
+        Traversal::trees(self.all().into_iter().collect(), neighbours)
+            .into_iter()
+            .map(|island| island.into_iter().collect::<BTreeSet<TangleIndex>>())
+            .filter(|island| island.iter().any(|tangle| !self.row(*tangle).is_empty()))
+            .collect()
+    }
+
+    pub fn restricted(&self, island: &BTreeSet<TangleIndex>) -> Condensed {
+        let local: BTreeMap<TangleIndex, TangleIndex> =
+            island.iter().enumerate().map(|(position, tangle)| (*tangle, TangleIndex::from(position))).collect();
+        let kept = |tangle: &TangleIndex| local.contains_key(tangle);
+        Condensed {
+            sizes: island.iter().map(|tangle| self.size(*tangle)).collect(),
+            rows: island
+                .iter()
+                .map(|tangle| {
+                    self.row(*tangle)
+                        .iter()
+                        .filter(|link| kept(&link.target()))
+                        .filter_map(|link| Some(Link::new(*local.get(&link.target())?, link.weight())))
+                        .collect()
+                })
+                .collect(),
+            origins: island.iter().filter_map(|tangle| self.origins.get(tangle.index()).copied()).collect(),
+        }
     }
 
     pub fn items(&self, side: &BTreeSet<TangleIndex>) -> ItemCount {
-        side.iter().filter_map(|tangle| self.sizes.get(tangle.index())).copied().sum()
+        side.iter().map(|tangle| self.size(*tangle)).sum()
     }
 
-    pub fn sweep_order(&self) -> Vec<TangleIndex> {
-        let mut order: Vec<(TangleIndex, f64)> = Spectrum::new(&self.weights)
+    pub fn size(&self, tangle: TangleIndex) -> ItemCount {
+        self.sizes.get(tangle.index()).copied().unwrap_or_default()
+    }
+
+    pub fn row(&self, tangle: TangleIndex) -> &[Link] {
+        self.rows.get(tangle.index()).map_or(&[], Vec::as_slice)
+    }
+
+    pub fn volume(&self) -> Weight {
+        self.rows.iter().flatten().map(|link| link.weight()).sum()
+    }
+
+    pub fn split(&self, inside: &BTreeSet<TangleIndex>) -> Split {
+        let origin = |side: &BTreeSet<TangleIndex>| -> BTreeSet<TangleIndex> {
+            side.iter().filter_map(|tangle| self.origins.get(tangle.index()).copied()).collect()
+        };
+        Split::new(self.conductance(inside), origin(inside), origin(&self.all().difference(inside).copied().collect()))
+    }
+
+    pub fn sweep(&self, floor: Least) -> Option<Split> {
+        let order = self.sweep_order();
+        let total = self.items(&self.all());
+        let candidates: Vec<(Conductance, ItemCount)> = order
+            .iter()
+            .scan(Frontier::new(self), |frontier, tangle| {
+                frontier.admit(*tangle);
+                Some((frontier.admitted_conductance(), frontier.items()))
+            })
+            .collect();
+        let best = candidates
+            .iter()
+            .enumerate()
+            .take(order.len().saturating_sub(1))
+            .filter(|(_, (_, items))| floor.allows(items.smaller_of(total).count()))
+            .min_by(|(_, (left, _)), (_, (right, _))| left.total_cmp(*right))?;
+        Some(self.split(&order.iter().take(best.0 + 1).copied().collect()))
+    }
+
+    fn sweep_order(&self) -> Vec<TangleIndex> {
+        let mut order: Vec<(TangleIndex, f64)> = Spectrum::new(&self.rows)
             .fiedler()
             .into_iter()
             .enumerate()
@@ -74,38 +142,16 @@ impl Condensed {
     }
 
     pub fn conductance(&self, side: &BTreeSet<TangleIndex>) -> Conductance {
-        let inside = |index: &usize| side.contains(&TangleIndex::from(*index));
-        let (within, beyond): (Vec<_>, Vec<_>) = self.weights.iter().enumerate().partition(|(row, _)| inside(row));
-        let volume = |rows: &[(usize, &Vec<Weight>)]| -> f64 {
-            rows.iter().flat_map(|(_, weights)| weights.iter()).map(|weight| weight.crossings()).sum()
+        let rows = |inside: bool| {
+            self.rows.iter().enumerate().filter(move |(row, _)| side.contains(&TangleIndex::from(*row)) == inside)
         };
-        let crossing: f64 = within
-            .iter()
-            .flat_map(|(_, weights)| weights.iter().enumerate())
-            .filter(|(column, _)| !inside(column))
-            .map(|(_, weight)| weight.crossings())
+        let volume =
+            |inside: bool| -> f64 { rows(inside).flat_map(|(_, row)| row).map(|link| link.weight().crossings()).sum() };
+        let crossing: f64 = rows(true)
+            .flat_map(|(_, row)| row)
+            .filter(|link| !side.contains(&link.target()))
+            .map(|link| link.weight().crossings())
             .sum();
-        Conductance::of_ratio(crossing, volume(&within).min(volume(&beyond)))
-    }
-
-    fn reached(&self, tangle: TangleIndex, seen: BTreeSet<TangleIndex>) -> BTreeSet<TangleIndex> {
-        let neighbours: Vec<TangleIndex> = self
-            .weights
-            .get(tangle.index())
-            .into_iter()
-            .flat_map(|row| row.iter().enumerate().filter(|(_, weight)| weight.crossings() > 0.0))
-            .map(|(other, _)| TangleIndex::from(other))
-            .collect();
-        neighbours.into_iter().fold(seen, |seen, other| self.grown(seen, other))
-    }
-
-    fn grown(&self, seen: BTreeSet<TangleIndex>, other: TangleIndex) -> BTreeSet<TangleIndex> {
-        if seen.contains(&other) {
-            seen
-        } else {
-            let mut grown = seen;
-            grown.insert(other);
-            self.reached(other, grown)
-        }
+        Conductance::of_ratio(crossing, volume(true).min(volume(false)))
     }
 }

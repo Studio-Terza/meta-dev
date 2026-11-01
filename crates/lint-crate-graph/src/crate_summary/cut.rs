@@ -1,14 +1,15 @@
 mod condensed;
 mod conductance;
+mod split;
 
 use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::crate_summary::cut::conductance::Conductance;
-use crate::crate_summary::item_count::ItemCount;
-use crate::item_graph::{ItemGraph, NodeIndex};
 use condensed::{Condensed, TangleIndex};
-use lint_core::Name;
+use lint_core::{Least, Name};
+use lint_item_graph::{ItemGraph, NodeIndex};
+use split::Split;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cut {
@@ -18,41 +19,44 @@ pub struct Cut {
 }
 
 impl Cut {
-    pub fn best(graph: &ItemGraph, tangles: &[Vec<NodeIndex>]) -> Option<Cut> {
-        let condensed = Condensed::of_tangles(graph, tangles);
-        Self::best_side(&condensed).map(|side| Cut {
-            conductance: condensed.conductance(&side),
-            inside: Self::names(graph, tangles, &side),
-            outside: Self::names(graph, tangles, &condensed.all().difference(&side).copied().collect()),
-        })
+    pub fn best(graph: &ItemGraph, tangles: &[Vec<NodeIndex>], floor: Least) -> Option<Cut> {
+        let whole = Condensed::of_tangles(graph, tangles);
+        let islands = whole.islands();
+        let sweeps =
+            islands.iter().filter(|island| island.len() > 1).filter_map(|island| whole.restricted(island).sweep(floor));
+        Self::apart(&whole, &islands, floor)
+            .into_iter()
+            .chain(sweeps)
+            .min_by(|left, right| left.conductance().total_cmp(right.conductance()))
+            .map(|split| Cut {
+                conductance: split.conductance(),
+                inside: Self::names(graph, tangles, split.inside()),
+                outside: Self::names(graph, tangles, &split.into_outside()),
+            })
     }
 
     pub fn conductance(&self) -> Conductance {
         self.conductance
     }
 
-    pub fn smaller_side(&self) -> ItemCount {
-        ItemCount::of_len(self.inside.len().min(self.outside.len()))
+    fn apart(whole: &Condensed, islands: &[BTreeSet<TangleIndex>], floor: Least) -> Option<Split> {
+        let total: BTreeSet<TangleIndex> = islands.iter().flatten().copied().collect();
+        let inside = Self::balanced(whole, islands, &total);
+        let outside: BTreeSet<TangleIndex> = total.difference(&inside).copied().collect();
+        let smaller = whole.items(&inside).count().min(whole.items(&outside).count());
+        floor.allows(smaller).then(|| Split::new(whole.conductance(&inside), inside, outside))
     }
 
-    fn best_side(condensed: &Condensed) -> Option<BTreeSet<TangleIndex>> {
-        let islands = condensed.islands();
-        if islands.len() > 1 {
-            Some(Self::balanced(condensed, islands))
-        } else {
-            let order = condensed.sweep_order();
-            (1..order.len())
-                .map(|prefix| order.iter().take(prefix).copied().collect::<BTreeSet<TangleIndex>>())
-                .min_by(|left, right| condensed.conductance(left).total_cmp(condensed.conductance(right)))
-        }
-    }
-
-    fn balanced(condensed: &Condensed, islands: Vec<BTreeSet<TangleIndex>>) -> BTreeSet<TangleIndex> {
-        let mut islands = islands;
+    fn balanced(
+        condensed: &Condensed,
+        islands: &[BTreeSet<TangleIndex>],
+        total: &BTreeSet<TangleIndex>,
+    ) -> BTreeSet<TangleIndex> {
+        let mut islands = islands.to_vec();
         islands.sort_by_key(|island| std::cmp::Reverse(condensed.items(island)));
-        let total = condensed.items(&condensed.all());
+        let whole = condensed.items(total);
         islands.into_iter().fold(BTreeSet::new(), |inside, island| {
-            if condensed.items(&inside) + condensed.items(&inside) < total {
+            if condensed.items(&inside) + condensed.items(&inside) < whole {
                 inside.into_iter().chain(island).collect()
             } else {
                 inside

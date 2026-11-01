@@ -1,5 +1,6 @@
 mod members;
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,8 @@ impl Manifest {
     const WORKSPACE: &'static str = "workspace";
     const PATH: &'static str = "path";
     const FEATURES: &'static str = "features";
+    const LIBRARY: &'static str = "lib";
+    const BINARIES: &'static str = "bin";
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
     pub fn read(directory: &Path) -> Result<Option<Manifest>, Failure> {
@@ -79,6 +82,17 @@ impl Manifest {
             .filter_map(Value::as_table)
             .flat_map(Table::values)
             .filter_map(|dependency| dependency.get(Self::PATH)?.as_str())
+            .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn declared_roots(&self) -> BTreeSet<PathBuf> {
+        let library = self.table.get(Self::LIBRARY).into_iter();
+        let binaries = self.table.get(Self::BINARIES).and_then(Value::as_array).into_iter().flatten();
+        library
+            .chain(binaries)
+            .filter_map(|target| target.get(Self::PATH)?.as_str())
             .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
             .collect()
     }

@@ -25,7 +25,7 @@ settings. Files under `tests`, `examples` and `benches` are checked only by the 
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-fixtures` (shared test sources), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-fixtures` (shared test sources), `lint-runner` (the runner
 library), `lint` (the binary), `golden` (golden files for tests) and `laws` (law macros for tests). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.

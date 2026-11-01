@@ -2,6 +2,7 @@ mod placement;
 
 use std::path::{Path, PathBuf};
 
+use crate::crate_file::CrateFile;
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::role::Role;
@@ -11,6 +12,7 @@ use placement::Placement;
 pub struct SourceFile {
     path: PathBuf,
     placement: Placement,
+    crate_file: CrateFile,
     text: String,
     syntax: syn::File,
     test_modules: Vec<SourceFile>,
@@ -33,12 +35,23 @@ impl SourceFile {
             line: LineNumber::from(source.span()),
             source,
         })?;
-        Ok(Self { path, placement, text, syntax, test_modules: Vec::new() })
+        let crate_file = placement.crate_file(&path);
+        Ok(Self { path, placement, crate_file, text, syntax, test_modules: Vec::new() })
     }
 
     #[must_use]
     pub fn with_test_modules(self, test_modules: Vec<SourceFile>) -> SourceFile {
         SourceFile { test_modules, ..self }
+    }
+
+    #[must_use]
+    pub fn in_crate_file(self, crate_file: CrateFile) -> SourceFile {
+        SourceFile { crate_file, ..self }
+    }
+
+    #[must_use]
+    pub fn crate_file(&self) -> &CrateFile {
+        &self.crate_file
     }
 
     #[must_use]
