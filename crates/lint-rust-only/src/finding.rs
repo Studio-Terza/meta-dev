@@ -1,20 +1,22 @@
 use std::fmt;
 
 use crate::language::Language;
+use crate::place::Place;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Finding {
     language: Language,
+    place: Place,
 }
 
 impl Finding {
-    pub fn new(language: Language) -> Finding {
-        Finding { language }
+    pub(crate) fn new(language: Language, place: Place) -> Finding {
+        Finding { language, place }
     }
 }
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} source outside assets; {}", self.language.name(), self.language.fix())
+        write!(formatter, "{} {}; {}", self.language.name(), self.place, self.language.fix())
     }
 }

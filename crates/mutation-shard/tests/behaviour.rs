@@ -23,7 +23,7 @@ impl Mutants {
         Ok(mutants)
     }
 
-    fn log(&self, name: &str, text: &str) -> Result<(), io::Error> {
+    fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
         fs::write(self.0.path().join("log").join(name), text)
     }
 
@@ -123,6 +123,21 @@ fn a_shard_lists_the_baseline_tests_and_the_tests_that_failed_per_mutant() -> Re
             ],
         })
     );
+    Ok(())
+}
+
+#[test]
+fn a_log_with_a_byte_that_is_not_utf8_is_still_read() -> Result<(), Box<dyn Error>> {
+    let mutants = Mutants::new()?;
+    mutants.log("baseline.log", [BASELINE_LOG.as_bytes(), b"\xff\n"].concat())?;
+    mutants.log("one.log", [KILLING_LOG.as_bytes(), b"\xff\n"].concat())?;
+    mutants.outcomes(&json!([
+        Outcome::baseline(),
+        Outcome::mutant(json!({ "name": "m" }), "CaughtMutant", json!("log/one.log"), &json!([])),
+    ]))?;
+    assert_eq!(mutants.shard(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
+    assert_eq!(mutants.baseline_field(), json!(["doc-foo :: src/lib.rs - f (line 1)", "foo-1 :: a", "foo-1 :: b"]));
+    assert_eq!(mutants.mutants_field("failed"), vec![json!(["foo-1 :: a", "foo-1 :: c"])]);
     Ok(())
 }
 

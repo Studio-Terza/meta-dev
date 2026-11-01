@@ -22,32 +22,49 @@ impl RunStep {
     const QUOTES: [char; 2] = ['\'', '"'];
     const LIMIT: Characters = Characters::new(120);
     const OPERATORS: [&'static str; 7] = ["|", "&", ";", ">", "<", "`", "$("];
+    const OPENERS: [&'static str; 2] = ["!", "("];
+    const COMMENT: char = '#';
     const KEYWORDS: [&'static str; 7] = ["if", "for", "while", "until", "case", "[", "[["];
 
-    pub(crate) fn finding(&self, next: Option<&str>) -> Option<Finding> {
+    pub(crate) fn finding(&self, following: &[&str]) -> Option<Finding> {
         match self {
             RunStep::Absent => None,
             RunStep::Block => Some(Finding::Block),
-            RunStep::Opening => Text::new(next.unwrap_or_default()).names_key().map_or(Some(Finding::Block), |_| None),
+            RunStep::Opening => Self::next_content(following).names_key().map_or(Some(Finding::Block), |_| None),
             RunStep::Inline(command) => Self::inline_finding(command),
         }
     }
 
+    fn next_content<'lines>(following: &[&'lines str]) -> Text<'lines> {
+        following
+            .iter()
+            .map(|line| Text::new(line).after_blanks())
+            .find(|line| line.first_letter().is_some_and(|first| first != Self::COMMENT))
+            .unwrap_or_default()
+    }
+
     fn inline_finding(command: &str) -> Option<Finding> {
         let characters = command.parse::<Characters>().ok()?;
-        let operator = Self::OPERATORS.iter().find(|symbol| command.contains(**symbol));
-        let keyword = Self::KEYWORDS.iter().find(|word| {
-            Text::new(command)
-                .after(Text::new(word))
-                .is_some_and(|rest| rest.first_letter().is_none_or(char::is_whitespace))
-        });
-        if characters > Self::LIMIT {
-            Some(Finding::TooLong { characters, limit: Self::LIMIT })
-        } else if let Some(symbol) = operator {
-            Some(Finding::Operator { symbol })
-        } else {
-            keyword.map(|word| Finding::Control { word })
-        }
+        (characters > Self::LIMIT)
+            .then_some(Finding::TooLong { characters, limit: Self::LIMIT })
+            .or_else(|| Self::operator_in(command).map(|symbol| Finding::Operator { symbol }))
+            .or_else(|| Self::keyword_in(Text::new(command)).map(|word| Finding::Control { word }))
+    }
+
+    fn operator_in(command: &str) -> Option<&'static str> {
+        Self::OPERATORS
+            .iter()
+            .copied()
+            .find(|symbol| command.contains(*symbol))
+            .or_else(|| Text::new(command).modified_expansion().map(|_| Text::EXPANSION))
+    }
+
+    fn keyword_in(text: Text<'_>) -> Option<&'static str> {
+        Self::OPENERS
+            .iter()
+            .copied()
+            .find(|word| text.after(Text::new(word)).is_some())
+            .or_else(|| Self::KEYWORDS.iter().copied().find(|word| text.after_word(word).is_some()))
     }
 }
 

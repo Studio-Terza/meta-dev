@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 test-log = { path = "../test-log" }
+text-lines = { path = "../text-lines" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

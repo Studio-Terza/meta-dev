@@ -28,7 +28,7 @@ jobs:
           tool: cargo-mutants@27.1.0
       - name: mutants in shard
         env:
-          SHARD: ${{ matrix.index }}/8
+          SHARD: ${{ matrix.index }}/${{ strategy.job-total }}
         run: cargo run --locked -q --bin ci -- mutants-shard "$SHARD" "$RUNNER_TEMP"
       - name: which tests failed per mutant
         if: always()

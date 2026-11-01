@@ -1,7 +1,7 @@
 use lint_core::RepoFile;
 use lint_rust_only::RustOnly;
 
-const EXTENSIONS: [(&str, &str); 52] = [
+const EXTENSIONS: [(&str, &str); 83] = [
     ("py", "Python"),
     ("pyw", "Python"),
     ("pyi", "Python"),
@@ -52,11 +52,42 @@ const EXTENSIONS: [(&str, &str); 52] = [
     ("jl", "Julia"),
     ("groovy", "Groovy"),
     ("zig", "Zig"),
+    ("dash", "shell"),
+    ("t", "Perl"),
+    ("rake", "Ruby"),
+    ("erb", "Ruby"),
+    ("cljc", "Clojure"),
+    ("pyx", "Python"),
+    ("hrl", "Erlang"),
+    ("awk", "awk"),
+    ("sed", "sed"),
+    ("tcl", "Tcl"),
+    ("nix", "Nix"),
+    ("mk", "make"),
+    ("ipynb", "notebook"),
+    ("vim", "Vim script"),
+    ("el", "Lisp"),
+    ("lisp", "Lisp"),
+    ("scm", "Scheme"),
+    ("rkt", "Racket"),
+    ("nim", "Nim"),
+    ("vb", "Visual Basic"),
+    ("vbs", "Visual Basic"),
+    ("sol", "Solidity"),
+    ("asm", "assembly"),
+    ("s", "assembly"),
+    ("d", "D"),
+    ("pas", "Pascal"),
+    ("f90", "Fortran"),
+    ("cr", "Crystal"),
+    ("v", "V"),
+    ("ino", "Arduino"),
+    ("bzl", "Starlark"),
     ("PY", "Python"),
     ("Sh", "shell"),
 ];
 
-const WEB: [(&str, &str); 14] = [
+const WEB: [(&str, &str); 15] = [
     ("js", "JavaScript"),
     ("mjs", "JavaScript"),
     ("cjs", "JavaScript"),
@@ -71,6 +102,7 @@ const WEB: [(&str, &str); 14] = [
     ("scss", "CSS"),
     ("vue", "Vue"),
     ("svelte", "Svelte"),
+    ("astro", "Astro"),
 ];
 
 const REWRITE: &str = "rewrite it in Rust";
@@ -132,10 +164,22 @@ fn rust_and_configuration_files_pass() {
 }
 
 #[test]
-fn a_file_below_a_directory_named_assets_passes() {
-    for path in ["assets/app.js", "site/assets/app.js", "site/assets/deep/er/run.py", "assets/x.sh"] {
+fn a_web_file_below_a_directory_named_assets_passes() {
+    for path in ["assets/app.js", "site/assets/app.js", "site/assets/deep/er/app.css", "assets/page.html"] {
         assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
     }
+}
+
+#[test]
+fn a_script_below_a_directory_named_assets_still_fails() {
+    assert_eq!(
+        Checked::one("site/assets/deep/run.py"),
+        [format!("site/assets/deep/run.py:1: Python source below assets is not a web asset; {REWRITE}")]
+    );
+    assert_eq!(
+        Checked::one("assets/x.sh"),
+        [format!("assets/x.sh:1: shell source below assets is not a web asset; {REWRITE}")]
+    );
 }
 
 #[test]
@@ -158,7 +202,7 @@ fn the_directories_above_the_checkout_do_not_count() {
         Checked::within("/home/assets/repo", "run.sh"),
         ["/home/assets/repo/run.sh:1: shell source outside assets; rewrite it in Rust"]
     );
-    assert_eq!(Checked::within("/home/repo", "assets/run.sh"), Vec::<String>::new());
+    assert_eq!(Checked::within("/home/repo", "assets/app.js"), Vec::<String>::new());
 }
 
 #[test]

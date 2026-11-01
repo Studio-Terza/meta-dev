@@ -226,17 +226,18 @@ laws::table!(
         "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => "test-run = 1.75\n",
         "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => "test-run = 2.00\n",
         "test result: ok. 1 passed; 0 failed\n" => "test-run = 0.00\n",
-        "" => "test-run = 0.00\n",
+        "" => "",
+        "no result lines here\n" => "",
         "test result: ok. finished in abc\n" => "test-run = 0.00\n",
         "test result: ok. finished in 3s\n" => "test-run = 3.00\n",
         "test result: ok. finished in 0.5\n" => "test-run = 0.50\n",
         "test result: ok. finished in 1s in 2s\n" => "test-run = 3.00\n",
-        "  test result: ok. finished in 9s\n" => "test-run = 0.00\n",
+        "  test result: ok. finished in 9s\n" => "",
         "test results: ok. finished in 4s\n" => "test-run = 4.00\n",
         "test result: ok. finished in\n" => "test-run = 0.00\n",
         "test result: ok. finishedin 5s\n" => "test-run = 0.00\n",
         "test result: ok. in 1.5.5s\n" => "test-run = 0.00\n",
-        "test resul: ok. finished in 5s\n" => "test-run = 0.00\n",
+        "test resul: ok. finished in 5s\n" => "",
         "test result: ok. finished  in\t7s\n" => "test-run = 7.00\n",
         "test result: ok. finished in 0.004s\n" => "test-run = 0.00\n",
     ]
@@ -337,6 +338,18 @@ fn test_output_that_cannot_be_read_is_reported_and_nothing_is_measured() -> Resu
 }
 
 #[test]
+fn test_output_without_a_result_line_is_a_failure_and_nothing_is_measured() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("out.txt", "no result lines here\n")?;
+    let answer =
+        Answer::to(&Fake::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("no libtest result line"));
+    assert_eq!(scratch.read("m.toml"), "");
+    Ok(())
+}
+
+#[test]
 fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let fake = Fake::new();
@@ -367,7 +380,10 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
         *fake.calls.borrow(),
         [
             Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
-            Invocation::new("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"]),
+            Invocation::new(
+                "git",
+                ["-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"]
+            ),
         ]
     );
     assert_eq!(scratch.read("metadata.json"), METADATA);
@@ -571,7 +587,9 @@ impl Exits {
     }
 
     fn changed(code: &Code) -> ExitCode {
-        Answer::to(&Fake::exiting(code.0), &["mutants-changed", "d.diff", "out", "--test-package=leaf"]).exit
+        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let arguments = ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "--test-package=leaf"];
+        Answer::to(&Fake::exiting(code.0), &arguments).exit
     }
 }
 
@@ -772,7 +790,7 @@ impl Labelled {
     fn verdict(case: &Case) -> Verdict {
         let fake = Fake::answering(vec![
             Reply::to("git merge-base", "abc123\n"),
-            Reply::to("git diff", case.changes),
+            Reply::to("git -c", case.changes),
             Reply::to("gh pr", case.labels),
         ]);
         let answer = Answer::to(&fake, &["labels", "main", "121"]);
@@ -833,7 +851,19 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
         *fake.calls.borrow(),
         [
             Invocation::new("git", ["merge-base", "origin/release", "HEAD"]),
-            Invocation::new("git", ["diff", "--name-status", "--find-renames", "--find-copies", "abc123", "HEAD"]),
+            Invocation::new(
+                "git",
+                [
+                    "-c",
+                    "core.quotePath=false",
+                    "diff",
+                    "--name-status",
+                    "--find-renames",
+                    "--find-copies",
+                    "abc123",
+                    "HEAD"
+                ],
+            ),
             Invocation::new("gh", ["pr", "view", "7", "--json", "labels", "--jq", ".labels[].name"]),
         ]
     );

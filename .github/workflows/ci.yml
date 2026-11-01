@@ -38,7 +38,7 @@ jobs:
         id: tools
         with:
           path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/mutation-report/Cargo.toml', 'crates/mutation-report/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
         run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
@@ -53,10 +53,10 @@ jobs:
         if: env.CARGO_SCOPE != ''
         run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run $CARGO_SCOPE'
       - name: fuzz targets clippy
-        if: env.CARGO_SCOPE == '--workspace' || contains(env.CARGO_SCOPE, '-p fuzz')
+        if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
       - name: fuzz targets compile
-        if: env.CARGO_SCOPE == '--workspace' || contains(env.CARGO_SCOPE, '-p fuzz')
+        if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
         run: cargo test --locked -p fuzz --features campaign --test fuzz --no-run
       - name: test run
         if: env.CARGO_SCOPE != ''
@@ -97,7 +97,7 @@ jobs:
         id: tools
         with:
           path: ${{ github.workspace }}/target/ci/tools
-          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/lint*/Cargo.toml', 'crates/lint*/src/**', 'crates/newtype*/Cargo.toml', 'crates/newtype*/src/**', 'crates/reach/Cargo.toml', 'crates/reach/src/**', 'crates/ci/Cargo.toml', 'crates/ci/src/**', 'crates/mutation-report/Cargo.toml', 'crates/mutation-report/src/**', 'crates/text-lines/Cargo.toml', 'crates/text-lines/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/Cargo.toml', 'crates/**/src/**') }}
       - name: tools
         if: steps.tools.outputs.cache-hit != 'true'
         run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"

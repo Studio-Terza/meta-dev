@@ -3,7 +3,7 @@ mod fix;
 use std::ffi::OsStr;
 use std::path::Path;
 
-use fix::Fix;
+pub(crate) use fix::Fix;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -41,6 +41,28 @@ pub enum Language {
     Css,
     Vue,
     Svelte,
+    Awk,
+    Sed,
+    Tcl,
+    Nix,
+    Make,
+    Notebook,
+    Vim,
+    Lisp,
+    Scheme,
+    Racket,
+    Nim,
+    VisualBasic,
+    Solidity,
+    Assembly,
+    D,
+    Pascal,
+    Fortran,
+    Crystal,
+    V,
+    Arduino,
+    Starlark,
+    Astro,
 }
 
 impl Language {
@@ -79,6 +101,28 @@ impl Language {
         Language::Css,
         Language::Vue,
         Language::Svelte,
+        Language::Awk,
+        Language::Sed,
+        Language::Tcl,
+        Language::Nix,
+        Language::Make,
+        Language::Notebook,
+        Language::Vim,
+        Language::Lisp,
+        Language::Scheme,
+        Language::Racket,
+        Language::Nim,
+        Language::VisualBasic,
+        Language::Solidity,
+        Language::Assembly,
+        Language::D,
+        Language::Pascal,
+        Language::Fortran,
+        Language::Crystal,
+        Language::V,
+        Language::Arduino,
+        Language::Starlark,
+        Language::Astro,
     ];
 
     #[must_use]
@@ -125,6 +169,28 @@ impl Language {
             Language::Css => "CSS",
             Language::Vue => "Vue",
             Language::Svelte => "Svelte",
+            Language::Awk => "awk",
+            Language::Sed => "sed",
+            Language::Tcl => "Tcl",
+            Language::Nix => "Nix",
+            Language::Make => "make",
+            Language::Notebook => "notebook",
+            Language::Vim => "Vim script",
+            Language::Lisp => "Lisp",
+            Language::Scheme => "Scheme",
+            Language::Racket => "Racket",
+            Language::Nim => "Nim",
+            Language::VisualBasic => "Visual Basic",
+            Language::Solidity => "Solidity",
+            Language::Assembly => "assembly",
+            Language::D => "D",
+            Language::Pascal => "Pascal",
+            Language::Fortran => "Fortran",
+            Language::Crystal => "Crystal",
+            Language::V => "V",
+            Language::Arduino => "Arduino",
+            Language::Starlark => "Starlark",
+            Language::Astro => "Astro",
         }
     }
 
@@ -136,19 +202,20 @@ impl Language {
             | Language::Html
             | Language::Css
             | Language::Vue
-            | Language::Svelte => Fix::MoveToAssets,
+            | Language::Svelte
+            | Language::Astro => Fix::MoveToAssets,
             _ => Fix::Rewrite,
         }
     }
 
     fn extensions(self) -> &'static [&'static str] {
         match self {
-            Language::Python => &["py", "pyw", "pyi"],
-            Language::Shell => &["sh", "bash", "zsh", "fish", "ksh", "csh"],
+            Language::Python => &["py", "pyw", "pyi", "pyx"],
+            Language::Shell => &["sh", "bash", "zsh", "fish", "ksh", "csh", "dash"],
             Language::Batch => &["bat", "cmd"],
             Language::PowerShell => &["ps1", "psm1"],
-            Language::Perl => &["pl", "pm"],
-            Language::Ruby => &["rb"],
+            Language::Perl => &["pl", "pm", "t"],
+            Language::Ruby => &["rb", "rake", "erb"],
             Language::Php => &["php"],
             Language::Lua => &["lua"],
             Language::Go => &["go"],
@@ -163,8 +230,8 @@ impl Language {
             Language::Dart => &["dart"],
             Language::Haskell => &["hs"],
             Language::Elixir => &["ex", "exs"],
-            Language::Erlang => &["erl"],
-            Language::Clojure => &["clj", "cljs"],
+            Language::Erlang => &["erl", "hrl"],
+            Language::Clojure => &["clj", "cljs", "cljc"],
             Language::OCaml => &["ml", "mli"],
             Language::FSharp => &["fs", "fsx"],
             Language::R => &["r"],
@@ -177,6 +244,28 @@ impl Language {
             Language::Css => &["css", "scss", "sass", "less"],
             Language::Vue => &["vue"],
             Language::Svelte => &["svelte"],
+            Language::Awk => &["awk"],
+            Language::Sed => &["sed"],
+            Language::Tcl => &["tcl"],
+            Language::Nix => &["nix"],
+            Language::Make => &["mk"],
+            Language::Notebook => &["ipynb"],
+            Language::Vim => &["vim"],
+            Language::Lisp => &["el", "lisp"],
+            Language::Scheme => &["scm"],
+            Language::Racket => &["rkt"],
+            Language::Nim => &["nim"],
+            Language::VisualBasic => &["vb", "vbs"],
+            Language::Solidity => &["sol"],
+            Language::Assembly => &["asm", "s"],
+            Language::D => &["d"],
+            Language::Pascal => &["pas"],
+            Language::Fortran => &["f90"],
+            Language::Crystal => &["cr"],
+            Language::V => &["v"],
+            Language::Arduino => &["ino"],
+            Language::Starlark => &["bzl"],
+            Language::Astro => &["astro"],
         }
     }
 }
