@@ -1,0 +1,54 @@
+mod callee;
+mod finding;
+mod forwarder;
+mod forwarders;
+mod workspace_types;
+
+use finding::Finding;
+use forwarder::Forwarder;
+use forwarders::Forwarders;
+use lint_core::Lint;
+use syn::visit::Visit;
+use workspace_types::WorkspaceTypes;
+
+use lint_core::LineNumber;
+use lint_core::Name;
+use lint_core::Report;
+use lint_core::Site;
+use lint_core::SourceFile;
+use lint_core::Violation;
+
+#[derive(Debug)]
+pub struct NoForwarders;
+
+impl Lint for NoForwarders {
+    fn report(files: &[SourceFile]) -> Report {
+        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let types = WorkspaceTypes::from(shipped.as_slice());
+        Report::new(
+            "methods do their own work, they do not forward to another type of ours",
+            shipped
+                .iter()
+                .flat_map(|file| {
+                    Self::forwarders(file, &types).into_iter().map(move |forwarder| {
+                        Violation::new(
+                            Site::new(file.path(), LineNumber::from(forwarder.name().span())),
+                            Finding::Forwards {
+                                name: Name::from(forwarder.name()),
+                                callee: forwarder.callee().clone(),
+                            },
+                        )
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+
+impl NoForwarders {
+    fn forwarders(file: &SourceFile, types: &WorkspaceTypes) -> Vec<Forwarder> {
+        let mut scan = Forwarders::new(types);
+        scan.visit_file(file.syntax());
+        scan.found()
+    }
+}

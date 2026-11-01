@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-lints = { path = "../lints" }
+lint-runner = { path = "../lint-runner" }
 
 [lints]
 workspace = true
