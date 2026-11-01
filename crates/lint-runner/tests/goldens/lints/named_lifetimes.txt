@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 4 files, 0 of 8 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/named.rs:2: fn f
 src/short.rs:2: fn f
@@ -8,3 +12,4 @@ src/short.rs:2: 'b
 function names say what the function does:
 src/named.rs:2: fn f names nothing; say what it does
 src/short.rs:2: fn f names nothing; say what it does
+fails

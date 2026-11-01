@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 7 files, 0 of 34 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/bare.rs:1: fn f
 src/newtype.rs:2: fn f
@@ -26,3 +30,4 @@ src/text.rs:4: format handles text outside a door; parse in FromStr or render in
 src/text.rs:5: to_string handles text outside a door; parse in FromStr or render in Display
 src/wire.rs:2: serde_json::Value in f is a wire form; parse it into a type at the door
 src/wire.rs:3: serde_json::Value in g is a wire form; parse it into a type at the door
+fails

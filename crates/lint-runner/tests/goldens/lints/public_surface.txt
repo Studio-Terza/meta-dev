@@ -1,4 +1,8 @@
-a struct with no logic of its own that one other file consumes is a parameter bag:
-exporter/src/inner.rs:2: Unused only carries values into one other file; give it the logic that consumes it
+test budget, report only:
+exporter: 0 tests in 2 files, 0 of 4 lines, 0 process starts
+user: 0 tests in 1 files, 0 of 1 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 a crate exports exactly what another crate uses:
 exporter/src/lib.rs:2: Unused is exported but no other crate names it; export it when a user appears
+fails

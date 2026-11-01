@@ -1,6 +1,12 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 0 of 24 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+src/inline.rs:4: fn is_a -> bool
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 an enum method returning bool throws away the variant; return an enum or match where the answer is used:
 src/elsewhere.rs:2: fn is_a -> bool
 src/inline.rs:4: fn is_a -> bool
 src/mode.rs:3: fn is_a -> bool
 primitives appear only at a type's boundary:
 src/mode.rs:4: bare u8 in name; name what it counts with a newtype
+fails

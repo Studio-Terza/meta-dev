@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 3 files, 0 of 13 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/said.rs:1: fn parse_header
 src/vague.rs:1: fn get
@@ -7,3 +11,4 @@ function names say what the function does:
 src/vague.rs:1: fn get names nothing; say what it does
 src/vague.rs:4: fn handle names nothing; say what it does
 src/vague.rs:5: fn go names nothing; say what it does
+fails

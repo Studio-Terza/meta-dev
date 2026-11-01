@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::gate::limit::Limit;
-use crate::gate::seconds::Seconds;
-use crate::gate::verdict::Verdict;
+use crate::cli::gate::limit::Limit;
+use crate::cli::gate::seconds::Seconds;
+use crate::cli::gate::verdict::Verdict;
 
 #[derive(Debug)]
 pub struct Finding {

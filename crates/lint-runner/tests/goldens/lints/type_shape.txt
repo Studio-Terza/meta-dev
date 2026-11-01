@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 9 files, 4 of 37 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/errors.rs:1: fn f
 src/fine.rs:2: fn f
@@ -51,3 +55,4 @@ src/fields.rs:2: field on of A is pub; struct fields are private
 src/real.rs:3: field on of S is pub; struct fields are private
 tests go through public APIs:
 src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
+fails

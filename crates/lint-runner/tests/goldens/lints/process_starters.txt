@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 8 files, 4 of 33 lines, 6 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/built_only.rs:2: fn f
 src/imported.rs:2: fn f
@@ -19,3 +23,4 @@ src/imported.rs:3: starts a std::process::Command; move it behind a port: a crat
 src/qualified.rs:2: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
 src/renamed.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
 tests/spawns.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+fails

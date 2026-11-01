@@ -1,14 +1,10 @@
-a struct with no logic of its own that one other file consumes is a parameter bag:
-groups/src/lib.rs:1: A0 only carries values into one other file; give it the logic that consumes it
-groups/src/lib.rs:2: A1 only carries values into one other file; give it the logic that consumes it
-groups/src/lib.rs:3: A2 only carries values into one other file; give it the logic that consumes it
-groups/src/lib.rs:4: A3 only carries values into one other file; give it the logic that consumes it
-groups/src/lib.rs:5: A4 only carries values into one other file; give it the logic that consumes it
-linked/src/lib.rs:1: A0 only carries values into one other file; give it the logic that consumes it
-linked/src/lib.rs:2: A1 only carries values into one other file; give it the logic that consumes it
-linked/src/lib.rs:3: A2 only carries values into one other file; give it the logic that consumes it
-linked/src/lib.rs:4: A3 only carries values into one other file; give it the logic that consumes it
-linked/src/lib.rs:5: A4 only carries values into one other file; give it the logic that consumes it
+test budget, report only:
+cycle: 0 tests in 1 files, 0 of 41 lines, 0 process starts
+groups: 0 tests in 1 files, 0 of 10 lines, 0 process starts
+linked: 0 tests in 1 files, 0 of 7 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 a crate whose items form one big cycle or two loosely linked groups is split:
 cycle/src/lib.rs:1: cycle of 41 items: R0 R1 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R2 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R3 R30 R31 R32 R33 R34 R35 R36 R37 R38 R39 R4 R40 R5 R6 R7 R8 R9
 groups/src/lib.rs:1: conductance 0.000 between 5 items [A0 A1 A2 A3 A4] and 5 items [B0 B1 B2 B3 B4]
+fails

@@ -3,89 +3,16 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use gate_limits::{Cli, Failure, Gate};
+use gate_limits::Cli;
 
 const LIMITS: &str = "[test-run]\nwarn = 3\nblock = 5\n[clippy]\nwarn = 10.5\nblock = 20\n";
-
-struct Judged;
-
-impl Judged {
-    fn text(measured: &str) -> Result<String, Failure> {
-        Gate::judge(LIMITS, measured).map(|gate| gate.to_string())
-    }
-
-    fn blocks(measured: &str) -> Result<bool, Failure> {
-        Gate::judge(LIMITS, measured).map(|gate| gate.blocks())
-    }
-}
-
-#[test]
-fn a_run_within_every_warn_level_is_ok_and_does_not_block() -> Result<(), Failure> {
-    assert_eq!(
-        Judged::text("test-run = 2.9\nclippy = 10")?,
-        "ok: clippy took 10s, warn above 10.5s, block above 20s\nok: test-run took 2.9s, warn above 3s, block above 5s\n"
-    );
-    assert!(!Judged::blocks("test-run = 2.9\nclippy = 10")?);
-    Ok(())
-}
-
-#[test]
-fn above_warn_but_not_above_block_warns_without_blocking() -> Result<(), Failure> {
-    assert!(
-        Judged::text("test-run = 4\nclippy = 10")?.contains("WARN: test-run took 4s, warn above 3s, block above 5s\n")
-    );
-    assert!(!Judged::blocks("test-run = 4\nclippy = 10")?);
-    Ok(())
-}
-
-#[test]
-fn above_block_blocks() -> Result<(), Failure> {
-    assert!(
-        Judged::text("test-run = 5.1\nclippy = 1")?
-            .contains("BLOCK: test-run took 5.1s, warn above 3s, block above 5s\n")
-    );
-    assert!(Judged::blocks("test-run = 5.1\nclippy = 1")?);
-    Ok(())
-}
-
-#[test]
-fn exactly_on_a_level_is_within_it() -> Result<(), Failure> {
-    assert!(Judged::text("test-run = 5\nclippy = 10.5")?.contains("WARN: test-run"));
-    assert!(Judged::text("test-run = 5\nclippy = 10.5")?.contains("ok: clippy"));
-    assert!(!Judged::blocks("test-run = 5\nclippy = 10.5")?);
-    Ok(())
-}
-
-#[test]
-fn a_limited_stage_that_was_not_measured_fails_closed() {
-    assert!(matches!(Judged::blocks("test-run = 1"), Err(Failure::Unmeasured { .. })));
-}
-
-#[test]
-fn a_measured_stage_without_a_limit_fails_closed() {
-    assert!(matches!(Judged::blocks("test-run = 1\nclippy = 1\nlint = 1"), Err(Failure::Unlimited { .. })));
-}
-
-#[test]
-fn a_measurement_that_is_not_a_number_fails_closed() {
-    assert!(matches!(Judged::blocks("test-run = \"fast\"\nclippy = 1"), Err(Failure::Parse { .. })));
-}
-
-#[test]
-fn a_warn_level_above_the_block_level_is_refused() {
-    assert!(matches!(Gate::judge("[test-run]\nwarn = 6\nblock = 5\n", "test-run = 1"), Err(Failure::Unlimited { .. })));
-}
-
-#[test]
-fn a_limit_without_a_block_level_is_refused() {
-    assert!(matches!(Gate::judge("[test-run]\nwarn = 1\n", "test-run = 1"), Err(Failure::Parse { .. })));
-}
-
-#[test]
-fn an_empty_limits_file_is_refused_rather_than_passing_everything() {
-    assert!(matches!(Gate::judge("", ""), Err(Failure::Empty)));
-}
 const LIMIT: &str = "[test-run]\nwarn = 1\nblock = 2\n";
+
+struct Reported {
+    exit: ExitCode,
+    out: String,
+    err: String,
+}
 
 struct Run;
 
@@ -99,6 +26,77 @@ impl Run {
     fn cli(limits: &Path, measured: &Path) -> Cli {
         Cli::from_args([limits, measured].map(|path| path.as_os_str().to_owned()).into_iter())
     }
+
+    fn reported(name: &str, limits: &str, measured: &str) -> io::Result<Reported> {
+        let limits = Self::fixture(&format!("{name}-limits.toml"), limits)?;
+        let measured = Self::fixture(&format!("{name}-measured.toml"), measured)?;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let exit = Self::cli(&limits, &measured).report_to(&mut out, &mut err);
+        Ok(Reported {
+            exit,
+            out: String::from_utf8(out).map_err(io::Error::other)?,
+            err: String::from_utf8(err).map_err(io::Error::other)?,
+        })
+    }
+
+    fn judged(name: &str, measured: &str) -> io::Result<Reported> {
+        Self::reported(name, LIMITS, measured)
+    }
+}
+
+#[test]
+fn a_run_within_every_warn_level_is_ok_and_does_not_block() -> io::Result<()> {
+    let run = Run::judged("all-ok", "test-run = 2.9\nclippy = 10")?;
+    assert_eq!(
+        run.out,
+        "ok: clippy took 10s, warn above 10.5s, block above 20s\nok: test-run took 2.9s, warn above 3s, block above 5s\n"
+    );
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn above_warn_but_not_above_block_warns_without_blocking() -> io::Result<()> {
+    let run = Run::judged("warns", "test-run = 4\nclippy = 10")?;
+    assert!(run.out.contains("WARN: test-run took 4s, warn above 3s, block above 5s\n"));
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn above_block_blocks() -> io::Result<()> {
+    let run = Run::judged("blocks", "test-run = 5.1\nclippy = 1")?;
+    assert!(run.out.contains("BLOCK: test-run took 5.1s, warn above 3s, block above 5s\n"));
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn exactly_on_a_level_is_within_it() -> io::Result<()> {
+    let run = Run::judged("on-level", "test-run = 5\nclippy = 10.5")?;
+    assert!(run.out.contains("WARN: test-run"));
+    assert!(run.out.contains("ok: clippy"));
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    Ok(())
+}
+
+const REFUSALS: [[&str; 4]; 6] = [
+    ["unmeasured", LIMITS, "test-run = 1", "was not measured"],
+    ["unlimited", LIMITS, "test-run = 1\nclippy = 1\nlint = 1", "no usable limit"],
+    ["not-a-number", LIMITS, "test-run = \"fast\"\nclippy = 1", "cannot parse"],
+    ["warn-above-block", "[test-run]\nwarn = 6\nblock = 5\n", "test-run = 1", "no usable limit"],
+    ["no-block", "[test-run]\nwarn = 1\n", "test-run = 1", "cannot parse"],
+    ["empty", "", "", "no stage has a limit"],
+];
+
+#[test]
+fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
+    for [name, limits, measured, reason] in REFUSALS {
+        let run = Run::reported(name, limits, measured)?;
+        assert_eq!(run.exit, ExitCode::FAILURE, "{name}");
+        assert!(run.err.contains(reason), "{name}: {}", run.err);
+    }
+    Ok(())
 }
 
 #[test]

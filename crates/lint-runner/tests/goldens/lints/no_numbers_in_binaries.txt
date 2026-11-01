@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 4 files, 0 of 17 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/lib.rs:1: fn numbers
 src/wiring.rs:1: fn pause
@@ -16,3 +20,4 @@ src/main.rs:4: numeric literal in a binary; read it from the settings file or it
 src/wiring.rs:2: numeric literal in a binary; read it from the settings file or its embedded defaults
 primitives appear only at a type's boundary:
 src/wiring.rs:1: bare u32 in pause; name what it counts with a newtype
+fails

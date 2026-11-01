@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 8 files, 0 of 25 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/first.rs:1: fn run
 src/logic_user.rs:1: fn run
@@ -13,3 +17,4 @@ src/shared.rs:2: bare u8 in depth; name what it counts with a newtype
 state graph violated:
 src/bag.rs:2: field depth of Options is pub; struct fields are private
 src/shared.rs:2: field depth of Shared is pub; struct fields are private
+fails

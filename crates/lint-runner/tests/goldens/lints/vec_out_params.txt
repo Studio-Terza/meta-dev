@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 4 of 21 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/fine.rs:1: fn read
 src/fine.rs:2: fn take
@@ -20,3 +24,4 @@ src/out.rs:1: bare u8 in fill; name what it counts with a newtype
 src/out.rs:4: bare u8 in push; name what it counts with a newtype
 tests go through public APIs:
 src/fine.rs:4: test code in src; move it to the package's tests directory and call the public API from there
+fails

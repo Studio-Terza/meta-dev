@@ -15,7 +15,16 @@ const INLINE_OTHER: &str = "mod masks {\n    pub fn f() -> u32 {\n        42\n  
 const METHOD: &str = "struct A;\nimpl A {\n    fn f() -> u32 {\n        42\n    }\n}\n";
 const PLAIN_MODULE: &str = "mod fixtures;\n";
 
-const CASES: [Case; 12] = [
+const NEGATIVE_PATTERN: &str =
+    "fn f(x: i32) -> bool {\n    match x {\n        -1 => true,\n        _ => false,\n    }\n}\n";
+const NEGATIVE_EXPRESSION: &str = "fn f() -> i32 {\n    -1\n}\n";
+const NEGATIVE_PATTERN_OTHER: &str =
+    "fn f(x: i32) -> bool {\n    match x {\n        -7 => true,\n        _ => false,\n    }\n}\n";
+const TEST_ONLY_ALL: &str = "#[cfg(all(test, unix))]\nmod tests {\n    fn f() -> u32 {\n        42\n    }\n}\n";
+const FEATURE_ONLY: &str =
+    "#[cfg(feature = \"proptest\")]\nmod support {\n    pub fn f() -> u32 {\n        42\n    }\n}\n";
+
+const CASES: [Case; 17] = [
     Case::new("static", &[Source::new("a.rs", STATIC)], &["a.rs:1", "a.rs:1", "a.rs:1"]),
     Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &[]),
     Case::new(
@@ -23,7 +32,12 @@ const CASES: [Case; 12] = [
         &[Source::new("src/lib.rs", SUPPORT_MODULE), Source::new("src/fixtures.rs", LITERAL)],
         &[],
     ),
-    Case::new("test or feature", &[Source::new("a.rs", FEATURE_SUPPORT)], &[]),
+    Case::new("test or feature ships", &[Source::new("a.rs", FEATURE_SUPPORT)], &["a.rs:5"]),
+    Case::new("test and platform", &[Source::new("a.rs", TEST_ONLY_ALL)], &[]),
+    Case::new("feature only ships", &[Source::new("a.rs", FEATURE_ONLY)], &["a.rs:4"]),
+    Case::new("negative unit in a pattern", &[Source::new("a.rs", NEGATIVE_PATTERN)], &[]),
+    Case::new("negative unit in an expression", &[Source::new("a.rs", NEGATIVE_EXPRESSION)], &[]),
+    Case::new("negative number in a pattern", &[Source::new("a.rs", NEGATIVE_PATTERN_OTHER)], &["a.rs:3"]),
     Case::new("bits module file", &[Source::new("crates/x/src/bits/mask.rs", LITERAL)], &[]),
     Case::new("bits module root", &[Source::new("crates/x/src/bits.rs", LITERAL)], &[]),
     Case::new("inline bits module", &[Source::new("a.rs", INLINE_BITS)], &[]),

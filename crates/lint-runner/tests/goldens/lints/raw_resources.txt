@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 6 files, 0 of 24 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/imported.rs:2: fn f
 src/other_calls.rs:2: fn f
@@ -17,3 +21,4 @@ only ports touch raw resources:
 src/imported.rs:3: calls std::mem::forget; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
 src/qualified.rs:2: calls std::fs::remove_dir_all; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
 src/renamed.rs:3: calls std::env::temp_dir; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
+fails

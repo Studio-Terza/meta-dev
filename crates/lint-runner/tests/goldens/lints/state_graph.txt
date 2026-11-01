@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 10 files, 0 of 91 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/area.rs:1: fn area
 two functions on one type with the same signature hide a missing type or type parameter:
@@ -27,3 +31,4 @@ src/edges.rs:5: is a hidden edge Open -> Ajar; edges are pub
 src/edges.rs:8: takes &mut self on vertex Open; transitions consume self
 src/duplicate.rs:2: Closed -> Open has 2 edges, at most one allowed: force at src/duplicate.rs:5, open at src/duplicate.rs:2
 src/crowded.rs:2: Ajar has 7 edges leaving it, at most 4 allowed
+fails

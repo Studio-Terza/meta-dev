@@ -1,3 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 8 files, 0 of 13 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 modules nest by use: a file used only inside one sibling belongs inside it:
 src/helper.rs:1: used only from crate::parent; move it inside that module
 src/reaching.rs:1: reaches into crate::outer::inner; import the parent's re-export instead
@@ -5,3 +9,4 @@ src/wide.rs:1: re-exports 9 items, at most 8 allowed; split the module
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/helper.rs:1: Tool only carries values into one other file; give it the logic that consumes it
 src/outer/inner.rs:1: Thing only carries values into one other file; give it the logic that consumes it
+fails

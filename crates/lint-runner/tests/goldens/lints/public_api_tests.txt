@@ -1,5 +1,10 @@
+test budget, report only:
+corpus: 2 tests in 3 files, 9 of 10 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 tests go through public APIs:
 src/lib.rs:3: test code in src; move it to the package's tests directory and call the public API from there
 tests/peek.rs:2: test file includes a module from src with #[path]; call the public API instead
 tests differ by more than their literals:
 tests/behaviour.rs:2: test t differs from t only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!
+fails
