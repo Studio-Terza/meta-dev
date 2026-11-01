@@ -206,6 +206,7 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
 ]
 
