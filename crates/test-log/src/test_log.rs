@@ -25,7 +25,7 @@ impl TestLog {
 
     #[must_use]
     pub fn failed(&self) -> Vec<TestName> {
-        self.0.iter().filter(|(_, verdict)| **verdict == Verdict::Failed).map(|(name, _)| name.clone()).collect()
+        self.0.iter().filter(|(_, seen)| **seen == Verdict::Failed).map(|(name, _)| name.clone()).collect()
     }
 }
 
