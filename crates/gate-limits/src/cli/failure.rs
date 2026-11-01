@@ -6,7 +6,7 @@ use crate::cli::stage::Stage;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
-    #[error("cannot read {path}: {source}", path = path.display())]
+    #[error("cannot read file {path}: {source}", path = path.display())]
     Io { path: PathBuf, source: io::Error },
     #[error("cannot parse {file}: {source}")]
     Parse { file: Document, source: toml::de::Error },
