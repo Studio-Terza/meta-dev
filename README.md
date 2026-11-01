@@ -28,7 +28,7 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-near_duplicate_tests, mandatory_laws, rust_only.
+near_duplicate_tests, mandatory_laws, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -50,7 +50,7 @@ a raw call must sit in an impl of a type that implements `Drop`: the guard that 
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
 library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
@@ -66,10 +66,30 @@ language, move it under `assets` if it is a web asset. The lint reads every file
 included, so `.github/` is checked. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
 (`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
 
-The CI helpers are Rust too: `ci` times stages, sums libtest seconds and finds the reach scope; `mutation-shard` and
-`mutation-report` read the cargo-mutants output (`ci timed`, `ci libtest-seconds`, `ci reach`,
-`mutation-shard <mutants.out> <out.json>`, `mutation-report <shards> <sources> <report.md> <report.json>`). `ci` starts
-processes only in its `ports` module.
+`workflow_run` keeps logic out of YAML. In a file under `.github/workflows`, a `run:` step must be one line of at most
+120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick or `$(`, and not start with
+`if`, `for`, `while`, `until`, `case`, `[` or `[[`. A `run:` that opens a block (`|`, `>` or an empty value followed
+by text) fails. A workflow file the lint cannot read fails too. There is no allow-list: anything longer is a Rust
+command.
+
+The CI helpers are Rust too, and workflows only call them. `ci` has these commands:
+
+    ci timed <measured> <stage> <program> [<argument>...]       time a stage into the measured file
+    ci logged <log> <program> [<argument>...]                   run a program, copy its output to the log
+    ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
+    ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
+    ci tools <built directory> <tools directory>                build and copy reach, lint and ci
+    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-shard <shard> <output>                           one weekly shard of all mutants
+    ci wall-times <repository> <run> <job>                      wall time per step, from the GitHub API
+    ci show <file>...                                           print files, and say which are absent
+    ci labels <base branch> <pull request>                      the golden-change and new-scenario checks
+    ci shard-summary <shards> <summary>                         outcome counts of the weekly shards
+    ci matrix <shards> <sources> <directory> <summary>          the mutation matrix report
+
+`mutation-shard` and `mutation-report` read the cargo-mutants output
+(`mutation-shard <mutants.out> <out.json>`, `mutation-report <shards> <sources> <report.md> <report.json>`). `ci`
+starts processes only in its `ports` module.
 
 ## Goldens
 
@@ -118,10 +138,12 @@ The test title does not count as naming the type.
 
 ## Labels
 
-`labels.yml` fails a pull request that changes a golden (including renaming one out of `tests/goldens`) unless it
-carries the label `golden-change`, and one that adds, copies or renames a file into `tests/fixtures` or `tests/e2e`
-unless it carries `new-scenario`. A person adds the label after reviewing the change. The workflow reads label names
-only: it does not check who added a label.
+`labels.yml` runs `ci labels`. It fails a pull request that changes a golden (including renaming one out of
+`tests/goldens`) unless it carries the label `golden-change`, and one that adds, copies or renames a file into
+`tests/fixtures` or `tests/e2e` unless it carries `new-scenario`. A person adds the label after reviewing the change.
+The workflow reads label names only: it does not check who added a label. It compares the head of the branch with the
+merge base of the head and the base branch, so a branch that is behind the base branch is not charged for goldens and
+fixtures that are already on it.
 
 ## CI wall-time limits
 
@@ -150,7 +172,9 @@ files of a deleted crate and anything not yet known. A file `reach` cannot place
 
 `affected` prints the share of crates reached and the scopes CI uses, and the run summary of each pull
 request shows them. Clippy, the tests and mutants run on that scope, and are skipped when nothing is
-reached. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
+reached. A skip is not silent: for each scope that is empty, `ci reach` prints `skipped: <scope> is empty, so the
+steps that use it do not run` in the step and in the run summary, and `ci mutants-changed` prints that mutants were
+skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
 cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
