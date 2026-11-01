@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{ItemUse, Path, UseTree};
+use syn::{ItemType, ItemUse, Path, Type, UseTree};
 
 use lint_layout::Name;
 use lint_layout::UsePath;
@@ -44,5 +44,19 @@ impl UseAliases {
 impl<'ast> Visit<'ast> for UseAliases {
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
         self.walk(&UsePath::default(), &item.tree);
+    }
+
+    fn visit_item_type(&mut self, item: &'ast ItemType) {
+        self.aliased(item);
+    }
+}
+
+impl UseAliases {
+    fn aliased(&mut self, item: &ItemType) {
+        let target = match &*item.ty {
+            Type::Path(target) if target.qself.is_none() => Some(target),
+            _ => None,
+        };
+        self.0.extend(target.map(|target| (Name::from(&item.ident), UsePath::from(&target.path))));
     }
 }

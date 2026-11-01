@@ -6,6 +6,7 @@ use reach::Cli;
 const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
 const PATCHED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/patched.json");
 const ROOTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/rooted.json");
+const READING: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/reading.json");
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
@@ -142,6 +143,21 @@ fn a_package_at_the_workspace_root_does_not_own_every_path() {
     for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
         assert_eq!(Answer::reached_in(ROOTED, &[changed]), everything, "{changed}");
     }
+}
+
+#[test]
+fn a_crate_that_declares_what_it_reads_is_reached_by_changes_there() {
+    let runner_and_tool =
+        "REACH=2 of 3 crates\nCARGO_SCOPE=-p runner -p tool\nMUTANTS_SCOPE=--test-package=runner --test-package=tool\n";
+    assert_eq!(
+        Answer::reached_in(READING, &["crates/leaf/src/lib.rs"]),
+        "REACH=3 of 3 crates\nCARGO_SCOPE=-p leaf -p runner -p tool\nMUTANTS_SCOPE=--test-package=leaf --test-package=runner --test-package=tool\n"
+    );
+    assert_eq!(Answer::reached_in(READING, &["crates/runner/src/lib.rs"]), runner_and_tool);
+    assert_eq!(
+        Answer::reached_in(READING, &["tool/src/lib.rs"]),
+        "REACH=1 of 3 crates\nCARGO_SCOPE=-p tool\nMUTANTS_SCOPE=--test-package=tool\n"
+    );
 }
 
 laws::table!(

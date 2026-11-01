@@ -1,0 +1,5 @@
+{"workspace_root": "/w", "packages": [
+  {"name": "runner", "manifest_path": "/w/crates/runner/Cargo.toml", "dependencies": [], "metadata": {"reach": {"reads": ["crates"]}}},
+  {"name": "leaf", "manifest_path": "/w/crates/leaf/Cargo.toml", "dependencies": [], "metadata": null},
+  {"name": "tool", "manifest_path": "/w/tool/Cargo.toml", "dependencies": [{"name": "runner", "path": "/w/crates/runner"}], "metadata": {"docs": {}}}
+]}
