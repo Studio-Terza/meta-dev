@@ -47,8 +47,8 @@ impl Lint for NoForwarders {
 
 impl NoForwarders {
     fn forwarders(file: &SourceFile, types: &WorkspaceTypes) -> Vec<Forwarder> {
-        let mut scan = Forwarders::new(types);
-        scan.visit_file(file.syntax());
-        scan.found()
+        let mut walk = Forwarders::new(types);
+        walk.visit_file(file.syntax());
+        walk.found()
     }
 }
