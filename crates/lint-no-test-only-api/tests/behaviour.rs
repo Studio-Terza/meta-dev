@@ -44,7 +44,74 @@ const OPTION_CONSTRUCTOR: &str =
     "pub struct A;\nimpl A {\n    pub fn staged() -> Option<A> {\n        None\n    }\n}\n";
 const FREE_TEST: &str = "fn t() {\n    staged();\n}\n";
 
-const CASES: [Case; 34] = [
+const IMPL_USER: &str = "struct B;\nimpl B {\n    fn run() {\n        A::staged();\n    }\n}\n";
+const ARG_USER: &str = "fn run(Clock::Stopped: Clock) {}\n";
+const DISCRIMINANT_USER: &str = "enum B {\n    X = Clock::Stopped as isize,\n}\n";
+const NESTED: &str = "mod inner {\n    pub struct A;\n    impl A {\n        pub fn staged() -> A {\n            A\n        }\n    }\n}\n";
+const RECEIVER_SELF: &str = "pub struct A;\nimpl A {\n    pub fn staged(&self) -> Self {\n        A\n    }\n}\n";
+const PLAIN_RETURN: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> u8 {\n        1\n    }\n}\n";
+const SELF_RETURN: &str = "pub struct A;\nimpl A {\n    pub fn staged() -> Self {\n        A\n    }\n}\n";
+
+const CASES: [Case; 41] = [
+    Case::new(
+        Title::new("shipped caller inside an impl"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STAGED)),
+            Source::new(Located::new("src/b.rs"), Text::new(IMPL_USER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("variant named in an argument pattern"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STOPPED)),
+            Source::new(Located::new("src/b.rs"), Text::new(ARG_USER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STOPPED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("variant named in a discriminant"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(STOPPED)),
+            Source::new(Located::new("src/b.rs"), Text::new(DISCRIMINANT_USER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STOPPED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor in an inline module"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(NESTED)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&["src/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("method with a receiver returning self"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(RECEIVER_SELF)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("fn with no receiver returning another type"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(PLAIN_RETURN)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constructor returning self"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(SELF_RETURN)),
+            Source::new(Located::new("tests/a.rs"), Text::new(STAGED_TEST)),
+        ],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
     Case::new(
         Title::new("constructor only tests call"),
         &[
