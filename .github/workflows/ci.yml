@@ -28,10 +28,10 @@ jobs:
       TESTLOG: ${{ github.workspace }}/target/ci/test.txt
       BUDGET: ${{ github.workspace }}/target/ci/budget.txt
       LIMITS: ${{ github.workspace }}/target/ci/limits.txt
-      PROOF_VARIANT: mold
+      PROOF_VARIANT: mold2
       RUSTC_WRAPPER: sccache
       SCCACHE_GHA_ENABLED: "true"
-      SCCACHE_GHA_VERSION: mold
+      SCCACHE_GHA_VERSION: mold2
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@v4
