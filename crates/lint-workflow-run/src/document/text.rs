@@ -1,4 +1,7 @@
 use std::fmt;
+use std::path::Path;
+
+use crate::characters::Characters;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Text<'text>(&'text str);
@@ -12,28 +15,12 @@ impl<'text> Text<'text> {
         Text(text)
     }
 
-    pub(crate) fn after_blanks(self) -> Text<'text> {
-        Text(
-            self.0
-                .char_indices()
-                .find(|(_, letter)| !letter.is_whitespace())
-                .and_then(|(at, _)| self.0.get(at..))
-                .unwrap_or_default(),
-        )
-    }
-
     pub(crate) fn after(self, prefix: Text<'_>) -> Option<Text<'text>> {
         self.0.get(..prefix.0.len()).filter(|start| *start == prefix.0).and(self.0.get(prefix.0.len()..)).map(Text)
     }
 
     pub(crate) fn after_word(self, word: &str) -> Option<Text<'text>> {
         self.after(Text::new(word)).filter(|rest| rest.first_letter().is_none_or(char::is_whitespace))
-    }
-
-    pub(crate) fn names_key(self) -> Option<Text<'text>> {
-        let start = self.after_blanks();
-        let end = start.0.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.0.len(), |(at, _)| at);
-        start.0.get(..end).filter(|word| word.char_indices().last().is_some_and(|(_, last)| last == ':')).map(Text)
     }
 
     pub(crate) fn modified_expansion(self) -> Option<&'text str> {
@@ -49,18 +36,48 @@ impl<'text> Text<'text> {
             .filter(|name| name.chars().any(|letter| !letter.is_alphanumeric() && letter != '_'))
     }
 
-    pub(crate) fn first_letter(self) -> Option<char> {
+    fn first_letter(self) -> Option<char> {
         self.0.chars().next()
     }
 
-    pub(crate) fn unquoted(self, quotes: &[char]) -> Text<'text> {
+    pub(crate) fn first_word_outside(self, known: &[&str]) -> Option<&'text str> {
+        let start = self.without_leading_blanks();
+        let end = start.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.len(), |(at, _)| at);
+        start.get(..end).filter(|word| !word.is_empty() && !known.contains(word))
+    }
+
+    pub(crate) fn count(self) -> Characters {
+        Characters::new(self.0.chars().count())
+    }
+
+    pub(crate) fn first_inside(self, symbols: &[&'static str]) -> Option<&'static str> {
+        symbols.iter().copied().find(|symbol| self.0.contains(*symbol))
+    }
+
+    pub(crate) fn trimmed(self) -> Text<'text> {
+        let blanks_gone = self.without_leading_blanks();
+        let end = blanks_gone
+            .char_indices()
+            .rev()
+            .find(|(_, letter)| !letter.is_whitespace())
+            .map_or(0, |(at, letter)| at + letter.len_utf8());
+        Text(blanks_gone.get(..end).unwrap_or_default())
+    }
+
+    fn without_leading_blanks(self) -> &'text str {
         self.0
-            .chars()
-            .next()
-            .zip(self.0.chars().last())
-            .filter(|(opening, closing)| opening == closing && quotes.contains(opening))
-            .and_then(|(opening, closing)| self.0.get(opening.len_utf8()..self.0.len() - closing.len_utf8()))
-            .map_or(self, Text)
+            .char_indices()
+            .find(|(_, letter)| !letter.is_whitespace())
+            .and_then(|(at, _)| self.0.get(at..))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn path(self) -> &'text Path {
+        Path::new(self.0)
+    }
+
+    pub(crate) fn spans_lines(self) -> bool {
+        self.0.contains('\n')
     }
 }
 
