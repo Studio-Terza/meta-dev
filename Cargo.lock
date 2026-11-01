@@ -135,6 +135,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-bool-methods"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-const-shape"
 version = "0.1.0"
 dependencies = [
@@ -165,6 +175,7 @@ dependencies = [
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
+ "newtype",
 ]
 
 [[package]]
@@ -478,6 +489,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "lint-bool-methods",
  "lint-const-shape",
  "lint-core",
  "lint-crate-graph",
@@ -522,6 +534,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
+ "newtype",
  "quote",
  "syn 2.0.119",
 ]
@@ -536,6 +549,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "lint-process-starters",
+ "newtype",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -584,6 +598,24 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "newtype"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "newtype-derive",
+ "proptest",
+]
+
+[[package]]
+name = "newtype-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "num-traits"

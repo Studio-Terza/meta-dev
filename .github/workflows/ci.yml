@@ -38,6 +38,7 @@ jobs:
           cargo test | tee "$RUNNER_TEMP/test.txt"
           ci/libtest-seconds.sh test-run "$RUNNER_TEMP/test.txt"
       - name: lint
+        shell: bash
         run: ci/timed.sh lint cargo run --bin lint -- . | tee "$RUNNER_TEMP/budget.txt"
       - name: limits
         run: cargo run -q --bin gate-limits -- ci/limits.toml "$MEASURED" | tee "$RUNNER_TEMP/limits.txt"
@@ -55,3 +56,24 @@ jobs:
           echo "measured stages, seconds:"
           cat "$MEASURED"
           cat "$RUNNER_TEMP/limits.txt"
+
+  mutants:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: toolchain
+        run: rustup toolchain install
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants@27.1.0
+      - name: changed lines
+        run: git diff --no-renames HEAD^1 HEAD -- '*.rs' > "$RUNNER_TEMP/changed.diff"
+      - name: mutants in changed lines
+        run: |
+          status=0
+          cargo mutants --in-diff "$RUNNER_TEMP/changed.diff" --output "$RUNNER_TEMP" --jobs 2 --colors never || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
+          if [ -s "$RUNNER_TEMP/mutants.out/missed.txt" ]; then exit 2; fi
