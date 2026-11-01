@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lint_layout::{Name, UsePath};
+use lint_layout::{Name, UsePath, Whole};
 
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
@@ -20,9 +20,7 @@ impl Scope {
     pub(crate) fn renamed_to(&self, finals: &[&str]) -> Vec<Name> {
         self.imports
             .iter()
-            .filter(|(_, target)| {
-                finals.iter().any(|wanted| target.segments().last().is_some_and(|last| last == wanted))
-            })
+            .filter(|(_, target)| target.segments().last().is_some_and(|last| last.matches::<Whole>(finals)))
             .map(|(local, _)| local.clone())
             .collect()
     }
