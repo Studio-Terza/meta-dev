@@ -13,22 +13,37 @@ pub struct SourceFile {
     placement: Placement,
     text: String,
     syntax: syn::File,
+    test_modules: Vec<SourceFile>,
 }
 
 impl SourceFile {
     pub fn parse(path: impl Into<PathBuf>, text: String) -> Result<Self, Failure> {
         let path = path.into();
-        let located = path.clone();
-        Self::parse_at(path, &located, text)
+        let placement = Placement::locate(&path);
+        Self::parse_placed(path, placement, text)
     }
 
-    pub fn parse_at(path: PathBuf, located: &Path, text: String) -> Result<Self, Failure> {
+    pub fn parse_at(path: PathBuf, package: &Path, located: &Path, text: String) -> Result<Self, Failure> {
+        Self::parse_placed(path, Placement::within(package, located), text)
+    }
+
+    fn parse_placed(path: PathBuf, placement: Placement, text: String) -> Result<Self, Failure> {
         let syntax = syn::parse_file(&text).map_err(|source| Failure::Parse {
             path: path.clone(),
             line: LineNumber::from(source.span()),
             source,
         })?;
-        Ok(Self { path, placement: Placement::locate(located), text, syntax })
+        Ok(Self { path, placement, text, syntax, test_modules: Vec::new() })
+    }
+
+    #[must_use]
+    pub fn with_test_modules(self, test_modules: Vec<SourceFile>) -> SourceFile {
+        SourceFile { test_modules, ..self }
+    }
+
+    #[must_use]
+    pub fn test_modules(&self) -> &[SourceFile] {
+        &self.test_modules
     }
 
     #[must_use]

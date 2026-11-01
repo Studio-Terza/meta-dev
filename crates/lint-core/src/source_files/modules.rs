@@ -16,6 +16,7 @@ use declaration::Declaration;
 #[derive(Debug)]
 pub struct Modules {
     children: Vec<Child>,
+    tests: Vec<Child>,
     failures: Vec<Failure>,
 }
 
@@ -27,8 +28,11 @@ impl Modules {
     #[must_use]
     pub fn declared_in(file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
         let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
-        Self::declarations(items, children_directory).into_iter().fold(
-            Modules { children: Vec::new(), failures: Vec::new() },
+        let entered = Self::declarations(items, children_directory, Walk::Entered);
+        let skipped = Self::declarations(items, children_directory, Walk::Skipped);
+        let tests = skipped.iter().filter_map(|declaration| Self::resolve(&file_directory, declaration).ok()).collect();
+        entered.into_iter().fold(
+            Modules { children: Vec::new(), tests, failures: Vec::new() },
             |modules, declaration| match Self::resolve(&file_directory, &declaration) {
                 Ok(child) => Modules { children: modules.children.into_iter().chain([child]).collect(), ..modules },
                 Err(failure) => {
@@ -42,20 +46,28 @@ impl Modules {
         std::mem::take(&mut self.children)
     }
 
+    #[must_use]
+    pub fn tests(&self) -> &[Child] {
+        &self.tests
+    }
+
     pub fn take_failures(&mut self) -> Vec<Failure> {
         std::mem::take(&mut self.failures)
     }
 
-    fn declarations<'items>(items: &'items [Item], directory: &Path) -> Vec<Declaration<'items>> {
+    fn declarations<'items>(items: &'items [Item], directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
         items
             .iter()
             .filter_map(|item| match item {
-                Item::Mod(module) if Walk::outside_tests(&module.attrs) == Walk::Entered => Some(module),
+                Item::Mod(module) => Some(module),
                 _ => None,
             })
-            .flat_map(|module| match &module.content {
-                Some((_, inner)) => Self::declarations(inner, &directory.join(Name::from(&module.ident))),
-                None => vec![Declaration::new(module, directory.to_path_buf())],
+            .flat_map(|module| match (&module.content, Walk::outside_tests(&module.attrs)) {
+                (Some((_, inner)), Walk::Entered) => {
+                    Self::declarations(inner, &directory.join(Name::from(&module.ident)), wanted)
+                }
+                (None, walk) if walk == wanted => vec![Declaration::new(module, directory.to_path_buf())],
+                _ => Vec::new(),
             })
             .collect()
     }

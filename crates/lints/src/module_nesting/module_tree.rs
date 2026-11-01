@@ -1,6 +1,7 @@
 mod finding;
 mod module_path;
 mod reexport_count;
+mod users;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -14,10 +15,11 @@ use lint_core::UseEdges;
 use lint_core::UsePath;
 use lint_core::Violation;
 use reexport_count::ReexportCount;
+use users::Users;
 
 pub struct ModuleTree {
     modules: Vec<ModulePath>,
-    users: BTreeMap<ModulePath, BTreeSet<ModulePath>>,
+    users: Users,
     deep_uses: Vec<Violation>,
     reexports: BTreeMap<ModulePath, ReexportCount>,
 }
@@ -25,8 +27,8 @@ pub struct ModuleTree {
 impl From<&[&SourceFile]> for ModuleTree {
     fn from(files: &[&SourceFile]) -> ModuleTree {
         let empty = ModuleTree {
-            modules: files.iter().filter_map(|file| ModulePath::of_file(file.path())).collect(),
-            users: BTreeMap::new(),
+            modules: files.iter().map(|file| ModulePath::of_file(file)).collect(),
+            users: Users::default(),
             deep_uses: Vec::new(),
             reexports: BTreeMap::new(),
         };
@@ -57,20 +59,17 @@ impl ModuleTree {
     }
 
     fn absorbed(mut self, file: &SourceFile) -> ModuleTree {
-        match ModulePath::of_file(file.path()) {
-            Some(module) => {
-                self.reexports.insert(module.clone(), ReexportCount::of_file(file.syntax()));
-                UseEdges::in_file(file.syntax()).iter().fold(self, |tree, path| tree.absorbing(&module, path))
-            }
-            None => self,
-        }
+        let module = ModulePath::of_file(file);
+        self.reexports.insert(module.clone(), ReexportCount::of_file(file.syntax()));
+        self.users = std::mem::take(&mut self.users).with_tests(&self.modules, file.test_modules());
+        UseEdges::in_file(file.syntax()).iter().fold(self, |tree, path| tree.absorbing(&module, path))
     }
 
     fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
                 let used = ModulePath::deepest_module_containing(&self.modules, &target, module);
-                self.record_user(used.cloned(), module);
+                self.users.record(used.cloned(), module);
                 self.deep_uses.extend(target.crosses_directory_boundary(module, &self.modules).then(|| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })
                 }));
@@ -80,16 +79,9 @@ impl ModuleTree {
         }
     }
 
-    fn record_user(&mut self, used: Option<ModulePath>, module: &ModulePath) -> bool {
-        match used {
-            Some(used) => self.users.entry(used).or_default().insert(module.clone()),
-            None => false,
-        }
-    }
-
     fn home_of(&self, module: &ModulePath) -> Option<ModulePath> {
         let outsiders: Vec<&ModulePath> =
-            self.users.get(module)?.iter().filter(|user| !module.relates::<Ancestor>(user)).collect();
+            self.users.callers_of(module)?.iter().filter(|user| !module.relates::<Ancestor>(user)).collect();
         outsiders
             .iter()
             .all(|user| user.relates::<InsideSibling>(module))

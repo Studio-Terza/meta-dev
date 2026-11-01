@@ -13,7 +13,16 @@ const MATCHING: Source = Source::new(
     "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n        Shape::Square => 1,\n    }\n}\n",
 );
 
-const CASES: [Case; 6] = [
+const TEST_AREA: Source = Source::new(
+    "area.rs",
+    "#[cfg(test)]\nmod tests {\n    fn area(shape: Shape) -> u8 {\n        match shape {\n            Shape::Circle(radius) => grow(radius),\n            Shape::Square => 1,\n        }\n    }\n}\n",
+);
+const UNIT_SHAPE: Source = Source::new(
+    "unit.rs",
+    "enum Shape {\n    Circle,\n    Square,\n}\nfn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle => grow(1),\n        Shape::Square => grow(2),\n    }\n}\n",
+);
+
+const CASES: [Case; 8] = [
     Case { name: "exposed field", sources: &[Source::new("a.rs", EXPOSED)], flagged: &["a.rs:2"] },
     Case { name: "foreign match", sources: &[SHAPE, MATCHING], flagged: &["area.rs:3"] },
     Case { name: "own match", sources: &[SHAPE], flagged: &[] },
@@ -32,6 +41,8 @@ const CASES: [Case; 6] = [
         sources: &[Source::new("a.rs", OPEN_AND_CLOSED), Source::new("b.rs", EDGE)],
         flagged: &[],
     },
+    Case { name: "test module match", sources: &[SHAPE, TEST_AREA], flagged: &[] },
+    Case { name: "own unit enum of that name", sources: &[SHAPE, UNIT_SHAPE], flagged: &[] },
 ];
 
 #[test]

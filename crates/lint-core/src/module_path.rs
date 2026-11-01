@@ -28,6 +28,11 @@ impl ModulePath {
     }
 
     #[must_use]
+    pub fn segments(&self) -> &[Name] {
+        &self.0
+    }
+
+    #[must_use]
     pub fn child(&self, name: &Name) -> ModulePath {
         ModulePath(self.0.iter().cloned().chain(Some(name.clone())).collect())
     }

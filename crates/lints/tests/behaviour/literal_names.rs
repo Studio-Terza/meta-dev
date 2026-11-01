@@ -7,11 +7,16 @@ const SAID: &str = "fn parse_header() {}\nstruct A;\nimpl A {\n    fn render_row
 const TRAIT_IMPL: &str = "struct A;\nimpl Tr for A {\n    fn get(&self) {}\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn get() {}\n}\n";
 
-const CASES: [Case; 4] = [
+const GENERATED: &str = "struct A;\nmacro_rules! vague {\n    () => {\n        fn get() {}\n    };\n}\n";
+const TEST_FN: &str = "#[cfg(test)]\nfn get() {}\n";
+
+const CASES: [Case; 6] = [
     Case { name: "vague", sources: &[Source::new("a.rs", VAGUE)], flagged: &["a.rs:1", "a.rs:4", "a.rs:5"] },
     Case { name: "said", sources: &[Source::new("a.rs", SAID)], flagged: &[] },
     Case { name: "trait impl", sources: &[Source::new("a.rs", TRAIT_IMPL)], flagged: &[] },
     Case { name: "test module", sources: &[Source::new("a.rs", TEST_MODULE)], flagged: &[] },
+    Case { name: "inside a macro", sources: &[Source::new("a.rs", GENERATED)], flagged: &["a.rs:4"] },
+    Case { name: "test fn", sources: &[Source::new("a.rs", TEST_FN)], flagged: &[] },
 ];
 
 #[test]

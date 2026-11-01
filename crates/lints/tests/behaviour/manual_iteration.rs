@@ -11,13 +11,18 @@ const WORKING_LOOP: &str = "fn f(items: Vec<u8>) {\n    for item in items {\n   
 const TEST_MODULE: &str =
     "#[cfg(test)]\nmod tests {\n    fn f(items: Vec<u8>) {\n        let mut walk = items.iter();\n    }\n}\n";
 
-const CASES: [Case; 6] = [
+const GENERATED: &str = "macro_rules! walking {\n    () => {\n        fn f(items: Vec<u8>) {\n            let mut walk = items.iter();\n        }\n    };\n}\n";
+const TEST_FN: &str = "#[cfg(test)]\nfn f(items: Vec<u8>) {\n    let mut walk = items.iter();\n}\n";
+
+const CASES: [Case; 8] = [
     Case { name: "mutable iterator", sources: &[Source::new("a.rs", MUTABLE_ITERATOR)], flagged: &["a.rs:2"] },
     Case { name: "accumulating loop", sources: &[Source::new("a.rs", ACCUMULATING_LOOP)], flagged: &["a.rs:2"] },
     Case { name: "filtered loop", sources: &[Source::new("a.rs", FILTERED_LOOP)], flagged: &["a.rs:2"] },
     Case { name: "counter", sources: &[Source::new("a.rs", COUNTER)], flagged: &[] },
     Case { name: "working loop", sources: &[Source::new("a.rs", WORKING_LOOP)], flagged: &[] },
     Case { name: "test module", sources: &[Source::new("a.rs", TEST_MODULE)], flagged: &[] },
+    Case { name: "inside a macro", sources: &[Source::new("a.rs", GENERATED)], flagged: &["a.rs:4"] },
+    Case { name: "test fn", sources: &[Source::new("a.rs", TEST_FN)], flagged: &[] },
 ];
 
 #[test]

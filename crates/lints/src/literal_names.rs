@@ -3,9 +3,10 @@ mod finding;
 use crate::Lint;
 use finding::Finding;
 use syn::visit::Visit;
-use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
+use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, TraitItemFn};
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -66,27 +67,32 @@ impl VagueNames {
 
 impl<'ast> Visit<'ast> for VagueNames {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        match Walk::inherent_impls(item) {
+        Walk::enter(&item.attrs, || match Walk::inherent_impls(item) {
             Walk::Entered => syn::visit::visit_item_impl(self, item),
             Walk::Skipped => {}
-        }
+        });
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.note(&function.sig.ident);
-        syn::visit::visit_item_fn(self, function);
+        Walk::enter(&function.attrs, || {
+            self.note(&function.sig.ident);
+            syn::visit::visit_item_fn(self, function);
+        });
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        self.note(&function.sig.ident);
-        syn::visit::visit_impl_item_fn(self, function);
+        Walk::enter(&function.attrs, || {
+            self.note(&function.sig.ident);
+            syn::visit::visit_impl_item_fn(self, function);
+        });
     }
 
     fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {

@@ -53,6 +53,6 @@ impl<'ast> Visit<'ast> for Numbers {
     }
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.0.push(LineNumber::from(literal.span()));
+        self.0.extend((!NamedNumbers::is_unit(literal.base10_digits())).then(|| LineNumber::from(literal.span())));
     }
 }

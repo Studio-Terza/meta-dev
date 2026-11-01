@@ -7,6 +7,7 @@ mod least;
 mod line_number;
 mod lowered_infix;
 mod macros;
+mod manifest;
 mod matching;
 mod module_path;
 mod most;

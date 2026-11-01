@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::Visit;
-use syn::{Ident, ItemUse, Path, UseTree};
+use syn::{Ident, ItemUse, Macro, Path, UseTree};
 
 use super::export::Export;
 use lint_core::BinaryFiles;
+use lint_core::Macros;
 use lint_core::SourceFile;
 use lint_core::{CrateName, Name};
 
@@ -13,12 +14,14 @@ pub struct ForeignReferences {
     own_crate: Option<CrateName>,
     names: BTreeMap<CrateName, BTreeSet<Name>>,
     crates: BTreeSet<CrateName>,
+    globbed: BTreeSet<CrateName>,
 }
 
 impl ForeignReferences {
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
         let own_crate = (!binaries.contains(file.path())).then(|| CrateName::from(file.placement().crate_root()));
-        let mut references = ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new() };
+        let mut references =
+            ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new(), globbed: BTreeSet::new() };
         references.visit_file(file.syntax());
         references
     }
@@ -28,6 +31,7 @@ impl ForeignReferences {
             self.names.entry(crate_name).or_default().extend(names);
         });
         self.crates.extend(other.crates);
+        self.globbed.extend(other.globbed);
         self
     }
 
@@ -36,7 +40,8 @@ impl ForeignReferences {
     }
 
     pub fn names(&self, export: &Export) -> bool {
-        self.names.get(export.crate_name()).is_some_and(|names| names.contains(export.name()))
+        self.globbed.contains(export.crate_name())
+            || self.names.get(export.crate_name()).is_some_and(|names| names.contains(export.name()))
     }
 
     fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {
@@ -45,8 +50,19 @@ impl ForeignReferences {
             UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(first, item)),
             UseTree::Name(name) => self.record(first, &name.ident),
             UseTree::Rename(rename) => self.record(first, &rename.ident),
-            UseTree::Glob(_) => {}
+            UseTree::Glob(_) => self.record_glob(first),
         }
+    }
+
+    fn record_glob(&mut self, first: Option<&Ident>) {
+        first
+            .map(CrateName::from)
+            .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
+            .into_iter()
+            .for_each(|crate_name| {
+                self.crates.insert(crate_name.clone());
+                self.globbed.insert(crate_name);
+            });
     }
 
     fn record(&mut self, first: Option<&Ident>, name: &Ident) {
@@ -64,6 +80,11 @@ impl ForeignReferences {
 impl<'ast> Visit<'ast> for ForeignReferences {
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
         self.walk(None, &item.tree);
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        syn::visit::visit_macro(self, invocation);
     }
 
     fn visit_path(&mut self, path: &'ast Path) {

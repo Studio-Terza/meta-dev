@@ -1,0 +1,40 @@
+mod wildcard;
+
+use std::path::{Component, Path};
+
+use crate::name::Name;
+use wildcard::Wildcard;
+
+#[derive(Debug, Default)]
+pub struct Members {
+    listed: Vec<String>,
+    excluded: Vec<String>,
+}
+
+impl Members {
+    #[must_use]
+    pub fn new(listed: Vec<String>, excluded: Vec<String>) -> Members {
+        Members { listed, excluded }
+    }
+
+    #[must_use]
+    pub fn admits(&self, relative: &Path) -> bool {
+        Self::any_matches(&self.listed, relative) && !Self::any_matches(&self.excluded, relative)
+    }
+
+    fn any_matches(patterns: &[String], relative: &Path) -> bool {
+        patterns.iter().any(|pattern| Self::matches(Path::new(pattern), relative))
+    }
+
+    fn matches(pattern: &Path, relative: &Path) -> bool {
+        let wanted: Vec<Component> = pattern.components().filter(|part| matches!(part, Component::Normal(_))).collect();
+        let found: Vec<Component> = relative.components().collect();
+        wanted.len() == found.len()
+            && wanted.iter().zip(&found).all(|(expected, part)| {
+                expected
+                    .as_os_str()
+                    .to_str()
+                    .is_some_and(|spelled| Name::from(part.as_os_str()).matches::<Wildcard>(&[spelled]))
+            })
+    }
+}

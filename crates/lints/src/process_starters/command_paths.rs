@@ -9,6 +9,7 @@ use lint_core::{LineNumber, SourceFile};
 #[derive(Debug, Default)]
 pub(crate) struct CommandPaths {
     bound: BTreeSet<Ident>,
+    modules: BTreeSet<Ident>,
     started: Vec<LineNumber>,
     open_starts: Vec<LineNumber>,
 }
@@ -28,6 +29,9 @@ impl CommandPaths {
     fn imported(&mut self, tree: &UseTree, under_process: bool) {
         match tree {
             UseTree::Path(path) => self.imported(&path.tree, path.ident == Self::MODULE),
+            UseTree::Rename(name) if name.ident == Self::MODULE => {
+                self.modules.insert(name.rename.clone());
+            }
             UseTree::Name(name) if under_process && name.ident == Self::STARTER => {
                 self.bound.insert(name.ident.clone());
             }
@@ -46,21 +50,23 @@ impl CommandPaths {
         match &*call.func {
             Expr::Path(path) => {
                 let names: Vec<&Ident> = path.path.segments.iter().map(|segment| &segment.ident).collect();
-                Self::spells_command(&names)
+                self.spells_command(&names)
                     || matches!(names.as_slice(), [starter, built] if self.bound.contains(*starter) && *built == Self::BUILT)
             }
             _ => false,
         }
     }
 
-    fn spells_command(names: &[&Ident]) -> bool {
+    fn spells_command(&self, names: &[&Ident]) -> bool {
         match names {
             [module, starter, built, ..]
-                if *module == Self::MODULE && *starter == Self::STARTER && *built == Self::BUILT =>
+                if (*module == Self::MODULE || self.modules.contains(*module))
+                    && *starter == Self::STARTER
+                    && *built == Self::BUILT =>
             {
                 true
             }
-            [_, rest @ ..] => Self::spells_command(rest),
+            [_, rest @ ..] => self.spells_command(rest),
             [] => false,
         }
     }

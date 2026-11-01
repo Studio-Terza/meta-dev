@@ -1,18 +1,22 @@
 use std::fmt;
 
 use quote::ToTokens;
-use syn::{FnArg, ItemImpl, ReturnType, Signature};
+use syn::{FnArg, ImplItemFn, ItemImpl, ReturnType};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Shape {
     self_type: String,
     generics: String,
+    platform: String,
     inputs: String,
     output: String,
 }
 
 impl Shape {
-    pub fn describe(item: &ItemImpl, signature: &Signature) -> Shape {
+    pub fn describe(item: &ItemImpl, function: &ImplItemFn) -> Shape {
+        let signature = &function.sig;
+        let platform: Vec<String> =
+            function.attrs.iter().filter(|attribute| attribute.path().is_ident("cfg")).map(Self::squeezed).collect();
         let inputs: Vec<String> = signature
             .inputs
             .iter()
@@ -24,6 +28,7 @@ impl Shape {
         Shape {
             self_type: Self::squeezed(&item.self_ty),
             generics: Self::squeezed(&signature.generics),
+            platform: platform.join(", "),
             inputs: inputs.join(", "),
             output: match &signature.output {
                 ReturnType::Default => String::new(),

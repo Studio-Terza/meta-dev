@@ -6,15 +6,18 @@ use std::collections::BTreeMap;
 use fn_body::FnBody;
 use proc_macro2::Span;
 use std::path::Path;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
     BinOp, Block, Expr, ExprAssign, ExprBinary, ExprBreak, ExprContinue, ExprForLoop, ExprIf, ExprLoop, ExprReturn,
-    ExprWhile, Ident, ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemMod, Local, Pat, PatIdent, Stmt, TraitItemFn,
+    ExprWhile, Ident, ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat,
+    PatIdent, Stmt, Token, TraitItemFn,
 };
 
 use lint_core::LineNumber;
+use lint_core::Macros;
 use lint_core::Name;
 use lint_core::Report;
 use lint_core::Site;
@@ -110,10 +113,19 @@ impl Flows<'_> {
 
 impl<'ast> Visit<'ast> for Flows<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    }
+
+    fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_trait(self, item));
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 
     fn visit_item_const(&mut self, _: &'ast ItemConst) {}
@@ -121,15 +133,21 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     fn visit_impl_item_const(&mut self, _: &'ast ImplItemConst) {}
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
+        Walk::enter(&function.attrs, || {
+            FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
+        });
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
+        Walk::enter(&function.attrs, || {
+            FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
+        });
     }
 
     fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        FnBody::scanned_unless_const(&function.sig, function.default.as_ref()).walked_by(self);
+        Walk::enter(&function.attrs, || {
+            FnBody::scanned_unless_const(&function.sig, function.default.as_ref()).walked_by(self);
+        });
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
@@ -228,6 +246,8 @@ struct MutableLocals {
 }
 
 impl MutableLocals {
+    const WRITING_MACROS: [&'static str; 2] = ["write", "writeln"];
+
     fn declared_mutable(local: &Local) -> Option<&PatIdent> {
         match &local.pat {
             Pat::Ident(binding) if binding.mutability.is_some() => Some(binding),
@@ -238,11 +258,23 @@ impl MutableLocals {
     fn touched_by(expr: &Expr) -> Option<&Ident> {
         match expr {
             Expr::MethodCall(call) => ExpressionFlow::assigned_local(&call.receiver),
+            Expr::Call(call) => ExpressionFlow::assigned_local(&call.func),
             Expr::Reference(reference) if reference.mutability.is_some() => {
                 ExpressionFlow::assigned_local(&reference.expr)
             }
             _ => None,
         }
+    }
+
+    fn written_to(invocation: &Macro) -> Option<Name> {
+        let arguments = invocation.parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated).ok()?;
+        Self::WRITING_MACROS
+            .iter()
+            .any(|name| invocation.path.is_ident(name))
+            .then_some(arguments)?
+            .first()
+            .and_then(ExpressionFlow::assigned_local)
+            .map(Name::from)
     }
 
     fn only_reassigned(&self) -> Vec<Span> {
@@ -260,5 +292,10 @@ impl<'ast> Visit<'ast> for MutableLocals {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         self.touched.extend(Self::touched_by(expr).map(Name::from));
         syn::visit::visit_expr(self, expr);
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        self.touched.extend(Self::written_to(invocation));
     }
 }

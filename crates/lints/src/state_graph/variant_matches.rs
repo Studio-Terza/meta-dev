@@ -6,7 +6,7 @@ use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use syn::{Arm, Expr, ExprLet, ExprMatch, Local, Pat};
+use syn::{Arm, Expr, ExprLet, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, Local, Pat};
 
 use super::declarations::Declarations;
 use super::finding::Finding;
@@ -15,6 +15,7 @@ use lint_core::Name;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_core::Walk;
 
 pub struct VariantMatches<'scan> {
     declarations: &'scan Declarations,
@@ -61,6 +62,22 @@ impl<'scan> VariantMatches<'scan> {
 }
 
 impl<'ast> Visit<'ast> for VariantMatches<'_> {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        Walk::enter(&item.attrs, || syn::visit::visit_item_impl(self, item));
+    }
+
+    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_item_fn(self, function));
+    }
+
+    fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
+        Walk::enter(&function.attrs, || syn::visit::visit_impl_item_fn(self, function));
+    }
+
     fn visit_expr_match(&mut self, expr: &'ast ExprMatch) {
         let found: Vec<Violation> = expr.arms.iter().filter_map(|arm| self.foreign_match(arm)).collect();
         self.violations.extend(found);

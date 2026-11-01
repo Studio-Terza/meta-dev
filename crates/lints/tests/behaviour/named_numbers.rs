@@ -12,7 +12,9 @@ const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f() -> u32 {\n     
 const SUPPORT_MODULE: &str = "#[cfg(test)]\nmod fixtures;\n";
 const STATIC: &str = "static TABLE: [u8; 2] = [4, 5];\n";
 
-const CASES: [Case; 8] = [
+const FEATURE_SUPPORT: &str = "struct Clock;\n#[cfg(any(test, feature = \"proptest\"))]\nimpl Clock {\n    pub fn range() -> u8 {\n        60\n    }\n}\n";
+
+const CASES: [Case; 9] = [
     Case { name: "static", sources: &[Source::new("a.rs", STATIC)], flagged: &["a.rs:1", "a.rs:1", "a.rs:1"] },
     Case { name: "integer", sources: &[Source::new("a.rs", LITERAL)], flagged: &["a.rs:2"] },
     Case { name: "float", sources: &[Source::new("a.rs", FLOAT)], flagged: &["a.rs:2"] },
@@ -25,6 +27,7 @@ const CASES: [Case; 8] = [
         sources: &[Source::new("src/lib.rs", SUPPORT_MODULE), Source::new("src/fixtures.rs", LITERAL)],
         flagged: &[],
     },
+    Case { name: "test or feature", sources: &[Source::new("a.rs", FEATURE_SUPPORT)], flagged: &[] },
 ];
 
 #[test]
