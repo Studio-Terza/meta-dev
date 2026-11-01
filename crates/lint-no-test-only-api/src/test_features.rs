@@ -3,7 +3,8 @@ use quote::ToTokens;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Lit, Macro};
 
-use lint_layout::{LineNumber, Name};
+use lint_layout::LineNumber;
+use lint_layout::Name;
 
 use crate::feature_word::FeatureWord;
 use crate::finding::Finding;

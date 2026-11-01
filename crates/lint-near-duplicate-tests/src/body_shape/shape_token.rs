@@ -1,6 +1,7 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-use lint_layout::{Name, Whole};
+use lint_layout::Name;
+use lint_layout::Whole;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum ShapeToken {

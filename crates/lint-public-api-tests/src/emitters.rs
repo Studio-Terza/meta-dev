@@ -4,7 +4,8 @@ use syn::ItemMacro;
 use syn::visit::{self, Visit};
 
 use lint_core::Macros;
-use lint_layout::{Name, TestMarks};
+use lint_layout::Name;
+use lint_layout::TestMarks;
 
 #[derive(Debug, Default)]
 pub(crate) struct Emitters {

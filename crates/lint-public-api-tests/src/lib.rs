@@ -3,7 +3,11 @@ mod path_reach;
 mod test_code;
 
 use emitters::Emitters;
-use lint_core::{Lint, Report, Site, SourceFile, Violation};
+use lint_core::Lint;
+use lint_core::Report;
+use lint_core::Site;
+use lint_core::SourceFile;
+use lint_core::Violation;
 use path_reach::PathReach;
 use test_code::TestCode;
 
