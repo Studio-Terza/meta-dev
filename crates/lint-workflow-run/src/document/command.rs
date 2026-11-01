@@ -3,12 +3,17 @@ use crate::document::key::Key;
 use crate::document::text::Text;
 use crate::finding::Finding;
 
+mod unquoted;
+use unquoted::Unquoted;
+use unquoted::hidden::Hidden;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Command<'text>(Text<'text>);
 
 impl<'text> Command<'text> {
     const LIMIT: Characters = Characters::new(120);
-    const OPERATORS: [&'static str; 7] = ["|", "&", ";", ">", "<", "`", "$("];
+    const SEPARATORS: [&'static str; 5] = ["|", "&", ";", ">", "<"];
+    const SUBSTITUTIONS: [&'static str; 2] = ["`", "$("];
     const OPENERS: [&'static str; 2] = ["!", "("];
     const KEYWORDS: [&'static str; 7] = ["if", "for", "while", "until", "case", "[", "[["];
     const SHELLS: [&'static str; 5] = ["bash", "sh", "pwsh", "powershell", "cmd"];
@@ -22,7 +27,7 @@ impl<'text> Command<'text> {
             .spans_lines()
             .then_some(Finding::Block)
             .or_else(|| self.excess().map(|characters| Finding::TooLong { characters, limit: Self::LIMIT }))
-            .or_else(|| Self::operator_in(self).map(|symbol| Finding::Operator { symbol }))
+            .or_else(|| Self::operator_in(self, setting).map(|symbol| Finding::Operator { symbol }))
             .or_else(|| Self::keyword_in(self.0).map(|word| Finding::Control { word }))
             .or_else(|| {
                 (setting == Key::Shell)
@@ -40,8 +45,16 @@ impl<'text> Command<'text> {
         self.0.first_word_outside(&Self::SHELLS)
     }
 
-    fn operator_in(command: Command<'_>) -> Option<&'static str> {
-        command.0.first_inside(&Self::OPERATORS).or_else(|| command.0.modified_expansion().map(|_| Text::EXPANSION))
+    fn operator_in(command: Command<'_>, setting: Key) -> Option<&'static str> {
+        let separators = if setting == Key::Shell {
+            Unquoted::new(command.0, Hidden::Nothing)
+        } else {
+            Unquoted::new(command.0, Hidden::Quoted)
+        };
+        separators
+            .first_of(&Self::SEPARATORS)
+            .or_else(|| Unquoted::new(command.0, Hidden::Singles).first_of(&Self::SUBSTITUTIONS))
+            .or_else(|| command.0.modified_expansion().map(|_| Text::EXPANSION))
     }
 
     fn keyword_in(text: Text<'_>) -> Option<&'static str> {
