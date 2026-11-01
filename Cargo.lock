@@ -408,6 +408,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
+ "lint-placement",
  "syn 2.0.119",
 ]
 
