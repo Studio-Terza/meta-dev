@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::crate_summary::item_count::ItemCount;
 use lint_layout::Name;
+use newtype::Newtype;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tangle(Vec<Name>);
@@ -12,7 +13,7 @@ impl Tangle {
     }
 
     pub fn items(&self) -> ItemCount {
-        ItemCount::of_len(self.0.len())
+        ItemCount::new(self.0.len())
     }
 }
 

@@ -10,6 +10,7 @@ use condensed::{Condensed, TangleIndex};
 use lint_core::Least;
 use lint_item_graph::{ItemGraph, NodeIndex};
 use lint_layout::Name;
+use newtype::Counter;
 use split::Split;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -57,7 +58,7 @@ impl Cut {
         islands.sort_by_key(|island| std::cmp::Reverse(condensed.items(island)));
         let whole = condensed.items(total);
         islands.into_iter().fold(BTreeSet::new(), |inside, island| {
-            if condensed.items(&inside) + condensed.items(&inside) < whole {
+            if condensed.items(&inside).plus(condensed.items(&inside)) < whole {
                 inside.into_iter().chain(island).collect()
             } else {
                 inside

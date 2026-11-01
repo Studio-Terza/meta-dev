@@ -6,13 +6,16 @@ use lint_crate_graph::CrateGraph;
 use lint_fixtures::Sources;
 use lint_layout::Failure;
 use lint_reader::SourceFiles;
-use lint_runner::{Lints, Outcome};
+use lint_runner::{Cli, Lints, Outcome};
 
+use std::ffi::OsString;
 use std::path::Path;
+use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
 const LINT_COUNT: usize = 29;
+const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -45,6 +48,23 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
     Trees::write(root.path(), "src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "target/out.rs", DIRTY)?;
     assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    Ok(())
+}
+
+#[test]
+fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", PREDICATE)?;
+    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert_eq!(Trees::exit_code(root.path()), ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::exit_code(root.path()), ExitCode::FAILURE);
     Ok(())
 }
 
@@ -82,6 +102,10 @@ impl Trees {
     fn crate_graph_lines(root: &Path) -> Result<Vec<String>, Box<dyn Error>> {
         let readout = SourceFiles::read(root)?;
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
+    }
+
+    fn exit_code(root: &Path) -> ExitCode {
+        Cli::from_args(std::iter::once(OsString::from(root))).run()
     }
 
     fn violation_count(outcome: &Outcome) -> usize {

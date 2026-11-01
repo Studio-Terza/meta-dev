@@ -7,6 +7,7 @@ use lint_placement::CrateFile;
 
 use cut::Cut;
 use lint_item_graph::ItemGraph;
+use newtype::Counter;
 use tangle::Tangle;
 
 #[derive(Clone, Debug)]
