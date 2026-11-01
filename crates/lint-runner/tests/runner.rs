@@ -14,7 +14,6 @@ use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const LINT_COUNT: usize = 32;
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
@@ -22,11 +21,23 @@ const MANIFEST: &str = "[package]\nname = \"r\"\n";
 #[test]
 fn every_lint_reports_over_the_same_files() {
     let reports = Lints::reports(&[Sources::file("a.rs", DIRTY)]);
-    assert_eq!(reports.len(), LINT_COUNT);
     let dirty = reports.iter().filter(|report| !report.is_clean()).count();
     assert_eq!(dirty, 2);
     let lines: Vec<String> = reports.iter().flat_map(Sources::lines).collect();
     assert_eq!(lines, ["a.rs:1", "a.rs:2"]);
+}
+
+#[test]
+fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
+    let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut implemented = 0;
+    for entry in fs::read_dir(here.join(".."))? {
+        implemented += Trees::occurrences(&entry?.path().join("src"), "impl Lint for")?;
+    }
+    let listed_by_the_cli = Trees::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
+    assert!(listed_by_the_cli < implemented);
+    assert_eq!(Lints::reports(&[]).len(), implemented - listed_by_the_cli);
+    Ok(())
 }
 
 #[test]
@@ -73,6 +84,17 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 struct Trees;
 
 impl Trees {
+    fn occurrences(path: &Path, needle: &str) -> Result<usize, Box<dyn Error>> {
+        if !path.is_dir() {
+            return Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()));
+        }
+        let mut found = 0;
+        for entry in fs::read_dir(path)? {
+            found += Self::occurrences(&entry?.path(), needle)?;
+        }
+        Ok(found)
+    }
+
     fn package() -> Result<tempfile::TempDir, Box<dyn Error>> {
         let root = tempfile::tempdir()?;
         Self::write(root.path(), "Cargo.toml", MANIFEST)?;
