@@ -7,8 +7,8 @@ use lint_core::Macros;
 use lint_core::Walk;
 use lint_layout::TestMarks;
 
-use crate::count::Count;
-use crate::crate_budget::CrateBudget;
+use super::CrateBudget;
+use super::count::Count;
 
 #[derive(Debug, Default)]
 pub(super) struct TestScan(CrateBudget);

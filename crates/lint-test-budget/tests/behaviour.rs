@@ -4,29 +4,34 @@ use lint_core::SourceFile;
 use lint_fixtures::Sources;
 use lint_placement::CrateName;
 use lint_placement::CrateRoot;
-use lint_test_budget::{Count, CrateBudget, TestBudget};
+use lint_test_budget::TestBudget;
 
 const SHIPPED: &str = "pub struct A;\npub struct B;\n";
 const WITH_MODULE: &str = "pub struct A;\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {}\n}\n";
 const NESTED: &str = "#[cfg(test)]\nmod a {\n    mod b {\n        #[test]\n        fn t() {}\n    }\n}\n";
 const TESTS: &str = "#[test]\nfn a() {}\n#[tokio::test]\nfn b() {}\nfn helper() {}\n";
+const STARTS: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\nmod ports {\n    fn g() {\n        std::process::Command::new(\"ls\").spawn();\n    }\n}\n";
 const LAWS: &str = "laws::table!(a, f, [1 => 2]);\nroundtrip!(b, s, e, d);\nlaws::idempotent!(c, s, f);\n";
 const PROPTEST: &str = "proptest! {\n    #[test]\n    fn a(x in 0..2) {}\n    #[test]\n    fn b(x in 0..2) {}\n}\n";
 
 struct Budgets;
 
 impl Budgets {
-    fn of_crate(files: &[SourceFile], name: &str) -> Option<CrateBudget> {
+    fn of_crate(files: &[SourceFile], name: &str) -> Option<String> {
         let name = CrateName::from(&CrateRoot::new(PathBuf::from(name)));
-        TestBudget::measured(files).of_crate(&name).copied()
+        TestBudget::measured(files).of_crate(&name)
     }
 
-    fn of_test_file(text: &&str) -> Option<CrateBudget> {
+    fn of_test_file(text: &&str) -> Option<String> {
         Self::of_crate(&[Sources::file("crates/a/tests/t.rs", text)], "a")
     }
 
-    fn counted(tests: usize, files: usize, lines: usize, test_lines: usize) -> CrateBudget {
-        CrateBudget::new(Count::from(tests), Count::from(files), Count::from(lines), Count::from(test_lines))
+    fn counted(tests: usize, files: usize, lines: usize, test_lines: usize) -> String {
+        Self::started(tests, files, lines, test_lines, 0)
+    }
+
+    fn started(tests: usize, files: usize, lines: usize, test_lines: usize, starts: usize) -> String {
+        format!("{tests} tests in {files} files, {test_lines} of {lines} lines, {starts} process starts")
     }
 }
 
@@ -86,4 +91,16 @@ fn files_of_a_package_add_up_and_packages_stay_apart() {
 fn the_report_lists_each_crate() {
     let report = TestBudget::measured(&[Sources::file("crates/a/tests/t.rs", TESTS)]).to_string();
     assert!(report.contains("a: ") && report.contains("report only"));
+}
+
+#[test]
+fn process_starts_are_counted_inside_and_outside_ports() {
+    let files = [Sources::file("crates/a/src/lib.rs", STARTS)];
+    assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::started(0, 1, 9, 0, 2)));
+}
+
+#[test]
+fn process_starts_are_counted_per_crate() {
+    let files = [Sources::file("crates/a/src/lib.rs", STARTS), Sources::file("crates/b/src/lib.rs", SHIPPED)];
+    assert_eq!(Budgets::of_crate(&files, "b"), Some(Budgets::counted(0, 1, 2, 0)));
 }
