@@ -16,6 +16,7 @@ lint-distinct-signatures = { path = "../lint-distinct-signatures" }
 lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
 lint-fn-shape = { path = "../lint-fn-shape" }
+lint-guard-must-use = { path = "../lint-guard-must-use" }
 lint-literal-names = { path = "../lint-literal-names" }
 lint-mandatory-laws = { path = "../lint-mandatory-laws" }
 lint-manual-iteration = { path = "../lint-manual-iteration" }
@@ -30,11 +31,13 @@ lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
 lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
+lint-paired-apis = { path = "../lint-paired-apis" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }
 lint-private-fns = { path = "../lint-private-fns" }
 lint-process-starters = { path = "../lint-process-starters" }
 lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
+lint-raw-resources = { path = "../lint-raw-resources" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }

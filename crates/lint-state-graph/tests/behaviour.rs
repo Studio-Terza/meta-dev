@@ -22,6 +22,22 @@ const UNIT_SHAPE: Source = Source::new(
     "enum Shape {\n    Circle,\n    Square,\n}\nfn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle => grow(1),\n        Shape::Square => grow(2),\n    }\n}\n",
 );
 
+const NONE: [&str; 0] = [];
+const SOUND: &str = "states! {\n    pub mod pr {\n        start Working { review -> Reviewing, abandon -> Abandoned }\n        state Reviewing { approve -> Merged, rework -> Working }\n        terminal Merged {}\n        terminal Abandoned {}\n    }\n}\n";
+const NESTED: &str = "fn f() {\n    mod inner {\n        states::states! {\n            #[derive()]\n            mod door {\n                start Open { shut -> Shut, }\n                terminal Shut {}\n                state Lost {}\n            }\n        }\n    }\n}\n";
+const UNREACHABLE: &str = "states! {\n    mod door {\n        start Open { shut -> Shut }\n        state Ajar { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
+const LOOPING: &str = "states! {\n    mod door {\n        start Open { swing -> Ajar, shut -> Shut }\n        state Ajar { stick -> Stuck }\n        state Stuck { stick -> Ajar }\n        terminal Shut {}\n    }\n}\n";
+const OPEN_TERMINAL: &str = "states! {\n    mod door {\n        start Open { shut -> Shut }\n        terminal Shut { reopen -> Open }\n    }\n}\n";
+const NO_START: &str =
+    "states! {\n    mod door {\n        state Open { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
+const NO_TERMINAL: &str = "states! {\n    mod door {\n        start Open {}\n    }\n}\n";
+const UNKNOWN_KIND: &str = "states! {\n    mod door {\n        begin Open {}\n    }\n}\n";
+const NOT_A_GRAPH: &str = "fn f() {\n    states!(1 + 1);\n}\n";
+const IN_TEST_MODULE: &str =
+    "#[cfg(test)]\nmod tests {\n    states! {\n        mod door {\n            begin Open {}\n        }\n    }\n}\n";
+const OTHER_MACRO: &str = "fn f() {\n    print!(\"start Open\");\n}\n";
+const THE_DEFINITION: &str = "macro_rules! states {\n    () => {};\n}\n";
+
 const CASES: [Case; 8] = [
     Case::new("exposed field", &[Source::new("a.rs", EXPOSED)], &["a.rs:2"]),
     Case::new("foreign match", &[SHAPE, MATCHING], &["area.rs:3"]),
@@ -36,4 +52,38 @@ const CASES: [Case; 8] = [
 #[test]
 fn state_graph_rules_are_flagged() {
     assert_eq!(Sources::mismatches::<StateGraph>(&CASES), Vec::<String>::new());
+}
+
+laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
+    [Source::new("a.rs", SOUND)] => NONE,
+    [Source::new("a.rs", IN_TEST_MODULE)] => NONE,
+    [Source::new("x/tests/a.rs", UNREACHABLE)] => NONE,
+    [Source::new("a.rs", OTHER_MACRO)] => NONE,
+    [Source::new("a.rs", THE_DEFINITION)] => NONE,
+]);
+
+laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<StateGraph>, [
+    [Source::new("a.rs", NESTED)] => ["a.rs:8", "a.rs:8"],
+    [Source::new("a.rs", UNREACHABLE)] => ["a.rs:4"],
+    [Source::new("a.rs", LOOPING)] => ["a.rs:4", "a.rs:5"],
+    [Source::new("a.rs", OPEN_TERMINAL)] => ["a.rs:4"],
+    [Source::new("a.rs", NO_START)] => ["a.rs:3", "a.rs:4"],
+    [Source::new("a.rs", NO_TERMINAL)] => ["a.rs:3"],
+    [Source::new("a.rs", UNKNOWN_KIND)] => ["a.rs:1"],
+    [Source::new("a.rs", NOT_A_GRAPH)] => ["a.rs:2"],
+]);
+
+#[test]
+fn the_messages_name_the_state() {
+    let shown: String = [UNREACHABLE, LOOPING, OPEN_TERMINAL, UNKNOWN_KIND]
+        .iter()
+        .map(|text| Sources::report::<StateGraph>(&[Source::new("a.rs", text)]).to_string())
+        .collect();
+    let named = [
+        "state Ajar cannot be reached",
+        "state Stuck cannot reach a terminal",
+        "terminal state Shut has outgoing",
+        "graph cannot be read",
+    ];
+    assert!(named.iter().all(|word| shown.contains(word)));
 }

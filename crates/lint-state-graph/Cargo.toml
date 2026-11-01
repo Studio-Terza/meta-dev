@@ -13,6 +13,7 @@ quote.workspace = true
 syn.workspace = true
 
 [dev-dependencies]
+laws = { path = "../laws" }
 lint-fixtures = { path = "../lint-fixtures" }
 
 [lints]

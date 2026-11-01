@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::TypeName;
@@ -15,6 +16,14 @@ impl Edge {
 
     pub fn source(&self) -> &TypeName {
         &self.source
+    }
+
+    pub fn target_from(&self, seen: &BTreeSet<TypeName>) -> Option<TypeName> {
+        seen.contains(&self.source).then(|| self.target.clone())
+    }
+
+    pub fn reversed(&self) -> Edge {
+        Edge { source: self.target.clone(), target: self.source.clone() }
     }
 }
 

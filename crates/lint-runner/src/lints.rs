@@ -10,6 +10,7 @@ use lint_distinct_signatures::DistinctSignatures;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
 use lint_fn_shape::FnShape;
+use lint_guard_must_use::GuardMustUse;
 use lint_literal_names::LiteralNames;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
@@ -29,6 +30,7 @@ use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
+use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
@@ -65,9 +67,11 @@ impl Lints {
             PrimitiveBoundary::report(files),
             PrivateFns::report(files),
             ProcessStarters::report(files),
+            RawResources::report(files),
             PublicSurface::report(files),
             RepeatedMethods::report(files),
             StateGraph::report(files),
+            GuardMustUse::report(files),
             CrateGraph::report(files),
             PublicApiTests::report(files),
             NoTestOnlyApi::report(files),
