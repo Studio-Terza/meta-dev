@@ -69,6 +69,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "gate-limits"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,6 +135,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-bool-methods"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-const-shape"
 version = "0.1.0"
 dependencies = [
@@ -156,6 +175,7 @@ dependencies = [
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
+ "newtype",
 ]
 
 [[package]]
@@ -195,6 +215,7 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
 ]
 
@@ -206,6 +227,17 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-guard-must-use"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
  "syn 2.0.119",
 ]
 
@@ -224,6 +256,7 @@ dependencies = [
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "proc-macro2",
  "syn 2.0.119",
  "thiserror",
@@ -238,6 +271,19 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-mandatory-laws"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "lint-reader",
+ "proc-macro2",
+ "syn 2.0.119",
+ "tempfile",
 ]
 
 [[package]]
@@ -357,6 +403,7 @@ dependencies = [
  "lint-core",
  "lint-fixtures",
  "lint-layout",
+ "lint-placement",
  "syn 2.0.119",
 ]
 
@@ -373,6 +420,17 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "tempfile",
+]
+
+[[package]]
+name = "lint-paired-apis"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -436,6 +494,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-raw-resources"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
@@ -469,6 +538,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "lint-bool-methods",
  "lint-const-shape",
  "lint-core",
  "lint-crate-graph",
@@ -477,8 +547,10 @@ dependencies = [
  "lint-expression-flow",
  "lint-fixtures",
  "lint-fn-shape",
+ "lint-guard-must-use",
  "lint-layout",
  "lint-literal-names",
+ "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
  "lint-named-lifetimes",
@@ -491,11 +563,13 @@ dependencies = [
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
  "lint-no-test-only-api",
+ "lint-paired-apis",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
  "lint-public-api-tests",
  "lint-public-surface",
+ "lint-raw-resources",
  "lint-reader",
  "lint-repeated-methods",
  "lint-state-graph",
@@ -510,9 +584,11 @@ dependencies = [
 name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "lint-fixtures",
  "lint-layout",
+ "newtype",
  "quote",
  "syn 2.0.119",
 ]
@@ -526,6 +602,8 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-process-starters",
+ "newtype",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -574,6 +652,24 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "newtype"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "newtype-derive",
+ "proptest",
+]
+
+[[package]]
+name = "newtype-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "num-traits"
@@ -686,6 +782,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -712,6 +818,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7523beb55eece201a2356bee0bbca0d1ab466c14c07703b2e0ee6d42cb0c2c"
 dependencies = [
  "serde_core",
+]
+
+[[package]]
+name = "states"
+version = "0.1.0"
+dependencies = [
+ "laws",
 ]
 
 [[package]]

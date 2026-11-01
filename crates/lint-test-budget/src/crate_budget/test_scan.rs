@@ -6,9 +6,10 @@ use syn::{ItemFn, ItemMod, Macro};
 use lint_core::Macros;
 use lint_core::Walk;
 use lint_layout::TestMarks;
+use newtype::{Counter, Newtype};
 
-use crate::count::Count;
-use crate::crate_budget::CrateBudget;
+use super::CrateBudget;
+use super::count::Count;
 
 #[derive(Debug, Default)]
 pub(super) struct TestScan(CrateBudget);
@@ -23,7 +24,7 @@ impl TestScan {
     }
 
     fn line_count(span: Span) -> Count {
-        Count::from(span.end().line - span.start().line + 1)
+        Count::new(span.end().line - span.start().line + 1)
     }
 
     fn is_property_block(invocation: &Macro) -> bool {
@@ -32,9 +33,9 @@ impl TestScan {
 
     fn tests_in(invocation: &Macro) -> Count {
         if TestMarks::is_law(invocation) {
-            Count::from(1)
+            Count::new(1)
         } else if Self::is_property_block(invocation) {
-            Count::from(Macros::attributes(invocation).iter().filter(|attribute| TestMarks::is_test(attribute)).count())
+            Count::new(Macros::attributes(invocation).iter().filter(|attribute| TestMarks::is_test(attribute)).count())
         } else {
             Count::default()
         }
@@ -43,7 +44,7 @@ impl TestScan {
 
 impl<'ast> Visit<'ast> for TestScan {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.0.tests = self.0.tests + Count::from(usize::from(TestMarks::mark_test(&function.attrs)));
+        self.0.tests = self.0.tests.plus(Count::new(usize::from(TestMarks::mark_test(&function.attrs))));
         visit::visit_item_fn(self, function);
     }
 
@@ -51,12 +52,12 @@ impl<'ast> Visit<'ast> for TestScan {
         let before = self.0.test_lines;
         visit::visit_item_mod(self, module);
         match Walk::outside_tests(&module.attrs) {
-            Walk::Skipped => self.0.test_lines = before + Self::line_count(module.span()),
+            Walk::Skipped => self.0.test_lines = before.plus(Self::line_count(module.span())),
             Walk::Entered => {}
         }
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        self.0.tests = self.0.tests + Self::tests_in(invocation);
+        self.0.tests = self.0.tests.plus(Self::tests_in(invocation));
     }
 }

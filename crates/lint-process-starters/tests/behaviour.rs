@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs;
 
 use lint_core::Lint;
-use lint_process_starters::ProcessStarters;
+use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
 use lint_fixtures::{Case, Source, Sources};
 
@@ -66,4 +66,14 @@ fn a_crate_whose_name_ends_in_ports_may_start_processes() -> Result<(), Box<dyn 
     }
     assert_eq!(wrong, Vec::<String>::new());
     Ok(())
+}
+
+#[test]
+fn every_start_is_counted_including_those_behind_ports() {
+    let ported = Sources::file("crates/x/src/ports/run.rs", IMPORTED);
+    let inline = Sources::file("a.rs", INLINE_PORTS);
+    let other = Sources::file("b.rs", OTHER_COMMAND);
+    let counts: Vec<usize> =
+        [ported, inline, other].iter().map(|file| CommandPaths::found(file, Scope::Everywhere).len()).collect();
+    assert_eq!(counts, vec![1, 1, 0]);
 }

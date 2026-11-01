@@ -29,7 +29,7 @@ const OTHER_FEATURE: &str = "#[cfg(feature = \"latest\")]\nfn f() {}\n#[cfg(feat
 const CASES: [Case; 19] = [
     Case::new("gated fn", &[Source::new("src/a.rs", GATED_FN)], &["src/a.rs:2"]),
     Case::new("gated crate fn", &[Source::new("src/a.rs", GATED_CRATE_FN)], &["src/a.rs:2"]),
-    Case::new("gated any", &[Source::new("src/a.rs", GATED_ANY)], &["src/a.rs:2"]),
+    Case::new("gated any ships elsewhere", &[Source::new("src/a.rs", GATED_ANY)], &[]),
     Case::new("gated method", &[Source::new("src/a.rs", GATED_METHOD)], &["src/a.rs:4"]),
     Case::new("gated impl", &[Source::new("src/a.rs", GATED_IMPL)], &["src/a.rs:4"]),
     Case::new("gated field", &[Source::new("src/a.rs", GATED_FIELD)], &["src/a.rs:3"]),

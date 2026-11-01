@@ -4,25 +4,43 @@ use std::fs;
 use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::Sources;
-use lint_layout::Failure;
 use lint_reader::SourceFiles;
-use lint_runner::{Lints, Outcome};
+use lint_runner::Cli;
 
-use std::path::Path;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const LINT_COUNT: usize = 29;
+const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
+const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
-fn every_lint_reports_over_the_same_files() {
-    let reports = Lints::reports(&[Sources::file("a.rs", DIRTY)]);
-    assert_eq!(reports.len(), LINT_COUNT);
-    let dirty = reports.iter().filter(|report| !report.is_clean()).count();
-    assert_eq!(dirty, 2);
-    let lines: Vec<String> = reports.iter().flat_map(Sources::lines).collect();
-    assert_eq!(lines, ["a.rs:1", "a.rs:2"]);
+fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    let run = Trees::reported(root.path());
+    assert_eq!(run.violations(), 2);
+    assert_eq!(run.headlines(), 2);
+    assert!(run.err.contains("src/lib.rs:1"));
+    assert!(run.err.contains("src/lib.rs:2"));
+    Ok(())
+}
+
+#[test]
+fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
+    let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut implemented = 0;
+    for entry in fs::read_dir(here.join(".."))? {
+        implemented += Trees::occurrences(&entry?.path().join("src"), "impl Lint for")?;
+    }
+    let listed_by_the_cli = Trees::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
+    let listed_by_the_runner = Trees::occurrences(&here.join("src/lints.rs"), "::report(files)")?;
+    assert!(listed_by_the_cli < implemented);
+    assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli);
+    Ok(())
 }
 
 #[test]
@@ -30,12 +48,9 @@ fn a_tree_with_violations_is_not_clean() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", DIRTY)?;
     Trees::write(root.path(), "src/clean.rs", CLEAN)?;
-    let outcome = Lints::check_root(root.path())?;
-    let Outcome::Violations { reports, .. } = &outcome else {
-        return Err("the tree has violations".into());
-    };
-    assert_eq!(reports.len(), 2);
-    assert!(outcome.to_string().contains("src/lib.rs:2"));
+    let run = Trees::reported(root.path());
+    assert_eq!(run.headlines(), 2);
+    assert!(run.err.contains("src/lib.rs:2"));
     Ok(())
 }
 
@@ -44,13 +59,50 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "target/out.rs", DIRTY)?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert!(Trees::reported(root.path()).is_clean());
+    Ok(())
+}
+
+#[test]
+fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", PREDICATE)?;
+    Trees::write(root.path(), "src/paired.rs", PAIRED)?;
+    assert!(Trees::reported(root.path()).is_clean());
+    assert_eq!(Trees::reported(root.path()).exit, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn the_process_entry_point_fails_on_a_violation() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    assert_eq!(Cli::from_args(std::iter::once(OsString::from(root.path()))).run(), ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).exit, ExitCode::FAILURE);
     Ok(())
 }
 
 struct Trees;
 
 impl Trees {
+    fn occurrences(path: &Path, needle: &str) -> Result<usize, Box<dyn Error>> {
+        if !path.is_dir() {
+            return Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()));
+        }
+        let mut found = 0;
+        for entry in fs::read_dir(path)? {
+            found += Self::occurrences(&entry?.path(), needle)?;
+        }
+        Ok(found)
+    }
+
     fn package() -> Result<tempfile::TempDir, Box<dyn Error>> {
         let root = tempfile::tempdir()?;
         Self::write(root.path(), "Cargo.toml", MANIFEST)?;
@@ -84,11 +136,42 @@ impl Trees {
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
 
-    fn violation_count(outcome: &Outcome) -> usize {
-        match outcome {
-            Outcome::Clean => 0,
-            Outcome::Violations { reports, .. } => reports.iter().map(|report| report.violations().len()).sum(),
-        }
+    fn reported(root: &Path) -> Reported {
+        Self::reported_all(&[root.to_path_buf()])
+    }
+
+    fn reported_all(roots: &[PathBuf]) -> Reported {
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&mut out, &mut err);
+        Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
+    }
+}
+
+struct Reported {
+    exit: ExitCode,
+    err: String,
+}
+
+impl Reported {
+    const FAILURE_STARTS: [&'static str; 2] = ["\ncannot ", "\nno Rust sources"];
+    const HEADLINE_END: &'static str = ":\n";
+    const SITE: &'static str = ".rs:";
+
+    fn is_clean(&self) -> bool {
+        self.exit == ExitCode::SUCCESS && self.err == "\n"
+    }
+
+    fn headlines(&self) -> usize {
+        self.err.matches(Self::HEADLINE_END).count()
+    }
+
+    fn failures(&self) -> usize {
+        Self::FAILURE_STARTS.iter().map(|start| self.err.matches(start).count()).sum()
+    }
+
+    fn violations(&self) -> usize {
+        self.err.matches(Self::SITE).count() - self.err.matches(Self::FAILURE_STARTS[0]).count()
     }
 }
 
@@ -97,12 +180,10 @@ fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "// note\nmod broken;\n")?;
     Trees::write(root.path(), "src/broken.rs", "\n\nfn (")?;
-    let outcome = Lints::check_root(root.path())?;
-    let Outcome::Violations { failures, .. } = &outcome else {
-        return Err("the tree has a failure".into());
-    };
-    assert!(matches!(failures.as_slice(), [Failure::Parse { .. }]));
-    assert_eq!(Trees::violation_count(&outcome), 1);
+    let run = Trees::reported(root.path());
+    assert_eq!(run.failures(), 1);
+    assert!(run.err.contains("cannot parse"));
+    assert_eq!(run.violations(), 1);
     Ok(())
 }
 
@@ -111,13 +192,7 @@ fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "mod broken;\n")?;
     Trees::write(root.path(), "src/broken.rs", "struct A;\nstruct B;\nfn f() { let x = (1; }\n")?;
-    let Outcome::Violations { failures, .. } = Lints::check_root(root.path())? else {
-        return Err("the tree has a failure".into());
-    };
-    let Some(Failure::Parse { line, .. }) = failures.first() else {
-        return Err("a parse failure".into());
-    };
-    assert_eq!(line.to_string(), "3");
+    assert!(Trees::reported(root.path()).err.contains("src/broken.rs:3"));
     Ok(())
 }
 
@@ -127,7 +202,7 @@ fn files_outside_every_crate_target_are_not_read() -> Result<(), Box<dyn Error>>
     Trees::write(root.path(), "src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "tests/ui/bad.rs", "fn (")?;
     Trees::write(root.path(), "tooling/corpus/dirty.rs", DIRTY)?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
@@ -136,7 +211,7 @@ fn modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>>
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "pub mod target;\n")?;
     Trees::write(root.path(), "src/target/mod.rs", DIRTY)?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -145,9 +220,9 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "#[cfg(test)]\nmod tests;\n")?;
     Trees::write(root.path(), "src/tests.rs", "struct S { on: bool }\n")?;
-    let outcome = Lints::check_root(root.path())?;
-    assert_eq!(Trees::violation_count(&outcome), 1);
-    assert!(!outcome.to_string().contains("src/tests.rs"));
+    let run = Trees::reported(root.path());
+    assert_eq!(run.violations(), 1);
+    assert!(!run.err.contains("src/tests.rs"));
     Ok(())
 }
 
@@ -155,20 +230,19 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
 fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "mod absent;\n")?;
-    let Outcome::Violations { failures, .. } = Lints::check_root(root.path())? else {
-        return Err("the tree has a failure".into());
-    };
-    assert!(matches!(failures.as_slice(), [Failure::Io { .. }]));
+    let run = Trees::reported(root.path());
+    assert_eq!(run.failures(), 1);
+    assert!(run.err.contains("cannot read"));
     Ok(())
 }
 
 #[test]
 fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
     let empty = tempfile::tempdir()?;
-    assert!(matches!(Lints::check_root(empty.path()), Err(Failure::NoSources { .. })));
+    assert!(Trees::reported(empty.path()).err.contains("no Rust sources found"));
     let other = tempfile::tempdir()?;
     Trees::write(other.path(), "README", "x")?;
-    assert!(matches!(Lints::check_root(other.path()), Err(Failure::NoSources { .. })));
+    assert!(Trees::reported(other.path()).err.contains("no Rust sources found"));
     Ok(())
 }
 
@@ -179,7 +253,7 @@ fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
     let dirty = Trees::package()?;
     Trees::write(dirty.path(), "src/lib.rs", DIRTY)?;
     let roots = [clean.path(), dirty.path()].map(Path::to_path_buf);
-    assert!(matches!(Lints::check_all(&roots), Ok(Outcome::Violations { .. })));
+    assert_eq!(Trees::reported_all(&roots).exit, ExitCode::FAILURE);
     Ok(())
 }
 
@@ -187,8 +261,8 @@ fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
 fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/main.rs", "struct Extra;\nfn main() {}\n")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
-    assert_eq!(Trees::violation_count(&Lints::check_root(&root.path().join("src"))?), 1);
+    assert_eq!(Trees::reported(root.path()).violations(), 1);
+    assert_eq!(Trees::reported(&root.path().join("src")).violations(), 1);
     Ok(())
 }
 
@@ -197,7 +271,7 @@ fn bin_directory_roots_are_checked() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
     Trees::write(root.path(), "src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -206,7 +280,7 @@ fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", DIRTY)?;
     std::os::unix::fs::symlink(root.path(), root.path().join("src/loop"))?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -214,7 +288,7 @@ fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
 fn a_shebang_is_not_a_comment() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "#!//usr/bin/env foo\nstruct A;\n")?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
@@ -226,7 +300,7 @@ fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn E
     Trees::write(root.path(), "src/request/tests.rs", "mod a;\n")?;
     Trees::write(root.path(), "src/request/tests/a.rs", "mod b;\n")?;
     Trees::write(root.path(), "src/request/tests/a/b.rs", "")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
+    assert_eq!(Trees::reported(root.path()).violations(), 1);
     Ok(())
 }
 
@@ -236,7 +310,7 @@ fn fixture_trees_without_a_manifest_are_not_read() -> Result<(), Box<dyn Error>>
     Trees::write(root.path(), "src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "tooling/corpus/case/src/lib.rs", DIRTY)?;
     Trees::write(root.path(), "tests/fixtures/bad/src/lib.rs", "fn (")?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
@@ -252,10 +326,10 @@ fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), Box<dyn E
     Trees::write(root.path(), "vendor/dep/src/lib.rs", DIRTY)?;
     Trees::write(root.path(), ".claude/worktrees/t1/Cargo.toml", MANIFEST)?;
     Trees::write(root.path(), ".claude/worktrees/t1/src/lib.rs", DIRTY)?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert!(Trees::reported(root.path()).is_clean());
     Trees::write(root.path(), "crates/two/Cargo.toml", MANIFEST)?;
     Trees::write(root.path(), "crates/two/src/lib.rs", DIRTY)?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -271,7 +345,7 @@ fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), Box<dyn Error>
     Trees::write(root.path(), "app/src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "help/Cargo.toml", "[package]\nname = \"help\"\n")?;
     Trees::write(root.path(), "help/src/lib.rs", DIRTY)?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -291,10 +365,8 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
         Trees::write(&at, "tests/flow.rs", flow)?;
         Trees::write(&at, "build.rs", build)
     })?;
-    let counts: Vec<usize> = layouts
-        .iter()
-        .map(|layout| Lints::check_root(&root.path().join(layout)).map(|outcome| Trees::violation_count(&outcome)))
-        .collect::<Result<_, _>>()?;
+    let counts: Vec<usize> =
+        layouts.iter().map(|layout| Trees::reported(&root.path().join(layout)).violations()).collect();
     let first = counts.first().copied().unwrap_or_default();
     assert!(first > 0);
     assert!(counts.iter().all(|count| *count == first));
@@ -309,9 +381,9 @@ fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dy
     Trees::write(root.path(), "src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
     Trees::write(root.path(), "src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
     Trees::write(root.path(), "src/a/tests.rs", "use super::helper::Help;\n")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
+    assert_eq!(Trees::reported(root.path()).violations(), 1);
     Trees::write(root.path(), "src/a/tests.rs", "")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
@@ -328,7 +400,7 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
     )?;
     Trees::write(root.path(), "crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
     Trees::write(root.path(), "crates/app/src/lib.rs", "pub use engine::Used;\n")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
+    assert_eq!(Trees::reported(root.path()).violations(), 1);
     Ok(())
 }
 

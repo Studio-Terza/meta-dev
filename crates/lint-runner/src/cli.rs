@@ -3,6 +3,9 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use lint_bool_methods::BoolMethods;
+use lint_core::Lint;
+use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
 use lint_test_budget::TestBudget;
 
@@ -21,17 +24,24 @@ impl Cli {
 
     #[must_use]
     pub fn run(&self) -> ExitCode {
+        self.report_to(&mut io::stdout(), &mut io::stderr())
+    }
+
+    #[must_use]
+    pub fn report_to(&self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match SourceFiles::read_all(&self.roots).map(|readout| {
-            write!(io::stdout(), "{}", TestBudget::measured(readout.files())).ok();
+            let files = readout.files();
+            write!(out, "{}{}{}", TestBudget::measured(files), BoolMethods::report(files), PairedApis::report(files))
+                .ok();
             Lints::checked(readout)
         }) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
-                eprint!("{violations}");
+                write!(err, "{violations}").ok();
                 ExitCode::FAILURE
             }
             Err(failure) => {
-                eprintln!("{failure}");
+                writeln!(err, "{failure}").ok();
                 ExitCode::FAILURE
             }
         }

@@ -1,4 +1,3 @@
-mod count;
 mod crate_budget;
 
 use std::collections::BTreeMap;
@@ -7,8 +6,7 @@ use std::fmt;
 use lint_core::SourceFile;
 use lint_placement::CrateName;
 
-pub use count::Count;
-pub use crate_budget::CrateBudget;
+use crate_budget::CrateBudget;
 
 #[derive(Debug, Default)]
 pub struct TestBudget(BTreeMap<CrateName, CrateBudget>);
@@ -25,8 +23,8 @@ impl TestBudget {
     }
 
     #[must_use]
-    pub fn of_crate(&self, name: &CrateName) -> Option<&CrateBudget> {
-        self.0.get(name)
+    pub fn of_crate(&self, name: &CrateName) -> Option<String> {
+        self.0.get(name).map(ToString::to_string)
     }
 }
 

@@ -1,8 +1,4 @@
-use std::path::{Path, PathBuf};
-
 use lint_core::{Lint, Readout, Report, SourceFile};
-use lint_layout::Failure;
-use lint_reader::SourceFiles;
 
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
@@ -10,7 +6,9 @@ use lint_distinct_signatures::DistinctSignatures;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
 use lint_fn_shape::FnShape;
+use lint_guard_must_use::GuardMustUse;
 use lint_literal_names::LiteralNames;
+use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
 use lint_named_lifetimes::NamedLifetimes;
@@ -28,6 +26,7 @@ use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
 use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
+use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
@@ -64,23 +63,18 @@ impl Lints {
             PrimitiveBoundary::report(files),
             PrivateFns::report(files),
             ProcessStarters::report(files),
+            RawResources::report(files),
             PublicSurface::report(files),
             RepeatedMethods::report(files),
             StateGraph::report(files),
+            GuardMustUse::report(files),
             CrateGraph::report(files),
             PublicApiTests::report(files),
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
             NearDuplicateTests::report(files),
+            MandatoryLaws::report(files),
         ]
-    }
-
-    pub fn check_root(root: &Path) -> Result<Outcome, Failure> {
-        Self::check_all(&[root.to_path_buf()])
-    }
-
-    pub fn check_all(roots: &[PathBuf]) -> Result<Outcome, Failure> {
-        SourceFiles::read_all(roots).map(Self::checked)
     }
 
     #[must_use]
