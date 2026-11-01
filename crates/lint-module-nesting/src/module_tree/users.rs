@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::module_path::ModulePath;
+use super::module_path::{ModuleIndex, ModulePath};
 use lint_core::SourceFile;
 use lint_layout::UseEdges;
 
@@ -16,7 +16,7 @@ impl Users {
     }
 
     #[must_use]
-    pub fn with_tests(self, modules: &[ModulePath], files: &[SourceFile]) -> Users {
+    pub fn with_tests(self, modules: &ModuleIndex, files: &[SourceFile]) -> Users {
         files.iter().fold(self, |users, file| users.with_test(modules, file))
     }
 
@@ -24,11 +24,11 @@ impl Users {
         self.0.get(module)
     }
 
-    fn with_test(self, modules: &[ModulePath], file: &SourceFile) -> Users {
+    fn with_test(self, modules: &ModuleIndex, file: &SourceFile) -> Users {
         let caller = ModulePath::of_file(file);
         UseEdges::in_file(file.syntax()).iter().fold(self, |mut users, path| {
             let home = ModulePath::from_use(&caller, path, modules)
-                .and_then(|target| ModulePath::deepest_module_containing(modules, &target, &caller).cloned());
+                .and_then(|target| modules.deepest_containing(&target, &caller).cloned());
             users.record(home, &caller);
             users
         })

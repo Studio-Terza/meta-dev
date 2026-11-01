@@ -26,17 +26,23 @@ impl Readout {
 
     #[must_use]
     pub fn with_file(self, file: SourceFile) -> Readout {
-        Readout { files: self.files.into_iter().chain([file]).collect(), ..self }
+        let mut files = self.files;
+        files.push(file);
+        Readout { files, ..self }
     }
 
     #[must_use]
     pub fn with_repo_files(self, found: Vec<RepoFile>) -> Readout {
-        Readout { repo_files: self.repo_files.into_iter().chain(found).collect(), ..self }
+        let mut repo_files = self.repo_files;
+        repo_files.extend(found);
+        Readout { repo_files, ..self }
     }
 
     #[must_use]
     pub fn with_failure(self, failure: Failure) -> Readout {
-        Readout { failures: self.failures.into_iter().chain([failure]).collect(), ..self }
+        let mut failures = self.failures;
+        failures.push(failure);
+        Readout { failures, ..self }
     }
 
     #[must_use]
