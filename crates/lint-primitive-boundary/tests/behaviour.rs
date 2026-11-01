@@ -29,7 +29,19 @@ const INLINE_TEXT: &str = "mod inner {\n    pub fn f(x: Name) {\n        x.trim(
 const METHOD_TEXT: &str = "struct A;\nimpl A {\n    fn f(x: Name) {\n        x.trim();\n    }\n}\n";
 const OTHER_PATH: &str = "fn f(x: other::Thing) {}\n";
 
-const CASES: [Case; 27] = [
+const PARAM_SIZE: &str = "struct A;\nimpl A {\n    fn at(&self, index: usize) {}\n}\n";
+const PARAM_UNNAMED_SIZE: &str = "struct A;\nimpl A {\n    fn len(&self, step: usize) {}\n}\n";
+const RETURN_SIZE: &str = "struct A;\nimpl A {\n    fn len(&self) -> usize {\n        1\n    }\n}\n";
+const RETURN_UNNAMED_SIZE: &str = "struct A;\nimpl A {\n    fn step(&self) -> usize {\n        1\n    }\n}\n";
+const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\n";
+const DOOR_AND_TRIM: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nfn g(x: Name) {\n    x.trim();\n}\n";
+
+const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+
+const DOOR_ON_A_REFERENCE: &str = "struct A;\nimpl fmt::Display for &A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nfn g(x: Name) {\n    x.trim();\n}\n";
+
+const CASES: [Case; 36] = [
     Case::new("test module", &[Source::new("a.rs", TEST_MODULE)], &[]),
     Case::new("bits module file", &[Source::new("crates/x/src/bits/mask.rs", BARE)], &[]),
     Case::new("bits module root", &[Source::new("crates/x/src/bits.rs", BARE)], &[]),
@@ -61,6 +73,23 @@ const CASES: [Case; 27] = [
     Case::new("text in an inline module", &[Source::new("a.rs", INLINE_TEXT)], &["a.rs:3"]),
     Case::new("text in a method", &[Source::new("a.rs", METHOD_TEXT)], &["a.rs:4"]),
     Case::new("another two-part path", &[Source::new("a.rs", OTHER_PATH)], &[]),
+    Case::new("a size parameter named for a size", &[Source::new("a.rs", PARAM_SIZE)], &[]),
+    Case::new("a size parameter in a method named for a size", &[Source::new("a.rs", PARAM_UNNAMED_SIZE)], &["a.rs:3"]),
+    Case::new("a size return in a method named for a size", &[Source::new("a.rs", RETURN_SIZE)], &[]),
+    Case::new(
+        "a size return in a method not named for a size",
+        &[Source::new("a.rs", RETURN_UNNAMED_SIZE)],
+        &["a.rs:3"],
+    ),
+    Case::new("text inside a Display impl", &[Source::new("a.rs", DOOR)], &[]),
+    Case::new("text in an inherent impl of a Display type", &[Source::new("a.rs", DOOR_AND_HELPER)], &[]),
+    Case::new("text in an impl of another type", &[Source::new("a.rs", DOOR_AND_OTHER_TYPE)], &["a.rs:10"]),
+    Case::new(
+        "text in a free function beside a Display impl on a reference",
+        &[Source::new("a.rs", DOOR_ON_A_REFERENCE)],
+        &["a.rs:8"],
+    ),
+    Case::new("text beside a Display impl", &[Source::new("a.rs", DOOR_AND_TRIM)], &["a.rs:8"]),
 ];
 
 #[test]

@@ -74,8 +74,8 @@ impl ModulePath {
         &self.file
     }
 
-    pub fn segments(&self) -> &[Name] {
-        &self.segments
+    pub fn segment_length(&self) -> usize {
+        self.segments.len()
     }
 
     pub fn parent(&self) -> Option<ModulePath> {

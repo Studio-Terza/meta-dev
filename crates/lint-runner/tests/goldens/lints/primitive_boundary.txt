@@ -21,8 +21,7 @@ src/sizes.rs:2: A only carries values into one other file; give it the logic tha
 primitives appear only at a type's boundary:
 src/bare.rs:1: bare u32 in f; name what it counts with a newtype
 src/bare.rs:1: bare f64 in f; name what it counts with a newtype
-src/sizes.rs:1: usize in f is neither a length nor an index; a count gets a newtype, a size says so in its name
-src/sizes.rs:1: usize in f is neither a length nor an index; a count gets a newtype, a size says so in its name
+src/sizes.rs:1: usize in items is neither a length nor an index; a count gets a newtype, a size says so in its name
 src/sizes.rs:4: usize in total is neither a length nor an index; a count gets a newtype, a size says so in its name
 src/text.rs:2: trim handles text outside a door; parse in FromStr or render in Display
 src/text.rs:3: from handles text outside a door; parse in FromStr or render in Display

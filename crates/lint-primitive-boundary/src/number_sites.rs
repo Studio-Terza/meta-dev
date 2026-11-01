@@ -13,8 +13,8 @@ use use_aliases::UseAliases;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType,
-    Signature, TraitItemConst, TypePath,
+    Block, ConstParam, Field, Fields, ImplItemConst, ItemConst, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Pat,
+    PatType, Signature, TraitItemConst, TypePath,
 };
 
 use super::finding::Finding;
@@ -31,6 +31,7 @@ pub struct NumberSites {
     path: PathBuf,
     aliases: UseAliases,
     context: Name,
+    parameter: Option<Name>,
     newtypes: Vec<Name>,
     sightings: Sightings,
 }
@@ -57,6 +58,7 @@ impl NumberSites {
             path: file.path().to_owned(),
             aliases: UseAliases::in_file(file.syntax()),
             context: Name::default(),
+            parameter: None,
             newtypes: Vec::new(),
             sightings: Sightings::default(),
         };
@@ -85,6 +87,7 @@ impl NumberSites {
 
     fn sighting(&self, path: &TypePath) -> Option<Sighting> {
         let wire = self.aliases.resolve(&path.path);
+        let sized_by = self.parameter.as_ref().unwrap_or(&self.context);
         let site = Site::new(&self.path, LineNumber::from(path.path.span()));
         if Self::is_named(path, &Self::PRIMITIVES) {
             Some(Sighting::new(
@@ -102,11 +105,8 @@ impl NumberSites {
                 Rank::Number,
                 Violation::new(site, Finding::WireForm { wire, context: self.context.clone() }),
             ))
-        } else if Self::is_named(path, &Self::SIZES) && !self.context.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
-            Some(Sighting::new(
-                Rank::Size,
-                Violation::new(site, Finding::UnnamedSize { context: self.context.clone() }),
-            ))
+        } else if Self::is_named(path, &Self::SIZES) && !sized_by.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
+            Some(Sighting::new(Rank::Size, Violation::new(site, Finding::UnnamedSize { context: sized_by.clone() })))
         } else {
             None
         }
@@ -171,6 +171,16 @@ impl<'ast> Visit<'ast> for NumberSites {
     fn visit_signature(&mut self, signature: &'ast Signature) {
         self.context = Name::from(&signature.ident);
         syn::visit::visit_signature(self, signature);
+    }
+
+    fn visit_pat_type(&mut self, typed: &'ast PatType) {
+        let outer = self.parameter.take();
+        self.parameter = match &*typed.pat {
+            Pat::Ident(bound) => Some(Name::from(&bound.ident)),
+            _ => None,
+        };
+        syn::visit::visit_type(self, &typed.ty);
+        self.parameter = outer;
     }
 
     fn visit_type_path(&mut self, path: &'ast TypePath) {

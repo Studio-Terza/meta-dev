@@ -55,6 +55,18 @@ const PAINT: Source = Source::new(
     "paint.rs",
     "fn paint(color: Color) -> u8 {\n    match color {\n        Color::Red => grow(1),\n        Color::Blue => grow(2),\n    }\n}\n",
 );
+const SUM_SHAPE_X: Source = Source::new("crates/x/src/shape.rs", "pub enum Shape {\n    Circle(u8),\n    Square,\n}\n");
+const UNIT_SHAPE_X: Source = Source::new("crates/x/src/shape.rs", "pub enum Shape {\n    Circle,\n    Square,\n}\n");
+const SUM_SHAPE_Y: Source = Source::new("crates/y/src/shape.rs", "pub enum Shape {\n    Circle(u8),\n    Square,\n}\n");
+const UNIT_SHAPE_Y: Source = Source::new("crates/y/src/shape.rs", "pub enum Shape {\n    Circle,\n    Square,\n}\n");
+const AREA_X: Source = Source::new(
+    "crates/x/src/area.rs",
+    "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n        Shape::Square => grow(1),\n    }\n}\n",
+);
+const UNIT_AREA_X: Source = Source::new(
+    "crates/x/src/area.rs",
+    "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle => grow(1),\n        Shape::Square => grow(2),\n    }\n}\n",
+);
 const BOXED_VIEW: &str = "impl Open {\n    pub fn next(&self) -> Box<Closed> {\n        make()\n    }\n}\n";
 const UNIT_ARM: Source = Source::new(
     "area.rs",
@@ -93,7 +105,7 @@ const GROUPED_ALIAS: &str = "use states::{states as lifecycle, other};\nfn f() {
 const BEHIND_CFG_IF: &str = "cfg_if::cfg_if! {\n    if #[cfg(unix)] {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    }\n}\n";
 const BEHIND_MACRO_RULES: &str = "macro_rules! door {\n    () => {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    };\n}\ndoor!();\n";
 
-const CASES: [Case; 24] = [
+const CASES: [Case; 28] = [
     Case::new("public edge", &[Source::new("a.rs", OPEN_AND_CLOSED), Source::new("b.rs", EDGE)], &[]),
     Case::new("test module match", &[SHAPE, TEST_AREA], &[]),
     Case::new("own unit enum of that name", &[SHAPE, UNIT_SHAPE], &[]),
@@ -150,6 +162,32 @@ const CASES: [Case; 24] = [
     ),
     Case::new("a unit variant arm", &[SHAPE, UNIT_ARM], &["area.rs:3"]),
     Case::new("a struct variant arm", &[ROUND, STRUCT_ARM], &["area.rs:3"]),
+    Case::new(
+        "a unit enum of the crate's own beside a sum type of that name in another crate",
+        &[SUM_SHAPE_Y, UNIT_SHAPE_X, UNIT_AREA_X],
+        &[],
+    ),
+    Case::new(
+        "a sum type of the crate's own beside a unit enum of that name in another crate",
+        &[UNIT_SHAPE_Y, SUM_SHAPE_X, AREA_X],
+        &["crates/x/src/area.rs:3", "crates/x/src/area.rs:4"],
+    ),
+    Case::new(
+        "a sum type of the file's own beside one of that name in another crate",
+        &[
+            SUM_SHAPE_Y,
+            Source::new(
+                "crates/x/src/area.rs",
+                "enum Shape {\n    Circle(u8),\n}\nfn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Circle(radius) => grow(radius),\n    }\n}\n",
+            ),
+        ],
+        &[],
+    ),
+    Case::new(
+        "a sum type of another file of the crate",
+        &[SUM_SHAPE_X, AREA_X],
+        &["crates/x/src/area.rs:3", "crates/x/src/area.rs:4"],
+    ),
 ];
 
 #[test]
