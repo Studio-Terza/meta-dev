@@ -9,4 +9,5 @@ D1 Reach tool: changed files to affected crates, no process spawning in tests.
 D2 PR CI runs clippy, tests, lints and mutants on the reach only. after: D1
 D3 Report reach per PR, and a per-crate fan-in, on main. after: D1
 D4 Prove it on a real PR: an unrelated change runs a fraction of the suite. after: D2
+D5 A PR reaching a fraction of the crates takes a matching fraction of job time. after: D4
 Out: elegance lints, test-level selection, runner noise.
