@@ -1,12 +1,11 @@
 mod crate_summary;
-mod item_graph;
 
 use std::collections::BTreeMap;
 
-use lint_core::{CrateRoot, Lint, Report, SourceFile};
+use lint_core::{CrateFile, Lint, Report, SourceFile};
 
 use crate_summary::CrateSummary;
-use item_graph::ItemGraph;
+use lint_item_graph::ItemGraph;
 
 #[derive(Debug)]
 pub struct CrateGraph;
@@ -14,9 +13,9 @@ pub struct CrateGraph;
 impl Lint for CrateGraph {
     fn report(files: &[SourceFile]) -> Report {
         let crates = files.iter().filter(|file| file.is_shipped()).fold(
-            BTreeMap::<&CrateRoot, Vec<&SourceFile>>::new(),
+            BTreeMap::<&CrateFile, Vec<&SourceFile>>::new(),
             |mut crates, file| {
-                crates.entry(file.placement().crate_root()).or_default().push(file);
+                crates.entry(file.crate_file()).or_default().push(file);
                 crates
             },
         );
@@ -24,7 +23,9 @@ impl Lint for CrateGraph {
             "a crate whose items form one big cycle or two loosely linked groups is split",
             crates
                 .into_iter()
-                .flat_map(|(root, files)| CrateSummary::of_graph(root, &ItemGraph::of_files(&files)).violations())
+                .flat_map(|(crate_file, files)| {
+                    CrateSummary::of_graph(crate_file, &ItemGraph::of_files(&files)).violations()
+                })
                 .collect(),
         )
     }
