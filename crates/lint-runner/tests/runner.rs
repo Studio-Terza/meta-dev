@@ -15,6 +15,7 @@ const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
 const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
+const LONG_CHAIN_LINKS: usize = 20_000;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -488,5 +489,14 @@ fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     fs::create_dir(root.path().join("Cargo.toml"))?;
     assert!(Trees::reported(root.path()).err.contains("Cargo.toml"));
+    Ok(())
+}
+
+#[test]
+fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), Box<dyn Error>> {
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
+    let run = Trees::reported(root.path());
+    assert!(run.err.contains("src/lib.rs:1"));
     Ok(())
 }
