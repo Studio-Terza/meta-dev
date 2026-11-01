@@ -14,6 +14,7 @@ use walker::Walker;
 
 pub use cover::Cover;
 pub use ground::Ground;
+pub use module::Module;
 pub use uses::Use;
 
 #[derive(Debug)]

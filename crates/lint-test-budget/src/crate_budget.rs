@@ -6,7 +6,7 @@ use std::ops::Add;
 
 use lint_core::SourceFile;
 use lint_process_starters::{CommandPaths, Scope};
-use newtype::{Counter, Newtype};
+use newtype::Counter;
 
 use count::Count;
 use test_scan::TestScan;

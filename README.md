@@ -15,26 +15,29 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-near_duplicate_tests.
+near_duplicate_tests, mandatory_laws.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
-It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`
+It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`, in impls and in public traits
 (`bool_methods`), with the headline naming the alternatives, and public methods that form a pair such as
-`start` and `stop` (`paired_apis`), with the headline saying to write a guard. Those lists are report only too,
+`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with the headline saying to write a guard. Those lists are report only too,
 so they are outside the lints above and never change the exit code.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
 settings, and there is no per-repository configuration, switch or baseline. Where something is sometimes
 legitimate, the lint gates where by naming convention: starting a process (`process_starters`) and calling
 `fs::remove_dir_all`, `mem::forget` or `env::temp_dir` (`raw_resources`) are allowed only in a crate whose name
-ends in `ports` or a module named `ports`, and casts (`const_shape`), bare numbers
+ends in the word `ports` (`meta-ports`, not `meta-reports`) or a module named `ports`. Both lints read paths through
+`use` items in any order, renames, type aliases, glob imports, re-exports across the files of a crate, qualified
+`<T>::f` calls and macro bodies, so `matches!(..., Ok(s) if s.success())` is read like any other call. Inside `ports`,
+a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Casts (`const_shape`), bare numbers
 (`named_numbers`) and bare primitives (`primitive_boundary`) only in a module named `bits`. Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-fixtures` (shared test sources), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-runner` (the runner
 library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `laws` (law macros for tests), `newtype` (the newtype traits) and `newtype-derive` (their derives). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
@@ -51,6 +54,8 @@ A golden is a recorded output of a public API, kept at `tests/goldens/<name>` in
 `cargo test` only compares. It fails on a difference or a missing golden, and it writes nothing. The
 failure names the file and shows a diff in which each line is quoted, so a change in whitespace or line
 endings is visible. The diff is one hunk, from the first changed line to the last.
+
+A golden name stays inside `tests/goldens`: `golden!("../x")` or an absolute name fails with an error.
 
 To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
 `GOLDEN_RECORD` fails, and so does recording when `CI` is set.
@@ -70,6 +75,19 @@ row and names the first broken row, without generated input. Attributes before t
 
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
+
+`mandatory_laws` fails a type that has a conversion pair, or a hand-written `Ord` or `PartialEq`, without a law in a
+test of the same package that names the type. A pair is `Display` with `FromStr`, `Serialize` with `Deserialize`
+(also behind `cfg_attr`), `encode` with `decode`, or `to_x` with `from_x`, in inherent impls or any trait impl, in one
+file or several. Each pair needs its own `roundtrip!`: one that names the type and, for method pairs, both methods.
+The test title does not count as naming the type.
+
+## Labels
+
+`labels.yml` fails a pull request that changes a golden (including renaming one out of `tests/goldens`) unless it
+carries the label `golden-change`, and one that adds, copies or renames a file into `tests/fixtures` or `tests/e2e`
+unless it carries `new-scenario`. A person adds the label after reviewing the change. The workflow reads label names
+only: it does not check who added a label.
 
 ## CI wall-time limits
 
@@ -100,14 +118,24 @@ A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` th
 `#[derive(Arbitrary)]` implements proptest's `Arbitrary` through those constructors, so a validated newtype
 only generates values its check admits. The using crate needs `proptest` as a dependency.
 
+`#[newtype(strategy = ...)]` gives the derived `Arbitrary` its own proptest strategy for the inner value, for checks
+that admit a small share of it (`strategy = 0u32..1000`, `strategy = "[0-9a-f]{40}"`). A validated newtype with a
+strategy still goes through its check. The derive also writes an inherent `const fn new` for a plain newtype, and
+`const fn zero` when the inner type is `usize`, so constants can be built. `#[derive(Display)]` forwards `Display` to
+the inner value.
+
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
 and `total`, saturating at the largest count. The orphan rule forbids a blanket `Add` or `Sum`, so these
-are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and a
-hand-written constructor on three types still fails.
+are named methods. Derived code is not in the source, so `repeated_methods` does not see it. A
+hand-written constructor on three types still fails, whatever their inner types are (an argument of the inner type
+counts as `Inner`), and so does the same body of an operator, `Display`, `From`, `Default`, `Sum`, `AsRef`, `Deref` or
+`FromStr` impl on three newtypes.
 
 ## Guards
 
-A guard is a type that implements `Drop`. `guard_must_use` fails a guard without `#[must_use]`.
+A guard is a type that implements `Drop`. `guard_must_use` fails a guard without `#[must_use]`, also when the
+attribute is behind `cfg_attr`. An impl binds to the type of that name in its own module, or through a type alias, or
+else to the types of that name in its own crate; a crate with a same-named type that has no `Drop` is not flagged.
 
 ## Lifecycles
 
@@ -131,15 +159,16 @@ A guard is a type that implements `Drop`. `guard_must_use` fails a guard without
 Each state is a `#[must_use]` type, and each edge a method that consumes it. `finish` exists on terminal states
 only, and it is the only way to get `Finished`. `scope` gives the closure a fresh invariant brand `'id`, as
 `GhostCell` does, and the closure must return `Finished` of that brand. A path that drops the state has no
-witness to return, so it does not compile. A path that diverges, by panic or endless loop, returns nothing and
-is not caught.
+witness to return, so it does not compile. A path that diverges, by `panic!`, `todo!`, `std::process::exit` or an endless
+loop, returns nothing and is not caught.
 
 The `compile_fail` doctests in `crates/states/src/compile_fail.md` prove this. `cargo test` runs them, and no
 test code starts a process, though rustdoc itself runs `rustc` for each one. Stable rustdoc does not check the
 error codes in them.
 
 `state_graph` reads each `states!` graph in shipped code. Every state must be reachable from a `start` state and
-reach a `terminal` state, and a terminal state has no outgoing edges. A graph it cannot read fails.
+reach a `terminal` state, and a terminal state has no outgoing edges. A graph it cannot read fails. It finds `states!` under a rename
+(`use states::states as lifecycle`), inside other macros such as `cfg_if!`, and in `macro_rules!` bodies.
 
 ## Mutants
 

@@ -2,18 +2,20 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateFile;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Module {
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Module {
     crate_file: CrateFile,
     path: Vec<Name>,
 }
 
 impl Module {
-    pub(crate) fn of_file(file: &SourceFile) -> Module {
+    #[must_use]
+    pub fn of_file(file: &SourceFile) -> Module {
         Module { crate_file: file.crate_file().clone(), path: file.placement().module().segments().to_vec() }
     }
 
-    pub(crate) fn within(&self, name: &Name) -> Module {
+    #[must_use]
+    pub fn within(&self, name: &Name) -> Module {
         Module {
             crate_file: self.crate_file.clone(),
             path: self.path.iter().cloned().chain(Some(name.clone())).collect(),
@@ -25,7 +27,8 @@ impl Module {
         Some(Module { crate_file: self.crate_file.clone(), path: self.path.iter().take(outer).cloned().collect() })
     }
 
-    pub(crate) fn root(&self) -> Module {
+    #[must_use]
+    pub fn root(&self) -> Module {
         Module { crate_file: self.crate_file.clone(), path: Vec::new() }
     }
 

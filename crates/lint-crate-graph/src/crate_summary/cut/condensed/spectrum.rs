@@ -3,15 +3,12 @@ use std::iter::Sum;
 use std::ops::{Add, Sub};
 
 use super::link::Link;
+use newtype::Newtype;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Newtype, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Weight(f64);
 
 impl Weight {
-    pub fn new(weight: f64) -> Weight {
-        Weight(weight)
-    }
-
     pub fn crossings(self) -> f64 {
         self.0
     }

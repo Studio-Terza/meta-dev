@@ -1,5 +1,3 @@
-use syn::Ident;
-
 use lint_layout::{Name, Prefix};
 
 #[derive(Debug)]
@@ -18,9 +16,8 @@ impl Pair {
         Pair { opening: "begin", closing: "end" },
     ];
 
-    pub fn partner(&self, method: &Ident) -> Option<Name> {
-        let name = Name::from(method);
-        let rest = name.spelled().get(self.opening.len()..).filter(|_| name.matches::<Prefix>(&[self.opening]))?;
+    pub fn partner(&self, method: &Name) -> Option<Name> {
+        let rest = method.spelled().get(self.opening.len()..).filter(|_| method.matches::<Prefix>(&[self.opening]))?;
         Some(Name::from([self.closing, rest].concat().as_str()))
     }
 }

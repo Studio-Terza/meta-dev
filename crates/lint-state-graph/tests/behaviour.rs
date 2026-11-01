@@ -38,6 +38,11 @@ const IN_TEST_MODULE: &str =
 const OTHER_MACRO: &str = "fn f() {\n    print!(\"start Open\");\n}\n";
 const THE_DEFINITION: &str = "macro_rules! states {\n    () => {};\n}\n";
 
+const ALIASED: &str = "use states::states as lifecycle;\nlifecycle! {\n    mod door {\n        start Open { shut -> Shut }\n        state Lost {}\n        terminal Shut {}\n    }\n}\n";
+const GROUPED_ALIAS: &str = "use states::{states as lifecycle, other};\nfn f() {\n    lifecycle! {\n        mod door {\n            start Open { shut -> Shut }\n            state Lost {}\n            terminal Shut {}\n        }\n    }\n}\n";
+const BEHIND_CFG_IF: &str = "cfg_if::cfg_if! {\n    if #[cfg(unix)] {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    }\n}\n";
+const BEHIND_MACRO_RULES: &str = "macro_rules! door {\n    () => {\n        states::states! {\n            mod door {\n                start Open { shut -> Shut }\n                state Lost {}\n                terminal Shut {}\n            }\n        }\n    };\n}\ndoor!();\n";
+
 const CASES: [Case; 8] = [
     Case::new("exposed field", &[Source::new("a.rs", EXPOSED)], &["a.rs:2"]),
     Case::new("foreign match", &[SHAPE, MATCHING], &["area.rs:3"]),
@@ -71,6 +76,10 @@ laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<StateGra
     [Source::new("a.rs", NO_TERMINAL)] => ["a.rs:3"],
     [Source::new("a.rs", UNKNOWN_KIND)] => ["a.rs:1"],
     [Source::new("a.rs", NOT_A_GRAPH)] => ["a.rs:2"],
+    [Source::new("a.rs", ALIASED)] => ["a.rs:5", "a.rs:5"],
+    [Source::new("a.rs", GROUPED_ALIAS)] => ["a.rs:6", "a.rs:6"],
+    [Source::new("a.rs", BEHIND_CFG_IF)] => ["a.rs:6", "a.rs:6"],
+    [Source::new("a.rs", BEHIND_MACRO_RULES)] => ["a.rs:6", "a.rs:6"],
 ]);
 
 #[test]

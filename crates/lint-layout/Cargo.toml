@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+newtype = { path = "../newtype" }
 proc-macro2.workspace = true
 syn.workspace = true
 thiserror.workspace = true
