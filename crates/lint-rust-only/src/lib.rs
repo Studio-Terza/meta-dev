@@ -3,7 +3,7 @@ mod language;
 
 use finding::Finding;
 use language::Language;
-use lint_core::{RepoFile, Report, Site, Violation};
+use lint_core::{Headline, RepoFile, Report, Site, Violation};
 
 #[derive(Debug)]
 pub struct RustOnly;
@@ -14,7 +14,7 @@ impl RustOnly {
     #[must_use]
     pub fn report(files: &[RepoFile]) -> Report {
         Report::new(
-            "logic is Rust; web assets live under a directory named assets",
+            Headline::new("logic is Rust; web assets live under a directory named assets"),
             files
                 .iter()
                 .filter(|file| !file.lies_under(Self::ASSETS))
