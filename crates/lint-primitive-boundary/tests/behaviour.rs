@@ -77,8 +77,10 @@ const WIDER_8: &str = "use std::string::String as S;\npub fn m(a: S) {}\n";
 const WIDER_9: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
 const WIDER_10: &str = "union U {\n    a: &'static str,\n}\n";
 const WIDER_11: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
+const PUBLIC_UNION: &str = "pub union U {\n    pub a: &'static str,\n}\n";
+const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 74] = [
+const CASES: [Case; 76] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -444,6 +446,16 @@ const CASES: [Case; 74] = [
         Title::new("text in a private extern block"),
         &[Source::new(Located::new("a.rs"), Text::new(WIDER_11))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in a public union"),
+        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_UNION))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text in a public extern function"),
+        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_EXTERN))],
+        Flagged::new(&["a.rs:2"]),
     ),
 ];
 

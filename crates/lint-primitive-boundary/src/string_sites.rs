@@ -6,7 +6,7 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
     Block, Field, ForeignItemFn, ImplItemConst, ImplItemFn, ImplItemType, ItemConst, ItemEnum, ItemFn, ItemImpl,
-    ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, Type, TypePath, TypeReference, Visibility,
+    ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUnion, TypePath, Visibility,
 };
 
 use super::finding::Finding;
@@ -47,10 +47,6 @@ impl StringSites {
     fn sighted(&mut self, form: TextForm, line: LineNumber) {
         let site = Site::new(&self.path, line);
         self.found.push(Violation::new(site, Finding::BareText { form, context: self.context.clone() }));
-    }
-
-    fn is_named(path: &TypePath, word: &str) -> bool {
-        path.qself.is_none() && path.path.is_ident(word)
     }
 
     fn form_of(&self, path: &TypePath) -> Option<TextForm> {
@@ -136,15 +132,6 @@ impl<'ast> Visit<'ast> for StringSites {
     fn visit_field(&mut self, field: &'ast Field) {
         self.context = field.ident.as_ref().map_or_else(|| self.context.clone(), Name::from);
         syn::visit::visit_type(self, &field.ty);
-    }
-
-    fn visit_type_reference(&mut self, reference: &'ast TypeReference) {
-        match &*reference.elem {
-            Type::Path(path) if Self::is_named(path, "str") => {
-                self.sighted(TextForm::Borrowed, LineNumber::from(reference.span()));
-            }
-            _ => syn::visit::visit_type_reference(self, reference),
-        }
     }
 
     fn visit_type_path(&mut self, path: &'ast TypePath) {
