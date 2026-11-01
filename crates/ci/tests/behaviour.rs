@@ -171,7 +171,11 @@ struct Reach;
 
 impl Reach {
     fn on(scratch: &Scratch, event: &str) -> Vec<String> {
-        ["reach", &scratch.file("metadata.json"), event, &scratch.file("env"), &scratch.file("sum")]
+        Reach::into(scratch, event, "")
+    }
+
+    fn into(scratch: &Scratch, event: &str, base: &str) -> Vec<String> {
+        ["reach", &scratch.file("metadata.json"), event, base, &scratch.file("env"), &scratch.file("sum")]
             .map(str::to_owned)
             .to_vec()
     }
@@ -197,11 +201,13 @@ impl Sample {
     fn reach_report(changed: &&str) -> String {
         let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
         let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
-        Answer::to(
-            &fake,
-            &["reach", &scratch.file("metadata.json"), "pull_request", &scratch.file("env"), &scratch.file("sum")],
-        )
-        .out
+        Answer::to(&fake, &Reach::into(&scratch, "pull_request", "feature")).out
+    }
+
+    fn reach_into_main(changed: &&str) -> String {
+        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
+        Answer::to(&fake, &Reach::into(&scratch, "pull_request", "main")).out
     }
 }
 
@@ -253,6 +259,15 @@ laws::table!(
         "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n" => TWO_REPORT,
         "README.md\n" => EMPTY_REPORT_AND_NOTES,
         "" => EMPTY_REPORT_AND_NOTES,
+    ]
+);
+
+laws::table!(
+    a_pull_request_into_main_runs_the_whole_workspace_but_reports_the_reach_for_mutants,
+    Sample::reach_into_main,
+    [
+        "crates/leaf/src/lib.rs\n" => "REACH=1 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
+        "README.md\n" => "REACH=0 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=\nskipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n",
     ]
 );
 
@@ -521,7 +536,7 @@ fn metadata_reach_cannot_use_is_reported_with_its_reason() -> Result<(), Box<dyn
 fn metadata_that_cannot_be_stored_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.write("blocker", "")?;
-    let answer = Answer::to(&Fake::new(), &["reach", &scratch.file("blocker/metadata.json"), "push", "e", "s"]);
+    let answer = Answer::to(&Fake::new(), &["reach", &scratch.file("blocker/metadata.json"), "push", "", "e", "s"]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("blocker/metadata.json"));
     Ok(())
@@ -542,8 +557,12 @@ laws::table!(
         ["reach"] => true,
         ["reach", "metadata.json"] => true,
         ["reach", "metadata.json", "push"] => true,
-        ["reach", "metadata.json", "push", "env"] => true,
-        ["reach", "metadata.json", "push", "env", "sum", "extra"] => true,
+        ["reach", "metadata.json", "push", "main"] => true,
+        ["reach", "metadata.json", "push", "main", "env"] => true,
+        ["reach", "metadata.json", "push", "main", "env", "sum", "extra"] => true,
+        ["stage-issues"] => true,
+        ["stage-issues", "limits.toml"] => true,
+        ["stage-issues", "limits.toml", "measured.toml", "extra"] => true,
         ["compile-times"] => true,
         ["compile-times", "page.html"] => true,
         ["compile-times", "page.html", "report.txt", "extra"] => true,
@@ -891,6 +910,94 @@ fn step_times_are_asked_of_github_for_the_job() {
         )]
     );
     assert_eq!(Answer::to(&Fake::refusing("gh"), &["wall-times", "r", "1", "gates"]).err, "cannot run gh: boom\n");
+}
+
+const LIMITS: &str =
+    "[clippy]\nwarn = 11\nblock = 16\n[lint]\nwarn = 1.5\nblock = 3\n[test-run]\nwarn = 2\nblock = 3.5\n";
+const CLIPPY_BODY: &str = "WARN: clippy took 12s, warn above 11s, block above 16s";
+const TEST_RUN_BODY: &str = "BLOCK: test-run took 4s, warn above 2s, block above 3.5s";
+
+struct Gh;
+
+impl Gh {
+    fn call(arguments: &[&str]) -> Invocation {
+        Invocation::new("gh", arguments)
+    }
+
+    fn search(stage: &str) -> Invocation {
+        Gh::call(&[
+            "issue",
+            "list",
+            "--state",
+            "open",
+            "--limit",
+            "100",
+            "--search",
+            &format!("\"{stage}\" in:title"),
+            "--json",
+            "number,title",
+        ])
+    }
+
+    fn stage_issues(scratch: &Scratch, measured: &str) -> Result<Vec<String>, io::Error> {
+        scratch.write("limits.toml", LIMITS)?;
+        scratch.write("measured.toml", measured)?;
+        Ok(["stage-issues", &scratch.file("limits.toml"), &scratch.file("measured.toml")].map(str::to_owned).to_vec())
+    }
+}
+
+#[test]
+fn a_stage_past_its_warn_line_opens_an_issue_titled_with_its_name() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 4\n")?;
+    let fake = Fake::answering(vec![Reply::to("gh issue", "[]")]);
+    let answer = Answer::to(&fake, &arguments);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            Gh::search("clippy"),
+            Gh::call(&["issue", "create", "--title", "clippy", "--body", CLIPPY_BODY]),
+            Gh::search("test-run"),
+            Gh::call(&["issue", "create", "--title", "test-run", "--body", TEST_RUN_BODY]),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_stage_that_already_has_an_open_issue_updates_that_issue_and_not_a_look_alike() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 1\n")?;
+    let listed = r#"[{"number":3,"title":"clippy fixes"},{"number":7,"title":"clippy"}]"#;
+    let fake = Fake::answering(vec![Reply::to("gh issue", listed)]);
+    Answer::to(&fake, &arguments);
+    assert_eq!(fake.calls.borrow().last(), Some(&Gh::call(&["issue", "edit", "7", "--body", CLIPPY_BODY])));
+    Ok(())
+}
+
+#[test]
+fn stages_within_their_warn_line_open_nothing() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Gh::stage_issues(&scratch, "clippy = 11\nlint = 1\ntest-run = 1\n")?;
+    let fake = Fake::new();
+    assert_eq!(Answer::to(&fake, &arguments).exit, ExitCode::SUCCESS);
+    assert!(fake.calls.borrow().is_empty());
+    Ok(())
+}
+
+#[test]
+fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 1\n")?;
+    assert_eq!(Answer::to(&Fake::refusing("gh"), &arguments).err, "cannot run gh: boom\n");
+    let garbled = Fake::answering(vec![Reply::to("gh issue", "not json")]);
+    assert!(Answer::to(&garbled, &arguments).err.contains("cannot read the list of issues"));
+    let failing = Fake { exit: Exit::Failure(FAILED_WITH), ..Fake::answering(vec![Reply::to("gh issue", "[]")]) };
+    assert_eq!(Answer::to(&failing, &arguments).exit, ExitCode::from(FAILED_WITH.get()));
+    let unmeasured = Gh::stage_issues(&scratch, "clippy = 12\n")?;
+    assert!(Answer::to(&Fake::new(), &unmeasured).err.contains("the limits cannot be judged"));
+    Ok(())
 }
 
 #[test]

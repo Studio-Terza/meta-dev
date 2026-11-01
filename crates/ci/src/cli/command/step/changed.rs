@@ -11,8 +11,6 @@ use crate::cli::ports::{Invocation, Ports};
 pub(crate) struct Changed;
 
 impl Changed {
-    const AFFECTED: &'static str = "affected";
-
     pub(crate) fn asked(ports: &impl Ports, invocation: &Invocation) -> Result<String, Failure> {
         ports.output(invocation).map_err(|source| Failure::Program { program: invocation.program().to_owned(), source })
     }
@@ -35,9 +33,5 @@ impl Changed {
         } else {
             Err(Failure::Reach(Refusal::from(refusal)))
         }
-    }
-
-    pub(crate) fn affected(metadata: &Journal, ports: &impl Ports) -> Result<String, Failure> {
-        Self::answered(Self::AFFECTED, metadata, ports)
     }
 }

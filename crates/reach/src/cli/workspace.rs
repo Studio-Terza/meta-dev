@@ -4,6 +4,7 @@ mod fan_in;
 mod history;
 mod metadata;
 mod reached;
+mod readers;
 mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -18,12 +19,14 @@ use fan_in::FanIn;
 use history::History;
 use metadata::Metadata;
 use reached::Reached;
+use readers::Readers;
 use sources::Sources;
 
 #[derive(Debug)]
 pub struct Workspace {
     directories: BTreeMap<CrateName, PathBuf>,
     dependents: BTreeMap<CrateName, BTreeSet<CrateName>>,
+    readers: Readers,
 }
 
 impl FromStr for Workspace {
@@ -33,7 +36,7 @@ impl FromStr for Workspace {
         let metadata: Metadata = serde_json::from_str(metadata)?;
         let directories = metadata.directories()?;
         let dependents = metadata.dependents(&directories.keys().cloned().collect());
-        Ok(Workspace { directories, dependents })
+        Ok(Workspace { directories, dependents, readers: Readers::new(metadata.readers()) })
     }
 }
 
@@ -79,7 +82,7 @@ impl Workspace {
         if path.file_name().is_some_and(|name| name == Self::MANIFEST) {
             self.everything()
         } else {
-            self.owned(path).into_iter().collect()
+            self.owned(path).into_iter().chain(self.readers.reached_by(path)).collect()
         }
     }
 

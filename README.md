@@ -21,7 +21,9 @@ The runner finds the packages under the path (a directory with a `Cargo.toml` ho
 listed by its workspace when one encloses it; hidden directories and `target` are skipped), reads each
 package's crate roots and the modules they declare, runs all lints, prints the violations, and exits
 non-zero if there are any. Whether a file is shipped code, a binary or a test is decided from its place
-inside its package, so the verdict does not depend on where the checkout lives.
+inside its package, so the verdict does not depend on where the checkout lives. A file whose brackets or angle
+brackets nest more than 256 deep is refused as a parse failure before it is parsed, since no handwritten code does
+that and the parser would run out of stack or time.
 
 Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enum_predicates,
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
@@ -160,8 +162,9 @@ fixtures that are already on it.
 ## CI wall-time limits
 
 `ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
-test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
-by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
+test run and lint. The levels assume a full run, so they apply on main and on pull requests into main; a pull request into
+another branch is not judged by them. A stage above its warn level on main opens, or updates, one GitHub issue titled
+with the stage name (`ci stage-issues`), so creep becomes a work item before it blocks. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
 that main reports. `ci timed` times a stage; the test run is the sum of the `finished in`
 times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits`, which prints
 each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
@@ -180,14 +183,16 @@ gives them to `reach`, with the output of `cargo metadata --no-deps`:
 A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
 normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
 that covers `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`, `.cargo/`, `.github/`, `ci/`, the
-files of a deleted crate and anything not yet known. A file `reach` cannot place fails closed.
+files of a deleted crate and anything not yet known.
+A crate whose tests read files outside its own directory declares it in its manifest, and a change to a file under a
+declared path reaches that crate too: `[package.metadata.reach]` with `reads = ["crates"]`. A file `reach` cannot place fails closed.
 
 `affected` prints the share of crates reached and the scopes CI uses, and the run summary of each pull
 request shows them. Clippy, the tests and mutants run on that scope, and are skipped when nothing is
 reached. A skip is not silent: for each scope that is empty, `ci reach` prints `skipped: <scope> is empty, so the
 steps that use it do not run` in the step and in the run summary, and `ci mutants-changed` prints that mutants were
 skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
-cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
+cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
 is the measure of tangle, so the report on main prints it.
@@ -222,9 +227,9 @@ and `total`, saturating at the largest count. The orphan rule forbids a blanket 
 are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
 count the impl of a trait (an operator, `Display`, `From`, `AsRef`, `FromStr`). A hand-written constructor or other
 public method of one shape on three types still fails, whatever their inner types are (an argument of the inner type
-counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
+counts as `Inner`); a `const fn` is never counted, since a trait method cannot be const on stable. The fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
 
-Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
+Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
 Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 

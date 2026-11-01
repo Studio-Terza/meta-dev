@@ -51,6 +51,7 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "gate-limits",
  "laws",
  "mutation-report",
  "newtype",

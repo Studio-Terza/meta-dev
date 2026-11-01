@@ -10,7 +10,7 @@ use crate::cli::contents::Contents;
 use crate::cli::document::Document;
 use crate::cli::failure::Failure;
 use crate::cli::stage::Stage;
-use finding::Finding;
+pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
 use seconds::Seconds;
@@ -39,6 +39,11 @@ impl Gate {
     #[must_use]
     pub fn blocks(&self) -> bool {
         self.findings.iter().any(Finding::blocks)
+    }
+
+    #[must_use]
+    pub fn past_warn(self) -> Vec<Finding> {
+        self.findings.into_iter().filter_map(Finding::past_warn).collect()
     }
 
     fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
