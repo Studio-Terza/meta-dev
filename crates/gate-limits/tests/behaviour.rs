@@ -1,4 +1,9 @@
-use gate_limits::{Failure, Gate};
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitCode};
+
+use gate_limits::{Cli, Failure, Gate};
 
 const LIMITS: &str = "[test-run]\nwarn = 3\nblock = 5\n[clippy]\nwarn = 10.5\nblock = 20\n";
 
@@ -79,4 +84,51 @@ fn a_limit_without_a_block_level_is_refused() {
 #[test]
 fn an_empty_limits_file_is_refused_rather_than_passing_everything() {
     assert!(matches!(Gate::judge("", ""), Err(Failure::Empty)));
+}
+
+const LIMIT: &str = "[test-run]\nwarn = 1\nblock = 2\n";
+
+fn fixture(name: &str, text: &str) -> io::Result<PathBuf> {
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    fs::write(&path, text)?;
+    Ok(path)
+}
+
+fn cli(limits: &Path, measured: &Path) -> Cli {
+    Cli::from_args([limits, measured].map(|path| path.as_os_str().to_owned()).into_iter())
+}
+
+#[test]
+fn a_run_within_its_levels_exits_successfully() -> io::Result<()> {
+    let limits = fixture("within-limits.toml", LIMIT)?;
+    let measured = fixture("within-measured.toml", "test-run = 0.5\n")?;
+    assert_eq!(cli(&limits, &measured).run(), ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
+fn a_run_above_its_block_level_exits_with_failure() -> io::Result<()> {
+    let limits = fixture("blocked-limits.toml", LIMIT)?;
+    let measured = fixture("blocked-measured.toml", "test-run = 3\n")?;
+    assert_eq!(cli(&limits, &measured).run(), ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
+    let limits = fixture("unreadable-limits.toml", LIMIT)?;
+    let missing = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-such-measured.toml");
+    assert_eq!(cli(&limits, &missing).run(), ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn the_binary_exits_with_the_gate_verdict() -> io::Result<()> {
+    let limits = fixture("binary-limits.toml", LIMIT)?;
+    let ok = fixture("binary-ok.toml", "test-run = 0.5\n")?;
+    let blocked = fixture("binary-blocked.toml", "test-run = 3\n")?;
+    let bin = env!("CARGO_BIN_EXE_gate-limits");
+    assert!(Command::new(bin).arg(&limits).arg(&ok).status()?.success());
+    assert!(!Command::new(bin).arg(&limits).arg(&blocked).status()?.success());
+    Ok(())
 }
