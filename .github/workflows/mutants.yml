@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+  push:
+    branches: [work/mutation-d3]
 
 env:
   CARGO_TERM_COLOR: always
