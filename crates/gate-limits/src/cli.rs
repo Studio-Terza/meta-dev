@@ -11,8 +11,10 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use contents::Contents;
-use failure::Failure;
+pub use failure::Failure;
+pub use gate::Finding;
 use gate::Gate;
+pub use stage::Stage;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -47,6 +49,10 @@ impl Cli {
                 ExitCode::FAILURE
             }
         }
+    }
+
+    pub fn past_warn(&self) -> Result<Vec<Finding>, Failure> {
+        self.gate().map(Gate::past_warn)
     }
 
     fn gate(&self) -> Result<Gate, Failure> {

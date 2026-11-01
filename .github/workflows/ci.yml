@@ -21,6 +21,10 @@ defaults:
 jobs:
   gates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      issues: write
     env:
       TOOLS: ${{ github.workspace }}/target/ci/tools
       MEASURED: ${{ github.workspace }}/target/ci/measured.toml
@@ -55,7 +59,7 @@ jobs:
         if: steps.tools.outputs.cache-hit != 'true'
         run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
       - name: reach
-        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - name: fmt
         run: cargo fmt --check
       - name: clippy
@@ -79,16 +83,21 @@ jobs:
       - name: lint
         run: '"$TOOLS/ci" logged "$BUDGET" "$TOOLS/ci" timed "$MEASURED" lint "$TOOLS/lint" .'
       - name: limits
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
         run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED"'
       - name: step times
-        if: github.ref == 'refs/heads/main' && always()
+        if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: '"$TOOLS/ci" wall-times "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_JOB"'
       - name: report
-        if: github.ref == 'refs/heads/main' && always()
+        if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
         run: '"$TOOLS/ci" show "$BUDGET" ci/limits.toml "$MEASURED" "$LIMITS"'
+      - name: stage issues
+        if: github.ref == 'refs/heads/main' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$TOOLS/ci" stage-issues ci/limits.toml "$MEASURED"'
       - name: fan-in
         if: github.ref == 'refs/heads/main' && always()
         run: '"$TOOLS/reach" fan-in "$METADATA"'
@@ -151,7 +160,7 @@ jobs:
         if: steps.tools.outputs.cache-hit != 'true'
         run: cargo run --locked -q --profile tools --bin ci -- tools target/tools "$TOOLS"
       - name: reach
-        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
+        run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'
       - uses: taiki-e/install-action@v2
         if: env.MUTANTS_SCOPE != ''
         with:

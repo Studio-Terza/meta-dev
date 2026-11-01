@@ -122,3 +122,33 @@ fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
     assert_eq!(Run::cli(&limits, &missing).run(), ExitCode::FAILURE);
     Ok(())
 }
+
+#[test]
+fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result<()> {
+    let limits = Run::fixture("past-limits.toml", LIMITS)?;
+    let measured = Run::fixture("past-measured.toml", "test-run = 4\nclippy = 10")?;
+    let past = Run::cli(&limits, &measured).past_warn().map_err(io::Error::other)?;
+    assert_eq!(past.iter().map(|finding| finding.stage().as_ref()).collect::<Vec<&str>>(), ["test-run"]);
+    assert_eq!(
+        past.iter().map(ToString::to_string).collect::<Vec<String>>(),
+        ["WARN: test-run took 4s, warn above 3s, block above 5s"]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
+    let limits = Run::fixture("block-limits.toml", LIMITS)?;
+    let measured = Run::fixture("block-measured.toml", "test-run = 6\nclippy = 10")?;
+    let past = Run::cli(&limits, &measured).past_warn().map_err(io::Error::other)?;
+    assert_eq!(past.iter().map(gate_limits::Finding::blocks).collect::<Vec<bool>>(), [true]);
+    Ok(())
+}
+
+#[test]
+fn limits_that_cannot_be_judged_list_nothing() -> io::Result<()> {
+    let limits = Run::fixture("none-limits.toml", LIMITS)?;
+    let measured = Run::fixture("none-measured.toml", "clippy = 10")?;
+    assert!(Run::cli(&limits, &measured).past_warn().is_err());
+    Ok(())
+}

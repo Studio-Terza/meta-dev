@@ -57,6 +57,11 @@ impl Answer {
         Answer::to(&arguments).out
     }
 
+    fn widened_by(changed: &[&str]) -> String {
+        let arguments = ["widened", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
     fn crates(names: &[&str]) -> String {
         let flags = |flag: &str| names.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ");
         format!(
@@ -72,6 +77,15 @@ impl Answer {
         if answer.exit == ExitCode::FAILURE && answer.out.is_empty() { answer.err } else { String::new() }
     }
 }
+
+laws::table!(
+    a_widened_report_keeps_the_reach_for_mutants_but_runs_cargo_on_the_whole_workspace,
+    Answer::widened_by,
+    [
+        ["crates/leaf/src/lib.rs"] => "REACH=1 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
+        ["README.md"] => "REACH=0 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=\n",
+    ]
+);
 
 laws::table!(
     a_report_gives_the_share_and_both_scopes,
@@ -144,9 +158,9 @@ laws::table!(
     every_unusable_input_fails_closed_and_says_why,
     Answer::refused,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
         ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
     ]
 );
