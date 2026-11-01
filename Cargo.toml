@@ -9,6 +9,7 @@ publish = false
 license = "UNLICENSED"
 
 [workspace.dependencies]
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 rustc_lexer = { package = "ra-ap-rustc_lexer", version = "0.174.0" }
 quote = "1.0.40"

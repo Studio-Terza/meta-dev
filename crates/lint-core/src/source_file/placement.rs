@@ -1,3 +1,4 @@
+mod build_script;
 mod source_directory;
 mod target_directory;
 
@@ -7,12 +8,15 @@ use std::path::{Path, PathBuf};
 use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
 use crate::module_path::ModulePath;
+use crate::package_root::PackageRoot;
 use crate::role::Role;
+use build_script::BuildScript;
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
+    package: PackageRoot,
     crate_root: CrateRoot,
     module: ModulePath,
     role: Role,
@@ -22,6 +26,7 @@ impl Placement {
     const TARGET_DIRECTORIES: [&'static str; 3] = ["tests", "examples", "benches"];
     const SOURCE_DIRECTORY: &'static str = "src";
     const LIBRARY_FILE: &'static str = "lib.rs";
+    const BUILD_FILE: &'static str = "build.rs";
 
     #[must_use]
     pub fn locate(path: &Path) -> Placement {
@@ -34,6 +39,11 @@ impl Placement {
             .ok()
             .and_then(|inside| Self::in_package(package, inside))
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
+    }
+
+    #[must_use]
+    pub fn package(&self) -> &PackageRoot {
+        &self.package
     }
 
     #[must_use]
@@ -76,19 +86,27 @@ impl Placement {
     }
 
     fn unplaced(crate_root: CrateRoot) -> Placement {
-        Placement { crate_root, module: ModulePath::default(), role: Role::Other }
+        Placement {
+            package: PackageRoot::unplaced(crate_root.clone()),
+            crate_root,
+            module: ModulePath::default(),
+            role: Role::Other,
+        }
     }
 
     fn in_package(package: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let directory = first.as_os_str().to_str()?;
+        let root = PackageRoot::read(package);
         if directory == Self::SOURCE_DIRECTORY {
-            Some(SourceDirectory::place(package, rest))
+            Some(SourceDirectory::place(root, rest))
+        } else if directory == Self::BUILD_FILE && rest.as_os_str().is_empty() {
+            Some(BuildScript::place(root))
         } else {
             Self::TARGET_DIRECTORIES
                 .contains(&directory)
-                .then(|| TargetDirectory::place(&package.join(directory), rest))
+                .then(|| TargetDirectory::place(root, &package.join(directory), rest))
                 .flatten()
         }
     }

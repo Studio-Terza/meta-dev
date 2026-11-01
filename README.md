@@ -14,7 +14,11 @@ Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enu
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, primitive_boundary, private_fns, process_starters, public_surface,
-repeated_methods, state_graph, crate_graph.
+repeated_methods, state_graph, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
+near_duplicate_tests.
+
+Every run also prints the test budget: tests, files and lines per package, counting law macros as tests.
+It is report only, no number blocks.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
 settings. Files under `tests`, `examples` and `benches` are checked only by the lints that are not
@@ -22,6 +26,38 @@ about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library) and `lint` (the binary). Crates stay split by lint because `crate_graph` flags a crate whose items
-fall into two loosely linked groups of five or more, or whose cycle spans more than 40 items; its conductance
-floor is 19%.
+library), `lint` (the binary), `golden` (golden files for tests) and `laws` (law macros for tests). Crates
+stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
+five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
+
+## Goldens
+
+A golden is a recorded output of a public API, kept at `tests/goldens/<name>` in the package.
+
+    #[test]
+    fn report_is_stable() -> Result<(), golden::Failure> {
+        golden::golden!("report.txt", &render_report())
+    }
+
+`cargo test` only compares. It fails on a difference or a missing golden, and it writes nothing. The
+failure names the file and shows a diff in which each line is quoted, so a change in whitespace or line
+endings is visible. The diff is one hunk, from the first changed line to the last.
+
+To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
+`GOLDEN_RECORD` fails, and so does recording when `CI` is set.
+
+## Laws
+
+A law states a property in one line and generates one `#[test]`. The strategy is a proptest strategy,
+`laws::proptest` is the re-export, and functions take their input by reference.
+
+    laws::roundtrip!(hex_recovers_the_number, any::<u32>(), Hex::render, Hex::parse, Ok);
+    laws::idempotent!(sorting_twice_changes_nothing, vec(any::<u8>(), 0..32), Numbers::sorted);
+    laws::table!(hex_examples, Hex::parse, ["ff" => Ok(255), "0" => Ok(0)]);
+
+`roundtrip!` checks `decode(encode(value)) == wrap(value)`; `wrap` is optional, and `Ok` or `Some` suits
+a fallible decode. `idempotent!` checks `f(f(value)) == f(value)`. `table!` checks each `input => want`
+row and names the first broken row, without generated input. Attributes before the name go on the test.
+
+Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
+alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
