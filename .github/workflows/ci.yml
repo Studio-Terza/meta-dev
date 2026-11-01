@@ -28,6 +28,7 @@ jobs:
       TESTLOG: ${{ github.workspace }}/target/ci/test.txt
       BUDGET: ${{ github.workspace }}/target/ci/budget.txt
       LIMITS: ${{ github.workspace }}/target/ci/limits.txt
+      PROOF_VARIANT: none
     steps:
       - uses: actions/checkout@v4
         with:
