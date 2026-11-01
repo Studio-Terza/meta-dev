@@ -31,6 +31,7 @@ pub struct NumberSites {
     path: PathBuf,
     aliases: UseAliases,
     context: Name,
+    parameter: Option<Name>,
     newtypes: Vec<Name>,
     sightings: Sightings,
 }
@@ -57,6 +58,7 @@ impl NumberSites {
             path: file.path().to_owned(),
             aliases: UseAliases::in_file(file.syntax()),
             context: Name::default(),
+            parameter: None,
             newtypes: Vec::new(),
             sightings: Sightings::default(),
         };
@@ -83,6 +85,10 @@ impl NumberSites {
         }
     }
 
+    fn sized_by(&self) -> &Name {
+        self.parameter.as_ref().unwrap_or(&self.context)
+    }
+
     fn sighting(&self, path: &TypePath) -> Option<Sighting> {
         let wire = self.aliases.resolve(&path.path);
         let site = Site::new(&self.path, LineNumber::from(path.path.span()));
@@ -102,10 +108,10 @@ impl NumberSites {
                 Rank::Number,
                 Violation::new(site, Finding::WireForm { wire, context: self.context.clone() }),
             ))
-        } else if Self::is_named(path, &Self::SIZES) && !self.context.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
+        } else if Self::is_named(path, &Self::SIZES) && !self.sized_by().matches::<LoweredInfix>(&Self::SIZE_WORDS) {
             Some(Sighting::new(
                 Rank::Size,
-                Violation::new(site, Finding::UnnamedSize { context: self.context.clone() }),
+                Violation::new(site, Finding::UnnamedSize { context: self.sized_by().clone() }),
             ))
         } else {
             None
@@ -174,13 +180,13 @@ impl<'ast> Visit<'ast> for NumberSites {
     }
 
     fn visit_pat_type(&mut self, typed: &'ast PatType) {
-        let signature = self.context.clone();
-        self.context = match &*typed.pat {
-            Pat::Ident(bound) => Name::from(&bound.ident),
-            _ => signature.clone(),
+        let outer = self.parameter.take();
+        self.parameter = match &*typed.pat {
+            Pat::Ident(bound) => Some(Name::from(&bound.ident)),
+            _ => None,
         };
         syn::visit::visit_type(self, &typed.ty);
-        self.context = signature;
+        self.parameter = outer;
     }
 
     fn visit_type_path(&mut self, path: &'ast TypePath) {
