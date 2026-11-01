@@ -46,12 +46,12 @@ impl<'ast> Visit<'ast> for TestScan {
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.0.test_lines = self.0.test_lines
-            + match Walk::outside_tests(&module.attrs) {
-                Walk::Skipped => Self::line_count(module.span()),
-                Walk::Entered => Count::default(),
-            };
+        let before = self.0.test_lines;
         visit::visit_item_mod(self, module);
+        match Walk::outside_tests(&module.attrs) {
+            Walk::Skipped => self.0.test_lines = before + Self::line_count(module.span()),
+            Walk::Entered => {}
+        }
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {

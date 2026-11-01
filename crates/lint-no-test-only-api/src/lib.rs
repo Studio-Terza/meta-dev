@@ -4,7 +4,7 @@ mod flagged;
 mod gated_items;
 mod test_features;
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::iter;
 
 use feature_word::FeatureWord;
@@ -23,8 +23,8 @@ impl NoTestOnlyApi {
         shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
     }
 
-    fn in_manifest(package: &PackageRoot) -> Vec<Violation> {
-        let manifest = package.manifest_file();
+    fn in_manifest(package: &PackageRoot, file: &SourceFile) -> Vec<Violation> {
+        let manifest = file.manifest_file();
         package
             .features()
             .iter()
@@ -36,10 +36,15 @@ impl NoTestOnlyApi {
 
 impl Lint for NoTestOnlyApi {
     fn report(files: &[SourceFile]) -> Report {
-        let packages: BTreeSet<&PackageRoot> = files.iter().map(|file| file.placement().package()).collect();
+        let packages: BTreeMap<&PackageRoot, &SourceFile> =
+            files.iter().rev().map(|file| (file.placement().package(), file)).collect();
         Report::new(
             "shipped code has no test-only API",
-            files.iter().flat_map(Self::in_source).chain(packages.into_iter().flat_map(Self::in_manifest)).collect(),
+            files
+                .iter()
+                .flat_map(Self::in_source)
+                .chain(packages.into_iter().flat_map(|(package, file)| Self::in_manifest(package, file)))
+                .collect(),
         )
     }
 }

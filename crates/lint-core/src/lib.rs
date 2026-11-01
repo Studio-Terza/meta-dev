@@ -25,6 +25,7 @@ mod source_files;
 mod support_modules;
 mod test_marks;
 mod type_name;
+mod untested;
 mod use_edges;
 mod use_path;
 mod violation;

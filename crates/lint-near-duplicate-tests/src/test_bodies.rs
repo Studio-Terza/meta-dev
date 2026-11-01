@@ -20,10 +20,24 @@ impl TestBodies<'_> {
     }
 }
 
+impl TestBodies<'_> {
+    const PLAIN_TEST: &'static str = "test";
+    const PANICKING: &'static str = "should_panic";
+
+    fn is_row_shaped(function: &ItemFn) -> bool {
+        TestMarks::mark_test(&function.attrs)
+            && function.sig.asyncness.is_none()
+            && function.attrs.iter().all(|attribute| {
+                !attribute.path().is_ident(Self::PANICKING)
+                    && (!TestMarks::is_test(attribute) || attribute.path().is_ident(Self::PLAIN_TEST))
+            })
+    }
+}
+
 impl<'ast> Visit<'ast> for TestBodies<'_> {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         let name = &function.sig.ident;
-        self.bodies.extend(TestMarks::mark_test(&function.attrs).then(|| {
+        self.bodies.extend(Self::is_row_shaped(function).then(|| {
             let site = Site::new(self.file.path(), LineNumber::from(name.span()));
             TestBody::new(Name::from(name), site, BodyShape::from(function))
         }));

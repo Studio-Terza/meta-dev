@@ -8,8 +8,9 @@ use crate::whole::Whole;
 pub struct TestMarks;
 
 impl TestMarks {
-    const ATTRIBUTE: [&'static str; 1] = ["test"];
+    const ATTRIBUTE: [&'static str; 3] = ["test", "rstest", "test_case"];
     const LAWS: [&'static str; 4] = ["law", "roundtrip", "idempotent", "table"];
+    const LAW_CRATE: &'static str = "laws";
 
     #[must_use]
     pub fn is_test(attribute: &Attribute) -> bool {
@@ -23,7 +24,9 @@ impl TestMarks {
 
     #[must_use]
     pub fn is_law(invocation: &Macro) -> bool {
-        Self::ends_in(&invocation.path.segments, &Self::LAWS)
+        let segments = &invocation.path.segments;
+        Self::ends_in(segments, &Self::LAWS)
+            && segments.first().is_some_and(|first| segments.len() == 1 || first.ident == Self::LAW_CRATE)
     }
 
     fn ends_in(segments: &Punctuated<PathSegment, Token![::]>, words: &[&str]) -> bool {

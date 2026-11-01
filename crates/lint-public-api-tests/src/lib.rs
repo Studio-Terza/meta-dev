@@ -1,6 +1,10 @@
+mod emitters;
+mod path_reach;
 mod test_code;
 
+use emitters::Emitters;
 use lint_core::{Lint, Report, Site, SourceFile, Violation};
+use path_reach::PathReach;
 use test_code::TestCode;
 
 #[derive(Debug)]
@@ -8,19 +12,24 @@ pub struct PublicApiTests;
 
 impl PublicApiTests {
     const FIX: &str = "test code in src; move it to the package's tests directory and call the public API from there";
+    const REACH: &str = "test file includes a module from src with #[path]; call the public API instead";
 }
 
 impl Lint for PublicApiTests {
     fn report(files: &[SourceFile]) -> Report {
+        let syntax: Vec<&syn::File> = files.iter().map(SourceFile::syntax).collect();
+        let emitters = Emitters::defined_in(&syntax);
         Report::new(
             "tests go through public APIs",
             files
                 .iter()
-                .filter(|file| file.is_shipped())
                 .flat_map(|file| {
-                    TestCode::lines_in(file.syntax())
-                        .into_iter()
-                        .map(move |line| Violation::new(Site::new(file.path(), line), Self::FIX))
+                    let (lines, message) = if file.is_shipped() {
+                        (TestCode::lines_in(file.syntax(), &emitters), Self::FIX)
+                    } else {
+                        (PathReach::lines_in(file), Self::REACH)
+                    };
+                    lines.into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
                 })
                 .collect(),
         )

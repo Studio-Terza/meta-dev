@@ -15,7 +15,13 @@ const HELPERS: &str = "fn a() {\n    f(1);\n}\nfn b() {\n    f(2);\n}\n";
 const FIRST_FILE: &str = "#[test]\nfn a() {\n    f(1);\n}\n";
 const SECOND_FILE: &str = "\n#[test]\nfn b() {\n    f(2);\n}\n";
 
-const CASES: [Case; 10] = [
+const PANICS: &str = "#[test]\n#[should_panic(expected = \"big\")]\nfn a() {\n    f(10);\n}\n#[test]\n#[should_panic(expected = \"small\")]\nfn b() {\n    f(1);\n}\n";
+const ASYNC: &str =
+    "#[tokio::test]\nasync fn a() {\n    f(1).await;\n}\n#[tokio::test]\nasync fn b() {\n    f(2).await;\n}\n";
+const SIGNED: &str =
+    "#[test]\nfn a() {\n    assert_eq!(h(1), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(-1), 1);\n}\n";
+
+const CASES: [Case; 13] = [
     Case::new("literals differ", &[Source::new("tests/a.rs", LITERALS)], &["tests/a.rs:6"]),
     Case::new("identical", &[Source::new("tests/a.rs", IDENTICAL)], &["tests/a.rs:6"]),
     Case::new("nested literals differ", &[Source::new("tests/a.rs", NESTED)], &["tests/a.rs:8"]),
@@ -23,6 +29,9 @@ const CASES: [Case; 10] = [
     Case::new("three alike", &[Source::new("tests/a.rs", THREE)], &["tests/a.rs:6", "tests/a.rs:10"]),
     Case::new("other call", &[Source::new("tests/a.rs", OTHER_CALL)], &[]),
     Case::new("should panic differs", &[Source::new("tests/a.rs", SHOULD_PANIC)], &[]),
+    Case::new("both panic", &[Source::new("tests/a.rs", PANICS)], &[]),
+    Case::new("async tests", &[Source::new("tests/a.rs", ASYNC)], &[]),
+    Case::new("signed literal", &[Source::new("tests/a.rs", SIGNED)], &["tests/a.rs:6"]),
     Case::new("helpers are not tests", &[Source::new("tests/a.rs", HELPERS)], &[]),
     Case::new(
         "across files of a crate",

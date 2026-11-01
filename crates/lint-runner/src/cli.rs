@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -21,7 +22,7 @@ impl Cli {
     #[must_use]
     pub fn run(&self) -> ExitCode {
         match SourceFiles::read_all(&self.roots).map(|readout| {
-            print!("{}", TestBudget::measured(readout.files()));
+            write!(io::stdout(), "{}", TestBudget::measured(readout.files())).ok();
             Lints::checked(readout)
         }) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,

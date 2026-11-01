@@ -1,3 +1,4 @@
+mod build_script;
 mod source_directory;
 mod target_directory;
 
@@ -9,6 +10,7 @@ use crate::crate_root::CrateRoot;
 use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
+use build_script::BuildScript;
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
 
@@ -24,6 +26,7 @@ impl Placement {
     const TARGET_DIRECTORIES: [&'static str; 3] = ["tests", "examples", "benches"];
     const SOURCE_DIRECTORY: &'static str = "src";
     const LIBRARY_FILE: &'static str = "lib.rs";
+    const BUILD_FILE: &'static str = "build.rs";
 
     #[must_use]
     pub fn locate(path: &Path) -> Placement {
@@ -98,6 +101,8 @@ impl Placement {
         let root = PackageRoot::read(package);
         if directory == Self::SOURCE_DIRECTORY {
             Some(SourceDirectory::place(root, rest))
+        } else if directory == Self::BUILD_FILE && rest.as_os_str().is_empty() {
+            Some(BuildScript::place(root))
         } else {
             Self::TARGET_DIRECTORIES
                 .contains(&directory)

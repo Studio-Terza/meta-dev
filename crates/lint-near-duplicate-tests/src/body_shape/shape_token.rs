@@ -10,10 +10,17 @@ pub(super) enum ShapeToken {
 }
 
 impl ShapeToken {
+    const MINUS: char = '-';
     const LITERAL_WORDS: [&str; 2] = ["true", "false"];
 
     pub(super) fn normalized(tokens: TokenStream) -> Vec<ShapeToken> {
-        tokens.into_iter().flat_map(Self::of_tree).collect()
+        let shaped: Vec<ShapeToken> = tokens.into_iter().flat_map(Self::of_tree).collect();
+        shaped
+            .iter()
+            .zip(shaped.iter().skip(1).map(Some).chain([None]))
+            .filter(|(token, next)| !(**token == ShapeToken::Mark(Self::MINUS) && *next == Some(&ShapeToken::Literal)))
+            .map(|(token, _)| token.clone())
+            .collect()
     }
 
     fn of_tree(tree: TokenTree) -> Vec<ShapeToken> {

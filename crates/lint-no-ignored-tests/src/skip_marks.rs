@@ -1,22 +1,28 @@
+mod gate;
+
 use proc_macro2::TokenTree;
 use syn::visit::{self, Visit};
-use syn::{Attribute, ItemFn, Macro, Meta, MetaList};
+use syn::{Attribute, ItemFn, ItemMod, Macro, Meta, MetaList};
 
-use lint_core::{LineNumber, Macros, Name, TestMarks, Walk, Whole};
+use gate::Gate;
+use lint_core::{LineNumber, Macros, Name, TestMarks, Whole};
 
 #[derive(Debug, Default)]
 pub(crate) struct SkipMarks {
     lines: Vec<LineNumber>,
+    gates: Vec<LineNumber>,
 }
 
 impl SkipMarks {
-    const CONDITION: &str = "cfg";
     const CONDITIONAL_ATTRIBUTE: &str = "cfg_attr";
     const SKIPPING: [&str; 2] = ["ignore", "skip"];
 
     pub(crate) fn lines_in(file: &syn::File) -> Vec<LineNumber> {
         let mut marks = SkipMarks::default();
+        marks.gates.extend(Gate::lines_in(&file.attrs));
         marks.visit_file(file);
+        marks.lines.sort();
+        marks.lines.dedup();
         marks.lines
     }
 
@@ -42,14 +48,11 @@ impl SkipMarks {
         self.lines.extend(
             attributes
                 .iter()
-                .filter(|attribute| {
-                    Self::skips(attribute)
-                        || (marked == Marked::Test
-                            && Walk::outside_tests(attributes) == Walk::Entered
-                            && attribute.path().is_ident(Self::CONDITION))
-                })
+                .filter(|attribute| Self::skips(attribute))
                 .map(|attribute| LineNumber::from(attribute.pound_token.span)),
         );
+        let gated: Vec<LineNumber> = Gate::lines_in(attributes).into_iter().chain(self.gates.clone()).collect();
+        self.lines.extend(gated.into_iter().filter(|_| marked == Marked::Test));
     }
 }
 
@@ -66,6 +69,13 @@ impl Marked {
 }
 
 impl<'ast> Visit<'ast> for SkipMarks {
+    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        let before = self.gates.len();
+        self.gates.extend(Gate::lines_in(&module.attrs));
+        visit::visit_item_mod(self, module);
+        self.gates.truncate(before);
+    }
+
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         self.record_skips(&function.attrs, Marked::among(&function.attrs, false));
         visit::visit_item_fn(self, function);
