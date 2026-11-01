@@ -13,14 +13,18 @@ use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
 use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
+use lint_near_duplicate_tests::NearDuplicateTests;
 use lint_no_comments::NoComments;
 use lint_no_forwarders::NoForwarders;
 use lint_no_free_fns::NoFreeFns;
+use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
+use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
+use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_repeated_methods::RepeatedMethods;
 use lint_state_graph::StateGraph;
@@ -62,6 +66,10 @@ impl Lints {
             RepeatedMethods::report(files),
             StateGraph::report(files),
             CrateGraph::report(files),
+            PublicApiTests::report(files),
+            NoTestOnlyApi::report(files),
+            NoIgnoredTests::report(files),
+            NearDuplicateTests::report(files),
         ]
     }
 
@@ -70,8 +78,12 @@ impl Lints {
     }
 
     pub fn check_all(roots: &[PathBuf]) -> Result<Outcome, Failure> {
-        let mut readout: Readout = SourceFiles::read_all(roots)?;
+        SourceFiles::read_all(roots).map(Self::checked)
+    }
+
+    #[must_use]
+    pub fn checked(mut readout: Readout) -> Outcome {
         let reports = Self::reports(readout.files());
-        Ok(Outcome::from_reports(reports, readout.take_failures()))
+        Outcome::from_reports(reports, readout.take_failures())
     }
 }

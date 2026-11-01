@@ -2,6 +2,9 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use lint_core::SourceFiles;
+use lint_test_budget::TestBudget;
+
 use crate::{Lints, Outcome};
 
 #[derive(Debug)]
@@ -17,7 +20,10 @@ impl Cli {
 
     #[must_use]
     pub fn run(&self) -> ExitCode {
-        match Lints::check_all(&self.roots) {
+        match SourceFiles::read_all(&self.roots).map(|readout| {
+            print!("{}", TestBudget::measured(readout.files()));
+            Lints::checked(readout)
+        }) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
                 eprint!("{violations}");

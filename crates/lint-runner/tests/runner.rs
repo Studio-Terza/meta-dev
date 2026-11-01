@@ -9,7 +9,7 @@ use std::path::Path;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const LINT_COUNT: usize = 25;
+const LINT_COUNT: usize = 29;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
@@ -124,7 +124,9 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "#[cfg(test)]\nmod tests;\n")?;
     Trees::write(root.path(), "src/tests.rs", "struct S { on: bool }\n")?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    let outcome = Lints::check_root(root.path())?;
+    assert_eq!(Trees::violation_count(&outcome), 1);
+    assert!(!outcome.to_string().contains("src/tests.rs"));
     Ok(())
 }
 
@@ -203,7 +205,7 @@ fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn E
     Trees::write(root.path(), "src/request/tests.rs", "mod a;\n")?;
     Trees::write(root.path(), "src/request/tests/a.rs", "mod b;\n")?;
     Trees::write(root.path(), "src/request/tests/a/b.rs", "")?;
-    assert!(matches!(Lints::check_root(root.path()), Ok(Outcome::Clean)));
+    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
     Ok(())
 }
 
@@ -286,9 +288,9 @@ fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dy
     Trees::write(root.path(), "src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
     Trees::write(root.path(), "src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
     Trees::write(root.path(), "src/a/tests.rs", "use super::helper::Help;\n")?;
-    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 0);
-    Trees::write(root.path(), "src/a/tests.rs", "")?;
     assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 1);
+    Trees::write(root.path(), "src/a/tests.rs", "")?;
+    assert_eq!(Trees::violation_count(&Lints::check_root(root.path())?), 2);
     Ok(())
 }
 
