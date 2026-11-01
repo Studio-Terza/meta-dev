@@ -17,7 +17,8 @@ no_parameter_bags, primitive_boundary, private_fns, process_starters, public_sur
 repeated_methods, state_graph, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 near_duplicate_tests.
 
-Every run also prints the test budget: tests, files and lines per package, counting law macros as tests.
+Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
+are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
 It is report only, no number blocks.
 
 Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not

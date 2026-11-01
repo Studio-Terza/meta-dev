@@ -8,6 +8,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   gates:
     runs-on: ubuntu-latest
@@ -22,4 +26,13 @@ jobs:
       - name: test
         run: cargo test
       - name: lint
-        run: cargo run -p lint -- .
+        run: cargo run -p lint -- . | tee "$RUNNER_TEMP/budget.txt"
+      - name: report
+        if: github.ref == 'refs/heads/main' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "wall time per step, seconds:"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" \
+            --jq '.jobs[] | select(.name == env.GITHUB_JOB) | .steps[] | select(.completed_at != null) | "\(.name): \((.completed_at | fromdate) - (.started_at | fromdate))"'
+          cat "$RUNNER_TEMP/budget.txt"

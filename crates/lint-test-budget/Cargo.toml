@@ -9,6 +9,7 @@ publish.workspace = true
 lint-core = { path = "../lint-core" }
 lint-placement = { path = "../lint-placement" }
 lint-layout = { path = "../lint-layout" }
+lint-process-starters = { path = "../lint-process-starters" }
 proc-macro2.workspace = true
 syn.workspace = true
 

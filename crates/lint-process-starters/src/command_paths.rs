@@ -8,11 +8,19 @@ use lint_core::{Gate, SourceFile};
 use lint_layout::LineNumber;
 
 #[derive(Debug, Default)]
-pub(crate) struct CommandPaths {
+pub struct CommandPaths {
     bound: BTreeSet<Ident>,
     modules: BTreeSet<Ident>,
     started: Vec<LineNumber>,
     open_starts: Vec<LineNumber>,
+    scope: Scope,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    #[default]
+    OutsidePorts,
+    Everywhere,
 }
 
 impl CommandPaths {
@@ -21,8 +29,9 @@ impl CommandPaths {
     const BUILT: &str = "new";
     const STARTS: [&str; 3] = ["spawn", "output", "status"];
 
-    pub(crate) fn found(file: &SourceFile) -> Vec<LineNumber> {
-        let mut paths = CommandPaths::default();
+    #[must_use]
+    pub fn found(file: &SourceFile, scope: Scope) -> Vec<LineNumber> {
+        let mut paths = CommandPaths { scope, ..CommandPaths::default() };
         paths.visit_file(file.syntax());
         paths.started
     }
@@ -84,7 +93,7 @@ impl CommandPaths {
 impl<'ast> Visit<'ast> for CommandPaths {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Some(module)
-            .filter(|module| !Gate::PORTS.names(module))
+            .filter(|module| self.scope == Scope::Everywhere || !Gate::PORTS.names(module))
             .into_iter()
             .for_each(|module| visit::visit_item_mod(self, module));
     }
