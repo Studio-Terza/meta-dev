@@ -29,6 +29,7 @@ lint-no-comments = { path = "../lint-no-comments" }
 lint-no-forwarders = { path = "../lint-no-forwarders" }
 lint-no-free-fns = { path = "../lint-no-free-fns" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
+lint-no-plaintext = { path = "../lint-no-plaintext" }
 lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }

@@ -129,6 +129,7 @@ version = "0.1.0"
 dependencies = [
  "newtype",
  "serde",
+ "text-lines",
  "thiserror",
  "toml",
 ]
@@ -500,6 +501,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-no-plaintext"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
@@ -685,6 +696,7 @@ dependencies = [
  "lint-no-ignored-tests",
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
+ "lint-no-plaintext",
  "lint-no-test-only-api",
  "lint-paired-apis",
  "lint-primitive-boundary",
@@ -992,6 +1004,7 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
+ "text-lines",
  "thiserror",
 ]
 
@@ -1145,6 +1158,9 @@ name = "text-lines"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
