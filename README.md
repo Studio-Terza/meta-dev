@@ -2,7 +2,20 @@
 
 Source lints for Rust repositories, run through one binary.
 
-    cargo run -p lint -- <path>
+    lint <path>
+
+## Install
+
+Install the runner from a tag of this repository, with the tag as the version pin:
+
+    cargo install --git https://github.com/Studio-Terza/meta-dev --tag v0.1.0 --locked lint
+
+This puts the binary `lint` in `~/.cargo/bin`. Change the tag to change the version; a new tag is a new
+version, and nothing updates on its own. `--locked` builds with the dependency versions in `Cargo.lock`.
+The build needs Rust 1.99.0 or newer. The runner is not on crates.io and is not published there.
+The install has no configuration file and the runner reads none.
+
+In a checkout of this repository, `cargo run -p lint -- <path>` does the same without installing.
 
 The runner finds the packages under the path (a directory with a `Cargo.toml` holding `[package]`,
 listed by its workspace when one encloses it; hidden directories and `target` are skipped), reads each
