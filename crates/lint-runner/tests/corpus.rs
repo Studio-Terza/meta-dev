@@ -11,6 +11,21 @@ const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 
+#[test]
+fn every_lint_prints_its_golden_over_its_fixture() -> Result<(), Box<dyn Error>> {
+    let fixtures = Corpus::fixtures()?;
+    assert_eq!(fixtures.len(), Lints::reports(&[]).len());
+    let differences: Vec<String> = fixtures
+        .iter()
+        .map(|fixture| Corpus::difference(fixture))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    assert_eq!(differences, Vec::<String>::new());
+    Ok(())
+}
+
 struct Corpus;
 
 impl Corpus {
@@ -45,19 +60,4 @@ impl Corpus {
         let golden = Golden::in_running_package(format!("lints/{name}.txt"))?;
         Ok(golden.verify(&Self::output(fixture)?).err().map(|failure| format!("{failure:?}")))
     }
-}
-
-#[test]
-fn every_lint_prints_its_golden_over_its_fixture() -> Result<(), Box<dyn Error>> {
-    let fixtures = Corpus::fixtures()?;
-    assert_eq!(fixtures.len(), Lints::reports(&[]).len());
-    let differences: Vec<String> = fixtures
-        .iter()
-        .map(|fixture| Corpus::difference(fixture))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
-    assert_eq!(differences, Vec::<String>::new());
-    Ok(())
 }

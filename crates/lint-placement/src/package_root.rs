@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::crate_root::CrateRoot;
 use lint_layout::Manifest;
@@ -13,8 +13,6 @@ pub struct PackageRoot {
 }
 
 impl PackageRoot {
-    const MANIFEST: &'static str = "Cargo.toml";
-
     #[must_use]
     pub fn read(directory: &Path) -> PackageRoot {
         let manifest = Manifest::read(directory).ok().flatten();
@@ -43,10 +41,5 @@ impl PackageRoot {
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
-    }
-
-    #[must_use]
-    pub fn manifest_file(&self) -> PathBuf {
-        self.root.directory().join(Self::MANIFEST)
     }
 }

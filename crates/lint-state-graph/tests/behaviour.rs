@@ -54,6 +54,16 @@ const PAINT: Source = Source::new(
     "paint.rs",
     "fn paint(color: Color) -> u8 {\n    match color {\n        Color::Red => grow(1),\n        Color::Blue => grow(2),\n    }\n}\n",
 );
+const BOXED_VIEW: &str = "impl Open {\n    pub fn next(&self) -> Box<Closed> {\n        make()\n    }\n}\n";
+const UNIT_ARM: Source = Source::new(
+    "area.rs",
+    "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Square => grow(1),\n        _ => 2,\n    }\n}\n",
+);
+const ROUND: Source = Source::new("shape.rs", "pub enum Shape {\n    Round { radius: u8 },\n}\n");
+const STRUCT_ARM: Source = Source::new(
+    "area.rs",
+    "fn area(shape: Shape) -> u8 {\n    match shape {\n        Shape::Round { radius } => grow(radius),\n    }\n}\n",
+);
 const WIDE_SHAPE: Source =
     Source::new("shape.rs", "pub enum Shape {\n    Circle(u8),\n    Square,\n    Oval(u8),\n    Star(u8),\n}\n");
 const TABLES: Source = Source::new(
@@ -77,7 +87,7 @@ const LET_ELSE: Source = Source::new(
     "fn area(shape: Shape) -> u8 {\n    let Shape::Circle(radius) = shape else { panic() };\n    grow(radius)\n}\n",
 );
 
-const CASES: [Case; 21] = [
+const CASES: [Case; 24] = [
     Case::new("public edge", &[Source::new("a.rs", OPEN_AND_CLOSED), Source::new("b.rs", EDGE)], &[]),
     Case::new("test module match", &[SHAPE, TEST_AREA], &[]),
     Case::new("own unit enum of that name", &[SHAPE, UNIT_SHAPE], &[]),
@@ -127,6 +137,13 @@ const CASES: [Case; 21] = [
     Case::new("a match in an inline module", &[SHAPE, IN_MODULE], &["area.rs:4"]),
     Case::new("if let", &[SHAPE, IF_LET], &["area.rs:2"]),
     Case::new("let else", &[SHAPE, LET_ELSE], &["area.rs:2"]),
+    Case::new(
+        "a view returning another wrapper",
+        &[Source::new("a.rs", OPEN_AND_CLOSED), Source::new("b.rs", BOXED_VIEW)],
+        &[],
+    ),
+    Case::new("a unit variant arm", &[SHAPE, UNIT_ARM], &["area.rs:3"]),
+    Case::new("a struct variant arm", &[ROUND, STRUCT_ARM], &["area.rs:3"]),
 ];
 
 #[test]
