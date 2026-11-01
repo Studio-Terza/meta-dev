@@ -20,6 +20,10 @@ impl Journal {
             .map_err(|source| self.failed(source))
     }
 
+    pub(crate) fn emptied(&self) -> Result<Journal, Failure> {
+        self.replace("").map(|()| self.clone())
+    }
+
     pub(crate) fn replace(&self, text: &str) -> Result<(), Failure> {
         self.prepared().and_then(|()| fs::write(&self.0, text)).map_err(|source| self.failed(source))
     }
