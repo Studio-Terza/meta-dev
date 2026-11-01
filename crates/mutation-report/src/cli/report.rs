@@ -39,7 +39,7 @@ impl Report {
     pub fn write_summary(&self) -> Result<(), Failure> {
         let matrices = self.matrices()?;
         let summary = Summary::from_results(
-            &matrices.iter().flat_map(|matrix| matrix.baseline().iter().cloned()).collect(),
+            &matrices.iter().flat_map(|matrix| matrix.baseline().iter().map(ToString::to_string)).collect(),
             &matrices.iter().flat_map(|matrix| matrix.mutants().iter().cloned()).collect::<Vec<_>>(),
             GoldenTests::under(&self.sources)?.names(),
         );

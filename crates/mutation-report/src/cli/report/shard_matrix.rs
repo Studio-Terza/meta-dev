@@ -2,13 +2,14 @@ use std::fs;
 use std::path::Path;
 
 use serde::Deserialize;
+use text_lines::OneLine;
 
 use super::recorded_mutant::RecordedMutant;
 use crate::cli::report::failure::Failure;
 
 #[derive(Debug, Deserialize)]
 pub struct ShardMatrix {
-    baseline: Vec<String>,
+    baseline: Vec<OneLine>,
     mutants: Vec<RecordedMutant>,
 }
 
@@ -20,7 +21,7 @@ impl ShardMatrix {
         serde_json::from_str(&text).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })
     }
 
-    pub(crate) fn baseline(&self) -> &[String] {
+    pub(crate) fn baseline(&self) -> &[OneLine] {
         &self.baseline
     }
 

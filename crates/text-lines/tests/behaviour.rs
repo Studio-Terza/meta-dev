@@ -1,4 +1,4 @@
-use text_lines::{Lines, LossyText};
+use text_lines::{Lines, LossyText, NotOneLine, OneLine};
 
 struct Sample;
 
@@ -44,5 +44,42 @@ laws::table!(
         b"a\xffb" as &[u8] => "a\u{FFFD}b",
         b"\xff\xfe" as &[u8] => "\u{FFFD}\u{FFFD}",
         b"ok\xc3" as &[u8] => "ok\u{FFFD}",
+    ]
+);
+
+struct Read;
+
+impl Read {
+    fn line(text: &&str) -> Result<String, NotOneLine> {
+        OneLine::try_from((*text).to_owned()).map(|line| line.to_string())
+    }
+
+    fn deserialized(json: &&str) -> Result<String, ()> {
+        serde_json::from_str::<OneLine>(json).map(|line| line.as_ref().to_owned()).map_err(|_| ())
+    }
+}
+
+laws::table!(
+    text_with_a_line_break_or_control_character_is_not_one_line,
+    Read::line,
+    [
+        "" => Ok(String::new()),
+        "a b" => Ok("a b".to_owned()),
+        "é ü" => Ok("é ü".to_owned()),
+        "a\nb" => Err(NotOneLine),
+        "a\rb" => Err(NotOneLine),
+        "a\tb" => Err(NotOneLine),
+        "a\u{7f}" => Err(NotOneLine),
+        "\u{0}" => Err(NotOneLine),
+    ]
+);
+
+laws::table!(
+    a_line_read_from_json_is_checked,
+    Read::deserialized,
+    [
+        "\"a b\"" => Ok("a b".to_owned()),
+        "\"a\\nb\"" => Err(()),
+        "1" => Err(()),
     ]
 );

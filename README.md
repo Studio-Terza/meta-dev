@@ -26,7 +26,7 @@ inside its package, so the verdict does not depend on where the checkout lives.
 Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enum_predicates,
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
-no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
+no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 near_duplicate_tests, mandatory_laws, rust_only, workflow_run.
 
@@ -217,6 +217,8 @@ public method of one shape on three types still fails, whatever their inner type
 counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
 
 Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
+
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 
 ## Guards
 

@@ -8,7 +8,7 @@ use bits::Count;
 use section::Section;
 use serde::Serialize;
 
-use super::recorded_mutant::RecordedMutant;
+use super::recorded_mutant::{RecordedMutant, Verdict};
 
 #[derive(Debug, Serialize)]
 pub struct Summary {
@@ -22,8 +22,6 @@ pub struct Summary {
 }
 
 impl Summary {
-    const MISSED: &'static str = "MissedMutant";
-    const TIMEOUT: &'static str = "Timeout";
     const SCOPE: &'static str = "::";
 
     pub(crate) fn from_results(
@@ -31,14 +29,15 @@ impl Summary {
         mutants: &[RecordedMutant],
         golden: &BTreeSet<String>,
     ) -> Summary {
-        let killers: BTreeSet<&String> = mutants.iter().flat_map(RecordedMutant::failed).collect();
+        let killers: BTreeSet<String> =
+            mutants.iter().flat_map(RecordedMutant::failed).map(ToString::to_string).collect();
         Summary {
             mutants: Count::items_in(mutants),
             tests: Count::new(baseline.len()),
             golden_tests: Count::new(golden.len()),
-            surviving: Self::named_with(mutants, Self::MISSED),
-            timed_out: Self::named_with(mutants, Self::TIMEOUT),
-            tests_that_kill_nothing: baseline.iter().filter(|test| !killers.contains(test)).cloned().collect(),
+            surviving: Self::named_with(mutants, Verdict::MissedMutant),
+            timed_out: Self::named_with(mutants, Verdict::Timeout),
+            tests_that_kill_nothing: baseline.iter().filter(|test| !killers.contains(*test)).cloned().collect(),
             killed_with_no_golden_failing: Self::killed_without_golden(mutants, golden),
         }
     }
@@ -47,7 +46,7 @@ impl Summary {
         serde_json::to_string_pretty(self)
     }
 
-    fn named_with(mutants: &[RecordedMutant], summary: &str) -> Vec<String> {
+    fn named_with(mutants: &[RecordedMutant], summary: Verdict) -> Vec<String> {
         let mut names: Vec<String> = mutants
             .iter()
             .filter(|mutant| mutant.has_summary(summary))
@@ -63,7 +62,8 @@ impl Summary {
         ordered
             .into_iter()
             .filter(|mutant| {
-                !mutant.failed().is_empty() && !mutant.failed().iter().any(|test| Self::is_golden(test, golden))
+                !mutant.failed().is_empty()
+                    && !mutant.failed().iter().any(|test| Self::is_golden(test.as_ref(), golden))
             })
             .map(ToString::to_string)
             .collect()
