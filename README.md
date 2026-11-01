@@ -294,3 +294,4 @@ Each target runs for `FUZZ_SECONDS` seconds (default 5) with fresh random seeds.
 Found so far: a method chain of ten thousand links overflowed the stack of the main thread, because `syn` prints and walks a left-nested tree recursively. `Cli::report_to` now does its work on a thread with a 256 MiB stack, which is address space and not memory, and `a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack` holds it.
 
 proof
+second
