@@ -1,6 +1,7 @@
 mod crate_count;
 mod crate_name;
 mod fan_in;
+mod history;
 mod metadata;
 mod reached;
 
@@ -12,6 +13,7 @@ use crate::cli::failure::Failure;
 use crate_count::CrateCount;
 use crate_name::CrateName;
 use fan_in::FanIn;
+use history::History;
 use metadata::Metadata;
 use reached::Reached;
 
@@ -41,6 +43,10 @@ impl Workspace {
             self.closure(changed.iter().flat_map(|path| self.touched(path)).collect()),
             CrateCount::new(self.directories.len()),
         )
+    }
+
+    pub fn history(&self, changed: &[PathBuf]) -> History {
+        History::new(self.reached(changed), self.fan_in())
     }
 
     pub fn fan_in(&self) -> FanIn {
