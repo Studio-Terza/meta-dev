@@ -3,7 +3,7 @@ mod scope;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::module::Module;
-use lint_layout::Name;
+use lint_layout::{Name, UsePath};
 use scope::Scope;
 
 #[derive(Debug, Default)]
@@ -29,6 +29,16 @@ impl Scopes {
 
     pub(crate) fn scope(&self, module: &Module) -> Option<&Scope> {
         self.scopes.get(module)
+    }
+
+    pub(crate) fn renames_head(&self, module: &Module, path: &UsePath) -> bool {
+        path.first().is_some_and(|head| {
+            self.scope(module).is_some_and(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
+        })
+    }
+
+    pub(crate) fn renamed_to(&self, finals: &[&str]) -> Vec<Name> {
+        self.scopes.values().flat_map(|scope| scope.renamed_to(finals)).collect()
     }
 
     pub(crate) fn declares(&self, module: &Module) -> bool {

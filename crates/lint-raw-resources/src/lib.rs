@@ -11,6 +11,6 @@ pub struct RawResources;
 
 impl Lint for RawResources {
     fn report(files: &[SourceFile]) -> Report {
-        Report::new("only ports touch raw resources", RawPaths::found(&Paths::read(files)))
+        Report::new("only ports touch raw resources", RawPaths::found(&Paths::read(files, &RawPaths::FINALS)))
     }
 }

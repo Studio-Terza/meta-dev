@@ -8,6 +8,7 @@ use super::Finding;
 pub struct RawPaths;
 
 impl RawPaths {
+    pub const FINALS: [&'static str; 3] = ["remove_dir_all", "forget", "temp_dir"];
     const RAW: [[&'static str; 2]; 3] = [["fs", "remove_dir_all"], ["mem", "forget"], ["env", "temp_dir"]];
 
     pub fn found(uses: &[Use]) -> Vec<Violation> {

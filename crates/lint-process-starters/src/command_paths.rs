@@ -12,16 +12,17 @@ pub enum Scope {
 pub struct CommandPaths;
 
 impl CommandPaths {
+    const FINALS: [&'static str; 1] = ["new"];
     const STARTER: [&'static str; 3] = ["process", "Command", "new"];
 
     #[must_use]
     pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site> {
-        Self::among(Paths::read([file]), scope)
+        Self::among(Paths::read([file], &Self::FINALS), scope)
     }
 
     #[must_use]
     pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site> {
-        Self::among(Paths::read(files), scope)
+        Self::among(Paths::read(files, &Self::FINALS), scope)
     }
 
     fn among(uses: Vec<Use>, scope: Scope) -> Vec<Site> {

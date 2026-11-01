@@ -17,6 +17,16 @@ impl Scope {
         self.globs.push(prefix);
     }
 
+    pub(crate) fn renamed_to(&self, finals: &[&str]) -> Vec<Name> {
+        self.imports
+            .iter()
+            .filter(|(_, target)| {
+                finals.iter().any(|wanted| target.segments().last().is_some_and(|last| last == wanted))
+            })
+            .map(|(local, _)| local.clone())
+            .collect()
+    }
+
     pub(crate) fn imported(&self, name: &Name) -> Option<&UsePath> {
         self.imports.get(name)
     }
