@@ -22,4 +22,9 @@ impl Lint for ModuleNesting {
 
 impl ModuleNesting {
     const REEXPORTS: Most = Most::new(8);
+
+    #[must_use]
+    pub fn probe_name() -> &'static str {
+        "module_nesting"
+    }
 }
