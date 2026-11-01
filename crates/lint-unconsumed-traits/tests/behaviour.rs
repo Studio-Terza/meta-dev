@@ -21,7 +21,9 @@ const CONSUMER: &str = "fn total<T: Shape>(item: &T) -> u32 { item.area() }\n";
 const TEST_CONSUMER: &str = "#[cfg(test)]\nmod tests {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    pub trait Solid {\n        fn volume(&self) -> u32;\n    }\n}\n";
 
-const CASES: [Case; 15] = [
+const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
+
+const CASES: [Case; 16] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -67,6 +69,11 @@ const CASES: [Case; 15] = [
         Title::new("nested module"),
         &[Source::new(Located::new("a.rs"), Text::new(TWO))],
         Flagged::new(&["a.rs:1", "a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("consumer in a module"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_MODULE))],
+        Flagged::new(&[]),
     ),
 ];
 

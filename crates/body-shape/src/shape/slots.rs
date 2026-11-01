@@ -28,8 +28,9 @@ impl Slots {
     fn numbered(&mut self, name: &Name) -> Slot {
         let known = self.0.iter().position(|seen| seen == name);
         Slot::new(known.unwrap_or_else(|| {
+            let next = self.0.len();
             self.0.push(name.clone());
-            self.0.len() - 1
+            next
         }))
     }
 }

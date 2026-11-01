@@ -10,5 +10,8 @@ lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 proc-macro2.workspace = true
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true
