@@ -78,9 +78,13 @@ const WIDER_9: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
 const WIDER_10: &str = "union U {\n    a: &'static str,\n}\n";
 const WIDER_11: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
 const PUBLIC_UNION: &str = "pub union U {\n    pub a: &'static str,\n}\n";
+const AS_REF_IMPL: &str =
+    "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        self.0.trim()\n    }\n}\n";
+const BORROW_IMPL: &str = "pub struct A(Name);\nimpl std::borrow::Borrow<str> for A {\n    fn borrow(&self) -> &str {\n        self.0.trim()\n    }\n}\n";
+const AS_REF_HELPER: &str = "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        \"\"\n    }\n}\nimpl A {\n    fn g(&self) {\n        self.0.trim();\n    }\n}\n";
 const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 76] = [
+const CASES: [Case; 79] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -456,6 +460,21 @@ const CASES: [Case; 76] = [
         Title::new("text in a public extern function"),
         &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_EXTERN))],
         Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("text inside an AsRef<str> impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(AS_REF_IMPL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text inside a Borrow<str> impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(BORROW_IMPL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in an inherent impl beside an AsRef<str> impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(AS_REF_HELPER))],
+        Flagged::new(&[]),
     ),
 ];
 
