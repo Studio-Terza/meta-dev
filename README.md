@@ -218,13 +218,13 @@ cannot judge a slice. Main, and every pull request into main, ignore all this an
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first, as a count and a share of the
 workspace, then the distribution: crates per tenth of the share, the median and the largest. It reads only the graph
-as it stands, never its history. How far a change reaches is the measure of tangle, so the lint job on main prints it.
+as it stands, never its history. How far a change reaches is the measure of tangle, so main writes it to the job summary.
 
 `hubs` weighs how thick each crate is against how many depend on it: the logic a crate holds, its shipped
 functions' cyclomatic complexity above one summed as `lint-complexity` counts it, times the crates that depend on it.
 Each crate is listed at its heaviest function, heaviest weighted first, then the share of all logic held by crates that
 more than half the workspace depends on. A crate many depend on should be thin: types, traits and interfaces, with the
-logic in the leaves.
+logic in the leaves. Main writes it to the job summary.
 
 ## Newtypes
 
