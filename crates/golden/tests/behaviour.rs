@@ -113,6 +113,17 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
 }
 
 #[test]
+fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::with_recorded("old\n")?;
+    fs::write(fixture.directory.path().join("Cargo.toml"), "[package]\nname = \"a\"\n")?;
+    let recorded = fixture.golden().verify_in(Mode::Record, Output::new("new\n"));
+    let chosen = Mode::current().ok() == Some(Mode::Record);
+    assert_eq!(matches!(recorded, Err(Failure::NotChosen { .. })), !chosen);
+    assert_eq!(fixture.text()? == "old\n", !chosen);
+    Ok(())
+}
+
+#[test]
 fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     fixture.golden().verify_in(Mode::Record, Output::new("placed\n"))?;

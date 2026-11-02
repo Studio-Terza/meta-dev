@@ -123,6 +123,8 @@ A golden name stays inside `tests/goldens`: `golden!("../x")` or an absolute nam
 
 To change a golden, run `GOLDEN_RECORD=1 cargo test` and review the diff. Any other value of
 `GOLDEN_RECORD` fails, and so does recording when `CI` is set.
+A test cannot record a package's golden by passing `Mode::Record` to `verify_in`: into a directory that holds
+a `Cargo.toml`, that records only when `GOLDEN_RECORD=1` chose it, and fails otherwise.
 
 The lints have one golden each, in `crates/lint-runner/tests/goldens/lints/<lint>.txt`. It records what the
 runner prints for the package in `crates/lint-runner/tests/fixtures/<lint>`, and the test runs the runner from
