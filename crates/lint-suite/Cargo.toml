@@ -48,6 +48,7 @@ lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
+lint-transition-graph = { path = "../lint-transition-graph" }
 lint-type-graph = { path = "../lint-type-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
