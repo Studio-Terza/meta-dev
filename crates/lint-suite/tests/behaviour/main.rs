@@ -4,6 +4,7 @@ mod const_shape;
 mod crate_graph;
 mod distinct_signatures;
 mod duplicate_transitions;
+mod effect_sites;
 mod enum_predicates;
 mod expression_flow;
 mod fn_shape;
