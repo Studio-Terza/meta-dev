@@ -6,6 +6,7 @@ use lint_crate_graph::CrateGraph;
 use lint_distinct_signatures::DistinctSignatures;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
+use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
 use lint_literal_names::LiteralNames;
@@ -79,6 +80,7 @@ impl Lints {
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
             NoTestIo::report(files),
+            FakesAtPorts::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),
