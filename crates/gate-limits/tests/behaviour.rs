@@ -80,6 +80,8 @@ fn exactly_on_a_level_is_within_it() -> io::Result<()> {
     assert!(run.out.contains("WARN: test-run"));
     assert!(run.out.contains("ok: clippy"));
     assert_eq!(run.exit, ExitCode::SUCCESS);
+    let equal = Run::reported("equal-levels", "[test-run]\nwarn = 2\nblock = 2\n", "test-run = 2")?;
+    assert_eq!(equal.out, "ok: test-run took 2s, warn above 2s, block above 2s\n");
     Ok(())
 }
 
