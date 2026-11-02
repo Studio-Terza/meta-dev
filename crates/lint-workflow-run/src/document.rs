@@ -1,4 +1,5 @@
 mod command;
+mod environment;
 mod found;
 mod key;
 mod local;
@@ -10,6 +11,7 @@ use saphyr::{LoadableYamlNode, MarkedYaml, ScanError, YamlData};
 
 use crate::actions::Actions;
 use command::Command;
+use environment::Environment;
 use found::Found;
 use key::Key;
 use local::Local;
@@ -44,6 +46,7 @@ impl<'text> Document<'text> {
         match key.text().and_then(Key::named) {
             Some(setting @ (Key::Run | Key::Shell)) => Self::command(key, value, setting, actions),
             Some(Key::Uses) => Local::finding(value, actions).into_iter().collect(),
+            Some(Key::Env) => Environment::findings(value).into_iter().chain(Self::judged(value, actions)).collect(),
             Some(Key::With) => Script::finding(step, value).into_iter().chain(Self::judged(value, actions)).collect(),
             _ => Self::judged(value, actions),
         }

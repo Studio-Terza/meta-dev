@@ -3,7 +3,9 @@ use crate::document::key::Key;
 use crate::document::text::Text;
 use crate::finding::Finding;
 
+mod inline;
 mod unquoted;
+use inline::Inline;
 use unquoted::Unquoted;
 use unquoted::hidden::Hidden;
 
@@ -29,6 +31,13 @@ impl<'text> Command<'text> {
             .or_else(|| self.excess().map(|characters| Finding::TooLong { characters, limit: Self::LIMIT }))
             .or_else(|| Self::operator_in(self, setting).map(|symbol| Finding::Operator { symbol }))
             .or_else(|| Self::keyword_in(self.0).map(|word| Finding::Control { word }))
+            .or_else(|| {
+                (setting == Key::Run)
+                    .then(|| Unquoted::new(self.0, Hidden::Quoted).parsed::<Inline>().ok())
+                    .flatten()
+                    .and_then(|inline| inline.program())
+                    .map(|word| Finding::Inline { word })
+            })
             .or_else(|| {
                 (setting == Key::Shell)
                     .then(|| self.foreign_shell())

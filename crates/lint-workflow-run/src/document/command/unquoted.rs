@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 
 use crate::document::text::Text;
 
@@ -23,6 +24,10 @@ impl Unquoted {
                 .flatten()
                 .collect(),
         )
+    }
+
+    pub(super) fn parsed<Parsed: FromStr>(&self) -> Result<Parsed, Parsed::Err> {
+        self.to_string().parse()
     }
 
     pub(super) fn first_of(&self, symbols: &[&'static str]) -> Option<&'static str> {
