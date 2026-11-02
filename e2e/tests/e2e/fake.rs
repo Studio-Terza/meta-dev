@@ -6,12 +6,14 @@ use ci::ports::{Invocation, Ports, Run};
 #[derive(Debug, Clone, Copy)]
 pub enum Edit {
     Modified,
+    Added,
 }
 
 impl Edit {
     fn status(self) -> &'static str {
         match self {
             Edit::Modified => "M",
+            Edit::Added => "A",
         }
     }
 }
