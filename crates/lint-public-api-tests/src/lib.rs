@@ -3,6 +3,9 @@ mod path_reach;
 mod test_code;
 
 use emitters::Emitters;
+use lint_core::Fix;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -15,8 +18,14 @@ use test_code::TestCode;
 pub struct PublicApiTests;
 
 impl PublicApiTests {
-    const FIX: &str = "test code in src; move it to the package's tests directory and call the public API from there";
-    const REACH: &str = "test file includes a module from src with #[path]; call the public API instead";
+    const IN_SOURCE: Message = Message::new(
+        Problem::new("test code in src"),
+        Fix::new("move it to the package's tests directory and call the public API from there"),
+    );
+    const REACH: Message = Message::new(
+        Problem::new("test file includes a module from src with #[path]"),
+        Fix::new("call the public API instead"),
+    );
 }
 
 impl Lint for PublicApiTests {
@@ -29,7 +38,7 @@ impl Lint for PublicApiTests {
                 .iter()
                 .flat_map(|file| {
                     let (lines, message) = if file.is_shipped() {
-                        (TestCode::lines_in(file.syntax(), &emitters), Self::FIX)
+                        (TestCode::lines_in(file.syntax(), &emitters), Self::IN_SOURCE)
                     } else {
                         (PathReach::lines_in(file), Self::REACH)
                     };

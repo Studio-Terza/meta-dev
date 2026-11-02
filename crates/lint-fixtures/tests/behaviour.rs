@@ -1,4 +1,4 @@
-use lint_core::{Headline, Lint, Report, Site, SourceFile, Violation};
+use lint_core::{Fix, Headline, Lint, Message, Problem, Report, Site, SourceFile, Violation};
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const SOURCES: &[Source] = &[Source::new(Located::new("a.rs"), Text::new("struct A;\n"))];
@@ -7,7 +7,9 @@ struct EveryFile;
 
 impl Lint for EveryFile {
     fn report(files: &[SourceFile]) -> Report {
-        let flagged = files.iter().map(|file| Violation::new(Site::of_file(file.path()), "flagged"));
+        let flagged = files.iter().map(|file| {
+            Violation::new(Site::of_file(file.path()), Message::new(Problem::new("flagged"), Fix::new("unflag it")))
+        });
         Report::new(Headline::new("every file"), flagged.collect())
     }
 }

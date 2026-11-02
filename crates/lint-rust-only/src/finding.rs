@@ -17,6 +17,12 @@ impl Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {}; {}", self.language.name(), self.place, self.language.fix())
+        write!(formatter, "{} {}", self.language.name(), self.place)
+    }
+}
+
+impl lint_core::Finding for Finding {
+    fn fix(&self) -> lint_core::Fix {
+        lint_core::Fix::from(self.language.fix())
     }
 }

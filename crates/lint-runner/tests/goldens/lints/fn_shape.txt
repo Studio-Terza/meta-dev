@@ -3,12 +3,12 @@ corpus: 0 tests in 6 files, 0 of 31 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/deep.rs:1: fn f
-src/locals.rs:1: fn f
-src/locals.rs:5: fn h
-src/narrow.rs:1: fn f
-src/shallow.rs:1: fn f
-src/wide.rs:1: fn f
+src/deep.rs:1: fn f; make it an associated function or a method
+src/locals.rs:1: fn f; make it an associated function or a method
+src/locals.rs:5: fn h; make it an associated function or a method
+src/narrow.rs:1: fn f; make it an associated function or a method
+src/shallow.rs:1: fn f; make it an associated function or a method
+src/wide.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
 src/deep.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
 src/deep.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value

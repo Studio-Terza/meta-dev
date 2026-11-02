@@ -35,11 +35,13 @@ no_test_io, fakes_at_ports, near_duplicate_tests, mandatory_laws, arbitrary_newt
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
 It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`, in impls and in public traits
-(`bool_methods`), with the headline naming the alternatives, and public methods that form a pair such as
-`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with the headline saying to write a guard. Those lists are report only too,
+(`bool_methods`), with each entry naming the alternatives, and public methods that form a pair such as
+`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. Those lists are report only too,
 so they are outside the lints above and never change the exit code.
 
-Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
+Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
+`Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
+compile, and each violation prints as `path:line: problem; fix`. A constant message is a `Message` of a `Problem` and a `Fix`. Limits are constants inside each lint, not
 settings, and there is no per-repository configuration, switch or baseline. Where something is sometimes
 legitimate, the lint gates where by naming convention: starting a process (`process_starters`) and calling
 `fs::remove_dir_all`, `mem::forget` or `env::temp_dir` (`raw_resources`) are allowed only in a crate whose name
@@ -78,7 +80,7 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 `cfg(test)` gate or `#[doc(hidden)]`. It matches by name across the files it is given, so a name that shipped code also
 uses elsewhere passes.
 
-Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
+Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
 library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of

@@ -7,6 +7,7 @@ use std::fmt;
 
 use crate::crate_summary::cut::conductance::Conductance;
 use condensed::{Condensed, TangleIndex};
+use lint_core::Fix;
 use lint_core::Least;
 use lint_item_graph::{ItemGraph, NodeIndex};
 use lint_layout::Name;
@@ -87,5 +88,11 @@ impl fmt::Display for Cut {
             self.outside.len(),
             list(&self.outside)
         )
+    }
+}
+
+impl lint_core::Finding for Cut {
+    fn fix(&self) -> Fix {
+        Fix::new("move the two groups into crates of their own")
     }
 }

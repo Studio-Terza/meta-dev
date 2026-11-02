@@ -3,17 +3,17 @@ corpus: 0 tests in 6 files, 4 of 21 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/fine.rs:1: fn read
-src/fine.rs:2: fn take
-src/fine.rs:5: fn fill
-src/in_macro.rs:1: fn free
-src/optional.rs:1: fn g
-src/out.rs:1: fn fill
+src/fine.rs:1: fn read; make it an associated function or a method
+src/fine.rs:2: fn take; make it an associated function or a method
+src/fine.rs:5: fn fill; make it an associated function or a method
+src/in_macro.rs:1: fn free; make it an associated function or a method
+src/optional.rs:1: fn g; make it an associated function or a method
+src/out.rs:1: fn fill; make it an associated function or a method
 a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules:
-src/in_macro.rs:1: fn free
-src/optional.rs:1: fn g
-src/out.rs:1: fn fill
-src/out.rs:4: fn push
+src/in_macro.rs:1: fn free; give the collection a type that owns its rules
+src/optional.rs:1: fn g; give the collection a type that owns its rules
+src/out.rs:1: fn fill; give the collection a type that owns its rules
+src/out.rs:4: fn push; give the collection a type that owns its rules
 function names say what the function does:
 src/optional.rs:1: fn g names nothing; say what it does
 primitives appear only at a type's boundary:

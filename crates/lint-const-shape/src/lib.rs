@@ -8,8 +8,11 @@ use syn::{
     ItemFn, ItemMod, ItemStatic, Macro, TraitItemConst, TraitItemFn, TypeArray, Variant,
 };
 
+use lint_core::Fix;
 use lint_core::Gate;
 use lint_core::Macros;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -78,7 +81,7 @@ struct ConstContexts<'scan> {
 }
 
 impl ConstContexts<'_> {
-    fn violation(&self, span: Span, message: &str) -> Violation {
+    fn violation(&self, span: Span, message: Message) -> Violation {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
@@ -89,11 +92,15 @@ impl ConstContexts<'_> {
     }
 
     fn cast_finding(&self, cast: &ExprCast) -> Option<Violation> {
-        (self.context == Context::Surface && self.zone == Zone::Elsewhere)
-            .then(|| self.violation(cast.as_token.span, "as cast outside a const fn; use From, TryFrom, or an EnumMap"))
+        (self.context == Context::Surface && self.zone == Zone::Elsewhere).then(|| {
+            self.violation(
+                cast.as_token.span,
+                Message::new(Problem::new("as cast outside a const fn"), Fix::new("use From, TryFrom, or an EnumMap")),
+            )
+        })
     }
 
-    fn loop_finding(&self, span: Span, message: &str) -> Option<Violation> {
+    fn loop_finding(&self, span: Span, message: Message) -> Option<Violation> {
         (self.context == Context::Const).then(|| self.violation(span, message))
     }
 }
@@ -177,7 +184,10 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
         let finding = (!matches!(*expr.cond, Expr::Let(_))).then(|| {
             self.loop_finding(
                 expr.while_token.span,
-                "counter loop in const context; walk a slice with while let [head, rest @ ..]",
+                Message::new(
+                    Problem::new("counter loop in const context"),
+                    Fix::new("walk a slice with while let [head, rest @ ..]"),
+                ),
             )
         });
         self.violations.extend(finding.flatten());
@@ -185,14 +195,25 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
     }
 
     fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
-        let finding = self
-            .loop_finding(expr.loop_token.span, "open loop in const context; walk a slice with while let or recurse");
+        let finding = self.loop_finding(
+            expr.loop_token.span,
+            Message::new(
+                Problem::new("open loop in const context"),
+                Fix::new("walk a slice with while let or recurse"),
+            ),
+        );
         self.violations.extend(finding);
         syn::visit::visit_expr_loop(self, expr);
     }
 
     fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
-        let finding = self.loop_finding(expr.for_token.span, "for loop in const context");
+        let finding = self.loop_finding(
+            expr.for_token.span,
+            Message::new(
+                Problem::new("for loop in const context"),
+                Fix::new("walk a slice with while let [head, rest @ ..]"),
+            ),
+        );
         self.violations.extend(finding);
         syn::visit::visit_expr_for_loop(self, expr);
     }

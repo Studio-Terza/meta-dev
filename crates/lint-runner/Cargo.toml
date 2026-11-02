@@ -64,6 +64,7 @@ lint-workflow-run = { path = "../lint-workflow-run" }
 golden = { path = "../golden" }
 lint-fixtures = { path = "../lint-fixtures" }
 tempfile.workspace = true
+text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true
