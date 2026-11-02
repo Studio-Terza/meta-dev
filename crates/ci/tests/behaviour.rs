@@ -12,14 +12,14 @@ use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
-const LEAF_REPORT: &str = "REACH=1 of 5 crates\nCARGO_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
-const TWO_REPORT: &str = "REACH=2 of 5 crates\nCARGO_SCOPE=-p middle -p tested-through\n\
+const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
+const TWO_REPORT: &str = "REACH=2 of 5 crates\nBUILD_SCOPE=-p middle -p tested-through\n\
     MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
-const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n";
-const EMPTY_NOTES: &str = "skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
+const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n";
+const EMPTY_NOTES: &str = "skipped: BUILD_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
-const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n\
-    skipped: CARGO_SCOPE is empty, so the steps that use it do not run\n\
+const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n\
+    skipped: BUILD_SCOPE is empty, so the steps that use it do not run\n\
     skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
 const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
@@ -266,8 +266,8 @@ laws::table!(
     a_pull_request_into_main_runs_the_whole_workspace_but_reports_the_reach_for_mutants,
     Sample::reach_into_main,
     [
-        "crates/leaf/src/lib.rs\n" => "REACH=1 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
-        "README.md\n" => "REACH=0 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=\nskipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n",
+        "crates/leaf/src/lib.rs\n" => "REACH=1 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
+        "README.md\n" => "REACH=0 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=\nskipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n",
     ]
 );
 
@@ -372,10 +372,10 @@ fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn E
     let answer = Answer::to(&fake, &Reach::on(&scratch, "push"));
     assert_eq!(
         answer,
-        Answer { exit: ExitCode::SUCCESS, out: "CARGO_SCOPE=--workspace\n".to_owned(), err: String::new() }
+        Answer { exit: ExitCode::SUCCESS, out: "BUILD_SCOPE=--workspace\n".to_owned(), err: String::new() }
     );
-    assert_eq!(scratch.read("env"), "CARGO_SCOPE=--workspace\n");
-    assert_eq!(scratch.read("sum"), "CARGO_SCOPE=--workspace\n");
+    assert_eq!(scratch.read("env"), "BUILD_SCOPE=--workspace\n");
+    assert_eq!(scratch.read("sum"), "BUILD_SCOPE=--workspace\n");
     assert_eq!(
         *fake.calls.borrow(),
         [Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"])]
@@ -606,8 +606,8 @@ fn a_reach_report_is_appended_to_the_environment_and_the_summary() -> Result<(),
     scratch.write("env", "KEPT=1\n")?;
     scratch.write("sum", "# Summary\n")?;
     Answer::to(&Fake::new(), &Reach::on(&scratch, "push"));
-    assert_eq!(scratch.read("env"), "KEPT=1\nCARGO_SCOPE=--workspace\n");
-    assert_eq!(scratch.read("sum"), "# Summary\nCARGO_SCOPE=--workspace\n");
+    assert_eq!(scratch.read("env"), "KEPT=1\nBUILD_SCOPE=--workspace\n");
+    assert_eq!(scratch.read("sum"), "# Summary\nBUILD_SCOPE=--workspace\n");
     Ok(())
 }
 
