@@ -1269,6 +1269,8 @@ laws::table!(
         "spec: none, a#D1\n" => Body::malformed(&["spec: none, a#D1"]),
         "spec: owner 96d1331\n" => Body::malformed(&["spec: owner 96d1331"]),
         "spec: owner 96d1331g\n" => Body::malformed(&["spec: owner 96d1331g"]),
+        "spec: owner 96d13317x\n" => Body::malformed(&["spec: owner 96d13317x"]),
+        "spec: owner 96d1-3317\n" => Body::malformed(&["spec: owner 96d1-3317"]),
         "spec: owner\n" => Body::malformed(&["spec: owner"]),
         "spec: Lint-port#D3\n" => Body::malformed(&["spec: Lint-port#D3"]),
         "spec: lint_port#D3\n" => Body::malformed(&["spec: lint_port#D3"]),
