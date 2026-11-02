@@ -1,13 +1,17 @@
+use std::error::Error;
 use std::ffi::OsString;
+use std::fs;
 use std::process::ExitCode;
 
 use reach::Cli;
+use tempfile::TempDir;
 
 const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
 const PATCHED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/patched.json");
 const ROOTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/rooted.json");
 const READING: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/reading.json");
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
+const HUBS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/hubs.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
 const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
@@ -17,6 +21,15 @@ const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n"
 const HISTORY_LEAF: &str = "reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_CORE: &str = "reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_NONE: &str = "reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
+const WORKSPACE_MANIFEST: &str = "[workspace]\nmembers = [\"crates/*\"]\n";
+const BRANCHY: &str = "pub fn pick(x: u32) -> u32 {\n    if x > 1 { 2 } else if x > 3 { 4 } else { 5 }\n}\n";
+const ONE_BRANCH: &str = "pub fn pick(x: u32) -> u32 {\n    if x > 1 { 2 } else { 5 }\n}\n";
+const STRAIGHT: &str = "pub fn pick(x: u32) -> u32 {\n    x\n}\n";
+const HUBS_HEADLINE: &str = "report only, hub thickness: the logic each crate holds, its shipped functions' cyclomatic complexity above one summed, weighted by the crates that depend on it; a crate many depend on should hold types, traits and interfaces, with the logic in the leaves:\n";
+const HUB_CORE: &str = "crate core: logic 2, depended on by 2 of 3, 66%; weighted 4\n";
+const HUB_LEAF: &str = "crate leaf: logic 1, depended on by 0 of 3, 0%; weighted 0\n";
+const HUB_OTHER: &str = "crate other-leaf: logic 0, depended on by 0 of 3, 0%; weighted 0\n";
+const HUB_SHARE: &str = "logic in crates more than half the workspace depends on: 2 of 3, 66%\n";
 const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not, of 5 workspace crates:\n\
     2 of 5, 40%: core\n1 of 5, 20%: middle\n0 of 5, 0%: leaf\n0 of 5, 0%: serde-user\n0 of 5, 0%: tested-through\n\
     crates per tenth of the workspace depending on them:\n\
@@ -182,10 +195,10 @@ laws::table!(
     every_unusable_input_fails_closed_and_says_why,
     Answer::refused,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["beyond", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach hubs <metadata> <repository> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach hubs <metadata> <repository> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach hubs <metadata> <repository> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["beyond", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach hubs <metadata> <repository> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
         ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
     ]
 );
@@ -243,4 +256,51 @@ laws::table!(
 fn metadata_that_cannot_be_read_or_parsed_is_refused() {
     assert!(Answer::refused(&["fan-in", "/no/such/metadata.json"]).contains("cannot read /no/such/metadata.json"));
     assert!(Answer::refused(&["affected", BROKEN]).contains("cannot parse cargo metadata"));
+}
+
+struct Repository(TempDir);
+
+impl Repository {
+    fn new() -> Result<Repository, Box<dyn Error>> {
+        let root = TempDir::new()?;
+        fs::write(root.path().join("Cargo.toml"), WORKSPACE_MANIFEST)?;
+        Ok(Repository(root))
+    }
+
+    fn with_crate(self, name: &str, source: &str) -> Result<Repository, Box<dyn Error>> {
+        let directory = self.0.path().join("crates").join(name);
+        fs::create_dir_all(directory.join("src"))?;
+        fs::write(directory.join("Cargo.toml"), format!("[package]\nname = \"{name}\"\n"))?;
+        fs::write(directory.join("src/lib.rs"), source)?;
+        Ok(self)
+    }
+
+    fn hubs(&self) -> Answer {
+        Answer::to(&["hubs", HUBS, &self.0.path().display().to_string()])
+    }
+
+    fn site(&self, name: &str) -> String {
+        format!("{}: ", self.0.path().join("crates").join(name).join("src/lib.rs:1").display())
+    }
+}
+
+#[test]
+fn hubs_weigh_each_crates_logic_by_the_crates_depending_on_it_heaviest_first() -> Result<(), Box<dyn Error>> {
+    let repository = Repository::new()?
+        .with_crate("core", BRANCHY)?
+        .with_crate("leaf", ONE_BRANCH)?
+        .with_crate("other-leaf", STRAIGHT)?;
+    let expected = format!(
+        "{HUBS_HEADLINE}{}{HUB_CORE}{}{HUB_LEAF}{}{HUB_OTHER}{HUB_SHARE}",
+        repository.site("core"),
+        repository.site("leaf"),
+        repository.site("other-leaf")
+    );
+    assert_eq!(repository.hubs(), Answer { exit: ExitCode::SUCCESS, out: expected, err: String::new() });
+    Ok(())
+}
+
+#[test]
+fn hubs_without_a_repository_is_a_usage_error() {
+    assert!(Answer::refused(&["hubs", HUBS]).contains("reach hubs <metadata> <repository>"));
 }

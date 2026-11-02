@@ -29,6 +29,12 @@ impl FanIn {
         self
     }
 
+    pub fn share_of(&self, crate_name: &CrateName) -> Option<Share> {
+        self.by_count
+            .iter()
+            .find_map(|(Reverse(count), names)| names.contains(crate_name).then(|| Share::new(*count, self.total)))
+    }
+
     fn shares(&self) -> impl Iterator<Item = Share> {
         self.by_count
             .iter()
