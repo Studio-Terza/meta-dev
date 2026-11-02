@@ -36,6 +36,19 @@ impl fmt::Display for Edge {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Key {
+    takes: Vec<Node>,
+    gives: Node,
+}
+
+impl fmt::Display for Key {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let takes: Vec<String> = self.takes.iter().map(ToString::to_string).collect();
+        write!(formatter, "{} -> {}", takes.join(", "), self.gives)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum End {
     Domain(Node),
@@ -85,5 +98,13 @@ impl Ends {
         } else {
             Class::Covered
         }
+    }
+
+    pub(crate) fn key(&self) -> Option<Key> {
+        let mut takes: Vec<Node> =
+            self.takes.iter().map(|taken| taken.domain().cloned()).collect::<Option<Vec<Node>>>()?;
+        takes.sort();
+        let gives = self.gives.domain()?.clone();
+        (!takes.is_empty()).then_some(Key { takes, gives })
     }
 }

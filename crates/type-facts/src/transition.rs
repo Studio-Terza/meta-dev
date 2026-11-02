@@ -44,6 +44,12 @@ impl AsRef<CrateName> for Transition {
     }
 }
 
+impl AsRef<Name> for Transition {
+    fn as_ref(&self) -> &Name {
+        &self.name
+    }
+}
+
 impl AsRef<Site> for Transition {
     fn as_ref(&self) -> &Site {
         &self.site

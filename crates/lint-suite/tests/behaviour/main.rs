@@ -3,6 +3,7 @@ mod complexity;
 mod const_shape;
 mod crate_graph;
 mod distinct_signatures;
+mod duplicate_transitions;
 mod enum_predicates;
 mod expression_flow;
 mod fn_shape;

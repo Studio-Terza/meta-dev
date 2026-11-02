@@ -1,5 +1,6 @@
 mod count;
 mod crate_transitions;
+mod duplicates;
 mod end;
 mod workspace_types;
 
@@ -11,6 +12,8 @@ use type_facts::{Facts, Transition};
 
 use crate_transitions::CrateTransitions;
 use workspace_types::WorkspaceTypes;
+
+pub use duplicates::DuplicateTransitions;
 
 #[derive(Debug)]
 pub struct TransitionGraph;

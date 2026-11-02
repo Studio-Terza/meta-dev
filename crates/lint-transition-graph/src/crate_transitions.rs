@@ -27,13 +27,7 @@ impl<'found> CrateTransitions<'found> {
         name: &'found CrateName,
         found: &[&'found Transition],
     ) -> CrateTransitions<'found> {
-        let ends: Vec<Ends> = found
-            .iter()
-            .map(|transition| {
-                let takes = transition.takes().iter().map(|taken| types.end(name, taken)).collect();
-                Ends::new(takes, types.end(name, transition.gives()))
-            })
-            .collect();
+        let ends: Vec<Ends> = found.iter().map(|transition| types.ends(transition)).collect();
         CrateTransitions {
             name,
             first: found.iter().map(|transition| AsRef::<Site>::as_ref(*transition)).min(),
