@@ -16,7 +16,7 @@ fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
 fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
     assert!(matches!(fixture.golden().verify(Output::new("new\n")), Err(Failure::Differs { .. })));
-    assert_eq!(fixture.text()?, "old\n");
+    assert!(fixture.golden().verify(Output::new("old\n")).is_ok());
     Ok(())
 }
 
@@ -60,12 +60,18 @@ roundtrip!(
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    let printed = fixture.golden().verify(Output::new("new\n")).map_err(|failure| format!("{failure:?}"));
-    let wanted = format!(
-        "{}: output differs from the golden\n@ first change at line 1; - golden, + actual\n- \"old\\n\"\n+ \"new\\n\"\n\nif this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
-        fixture.path().display()
-    );
-    assert_eq!(printed, Err(wanted));
+    let printed = fixture.golden().verify(Output::new("new\n")).err().map(|failure| format!("{failure:?}"));
+    let heading = format!("{}: output differs from the golden", fixture.path().display());
+    let lines = printed.as_deref().map(|text| text_lines::Lines::from(text).collect::<Vec<&str>>());
+    let wanted = [
+        heading.as_str(),
+        "@ first change at line 1; - golden, + actual",
+        "- \"old\\n\"",
+        "+ \"new\\n\"",
+        "",
+        "if this change is intended, run `GOLDEN_RECORD=1 cargo test` and review the diff",
+    ];
+    assert_eq!(lines, Some(wanted.to_vec()));
     Ok(())
 }
 
@@ -84,7 +90,7 @@ fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::
 fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     fixture.golden().verify_in(Mode::Record, Output::new("placed\n"))?;
-    assert_eq!(fixture.text()?, "placed\n");
+    assert!(fixture.golden().verify(Output::new("placed\n")).is_ok());
     Ok(())
 }
 

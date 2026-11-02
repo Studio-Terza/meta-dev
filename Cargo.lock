@@ -154,6 +154,7 @@ dependencies = [
  "laws",
  "newtype",
  "tempfile",
+ "text-lines",
  "thiserror",
 ]
 
@@ -372,6 +373,16 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-long-exact-strings"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 
@@ -672,6 +683,7 @@ dependencies = [
  "lint-guard-must-use",
  "lint-layout",
  "lint-literal-names",
+ "lint-long-exact-strings",
  "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
@@ -749,6 +761,7 @@ dependencies = [
  "lint-guard-must-use",
  "lint-layout",
  "lint-literal-names",
+ "lint-long-exact-strings",
  "lint-mandatory-laws",
  "lint-manual-iteration",
  "lint-module-nesting",
@@ -889,6 +902,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "golden",
  "laws",
  "newtype",
  "serde",

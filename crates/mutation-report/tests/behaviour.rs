@@ -69,50 +69,6 @@ fn unicode_ünder_score() {
     golden!(\"u\");
 }
 ";
-const REPORT: &str = "\
-## Mutation matrix
-
-5 mutants, 4 tests, 7 golden tests.
-
-### Surviving mutants (2)
-
-- a-missed
-- m-missed
-
-### Timed out mutants (1)
-
-- m-timeout
-
-### Tests that kill no mutant (2)
-
-- b1 :: unused
-- b2 :: other
-
-### Mutants killed while no golden test fails (1)
-
-- m-killed-nongolden -> b1 :: plain
-";
-const EMPTY_REPORT: &str = "\
-## Mutation matrix
-
-0 mutants, 0 tests, 0 golden tests.
-
-### Surviving mutants (0)
-
-none
-
-### Timed out mutants (0)
-
-none
-
-### Tests that kill no mutant (0)
-
-none
-
-### Mutants killed while no golden test fails (0)
-
-none
-";
 
 #[derive(Debug, PartialEq)]
 struct Answer {
@@ -160,7 +116,7 @@ fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Resul
     let checkout = Checkout::new()?;
     Shards::two(&checkout)?;
     assert_eq!(checkout.report(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
-    assert_eq!(checkout.markdown(), REPORT);
+    golden::golden!("report.md", &checkout.markdown())?;
     assert_eq!(
         checkout.json(),
         json!({
@@ -183,7 +139,7 @@ fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
     checkout.write("shards/loose-file.json", "{}")?;
     checkout.write("bare/crates/empty/src/lib.rs", "")?;
     assert_eq!(checkout.report_of("shards", "bare").exit, ExitCode::SUCCESS);
-    assert_eq!(checkout.markdown(), EMPTY_REPORT);
+    golden::golden!("empty_report.md", &checkout.markdown())?;
     assert_eq!(checkout.field("mutants"), json!(0));
     Ok(())
 }
@@ -321,7 +277,15 @@ fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
     for arguments in [&[][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..], &["a".as_ref(); 5][..]] {
         let answer = Answer::to(arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
-        assert_eq!(answer.err, "usage: mutation-report <shards> <sources> <report.md> <report.json>\n");
+        assert_eq!(Text::lines(&answer.err), ["usage: mutation-report <shards> <sources> <report.md> <report.json>"]);
+    }
+}
+
+struct Text;
+
+impl Text {
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
     }
 }
 

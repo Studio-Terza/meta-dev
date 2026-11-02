@@ -50,8 +50,11 @@ impl Run {
 fn a_run_within_every_warn_level_is_ok_and_does_not_block() -> io::Result<()> {
     let run = Run::judged("all-ok", "test-run = 2.9\nclippy = 10")?;
     assert_eq!(
-        run.out,
-        "ok: clippy took 10s, warn above 10.5s, block above 20s\nok: test-run took 2.9s, warn above 3s, block above 5s\n"
+        Text::lines(&run.out),
+        [
+            "ok: clippy took 10s, warn above 10.5s, block above 20s",
+            "ok: test-run took 2.9s, warn above 3s, block above 5s"
+        ]
     );
     assert_eq!(run.exit, ExitCode::SUCCESS);
     Ok(())
@@ -158,7 +161,7 @@ fn limits_that_cannot_be_judged_list_nothing() -> io::Result<()> {
 #[test]
 fn named_stages_are_judged_alone_so_a_job_can_judge_the_stages_it_timed() -> io::Result<()> {
     let run = Run::reported_only("named", LIMITS, "test-run = 4", &["test-run"])?;
-    assert_eq!(run.out, "WARN: test-run took 4s, warn above 3s, block above 5s\n");
+    assert_eq!(Text::lines(&run.out), ["WARN: test-run took 4s, warn above 3s, block above 5s"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
     Ok(())
 }
@@ -175,6 +178,14 @@ fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Res
     assert_eq!(stray.exit, ExitCode::FAILURE);
     assert!(stray.err.contains("no usable limit"), "{}", stray.err);
     Ok(())
+}
+
+struct Text;
+
+impl Text {
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
+    }
 }
 
 mod ports {

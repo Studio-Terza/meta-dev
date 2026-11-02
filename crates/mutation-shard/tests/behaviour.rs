@@ -194,7 +194,15 @@ fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
     for arguments in [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]] {
         let answer = Answer::to(arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
-        assert_eq!(answer.err, "usage: mutation-shard <mutants.out> <out.json>\n");
+        assert_eq!(Text::lines(&answer.err), ["usage: mutation-shard <mutants.out> <out.json>"]);
+    }
+}
+
+struct Text;
+
+impl Text {
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
     }
 }
 
