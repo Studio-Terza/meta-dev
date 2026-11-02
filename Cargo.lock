@@ -304,6 +304,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-fakes-at-ports"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-paths",
+ "lint-placement",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
@@ -655,6 +666,7 @@ dependencies = [
  "lint-distinct-signatures",
  "lint-enum-predicates",
  "lint-expression-flow",
+ "lint-fakes-at-ports",
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
@@ -731,6 +743,7 @@ dependencies = [
  "lint-distinct-signatures",
  "lint-enum-predicates",
  "lint-expression-flow",
+ "lint-fakes-at-ports",
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",

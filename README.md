@@ -30,7 +30,7 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
+no_test_io, fakes_at_ports, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -60,6 +60,16 @@ exercise the real effect; everywhere else a test goes through a fake of the port
 the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
+`fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union
+whose name has the word `Fake`, `Stub`, `Mock`, `Spy` or `Dummy` among its camel-case words (`FakeClock`, `HTTPStub`, not
+`Fakery` or `Spyglass`) must implement a port: a trait whose path, read through the `use` items of its test target as
+`lint-paths` reads them, passes through a module named `ports`, starts at a crate whose name ends in the word `ports`, or
+names a trait that crate declares in a `ports` module or a crate whose name ends in ports (so a re-export such as `ci::Ports`
+counts). Besides ports it may implement only std traits: a path that starts at `std`, `core` or `alloc`, or a bare name
+of a prelude trait such as `Clone`, `Default` or `Drop`. Derives and inherent impls are not trait impls and pass. The impls
+of a double are matched by name within its test target, across its files. A double with no port fails at its declaration,
+and any other trait impl fails at the impl; the message names the fix: implement a port, or rename the type.
+
 A check that cannot run under plain `cargo test`, such as one that drives a browser or needs its own time budget,
 goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_ignored_tests` does not read
 `test = false` on an `[[example]]`, since an example is not a test.
@@ -69,7 +79,7 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
 library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.

@@ -15,6 +15,7 @@ lint-crate-graph = { path = "../lint-crate-graph" }
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }
 lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
+lint-fakes-at-ports = { path = "../lint-fakes-at-ports" }
 lint-fixtures = { path = "../lint-fixtures" }
 lint-fn-shape = { path = "../lint-fn-shape" }
 lint-guard-must-use = { path = "../lint-guard-must-use" }
