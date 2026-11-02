@@ -3,18 +3,7 @@ use std::fmt;
 
 use crate::cli::workspace::crate_count::CrateCount;
 use crate::cli::workspace::crate_name::CrateName;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Share {
-    reached: CrateCount,
-    total: CrateCount,
-}
-
-impl fmt::Display for Share {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} of {}", self.reached, self.total)
-    }
-}
+use crate::cli::workspace::share::Share;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cargo {
@@ -44,7 +33,7 @@ impl Reached {
     }
 
     pub fn share(&self) -> Share {
-        Share { reached: CrateCount::new(self.crates.len()), total: self.total }
+        Share::new(CrateCount::new(self.crates.len()), self.total)
     }
 
     pub fn covering(&self, crates: &BTreeSet<CrateName>) -> Option<&Reached> {
