@@ -64,15 +64,10 @@ fn a_run_within_every_warn_level_is_ok_and_does_not_block() -> io::Result<()> {
 }
 
 #[test]
-fn above_warn_but_not_above_block_warns_without_blocking() -> io::Result<()> {
+fn above_warn_warns_and_above_block_blocks() -> io::Result<()> {
     let run = Run::judged("warns", "test-run = 4\nclippy = 10")?;
     assert!(run.out.contains("WARN: test-run took 4s, warn above 3s, block above 5s\n"));
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    Ok(())
-}
-
-#[test]
-fn above_block_blocks() -> io::Result<()> {
     let run = Run::judged("blocks", "test-run = 5.1\nclippy = 1")?;
     assert!(run.out.contains("BLOCK: test-run took 5.1s, warn above 3s, block above 5s\n"));
     assert_eq!(run.exit, ExitCode::FAILURE);
@@ -108,15 +103,10 @@ fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
 }
 
 #[test]
-fn a_run_within_its_levels_exits_successfully() -> io::Result<()> {
+fn a_run_fails_only_above_its_block_level() -> io::Result<()> {
     let limits = Run::fixture("within-limits.toml", LIMIT)?;
     let measured = Run::fixture("within-measured.toml", "test-run = 0.5\n")?;
     assert_eq!(Run::cli(&limits, &measured).run(), ExitCode::SUCCESS);
-    Ok(())
-}
-
-#[test]
-fn a_run_above_its_block_level_exits_with_failure() -> io::Result<()> {
     let limits = Run::fixture("blocked-limits.toml", LIMIT)?;
     let measured = Run::fixture("blocked-measured.toml", "test-run = 3\n")?;
     assert_eq!(Run::cli(&limits, &measured).run(), ExitCode::FAILURE);

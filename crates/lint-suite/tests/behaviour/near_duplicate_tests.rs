@@ -19,9 +19,13 @@ const ASYNC: &str =
 const SIGNED: &str =
     "#[test]\nfn a() {\n    assert_eq!(h(1), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(-1), 1);\n}\n";
 
+const CONSTANTS: &str =
+    "#[test]\nfn a() {\n    assert_eq!(h(LOW), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(HIGH_END), 1);\n}\n";
+const OTHER_NAMES: &str = "#[test]\nfn a() {\n    assert_eq!(h(T), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(U), 1);\n}\n#[test]\nfn c() {\n    assert_eq!(h(Low), 1);\n}\n#[test]\nfn d() {\n    assert_eq!(h(High), 1);\n}\n";
+
 const GATED: &str = "#[test]\n#[cfg(unix)]\nfn a() {\n    f(1);\n}\n#[test]\n#[cfg(unix)]\nfn b() {\n    f(2);\n}\n";
 
-const CASES: [Case; 13] = [
+const CASES: [Case; 15] = [
     Case::new(
         Title::new("identical"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(IDENTICAL))],
@@ -86,6 +90,16 @@ const CASES: [Case; 13] = [
             Source::new(Located::new("crates/a/tests/x.rs"), Text::new(FIRST_FILE)),
             Source::new(Located::new("crates/b/tests/x.rs"), Text::new(SECOND_FILE)),
         ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("constants differ"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(CONSTANTS))],
+        Flagged::new(&["tests/a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a letter or a type differs"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(OTHER_NAMES))],
         Flagged::new(&[]),
     ),
     Case::new(

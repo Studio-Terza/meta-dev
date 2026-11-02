@@ -5,6 +5,7 @@ pub(crate) enum Key {
     Uses,
     With,
     Script,
+    Env,
 }
 
 impl Key {
@@ -15,6 +16,7 @@ impl Key {
             "uses" => Some(Key::Uses),
             "with" => Some(Key::With),
             "script" => Some(Key::Script),
+            "env" => Some(Key::Env),
             _ => None,
         }
     }
