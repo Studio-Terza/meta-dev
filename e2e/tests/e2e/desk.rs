@@ -9,31 +9,52 @@ use tempfile::TempDir;
 use crate::fake::Fake;
 
 #[derive(Debug)]
-pub enum Scope {
+pub enum Build {
     Workspace,
     Crates(BTreeSet<String>),
+}
+
+#[derive(Debug)]
+pub struct Scope {
+    build: Build,
+    mutated: BTreeSet<String>,
 }
 
 impl Scope {
     const BUILD: &'static str = "BUILD_SCOPE=";
     const WORKSPACE: &'static str = "--workspace";
     const PACKAGE: &'static str = "-p";
+    const MUTANTS: &'static str = "MUTANTS_SCOPE=";
+    const TEST_PACKAGE: &'static str = "--test-package=";
 
     fn read(report: &str) -> Scope {
         let value = |key: &str| report.lines().find_map(|line| line.strip_prefix(key)).unwrap_or_default().to_owned();
         let build = value(Self::BUILD);
-        if build == Self::WORKSPACE {
-            Scope::Workspace
-        } else {
-            Scope::Crates(build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect())
+        Scope {
+            build: if build == Self::WORKSPACE {
+                Build::Workspace
+            } else {
+                Build::Crates(
+                    build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect(),
+                )
+            },
+            mutated: value(Self::MUTANTS)
+                .split_whitespace()
+                .filter_map(|word| word.strip_prefix(Self::TEST_PACKAGE))
+                .map(str::to_owned)
+                .collect(),
         }
     }
 
     pub fn built(&self, everything: impl Iterator<Item = String>) -> BTreeSet<String> {
-        match self {
-            Scope::Workspace => everything.collect(),
-            Scope::Crates(built) => built.clone(),
+        match &self.build {
+            Build::Workspace => everything.collect(),
+            Build::Crates(built) => built.clone(),
         }
+    }
+
+    pub fn mutated(&self) -> &BTreeSet<String> {
+        &self.mutated
     }
 }
 
