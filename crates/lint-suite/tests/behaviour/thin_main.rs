@@ -4,8 +4,9 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 
 const ATTRIBUTED: &str = "#[allow(unused)]\nfn helper() {}\n#[allow(unused)]\nenum E {}\n#[allow(unused)]\nmod m {}\n#[allow(unused)]\nimpl A {}\n#[allow(unused)]\ntrait T {}\n#[allow(unused)]\nconst C: u8 = 1;\n#[allow(unused)]\nstatic S: u8 = 1;\n#[allow(unused)]\ntype Y = u8;\nfn main() {}\n";
 const FAT: &str = "use std::fmt;\nfn main() {}\nstruct Extra;\n";
+const FAT_BODY: &str = "fn main() {\n    use std::fmt;\n    struct Extra;\n    impl Extra {\n        fn go() {}\n    }\n    if true {\n        fn deep() {}\n    }\n}\n";
 
-const CASES: [Case; 5] = [
+const CASES: [Case; 6] = [
     Case::new(
         Title::new("each item on its keyword line"),
         &[Source::new(Located::new("src/main.rs"), Text::new(ATTRIBUTED))],
@@ -19,6 +20,11 @@ const CASES: [Case; 5] = [
             "src/main.rs:14",
             "src/main.rs:16",
         ]),
+    ),
+    Case::new(
+        Title::new("items declared inside main"),
+        &[Source::new(Located::new("src/main.rs"), Text::new(FAT_BODY))],
+        Flagged::new(&["src/main.rs:3", "src/main.rs:4", "src/main.rs:8"]),
     ),
     Case::new(
         Title::new("a library file"),
