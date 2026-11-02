@@ -21,6 +21,6 @@ D3, measured, not built: the phantom form is not simpler. A prototype on main at
 | Lines declaring the 19 types | 149 | 207, plus 95 for `Count<Tag>`, 4 for a shared trait and 6 of module, re-export and manifest lines |
 | Call-site files changed | 0 | 17, each gaining a trait or `Counter` import: +18 −5 lines |
 | Whole change | | 42 files, +273 −97, net +176 |
-| New blocking lint findings | 0 | 14: 9 `primitive_boundary`, 3 `crate_graph` splits, 1 missing law on the hand-written `Ord`, 1 `usize` field in `Count` itself |
+| New blocking lint findings | 0 | 13: 9 `primitive_boundary`, 2 of them in `Count` itself, 3 `crate_graph` splits, 1 missing law on the hand-written `Ord` |
 
 Why: an alias of a foreign generic type cannot have inherent items, so the 7 types with their own methods or constants (`Least`, `Most`, `Depth`, `Rows`, `Stride`, `ItemCount`, mutation-report's `Count`) each needed an extension trait, imported wherever it is called. `Least::allows` and `Most::allows` stopped being `const fn`. Every counter gets every trait, so per-type choices such as no `Ord` or no `Default` are lost. `newtype` would depend on `serde`. Passing the lints would need more code still.
