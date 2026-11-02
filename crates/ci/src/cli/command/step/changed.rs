@@ -15,6 +15,24 @@ impl Changed {
         ports.output(invocation).map_err(|source| Failure::Program { program: invocation.program().to_owned(), source })
     }
 
+    pub(crate) fn stored_metadata(ports: &impl Ports, metadata: &Journal) -> Result<(), Failure> {
+        let text = Self::asked(
+            ports,
+            &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
+        )?;
+        metadata.replace(&text)
+    }
+
+    pub(crate) fn reach(arguments: impl Iterator<Item = OsString>) -> Result<String, Failure> {
+        let mut report = Vec::new();
+        let mut refusal = Vec::new();
+        if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {
+            Ok(String::from_utf8(report).unwrap_or_default())
+        } else {
+            Err(Failure::Reach(Refusal::from(refusal)))
+        }
+    }
+
     pub(crate) fn answered(command: &str, metadata: &Journal, ports: &impl Ports) -> Result<String, Failure> {
         let changed = Self::asked(
             ports,
@@ -26,12 +44,6 @@ impl Changed {
         let arguments = [OsString::from(command), metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(Lines::from(changed.as_str()).map(OsString::from));
-        let mut report = Vec::new();
-        let mut refusal = Vec::new();
-        if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {
-            Ok(String::from_utf8(report).unwrap_or_default())
-        } else {
-            Err(Failure::Reach(Refusal::from(refusal)))
-        }
+        Self::reach(arguments)
     }
 }

@@ -14,11 +14,14 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      PULL_REQUEST: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/toolchain
-      - name: golden and scenario files carry their labels
-        run: cargo run --locked -q --bin ci -- labels "$GITHUB_BASE_REF" ${{ github.event.pull_request.number }}
+      - name: golden and scenario files lie in the reach of the change
+        env:
+          METADATA: ${{ runner.temp }}/metadata.json
+        run: cargo run --locked -q --bin ci -- labels "$GITHUB_BASE_REF" "$PULL_REQUEST" "$METADATA"

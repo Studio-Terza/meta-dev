@@ -51,6 +51,12 @@ impl Workspace {
         )
     }
 
+    pub fn beyond<'produced>(&self, produced: &'produced Path, changed: &[PathBuf]) -> Option<&'produced Path> {
+        let owners = self.touched(produced);
+        let reached = self.reached(changed);
+        (owners.is_empty() || reached.covering(&owners).is_none()).then_some(produced)
+    }
+
     pub fn history(&self, changed: &[PathBuf]) -> History {
         History::new(self.reached(changed), self.fan_in())
     }

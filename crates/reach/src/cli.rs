@@ -19,6 +19,7 @@ impl Cli {
     const FAN_IN: &'static str = "fan-in";
     const HISTORY: &'static str = "history";
     const SOURCES: &'static str = "sources";
+    const BEYOND: &'static str = "beyond";
 
     #[must_use]
     pub fn answer(arguments: impl Iterator<Item = OsString>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
@@ -50,6 +51,12 @@ impl Cli {
             Some(Self::SOURCES) => {
                 let roots: Vec<OsString> = arguments.collect();
                 Ok(write!(out, "{}", Self::workspace(&metadata)?.sources(&roots))?)
+            }
+            Some(Self::BEYOND) => {
+                let produced = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
+                let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
+                let beyond = Self::workspace(&metadata)?.beyond(&produced, &changed);
+                Ok(beyond.map_or(Ok(()), |path| writeln!(out, "{}", path.display()))?)
             }
             Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(&metadata)?.fan_in())?),
             _ => Err(Failure::Usage),

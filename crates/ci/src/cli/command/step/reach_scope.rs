@@ -10,7 +10,7 @@ use super::Step;
 use super::changed::Changed;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::ports::{Exit, Ports};
 use skipped::Skipped;
 
 #[derive(Debug)]
@@ -55,11 +55,7 @@ impl Step for ReachScope {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let metadata = Changed::asked(
-            ports,
-            &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
-        )?;
-        self.metadata.replace(&metadata)?;
+        Changed::stored_metadata(ports, &self.metadata)?;
         let report = match (self.event == Self::PULL_REQUEST, self.base == Self::MAIN) {
             (true, false) => Changed::answered(Self::AFFECTED, &self.metadata, ports)?,
             (true, true) => Changed::answered(Self::WIDENED, &self.metadata, ports)?,
