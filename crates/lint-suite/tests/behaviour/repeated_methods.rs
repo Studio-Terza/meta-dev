@@ -16,6 +16,8 @@ const DIFFERENT_RETURNS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    
 const INLINE: &str = "mod inner {\n    struct A;\n    struct B;\n    struct C;\n    impl A {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl B {\n        pub fn show(&self) -> u8 { 1 }\n    }\n    impl C {\n        pub fn show(&self) -> u8 { 1 }\n    }\n}\n";
 
 const MIXED_INNERS: &str = "pub struct A(u8);\npub struct B(u16);\npub struct C { value: u32 }\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C { value: inner } }\n}\n";
+const TWO_UNNAMED: &str = "pub struct A(u8, u8);\npub struct B(u16, u8);\npub struct C(u32, u8);\nimpl A {\n    pub fn new(inner: u8) -> Self { A(inner, 0) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner, 0) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner, 0) }\n}\n";
+const TWO_NAMED: &str = "pub struct A { a: u8, b: u8 }\npub struct B { a: u16, b: u8 }\npub struct C { a: u32, b: u8 }\nimpl A {\n    pub fn new(inner: u8) -> Self { A { a: inner, b: 0 } }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B { a: inner, b: 0 } }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C { a: inner, b: 0 } }\n}\n";
 const ARITHMETIC: &str = "pub struct A(usize);\npub struct B(usize);\npub struct C(usize);\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A { A(self.0 + other.0) }\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B { B(self.0 + other.0) }\n}\nimpl Add for C {\n    type Output = C;\n    fn add(self, other: C) -> C { C(self.0 + other.0) }\n}\n";
 const SHOWN_THE_SAME: &str = "pub struct A(usize);\npub struct B(usize);\npub struct C(usize);\nimpl fmt::Display for A {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { write!(formatter, \"{}\", self.0) }\n}\nimpl fmt::Display for B {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { write!(formatter, \"{}\", self.0) }\n}\nimpl fmt::Display for C {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { write!(formatter, \"{}\", self.0) }\n}\n";
 
@@ -28,7 +30,7 @@ const WRAPPED_B: Source = Source::new(Located::new("crates/x/src/b.rs"), Text::n
 const WRAPPED_C: Source = Source::new(Located::new("crates/x/src/c.rs"), Text::new("pub struct C(u32);\n"));
 const CONSTRUCTORS_ELSEWHERE: &str = "impl A {\n    pub fn new(inner: u8) -> Self { A(inner) }\n}\nimpl B {\n    pub fn new(inner: u16) -> Self { B(inner) }\n}\nimpl C {\n    pub fn new(inner: u32) -> Self { C(inner) }\n}\n";
 
-const CASES: [Case; 16] = [
+const CASES: [Case; 18] = [
     Case::new(
         Title::new("private methods"),
         &[Source::new(Located::new("a.rs"), Text::new(PRIVATE))],
@@ -78,6 +80,16 @@ const CASES: [Case; 16] = [
         Title::new("constructors over different inner types"),
         &[Source::new(Located::new("a.rs"), Text::new(MIXED_INNERS))],
         Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("a struct of two tuple fields has no inner type"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_UNNAMED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a struct of two named fields has no inner type"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_NAMED))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("hand-written arithmetic is a standard trait impl"),

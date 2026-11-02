@@ -1,4 +1,4 @@
-use proc_macro2::{Delimiter, TokenStream, TokenTree};
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
@@ -9,7 +9,6 @@ pub struct Macros;
 
 impl Macros {
     const ARROW_END: char = '>';
-    const ATTRIBUTE_MARK: char = '#';
 
     #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {
@@ -32,11 +31,7 @@ impl Macros {
     fn attributes_in(tokens: TokenStream) -> Vec<Attribute> {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
         let here = trees.iter().zip(trees.iter().skip(1)).filter_map(|(mark, body)| match (mark, body) {
-            (TokenTree::Punct(punct), TokenTree::Group(group))
-                if punct.as_char() == Self::ATTRIBUTE_MARK && group.delimiter() == Delimiter::Bracket =>
-            {
-                Attribute::parse_outer.parse2(quote!(#mark #body)).ok()
-            }
+            (TokenTree::Punct(_), TokenTree::Group(_)) => Attribute::parse_outer.parse2(quote!(#mark #body)).ok(),
             _ => None,
         });
         let nested = trees.iter().filter_map(|tree| match tree {
