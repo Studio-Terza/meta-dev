@@ -200,6 +200,7 @@ gives them to `reach`, with the output of `cargo metadata --no-deps`:
 
     reach affected <metadata> [<changed file>...]
     reach fan-in <metadata>
+    reach hubs <metadata> <repository>
 
 A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
 normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
@@ -215,8 +216,15 @@ steps that use it do not run` in the step and in the run summary, and `ci mutant
 skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
 cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
 
-`fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
-is the measure of tangle, so the report on main prints it.
+`fan-in` lists how many crates depend on each crate, directly or not, most first, as a count and a share of the
+workspace, then the distribution: crates per tenth of the share, the median and the largest. It reads only the graph
+as it stands, never its history. How far a change reaches is the measure of tangle, so the lint job on main prints it.
+
+`hubs` weighs how thick each crate is against how many depend on it: the logic a crate holds, its shipped
+functions' cyclomatic complexity above one summed as `lint-complexity` counts it, times the crates that depend on it.
+Each crate is listed at its heaviest function, heaviest weighted first, then the share of all logic held by crates that
+more than half the workspace depends on. A crate many depend on should be thin: types, traits and interfaces, with the
+logic in the leaves.
 
 ## Newtypes
 

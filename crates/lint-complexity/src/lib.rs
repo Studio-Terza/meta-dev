@@ -3,6 +3,7 @@ mod crates;
 use lint_core::{Headline, Lint, Report, SourceFile};
 
 use crates::Crates;
+pub use crates::{Held, Logic};
 
 #[derive(Debug)]
 pub struct Complexity;
@@ -15,5 +16,12 @@ impl Lint for Complexity {
             ),
             Crates::grouped(files).violations(),
         )
+    }
+}
+
+impl Complexity {
+    #[must_use]
+    pub fn held(files: &[SourceFile]) -> Vec<Held> {
+        Crates::grouped(files).held()
     }
 }
