@@ -1,3 +1,5 @@
+mod differences;
+
 use std::ffi::OsStr;
 
 use golden::{Difference, Failure, Golden, Mode, Output, golden};

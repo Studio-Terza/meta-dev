@@ -579,6 +579,8 @@ laws::table!(
         ["labels", "main"] => true,
         ["labels", "main", "1"] => true,
         ["labels", "main", "1", "metadata.json", "extra"] => true,
+        ["spec-line"] => true,
+        ["spec-line", "1", "extra"] => true,
         ["shard-summary"] => true,
         ["shard-summary", "shards"] => true,
         ["matrix"] => true,
@@ -1212,6 +1214,94 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
         Text::lines(&Answer::to(&Fake::refusing("cargo"), &["labels", "main", "1", &metadata]).err),
         ["cannot run cargo: boom"]
     );
+}
+
+struct Body;
+
+impl Body {
+    const FORMS: &'static str = "write a line spec: none, spec: owner <uuid prefix of 8 or more hex digits>, or spec: <project>#D<n> or <project>#L<n> (several comma-separated); a PR that repairs a red main writes the line repair: main instead\n";
+    const REPAIRING: &'static str =
+        "repairing main: the body has the line repair: main, so the spec line is not checked\n";
+
+    fn checked(body: &&str) -> Verdict {
+        let fake = Fake::answering(vec![Reply::to("gh pr", body)]);
+        let answer = Answer::to(&fake, &["spec-line", "172"]);
+        Verdict { exit: answer.exit, out: answer.out }
+    }
+
+    fn formed(line: &str) -> Verdict {
+        Verdict { exit: ExitCode::SUCCESS, out: ["spec line well formed: ", line, "\n"].concat() }
+    }
+
+    fn repairing() -> Verdict {
+        Verdict { exit: ExitCode::SUCCESS, out: Self::REPAIRING.to_owned() }
+    }
+
+    fn malformed(lines: &[&str]) -> Verdict {
+        let listed: String = lines.iter().map(|line| ["spec line malformed: ", line, "\n"].concat()).collect();
+        Verdict::failing(&[listed.as_str(), "::error::no spec line of the body is well formed; ", Self::FORMS].concat())
+    }
+
+    fn missing() -> Verdict {
+        Verdict::failing(
+            &["spec line missing\n::error::the body has no line starting \"spec: \"; ", Self::FORMS].concat(),
+        )
+    }
+}
+
+laws::table!(
+    a_pull_request_body_carries_a_well_formed_spec_line_unless_it_repairs_main,
+    Body::checked,
+    [
+        "spec: none\n" => Body::formed("spec: none"),
+        "spec: local-tools#D23\n\nMore text.\n" => Body::formed("spec: local-tools#D23"),
+        "spec: lint-port#L5\n" => Body::formed("spec: lint-port#L5"),
+        "spec: test-tooling#D6, test-tooling#D7\n" => Body::formed("spec: test-tooling#D6, test-tooling#D7"),
+        "spec: a#D1,b2#L10\n" => Body::formed("spec: a#D1,b2#L10"),
+        "spec: owner 96d13317\n" => Body::formed("spec: owner 96d13317"),
+        "spec: owner 4a82c67a-1b2c\n" => Body::formed("spec: owner 4a82c67a-1b2c"),
+        "spec: none\r\nbody\r\n" => Body::formed("spec: none"),
+        "Intro.\nspec: rust-only#D2  \n" => Body::formed("spec: rust-only#D2"),
+        "spec: wrong\nspec: none\n" => Body::formed("spec: none"),
+        "repair: main\n" => Body::repairing(),
+        "spec: wrong\nrepair: main\n" => Body::repairing(),
+        "spec: none\nrepair: main\n" => Body::repairing(),
+        "" => Body::missing(),
+        "Implements D1 of the spec.\n" => Body::missing(),
+        "Spec: none\n" => Body::missing(),
+        " spec: none\n" => Body::missing(),
+        "spec:none\n" => Body::missing(),
+        "repair: main later\n" => Body::missing(),
+        "Repair: main\n" => Body::missing(),
+        "spec: \n" => Body::missing(),
+        "spec: None\n" => Body::malformed(&["spec: None"]),
+        "spec: none, a#D1\n" => Body::malformed(&["spec: none, a#D1"]),
+        "spec: owner 96d1331\n" => Body::malformed(&["spec: owner 96d1331"]),
+        "spec: owner 96d1331g\n" => Body::malformed(&["spec: owner 96d1331g"]),
+        "spec: owner 96d13317x\n" => Body::malformed(&["spec: owner 96d13317x"]),
+        "spec: owner 96d1-3317\n" => Body::malformed(&["spec: owner 96d1-3317"]),
+        "spec: owner\n" => Body::malformed(&["spec: owner"]),
+        "spec: Lint-port#D3\n" => Body::malformed(&["spec: Lint-port#D3"]),
+        "spec: lint_port#D3\n" => Body::malformed(&["spec: lint_port#D3"]),
+        "spec: #D3\n" => Body::malformed(&["spec: #D3"]),
+        "spec: lint-port#D\n" => Body::malformed(&["spec: lint-port#D"]),
+        "spec: lint-port#X3\n" => Body::malformed(&["spec: lint-port#X3"]),
+        "spec: lint-port#d3\n" => Body::malformed(&["spec: lint-port#d3"]),
+        "spec: lint-port#D3a\n" => Body::malformed(&["spec: lint-port#D3a"]),
+        "spec: lint-port D3\n" => Body::malformed(&["spec: lint-port D3"]),
+        "spec: a#D1,\n" => Body::malformed(&["spec: a#D1,"]),
+        "spec: a#D1 b#D2\n" => Body::malformed(&["spec: a#D1 b#D2"]),
+        "spec: a#D1 and more\nspec: x\n" => Body::malformed(&["spec: a#D1 and more", "spec: x"]),
+    ]
+);
+
+#[test]
+fn the_spec_line_is_read_from_the_body_of_the_pull_request() {
+    let fake = Fake::answering(vec![Reply::to("gh pr", "spec: none\n")]);
+    let answer = Answer::to(&fake, &["spec-line", "9"]);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(*fake.calls.borrow(), [Invocation::new("gh", ["pr", "view", "9", "--json", "body", "--jq", ".body"])]);
+    assert_eq!(Answer::to(&Fake::refusing("gh"), &["spec-line", "9"]).err, "cannot run gh: boom\n");
 }
 
 #[test]

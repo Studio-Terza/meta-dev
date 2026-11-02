@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+autotests = false
 
 [lib]
 test = false
@@ -60,6 +61,10 @@ lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-walk-similarity = { path = "../lint-walk-similarity" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
+
+[[test]]
+name = "behaviour"
+path = "tests/behaviour.rs"
 
 [dev-dependencies]
 golden = { path = "../golden" }
