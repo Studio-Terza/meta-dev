@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
 use crate::cli::workspace::crate_name::CrateName;
 
-#[derive(Newtype, Debug)]
+#[derive(Newtype, Arbitrary, Debug)]
 pub struct Readers(BTreeMap<CrateName, Vec<PathBuf>>);
 
 impl Readers {

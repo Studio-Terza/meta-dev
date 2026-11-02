@@ -1,11 +1,11 @@
 use std::fmt;
 
 use lint_layout::SourceText;
-use newtype::{Counter, Newtype};
+use newtype::{Arbitrary, Counter, Newtype};
 
 use crate::Most;
 
-#[derive(Newtype, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Depth(usize);
 
 impl Depth {

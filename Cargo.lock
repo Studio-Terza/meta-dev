@@ -212,6 +212,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-arbitrary-newtypes"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-bool-methods"
 version = "0.1.0"
 dependencies = [
@@ -637,6 +646,7 @@ name = "lint-runner"
 version = "0.1.0"
 dependencies = [
  "golden",
+ "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-complexity",
  "lint-const-shape",
@@ -712,6 +722,7 @@ name = "lint-suite"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-complexity",
  "lint-const-shape",
@@ -1167,6 +1178,7 @@ name = "text-lines"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror",
