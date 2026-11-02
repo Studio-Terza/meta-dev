@@ -16,5 +16,5 @@ shipped code has no test-only API:
 src/feature.rs:1: test feature test-utils; remove the feature and test through the API every build has
 src/gated.rs:2: visible item gated on test; remove the gate and test through the real public API
 src/hidden.rs:2: #[doc(hidden)] on a visible item; document it as real API, or make it private
-Cargo.toml:1: test feature test-utils; remove the feature and test through the API every build has
+Cargo.toml:4: test feature test-utils; remove the feature and test through the API every build has
 fails
