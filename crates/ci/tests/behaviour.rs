@@ -1303,7 +1303,7 @@ fn the_spec_line_is_read_from_the_body_of_the_pull_request() {
     assert_eq!(*fake.calls.borrow(), [Invocation::new("gh", ["pr", "view", "9", "--json", "body", "--jq", ".body"])]);
     let refused = Answer::to(&Fake::refusing("gh"), &["spec-line", "9"]);
     assert_eq!(Text::lines(&refused.err), ["cannot run gh: boom"]);
-    assert!(refused.err.ends_with('\n'));
+    assert_eq!(refused.err.chars().last(), Some('\n'));
 }
 
 #[test]
