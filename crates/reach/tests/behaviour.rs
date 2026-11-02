@@ -63,6 +63,11 @@ impl Answer {
         Answer::to(&arguments).out
     }
 
+    fn beyond(arguments: &[&str]) -> String {
+        let arguments = ["beyond", WORKSPACE].iter().chain(arguments).copied().collect::<Vec<&str>>();
+        Answer::to(&arguments).out
+    }
+
     fn crates(names: &[&str]) -> String {
         let flags = |flag: &str| names.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ");
         format!(
@@ -174,9 +179,10 @@ laws::table!(
     every_unusable_input_fails_closed_and_says_why,
     Answer::refused,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>...\n",
+        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
+        ["beyond", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
         ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
     ]
 );
@@ -202,6 +208,21 @@ laws::table!(
         ["core", "leaf"] => "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/leaf/Cargo.toml\ncrates/leaf/src/**\n",
         ["absent"] => "",
         [] => "",
+    ]
+);
+
+laws::table!(
+    a_produced_file_is_beyond_the_changes_unless_they_reach_every_crate_owning_it,
+    Answer::beyond,
+    [
+        ["crates/leaf/tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => "",
+        ["crates/tested-through/tests/goldens/x.txt", "crates/core/src/lib.rs"] => "",
+        ["crates/core/tests/goldens/x.txt", "crates/middle/src/lib.rs"] => "crates/core/tests/goldens/x.txt\n",
+        ["crates/leaf/tests/goldens/x.txt"] => "crates/leaf/tests/goldens/x.txt\n",
+        ["crates/leaf/tests/goldens/x.txt", "README.md"] => "crates/leaf/tests/goldens/x.txt\n",
+        ["tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => "tests/goldens/x.txt\n",
+        ["tests/goldens/x.txt", "Cargo.lock"] => "",
+        ["specs/tests/goldens/x.txt", "Cargo.lock"] => "specs/tests/goldens/x.txt\n",
     ]
 );
 

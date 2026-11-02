@@ -1,14 +1,13 @@
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
-use std::process::ExitCode;
 
 use super::Step;
 use super::changed::Changed;
 use super::install_tools::InstallTools;
 use super::journal::Journal;
-use crate::cli::command::failure::{Failure, Refusal};
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::command::failure::Failure;
+use crate::cli::ports::{Exit, Ports};
 
 #[derive(Debug)]
 pub struct ToolsKey {
@@ -24,13 +23,7 @@ impl ToolsKey {
         let arguments = [OsString::from(Self::SOURCES), self.metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(InstallTools::PROGRAMS.iter().map(OsString::from));
-        let mut report = Vec::new();
-        let mut refusal = Vec::new();
-        if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {
-            Ok(String::from_utf8(report).unwrap_or_default())
-        } else {
-            Err(Failure::Reach(Refusal::from(refusal)))
-        }
+        Changed::reach(arguments)
     }
 }
 
@@ -45,11 +38,7 @@ impl Step for ToolsKey {
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
-        let metadata = Changed::asked(
-            ports,
-            &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
-        )?;
-        self.metadata.replace(&metadata)?;
+        Changed::stored_metadata(ports, &self.metadata)?;
         let listed = self.listed()?;
         self.output.append(format_args!("{}<<{}\n{listed}{}\n", Self::SOURCES, Self::DELIMITER, Self::DELIMITER))?;
         Ok(Exit::Success)

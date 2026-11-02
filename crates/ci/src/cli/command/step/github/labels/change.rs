@@ -27,6 +27,13 @@ impl Change {
         }
     }
 
+    pub(crate) fn paths(&self) -> Vec<&Path> {
+        match self {
+            Change::Added(path) | Change::Copied(path) | Change::Touched(path) => vec![path.as_path()],
+            Change::Renamed { from, to } => vec![from.as_path(), to.as_path()],
+        }
+    }
+
     pub(crate) fn touching(&self, place: Place) -> Option<&Change> {
         let touched = match self {
             Change::Renamed { from, to } => [from, to].iter().any(|path| place.containing(path).is_some()),

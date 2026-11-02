@@ -591,7 +591,8 @@ laws::table!(
         ["summarize", "report.txt", "summary.md", "extra"] => true,
         ["labels"] => true,
         ["labels", "main"] => true,
-        ["labels", "main", "1", "extra"] => true,
+        ["labels", "main", "1"] => true,
+        ["labels", "main", "1", "metadata.json", "extra"] => true,
         ["shard-summary"] => true,
         ["shard-summary", "shards"] => true,
         ["matrix"] => true,
@@ -1022,13 +1023,18 @@ fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> 
 
 #[derive(Debug)]
 struct Case {
+    kind: &'static str,
     changes: &'static str,
     labels: &'static str,
 }
 
 impl Case {
     fn of(changes: &'static str, labels: &'static str) -> Case {
-        Case { changes, labels }
+        Case { kind: "change", changes, labels }
+    }
+
+    fn refactor(changes: &'static str, labels: &'static str) -> Case {
+        Case { kind: "refactor", changes, labels }
     }
 }
 
@@ -1052,17 +1058,18 @@ struct Labelled;
 
 impl Labelled {
     const HEADER: &'static str = "labels of pull request 121 against the merge base with main\n";
-    const GOLDEN_ERROR: &'static str =
-        "::error::this PR changes goldens; a person reviews the change and adds the label golden-change\n";
-    const SCENARIO_ERROR: &'static str = "::error::this PR adds files under tests/fixtures or tests/e2e; a person reviews the scenario and adds the label new-scenario\n";
+    const GOLDEN_ERROR: &'static str = "::error::this PR changes goldens of crates that nothing else it changes reaches, so it did not produce them; only the owner passes this, with the label golden-change\n";
+    const SCENARIO_ERROR: &'static str = "::error::this PR adds files under tests/fixtures or tests/e2e of crates that nothing else it changes reaches; only the owner passes this, with the label new-scenario\n";
+    const REFACTOR_ERROR: &'static str = "::error::this PR's title starts with refactor:, and a refactor leaves behaviour unchanged, so it changes no golden; only the owner passes this, with the label golden-change\n";
 
     fn verdict(case: &Case) -> Verdict {
         let fake = Fake::answering(vec![
             Reply::to("git merge-base", "abc123\n"),
             Reply::to("git -c", case.changes),
-            Reply::to("gh pr", case.labels),
+            Reply::to("gh pr", &[case.kind, "\n", case.labels].concat()),
         ]);
-        let answer = Answer::to(&fake, &["labels", "main", "121"]);
+        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let answer = Answer::to(&fake, &["labels", "main", "121", &scratch.file("metadata.json")]);
         Verdict { exit: answer.exit, out: answer.out.get(Self::HEADER.len()..).unwrap_or_default().to_owned() }
     }
 
@@ -1072,6 +1079,10 @@ impl Labelled {
 
     fn scenario(path: &str) -> Verdict {
         Verdict::failing(&[path, "\n", Self::SCENARIO_ERROR].concat())
+    }
+
+    fn refactor(path: &str) -> Verdict {
+        Verdict::failing(&[path, "\n", Self::REFACTOR_ERROR].concat())
     }
 }
 
@@ -1111,11 +1122,49 @@ laws::table!(
     ]
 );
 
+laws::table!(
+    goldens_and_new_scenarios_pass_inside_the_reach_of_the_rest_of_the_change,
+    Labelled::verdict,
+    [
+        Case::of("M\tcrates/leaf/src/lib.rs\nM\tcrates/leaf/tests/goldens/x.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/core/src/lib.rs\nM\tcrates/tested-through/tests/goldens/x.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/leaf/tests/behaviour.rs\nD\tcrates/leaf/tests/goldens/x.txt\n", "") => Verdict::passing(),
+        Case::of("M\tCargo.lock\nM\ttests/goldens/x.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/middle/src/lib.rs\nM\tcrates/core/tests/goldens/x.txt\n", "") => Labelled::golden("crates/core/tests/goldens/x.txt"),
+        Case::of("M\tcrates/leaf/tests/goldens/x.txt\nM\tREADME.md\n", "") => Labelled::golden("crates/leaf/tests/goldens/x.txt"),
+        Case::of("M\tcrates/leaf/tests/goldens/x.txt\nM\tcrates/core/tests/goldens/x.txt\n", "") => Verdict::failing(
+            &["crates/leaf/tests/goldens/x.txt\n", "crates/core/tests/goldens/x.txt\n", Labelled::GOLDEN_ERROR].concat(),
+        ),
+        Case::of("M\tcrates/middle/src/lib.rs\nM\tcrates/core/tests/goldens/x.txt\n", "golden-change\n") => Verdict::passing(),
+        Case::of("M\tcrates/leaf/src/lib.rs\nR100\tcrates/leaf/tests/goldens/x.txt\tcrates/core/tests/goldens/x.txt\n", "") => Labelled::golden("crates/core/tests/goldens/x.txt"),
+        Case::of("M\tcrates/leaf/src/lib.rs\nA\tcrates/leaf/tests/fixtures/a.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/core/src/lib.rs\nA\tcrates/middle/tests/e2e/a.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/leaf/src/lib.rs\nA\tcrates/core/tests/fixtures/a.txt\n", "") => Labelled::scenario("crates/core/tests/fixtures/a.txt"),
+        Case::of("M\tcrates/leaf/src/lib.rs\nA\tcrates/core/tests/fixtures/a.txt\n", "new-scenario\n") => Verdict::passing(),
+        Case::of("M\tcrates/leaf/tests/fixtures/a.txt\nM\tcrates/leaf/tests/goldens/x.txt\n", "") => Verdict::passing(),
+    ]
+);
+
+laws::table!(
+    a_pull_request_titled_refactor_changes_no_golden,
+    Labelled::verdict,
+    [
+        Case::refactor("M\tcrates/leaf/src/lib.rs\nM\tcrates/leaf/tests/goldens/x.txt\n", "") => Labelled::refactor("crates/leaf/tests/goldens/x.txt"),
+        Case::refactor("M\tcrates/leaf/src/lib.rs\nM\tcrates/leaf/tests/goldens/x.txt\n", "golden-change\n") => Verdict::passing(),
+        Case::refactor("M\tcrates/leaf/src/lib.rs\n", "") => Verdict::passing(),
+        Case::refactor("M\tcrates/leaf/src/lib.rs\nA\tcrates/leaf/tests/fixtures/a.txt\n", "") => Verdict::passing(),
+        Case::of("M\tcrates/leaf/src/lib.rs\nM\tcrates/leaf/tests/goldens/x.txt\n", "refactor\n") => Verdict::passing(),
+    ]
+);
+
 #[test]
 fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
     let fake = Fake::answering(vec![Reply::to("git merge-base", "abc123\n")]);
-    let answer = Answer::to(&fake, &["labels", "release", "7"]);
+    let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    let metadata = scratch.file("metadata.json");
+    let answer = Answer::to(&fake, &["labels", "release", "7", &metadata]);
     assert_eq!(answer.out, "labels of pull request 7 against the merge base with release\n");
+    assert_eq!(scratch.read("metadata.json"), METADATA);
     assert_eq!(
         *fake.calls.borrow(),
         [
@@ -1133,11 +1182,27 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
                     "HEAD"
                 ],
             ),
-            Invocation::new("gh", ["pr", "view", "7", "--json", "labels", "--jq", ".labels[].name"]),
+            Invocation::new(
+                "gh",
+                [
+                    "pr",
+                    "view",
+                    "7",
+                    "--json",
+                    "title,labels",
+                    "--jq",
+                    r#"if (.title | startswith("refactor:")) then "refactor" else "change" end, .labels[].name"#
+                ]
+            ),
+            Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
         ]
     );
-    assert_eq!(Answer::to(&Fake::refusing("git"), &["labels", "main", "1"]).err, "cannot run git: boom\n");
-    assert_eq!(Answer::to(&Fake::refusing("gh"), &["labels", "main", "1"]).err, "cannot run gh: boom\n");
+    assert_eq!(Answer::to(&Fake::refusing("git"), &["labels", "main", "1", &metadata]).err, "cannot run git: boom\n");
+    assert_eq!(Answer::to(&Fake::refusing("gh"), &["labels", "main", "1", &metadata]).err, "cannot run gh: boom\n");
+    assert_eq!(
+        Answer::to(&Fake::refusing("cargo"), &["labels", "main", "1", &metadata]).err,
+        "cannot run cargo: boom\n"
+    );
 }
 
 #[test]
