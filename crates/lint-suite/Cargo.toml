@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dev-dependencies]
+lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-bool-methods = { path = "../lint-bool-methods" }
 lint-complexity = { path = "../lint-complexity" }
 lint-const-shape = { path = "../lint-const-shape" }

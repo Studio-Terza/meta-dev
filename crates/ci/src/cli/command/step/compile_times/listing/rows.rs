@@ -1,6 +1,6 @@
-use newtype::{Counter, Newtype};
+use newtype::{Arbitrary, Counter, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Rows(usize);
 
 impl Rows {

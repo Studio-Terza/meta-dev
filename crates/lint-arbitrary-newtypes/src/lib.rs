@@ -1,0 +1,16 @@
+mod ungenerated;
+
+use lint_core::{Headline, Lint, Report, SourceFile};
+use ungenerated::Ungenerated;
+
+#[derive(Debug)]
+pub struct ArbitraryNewtypes;
+
+impl Lint for ArbitraryNewtypes {
+    fn report(files: &[SourceFile]) -> Report {
+        Report::new(
+            Headline::new("a newtype that owns its value derives Arbitrary"),
+            files.iter().filter(|file| file.is_shipped()).flat_map(Ungenerated::in_file).collect(),
+        )
+    }
+}

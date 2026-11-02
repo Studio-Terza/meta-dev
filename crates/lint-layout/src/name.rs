@@ -8,6 +8,8 @@ use crate::casing::Casing;
 use crate::matching::Matching;
 use crate::word::Word;
 use newtype::Newtype;
+use newtype::proptest::arbitrary::{Arbitrary, any};
+use newtype::proptest::strategy::{BoxedStrategy, Strategy};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(String);
@@ -131,5 +133,14 @@ impl From<&OsStr> for Name {
 impl fmt::Display for Name {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
+    }
+}
+
+impl Arbitrary for Name {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Name>;
+
+    fn arbitrary_with((): ()) -> BoxedStrategy<Name> {
+        any::<String>().prop_map(Name).boxed()
     }
 }

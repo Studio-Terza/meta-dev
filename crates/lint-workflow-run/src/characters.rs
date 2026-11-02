@@ -1,4 +1,4 @@
-use newtype::{Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype};
 
-#[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Characters(usize);

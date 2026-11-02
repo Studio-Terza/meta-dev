@@ -1,5 +1,7 @@
 use std::fmt;
 
+use proptest::arbitrary::Arbitrary;
+use proptest::strategy::{BoxedStrategy, Strategy};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -9,6 +11,10 @@ pub struct OneLine(String);
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("a line of text holds no line break or other control character")]
 pub struct NotOneLine;
+
+impl OneLine {
+    const PRINTABLE: &'static str = "\\PC*";
+}
 
 impl TryFrom<String> for OneLine {
     type Error = NotOneLine;
@@ -27,5 +33,14 @@ impl AsRef<str> for OneLine {
 impl fmt::Display for OneLine {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
+    }
+}
+
+impl Arbitrary for OneLine {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<OneLine>;
+
+    fn arbitrary_with((): ()) -> BoxedStrategy<OneLine> {
+        Self::PRINTABLE.prop_map(OneLine).boxed()
     }
 }
