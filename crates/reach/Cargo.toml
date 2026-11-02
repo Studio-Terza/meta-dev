@@ -10,6 +10,11 @@ test = false
 doctest = false
 
 [dependencies]
+lint-complexity = { path = "../lint-complexity" }
+lint-core = { path = "../lint-core" }
+lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
+lint-reader = { path = "../lint-reader" }
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 serde.workspace = true
@@ -18,6 +23,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
+tempfile.workspace = true
 
 [lints]
 workspace = true

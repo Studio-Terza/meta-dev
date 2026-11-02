@@ -1027,9 +1027,15 @@ name = "reach"
 version = "0.1.0"
 dependencies = [
  "laws",
+ "lint-complexity",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "lint-reader",
  "newtype",
  "serde",
  "serde_json",
+ "tempfile",
  "text-lines",
  "thiserror",
 ]
