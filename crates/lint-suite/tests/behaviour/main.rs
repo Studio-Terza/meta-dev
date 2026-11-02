@@ -35,6 +35,7 @@ mod rust_only;
 mod state_graph;
 mod test_budget;
 mod thin_main;
+mod transition_graph;
 mod type_graph;
 mod type_shape;
 mod unconsumed_traits;
