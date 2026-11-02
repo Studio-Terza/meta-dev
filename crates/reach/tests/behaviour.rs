@@ -10,10 +10,10 @@ const READING: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/readi
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
-const LEAF_REPORT: &str = "REACH=1 of 5 crates\nCARGO_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
-const TWO_REPORT: &str = "REACH=2 of 5 crates\nCARGO_SCOPE=-p middle -p tested-through\n\
+const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
+const TWO_REPORT: &str = "REACH=2 of 5 crates\nBUILD_SCOPE=-p middle -p tested-through\n\
     MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
-const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nCARGO_SCOPE=\nMUTANTS_SCOPE=\n";
+const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n";
 const HISTORY_LEAF: &str = "reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_CORE: &str = "reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_NONE: &str = "reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
@@ -66,7 +66,7 @@ impl Answer {
     fn crates(names: &[&str]) -> String {
         let flags = |flag: &str| names.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ");
         format!(
-            "REACH={} of 5 crates\nCARGO_SCOPE={}\nMUTANTS_SCOPE={}\n",
+            "REACH={} of 5 crates\nBUILD_SCOPE={}\nMUTANTS_SCOPE={}\n",
             names.len(),
             flags("-p "),
             flags("--test-package=")
@@ -83,8 +83,8 @@ laws::table!(
     a_widened_report_keeps_the_reach_for_mutants_but_runs_cargo_on_the_whole_workspace,
     Answer::widened_by,
     [
-        ["crates/leaf/src/lib.rs"] => "REACH=1 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
-        ["README.md"] => "REACH=0 of 5 crates\nCARGO_SCOPE=--workspace\nMUTANTS_SCOPE=\n",
+        ["crates/leaf/src/lib.rs"] => "REACH=1 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
+        ["README.md"] => "REACH=0 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=\n",
     ]
 );
 
@@ -132,14 +132,14 @@ fn a_dependency_served_by_a_patch_is_still_an_edge() {
     let reached = Answer::reached_in(PATCHED, &["crates/a/src/lib.rs"]);
     assert_eq!(
         reached,
-        "REACH=2 of 2 crates\nCARGO_SCOPE=-p a -p b\nMUTANTS_SCOPE=--test-package=a --test-package=b\n"
+        "REACH=2 of 2 crates\nBUILD_SCOPE=-p a -p b\nMUTANTS_SCOPE=--test-package=a --test-package=b\n"
     );
 }
 
 #[test]
 fn a_package_at_the_workspace_root_does_not_own_every_path() {
     let everything =
-        "REACH=2 of 2 crates\nCARGO_SCOPE=-p leaf -p root\nMUTANTS_SCOPE=--test-package=leaf --test-package=root\n";
+        "REACH=2 of 2 crates\nBUILD_SCOPE=-p leaf -p root\nMUTANTS_SCOPE=--test-package=leaf --test-package=root\n";
     for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
         assert_eq!(Answer::reached_in(ROOTED, &[changed]), everything, "{changed}");
     }
@@ -148,15 +148,15 @@ fn a_package_at_the_workspace_root_does_not_own_every_path() {
 #[test]
 fn a_crate_that_declares_what_it_reads_is_reached_by_changes_there() {
     let runner_and_tool =
-        "REACH=2 of 3 crates\nCARGO_SCOPE=-p runner -p tool\nMUTANTS_SCOPE=--test-package=runner --test-package=tool\n";
+        "REACH=2 of 3 crates\nBUILD_SCOPE=-p runner -p tool\nMUTANTS_SCOPE=--test-package=runner --test-package=tool\n";
     assert_eq!(
         Answer::reached_in(READING, &["crates/leaf/src/lib.rs"]),
-        "REACH=3 of 3 crates\nCARGO_SCOPE=-p leaf -p runner -p tool\nMUTANTS_SCOPE=--test-package=leaf --test-package=runner --test-package=tool\n"
+        "REACH=3 of 3 crates\nBUILD_SCOPE=-p leaf -p runner -p tool\nMUTANTS_SCOPE=--test-package=leaf --test-package=runner --test-package=tool\n"
     );
     assert_eq!(Answer::reached_in(READING, &["crates/runner/src/lib.rs"]), runner_and_tool);
     assert_eq!(
         Answer::reached_in(READING, &["tool/src/lib.rs"]),
-        "REACH=1 of 3 crates\nCARGO_SCOPE=-p tool\nMUTANTS_SCOPE=--test-package=tool\n"
+        "REACH=1 of 3 crates\nBUILD_SCOPE=-p tool\nMUTANTS_SCOPE=--test-package=tool\n"
     );
 }
 
