@@ -1,11 +1,11 @@
 use std::error::Error;
-use std::fs;
 
 use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
 use lint_runner::Cli;
+use ports::Disk;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -26,8 +26,8 @@ const MANIFEST: &str = "[package]\nname = \"r\"\n";
 
 #[test]
 fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
     let run = Trees::reported(root.path());
     assert_eq!(run.violations(), 2);
     assert_eq!(run.headlines(), 2);
@@ -40,22 +40,22 @@ fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
 fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let here = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut implemented = 0;
-    for entry in fs::read_dir(here.join(".."))? {
-        implemented += Trees::occurrences(&entry?.path().join("src"), "impl Lint for")?;
+    for entry in Disk::entries(&here.join(".."))? {
+        implemented += Disk::occurrences(&entry.join("src"), "impl Lint for")?;
     }
-    let listed_by_the_cli = Trees::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
-    let listed_by_the_runner = Trees::occurrences(&here.join("src/lints.rs"), "::report(files)")?;
+    let listed_by_the_cli = Disk::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
+    let listed_by_the_runner = Disk::occurrences(&here.join("src/lints.rs"), "::report(files)")?;
     assert!(listed_by_the_cli < implemented);
-    let listed_by_elegance = Trees::occurrences(&here.join("src/elegance.rs"), "::report(files)")?;
+    let listed_by_elegance = Disk::occurrences(&here.join("src/elegance.rs"), "::report(files)")?;
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli - listed_by_elegance);
     Ok(())
 }
 
 #[test]
 fn a_tree_with_violations_is_not_clean() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), "src/clean.rs", CLEAN)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "src/clean.rs", CLEAN)?;
     let run = Trees::reported(root.path());
     assert_eq!(run.headlines(), 2);
     assert!(run.err.contains("src/lib.rs:2"));
@@ -64,18 +64,18 @@ fn a_tree_with_violations_is_not_clean() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "target/out.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "target/out.rs", DIRTY)?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
 #[test]
 fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", PREDICATE)?;
-    Trees::write(root.path(), "src/paired.rs", PAIRED)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", PREDICATE)?;
+    Disk::write(root.path(), "src/paired.rs", PAIRED)?;
     assert!(Trees::reported(root.path()).is_clean());
     assert_eq!(Trees::reported(root.path()).exit, ExitCode::SUCCESS);
     Ok(())
@@ -83,10 +83,10 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", &format!("{DIRTY}{MODULES}"))?;
-    Trees::write(root.path(), "src/one.rs", REPEATED)?;
-    Trees::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", &format!("{DIRTY}{MODULES}"))?;
+    Disk::write(root.path(), "src/one.rs", REPEATED)?;
+    Disk::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
     let run = Trees::flagged(root.path(), &["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
     assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
@@ -97,10 +97,10 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
 
 #[test]
 fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", MODULES)?;
-    Trees::write(root.path(), "src/one.rs", REPEATED)?;
-    Trees::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", MODULES)?;
+    Disk::write(root.path(), "src/one.rs", REPEATED)?;
+    Disk::write(root.path(), "src/two.rs", REPEATED_AGAIN)?;
     let run = Trees::flagged(root.path(), &[]);
     assert!(!run.out.contains("copies"), "{}", run.out);
     Ok(())
@@ -115,16 +115,16 @@ fn the_report_flag_fails_on_an_unreadable_root() {
 
 #[test]
 fn the_process_entry_point_fails_on_a_violation() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
     assert_eq!(Cli::from_args(std::iter::once(OsString::from(root.path()))).run(), ExitCode::FAILURE);
     Ok(())
 }
 
 #[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).exit, ExitCode::FAILURE);
     Ok(())
 }
@@ -132,32 +132,6 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 struct Trees;
 
 impl Trees {
-    fn occurrences(path: &Path, needle: &str) -> Result<usize, Box<dyn Error>> {
-        if !path.is_dir() {
-            return Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()));
-        }
-        let mut found = 0;
-        for entry in fs::read_dir(path)? {
-            found += Self::occurrences(&entry?.path(), needle)?;
-        }
-        Ok(found)
-    }
-
-    fn package() -> Result<tempfile::TempDir, Box<dyn Error>> {
-        let root = tempfile::tempdir()?;
-        Self::write(root.path(), "Cargo.toml", MANIFEST)?;
-        Ok(root)
-    }
-
-    fn write(root: &Path, path: &str, text: &str) -> Result<(), Box<dyn Error>> {
-        let file = root.join(path);
-        if let Some(parent) = file.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(file, text)?;
-        Ok(())
-    }
-
     fn chain(prefix: &str, size: usize) -> String {
         let lines: Vec<String> = (0..size)
             .map(|index| {
@@ -234,9 +208,9 @@ impl Reported {
 
 #[test]
 fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "// note\nmod broken;\n")?;
-    Trees::write(root.path(), "src/broken.rs", "\n\nfn (")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "// note\nmod broken;\n")?;
+    Disk::write(root.path(), "src/broken.rs", "\n\nfn (")?;
     let run = Trees::reported(root.path());
     assert_eq!(run.failures(), 1);
     assert!(run.err.contains("cannot parse"));
@@ -246,37 +220,37 @@ fn a_file_that_does_not_parse_is_reported_without_hiding_other_lints() -> Result
 
 #[test]
 fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "mod broken;\n")?;
-    Trees::write(root.path(), "src/broken.rs", "struct A;\nstruct B;\nfn f() { let x = (1; }\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "mod broken;\n")?;
+    Disk::write(root.path(), "src/broken.rs", "struct A;\nstruct B;\nfn f() { let x = (1; }\n")?;
     assert!(Trees::reported(root.path()).err.contains("src/broken.rs:3"));
     Ok(())
 }
 
 #[test]
 fn files_outside_every_crate_target_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "tests/ui/bad.rs", "fn (")?;
-    Trees::write(root.path(), "tooling/corpus/dirty.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "tests/ui/bad.rs", "fn (")?;
+    Disk::write(root.path(), "tooling/corpus/dirty.rs", DIRTY)?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
 #[test]
 fn modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "pub mod target;\n")?;
-    Trees::write(root.path(), "src/target/mod.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "pub mod target;\n")?;
+    Disk::write(root.path(), "src/target/mod.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "#[cfg(test)]\nmod tests;\n")?;
-    Trees::write(root.path(), "src/tests.rs", "struct S { on: bool }\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "#[cfg(test)]\nmod tests;\n")?;
+    Disk::write(root.path(), "src/tests.rs", "struct S { on: bool }\n")?;
     let run = Trees::reported(root.path());
     assert_eq!(run.violations(), 1);
     assert!(!run.err.contains("src/tests.rs"));
@@ -285,8 +259,8 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
 
 #[test]
 fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "mod absent;\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "mod absent;\n")?;
     let run = Trees::reported(root.path());
     assert_eq!(run.failures(), 1);
     assert!(run.err.contains("cannot read"));
@@ -295,20 +269,20 @@ fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
-    let empty = tempfile::tempdir()?;
+    let empty = Disk::temporary()?;
     assert!(Trees::reported(empty.path()).err.contains("no Rust sources found"));
-    let other = tempfile::tempdir()?;
-    Trees::write(other.path(), "README", "x")?;
+    let other = Disk::temporary()?;
+    Disk::write(other.path(), "README", "x")?;
     assert!(Trees::reported(other.path()).err.contains("no Rust sources found"));
     Ok(())
 }
 
 #[test]
 fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
-    let clean = Trees::package()?;
-    Trees::write(clean.path(), "src/lib.rs", CLEAN)?;
-    let dirty = Trees::package()?;
-    Trees::write(dirty.path(), "src/lib.rs", DIRTY)?;
+    let clean = Disk::package()?;
+    Disk::write(clean.path(), "src/lib.rs", CLEAN)?;
+    let dirty = Disk::package()?;
+    Disk::write(dirty.path(), "src/lib.rs", DIRTY)?;
     let roots = [clean.path(), dirty.path()].map(Path::to_path_buf);
     assert_eq!(Trees::reported_all(&roots).exit, ExitCode::FAILURE);
     Ok(())
@@ -316,8 +290,8 @@ fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/main.rs", "struct Extra;\nfn main() {}\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/main.rs", "struct Extra;\nfn main() {}\n")?;
     assert_eq!(Trees::reported(root.path()).violations(), 1);
     assert_eq!(Trees::reported(&root.path().join("src")).violations(), 1);
     Ok(())
@@ -325,102 +299,102 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Erro
 
 #[test]
 fn bin_directory_roots_are_checked() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
-    Trees::write(root.path(), "src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
+    Disk::write(root.path(), "src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
-    std::os::unix::fs::symlink(root.path(), root.path().join("src/loop"))?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
+    Disk::linked(root.path(), &root.path().join("src/loop"))?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn a_shebang_is_not_a_comment() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "#!//usr/bin/env foo\nstruct A;\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "#!//usr/bin/env foo\nstruct A;\n")?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
 #[test]
 fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "pub mod request;\n")?;
-    Trees::write(root.path(), "src/request.rs", "#[cfg(test)]\nmod tests;\n")?;
-    Trees::write(root.path(), "src/request/tests.rs", "mod a;\n")?;
-    Trees::write(root.path(), "src/request/tests/a.rs", "mod b;\n")?;
-    Trees::write(root.path(), "src/request/tests/a/b.rs", "")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "pub mod request;\n")?;
+    Disk::write(root.path(), "src/request.rs", "#[cfg(test)]\nmod tests;\n")?;
+    Disk::write(root.path(), "src/request/tests.rs", "mod a;\n")?;
+    Disk::write(root.path(), "src/request/tests/a.rs", "mod b;\n")?;
+    Disk::write(root.path(), "src/request/tests/a/b.rs", "")?;
     assert_eq!(Trees::reported(root.path()).violations(), 1);
     Ok(())
 }
 
 #[test]
 fn fixture_trees_without_a_manifest_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "tooling/corpus/case/src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), "tests/fixtures/bad/src/lib.rs", "fn (")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "tooling/corpus/case/src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "tests/fixtures/bad/src/lib.rs", "fn (")?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
 #[test]
 fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\nexclude = [\"crates/skipped\"]\n")?;
-    Trees::write(root.path(), "crates/one/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), "crates/one/src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "crates/skipped/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), "crates/skipped/src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), "vendor/dep/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), "vendor/dep/src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), ".claude/worktrees/t1/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), ".claude/worktrees/t1/src/lib.rs", DIRTY)?;
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\nexclude = [\"crates/skipped\"]\n")?;
+    Disk::write(root.path(), "crates/one/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "crates/one/src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "crates/skipped/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "crates/skipped/src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "vendor/dep/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "vendor/dep/src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), ".claude/worktrees/t1/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), ".claude/worktrees/t1/src/lib.rs", DIRTY)?;
     assert!(Trees::reported(root.path()).is_clean());
-    Trees::write(root.path(), "crates/two/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), "crates/two/src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "crates/two/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "crates/two/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn a_path_dependency_inside_the_workspace_is_read() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"app\"]\n")?;
-    Trees::write(
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"app\"]\n")?;
+    Disk::write(
         root.path(),
         "app/Cargo.toml",
         "[package]\nname = \"app\"\n[dependencies]\nhelp = { path = \"../help\" }\n",
     )?;
-    Trees::write(root.path(), "app/src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "help/Cargo.toml", "[package]\nname = \"help\"\n")?;
-    Trees::write(root.path(), "help/src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "app/src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "help/Cargo.toml", "[package]\nname = \"help\"\n")?;
+    Disk::write(root.path(), "help/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
+    let root = Disk::temporary()?;
     let flow = "#[test]\nfn t() { for i in [2, 3] { if i > 9 { return; } } }\n";
     let build = "fn main() { println!(\"{}\", 2 + 3); }\n";
     let nested = "pub mod a;\npub mod b;\n";
     let layouts = ["plain/proj", "src/proj", "tests/proj"];
     layouts.iter().try_for_each(|layout| {
         let at = root.path().join(layout);
-        Trees::write(&at, "Cargo.toml", MANIFEST)?;
-        Trees::write(&at, "src/lib.rs", nested)?;
-        Trees::write(&at, "src/a.rs", "pub struct Tool;\n")?;
-        Trees::write(&at, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
-        Trees::write(&at, "tests/flow.rs", flow)?;
-        Trees::write(&at, "build.rs", build)
+        Disk::write(&at, "Cargo.toml", MANIFEST)?;
+        Disk::write(&at, "src/lib.rs", nested)?;
+        Disk::write(&at, "src/a.rs", "pub struct Tool;\n")?;
+        Disk::write(&at, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
+        Disk::write(&at, "tests/flow.rs", flow)?;
+        Disk::write(&at, "build.rs", build)
     })?;
     let counts: Vec<usize> =
         layouts.iter().map(|layout| Trees::reported(&root.path().join(layout)).violations()).collect();
@@ -432,51 +406,51 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
 
 #[test]
 fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "pub mod a;\n")?;
-    Trees::write(root.path(), "src/a.rs", "mod helper;\npub mod user;\n#[cfg(test)]\nmod tests;\n")?;
-    Trees::write(root.path(), "src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
-    Trees::write(root.path(), "src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
-    Trees::write(root.path(), "src/a/tests.rs", "use super::helper::Help;\n")?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "pub mod a;\n")?;
+    Disk::write(root.path(), "src/a.rs", "mod helper;\npub mod user;\n#[cfg(test)]\nmod tests;\n")?;
+    Disk::write(root.path(), "src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
+    Disk::write(root.path(), "src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
+    Disk::write(root.path(), "src/a/tests.rs", "use super::helper::Help;\n")?;
     assert_eq!(Trees::reported(root.path()).violations(), 1);
-    Trees::write(root.path(), "src/a/tests.rs", "")?;
+    Disk::write(root.path(), "src/a/tests.rs", "")?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
-    Trees::write(root.path(), "crates/engine-impl/Cargo.toml", "[package]\nname = \"engine\"\n")?;
-    Trees::write(root.path(), "crates/engine-impl/src/lib.rs", "mod x;\npub use x::{Used, Unused};\n")?;
-    Trees::write(
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
+    Disk::write(root.path(), "crates/engine-impl/Cargo.toml", "[package]\nname = \"engine\"\n")?;
+    Disk::write(root.path(), "crates/engine-impl/src/lib.rs", "mod x;\npub use x::{Used, Unused};\n")?;
+    Disk::write(
         root.path(),
         "crates/engine-impl/src/x.rs",
         "pub struct Used;\nimpl Used {\n    pub fn lift(&self) {}\n}\npub struct Unused;\nimpl Unused {\n    pub fn lift(&self) {}\n}\n",
     )?;
-    Trees::write(root.path(), "crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
-    Trees::write(root.path(), "crates/app/src/lib.rs", "pub use engine::Used;\n")?;
+    Disk::write(root.path(), "crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
+    Disk::write(root.path(), "crates/app/src/lib.rs", "pub use engine::Used;\n")?;
     assert_eq!(Trees::reported(root.path()).violations(), 1);
     Ok(())
 }
 
 #[test]
 fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", &Trees::chain("A", 5))?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", &Trees::chain("A", 5))?;
     let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
-    Trees::write(root.path(), "src/main.rs", &main)?;
+    Disk::write(root.path(), "src/main.rs", &main)?;
     assert_eq!(Trees::crate_graph_lines(root.path())?, Lines::default());
     Ok(())
 }
 
 #[test]
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    Trees::write(root.path(), "code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
-    Trees::write(root.path(), "code/a.rs", &Trees::chain("B", 5))?;
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
+    Disk::write(root.path(), "code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
+    Disk::write(root.path(), "code/a.rs", &Trees::chain("B", 5))?;
     let named = format!("{}:1", root.path().join("code/lib.rs").display());
     assert_eq!(Trees::crate_graph_lines(root.path())?, [named.as_str()]);
     Ok(())
@@ -489,9 +463,9 @@ fn inline_modules_and_path_attributes_lead_to_the_file_read() -> Result<(), Box<
         ("#[path = \"elsewhere/place.rs\"]\nmod renamed;\n", "src/elsewhere/place.rs"),
     ];
     layouts.iter().try_for_each(|(library, module)| {
-        let root = Trees::package()?;
-        Trees::write(root.path(), "src/lib.rs", library)?;
-        Trees::write(root.path(), module, DIRTY)?;
+        let root = Disk::package()?;
+        Disk::write(root.path(), "src/lib.rs", library)?;
+        Disk::write(root.path(), module, DIRTY)?;
         assert_eq!(Trees::reported(root.path()).violations(), 2);
         Ok(())
     })
@@ -506,9 +480,9 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
         ("[[bin]]\nname = \"c\"\npath = \"alt/c.rs\"\n", "alt/c.rs"),
     ];
     declared.iter().try_for_each(|(table, file)| {
-        let root = tempfile::tempdir()?;
-        Trees::write(root.path(), "Cargo.toml", &format!("{MANIFEST}{table}"))?;
-        Trees::write(root.path(), file, DIRTY)?;
+        let root = Disk::temporary()?;
+        Disk::write(root.path(), "Cargo.toml", &format!("{MANIFEST}{table}"))?;
+        Disk::write(root.path(), file, DIRTY)?;
         assert_eq!(Trees::reported(root.path()).violations(), 2, "{file}");
         Ok(())
     })
@@ -518,10 +492,10 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
 fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Box<dyn Error>> {
     let declared = [("example", "examples/e.rs", true), ("test", "tests/e.rs", false)];
     declared.iter().try_for_each(|(kind, file, clean)| {
-        let root = tempfile::tempdir()?;
+        let root = Disk::temporary()?;
         let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
-        Trees::write(root.path(), "Cargo.toml", &table)?;
-        Trees::write(root.path(), file, CLEAN)?;
+        Disk::write(root.path(), "Cargo.toml", &table)?;
+        Disk::write(root.path(), file, CLEAN)?;
         assert_eq!(Trees::reported(root.path()).is_clean(), *clean, "{kind}");
         Ok(())
     })
@@ -529,41 +503,41 @@ fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Bo
 
 #[test]
 fn a_conditional_path_attribute_leads_to_the_file_read_too() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
-    Trees::write(root.path(), "src/a.rs", CLEAN)?;
-    Trees::write(root.path(), "src/b.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
+    Disk::write(root.path(), "src/a.rs", CLEAN)?;
+    Disk::write(root.path(), "src/b.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;
-    Trees::write(root.path(), "nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
-    Trees::write(root.path(), "nested/src/lib.rs", DIRTY)?;
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;
+    Disk::write(root.path(), "nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
+    Disk::write(root.path(), "nested/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn a_package_inside_a_package_is_its_own_package() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
-    Trees::write(root.path(), "inner/src/lib.rs", DIRTY)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    Disk::write(root.path(), "inner/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
 
 #[test]
 fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", CLEAN)?;
     ["target/package/copy", ".cache/copy"].iter().try_for_each(|copy| {
-        Trees::write(root.path(), &format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
-        Trees::write(root.path(), &format!("{copy}/src/lib.rs"), DIRTY)
+        Disk::write(root.path(), &format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
+        Disk::write(root.path(), &format!("{copy}/src/lib.rs"), DIRTY)
     })?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
@@ -571,27 +545,27 @@ fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Erro
 
 #[test]
 fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
-    Trees::write(root.path(), "src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), "one/Cargo.toml", MANIFEST)?;
-    Trees::write(root.path(), "one/src/lib.rs", CLEAN)?;
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
+    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
+    Disk::write(root.path(), "one/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "one/src/lib.rs", CLEAN)?;
     assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
 #[test]
 fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    fs::create_dir(root.path().join("Cargo.toml"))?;
+    let root = Disk::temporary()?;
+    Disk::directory(&root.path().join("Cargo.toml"))?;
     assert!(Trees::reported(root.path()).err.contains("Cargo.toml"));
     Ok(())
 }
 
 #[test]
 fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
+    let root = Disk::package()?;
+    Disk::write(root.path(), "src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
     let run = Trees::reported(root.path());
     assert!(run.err.contains("src/lib.rs:1"));
     Ok(())
@@ -607,8 +581,8 @@ fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), B
         format!("fn render_page() {{ let a = {}1{}; }}\n", "vec![".repeat(DEEP_NESTING), "]".repeat(DEEP_NESTING)),
     ];
     shapes.iter().try_for_each(|shape| {
-        let root = Trees::package()?;
-        Trees::write(root.path(), "src/lib.rs", shape)?;
+        let root = Disk::package()?;
+        Disk::write(root.path(), "src/lib.rs", shape)?;
         let run = Trees::reported(root.path());
         assert_eq!(run.failures(), 1);
         assert!(run.err.contains("src/lib.rs:1"));
@@ -619,13 +593,13 @@ fn source_nested_past_what_anyone_writes_is_refused_not_parsed() -> Result<(), B
 
 #[test]
 fn deep_but_ordinary_nesting_is_still_linted() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
+    let root = Disk::package()?;
     let nested = format!(
         "fn render_page() {{ let a = {}1{}; }}\n// note\n",
         "(".repeat(SHALLOW_NESTING),
         ")".repeat(SHALLOW_NESTING)
     );
-    Trees::write(root.path(), "src/lib.rs", &nested)?;
+    Disk::write(root.path(), "src/lib.rs", &nested)?;
     let run = Trees::reported(root.path());
     assert_eq!(run.failures(), 0);
     assert!(run.err.contains("src/lib.rs:2"));
@@ -652,8 +626,8 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
         (format!("fn render_page(a: {angle}{}) {{}}\n", ">".repeat(SHALLOW_NESTING) + &angle), 1),
     ];
     cases.iter().try_for_each(|(source, failures)| {
-        let root = Trees::package()?;
-        Trees::write(root.path(), "src/lib.rs", source)?;
+        let root = Disk::package()?;
+        Disk::write(root.path(), "src/lib.rs", source)?;
         assert_eq!(
             Trees::reported(root.path()).err.matches("nested more than").count(),
             *failures,
@@ -662,4 +636,59 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
         );
         Ok(())
     })
+}
+
+mod ports {
+    use std::error::Error;
+    use std::fs;
+    use std::io;
+    use std::path::{Path, PathBuf};
+
+    use super::MANIFEST;
+
+    pub struct Disk;
+
+    impl Disk {
+        pub fn entries(directory: &Path) -> io::Result<Vec<PathBuf>> {
+            fs::read_dir(directory)?.map(|entry| Ok(entry?.path())).collect()
+        }
+
+        pub fn occurrences(path: &Path, needle: &str) -> Result<usize, Box<dyn Error>> {
+            if !path.is_dir() {
+                return Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()));
+            }
+            let mut found = 0;
+            for entry in Self::entries(path)? {
+                found += Self::occurrences(&entry, needle)?;
+            }
+            Ok(found)
+        }
+
+        pub fn temporary() -> io::Result<tempfile::TempDir> {
+            tempfile::tempdir()
+        }
+
+        pub fn package() -> Result<tempfile::TempDir, Box<dyn Error>> {
+            let root = Self::temporary()?;
+            Self::write(root.path(), "Cargo.toml", MANIFEST)?;
+            Ok(root)
+        }
+
+        pub fn write(root: &Path, path: &str, text: &str) -> Result<(), Box<dyn Error>> {
+            let file = root.join(path);
+            if let Some(parent) = file.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(file, text)?;
+            Ok(())
+        }
+
+        pub fn directory(path: &Path) -> io::Result<()> {
+            fs::create_dir(path)
+        }
+
+        pub fn linked(target: &Path, link: &Path) -> io::Result<()> {
+            std::os::unix::fs::symlink(target, link)
+        }
+    }
 }

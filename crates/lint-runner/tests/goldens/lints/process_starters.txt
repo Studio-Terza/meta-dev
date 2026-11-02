@@ -23,4 +23,6 @@ src/imported.rs:3: starts a std::process::Command; move it behind a port: a crat
 src/qualified.rs:2: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
 src/renamed.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
 tests/spawns.rs:3: starts a std::process::Command; move it behind a port: a crate whose name ends in ports, or a module named ports
+unit tests do no I/O and start no process:
+tests/spawns.rs:3: calls std::process::Command::new in test code; use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports
 fails

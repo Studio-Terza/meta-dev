@@ -1,11 +1,10 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use mutation_report::Cli;
+use ports::Checkout;
 use serde_json::{Value, json};
 
 const GOLDEN_SOURCE: &str = "\
@@ -114,60 +113,6 @@ none
 
 none
 ";
-
-struct Checkout(tempfile::TempDir);
-
-impl Checkout {
-    fn new() -> Result<Checkout, io::Error> {
-        let checkout = Checkout(tempfile::tempdir()?);
-        checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
-        checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
-        fs::create_dir(checkout.path("shards"))?;
-        Ok(checkout)
-    }
-
-    fn path(&self, name: &str) -> PathBuf {
-        self.0.path().join(name)
-    }
-
-    fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
-        let file = self.path(name);
-        fs::create_dir_all(file.parent().unwrap_or(Path::new("")))?;
-        fs::write(file, text)
-    }
-
-    fn shard(&self, name: &str, matrix: &Value) -> Result<(), io::Error> {
-        self.write(&format!("shards/{name}/matrix.json"), matrix.to_string())
-    }
-
-    fn report(&self) -> Answer {
-        self.report_of("shards", "sources")
-    }
-
-    fn report_of(&self, shards: &str, sources: &str) -> Answer {
-        Answer::to(&[
-            self.path(shards).as_os_str(),
-            self.path(sources).as_os_str(),
-            self.path("report.md").as_os_str(),
-            self.path("report.json").as_os_str(),
-        ])
-    }
-
-    fn markdown(&self) -> String {
-        fs::read_to_string(self.path("report.md")).unwrap_or_default()
-    }
-
-    fn field(&self, name: &str) -> Value {
-        self.json().get(name).cloned().unwrap_or_default()
-    }
-
-    fn json(&self) -> Value {
-        fs::read_to_string(self.path("report.json"))
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
-    }
-}
 
 #[derive(Debug, PartialEq)]
 struct Answer {
@@ -342,7 +287,7 @@ fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Err
     let answer = checkout.report_of("absent", "sources");
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use") && answer.err.contains("absent"));
-    fs::create_dir(checkout.path("bare"))?;
+    checkout.directory("bare")?;
     let answer = checkout.report_of("shards", "bare");
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use") && answer.err.contains("crates"));
@@ -377,5 +322,73 @@ fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
         let answer = Answer::to(arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
         assert_eq!(answer.err, "usage: mutation-report <shards> <sources> <report.md> <report.json>\n");
+    }
+}
+
+mod ports {
+    use std::fs;
+    use std::io;
+    use std::path::{Path, PathBuf};
+
+    use serde_json::Value;
+
+    use super::{Answer, GOLDEN_SOURCE};
+
+    pub struct Checkout(tempfile::TempDir);
+
+    impl Checkout {
+        pub fn new() -> Result<Checkout, io::Error> {
+            let checkout = Checkout(tempfile::tempdir()?);
+            checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
+            checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
+            fs::create_dir(checkout.path("shards"))?;
+            Ok(checkout)
+        }
+
+        pub fn path(&self, name: &str) -> PathBuf {
+            self.0.path().join(name)
+        }
+
+        pub fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
+            let file = self.path(name);
+            fs::create_dir_all(file.parent().unwrap_or(Path::new("")))?;
+            fs::write(file, text)
+        }
+
+        pub fn directory(&self, name: &str) -> Result<(), io::Error> {
+            fs::create_dir(self.path(name))
+        }
+
+        pub fn shard(&self, name: &str, matrix: &Value) -> Result<(), io::Error> {
+            self.write(&format!("shards/{name}/matrix.json"), matrix.to_string())
+        }
+
+        pub fn report(&self) -> Answer {
+            self.report_of("shards", "sources")
+        }
+
+        pub fn report_of(&self, shards: &str, sources: &str) -> Answer {
+            Answer::to(&[
+                self.path(shards).as_os_str(),
+                self.path(sources).as_os_str(),
+                self.path("report.md").as_os_str(),
+                self.path("report.json").as_os_str(),
+            ])
+        }
+
+        pub fn markdown(&self) -> String {
+            fs::read_to_string(self.path("report.md")).unwrap_or_default()
+        }
+
+        pub fn field(&self, name: &str) -> Value {
+            self.json().get(name).cloned().unwrap_or_default()
+        }
+
+        pub fn json(&self) -> Value {
+            fs::read_to_string(self.path("report.json"))
+                .ok()
+                .and_then(|text| serde_json::from_str(&text).ok())
+                .unwrap_or_default()
+        }
     }
 }

@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs;
 use std::io::{self, Write};
 use std::num::NonZeroU8;
 use std::path::{Path, PathBuf};
@@ -10,6 +9,7 @@ use std::time::Duration;
 
 use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
+use ports::Scratch;
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
 const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
@@ -112,8 +112,7 @@ impl Ports for Fake {
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {
         self.recorded(invocation)?;
         self.logs.borrow_mut().push(log.to_path_buf());
-        log.parent().map_or(Ok(()), fs::create_dir_all)?;
-        fs::write(log, &self.logged_text)?;
+        Scratch::placed(log, &self.logged_text)?;
         Ok(Run::new(self.exit, self.elapsed))
     }
 }
@@ -143,30 +142,6 @@ impl Answer {
     }
 }
 
-struct Scratch(tempfile::TempDir);
-
-impl Scratch {
-    fn new() -> Result<Scratch, io::Error> {
-        Ok(Scratch(tempfile::tempdir()?))
-    }
-
-    fn file(&self, name: &str) -> String {
-        self.0.path().join(name).display().to_string()
-    }
-
-    fn read(&self, name: &str) -> String {
-        fs::read_to_string(self.0.path().join(name)).unwrap_or_default()
-    }
-
-    fn write(&self, name: &str, text: &str) -> Result<(), io::Error> {
-        fs::write(self.0.path().join(name), text)
-    }
-
-    fn path(&self) -> &Path {
-        self.0.path()
-    }
-}
-
 struct Reach;
 
 impl Reach {
@@ -185,27 +160,27 @@ struct Sample;
 
 impl Sample {
     fn timed_line(elapsed: &Duration) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let fake = Fake { elapsed: *elapsed, ..Fake::new() };
         Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
         scratch.read("m.toml")
     }
 
     fn libtest_line(output: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
-        fs::write(scratch.path().join("out.txt"), output).ok();
+        let scratch = Scratch::fresh();
+        scratch.write("out.txt", output).ok();
         Answer::to(&Fake::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
         scratch.read("m.toml")
     }
 
     fn reach_report(changed: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
         Answer::to(&fake, &Reach::into(&scratch, "pull_request", "feature")).out
     }
 
     fn reach_into_main(changed: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
         Answer::to(&fake, &Reach::into(&scratch, "pull_request", "main")).out
     }
@@ -634,7 +609,7 @@ fn a_scope_with_crates_says_nothing_is_skipped() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir(scratch.path().join("built"))?;
+    scratch.directory("built")?;
     ["reach", "lint", "ci"].iter().try_for_each(|name| scratch.write(&format!("built/{name}"), name))?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["tools", &scratch.file("built"), &scratch.file("a/b/tools")]);
@@ -758,7 +733,7 @@ impl Exits {
     }
 
     fn changed(code: &Code) -> ExitCode {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let arguments = ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "--test-package=leaf"];
         Answer::to(&Fake::exiting(code.0), &arguments).exit
     }
@@ -840,7 +815,7 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
 #[test]
 fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("out/mutants.out"))?;
+    scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n")?;
     let answer = Answer::to(&Fake::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
     assert_eq!(answer.exit, ExitCode::from(2));
@@ -851,7 +826,7 @@ fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
 #[test]
 fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("out/mutants.out"))?;
+    scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "")?;
     let answer = Answer::to(&Fake::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
     assert_eq!((answer.exit, answer.out.as_str()), (ExitCode::SUCCESS, "mutants: none missed\n"));
@@ -1068,7 +1043,7 @@ impl Labelled {
             Reply::to("git -c", case.changes),
             Reply::to("gh pr", &[case.kind, "\n", case.labels].concat()),
         ]);
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let answer = Answer::to(&fake, &["labels", "main", "121", &scratch.file("metadata.json")]);
         Verdict { exit: answer.exit, out: answer.out.get(Self::HEADER.len()..).unwrap_or_default().to_owned() }
     }
@@ -1160,7 +1135,7 @@ laws::table!(
 #[test]
 fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
     let fake = Fake::answering(vec![Reply::to("git merge-base", "abc123\n")]);
-    let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    let scratch = Scratch::fresh();
     let metadata = scratch.file("metadata.json");
     let answer = Answer::to(&fake, &["labels", "release", "7", &metadata]);
     assert_eq!(answer.out, "labels of pull request 7 against the merge base with release\n");
@@ -1208,8 +1183,8 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
 #[test]
 fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("shards/shard-0"))?;
-    fs::create_dir_all(scratch.path().join("shards/shard-1"))?;
+    scratch.directory("shards/shard-0")?;
+    scratch.directory("shards/shard-1")?;
     scratch.write("shards/shard-0/caught.txt", "c1\nc2\n")?;
     scratch.write("shards/shard-0/missed.txt", "m2\n")?;
     scratch.write("shards/shard-1/caught.txt", "c3\n")?;
@@ -1236,8 +1211,8 @@ fn a_shard_summary_without_shards_is_reported() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("shards/shard-0"))?;
-    fs::create_dir_all(scratch.path().join("sources/crates"))?;
+    scratch.directory("shards/shard-0")?;
+    scratch.directory("sources/crates")?;
     scratch.write(
         "shards/shard-0/matrix.json",
         r#"{"baseline":["t :: one"],"mutants":[{"name":"m1","summary":"MissedMutant","failed":[]}]}"#,
@@ -1335,3 +1310,46 @@ laws::table!(
         Code(4) => Exit::Failure(NonZeroU8::MIN.saturating_add(3)),
     ]
 );
+
+mod ports {
+    use std::fs;
+    use std::io;
+    use std::path::Path;
+
+    pub struct Scratch(tempfile::TempDir);
+
+    impl Scratch {
+        pub fn new() -> Result<Scratch, io::Error> {
+            Ok(Scratch(tempfile::tempdir()?))
+        }
+
+        pub fn fresh() -> Scratch {
+            Scratch::new().unwrap_or_else(|_| unreachable!("a temporary directory"))
+        }
+
+        pub fn placed(path: &Path, text: &str) -> Result<(), io::Error> {
+            path.parent().map_or(Ok(()), fs::create_dir_all)?;
+            fs::write(path, text)
+        }
+
+        pub fn directory(&self, name: &str) -> Result<(), io::Error> {
+            fs::create_dir_all(self.0.path().join(name))
+        }
+
+        pub fn file(&self, name: &str) -> String {
+            self.0.path().join(name).display().to_string()
+        }
+
+        pub fn read(&self, name: &str) -> String {
+            fs::read_to_string(self.0.path().join(name)).unwrap_or_default()
+        }
+
+        pub fn write(&self, name: &str, text: &str) -> Result<(), io::Error> {
+            fs::write(self.0.path().join(name), text)
+        }
+
+        pub fn path(&self) -> &Path {
+            self.0.path()
+        }
+    }
+}

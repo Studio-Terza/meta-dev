@@ -35,6 +35,7 @@ lint-no-free-fns = { path = "../lint-no-free-fns" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
 lint-no-plaintext = { path = "../lint-no-plaintext" }
 lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
+lint-no-test-io = { path = "../lint-no-test-io" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-paired-apis = { path = "../lint-paired-apis" }
