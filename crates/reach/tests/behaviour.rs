@@ -12,6 +12,7 @@ const ROOTED: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/rooted
 const READING: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/reading.json");
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
 const HUBS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/hubs.json");
+const HALF: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/half.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
 const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
@@ -29,6 +30,8 @@ const HUBS_HEADLINE: &str = "report only, hub thickness: the logic each crate ho
 const HUB_CORE: &str = "crate core: logic 2, depended on by 2 of 3, 66%; weighted 4\n";
 const HUB_LEAF: &str = "crate leaf: logic 1, depended on by 0 of 3, 0%; weighted 0\n";
 const HUB_OTHER: &str = "crate other-leaf: logic 0, depended on by 0 of 3, 0%; weighted 0\n";
+const HUB_HALF: &str = "crate core: logic 2, depended on by 3 of 6, 50%; weighted 6\n";
+const HUB_NO_MAJORITY: &str = "logic in crates more than half the workspace depends on: 0 of 2, 0%\n";
 const HUB_SHARE: &str = "logic in crates more than half the workspace depends on: 2 of 3, 66%\n";
 const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not, of 5 workspace crates:\n\
     2 of 5, 40%: core\n1 of 5, 20%: middle\n0 of 5, 0%: leaf\n0 of 5, 0%: serde-user\n0 of 5, 0%: tested-through\n\
@@ -275,8 +278,8 @@ impl Repository {
         Ok(self)
     }
 
-    fn hubs(&self) -> Answer {
-        Answer::to(&["hubs", HUBS, &self.0.path().display().to_string()])
+    fn hubs(&self, metadata: &str) -> Answer {
+        Answer::to(&["hubs", metadata, &self.0.path().display().to_string()])
     }
 
     fn site(&self, name: &str) -> String {
@@ -296,7 +299,15 @@ fn hubs_weigh_each_crates_logic_by_the_crates_depending_on_it_heaviest_first() -
         repository.site("leaf"),
         repository.site("other-leaf")
     );
-    assert_eq!(repository.hubs(), Answer { exit: ExitCode::SUCCESS, out: expected, err: String::new() });
+    assert_eq!(repository.hubs(HUBS), Answer { exit: ExitCode::SUCCESS, out: expected, err: String::new() });
+    Ok(())
+}
+
+#[test]
+fn a_crate_exactly_half_the_workspace_depends_on_is_not_a_majority_hub() -> Result<(), Box<dyn Error>> {
+    let repository = Repository::new()?.with_crate("core", BRANCHY)?;
+    let expected = format!("{HUBS_HEADLINE}{}{HUB_HALF}{HUB_NO_MAJORITY}", repository.site("core"));
+    assert_eq!(repository.hubs(HALF), Answer { exit: ExitCode::SUCCESS, out: expected, err: String::new() });
     Ok(())
 }
 
