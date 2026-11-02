@@ -8,17 +8,24 @@ use newtype::Newtype;
 use crate::{Difference, Failure, Mode, Output};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Golden(PathBuf);
+pub struct Golden {
+    package: PathBuf,
+    path: PathBuf,
+}
 
 impl Golden {
     const DIRECTORY: &'static str = "tests/goldens";
     const PACKAGE_VARIABLE: &'static str = "CARGO_MANIFEST_DIR";
+    const MANIFEST: &'static str = "Cargo.toml";
 
     pub fn in_package(package: impl AsRef<Path>, name: impl AsRef<Path>) -> Result<Self, Failure> {
         let name = name.as_ref();
         name.components()
             .all(|part| matches!(part, Component::Normal(_)))
-            .then(|| Self(package.as_ref().join(Self::DIRECTORY).join(name)))
+            .then(|| Self {
+                package: package.as_ref().to_path_buf(),
+                path: package.as_ref().join(Self::DIRECTORY).join(name),
+            })
             .ok_or_else(|| Failure::Escapes { name: name.to_path_buf() })
     }
 
@@ -34,24 +41,31 @@ impl Golden {
     pub fn verify_in(&self, mode: Mode, actual: Output<'_>) -> Result<(), Failure> {
         match mode {
             Mode::Check => {
-                let recorded = fs::read_to_string(&self.0).map_err(|source| self.unread(source))?;
+                let recorded = fs::read_to_string(&self.path).map_err(|source| self.unread(source))?;
                 Difference::between(Output::new(&recorded), actual).map_or(Ok(()), |difference| {
-                    Err(Failure::Differs { path: self.0.clone(), difference: Box::new(difference) })
+                    Err(Failure::Differs { path: self.path.clone(), difference: Box::new(difference) })
                 })
             }
-            Mode::Record => self.written(actual).map_err(|source| Failure::Unwritable { path: self.0.clone(), source }),
+            Mode::Record if self.chosen_for_package() => {
+                self.written(actual).map_err(|source| Failure::Unwritable { path: self.path.clone(), source })
+            }
+            Mode::Record => Err(Failure::NotChosen { path: self.path.clone() }),
         }
     }
 
+    fn chosen_for_package(&self) -> bool {
+        !self.package.join(Self::MANIFEST).exists() || Mode::current().ok() == Some(Mode::Record)
+    }
+
     fn written(&self, actual: Output<'_>) -> io::Result<()> {
-        fs::create_dir_all(self.0.parent().unwrap_or(Path::new("")))
-            .and_then(|()| fs::write(&self.0, actual.into_inner()))
+        fs::create_dir_all(self.path.parent().unwrap_or(Path::new("")))
+            .and_then(|()| fs::write(&self.path, actual.into_inner()))
     }
 
     fn unread(&self, source: io::Error) -> Failure {
         match source.kind() {
-            io::ErrorKind::NotFound => Failure::Missing { path: self.0.clone() },
-            _ => Failure::Unreadable { path: self.0.clone(), source },
+            io::ErrorKind::NotFound => Failure::Missing { path: self.path.clone() },
+            _ => Failure::Unreadable { path: self.path.clone(), source },
         }
     }
 }

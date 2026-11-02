@@ -27,6 +27,11 @@ pub enum Failure {
     UnknownValue { value: OsString },
     #[error("{} is refused in CI; record locally and commit the diff", Mode::VARIABLE)]
     RecordInCi,
+    #[error(
+        "{}: a test cannot choose to record a package's golden; run `{}={} cargo test` to record it",
+        path.display(), Mode::VARIABLE, Mode::ON
+    )]
+    NotChosen { path: PathBuf },
     #[error("{}: a golden name stays inside tests/goldens; no `..`, root or drive", name.display())]
     Escapes { name: PathBuf },
     #[error("CARGO_MANIFEST_DIR is not set; run goldens through `cargo test`")]
