@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug)]
 pub(crate) struct ScanBytes(u64);
 
 impl ScanBytes {

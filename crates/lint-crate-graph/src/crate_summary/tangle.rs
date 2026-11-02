@@ -2,9 +2,9 @@ use std::fmt;
 
 use crate::crate_summary::item_count::ItemCount;
 use lint_layout::Name;
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Tangle(Vec<Name>);
 
 impl Tangle {

@@ -1,3 +1,4 @@
+mod arbitrary_newtypes;
 mod bool_methods;
 mod complexity;
 mod const_shape;

@@ -1,6 +1,6 @@
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct SourceText(String);
 
 impl AsRef<str> for SourceText {

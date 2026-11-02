@@ -3,9 +3,9 @@ use std::iter::Sum;
 use std::ops::{Add, Sub};
 
 use super::link::Link;
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Weight(f64);
 
 impl Weight {

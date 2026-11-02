@@ -88,8 +88,8 @@ impl Wrapped {
         let required: Vec<WherePredicate> = match chosen {
             None => vec![
                 parse_quote!(Self: ::core::fmt::Debug),
-                parse_quote!(#inner: ::proptest::arbitrary::Arbitrary + 'static),
-                parse_quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Strategy: 'static),
+                parse_quote!(#inner: ::newtype::proptest::arbitrary::Arbitrary + 'static),
+                parse_quote!(<#inner as ::newtype::proptest::arbitrary::Arbitrary>::Strategy: 'static),
             ],
             Some(_) => vec![parse_quote!(Self: ::core::fmt::Debug), parse_quote!(Self: 'static)],
         };
@@ -99,18 +99,18 @@ impl Wrapped {
         let (parameters, source) = match chosen {
             Some(strategy) => (quote!(()), quote!(let _ = parameters; let inner = #strategy;)),
             None => (
-                quote!(<#inner as ::proptest::arbitrary::Arbitrary>::Parameters),
-                quote!(let inner = ::proptest::arbitrary::any_with::<#inner>(parameters);),
+                quote!(<#inner as ::newtype::proptest::arbitrary::Arbitrary>::Parameters),
+                quote!(let inner = ::newtype::proptest::arbitrary::any_with::<#inner>(parameters);),
             ),
         };
         quote! {
-            impl #implemented ::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
+            impl #implemented ::newtype::proptest::arbitrary::Arbitrary for #name #arguments #bounds {
                 type Parameters = #parameters;
-                type Strategy = ::proptest::strategy::BoxedStrategy<Self>;
+                type Strategy = ::newtype::proptest::strategy::BoxedStrategy<Self>;
 
                 fn arbitrary_with(parameters: Self::Parameters) -> Self::Strategy {
                     #source
-                    ::proptest::strategy::Strategy::boxed(#mapped)
+                    ::newtype::proptest::strategy::Strategy::boxed(#mapped)
                 }
             }
         }
@@ -134,7 +134,7 @@ impl Wrapped {
 
     fn plain_strategy() -> TokenStream {
         quote! {
-            ::proptest::strategy::Strategy::prop_map(inner, <Self as ::newtype::Newtype>::new)
+            ::newtype::proptest::strategy::Strategy::prop_map(inner, <Self as ::newtype::Newtype>::new)
         }
     }
 

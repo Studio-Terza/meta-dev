@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
 lint-core = { path = "../lint-core" }
 lint-reader = { path = "../lint-reader" }

@@ -4,11 +4,11 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use lint_layout::Failure;
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
 use ignored::Ignored;
 
-#[derive(Newtype, Debug)]
+#[derive(Newtype, Arbitrary, Debug)]
 pub struct Directory(PathBuf);
 
 impl Directory {
