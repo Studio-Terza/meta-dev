@@ -299,6 +299,8 @@ laws::table!(
         "- run: echo 'bash -c x'\n" => 0,
         "- run: cargo test -c x\n" => 0,
         "- run: evaluate x\n" => 0,
+        "- run: bash ci/check\n" => 0,
+        "- env: !custom\n    S: \"a\\nb\"\n  run: cargo test\n" => 1,
         "- shell: bash -e {0}\n  run: cargo test\n" => 0,
     ]
 );
