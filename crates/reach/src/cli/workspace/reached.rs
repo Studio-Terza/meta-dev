@@ -47,6 +47,10 @@ impl Reached {
         Share { reached: CrateCount::new(self.crates.len()), total: self.total }
     }
 
+    pub fn covering(&self, crates: &BTreeSet<CrateName>) -> Option<&Reached> {
+        crates.is_subset(&self.crates).then_some(self)
+    }
+
     fn flags(&self, flag: &str) -> String {
         self.crates.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ")
     }

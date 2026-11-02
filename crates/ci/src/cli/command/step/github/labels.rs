@@ -1,33 +1,33 @@
 mod change;
 mod check;
+mod fault;
 mod git;
 mod hub;
 mod place;
+mod scope;
 
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
 use std::num::NonZeroU8;
+use std::path::Path;
 
-use super::Step;
+use super::super::Step;
+use super::super::changed::Changed;
+use super::super::journal::Journal;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
-use change::Change;
 use check::Check;
+use fault::Owed;
 use git::Git;
 use hub::Hub;
+use scope::Scope;
 
 #[derive(Debug)]
 pub struct Labels {
     base: String,
     pull_request: String,
-}
-
-impl Labels {
-    fn complained(check: Check, changes: &[Change], out: &mut impl Write) -> Result<(), Failure> {
-        check.flagged(changes).iter().try_for_each(|change| writeln!(out, "{}", change.now_at().display()))?;
-        Ok(writeln!(out, "::error::{check}")?)
-    }
+    metadata: Journal,
 }
 
 impl fmt::Display for Labels {
@@ -39,9 +39,10 @@ impl fmt::Display for Labels {
 impl Step for Labels {
     fn from_arguments(arguments: &[OsString]) -> Result<Labels, Failure> {
         match arguments {
-            [base, pull_request] => Ok(Labels {
+            [base, pull_request, metadata] => Ok(Labels {
                 base: base.to_str().ok_or(Failure::Usage)?.to_owned(),
                 pull_request: pull_request.to_str().ok_or(Failure::Usage)?.to_owned(),
+                metadata: Journal::file(Path::new(metadata)),
             }),
             _ => Err(Failure::Usage),
         }
@@ -49,13 +50,17 @@ impl Step for Labels {
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
         let changes = Git::with_ports(ports).changes_since_fork(&self.base)?;
-        let labels = Hub::with_ports(ports).labels_of(&self.pull_request)?;
+        let pull_request = Hub::with_ports(ports).pull_request(&self.pull_request)?;
+        Changed::stored_metadata(ports, &self.metadata)?;
         writeln!(out, "{self}")?;
-        let owed: Vec<Check> = Check::ALL
+        let scope = Scope::reached_by(&self.metadata, &changes);
+        let judged: Vec<Owed> = Check::ALL
             .into_iter()
-            .filter(|check| !check.flagged(&changes).is_empty() && labels.carrying(check.label()).is_none())
-            .collect();
-        owed.iter().try_for_each(|check| Self::complained(*check, &changes, out))?;
-        Ok(if owed.is_empty() { Exit::Success } else { Exit::Failure(NonZeroU8::MIN) })
+            .filter(|check| pull_request.carrying(check.label()).is_none())
+            .map(|check| scope.judged(check, pull_request.refactor(), &changes))
+            .collect::<Result<_, Failure>>()?;
+        let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
+        faults.iter().try_for_each(|owed| owed.complained(out))?;
+        Ok(if faults.is_empty() { Exit::Success } else { Exit::Failure(NonZeroU8::MIN) })
     }
 }
