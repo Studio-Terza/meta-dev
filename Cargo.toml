@@ -23,6 +23,7 @@ toml = "1.1.8"
 
 [profile.dev]
 opt-level = 1
+debug = "line-tables-only"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
