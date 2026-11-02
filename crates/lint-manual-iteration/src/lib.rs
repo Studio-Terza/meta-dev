@@ -137,7 +137,8 @@ struct IteratorCalls(usize);
 
 impl<'ast> Visit<'ast> for IteratorCalls {
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        self.0 += usize::from(Name::from(&call.method).matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS));
+        self.0 +=
+            Name::from(&call.method).matches::<Whole>(&ManualIteration::ITERATOR_CONSTRUCTORS).into_iter().count();
         syn::visit::visit_expr_method_call(self, call);
     }
 }

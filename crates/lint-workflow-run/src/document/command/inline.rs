@@ -37,14 +37,15 @@ impl Inline {
         words
             .iter()
             .zip(words.iter().skip(1))
-            .filter(|(program, _)| Self::interprets(program))
-            .find_map(|(_, flag)| Self::FLAGS.iter().copied().find(|known| flag == known))
+            .filter_map(|(program, flag)| Self::interpreter(program).map(|_| flag))
+            .find_map(|flag| Self::FLAGS.iter().copied().find(|known| flag == known))
     }
 
-    fn interprets(program: &str) -> bool {
+    fn interpreter(program: &str) -> Option<&str> {
         Path::new(program)
             .file_name()
-            .is_some_and(|name| Self::INTERPRETERS.iter().any(|known| name == OsStr::new(known)))
+            .filter(|name| Self::INTERPRETERS.iter().any(|known| *name == OsStr::new(known)))
+            .map(|_| program)
     }
 }
 

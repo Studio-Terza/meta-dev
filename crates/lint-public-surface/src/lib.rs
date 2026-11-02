@@ -30,15 +30,14 @@ impl Lint for PublicSurface {
             files
                 .iter()
                 .flat_map(|file| {
-                    Export::in_root(file)
-                        .into_iter()
-                        .filter(|export| references.depends_on(export.crate_name()) && !references.names(export))
-                        .map(move |export| {
+                    Export::in_root(file).into_iter().filter(|export| references.unnamed(export).is_some()).map(
+                        move |export| {
                             Violation::new(
                                 Site::new(file.path(), export.line()),
                                 Finding::UnnamedExport { name: export.name().clone() },
                             )
-                        })
+                        },
+                    )
                 })
                 .collect(),
         )

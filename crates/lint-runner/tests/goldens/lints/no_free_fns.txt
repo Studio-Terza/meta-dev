@@ -1,6 +1,5 @@
 test budget, report only:
 corpus: 2 tests in 5 files, 5 of 32 lines, 0 process starts
-report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
 src/free.rs:1: fn helper

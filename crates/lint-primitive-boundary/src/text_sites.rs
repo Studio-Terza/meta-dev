@@ -53,7 +53,7 @@ impl TextSites {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| segment.ident.clone())
-            .filter(|ident| Name::from(ident).matches::<Whole>(&Self::DOOR_TRAITS))
+            .filter(|ident| Name::from(ident).matches::<Whole>(&Self::DOOR_TRAITS).is_some())
     }
 
     fn sighted(&mut self, ident: Option<Ident>) {
@@ -91,8 +91,9 @@ impl<'ast> Visit<'ast> for TextSites {
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
         let name = Name::from(&call.method);
         self.sighted(
-            (name.matches::<Whole>(&Self::INSPECTING) || name.matches::<Whole>(&Self::PRODUCING))
-                .then(|| call.method.clone()),
+            name.matches::<Whole>(&Self::INSPECTING)
+                .or_else(|| name.matches::<Whole>(&Self::PRODUCING))
+                .map(|_| call.method.clone()),
         );
         syn::visit::visit_expr_method_call(self, call);
     }

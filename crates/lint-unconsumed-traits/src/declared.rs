@@ -27,10 +27,12 @@ impl Declared<'_> {
         })
     }
 
-    fn is_bare(block: &ItemTrait) -> bool {
-        Self::methods(block).next().is_some()
-            && Self::methods(block).all(|method| method.default.is_none())
-            && !block.attrs.iter().any(|attribute| attribute.path().is_ident(Self::DISPATCHING))
+    fn bare(block: &ItemTrait) -> Option<&ItemTrait> {
+        Self::methods(block)
+            .next()
+            .filter(|_| Self::methods(block).all(|method| method.default.is_none()))
+            .filter(|_| !block.attrs.iter().any(|attribute| attribute.path().is_ident(Self::DISPATCHING)))
+            .map(|_| block)
     }
 }
 
@@ -43,7 +45,7 @@ impl<'ast> Visit<'ast> for Declared<'_> {
         let site = Site::new(self.file.path(), LineNumber::from(block.ident.span()));
         let declaration = Declaration::new(Name::from(&block.ident), site);
         self.found.extend(
-            (Walk::outside_tests(&block.attrs) == Walk::Entered && Self::is_bare(block)).then_some(declaration),
+            Self::bare(block).filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered).map(|_| declaration),
         );
     }
 }

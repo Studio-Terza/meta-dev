@@ -50,25 +50,22 @@ impl Shape {
     fn implemented(item: &ItemImpl) -> Vec<Name> {
         let implemented =
             item.trait_.iter().filter_map(|(_, path, _)| path.segments.last()).map(|last| Name::from(&last.ident));
-        let by_address = PointerEq::is_whole_impl(item);
+        let by_address = PointerEq::whole_impl(item);
         implemented
-            .filter(|name| name.matches::<Whole>(&Self::TRAITS))
-            .filter(|name| !(by_address && name.matches::<Whole>(&Self::EQUALITY)))
-            .chain(Self::conversions(&item.items))
+            .filter(|name| name.matches::<Whole>(&Self::TRAITS).is_some())
+            .filter(|name| by_address.and(name.matches::<Whole>(&Self::EQUALITY)).is_none())
+            .chain(item.items.iter().filter_map(Self::conversion))
             .collect()
     }
 
-    fn conversions(members: &[ImplItem]) -> Vec<Name> {
-        members
-            .iter()
-            .filter_map(|member| match member {
-                ImplItem::Fn(function) => Some(Name::from(&function.sig.ident)),
-                _ => None,
-            })
-            .filter(|method| {
-                method.matches::<Whole>(&Self::METHODS)
-                    || method.words().first().is_some_and(|first| first.matches::<Whole>(&Self::LEADS))
-            })
-            .collect()
+    fn conversion(member: &ImplItem) -> Option<Name> {
+        let method = match member {
+            ImplItem::Fn(function) => Some(Name::from(&function.sig.ident)),
+            _ => None,
+        }?;
+        method
+            .matches::<Whole>(&Self::METHODS)
+            .or_else(|| method.words().first().and_then(|first| first.matches::<Whole>(&Self::LEADS)))
+            .map(|_| method)
     }
 }

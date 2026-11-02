@@ -20,10 +20,10 @@ pub struct ForeignReferences {
 
 impl ForeignReferences {
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
-        let own_crate = binaries
-            .holding(file.path())
-            .xor(Some(file.path()))
-            .map(|_| CrateName::from(file.placement().crate_root()));
+        let own_crate = match binaries.holding(file.path()) {
+            Some(_) => None,
+            None => Some(CrateName::from(file.placement().crate_root())),
+        };
         let mut references =
             ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new(), globbed: BTreeSet::new() };
         references.visit_file(file.syntax());
@@ -39,13 +39,13 @@ impl ForeignReferences {
         self
     }
 
-    pub fn depends_on(&self, crate_name: &CrateName) -> bool {
-        self.crates.contains(crate_name)
-    }
-
-    pub fn names(&self, export: &Export) -> bool {
-        self.globbed.contains(export.crate_name())
-            || self.names.get(export.crate_name()).is_some_and(|names| names.contains(export.name()))
+    pub fn unnamed<'export>(&self, export: &'export Export) -> Option<&'export Export> {
+        let crate_name = export.crate_name();
+        self.crates
+            .get(crate_name)
+            .filter(|_| !self.globbed.contains(crate_name))
+            .filter(|_| !self.names.get(crate_name).is_some_and(|names| names.contains(export.name())))
+            .map(|_| export)
     }
 
     fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {

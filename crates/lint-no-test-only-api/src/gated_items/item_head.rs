@@ -1,4 +1,4 @@
-use proc_macro2::TokenTree;
+use proc_macro2::{Ident, TokenTree};
 use syn::spanned::Spanned;
 use syn::{Attribute, Field, ImplItem, Item, Meta, MetaList, Visibility};
 
@@ -57,17 +57,20 @@ impl<'item> ItemHead<'item> {
     pub(super) fn gate_of(attributes: &[Attribute]) -> Option<Finding> {
         (Walk::outside_tests(attributes) == Walk::Skipped)
             .then_some(Finding::GatedOnTest)
-            .or_else(|| attributes.iter().any(Self::is_hidden).then_some(Finding::DocHidden))
+            .or_else(|| attributes.iter().find_map(Self::hiding).map(|_| Finding::DocHidden))
     }
 
-    fn is_hidden(attribute: &Attribute) -> bool {
+    fn hiding(attribute: &Attribute) -> Option<&Attribute> {
         match &attribute.meta {
-            Meta::List(list) if list.path.is_ident(Self::DOCUMENTATION) => Self::names_hidden(list),
-            _ => false,
+            Meta::List(list) if list.path.is_ident(Self::DOCUMENTATION) => Self::hidden_named(list).map(|_| attribute),
+            _ => None,
         }
     }
 
-    fn names_hidden(list: &MetaList) -> bool {
-        list.tokens.clone().into_iter().any(|tree| matches!(tree, TokenTree::Ident(ident) if ident == Self::HIDDEN))
+    fn hidden_named(list: &MetaList) -> Option<Ident> {
+        list.tokens.clone().into_iter().find_map(|tree| match tree {
+            TokenTree::Ident(ident) if ident == Self::HIDDEN => Some(ident),
+            _ => None,
+        })
     }
 }

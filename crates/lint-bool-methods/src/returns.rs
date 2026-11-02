@@ -52,7 +52,7 @@ impl<'ast> Visit<'ast> for Returns<'_> {
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         match (Walk::inherent_impls(block), Walk::outside_tests(&block.attrs)) {
             (Walk::Entered, Walk::Entered) => visit::visit_item_impl(self, block),
-            _ => {}
+            (Walk::Skipped, _) | (_, Walk::Skipped) => {}
         }
     }
 

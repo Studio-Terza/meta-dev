@@ -13,15 +13,17 @@ impl Environment {
         match values.structure() {
             YamlData::Mapping(entries) => entries
                 .iter()
-                .filter(|(_, value)| Self::holds_lines(Node::new(value)))
-                .map(|(name, _)| Found::new(Node::new(name).line(), Finding::Environment))
+                .filter_map(|(name, value)| Self::multiline_entry(Node::new(name), Node::new(value)))
                 .collect(),
             YamlData::Tagged(_, inner) => Self::findings(Node::new(inner)),
             _ => Vec::new(),
         }
     }
 
-    fn holds_lines(value: Node<'_, '_>) -> bool {
-        value.text().is_some_and(|text| Text::new(text).trimmed().spans_lines())
+    fn multiline_entry(name: Node<'_, '_>, value: Node<'_, '_>) -> Option<Found> {
+        value
+            .text()
+            .and_then(|text| Text::new(text).trimmed().multiline())
+            .map(|_| Found::new(name.line(), Finding::Environment))
     }
 }

@@ -57,7 +57,7 @@ impl<'ast> Visit<'ast> for TestCode<'_> {
         let line = LineNumber::from(function.sig.ident.span());
         match self.gated(&function.attrs, line) {
             Walk::Entered => {
-                self.lines.extend(TestMarks::mark_test(&function.attrs).then_some(line));
+                self.lines.extend(TestMarks::mark_test(&function.attrs).map(|_| line));
                 visit::visit_item_fn(self, function);
             }
             Walk::Skipped => {}
@@ -66,9 +66,9 @@ impl<'ast> Visit<'ast> for TestCode<'_> {
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         self.lines.extend(
-            (TestMarks::is_law(invocation)
+            (TestMarks::law(invocation).is_some()
                 || (!invocation.path.is_ident(Self::DEFINITION)
-                    && Macros::attributes(invocation).iter().any(TestMarks::is_test))
+                    && Macros::attributes(invocation).iter().find_map(TestMarks::test).is_some())
                 || invocation.path.get_ident().is_some_and(|name| self.emitters.contains(&Name::from(name))))
             .then(|| LineNumber::from(invocation.bang_token.span)),
         );

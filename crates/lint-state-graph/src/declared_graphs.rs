@@ -30,10 +30,9 @@ impl<'scan> DeclaredGraphs<'scan> {
     }
 
     fn found_in(&self, invocation: &Macro) -> Vec<Violation> {
-        if invocation.path.segments.last().is_some_and(|last| self.names.call(&Name::from(&last.ident))) {
-            Graph::checked(invocation, self.path)
-        } else {
-            MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect()
+        match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
+            Some(_) => Graph::checked(invocation, self.path),
+            None => MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),
         }
     }
 }

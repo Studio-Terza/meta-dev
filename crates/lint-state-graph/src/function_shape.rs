@@ -30,7 +30,7 @@ impl FunctionShape {
     ) -> FunctionShape {
         let vertex = |ty: &Type| {
             let name = declarations.resolve(TypeName::from_type(ty).or_self(context.self_type()));
-            declarations.is_vertex(&name).then_some(name)
+            declarations.vertex_named(&name).map(|_| name)
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),

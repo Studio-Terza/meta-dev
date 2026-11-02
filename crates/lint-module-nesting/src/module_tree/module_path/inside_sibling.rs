@@ -6,10 +6,12 @@ use super::same::Same;
 pub struct InsideSibling;
 
 impl Relation for InsideSibling {
-    fn holds(this: &ModulePath, module: &ModulePath) -> bool {
+    fn holds<'module>(this: &ModulePath, module: &'module ModulePath) -> Option<&'module ModulePath> {
         let length = module.segments.len();
-        module.parent().is_some_and(|parent| parent.relates::<Ancestor>(this))
-            && this.segments.len() >= length
-            && !this.truncated_to_length(length).relates::<Same>(module)
+        module
+            .parent()
+            .and_then(|parent| parent.relates::<Ancestor>(this).map(|_| module))
+            .filter(|_| this.segments.len() >= length)
+            .filter(|_| this.truncated_to_length(length).relates::<Same>(module).is_none())
     }
 }

@@ -73,7 +73,8 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
 #[test]
 fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", PAIRED)?;
+    Trees::write(root.path(), "src/lib.rs", "pub struct A;\n")?;
+    Trees::write(root.path(), "src/paired.rs", PAIRED)?;
     assert!(Trees::reported(root.path()).is_clean());
     assert_eq!(Trees::reported(root.path()).exit, ExitCode::SUCCESS);
     Ok(())

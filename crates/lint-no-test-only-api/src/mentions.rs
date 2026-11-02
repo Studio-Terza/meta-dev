@@ -20,7 +20,7 @@ pub(crate) struct Mentions {
 
 impl Mentions {
     pub(crate) fn in_file(file: &SourceFile, wanted: Ground) -> BTreeSet<Name> {
-        let ground = if file.is_shipped() { Ground::Shipped } else { Ground::Tests };
+        let ground = file.shipped().map_or(Ground::Tests, |_| Ground::Shipped);
         let mut mentions = Mentions { wanted, ground, names: BTreeSet::new() };
         mentions.visit_file(file.syntax());
         file.test_modules().iter().for_each(|module| {

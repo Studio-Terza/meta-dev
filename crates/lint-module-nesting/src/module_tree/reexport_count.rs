@@ -19,8 +19,8 @@ impl ReexportCount {
         )
     }
 
-    pub fn exceeds(self, most: Most) -> bool {
-        !most.allows(self.0)
+    pub fn beyond(self, most: Most) -> Option<ReexportCount> {
+        most.allows(self.0).map_or(Some(self), |_| None)
     }
 
     fn leaves(tree: &UseTree) -> usize {
