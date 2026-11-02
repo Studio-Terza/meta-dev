@@ -230,3 +230,41 @@ fn links_inside_impls_count_unless_the_impl_is_test_code() {
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&format!("{groups}{join}")))]), CLEAN);
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&format!("{groups}#[cfg(test)]\n{join}")))]), FLAGGED);
 }
+
+const KNOT: usize = 27;
+const KNOT_REACH: usize = 3;
+const CROSSINGS_AT_BOUND: usize = 38;
+
+impl Items {
+    fn knot(prefix: &str, other: &str, crossings: usize) -> String {
+        let lines: Vec<String> = (0..KNOT)
+            .map(|index| {
+                let within = (1..=KNOT_REACH).map(|step| format!("{prefix}{}", (index + step) % KNOT));
+                let across = (index..crossings)
+                    .step_by(KNOT)
+                    .map(|crossing| format!("{other}{}", (index + crossing / KNOT) % KNOT));
+                format!("pub struct {prefix}{index}({});\n", within.chain(across).collect::<Vec<String>>().join(", "))
+            })
+            .collect();
+        lines.concat()
+    }
+
+    fn knots(crossings: usize) -> Lines {
+        let text = format!("{}{}", Items::knot("A", "B", crossings), Items::knot("B", "A", 0));
+        Items::flagged(&[Sources::file(ONE, Text::new(&text))])
+    }
+}
+
+#[test]
+fn a_cut_exactly_at_the_loose_bound_is_not_flagged() {
+    assert_eq!(Items::knots(CROSSINGS_AT_BOUND), CLEAN);
+    assert_eq!(Items::knots(CROSSINGS_AT_BOUND - 1), FLAGGED);
+}
+
+#[test]
+fn groups_are_found_whatever_order_their_items_are_declared_in() {
+    let interleaved = "pub struct A(F, H, K);\npub struct B(C, D, K);\npub struct C(D, E, P);\npub struct D(E);\npub struct E;\n\
+        pub struct F(K, L);\npub struct G(I, K, O, P);\npub struct H;\npub struct I(J);\npub struct J;\npub struct K;\n\
+        pub struct L(P);\npub struct M(O);\npub struct N(P);\npub struct O(P);\npub struct P;\n";
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(interleaved))]), FLAGGED);
+}

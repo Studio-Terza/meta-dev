@@ -61,8 +61,9 @@ impl<'graph> Spectrum<'graph> {
 
     pub fn fiedler(&self) -> Vec<f64> {
         let top = Self::unit(self.degrees.iter().map(|degree| degree.sqrt()).collect());
-        let start = iter::successors(Some(Self::SEED), |seed: &f64| Some((seed * Self::STRIDE + Self::OFFSET).fract()))
-            .take(self.degrees.len());
+        let start =
+            iter::successors(Some(Self::SEED), |seed: &f64| Some(seed.mul_add(Self::STRIDE, Self::OFFSET).fract()))
+                .take(self.degrees.len());
         let vector = (0..Self::ROUNDS).fold(Self::deflated(&start.collect::<Vec<f64>>(), &top), |vector, _| {
             Self::deflated(&self.lazy_step(&vector), &top)
         });

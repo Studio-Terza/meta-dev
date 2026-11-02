@@ -24,8 +24,7 @@ impl Cut {
     pub fn best(graph: &ItemGraph, tangles: &[Vec<NodeIndex>], floor: Least) -> Option<Cut> {
         let whole = Condensed::of_tangles(graph, tangles);
         let islands = whole.islands();
-        let sweeps =
-            islands.iter().filter(|island| island.len() > 1).filter_map(|island| whole.restricted(island).sweep(floor));
+        let sweeps = islands.iter().filter_map(|island| whole.restricted(island).sweep(floor));
         Self::apart(&whole, &islands, floor)
             .into_iter()
             .chain(sweeps)
