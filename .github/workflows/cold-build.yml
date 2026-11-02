@@ -1,0 +1,101 @@
+name: cold build
+
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cold-build
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_DEV_OPT_LEVEL: "1"
+  RUSTFLAGS: -C link-arg=-fuse-ld=mold
+  COLD: ${{ github.workspace }}/target/cold
+  TOOLS: ${{ github.workspace }}/target/cold/tools/debug
+  MEASURED: ${{ github.workspace }}/target/cold/measured.toml
+  CLIPPY_TARGET: ${{ github.workspace }}/target/cold/clippy
+  TEST_TARGET: ${{ github.workspace }}/target/cold/test-compile
+  CLIPPY_CRATES: ${{ github.workspace }}/target/cold/clippy-crates.txt
+  TEST_CRATES: ${{ github.workspace }}/target/cold/test-compile-crates.txt
+  RECORD: ci/cold-build.toml
+  HISTORY: ${{ github.workspace }}/target/ci/history.tsv
+
+permissions:
+  contents: read
+  issues: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  cold-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - uses: rui314/setup-mold@v1
+      - name: sources
+        run: cargo fetch --locked
+      - name: tools
+        run: cargo build --locked -q --bin ci --bin gate-limits --target-dir "$COLD/tools"
+      - name: clippy from scratch
+        env:
+          CARGO_TARGET_DIR: ${{ env.CLIPPY_TARGET }}
+        run: '"$TOOLS/ci" timed "$MEASURED" cold-clippy cargo clippy --locked --all-targets --workspace --timings -- -D warnings'
+      - name: clippy per crate
+        run: '"$TOOLS/ci" compile-times "$CLIPPY_TARGET/cargo-timings/cargo-timing.html" "$CLIPPY_CRATES"'
+      - name: test compile from scratch
+        env:
+          CARGO_TARGET_DIR: ${{ env.TEST_TARGET }}
+        run: '"$TOOLS/ci" timed "$MEASURED" cold-test-compile cargo test --locked --no-run --workspace --timings'
+      - name: test compile per crate
+        run: '"$TOOLS/ci" compile-times "$TEST_TARGET/cargo-timings/cargo-timing.html" "$TEST_CRATES"'
+      - name: stage times
+        if: always()
+        run: '"$TOOLS/ci" show "$MEASURED"'
+      - name: clippy summary
+        if: always()
+        run: '"$TOOLS/ci" summarize "$CLIPPY_CRATES" "$GITHUB_STEP_SUMMARY"'
+      - name: test compile summary
+        if: always()
+        run: '"$TOOLS/ci" summarize "$TEST_CRATES" "$GITHUB_STEP_SUMMARY"'
+      - name: ratchet
+        if: always()
+        run: '"$TOOLS/gate-limits" "$RECORD" "$MEASURED"'
+      - name: ratchet issues
+        if: github.ref == 'refs/heads/main' && always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$TOOLS/ci" stage-issues "$RECORD" "$MEASURED"'
+      - name: history restore
+        if: github.ref == 'refs/heads/main' && always()
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/target/ci/history.tsv
+          key: history-cold-${{ github.run_id }}
+          restore-keys: history-
+      - name: history
+        if: github.ref == 'refs/heads/main' && always()
+        run: '"$TOOLS/ci" measured-history "$MEASURED" "$HISTORY" "$GITHUB_SHA"'
+      - name: history save
+        if: github.ref == 'refs/heads/main' && always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/target/ci/history.tsv
+          key: history-cold-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cold-build
+          path: |
+            ${{ github.workspace }}/target/cold/*.toml
+            ${{ github.workspace }}/target/cold/*.txt
+            ${{ github.workspace }}/target/cold/*/cargo-timings/cargo-timing.html
+          retention-days: 90

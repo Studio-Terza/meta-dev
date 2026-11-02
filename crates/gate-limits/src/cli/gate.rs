@@ -1,5 +1,6 @@
 mod finding;
 mod limit;
+mod record;
 mod seconds;
 mod verdict;
 
@@ -14,7 +15,8 @@ use crate::cli::stage::Stage;
 pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
-use seconds::Seconds;
+pub use record::Record;
+pub(crate) use seconds::Seconds;
 
 #[derive(Debug)]
 pub struct Gate {
@@ -36,6 +38,10 @@ impl Gate {
             .map(|stage| Self::finding(stage, limits.get(stage), measured.get(stage)))
             .collect::<Result<Vec<Finding>, Failure>>()
             .and_then(|findings| if findings.is_empty() { Err(Failure::Empty) } else { Ok(Gate { findings }) })
+    }
+
+    pub fn lowered(self) -> Result<Record, Failure> {
+        self.findings.into_iter().map(Finding::lowered).collect()
     }
 
     fn sliced(limits: BTreeMap<Stage, Limit>, only: &[OsString]) -> Result<BTreeMap<Stage, Limit>, Failure> {
@@ -65,9 +71,9 @@ impl Gate {
 
     fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
         let limit =
-            limit.filter(|limit| limit.is_ordered()).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
+            limit.copied().and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
         let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
-        Ok(Finding::new(stage.clone(), *measured, *limit))
+        Ok(Finding::new(stage.clone(), *measured, limit))
     }
 }
 

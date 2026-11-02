@@ -14,6 +14,7 @@ use contents::Contents;
 pub use failure::Failure;
 pub use gate::Finding;
 use gate::Gate;
+use gate::Record;
 pub use stage::Stage;
 
 #[derive(Debug)]
@@ -55,6 +56,14 @@ impl Cli {
 
     pub fn past_warn(&self) -> Result<Vec<Finding>, Failure> {
         self.gate().map(Gate::past_warn)
+    }
+
+    pub fn lower(&self) -> Result<Record, Failure> {
+        let record = self.gate()?.lowered()?;
+        fs::File::create(&self.limits)
+            .and_then(|mut file| write!(file, "{record}"))
+            .map(|()| record)
+            .map_err(|source| Failure::Io { path: self.limits.clone(), source })
     }
 
     fn gate(&self) -> Result<Gate, Failure> {
