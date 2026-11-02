@@ -1,7 +1,7 @@
 use newtype::Display;
 use proc_macro2::Span;
 
-#[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LineNumber(usize);
 
 impl LineNumber {

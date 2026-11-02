@@ -44,8 +44,8 @@ impl NoTestOnlyApi {
         package
             .features()
             .iter()
-            .filter(|name| FeatureWord::is_test(name))
-            .map(|name| Violation::new(Site::of_file(&manifest), Finding::Feature(name.clone())))
+            .filter(|(name, _)| FeatureWord::is_test(name))
+            .map(|(name, line)| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
             .collect()
     }
 }

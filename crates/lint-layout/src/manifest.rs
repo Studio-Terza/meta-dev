@@ -1,13 +1,15 @@
 mod members;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use toml::de::DeTable;
 use toml::{Table, Value};
 
 use crate::failure::Failure;
+use crate::line_number::LineNumber;
 use crate::name::Name;
 use crate::untested::Untested;
 use members::Members;
@@ -15,6 +17,7 @@ use members::Members;
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
+    text: String,
     table: Table,
 }
 
@@ -39,7 +42,7 @@ impl Manifest {
         match fs::read_to_string(&file) {
             Ok(text) => text
                 .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), table }))
+                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: text.clone(), table }))
                 .map_err(|source| Failure::Manifest { path: file, source }),
             Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(source) => Err(Failure::Io { path: file, source }),
@@ -62,14 +65,23 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn feature_names(&self) -> Vec<Name> {
-        self.table
-            .get(Self::FEATURES)
-            .and_then(Value::as_table)
-            .into_iter()
-            .flat_map(Table::keys)
-            .map(|name| Name::from(name.as_str()))
-            .collect()
+    pub fn features(&self) -> BTreeMap<Name, LineNumber> {
+        DeTable::parse(&self.text)
+            .map(|document| {
+                document
+                    .get_ref()
+                    .iter()
+                    .filter(|(key, _)| key.get_ref() == Self::FEATURES)
+                    .filter_map(|(_, value)| value.get_ref().as_table())
+                    .flat_map(|features| features.keys())
+                    .map(|key| (Name::from(key.get_ref().as_ref()), self.line_at(key.span().start)))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn line_at(&self, byte_index: usize) -> LineNumber {
+        LineNumber::from(self.text.get(..byte_index).unwrap_or_default().matches('\n').count() + 1)
     }
 
     #[must_use]

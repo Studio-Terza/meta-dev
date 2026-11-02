@@ -1,4 +1,7 @@
+mod body_items;
 mod finding;
+
+use body_items::BodyItems;
 
 use finding::Finding;
 use lint_core::Lint;
@@ -21,7 +24,9 @@ impl Lint for ThinMain {
                 .iter()
                 .filter(|file| file.placement().role() == Role::BinaryRoot)
                 .flat_map(|file| {
-                    file.syntax().items.iter().filter(|item| !Self::is_thin(item)).map(|item| {
+                    let items = &file.syntax().items;
+                    let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
+                    items.iter().filter(|item| !Self::is_thin(item)).chain(inside_main).map(|item| {
                         Violation::new(Site::new(file.path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
                     })
                 })
@@ -31,6 +36,13 @@ impl Lint for ThinMain {
 }
 
 impl ThinMain {
+    fn mains(items: &[Item]) -> impl Iterator<Item = &ItemFn> {
+        items.iter().filter_map(|item| match item {
+            Item::Fn(main) if Self::is_thin(item) => Some(main),
+            _ => None,
+        })
+    }
+
     fn keyword(item: &Item) -> Span {
         match item {
             Item::Use(found) => found.use_token.span,

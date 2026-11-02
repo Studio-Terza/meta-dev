@@ -1,5 +1,5 @@
 use syn::visit::{self, Visit};
-use syn::{ItemFn, ItemMod, Macro};
+use syn::{Attribute, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use std::collections::BTreeSet;
 
@@ -23,6 +23,12 @@ impl<'emitters> TestCode<'emitters> {
         code.visit_file(file);
         code.lines
     }
+
+    fn gated(&mut self, attributes: &[Attribute], line: LineNumber) -> Walk {
+        let walk = Walk::outside_tests(attributes);
+        self.lines.extend((walk == Walk::Skipped).then_some(line));
+        walk
+    }
 }
 
 impl<'ast> Visit<'ast> for TestCode<'_> {
@@ -33,9 +39,29 @@ impl<'ast> Visit<'ast> for TestCode<'_> {
         }
     }
 
+    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+        match self.gated(&item.attrs, LineNumber::from(item.impl_token.span)) {
+            Walk::Entered => visit::visit_item_impl(self, item),
+            Walk::Skipped => {}
+        }
+    }
+
+    fn visit_impl_item_fn(&mut self, method: &'ast ImplItemFn) {
+        match self.gated(&method.attrs, LineNumber::from(method.sig.ident.span())) {
+            Walk::Entered => visit::visit_impl_item_fn(self, method),
+            Walk::Skipped => {}
+        }
+    }
+
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.lines.extend(TestMarks::mark_test(&function.attrs).then(|| LineNumber::from(function.sig.ident.span())));
-        visit::visit_item_fn(self, function);
+        let line = LineNumber::from(function.sig.ident.span());
+        match self.gated(&function.attrs, line) {
+            Walk::Entered => {
+                self.lines.extend(TestMarks::mark_test(&function.attrs).then_some(line));
+                visit::visit_item_fn(self, function);
+            }
+            Walk::Skipped => {}
+        }
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
