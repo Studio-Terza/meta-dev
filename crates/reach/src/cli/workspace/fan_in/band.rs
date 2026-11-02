@@ -16,14 +16,13 @@ impl Band {
     }
 
     pub fn holding(percent: Percent) -> Band {
-        Band((percent.into_inner() / Self::WIDTH).min(Self::TENTHS - 1))
+        Band(percent.into_inner() / Self::WIDTH)
     }
 }
 
 impl fmt::Display for Band {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let lowest = self.0 * Self::WIDTH;
-        let highest = if self.0 + 1 == Self::TENTHS { Percent::WHOLE } else { lowest + Self::WIDTH - 1 };
-        write!(formatter, "{lowest}-{highest}%")
+        write!(formatter, "{lowest}-{}%", lowest + Self::WIDTH - 1)
     }
 }
