@@ -21,8 +21,7 @@ const SIGNED: &str =
 
 const CONSTANTS: &str =
     "#[test]\nfn a() {\n    assert_eq!(h(LOW), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(HIGH_END), 1);\n}\n";
-const OTHER_NAMES: &str =
-    "#[test]\nfn a() {\n    assert_eq!(h(T), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(Low), 1);\n}\n";
+const OTHER_NAMES: &str = "#[test]\nfn a() {\n    assert_eq!(h(T), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(U), 1);\n}\n#[test]\nfn c() {\n    assert_eq!(h(Low), 1);\n}\n#[test]\nfn d() {\n    assert_eq!(h(High), 1);\n}\n";
 
 const GATED: &str = "#[test]\n#[cfg(unix)]\nfn a() {\n    f(1);\n}\n#[test]\n#[cfg(unix)]\nfn b() {\n    f(2);\n}\n";
 
