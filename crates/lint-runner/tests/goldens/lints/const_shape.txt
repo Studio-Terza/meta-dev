@@ -3,18 +3,18 @@ corpus: 0 tests in 6 files, 0 of 26 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/casts.rs:1: fn f
-src/casts.rs:2: fn g
-src/loops.rs:1: fn f
-src/macros.rs:1: fn show
-src/walks.rs:1: fn f
-src/walks.rs:5: fn g
+src/casts.rs:1: fn f; make it an associated function or a method
+src/casts.rs:2: fn g; make it an associated function or a method
+src/loops.rs:1: fn f; make it an associated function or a method
+src/macros.rs:1: fn show; make it an associated function or a method
+src/walks.rs:1: fn f; make it an associated function or a method
+src/walks.rs:5: fn g; make it an associated function or a method
 casts live in const fns or bits modules, and const loops walk slices:
 src/casts.rs:1: as cast outside a const fn; use From, TryFrom, or an EnumMap
 src/contexts.rs:2: counter loop in const context; walk a slice with while let [head, rest @ ..]
 src/loops.rs:3: counter loop in const context; walk a slice with while let [head, rest @ ..]
 src/loops.rs:4: open loop in const context; walk a slice with while let or recurse
-src/loops.rs:5: for loop in const context
+src/loops.rs:5: for loop in const context; walk a slice with while let [head, rest @ ..]
 src/macros.rs:2: as cast outside a const fn; use From, TryFrom, or an EnumMap
 control flow is an expression; every branch yields the value the function returns:
 src/contexts.rs:2: while loop; drive an iterator with combinators, const fns excepted

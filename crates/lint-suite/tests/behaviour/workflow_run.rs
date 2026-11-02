@@ -267,6 +267,6 @@ laws::table!(
     a_workflow_that_is_not_yaml_is_reported_not_passed,
     Checked::workflow,
     [
-        "run: [a\n" => vec![format!("{WORKFLOW}:2: cannot parse the workflow as YAML: while parsing a flow sequence, expected ',' or ']'")],
+        "run: [a\n" => vec![format!("{WORKFLOW}:2: cannot parse the workflow as YAML: while parsing a flow sequence, expected ',' or ']'; correct the YAML so it parses")],
     ]
 );

@@ -3,8 +3,8 @@ corpus: 0 tests in 4 files, 0 of 17 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/lib.rs:1: fn numbers
-src/wiring.rs:1: fn pause
+src/lib.rs:1: fn numbers; make it an associated function or a method
+src/wiring.rs:1: fn pause; make it an associated function or a method
 a binary is a thin main over its library:
 src/main.rs:1: main.rs holds only fn main and imports; move this into the library
 a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item:

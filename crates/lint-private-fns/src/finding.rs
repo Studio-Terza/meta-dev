@@ -1,5 +1,6 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::Most;
 use lint_core::TypeName;
 use lint_layout::Name;
@@ -17,5 +18,12 @@ impl fmt::Display for Finding {
             names.len(),
             names.iter().map(ToString::to_string).collect::<Vec<String>>().join(", ")
         )
+    }
+}
+
+impl lint_core::Finding for Finding {
+    fn fix(&self) -> Fix {
+        let Finding::TooManyPrivateFns { .. } = self;
+        Fix::new("move the logic into its public interface or into more types")
     }
 }

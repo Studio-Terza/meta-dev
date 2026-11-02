@@ -1,5 +1,6 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_layout::UsePath;
 
 #[derive(Debug)]
@@ -13,10 +14,14 @@ impl<'path> From<&'path UsePath> for Finding<'path> {
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "calls {} in test code; use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports",
-            self.0
+        write!(formatter, "calls {} in test code", self.0)
+    }
+}
+
+impl lint_core::Finding for Finding<'_> {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports",
         )
     }
 }

@@ -4,8 +4,11 @@ use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitInt, Macro, TraitItemConst};
 
+use lint_core::Fix;
 use lint_core::Gate;
 use lint_core::Macros;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -35,7 +38,10 @@ impl Lint for NamedNumbers {
                     numbers.0.into_iter().map(move |line| {
                         Violation::new(
                             Site::new(file.path(), line),
-                            "numeric literal outside a const item; name it as a const so it can be found and tuned",
+                            Message::new(
+                                Problem::new("numeric literal outside a const item"),
+                                Fix::new("name it as a const so it can be found and tuned"),
+                            ),
                         )
                     })
                 })
