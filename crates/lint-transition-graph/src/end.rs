@@ -25,18 +25,6 @@ impl fmt::Display for Node {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Edge {
-    from: Node,
-    to: Node,
-}
-
-impl fmt::Display for Edge {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}", self.from, self.to)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Key {
     takes: Vec<Node>,
     gives: Node,
@@ -83,9 +71,13 @@ impl Ends {
         Ends { takes, gives }
     }
 
-    pub(crate) fn edges(&self) -> Vec<Edge> {
+    pub(crate) fn edges(&self) -> Vec<Key> {
         self.gives.domain().map_or_else(Vec::new, |to| {
-            self.takes.iter().filter_map(End::domain).map(|from| Edge { from: from.clone(), to: to.clone() }).collect()
+            self.takes
+                .iter()
+                .filter_map(End::domain)
+                .map(|from| Key { takes: vec![from.clone()], gives: to.clone() })
+                .collect()
         })
     }
 

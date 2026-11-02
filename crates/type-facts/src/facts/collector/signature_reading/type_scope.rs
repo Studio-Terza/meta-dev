@@ -36,7 +36,6 @@ impl<'owner> TypeScope<'owner> {
         match found {
             Type::Reference(reference) => self.endpoint(&reference.elem),
             Type::Paren(paren) => self.endpoint(&paren.elem),
-            Type::Group(group) => self.endpoint(&group.elem),
             Type::Slice(slice) => self.endpoint(&slice.elem),
             Type::Array(array) => self.endpoint(&array.elem),
             Type::Tuple(tuple) if tuple.elems.is_empty() => Endpoint::Unit,

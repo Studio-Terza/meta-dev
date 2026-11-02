@@ -8,7 +8,7 @@ use lint_placement::CrateName;
 use type_facts::Transition;
 
 use crate::count::Count;
-use crate::end::{Class, Edge, Ends};
+use crate::end::{Class, Ends, Key};
 use crate::workspace_types::WorkspaceTypes;
 use share::Share;
 
@@ -17,7 +17,7 @@ pub(crate) struct CrateTransitions<'found> {
     name: &'found CrateName,
     first: Option<&'found Site>,
     nodes: Count,
-    edges: BTreeSet<Edge>,
+    edges: BTreeSet<Key>,
     classes: Vec<Class>,
 }
 

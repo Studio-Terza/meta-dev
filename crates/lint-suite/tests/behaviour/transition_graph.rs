@@ -24,6 +24,7 @@ const CONVERSIONS: &str = "struct Raw;\nstruct Policy;\nimpl From<Raw> for Polic
 const PRIMITIVES: &str = "struct A;\nimpl A {\n    fn is_ready(&self) -> bool {}\n    fn label(&self) -> String {}\n    fn run(&mut self) {}\n    fn count(&self) -> Option<Vec<usize>> {}\n}\n";
 const FOREIGN: &str = "struct A;\nimpl A {\n    fn path(&self) -> PathBuf {}\n    fn each<T>(&self, item: T) -> A {}\n    fn pair(&self) -> (A, A) {}\n}\n";
 const WRAPPED: &str = "struct A;\nstruct B;\nimpl A {\n    fn all(&self) -> impl Iterator<Item = &B> {}\n    fn many(items: &[B]) -> Box<Self> {}\n    fn shared(&self) -> Rc<RefCell<B>> {}\n}\n";
+const READ_THROUGH: &str = "struct A;\nstruct B;\nimpl A {\n    fn p(&self) -> (B) {}\n    fn q(&self) -> [B; 2] {}\n    fn r(&self) -> () {}\n    fn s(&self) -> impl Tr<Other = B> {}\n    fn t<B>(&self, item: B) -> A {}\n}\nimpl<B> Wrap<B> for A {\n    fn u(&self, item: B) -> A {}\n}\n";
 const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n        fn f(&self) -> bool {}\n    }\n}\nimpl A {\n    #[cfg(test)]\n    fn g(&self) -> bool {}\n}\n";
 const FREE_AND_GENERIC: &str = "struct A;\nfn make() -> A {}\nimpl<T> Wrap for T {\n    fn wrapped(self) -> A {}\n}\n";
 
@@ -35,6 +36,7 @@ laws::table!(
         [PRIMITIVES, "1 nodes, 0 edges, 4 transitions, coverage 0 of 4, share 0.000, 4 touch a primitive or unit, 0 touch"] => true,
         [FOREIGN, "1 nodes, 1 edges, 3 transitions, coverage 0 of 3, share 0.000, 0 touch a primitive or unit, 3 touch a foreign or generic type"] => true,
         [WRAPPED, "2 nodes, 2 edges, 3 transitions, coverage 3 of 3, share 1.000"] => true,
+        [READ_THROUGH, "2 nodes, 2 edges, 6 transitions, coverage 2 of 6, share 0.333, 1 touch a primitive or unit, 3 touch a foreign or generic type"] => true,
         [TESTED, "crate x"] => false,
         [FREE_AND_GENERIC, "1 nodes, 0 edges, 2 transitions, coverage 1 of 2, share 0.500, 0 touch a primitive or unit, 1 touch a foreign or generic type"] => true,
         ["struct A;\n", "crate x"] => false,
