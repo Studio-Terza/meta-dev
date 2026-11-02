@@ -8,10 +8,10 @@ pub struct Conversions {
 impl Conversions {
     const NAMES: [&'static str; 2] = ["from_str", "parse"];
 
-    pub fn called_in(item: &ItemImpl) -> bool {
+    pub fn called_in(item: &ItemImpl) -> Option<Ident> {
         let mut conversions = Conversions { called: Vec::new() };
         conversions.visit_item_impl(item);
-        conversions.called.iter().any(|ident| Self::NAMES.iter().any(|name| ident == name))
+        conversions.called.into_iter().find(|ident| Self::NAMES.iter().any(|name| ident == name))
     }
 }
 

@@ -17,7 +17,7 @@ impl PathTokens {
     }
 
     pub fn root_index(&self, index: usize) -> Option<usize> {
-        self.separator_before_index(index).map_or(Some(index), |index| {
+        self.separator_before(index).map_or(Some(index), |_| {
             index
                 .checked_sub(Self::SEGMENT_LENGTH)
                 .filter(|before| matches!(self.0.get(*before), Some(TokenTree::Ident(_))))
@@ -25,13 +25,16 @@ impl PathTokens {
         })
     }
 
-    fn separator_before_index(&self, index: usize) -> Option<usize> {
+    fn separator_before(&self, index: usize) -> Option<&TokenTree> {
         (1..=Self::SEPARATOR_LENGTH)
-            .all(|back| {
-                index.checked_sub(back).and_then(|at| self.0.get(at)).is_some_and(
-                    |token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR),
-                )
+            .map(|back| {
+                index
+                    .checked_sub(back)
+                    .and_then(|at| self.0.get(at))
+                    .filter(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
             })
-            .then_some(index)
+            .collect::<Option<Vec<&TokenTree>>>()?
+            .into_iter()
+            .next()
     }
 }

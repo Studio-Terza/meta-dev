@@ -10,8 +10,8 @@ impl Conductance {
         Conductance(if volume > 0.0 { crossing / volume } else { 0.0 })
     }
 
-    pub fn is_loose(self) -> bool {
-        self.0 < Self::LOOSE_BELOW
+    pub fn loose(self) -> Option<Conductance> {
+        (self.0 < Self::LOOSE_BELOW).then_some(self)
     }
 
     pub fn total_cmp(self, other: Conductance) -> std::cmp::Ordering {

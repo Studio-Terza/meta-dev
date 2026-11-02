@@ -26,9 +26,9 @@ impl OnlyField {
     }
 
     pub fn counts(&self) -> Option<&Type> {
-        Some(&self.inner).filter(|inner| {
-            matches!(inner, Type::Path(path) if path.qself.is_none() && path.path.is_ident(Self::COUNT))
-        })
+        Some(&self.inner).filter(
+            |inner| matches!(inner, Type::Path(path) if path.qself.is_none() && path.path.is_ident(Self::COUNT)),
+        )
     }
 
     fn among(fields: &Fields) -> Option<OnlyField> {

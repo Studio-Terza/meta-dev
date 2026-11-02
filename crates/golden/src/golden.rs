@@ -46,12 +46,11 @@ impl Golden {
                     Err(Failure::Differs { path: self.path.clone(), difference: Box::new(difference) })
                 })
             }
-            Mode::Record => self.chosen_for_package().map_or_else(
-                || Err(Failure::NotChosen { path: self.path.clone() }),
-                |chosen| {
-                    chosen.written(actual).map_err(|source| Failure::Unwritable { path: self.path.clone(), source })
-                },
-            ),
+            Mode::Record => self
+                .chosen_for_package()
+                .ok_or_else(|| Failure::NotChosen { path: self.path.clone() })?
+                .written(actual)
+                .map_err(|source| Failure::Unwritable { path: self.path.clone(), source }),
         }
     }
 

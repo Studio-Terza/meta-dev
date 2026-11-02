@@ -25,16 +25,17 @@ impl Lint for PrimitiveBoundary {
             Headline::new("primitives appear only at a type's boundary"),
             files
                 .iter()
-                .filter(|file| file.is_shipped() && !support.contains(&file.path().to_owned()))
+                .filter_map(SourceFile::shipped)
+                .filter(|file| !support.contains(&file.path().to_owned()))
                 .flat_map(|file| {
                     Some(file)
-                        .filter(|file| !Gate::BITS.admits(file))
+                        .filter(|file| Gate::BITS.admits(file).is_none())
                         .into_iter()
                         .flat_map(NumberSites::violations)
                         .chain(TextSites::violations(file))
                         .chain(
                             Some(file)
-                                .filter(|file| !Gate::PORTS.admits(file))
+                                .filter(|file| Gate::PORTS.admits(file).is_none())
                                 .into_iter()
                                 .flat_map(StringSites::exposed_in),
                         )

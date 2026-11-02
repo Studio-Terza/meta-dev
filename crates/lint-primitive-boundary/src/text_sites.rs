@@ -43,7 +43,7 @@ impl TextSites {
     fn into_violations(self, path: &Path) -> Vec<Violation> {
         self.found
             .into_iter()
-            .filter(|sighting| sighting.outside(&self.doors))
+            .filter_map(|sighting| sighting.outside(&self.doors))
             .map(|sighting| sighting.into_violation(path))
             .collect()
     }

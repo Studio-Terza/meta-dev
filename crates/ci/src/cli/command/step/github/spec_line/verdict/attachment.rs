@@ -19,7 +19,9 @@ impl Attachment<'_> {
     fn owner(value: &str) -> Option<&str> {
         let (_, id) = value.split_at_checked(Self::OWNER.len()).filter(|(head, _)| *head == Self::OWNER)?;
         let start = id.get(..Self::SHORTEST_ID_LEN)?;
-        (start.chars().all(|letter| letter.is_ascii_hexdigit()) && id.chars().all(|letter| Self::id_letter(letter).is_some())).then_some(id)
+        (start.chars().all(|letter| letter.is_ascii_hexdigit())
+            && id.chars().all(|letter| Self::id_letter(letter).is_some()))
+        .then_some(id)
     }
 
     fn labels(value: &str) -> Option<Reading> {

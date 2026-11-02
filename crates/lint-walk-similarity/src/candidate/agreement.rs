@@ -19,8 +19,11 @@ impl Agreement {
         Agreement { shared: Tally::new(shared), all: Tally::new(all) }
     }
 
-    pub(crate) fn is_near_identical(self) -> bool {
-        self.shared.count().saturating_mul(Self::OUT_OF_PARTS) >= self.all.count().saturating_mul(Self::AT_LEAST_PARTS)
+    pub(crate) fn near_identical(self) -> Option<Agreement> {
+        Some(self).filter(|agreement| {
+            agreement.shared.count().saturating_mul(Self::OUT_OF_PARTS)
+                >= agreement.all.count().saturating_mul(Self::AT_LEAST_PARTS)
+        })
     }
 }
 

@@ -29,7 +29,9 @@ impl<'found> Family<'found> {
     }
 
     fn canonical(&self) -> Option<&&'found Transition> {
-        self.members.iter().find(|member| AsRef::<Name>::as_ref(**member).matches::<Whole>(&Self::CONVERSIONS).is_some())
+        self.members
+            .iter()
+            .find(|member| AsRef::<Name>::as_ref(**member).matches::<Whole>(&Self::CONVERSIONS).is_some())
     }
 }
 

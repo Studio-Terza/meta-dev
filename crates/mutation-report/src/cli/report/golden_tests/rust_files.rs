@@ -18,11 +18,7 @@ impl RustFiles {
     }
 
     fn descend(path: PathBuf) -> Result<Vec<PathBuf>, Failure> {
-        if path.is_dir() {
-            Self::below(&path)
-        } else {
-            Ok(Self::rust(path).into_iter().collect())
-        }
+        if path.is_dir() { Self::below(&path) } else { Ok(Self::rust(path).into_iter().collect()) }
     }
 
     fn rust(file: PathBuf) -> Option<PathBuf> {

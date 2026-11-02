@@ -13,8 +13,10 @@ impl Occurrence {
         Occurrence { site, extent }
     }
 
-    pub(crate) fn lies_within(&self, outer: &Occurrence) -> bool {
-        self.site.path() == outer.site.path() && outer.extent.holds(&self.extent)
+    pub(crate) fn lies_within<'outer>(&self, outer: &'outer Occurrence) -> Option<&'outer Occurrence> {
+        Some(outer)
+            .filter(|outer| self.site.path() == outer.site.path())
+            .and_then(|outer| outer.extent.holds(&self.extent).map(|_| outer))
     }
 }
 

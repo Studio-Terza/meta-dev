@@ -16,12 +16,12 @@ impl Declaration {
         Declaration { crate_root: crate_root.clone(), module, name, kind }
     }
 
-    pub fn is_named(&self, crate_root: &CrateRoot, name: &Name) -> bool {
-        self.crate_root == *crate_root && self.name == *name
+    pub fn named(&self, crate_root: &CrateRoot, name: &Name) -> Option<&Declaration> {
+        (self.crate_root == *crate_root && self.name == *name).then_some(self)
     }
 
-    pub fn is_in(&self, module: &ModulePath) -> bool {
-        self.module == *module
+    pub fn in_module(&self, module: &ModulePath) -> Option<&Declaration> {
+        (self.module == *module).then_some(self)
     }
 
     pub fn kind(&self) -> Kind {

@@ -7,8 +7,8 @@ pub(crate) struct Extent {
 }
 
 impl Extent {
-    pub(crate) fn holds(&self, inner: &Extent) -> bool {
-        self.start <= inner.start && inner.end <= self.end
+    pub(crate) fn holds<'inner>(&self, inner: &'inner Extent) -> Option<&'inner Extent> {
+        (self.start <= inner.start && inner.end <= self.end).then_some(inner)
     }
 }
 

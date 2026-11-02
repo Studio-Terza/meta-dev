@@ -62,11 +62,11 @@ enum Zone {
 
 impl Zone {
     fn of_file(file: &SourceFile) -> Zone {
-        if Gate::BITS.admits(file) { Zone::Bits } else { Zone::Elsewhere }
+        Gate::BITS.admits(file).map_or(Zone::Elsewhere, |_| Zone::Bits)
     }
 
     fn entering(self, module: &ItemMod) -> Zone {
-        if Gate::BITS.names(module) { Zone::Bits } else { self }
+        Gate::BITS.names(module).map_or(self, |_| Zone::Bits)
     }
 }
 

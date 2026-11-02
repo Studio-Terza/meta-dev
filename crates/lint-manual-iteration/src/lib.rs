@@ -56,14 +56,13 @@ impl ManualIteration {
         iterations.violations
     }
 
-    fn accumulates(block: &Block) -> bool {
+    fn accumulator(block: &Block) -> Option<&ExprMethodCall> {
         match block.stmts.as_slice() {
-            [Stmt::Expr(Expr::If(branch), _)] if branch.else_branch.is_none() => Self::accumulates(&branch.then_branch),
-            [Stmt::Expr(Expr::MethodCall(call), _)] => {
-                Name::from(&call.method).matches::<Whole>(&Self::ACCUMULATORS)
-                    && matches!(*call.receiver, Expr::Path(_) | Expr::Field(_))
+            [Stmt::Expr(Expr::If(branch), _)] if branch.else_branch.is_none() => Self::accumulator(&branch.then_branch),
+            [Stmt::Expr(Expr::MethodCall(call), _)] if matches!(*call.receiver, Expr::Path(_) | Expr::Field(_)) => {
+                Name::from(&call.method).matches::<Whole>(&Self::ACCUMULATORS).map(|_| call)
             }
-            _ => false,
+            _ => None,
         }
     }
 }
@@ -122,7 +121,7 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
     }
 
     fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
-        let finding = ManualIteration::accumulates(&expr.body).then(|| {
+        let finding = ManualIteration::accumulator(&expr.body).map(|_| {
             self.violation(
                 expr.for_token.span,
                 "loop that only accumulates; extend or collect from an iterator instead",

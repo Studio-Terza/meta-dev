@@ -23,7 +23,7 @@ pub(super) struct FileScan<'file> {
 
 impl<'file> FileScan<'file> {
     pub(super) fn scanned(file: &'file SourceFile) -> FileScan<'file> {
-        let ground = if Gate::PORTS.admits(file) { Ground::Ports } else { Ground::Open };
+        let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
         let mut scan = FileScan { file, ground, printed: Vec::new(), tested: BTreeSet::new() };
         scan.visit_file(file.syntax());
         scan
@@ -47,7 +47,7 @@ impl<'file> FileScan<'file> {
 impl<'ast> Visit<'ast> for FileScan<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.ground;
-        self.ground = if Gate::PORTS.names(module) { Ground::Ports } else { outer };
+        self.ground = Gate::PORTS.names(module).map_or(outer, |_| Ground::Ports);
         self.skipping(&module.attrs, module.span());
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
         self.ground = outer;
@@ -74,7 +74,7 @@ impl<'ast> Visit<'ast> for FileScan<'_> {
             .segments
             .last()
             .map(|last| (Name::from(&last.ident), LineNumber::from(last.ident.span())))
-            .filter(|(name, _)| name.matches::<Whole>(&Vocabulary::MACROS))
+            .filter(|(name, _)| name.matches::<Whole>(&Vocabulary::MACROS).is_some())
             .map(|(name, line)| {
                 EffectSite::new(Site::new(self.file.path(), line), Effect::Stdio, Called::Macro(name), self.ground)
             });

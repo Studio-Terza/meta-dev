@@ -22,8 +22,8 @@ impl Wrappers {
         .unwrap_or_default()
     }
 
-    pub fn holds_text(&self, name: &Name) -> bool {
-        self.plain.contains(name)
+    pub fn holds_text(&self, name: &Name) -> Option<&Name> {
+        self.plain.get(name)
     }
 
     fn widened(&self, definitions: &Definitions) -> Wrappers {

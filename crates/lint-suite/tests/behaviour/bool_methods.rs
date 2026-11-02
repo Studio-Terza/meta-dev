@@ -10,7 +10,8 @@ const OTHER_NAMES: &str = "pub struct A;\nimpl A {\n    pub fn allows(&self) -> 
 const OTHER_RETURNS: &str =
     "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> Option<u8> { None }\n    pub fn has_room(&self) {}\n}\n";
 const FREE: &str = "fn ready() -> bool { true }\npub const fn open() -> bool { true }\n";
-const INNER_FN: &str = "pub struct A;\nimpl A {\n    pub fn run(&self) {\n        fn done() -> bool { true }\n    }\n}\n";
+const INNER_FN: &str =
+    "pub struct A;\nimpl A {\n    pub fn run(&self) {\n        fn done() -> bool { true }\n    }\n}\n";
 const TRAIT_IMPL: &str = "pub struct A;\nimpl Tr for A {\n    fn is_on(&self) -> bool { true }\n}\nimpl PartialEq for A {\n    fn eq(&self, other: &A) -> bool { true }\n}\n";
 const TEST_MODULE: &str = "pub struct A;\n#[cfg(test)]\nmod tests {\n    use super::A;\n    impl A {\n        pub fn is_on(&self) -> bool { true }\n    }\n}\n";
 const TEST_IMPL: &str = "pub struct A;\n#[cfg(test)]\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
@@ -68,7 +69,11 @@ const CASES: [Case; 16] = [
         Flagged::new(&[]),
     ),
     Case::new(Title::new("test impls"), &[Source::new(Located::new("a.rs"), Text::new(TEST_IMPL))], Flagged::new(&[])),
-    Case::new(Title::new("test functions"), &[Source::new(Located::new("a.rs"), Text::new(TEST_FN))], Flagged::new(&[])),
+    Case::new(
+        Title::new("test functions"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_FN))],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("test targets"),
         &[Source::new(Located::new("x/tests/a.rs"), Text::new(LISTED))],
@@ -87,10 +92,7 @@ const CASES: [Case; 16] = [
     Case::new(Title::new("test trait"), &[Source::new(Located::new("a.rs"), Text::new(TEST_TRAIT))], Flagged::new(&[])),
     Case::new(
         Title::new("several files"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new(FREE)),
-            Source::new(Located::new("b.rs"), Text::new(TRAIT_IMPL)),
-        ],
+        &[Source::new(Located::new("a.rs"), Text::new(FREE)), Source::new(Located::new("b.rs"), Text::new(TRAIT_IMPL))],
         Flagged::new(&["a.rs:1", "a.rs:2"]),
     ),
 ];
@@ -103,5 +105,7 @@ fn every_function_returning_bool_is_flagged() {
 #[test]
 fn the_message_names_the_replacements() {
     let shown = BoolMethods::report(&[Sources::file("a.rs", Text::new(LISTED))]).to_string();
-    assert!(["Option", "Result", "enum", "match", "NonEmpty", "fn is_on -> bool"].iter().all(|word| shown.contains(word)));
+    assert!(
+        ["Option", "Result", "enum", "match", "NonEmpty", "fn is_on -> bool"].iter().all(|word| shown.contains(word))
+    );
 }

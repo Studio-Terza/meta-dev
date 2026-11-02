@@ -66,12 +66,15 @@ impl NumberSites {
         if sites.newtypes.is_empty() { sites.sightings.into_violations() } else { Vec::new() }
     }
 
-    fn is_wire(path: &UsePath) -> bool {
-        Self::WIRE_TYPES.iter().any(|wire| path.spells(wire))
+    fn wire(path: &UsePath) -> Option<&UsePath> {
+        Self::WIRE_TYPES.iter().find_map(|wire| path.spells(wire))
     }
 
-    fn is_named(path: &TypePath, names: &[Word<'_>]) -> bool {
-        path.qself.is_none() && path.path.get_ident().is_some_and(|ident| Name::from(ident).matches::<Whole>(names))
+    fn named<'word>(path: &TypePath, names: &[Word<'word>]) -> Option<Word<'word>> {
+        match &path.qself {
+            Some(_) => None,
+            None => path.path.get_ident().and_then(|ident| Name::from(ident).matches::<Whole>(names)),
+        }
     }
 
     fn newtype(&self, item: &ItemStruct) -> Option<Name> {
@@ -79,7 +82,7 @@ impl NumberSites {
             Fields::Unnamed(fields) if fields.unnamed.len() == 1 => fields
                 .unnamed
                 .first()
-                .filter(|field| matches!(&field.ty, syn::Type::Path(path) if Self::is_named(path, &Self::PRIMITIVES) || Self::is_named(path, &Self::SIZES) || Self::is_wire(&self.aliases.resolve(&path.path))))
+                .filter(|field| matches!(&field.ty, syn::Type::Path(path) if Self::named(path, &Self::PRIMITIVES).or_else(|| Self::named(path, &Self::SIZES)).is_some() || Self::wire(&self.aliases.resolve(&path.path)).is_some()))
                 .map(|_| Name::from(&item.ident)),
             _ => None,
         }
@@ -89,7 +92,7 @@ impl NumberSites {
         let wire = self.aliases.resolve(&path.path);
         let sized_by = self.parameter.as_ref().unwrap_or(&self.context);
         let site = Site::new(&self.path, LineNumber::from(path.path.span()));
-        if Self::is_named(path, &Self::PRIMITIVES) {
+        if Self::named(path, &Self::PRIMITIVES).is_some() {
             Some(Sighting::new(
                 Rank::Number,
                 Violation::new(
@@ -100,12 +103,14 @@ impl NumberSites {
                     },
                 ),
             ))
-        } else if Self::is_wire(&wire) {
+        } else if Self::wire(&wire).is_some() {
             Some(Sighting::new(
                 Rank::Number,
                 Violation::new(site, Finding::WireForm { wire, context: self.context.clone() }),
             ))
-        } else if Self::is_named(path, &Self::SIZES) && !sized_by.matches::<LoweredInfix>(&Self::SIZE_WORDS) {
+        } else if Self::named(path, &Self::SIZES).is_some()
+            && sized_by.matches::<LoweredInfix>(&Self::SIZE_WORDS).is_none()
+        {
             Some(Sighting::new(Rank::Size, Violation::new(site, Finding::UnnamedSize { context: sized_by.clone() })))
         } else {
             None
@@ -116,7 +121,7 @@ impl NumberSites {
 impl<'ast> Visit<'ast> for NumberSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if !Gate::BITS.names(module) => syn::visit::visit_item_mod(self, module),
+            Walk::Entered if Gate::BITS.names(module).is_none() => syn::visit::visit_item_mod(self, module),
             Walk::Entered | Walk::Skipped => {}
         }
     }

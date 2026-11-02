@@ -32,8 +32,7 @@ impl Admission {
             let loaded = Workspace::load(root)?;
             self.workspaces.into_iter().chain([(root.to_path_buf(), loaded)]).collect()
         };
-        let member = Some(package)
-            .filter(|candidate| {
+        let member = Some(package).filter(|candidate| {
             workspaces.get(root).and_then(|workspace| workspace.admits(candidate.directory())).is_some()
         });
         Ok(Admission { workspaces, admitted: self.admitted }.admitting(member))

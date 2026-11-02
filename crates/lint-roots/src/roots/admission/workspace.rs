@@ -43,8 +43,12 @@ impl Workspace {
         manifests: &BTreeMap<PathBuf, Manifest>,
     ) -> Option<&'path Path> {
         let relative = directory.strip_prefix(root).unwrap_or(directory);
-        Some(directory).filter(|_| directory == root).or_else(|| {
-            manifests.get(root).and_then(Manifest::workspace).and_then(|members| members.admits(relative)).map(|_| directory)
+        (directory == root).then_some(directory).or_else(|| {
+            manifests
+                .get(root)
+                .and_then(Manifest::workspace)
+                .and_then(|members| members.admits(relative))
+                .map(|_| directory)
         })
     }
 

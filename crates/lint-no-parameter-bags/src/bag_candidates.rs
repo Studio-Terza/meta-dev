@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use method_shape::MethodShape;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, ItemStruct, Type};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Type};
 
 use lint_core::SourceFile;
 use lint_core::Walk;
@@ -41,12 +41,20 @@ impl BagCandidates {
         }
     }
 
-    fn carries_logic(item: &ItemImpl, self_name: &Name) -> bool {
-        item.trait_.is_some()
-            || item.items.iter().any(|member| match member {
-                ImplItem::Fn(function) => MethodShape::classify(function, self_name) == MethodShape::Logic,
-                _ => false,
-            })
+    fn logic_carrier(item: &ItemImpl, self_name: Name) -> Option<Name> {
+        match &item.trait_ {
+            Some(_) => Some(self_name),
+            None => item.items.iter().find_map(|member| Self::logic(member, &self_name)).map(|_| self_name),
+        }
+    }
+
+    fn logic<'member>(member: &'member ImplItem, self_name: &Name) -> Option<&'member ImplItemFn> {
+        match member {
+            ImplItem::Fn(function) if MethodShape::classify(function, self_name) == MethodShape::Logic => {
+                Some(function)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -63,6 +71,6 @@ impl<'ast> Visit<'ast> for BagCandidates {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        self.disqualified.extend(Self::self_name(item).filter(|name| Self::carries_logic(item, name)));
+        self.disqualified.extend(Self::self_name(item).and_then(|name| Self::logic_carrier(item, name)));
     }
 }

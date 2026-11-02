@@ -1,5 +1,5 @@
-use syn::ItemFn;
 use syn::visit::{self, Visit};
+use syn::{Attribute, ItemFn};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -28,20 +28,26 @@ impl TestBodies<'_> {
     const PLAIN_TEST: &'static str = "test";
     const PANICKING: &'static str = "should_panic";
 
-    fn is_row_shaped(function: &ItemFn) -> bool {
+    fn row_shaped(function: &ItemFn) -> Option<&ItemFn> {
         TestMarks::mark_test(&function.attrs)
-            && function.sig.asyncness.is_none()
-            && function.attrs.iter().all(|attribute| {
-                !attribute.path().is_ident(Self::PANICKING)
-                    && (!TestMarks::is_test(attribute) || attribute.path().is_ident(Self::PLAIN_TEST))
-            })
+            .filter(|_| function.sig.asyncness.is_none())
+            .filter(|_| function.attrs.iter().all(|attribute| Self::row_attribute(attribute).is_some()))
+            .map(|_| function)
+    }
+
+    fn row_attribute(attribute: &Attribute) -> Option<&Attribute> {
+        match (attribute.path().is_ident(Self::PANICKING), TestMarks::test(attribute)) {
+            (true, _) => None,
+            (false, Some(_)) if !attribute.path().is_ident(Self::PLAIN_TEST) => None,
+            (false, _) => Some(attribute),
+        }
     }
 }
 
 impl<'ast> Visit<'ast> for TestBodies<'_> {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         let name = &function.sig.ident;
-        self.bodies.extend(Self::is_row_shaped(function).then(|| {
+        self.bodies.extend(Self::row_shaped(function).map(|_| {
             let site = Site::new(self.file.path(), LineNumber::from(name.span()));
             TestBody::new(Name::from(name), site, BodyShape::from(function))
         }));

@@ -45,8 +45,11 @@ impl LiteralNames {
         "helper", "util", "data", "value", "item", "thing", "execute", "perform", "update", "compute", "manage",
     ];
 
-    fn is_vague(name: &Name) -> bool {
-        !Self::SHORTEST.allows(name.length()) || name.matches::<Whole>(&Self::VAGUE)
+    fn vague(name: &Name) -> Option<&Name> {
+        match Self::SHORTEST.allows(name.length()) {
+            None => Some(name),
+            Some(_) => name.matches::<Whole>(&Self::VAGUE).map(|_| name),
+        }
     }
 
     fn vague_names(file: &syn::File) -> Vec<Ident> {
@@ -62,7 +65,7 @@ struct VagueNames {
 
 impl VagueNames {
     fn note(&mut self, name: &Ident) {
-        self.found.extend(LiteralNames::is_vague(&Name::from(name)).then(|| name.clone()));
+        self.found.extend(LiteralNames::vague(&Name::from(name)).map(|_| name.clone()));
     }
 }
 

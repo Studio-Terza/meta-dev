@@ -49,35 +49,41 @@ impl FnShape {
         shapes.violations
     }
 
-    fn is_boolean(expr: &Expr) -> bool {
+    fn boolean(expr: &Expr) -> Option<&Expr> {
         match expr {
-            Expr::Binary(binary) => matches!(
-                binary.op,
-                BinOp::Eq(_)
-                    | BinOp::Ne(_)
-                    | BinOp::Lt(_)
-                    | BinOp::Le(_)
-                    | BinOp::Gt(_)
-                    | BinOp::Ge(_)
-                    | BinOp::And(_)
-                    | BinOp::Or(_)
-            ),
-            Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)),
-            Expr::Lit(literal) => matches!(literal.lit, Lit::Bool(_)),
-            Expr::Paren(paren) => Self::is_boolean(&paren.expr),
+            Expr::Binary(binary)
+                if matches!(
+                    binary.op,
+                    BinOp::Eq(_)
+                        | BinOp::Ne(_)
+                        | BinOp::Lt(_)
+                        | BinOp::Le(_)
+                        | BinOp::Gt(_)
+                        | BinOp::Ge(_)
+                        | BinOp::And(_)
+                        | BinOp::Or(_)
+                ) =>
+            {
+                Some(expr)
+            }
+            Expr::Unary(unary) if matches!(unary.op, UnOp::Not(_)) => Some(expr),
+            Expr::Lit(literal) if matches!(literal.lit, Lit::Bool(_)) => Some(expr),
+            Expr::Paren(paren) => Self::boolean(&paren.expr).map(|_| expr),
             Expr::MethodCall(call) => {
                 let name = Name::from(&call.method);
-                name.matches::<Prefix>(&Self::BOOLEAN_PREFIXES) || name.matches::<Whole>(Self::BOOLEAN_METHODS)
+                name.matches::<Prefix>(&Self::BOOLEAN_PREFIXES)
+                    .or_else(|| name.matches::<Whole>(Self::BOOLEAN_METHODS))
+                    .map(|_| expr)
             }
-            _ => false,
+            _ => None,
         }
     }
 
-    fn binds_bool(local: &Local) -> bool {
-        matches!(
-            &local.pat,
-            Pat::Type(typed) if matches!(&*typed.ty, Type::Path(path) if path.path.is_ident("bool"))
-        ) || local.init.as_ref().is_some_and(|init| Self::is_boolean(&init.expr))
+    fn binds_bool(local: &Local) -> Option<&Local> {
+        match &local.pat {
+            Pat::Type(typed) if matches!(&*typed.ty, Type::Path(path) if path.path.is_ident("bool")) => Some(local),
+            _ => local.init.as_ref().and_then(|init| Self::boolean(&init.expr)).map(|_| local),
+        }
     }
 }
 
@@ -140,9 +146,7 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
 
     fn visit_local(&mut self, local: &'ast Local) {
         self.violations.extend(
-            FnShape::binds_bool(local)
-                .then_some(local.span())
-                .map(|span| Self::found(self.path, span, Finding::BooleanLocal)),
+            FnShape::binds_bool(local).map(|local| Self::found(self.path, local.span(), Finding::BooleanLocal)),
         );
         self.violations.extend(
             local

@@ -20,7 +20,10 @@ pub struct ForeignReferences {
 
 impl ForeignReferences {
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
-        let own_crate = binaries.holding(file.path()).xor(Some(file.path())).map(|_| CrateName::from(file.placement().crate_root()));
+        let own_crate = binaries
+            .holding(file.path())
+            .xor(Some(file.path()))
+            .map(|_| CrateName::from(file.placement().crate_root()));
         let mut references =
             ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new(), globbed: BTreeSet::new() };
         references.visit_file(file.syntax());

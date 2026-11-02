@@ -49,7 +49,7 @@ impl Summary {
     fn named_with(mutants: &[RecordedMutant], summary: Verdict) -> Vec<String> {
         let mut names: Vec<String> = mutants
             .iter()
-            .filter(|mutant| mutant.has_summary(summary))
+            .filter(|mutant| mutant.summary() == summary)
             .map(RecordedMutant::name)
             .map(ToString::to_string)
             .collect();

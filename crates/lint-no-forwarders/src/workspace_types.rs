@@ -19,8 +19,8 @@ impl From<&[&SourceFile]> for WorkspaceTypes {
 }
 
 impl WorkspaceTypes {
-    pub fn declares(&self, name: &Name) -> bool {
-        self.0.contains(name)
+    pub fn declares(&self, name: &Name) -> Option<&Name> {
+        self.0.get(name)
     }
 }
 

@@ -43,12 +43,16 @@ impl<'types> Forwarders<'types> {
         let params: Vec<Parameter> = function.sig.inputs.iter().filter_map(Parameter::describe).collect();
         let callee = match function.block.stmts.as_slice() {
             [Stmt::Expr(Expr::MethodCall(call), None)]
-                if self.receiver_type(&call.receiver, &params).is_some_and(|name| self.types.declares(&name))
-                    && call.args.iter().all(|arg| Self::forwards(arg, &params)) =>
+                if self
+                    .receiver_type(&call.receiver, &params)
+                    .is_some_and(|name| self.types.declares(&name).is_some())
+                    && call.args.iter().all(|arg| Self::forwarded(arg, &params).is_some()) =>
             {
                 Some(Callee::method(Name::from(&call.method)))
             }
-            [Stmt::Expr(Expr::Call(call), None)] if call.args.iter().all(|arg| Self::forwards(arg, &params)) => {
+            [Stmt::Expr(Expr::Call(call), None)]
+                if call.args.iter().all(|arg| Self::forwarded(arg, &params).is_some()) =>
+            {
                 self.workspace_callee(&call.func)
             }
             _ => None,
@@ -79,7 +83,7 @@ impl<'types> Forwarders<'types> {
         match segments.as_slice() {
             [.., owner, method] => {
                 let owner = if *owner == "Self" { &self.self_type } else { owner };
-                (self.types.declares(owner) && method.casing() == Casing::Lower)
+                (self.types.declares(owner).is_some() && method.casing() == Casing::Lower)
                     .then(|| Callee::associated(owner.clone(), method.clone()))
             }
             _ => None,
@@ -100,12 +104,12 @@ impl Forwarders<'_> {
         self.concrete = StructFields::type_arguments(segment);
     }
 
-    fn forwards(expr: &Expr, params: &[Parameter]) -> bool {
+    fn forwarded<'expr>(expr: &'expr Expr, params: &[Parameter]) -> Option<&'expr Expr> {
         match expr {
-            Expr::Path(path) => Parameter::named_by(params, &path.path).is_some(),
-            Expr::Field(field) => Self::forwards(&field.base, params),
-            Expr::Reference(reference) => Self::forwards(&reference.expr, params),
-            _ => false,
+            Expr::Path(path) => Parameter::named_by(params, &path.path).map(|_| expr),
+            Expr::Field(field) => Self::forwarded(&field.base, params),
+            Expr::Reference(reference) => Self::forwarded(&reference.expr, params),
+            _ => None,
         }
     }
 }

@@ -47,12 +47,11 @@ impl NamedNumbers {
     const UNITS: &[Word<'static>] = &words!["0", "1", "0.0", "1.0", "-1", "-1.0"];
 
     #[must_use]
-    pub fn is_unit(digits: Word<'_>) -> bool {
-        Self::UNITS.contains(&digits)
-    }
-
-    fn unnamed(digits: Word<'_>, line: LineNumber) -> Option<LineNumber> {
-        (!Self::is_unit(digits)).then_some(line)
+    pub fn unnamed(digits: Word<'_>, line: LineNumber) -> Option<LineNumber> {
+        match Self::UNITS.iter().find(|unit| **unit == digits) {
+            Some(_) => None,
+            None => Some(line),
+        }
     }
 }
 

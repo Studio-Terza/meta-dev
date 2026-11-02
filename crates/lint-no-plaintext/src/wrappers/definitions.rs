@@ -36,7 +36,11 @@ impl Definitions {
             .iter()
             .filter(|name| {
                 !self.validated.contains(*name)
-                    && self.shapes.iter().filter(|shape| shape.answers_to(name)).all(|shape| shape.holds_text(settled))
+                    && self
+                        .shapes
+                        .iter()
+                        .filter_map(|shape| shape.answers_to(name))
+                        .all(|shape| shape.holds_text(settled).is_some())
             })
             .cloned()
             .collect()
@@ -60,7 +64,7 @@ impl Definitions {
             Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
             _ => None,
         };
-        owner.filter(|_| deserializing.is_some() && Conversions::called_in(item))
+        deserializing.and(Conversions::called_in(item)).and(owner)
     }
 }
 

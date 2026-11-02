@@ -15,9 +15,9 @@ impl Wildcard {
     fn agrees<'text>(pattern: &[char], text: &'text [char]) -> Option<&'text [char]> {
         match pattern.split_first() {
             None => text.is_empty().then_some(text),
-            Some((&Self::ANY, rest)) => Self::agrees(rest, text)
-                .or_else(|| text.split_first().and_then(|(_, tail)| Self::agrees(pattern, tail)))
-                .map(|_| text),
+            Some((&Self::ANY, rest)) => {
+                Self::agrees(rest, text).or_else(|| Self::agrees(pattern, text.get(1..)?)).map(|_| text)
+            }
             Some((letter, rest)) => text
                 .split_first()
                 .filter(|(first, _)| *first == letter)

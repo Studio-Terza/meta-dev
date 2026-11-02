@@ -33,10 +33,7 @@ impl TestMarks {
             .map(|_| invocation)
     }
 
-    fn ends_in<'word>(
-        segments: &Punctuated<PathSegment, Token![::]>,
-        words: &[Word<'word>],
-    ) -> Option<Word<'word>> {
+    fn ends_in<'word>(segments: &Punctuated<PathSegment, Token![::]>, words: &[Word<'word>]) -> Option<Word<'word>> {
         segments.last().and_then(|segment| Name::from(&segment.ident).matches::<Whole>(words))
     }
 }

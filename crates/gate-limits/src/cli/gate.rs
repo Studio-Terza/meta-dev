@@ -67,8 +67,7 @@ impl Gate {
     }
 
     fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
-        let limit =
-            limit.and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
+        let limit = limit.and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
         let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
         Ok(Finding::new(stage.clone(), *measured, *limit))
     }

@@ -79,7 +79,9 @@ impl<'owner> TypeScope<'owner> {
     fn generic(&self, argument: &GenericArgument) -> Option<Endpoint> {
         match argument {
             GenericArgument::Type(inner) => Some(self.endpoint(inner)),
-            GenericArgument::AssocType(associated) if Name::from(&associated.ident).matches::<Whole>(&Self::ITEM).is_some() => {
+            GenericArgument::AssocType(associated)
+                if Name::from(&associated.ident).matches::<Whole>(&Self::ITEM).is_some() =>
+            {
                 Some(self.endpoint(&associated.ty))
             }
             _ => None,
