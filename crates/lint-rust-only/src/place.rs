@@ -23,17 +23,12 @@ impl Place {
     const VENDOR: &'static str = "vendor";
 
     pub(crate) fn locating(file: &RepoFile) -> Place {
-        if file.lies_under(Path::new(Self::VENDOR)) {
-            Place::Vendored
-        } else if Platform::covers_tests(file) {
-            Place::PlatformTests
-        } else if file.lies_under(Path::new(Self::ASSETS)) {
-            Place::Assets
-        } else if file.lies_under(Path::new(Platform::NAME)) {
-            Place::Platform
-        } else {
-            Place::Outside
-        }
+        file.lies_under(Path::new(Self::VENDOR))
+            .map(|_| Place::Vendored)
+            .or_else(|| Platform::tests_covering(file).map(|_| Place::PlatformTests))
+            .or_else(|| file.lies_under(Path::new(Self::ASSETS)).map(|_| Place::Assets))
+            .or_else(|| file.lies_under(Path::new(Platform::NAME)).map(|_| Place::Platform))
+            .unwrap_or(Place::Outside)
     }
 
     pub(crate) fn refusing(self, language: Language) -> Option<Language> {

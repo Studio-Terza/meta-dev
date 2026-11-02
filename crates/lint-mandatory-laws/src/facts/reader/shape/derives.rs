@@ -17,7 +17,7 @@ impl Derives {
             .iter()
             .flat_map(Self::listed)
             .filter_map(|path| path.segments.last().map(|last| Name::from(&last.ident)))
-            .filter(|name| name.matches::<Whole>(&Self::SERDE))
+            .filter(|name| name.matches::<Whole>(&Self::SERDE).is_some())
             .collect()
     }
 

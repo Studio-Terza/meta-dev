@@ -22,11 +22,11 @@ impl ImplContext {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| Name::from(&segment.ident));
-        let kind = match (trait_name, declarations.is_vertex(&self_type)) {
-            (Some(name), true) => ImplKind::TraitOnVertex(name),
-            (Some(name), false) => ImplKind::TraitOnValue(name),
-            (None, true) => ImplKind::InherentOnVertex,
-            (None, false) => ImplKind::InherentOnValue,
+        let kind = match (trait_name, declarations.vertex_named(&self_type)) {
+            (Some(name), Some(_)) => ImplKind::TraitOnVertex(name),
+            (Some(name), None) => ImplKind::TraitOnValue(name),
+            (None, Some(_)) => ImplKind::InherentOnVertex,
+            (None, None) => ImplKind::InherentOnValue,
         };
         ImplContext { self_type, kind }
     }
@@ -35,16 +35,15 @@ impl ImplContext {
         &self.self_type
     }
 
-    pub fn in_trait(&self) -> bool {
-        self.kind.trait_name().is_some()
-    }
-
     pub fn kind(&self) -> &ImplKind {
         &self.kind
     }
 
-    pub fn is_public(&self, function: &ImplItemFn) -> bool {
-        self.in_trait() || matches!(function.vis, Visibility::Public(_))
+    pub fn public<'function>(&self, function: &'function ImplItemFn) -> Option<&'function ImplItemFn> {
+        self.kind
+            .trait_name()
+            .map(|_| function)
+            .or_else(|| matches!(function.vis, Visibility::Public(_)).then_some(function))
     }
 
     pub fn edge_name(&self, function: &ImplItemFn) -> Name {

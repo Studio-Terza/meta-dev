@@ -14,8 +14,11 @@ impl Pair {
         Pair { left, right }
     }
 
-    pub(crate) fn witnessed_by(&self, mentions: &BTreeSet<Name>) -> bool {
-        mentions.contains(&self.left) && mentions.contains(&self.right)
+    pub(crate) fn witnessed_by<'mentions>(
+        &self,
+        mentions: &'mentions BTreeSet<Name>,
+    ) -> Option<&'mentions BTreeSet<Name>> {
+        (mentions.contains(&self.left) && mentions.contains(&self.right)).then_some(mentions)
     }
 }
 

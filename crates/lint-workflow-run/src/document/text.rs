@@ -76,8 +76,8 @@ impl<'text> Text<'text> {
         Path::new(self.0)
     }
 
-    pub(crate) fn spans_lines(self) -> bool {
-        self.0.contains('\n')
+    pub(crate) fn multiline(self) -> Option<Text<'text>> {
+        self.0.contains('\n').then_some(self)
     }
 }
 

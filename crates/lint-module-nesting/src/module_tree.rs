@@ -40,14 +40,13 @@ impl ModuleTree {
     pub fn violations(&self) -> impl Iterator<Item = Violation> + '_ {
         let most = ModuleNesting::REEXPORTS;
         let deep_uses = self.deep_uses.iter().cloned();
-        let crowded = self
-            .reexports
-            .iter()
-            .filter(|(module, _)| module.segment_length() != 0)
-            .filter(move |(_, count)| count.exceeds(most))
-            .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count: *count, most })
-            });
+        let crowded = self.reexports.iter().filter(|(module, _)| module.segment_length() != 0).filter_map(
+            move |(module, count)| {
+                count.beyond(most).map(|count| {
+                    Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
+                })
+            },
+        );
         self.modules
             .modules()
             .iter()
@@ -69,9 +68,10 @@ impl ModuleTree {
     fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
-                let used = self.modules.deepest_containing(&target, module);
-                self.users.record(used.cloned(), module);
-                self.deep_uses.extend(target.crosses_directory_boundary(module, &self.modules).then(|| {
+                let used = self.modules.deepest_containing(&target, module).cloned();
+                self.users =
+                    used.into_iter().fold(std::mem::take(&mut self.users), |users, home| users.recorded(home, module));
+                self.deep_uses.extend(target.crossed_directory(module, &self.modules).map(|_| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })
                 }));
                 self
@@ -82,15 +82,13 @@ impl ModuleTree {
 
     fn home_of(&self, module: &ModulePath) -> Option<ModulePath> {
         let outsiders: Vec<&ModulePath> =
-            self.users.callers_of(module)?.iter().filter(|user| !module.relates::<Ancestor>(user)).collect();
-        outsiders
+            self.users.callers_of(module)?.iter().filter(|user| module.relates::<Ancestor>(user).is_none()).collect();
+        let homes: BTreeSet<ModulePath> = outsiders
             .iter()
-            .all(|user| user.relates::<InsideSibling>(module))
-            .then(|| {
-                let homes: BTreeSet<ModulePath> =
-                    outsiders.iter().map(|user| user.truncated_to_length(module.segment_length())).collect();
-                (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
+            .map(|user| {
+                user.relates::<InsideSibling>(module).map(|_| user.truncated_to_length(module.segment_length()))
             })
-            .flatten()
+            .collect::<Option<_>>()?;
+        (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
     }
 }

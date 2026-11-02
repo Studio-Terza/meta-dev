@@ -15,18 +15,23 @@ impl<'files> Actions<'files> {
         Actions(files)
     }
 
-    pub(crate) fn resolves(self, target: &Path) -> bool {
-        self.0.iter().any(|file| Self::provides(file, target))
+    pub(crate) fn resolving(self, target: &Path) -> Option<&'files RepoFile> {
+        self.0.iter().find_map(|file| Self::provided(file, target))
     }
 
-    pub(crate) fn is_manifest(file: &RepoFile) -> bool {
-        file.shown().file_name().is_some_and(|name| Self::MANIFESTS.iter().any(|manifest| name == OsStr::new(manifest)))
+    pub(crate) fn manifest(file: &RepoFile) -> Option<&RepoFile> {
+        file.shown()
+            .file_name()
+            .filter(|name| Self::MANIFESTS.iter().any(|manifest| *name == OsStr::new(manifest)))
+            .map(|_| file)
     }
 
-    fn provides(file: &RepoFile, target: &Path) -> bool {
-        file.below(target).is_some_and(|rest| {
-            Self::MANIFESTS.iter().any(|manifest| rest == Path::new(manifest))
-                || (rest.as_os_str().is_empty() && WorkflowRun::is_workflow(file))
-        })
+    fn provided<'file>(file: &'file RepoFile, target: &Path) -> Option<&'file RepoFile> {
+        let rest = file.below(target)?;
+        Self::MANIFESTS
+            .iter()
+            .find(|manifest| rest == Path::new(manifest))
+            .map(|_| file)
+            .or_else(|| WorkflowRun::workflow(file).filter(|_| rest.as_os_str().is_empty()))
     }
 }

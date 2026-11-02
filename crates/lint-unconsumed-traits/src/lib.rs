@@ -26,7 +26,7 @@ impl Lint for UnconsumedTraits {
             shipped
                 .iter()
                 .flat_map(|file| Declared::of_file(file))
-                .filter(|declaration| !declaration.is_consumed_by(&consumers))
+                .filter_map(|declaration| declaration.unconsumed(&consumers))
                 .map(|declaration| {
                     Violation::new(AsRef::<Site>::as_ref(&declaration).clone(), Finding::from(&declaration))
                 })

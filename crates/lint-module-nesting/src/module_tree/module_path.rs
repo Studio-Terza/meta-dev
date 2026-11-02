@@ -48,8 +48,9 @@ impl ModulePath {
         } else {
             file.segments.clone()
         };
-        let skip = usize::from(first.matches::<Whole>(&Self::ANCHORS));
-        (skip != 0 || modules.same_as(&file.child(first)).is_some()).then_some(())?;
+        let anchor = first.matches::<Whole>(&Self::ANCHORS);
+        anchor.map(|_| ()).or_else(|| modules.same_as(&file.child(first)).map(|_| ()))?;
+        let skip = anchor.map_or(0, |_| 1);
         let segments = path.segments().iter().skip(skip).try_fold(start, |mut segments, segment| {
             if *segment == Self::SUPER {
                 segments.pop().and(Some(segments))
@@ -74,14 +75,13 @@ impl ModulePath {
         Some(ModulePath { crate_root: self.crate_root.clone(), segments: parents.to_vec(), file: PathBuf::new() })
     }
 
-    pub fn relates<R: Relation>(&self, other: &ModulePath) -> bool {
+    pub fn relates<'other, R: Relation>(&self, other: &'other ModulePath) -> Option<&'other ModulePath> {
         R::holds(self, other)
     }
 
-    pub fn crosses_directory_boundary(&self, user: &ModulePath, modules: &ModuleIndex) -> bool {
-        (1..self.segments.len()).any(|cut| {
-            let boundary = self.truncated_to_length(cut);
-            modules.directory_same_as(&boundary) && !boundary.relates::<Ancestor>(user)
+    pub fn crossed_directory(&self, user: &ModulePath, modules: &ModuleIndex) -> Option<ModulePath> {
+        (1..self.segments.len()).map(|cut| self.truncated_to_length(cut)).find(|boundary| {
+            modules.directory_same_as(boundary).is_some() && boundary.relates::<Ancestor>(user).is_none()
         })
     }
 
@@ -101,8 +101,8 @@ impl ModulePath {
         }
     }
 
-    fn is_directory_module(&self) -> bool {
-        self.file.file_name().is_some_and(|name| name == Self::MODULE_FILE)
+    fn directory_module(&self) -> Option<&ModulePath> {
+        self.file.file_name().filter(|name| *name == Self::MODULE_FILE).map(|_| self)
     }
 }
 

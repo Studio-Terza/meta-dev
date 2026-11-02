@@ -30,21 +30,19 @@ impl SkipMarks {
         marks.lines
     }
 
-    fn names_skip(list: &MetaList) -> bool {
-        list.tokens.clone().into_iter().any(|tree| match tree {
+    fn skip_named(list: &MetaList) -> Option<Word<'static>> {
+        list.tokens.clone().into_iter().find_map(|tree| match tree {
             TokenTree::Ident(ident) => Name::from(&ident).matches::<Whole>(&Self::SKIPPING),
-            _ => false,
+            _ => None,
         })
     }
 
-    fn skips(attribute: &Attribute) -> bool {
+    fn skip(attribute: &Attribute) -> Option<Word<'static>> {
         match &attribute.meta {
-            Meta::List(list) if list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE) => Self::names_skip(list),
-            meta => meta
-                .path()
-                .segments
-                .last()
-                .is_some_and(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING)),
+            Meta::List(list) if list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE) => Self::skip_named(list),
+            meta => {
+                meta.path().segments.last().and_then(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING))
+            }
         }
     }
 
@@ -52,8 +50,7 @@ impl SkipMarks {
         self.lines.extend(
             attributes
                 .iter()
-                .filter(|attribute| Self::skips(attribute))
-                .map(|attribute| LineNumber::from(attribute.pound_token.span)),
+                .filter_map(|attribute| Self::skip(attribute).map(|_| LineNumber::from(attribute.pound_token.span))),
         );
         let gated: Vec<LineNumber> = Gate::lines_in(attributes).into_iter().chain(self.gates.clone()).collect();
         self.lines.extend(gated.into_iter().filter(|_| marked == Marked::Test));
@@ -67,8 +64,10 @@ enum Marked {
 }
 
 impl Marked {
-    fn among(attributes: &[Attribute], is_law: bool) -> Marked {
-        if is_law || TestMarks::mark_test(attributes) { Marked::Test } else { Marked::Other }
+    fn among(attributes: &[Attribute], law: Option<&Macro>) -> Marked {
+        law.map(|_| Marked::Test)
+            .or_else(|| TestMarks::mark_test(attributes).map(|_| Marked::Test))
+            .unwrap_or(Marked::Other)
     }
 }
 
@@ -81,12 +80,12 @@ impl<'ast> Visit<'ast> for SkipMarks {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.record_skips(&function.attrs, Marked::among(&function.attrs, false));
+        self.record_skips(&function.attrs, Marked::among(&function.attrs, None));
         visit::visit_item_fn(self, function);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         let attributes = Macros::attributes(invocation);
-        self.record_skips(&attributes, Marked::among(&attributes, TestMarks::is_law(invocation)));
+        self.record_skips(&attributes, Marked::among(&attributes, TestMarks::law(invocation)));
     }
 }

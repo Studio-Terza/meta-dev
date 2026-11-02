@@ -13,7 +13,9 @@ impl Local {
     pub(crate) fn finding(used: Node<'_, '_>, actions: Actions<'_>) -> Option<Found> {
         let target = used.text()?;
         let local = Text::new(target).after(Text::new(Self::PREFIX))?;
-        (!actions.resolves(local.path()))
-            .then(|| Found::new(used.line(), Finding::LocalAction { target: target.to_owned() }))
+        match actions.resolving(local.path()) {
+            Some(_) => None,
+            None => Some(Found::new(used.line(), Finding::LocalAction { target: target.to_owned() })),
+        }
     }
 }

@@ -21,12 +21,17 @@ impl Coverage {
         files.iter().fold(Coverage::default(), Coverage::read)
     }
 
-    pub(crate) fn names(&self, subject: &Subject) -> bool {
-        self.laws.iter().any(|law| law.names(subject))
+    pub(crate) fn law_naming(&self, subject: &Subject) -> Option<&Law> {
+        self.laws.iter().find_map(|law| law.naming(subject))
     }
 
     pub(crate) fn roundtrips_naming(&self, subject: &Subject) -> Vec<&BTreeSet<Name>> {
-        self.laws.iter().filter(|law| law.kind() == Kind::Roundtrip && law.names(subject)).map(Law::mentions).collect()
+        self.laws
+            .iter()
+            .filter_map(|law| law.naming(subject))
+            .filter(|law| law.kind() == Kind::Roundtrip)
+            .map(Law::mentions)
+            .collect()
     }
 
     fn read(mut self, file: &SourceFile) -> Coverage {

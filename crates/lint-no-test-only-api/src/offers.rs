@@ -22,7 +22,7 @@ pub(crate) struct Offers<'file> {
 impl<'file> Offers<'file> {
     pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate> {
         let mut offers = Offers { path: file.path(), found: Vec::new() };
-        Some(file).filter_map(SourceFile::shipped).into_iter().for_each(|file| offers.visit_file(file.syntax()));
+        file.shipped().into_iter().for_each(|file| offers.visit_file(file.syntax()));
         offers.found
     }
 
@@ -38,7 +38,7 @@ impl<'file> Offers<'file> {
             .iter()
             .filter_map(Self::function)
             .filter(|function| Walk::outside_tests(&function.attrs) == Walk::Entered)
-            .filter(|function| Constructor::is_made_by(&function.sig, owner))
+            .filter_map(|function| Constructor::made_by(&function.sig, owner).map(|_| function))
             .for_each(|function| self.offered(&function.sig.ident, &function.vis));
     }
 

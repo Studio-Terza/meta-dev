@@ -43,15 +43,18 @@ impl NoFreeFns {
         visitor.found
     }
 
-    fn is_exempt(function: &ItemFn) -> bool {
-        function.sig.ident == "main" || function.attrs.iter().any(|attribute| Self::must_be_free(attribute.path()))
+    fn exemption(function: &ItemFn) -> Option<&Ident> {
+        Some(&function.sig.ident)
+            .filter(|name| **name == "main")
+            .or_else(|| function.attrs.iter().find_map(|attribute| Self::required_free(attribute.path())))
     }
 
-    fn must_be_free(attribute: &Path) -> bool {
+    fn required_free(attribute: &Path) -> Option<&Ident> {
         attribute
             .segments
             .last()
-            .is_some_and(|segment| Self::REQUIRED_FREE.iter().any(|required| segment.ident == required))
+            .map(|segment| &segment.ident)
+            .filter(|name| Self::REQUIRED_FREE.iter().any(|required| **name == required))
     }
 }
 
@@ -61,7 +64,7 @@ struct FreeFns {
 
 impl<'ast> Visit<'ast> for FreeFns {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.found.extend((!NoFreeFns::is_exempt(function)).then(|| function.sig.ident.clone()));
+        self.found.extend(NoFreeFns::exemption(function).map_or_else(|| Some(function.sig.ident.clone()), |_| None));
         syn::visit::visit_item_fn(self, function);
     }
 

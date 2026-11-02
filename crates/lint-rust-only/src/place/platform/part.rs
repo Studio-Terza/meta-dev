@@ -13,11 +13,22 @@ impl Part {
 
     const EXTENSION: char = '.';
 
-    pub(super) fn names_tests(&self) -> bool {
-        Self::WHOLE.contains(&self.lowered.as_str())
-            || Self::ENDINGS.iter().any(|ending| {
-                self.name.len().checked_sub(ending.len()).and_then(|from| self.name.get(from..)) == Some(*ending)
-            })
+    pub(super) fn naming_tests(self) -> Option<Part> {
+        Self::WHOLE
+            .iter()
+            .copied()
+            .find(|whole| self.lowered == *whole)
+            .or_else(|| Self::ENDINGS.iter().find_map(|ending| self.ending(ending)))
+            .map(|_| self)
+    }
+
+    fn ending(&self, ending: &'static str) -> Option<&'static str> {
+        self.name
+            .len()
+            .checked_sub(ending.len())
+            .and_then(|from| self.name.get(from..))
+            .filter(|tail| *tail == ending)
+            .map(|_| ending)
     }
 }
 
