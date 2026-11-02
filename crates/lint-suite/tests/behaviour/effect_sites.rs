@@ -23,6 +23,7 @@ impl Effects {
 const EVERY_KIND: &str = "use std::{env, fs, io, process, thread};\nuse std::time::{Instant, SystemTime};\nfn f() {\n    fs::read_to_string(\"a\");\n    std::fs::File::open(\"a\");\n    env::var(\"A\");\n    SystemTime::now();\n    Instant::now();\n    thread::sleep(d);\n    std::net::TcpStream::connect(\"a\");\n    process::Command::new(\"ls\");\n    rand::random();\n    io::stdout();\n    println!(\"a\");\n}\n";
 const IN_PORTS: &str = "mod ports {\n    pub fn f() {\n        std::fs::write(\"a\", \"b\");\n    }\n}\nfn g() {\n    std::fs::write(\"a\", \"b\");\n}\n";
 const IN_TESTS: &str = "fn f() {}\n#[cfg(test)]\nmod tests {\n    fn g() {\n        println!(\"a\");\n    }\n}\n";
+const PRINTED_IN_MODULES: &str = "mod a {\n    fn f() {\n        println!(\"a\");\n    }\n}\nmod ports {\n    fn g() {\n        eprintln!(\"b\");\n    }\n}\n";
 const FOREIGN: &str =
     "use clap::Command;\nfn f() {\n    Command::new(\"ls\");\n    cache.read();\n    Self::open();\n}\n";
 
@@ -36,6 +37,8 @@ laws::table!(
         [IN_PORTS, "crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1)"] => true,
         [IN_PORTS, "lib.rs:3: files effect"] => false,
         [IN_PORTS, "lib.rs:7: files effect outside ports: calls std::fs::write"] => true,
+        [PRINTED_IN_MODULES, "crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1)"] => true,
+        [PRINTED_IN_MODULES, "lib.rs:3: stdio effect outside ports: calls println!"] => true,
         [IN_TESTS, "crate x"] => false,
         [FOREIGN, "crate x"] => false,
     ]
