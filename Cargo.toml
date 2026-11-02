@@ -25,6 +25,10 @@ toml = "1.1.8"
 [profile.dev]
 debug = "line-tables-only"
 
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_debug_implementations = "warn"
