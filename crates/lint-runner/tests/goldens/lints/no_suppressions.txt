@@ -1,0 +1,10 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 6 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+no lint is switched off in code:
+src/lib.rs:1: lint switched off by an attribute; every lint is a lint for a reason, so fix the code and remove the attribute
+src/lib.rs:3: lint switched off by an attribute; every lint is a lint for a reason, so fix the code and remove the attribute
+no baselines or allow-lists:
+ci/lint-baseline.toml:1: baseline or allow-list file; no lint has a baseline, an allow-list or a per-repository switch, so fix the findings and delete the file
+fails

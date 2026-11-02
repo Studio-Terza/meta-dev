@@ -6,4 +6,6 @@ a binary is a thin main over its library:
 src/bin/attributed.rs:4: main.rs holds only fn main and imports; move this into the library
 src/bin/tool.rs:3: main.rs holds only fn main and imports; move this into the library
 src/main.rs:3: main.rs holds only fn main and imports; move this into the library
+no lint is switched off in code:
+src/bin/attributed.rs:3: lint switched off by an attribute; every lint is a lint for a reason, so fix the code and remove the attribute
 fails
