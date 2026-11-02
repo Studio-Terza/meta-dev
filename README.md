@@ -99,6 +99,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci wall-times <repository> <run> <job>                      wall time per step, from the GitHub API
     ci show <file>...                                           print files, and say which are absent
     ci labels <base branch> <pull request>                      the golden-change and new-scenario checks
+    ci spec-line <pull request>                                 the spec line of the body, or repair: main
     ci shard-summary <shards> <summary>                         outcome counts of the weekly shards
     ci matrix <shards> <sources> <directory> <summary>          the mutation matrix report
 
@@ -161,6 +162,21 @@ The test title does not count as naming the type. Only types in a crate's public
 The workflow reads label names only: it does not check who added a label. It compares the head of the branch with the
 merge base of the head and the base branch, so a branch that is behind the base branch is not charged for goldens and
 fixtures that are already on it.
+
+## Spec line
+
+`labels.yml` also runs `ci spec-line`, on every pull request when it is opened, edited, pushed to or reopened. It
+fails unless a line of the body is a well-formed spec line, one of:
+
+    spec: none
+    spec: owner <uuid prefix of 8 or more hex digits>
+    spec: <project>#D<n>
+    spec: <project>#L<n>, <project>#D<n>
+
+A project is lowercase letters, digits and hyphens; several labels are separated by commas. The check reads the form
+only: it does not look the label up in a spec, since a spec may be local. A pull request that repairs a red main carries
+the body line `repair: main` instead, and then passes whatever its spec line says. The output names the case that
+applied: repairing main, spec line well formed, spec line malformed (each such line), or spec line missing.
 
 ## CI wall-time limits
 
