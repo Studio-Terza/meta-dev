@@ -17,8 +17,11 @@ const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n"
 const HISTORY_LEAF: &str = "reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_CORE: &str = "reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
 const HISTORY_NONE: &str = "reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
-const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not:\n\
-    2 core\n1 middle\n0 leaf\n0 serde-user\n0 tested-through\n";
+const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not, of 5 workspace crates:\n\
+    2 of 5, 40%: core\n1 of 5, 20%: middle\n0 of 5, 0%: leaf\n0 of 5, 0%: serde-user\n0 of 5, 0%: tested-through\n\
+    crates per tenth of the workspace depending on them:\n\
+    0-9% 3\n10-19% 0\n20-29% 1\n30-39% 0\n40-49% 1\n50-59% 0\n60-69% 0\n70-79% 0\n80-89% 0\n90-100% 0\n\
+    median 0 of 5, 0%; largest 2 of 5, 40%: core\n";
 
 #[derive(Debug, PartialEq)]
 struct Answer {

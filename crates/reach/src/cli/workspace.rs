@@ -3,8 +3,10 @@ mod crate_name;
 mod fan_in;
 mod history;
 mod metadata;
+mod percent;
 mod reached;
 mod readers;
+mod share;
 mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -78,7 +80,7 @@ impl Workspace {
     }
 
     pub fn fan_in(&self) -> FanIn {
-        self.directories.keys().fold(FanIn::default(), |fan_in, name| {
+        self.directories.keys().fold(FanIn::among(CrateCount::new(self.directories.len())), |fan_in, name| {
             let reach = self.closure(BTreeSet::from([name.clone()]));
             fan_in.counted(CrateCount::new(reach.iter().filter(|reached| *reached != name).count()), name.clone())
         })
