@@ -9,10 +9,10 @@ const DECLARES: &str = "pub enum Mode { A }\n";
 fn only_an_enum_of_that_name_in_reach_counts() {
     let files =
         [Sources::file("x/src/mode.rs", Text::new(DECLARES)), Sources::file("y/src/impls.rs", Text::new(IMPL_ONLY))];
-    assert!(EnumPredicates::report(&files).is_clean());
+    assert!(EnumPredicates::report(&files).dirty().is_none());
     let files =
         [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
-    assert!(EnumPredicates::report(&files).is_clean());
+    assert!(EnumPredicates::report(&files).dirty().is_none());
 }
 
 const SHARED_TEST_NAME: &str = "enum Mode { A }\n";
@@ -26,7 +26,7 @@ fn integration_tests_are_separate_crates() {
         Sources::file("x/tests/a.rs", Text::new(SHARED_TEST_NAME)),
         Sources::file("y/tests/b.rs", Text::new(OTHER_TEST_CRATE)),
     ];
-    assert!(EnumPredicates::report(&files).is_clean());
+    assert!(EnumPredicates::report(&files).dirty().is_none());
 }
 
 const SAME_NAME_NEARBY: &str = "mod b {\n    pub struct Mode;\n}\nmod a {\n    pub enum Mode { A }\n    impl Mode {\n        pub fn is_a(&self) -> bool { true }\n    }\n}\n";

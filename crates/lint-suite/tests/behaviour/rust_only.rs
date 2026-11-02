@@ -216,8 +216,8 @@ fn findings_come_in_the_order_given() {
 
 #[test]
 fn a_report_with_no_findings_is_clean() {
-    assert!(RustOnly::report(&[]).is_clean());
-    assert!(!RustOnly::report(&[RepoFile::new("a.sh", "a.sh")]).is_clean());
+    assert!(RustOnly::report(&[]).dirty().is_none());
+    assert!(RustOnly::report(&[RepoFile::new("a.sh", "a.sh")]).dirty().is_some());
 }
 
 #[test]
