@@ -12,7 +12,7 @@ runs:
       id: tools
       with:
         path: ${{ github.workspace }}/target/ci/tools
-        key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
+        key: tools-${{ runner.os }}-opt${{ env.CARGO_PROFILE_DEV_OPT_LEVEL }}-debug${{ env.CARGO_PROFILE_DEV_DEBUG }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
     - name: tools
       if: steps.tools.outputs.cache-hit != 'true'
       shell: bash
