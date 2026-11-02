@@ -147,6 +147,8 @@ laws::table!(
             "{WORKFLOW}:1: a shell setting names python, which is not a shell; use a shell and put the logic in a Rust command"
         )],
         "run: cargo test   \n" => Vec::<String>::new(),
+        "run: eval x\n" => vec![format!("{WORKFLOW}:1: a run step runs code inline through eval{FIX}")],
+        "env:\n  S: |\n    a\n    b\n" => vec![format!("{WORKFLOW}:2: an env value spans several lines, which holds logic in YAML{FIX}")],
         "    run:   cargo test\n" => Vec::<String>::new(),
         "run: 'a'\n" => Vec::<String>::new(),
         "run: \"\"\n" => Vec::<String>::new(),
@@ -277,5 +279,26 @@ laws::table!(
     Checked::workflow,
     [
         "run: [a\n" => vec![format!("{WORKFLOW}:2: cannot parse the workflow as YAML: while parsing a flow sequence, expected ',' or ']'")],
+    ]
+);
+
+laws::table!(
+    logic_cannot_move_into_env_or_an_inline_program,
+    Checked::flagged,
+    [
+        "- env:\n    S: |\n      for i in a b; do echo $i | cat; done\n  run: eval \"$S\"\n" => 1,
+        "- env:\n    S: |\n      for i in a b\n      done\n  run: cargo test\n" => 1,
+        "env:\n  S: |\n    one line\n  T: ${{ github.workspace }}/target\n" => 0,
+        "- run: eval \"$S\"\n" => 1,
+        "- run: bash -c \"$S\"\n" => 1,
+        "- run: ci timed m s bash -c \"$S\"\n" => 1,
+        "- run: /usr/bin/python3 -c 'print(1)'\n" => 1,
+        "- run: python3 -c 'print(1)'\n" => 1,
+        "- run: node -e 'console.log(1)'\n" => 1,
+        "- run: perl -pe 's/a/b/' x\n" => 1,
+        "- run: echo 'bash -c x'\n" => 0,
+        "- run: cargo test -c x\n" => 0,
+        "- run: evaluate x\n" => 0,
+        "- shell: bash -e {0}\n  run: cargo test\n" => 0,
     ]
 );

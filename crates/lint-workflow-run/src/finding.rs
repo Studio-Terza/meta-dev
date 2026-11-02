@@ -10,6 +10,8 @@ pub(crate) enum Finding {
     Operator { symbol: &'static str },
     Control { word: &'static str },
     Interpreter { name: String },
+    Inline { word: &'static str },
+    Environment,
     LocalAction { target: String },
     Script,
     Unparsable { reason: String },
@@ -36,6 +38,15 @@ impl fmt::Display for Finding {
                 formatter,
                 "a shell setting names {name}, which is not a shell; use a shell and put the logic in a Rust command"
             ),
+            Finding::Inline { word } => {
+                write!(formatter, "a run step runs code inline through {word}; put the logic in a Rust command")
+            }
+            Finding::Environment => {
+                write!(
+                    formatter,
+                    "an env value spans several lines, which holds logic in YAML; put the logic in a Rust command"
+                )
+            }
             Finding::LocalAction { target } => {
                 write!(
                     formatter,
