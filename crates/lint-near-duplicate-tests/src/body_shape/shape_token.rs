@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
 use lint_layout::Whole;
-use lint_layout::{Name, Word, words};
+use lint_layout::{Casing, Name, Word, words};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum ShapeToken {
@@ -28,14 +28,7 @@ impl ShapeToken {
         match tree {
             TokenTree::Literal(_) => vec![ShapeToken::Literal],
             TokenTree::Punct(punct) => vec![ShapeToken::Mark(punct.as_char())],
-            TokenTree::Ident(ident) => {
-                let word = Name::from(&ident);
-                vec![if word.matches::<Whole>(&Self::LITERAL_WORDS) {
-                    ShapeToken::Literal
-                } else {
-                    ShapeToken::Word(word)
-                }]
-            }
+            TokenTree::Ident(ident) => vec![Self::of_word(Name::from(&ident))],
             TokenTree::Group(group) => {
                 let inner = Self::normalized(group.stream());
                 match group.delimiter() {
@@ -45,6 +38,14 @@ impl ShapeToken {
                     Delimiter::None => inner,
                 }
             }
+        }
+    }
+
+    fn of_word(word: Name) -> ShapeToken {
+        match (word.matches::<Whole>(&Self::LITERAL_WORDS), word.casing()) {
+            (true, _) => ShapeToken::Literal,
+            (false, Casing::Shouting) if word.length() > 1 => ShapeToken::Literal,
+            _ => ShapeToken::Word(word),
         }
     }
 

@@ -6,9 +6,12 @@ const IMPL_ONLY: &str = "impl Mode {\n    fn is_a(&self) -> bool { true }\n}\n";
 const DECLARES: &str = "pub enum Mode { A }\n";
 
 #[test]
-fn an_enum_in_another_crate_does_not_count() {
+fn only_an_enum_of_that_name_in_reach_counts() {
     let files =
         [Sources::file("x/src/mode.rs", Text::new(DECLARES)), Sources::file("y/src/impls.rs", Text::new(IMPL_ONLY))];
+    assert!(EnumPredicates::report(&files).is_clean());
+    let files =
+        [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
     assert!(EnumPredicates::report(&files).is_clean());
 }
 
@@ -23,13 +26,6 @@ fn integration_tests_are_separate_crates() {
         Sources::file("x/tests/a.rs", Text::new(SHARED_TEST_NAME)),
         Sources::file("y/tests/b.rs", Text::new(OTHER_TEST_CRATE)),
     ];
-    assert!(EnumPredicates::report(&files).is_clean());
-}
-
-#[test]
-fn a_struct_sharing_an_enums_name_in_another_module_passes() {
-    let files =
-        [Sources::file("x/src/a.rs", Text::new(STATUS_ENUM)), Sources::file("x/src/b.rs", Text::new(STATUS_STRUCT))];
     assert!(EnumPredicates::report(&files).is_clean());
 }
 

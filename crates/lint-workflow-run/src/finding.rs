@@ -12,6 +12,8 @@ pub(crate) enum Finding {
     Operator { symbol: &'static str },
     Control { word: &'static str },
     Interpreter { name: String },
+    Inline { word: &'static str },
+    Environment,
     LocalAction { target: String },
     Script,
     Unparsable { reason: String },
@@ -32,6 +34,8 @@ impl fmt::Display for Finding {
             Finding::Operator { symbol } => write!(formatter, "a run step uses the shell operator {symbol}"),
             Finding::Control { word } => write!(formatter, "a run step starts with the shell keyword {word}"),
             Finding::Interpreter { name } => write!(formatter, "a shell setting names {name}, which is not a shell"),
+            Finding::Inline { word } => write!(formatter, "a run step runs code inline through {word}"),
+            Finding::Environment => write!(formatter, "an env value spans several lines, which holds logic in YAML"),
             Finding::LocalAction { target } => {
                 write!(formatter, "uses {target} names no action.yml or workflow to check")
             }
@@ -49,6 +53,8 @@ impl lint_core::Finding for Finding {
             | Finding::TooLong { .. }
             | Finding::Operator { .. }
             | Finding::Control { .. }
+            | Finding::Inline { .. }
+            | Finding::Environment
             | Finding::LocalAction { .. }
             | Finding::Script => Self::RUST_COMMAND,
             Finding::Interpreter { .. } => "use a shell and put the logic in a Rust command",

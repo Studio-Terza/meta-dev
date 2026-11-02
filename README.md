@@ -110,7 +110,7 @@ included, so `.github/` is checked. Below a directory named `platform`, source o
 `workflow_run` keeps logic out of YAML. It parses each file under `.github/workflows`, and every `action.yml` or `action.yaml`, as
 YAML, so how a step is spelled does not matter. The value of a `run` key must be one line of at most
 120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick, `$(` or a `${` expansion with
-a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. A value that holds several lines fails, however it is written. The
+a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. It may not run code inline: no `eval`, and no shell or interpreter given a program as an argument (`bash -c`, `python3 -c`, `node -e`, `perl -pe`, `pwsh -Command` and the like). A value that holds several lines fails, however it is written, and so does a value under `env`, so a script cannot wait there for `eval`. The
 value of a `shell` key gets the same rules and must start with `bash`, `sh`, `pwsh`, `powershell` or `cmd`. A step that uses
 `actions/github-script` fails if it has a `script`. A `uses` that starts with `./` must name a directory with an `action.yml` or `action.yaml`, or a
 workflow file in the checked tree; that action is judged like a workflow. A workflow the lint cannot read or parse fails too. There is no allow-list: anything longer is a Rust
