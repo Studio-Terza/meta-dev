@@ -11,13 +11,14 @@ use syn::visit::{self, Visit};
 use syn::{BinOp, Expr, ImplItemFn, ItemFn, Macro, Token};
 
 use lint_core::{MacroAliases, MacroCalls, Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name, Word, words};
+use lint_layout::{LineNumber, Name, Whole, Word, words};
 
 use bindings::Bindings;
 use compared::Compared;
 use finding::Finding;
 use table_rows::TableRows;
 
+#[derive(Debug)]
 pub struct Assertions<'file> {
     path: &'file Path,
     constants: Bindings,
@@ -26,12 +27,8 @@ pub struct Assertions<'file> {
     found: Vec<Violation>,
 }
 
-impl Assertions<'_> {
-    const EQUALITIES: [Word<'static>; 2] = words!["assert_eq", "assert_ne"];
-    const ASSERT: &str = "assert";
-    const TABLE: Word<'static> = Word::new("table");
-
-    pub fn violations(file: &SourceFile) -> Vec<Violation> {
+impl<'file> From<&'file SourceFile> for Assertions<'file> {
+    fn from(file: &'file SourceFile) -> Assertions<'file> {
         let mut assertions = Assertions {
             path: file.path(),
             constants: Bindings::constants(file.syntax()),
@@ -40,8 +37,21 @@ impl Assertions<'_> {
             found: Vec::new(),
         };
         assertions.visit_file(file.syntax());
+        assertions
+    }
+}
+
+impl From<Assertions<'_>> for Vec<Violation> {
+    fn from(assertions: Assertions<'_>) -> Vec<Violation> {
         assertions.found
     }
+}
+
+impl Assertions<'_> {
+    const EQUALITIES: [Word<'static>; 2] = words!["assert_eq", "assert_ne"];
+    const ASSERT: &str = "assert";
+    const TABLE: Word<'static> = Word::new("table");
+    const SIDES_LENGTH: usize = 2;
 
     fn compared(&self, invocation: &Macro, name: &Name) -> Option<Vec<Expr>> {
         let arguments = || {
@@ -51,8 +61,8 @@ impl Assertions<'_> {
                 .unwrap_or_default()
         };
         match name {
-            _ if name.matches::<lint_layout::Whole>(&Self::EQUALITIES) => {
-                Some(arguments().into_iter().take(2).collect())
+            _ if name.matches::<Whole>(&Self::EQUALITIES) => {
+                Some(arguments().into_iter().take(Self::SIDES_LENGTH).collect())
             }
             _ if *name == Self::ASSERT => Some(arguments().into_iter().take(1).flat_map(Self::sides).collect()),
             _ if self.tables.call(name) => Some(TableRows::expected(&invocation.tokens)),
@@ -72,7 +82,7 @@ impl Assertions<'_> {
     fn judged(&mut self, invocation: &Macro, compared: &[Expr]) {
         let line =
             invocation.path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
-        let judge = Compared { constants: &self.constants, locals: &self.locals };
+        let judge = Compared::new(&self.constants, &self.locals);
         let pinned = compared.iter().find_map(|side| judge.pinning(side));
         self.found.extend(pinned.map(|pinning| Violation::new(Site::new(self.path, line), Finding::from(pinning))));
     }

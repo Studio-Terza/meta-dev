@@ -10,7 +10,7 @@ impl Lint for LongExactStrings {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("assertions do not pin long text"),
-            files.iter().flat_map(Assertions::violations).collect(),
+            files.iter().flat_map(|file| Vec::from(Assertions::from(file))).collect(),
         )
     }
 }

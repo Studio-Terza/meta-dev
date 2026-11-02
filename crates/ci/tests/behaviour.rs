@@ -134,8 +134,8 @@ struct Answer {
 }
 
 impl Answer {
-    fn lines(&self) -> (ExitCode, Vec<&str>, Vec<&str>) {
-        (self.exit, Text::lines(&self.out), Text::lines(&self.err))
+    fn lines(&self) -> Printed<'_> {
+        Printed { exit: self.exit, out: Text::lines(&self.out), err: Text::lines(&self.err) }
     }
 
     fn to<Argument: AsRef<str>>(fake: &Fake, arguments: &[Argument]) -> Answer {
@@ -264,7 +264,7 @@ fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Err
     let scratch = Scratch::new()?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo", "clippy", "--all-targets"]);
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["clippy", "--all-targets"])]);
     let calls = fake.calls.borrow();
     assert_eq!(
@@ -323,7 +323,7 @@ fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Box<dyn Err
     scratch.write("out.txt", "test result: ok. finished in 0.25s\n")?;
     let answer =
         Answer::to(&Fake::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.00", "test-run = 0.25"]);
     Ok(())
 }
@@ -358,7 +358,10 @@ fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn E
     let scratch = Scratch::new()?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &Reach::on(&scratch, "push"));
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, vec!["BUILD_SCOPE=--workspace"], Vec::<&str>::new()));
+    assert_eq!(
+        answer.lines(),
+        Printed { exit: ExitCode::SUCCESS, out: vec!["BUILD_SCOPE=--workspace"], err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("env")), ["BUILD_SCOPE=--workspace"]);
     assert_eq!(Text::lines(&scratch.read("sum")), ["BUILD_SCOPE=--workspace"]);
     assert_eq!(
@@ -374,7 +377,7 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
     let scratch = Scratch::new()?;
     let fake = Fake { changed: "crates/leaf/src/lib.rs\n".to_owned(), ..Fake::new() };
     let answer = Answer::to(&fake, &Reach::on(&scratch, "pull_request"));
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, LEAF_REPORT.to_vec(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: LEAF_REPORT.to_vec(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&scratch.read("env")), LEAF_REPORT);
     assert_eq!(Text::lines(&scratch.read("sum")), LEAF_REPORT);
     assert_eq!(
@@ -464,7 +467,7 @@ fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box
     let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
     let Timings { answer, stored } = Page::timed(&page)?;
     let expected = vec!["compile time per crate, seconds, longest first, 2.25 in all:", "2.00 zzz", "0.25 aaa"];
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, expected.clone(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.clone(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&stored), expected);
     Ok(())
 }
@@ -621,7 +624,7 @@ fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn
     ["reach", "lint", "ci"].iter().try_for_each(|name| scratch.write(&format!("built/{name}"), name))?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["tools", &scratch.file("built"), &scratch.file("a/b/tools")]);
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", [BUILD.as_slice(), &["--bin", "ci"]].concat())]);
     assert_eq!(["reach", "lint", "ci"].map(|name| scratch.read(&format!("a/b/tools/{name}"))), ["reach", "lint", "ci"]);
     Ok(())
@@ -685,7 +688,7 @@ fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_o
     scratch.write("out", "KEPT=1\n")?;
     let fake = Fake { metadata: TOOLS_WORKSPACE.to_owned(), ..Fake::new() };
     let answer = Answer::to(&fake, &["tools-key", &scratch.file("m/metadata.json"), &scratch.file("out")]);
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&scratch.read("out")), [["KEPT=1"].as_slice(), TOOLS_SOURCES.as_slice()].concat());
     Ok(())
 }
@@ -706,7 +709,10 @@ fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Box<dyn Err
     let scratch = Scratch::new()?;
     let fake = Fake { logged_text: "seen\n".to_owned(), exit: Exit::Failure(FAILED_WITH), ..Fake::new() };
     let answer = Answer::to(&fake, &["logged", &scratch.file("logs/test.txt"), "cargo", "test", "-p", "leaf"]);
-    assert_eq!(answer.lines(), (ExitCode::from(FAILED_WITH.get()), Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(
+        answer.lines(),
+        Printed { exit: ExitCode::from(FAILED_WITH.get()), out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["test", "-p", "leaf"])]);
     assert_eq!(*fake.logs.borrow(), [scratch.path().join("logs/test.txt")]);
     assert_eq!(Text::lines(&scratch.read("logs/test.txt")), ["seen"]);
@@ -786,7 +792,7 @@ laws::table!(
 fn a_shard_runs_cargo_mutants_for_its_slice() {
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["mutants-shard", "3/8", "/tmp/out"]);
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, Vec::<&str>::new(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Cargo::mutants("3/8", "/tmp/out")]);
     let refused = Answer::to(&Fake::refusing("cargo"), &["mutants-shard", "3/8", "out"]);
     assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
@@ -800,7 +806,10 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
         &fake,
         &["mutants-changed", &scratch.file("tmp/c.diff"), &scratch.file("out"), "--test-package=a", "--test-package=b"],
     );
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, vec!["mutants: none missed"], Vec::<&str>::new()));
+    assert_eq!(
+        answer.lines(),
+        Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: none missed"], err: Vec::<&str>::new() }
+    );
     assert_eq!(Text::lines(&scratch.read("tmp/c.diff")), ["+a line"]);
     assert_eq!(
         *fake.calls.borrow(),
@@ -854,11 +863,11 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
     let answer = Answer::to(&fake, &["mutants-changed", "c.diff", "out"]);
     assert_eq!(
         answer.lines(),
-        (
-            ExitCode::SUCCESS,
-            vec!["mutants: skipped, no crate is reached by this change, so nothing was tested"],
-            Vec::<&str>::new()
-        )
+        Printed {
+            exit: ExitCode::SUCCESS,
+            out: vec!["mutants: skipped, no crate is reached by this change, so nothing was tested"],
+            err: Vec::<&str>::new()
+        }
     );
     assert!(fake.calls.borrow().is_empty());
 }
@@ -881,11 +890,11 @@ fn step_times_are_asked_of_github_for_the_job() {
     let answer = Answer::to(&fake, &["wall-times", "Studio-Terza/meta-dev", "77", "gates"]);
     assert_eq!(
         answer.lines(),
-        (
-            ExitCode::SUCCESS,
-            vec!["wall time per step of gates, seconds:", "clippy: 12", "test-run: 3"],
-            Vec::<&str>::new()
-        )
+        Printed {
+            exit: ExitCode::SUCCESS,
+            out: vec!["wall time per step of gates, seconds:", "clippy: 12", "test-run: 3"],
+            err: Vec::<&str>::new()
+        }
     );
     assert_eq!(
         *fake.calls.borrow(),
@@ -1011,7 +1020,7 @@ fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> 
     let answer = Answer::to(&Fake::new(), &["show", &scratch.file("a.txt"), &scratch.file("b.txt")]);
     let (shown, absent) = (format!("{}:", scratch.file("a.txt")), format!("{}:", scratch.file("b.txt")));
     let expected = vec![shown.as_str(), "one", absent.as_str(), "not produced"];
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, expected, Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected, err: Vec::<&str>::new() });
     Ok(())
 }
 
@@ -1218,7 +1227,7 @@ fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result
     scratch.write("sum", "before\n")?;
     let answer = Answer::to(&Fake::new(), &["shard-summary", &scratch.file("shards"), &scratch.file("sum")]);
     let expected = ["caught: 3", "missed: 2", "timeout: 1", "unviable: 0", "```", "m1", "m2", "t1", "```"];
-    assert_eq!(answer.lines(), (ExitCode::SUCCESS, expected.to_vec(), Vec::<&str>::new()));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
     assert_eq!(Text::lines(&scratch.read("sum")), [["before"].as_slice(), expected.as_slice()].concat());
     Ok(())
 }
@@ -1335,6 +1344,13 @@ laws::table!(
         Code(4) => Exit::Failure(NonZeroU8::MIN.saturating_add(3)),
     ]
 );
+
+#[derive(Debug, PartialEq)]
+struct Printed<'answer> {
+    exit: ExitCode,
+    out: Vec<&'answer str>,
+    err: Vec<&'answer str>,
+}
 
 struct Text;
 

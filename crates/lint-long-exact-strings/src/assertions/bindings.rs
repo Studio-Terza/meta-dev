@@ -5,45 +5,49 @@ use syn::{Block, Expr, File, ItemConst, Local, Pat};
 
 use lint_layout::Name;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Scope {
+    #[default]
+    Items,
+    Body,
+}
+
 #[derive(Debug, Default)]
-pub struct Bindings(BTreeMap<Name, Expr>);
+pub struct Bindings {
+    bound: BTreeMap<Name, Expr>,
+    scope: Scope,
+}
 
 impl Bindings {
     pub fn constants(file: &File) -> Bindings {
-        let mut constants = Constants(Bindings::default());
+        let mut constants = Bindings::default();
         constants.visit_file(file);
-        constants.0
+        constants
     }
 
     pub fn locals(block: &Block) -> Bindings {
-        let mut locals = Locals(Bindings::default());
+        let mut locals = Bindings { bound: BTreeMap::new(), scope: Scope::Body };
         locals.visit_block(block);
-        locals.0
+        locals
     }
 
     pub fn bound(&self, name: &Name) -> Option<&Expr> {
-        self.0.get(name)
+        self.bound.get(name)
     }
 }
 
-struct Constants(Bindings);
-
-impl<'ast> Visit<'ast> for Constants {
+impl<'ast> Visit<'ast> for Bindings {
     fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        self.0.0.insert(Name::from(&item.ident), (*item.expr).clone());
+        self.bound.extend((self.scope == Scope::Items).then(|| (Name::from(&item.ident), (*item.expr).clone())));
         visit::visit_item_const(self, item);
     }
-}
 
-struct Locals(Bindings);
-
-impl<'ast> Visit<'ast> for Locals {
     fn visit_local(&mut self, local: &'ast Local) {
-        let bound = match (&local.pat, &local.init) {
-            (Pat::Ident(name), Some(init)) => Some((Name::from(&name.ident), (*init.expr).clone())),
+        let bound = match (&local.pat, &local.init, self.scope) {
+            (Pat::Ident(name), Some(init), Scope::Body) => Some((Name::from(&name.ident), (*init.expr).clone())),
             _ => None,
         };
-        self.0.0.extend(bound);
+        self.bound.extend(bound);
         visit::visit_local(self, local);
     }
 }

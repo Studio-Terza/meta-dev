@@ -18,6 +18,11 @@ const BYTES: &str = "fn t() {\n    assert_eq!(f(), b\"a\\n\");\n}\n";
 const NESTED: &str = "fn t() {\n    proptest! {\n        fn u(a in 0..2) {\n            assert_eq!(f(a), \"a\\nb\");\n        }\n    }\n}\n";
 
 const FIELD: &str = "fn t() {\n    assert_eq!(f(), Answer { out: \"a\\n\".to_owned() });\n}\n";
+const GROUPED: &str = "fn t() {\n    assert_eq!(f(), (\"a\\nb\"));\n    assert_eq!(f(), (1, \"a\\nb\"));\n}\n";
+const TABLE_EQUALS: &str = "laws::table!(t, f, [a == b => \"x\\ny\"]);\n";
+const TABLE_SHIFT: &str = "laws::table!(t, f, [1 >> 2 => \"x\\ny\"]);\n";
+const METHOD: &str = "impl T {\n    fn t() {\n        let w = \"a\\nb\";\n        assert_eq!(f(), w);\n    }\n}\n";
+const ONE_LINE_BYTES: &str = "fn t() {\n    assert_eq!(f(), b\"ab\");\n}\n";
 const ONE_LINE: &str = "fn t() {\n    assert_eq!(f(), \"a b\");\n    assert_eq!(f(), format!(\"{} b\", 1));\n}\n";
 const INPUT: &str = "fn t() {\n    assert_eq!(f(\"a\\nb\"), 2);\n    assert!(g(\"a\\nb\"));\n}\n";
 const DISPLAY: &str = "fn t() {\n    assert_eq!(f(), format!(\"{}\", g()));\n    assert_eq!(f(), \"{:?}\");\n}\n";
@@ -29,7 +34,7 @@ const OTHER_MACRO: &str = "fn t() {\n    println!(\"a\\nb {:?}\", 1);\n    let a
 const LESS: &str = "fn t() {\n    assert!(f() < \"a\\nb\");\n}\n";
 const LOOPED: &str = "const A: &str = B;\nconst B: &str = A;\nfn t() {\n    let c = c;\n    assert_eq!(f(), A);\n    assert_eq!(f(), c);\n}\n";
 
-const CASES: [Case; 24] = [
+const CASES: [Case; 29] = [
     Case::new(
         Title::new("escaped line break"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ESCAPED))],
@@ -104,6 +109,31 @@ const CASES: [Case; 24] = [
         Title::new("a field of a struct"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(FIELD))],
         Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("parenthesised and in a tuple"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GROUPED))],
+        Flagged::new(&["tests/a.rs:2", "tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a table row whose input holds =="),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(TABLE_EQUALS))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a table row whose input holds >>"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(TABLE_SHIFT))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("inside a method"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(METHOD))],
+        Flagged::new(&["tests/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("bytes on one line"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(ONE_LINE_BYTES))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("one line"),

@@ -1,7 +1,10 @@
 use std::fmt;
 
+use lint_layout::Fix;
+
 use super::pinning::Pinning;
 
+#[derive(Debug)]
 pub struct Finding(Pinning);
 
 impl From<Pinning> for Finding {
@@ -12,10 +15,15 @@ impl From<Pinning> for Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let pinned = match self.0 {
-            Pinning::LineBreak => "text with a line break",
-            Pinning::Debug | Pinning::Plain => "Debug-formatted text",
-        };
-        write!(formatter, "assertion pins {pinned}; compare a golden with golden!, or assert on the parts")
+        match self.0 {
+            Pinning::LineBreak => formatter.write_str("assertion pins text with a line break"),
+            Pinning::Debug | Pinning::Plain => formatter.write_str("assertion pins Debug-formatted text"),
+        }
+    }
+}
+
+impl lint_layout::Finding for Finding {
+    fn fix(&self) -> Fix {
+        Fix::new("compare a golden with golden!, or assert on the parts")
     }
 }
