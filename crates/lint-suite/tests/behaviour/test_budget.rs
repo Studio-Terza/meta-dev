@@ -48,30 +48,27 @@ laws::table!(
 );
 
 #[test]
-fn shipped_lines_are_not_test_lines() {
+fn only_test_modules_count_as_test_lines_and_only_once() {
     let files = [Sources::file("crates/a/src/lib.rs", Text::new(SHIPPED))];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(0, 1, 2, 0)));
-}
-
-#[test]
-fn an_inline_test_module_counts_as_test_lines() {
     let files = [Sources::file("crates/a/src/lib.rs", Text::new(WITH_MODULE))];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 6, 5)));
-}
-
-#[test]
-fn nested_test_modules_count_their_lines_once() {
     let files = [Sources::file("crates/a/src/lib.rs", Text::new(NESTED))];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(1, 1, 7, 7)));
 }
 
 #[test]
-fn a_build_script_belongs_to_its_package() {
+fn build_scripts_and_process_starts_belong_to_their_own_package() {
     let files = [
         Sources::file("crates/a/src/lib.rs", Text::new(SHIPPED)),
         Sources::file("crates/a/build.rs", Text::new(SHIPPED)),
     ];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::counted(0, 2, 4, 0)));
+    let files = [
+        Sources::file("crates/a/src/lib.rs", Text::new(STARTS)),
+        Sources::file("crates/b/src/lib.rs", Text::new(SHIPPED)),
+    ];
+    assert_eq!(Budgets::of_crate(&files, "b"), Some(Budgets::counted(0, 1, 2, 0)));
 }
 
 #[test]
@@ -102,13 +99,4 @@ fn the_report_lists_each_crate() {
 fn process_starts_are_counted_inside_and_outside_ports() {
     let files = [Sources::file("crates/a/src/lib.rs", Text::new(STARTS))];
     assert_eq!(Budgets::of_crate(&files, "a"), Some(Budgets::started(0, 1, 9, 0, 2)));
-}
-
-#[test]
-fn process_starts_are_counted_per_crate() {
-    let files = [
-        Sources::file("crates/a/src/lib.rs", Text::new(STARTS)),
-        Sources::file("crates/b/src/lib.rs", Text::new(SHIPPED)),
-    ];
-    assert_eq!(Budgets::of_crate(&files, "b"), Some(Budgets::counted(0, 1, 2, 0)));
 }
