@@ -28,7 +28,11 @@ const ANY_TESTS: &str = "#[cfg(any(test, all(test, unix)))]\nmod tests {}\n";
 
 const NEVER: &str = "#[cfg(any())]\nmod never {}\n";
 
-const CASES: [Case; 23] = [
+const GATED_IMPL: &str = "pub struct W;\n#[cfg(test)]\nimpl W {\n    fn probe(&self) {}\n}\n";
+const GATED_METHOD: &str = "pub struct W;\nimpl W {\n    #[cfg(test)]\n    fn probe(&self) {}\n}\n";
+const GATED_FN: &str = "#[cfg(all(test, unix))]\nfn probe() {}\n";
+
+const CASES: [Case; 26] = [
     Case::new(
         Title::new("inline module"),
         &[Source::new(Located::new("src/a.rs"), Text::new(MODULE))],
@@ -55,6 +59,21 @@ const CASES: [Case; 23] = [
         Flagged::new(&["src/a.rs:2"]),
     ),
     Case::new(Title::new("empty any"), &[Source::new(Located::new("src/a.rs"), Text::new(NEVER))], Flagged::new(&[])),
+    Case::new(
+        Title::new("test-gated impl"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_IMPL))],
+        Flagged::new(&["src/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("test-gated method"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_METHOD))],
+        Flagged::new(&["src/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("test-gated function"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(GATED_FN))],
+        Flagged::new(&["src/a.rs:2"]),
+    ),
     Case::new(Title::new("not test"), &[Source::new(Located::new("src/a.rs"), Text::new(NOT_TEST))], Flagged::new(&[])),
     Case::new(
         Title::new("bare test"),
