@@ -3,6 +3,7 @@ use std::io;
 use std::path::PathBuf;
 
 use crate::cli::document::Document;
+use crate::cli::gate::Seconds;
 use crate::cli::stage::Stage;
 
 #[derive(Debug, thiserror::Error)]
@@ -19,4 +20,10 @@ pub enum Failure {
     UnknownStage { name: OsString },
     #[error("no stage has a limit")]
     Empty,
+    #[error("stage {stage} has warn and block levels, which only the owner changes; only a record is lowered")]
+    Levels { stage: Stage },
+    #[error(
+        "stage {stage} took {measured}, above its record {record}; a record is never raised, so nothing was written"
+    )]
+    Above { stage: Stage, measured: Seconds, record: Seconds },
 }

@@ -6,6 +6,7 @@ use std::io::Write;
 
 use step::github::{Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
+use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::{Exit, Ports};
@@ -17,6 +18,8 @@ pub enum Command {
     LibtestSeconds(LibtestSeconds),
     Reach(ReachScope),
     History(History),
+    MeasuredHistory(MeasuredHistory),
+    RatchetLower(RatchetLower),
     CompileTimes(CompileTimes),
     Logged(Logged),
     Tools(InstallTools),
@@ -38,6 +41,8 @@ impl Command {
     const LIBTEST_SECONDS: &'static str = "libtest-seconds";
     const REACH: &'static str = "reach";
     const HISTORY: &'static str = "history";
+    const MEASURED_HISTORY: &'static str = "measured-history";
+    const RATCHET_LOWER: &'static str = "ratchet-lower";
     const COMPILE_TIMES: &'static str = "compile-times";
     const LOGGED: &'static str = "logged";
     const TOOLS: &'static str = "tools";
@@ -61,6 +66,8 @@ impl Command {
             Some(Self::LIBTEST_SECONDS) => LibtestSeconds::from_arguments(&rest).map(Command::LibtestSeconds),
             Some(Self::REACH) => ReachScope::from_arguments(&rest).map(Command::Reach),
             Some(Self::HISTORY) => History::from_arguments(&rest).map(Command::History),
+            Some(Self::MEASURED_HISTORY) => MeasuredHistory::from_arguments(&rest).map(Command::MeasuredHistory),
+            Some(Self::RATCHET_LOWER) => RatchetLower::from_arguments(&rest).map(Command::RatchetLower),
             Some(Self::COMPILE_TIMES) => CompileTimes::from_arguments(&rest).map(Command::CompileTimes),
             Some(Self::LOGGED) => Logged::from_arguments(&rest).map(Command::Logged),
             Some(Self::TOOLS) => InstallTools::from_arguments(&rest).map(Command::Tools),
@@ -85,6 +92,8 @@ impl Command {
             Command::LibtestSeconds(step) => step.carry_out(ports, out),
             Command::Reach(step) => step.carry_out(ports, out),
             Command::History(step) => step.carry_out(ports, out),
+            Command::MeasuredHistory(step) => step.carry_out(ports, out),
+            Command::RatchetLower(step) => step.carry_out(ports, out),
             Command::CompileTimes(step) => step.carry_out(ports, out),
             Command::Logged(step) => step.carry_out(ports, out),
             Command::Tools(step) => step.carry_out(ports, out),
