@@ -19,6 +19,7 @@ lint-bool-methods = { path = "../lint-bool-methods" }
 lint-const-shape = { path = "../lint-const-shape" }
 lint-crate-graph = { path = "../lint-crate-graph" }
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }
+lint-effect-sites = { path = "../lint-effect-sites" }
 lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
 lint-fn-shape = { path = "../lint-fn-shape" }
@@ -51,6 +52,7 @@ lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
+lint-transition-graph = { path = "../lint-transition-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-type-graph = { path = "../lint-type-graph" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }

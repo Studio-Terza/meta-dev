@@ -1,0 +1,32 @@
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      E2E_REPORT: ${{ runner.temp }}/e2e.txt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+      - name: scenarios
+        run: cargo test --locked -p e2e --features measure --test e2e -- --nocapture
+      - name: report
+        if: always()
+        run: cargo run --locked -q --bin ci -- summarize "$E2E_REPORT" "$GITHUB_STEP_SUMMARY"
