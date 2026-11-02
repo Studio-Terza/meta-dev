@@ -31,7 +31,7 @@ const OTHER_TYPE: &str = "laws::roundtrip!(b, any::<B>(), B::encode, B::decode);
 const SERDE_ENUM: &str = "#[derive(Serialize, Deserialize)]\npub enum A {}\n";
 const SPLIT_TYPES: &str =
     "pub struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for B {}\n";
-const UNRELATED_MACRO: &str = "fn t() {\n    vec![A];\n}\n";
+const UNRELATED_MACRO: &str = "fn t() {\n    vec![B, A];\n}\n";
 
 const TITLE_ONLY: &str = "laws::roundtrip!(A, any::<u8>(), B::encode, B::decode);\n";
 const BOTH_PAIRS: &str = "pub struct A;\nimpl std::fmt::Display for A {}\nimpl std::str::FromStr for A {}\nimpl A {\n    fn encode(&self) {}\n    fn decode() {}\n}\n";

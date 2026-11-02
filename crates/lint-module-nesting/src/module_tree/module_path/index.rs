@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use lint_layout::Name;
 use lint_placement::CrateRoot;
 
-use super::{ModulePath, Same};
+use super::ModulePath;
 
 #[derive(Debug)]
 pub struct ModuleIndex {
@@ -46,13 +46,5 @@ impl ModuleIndex {
 
     pub fn directory_same_as(&self, probe: &ModulePath) -> bool {
         self.directories.get(&probe.crate_root).is_some_and(|found| found.contains(probe.segments.as_slice()))
-    }
-
-    pub fn deepest_containing(&self, target: &ModulePath, user: &ModulePath) -> Option<&ModulePath> {
-        (0..=target.segments.len())
-            .rev()
-            .map(|length| target.truncated_to_length(length))
-            .filter(|probe| !probe.relates::<Same>(user))
-            .find_map(|probe| self.same_as(&probe))
     }
 }

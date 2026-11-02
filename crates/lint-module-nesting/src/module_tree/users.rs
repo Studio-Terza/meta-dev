@@ -27,8 +27,8 @@ impl Users {
     fn with_test(self, modules: &ModuleIndex, file: &SourceFile) -> Users {
         let caller = ModulePath::of_file(file);
         UseEdges::in_file(file.syntax()).iter().fold(self, |mut users, path| {
-            let home = ModulePath::from_use(&caller, path, modules)
-                .and_then(|target| modules.deepest_containing(&target, &caller).cloned());
+            let home =
+                ModulePath::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules).cloned());
             users.record(home, &caller);
             users
         })
