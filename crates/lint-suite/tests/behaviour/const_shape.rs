@@ -6,13 +6,9 @@ const NOT_TEST: &str = "#[cfg(not(test))]\nmod real {\n    pub fn f(x: u8) -> u3
 const NESTED: &str = "pub struct A;\nconst _: () = {\n    impl A {\n        pub fn wide(x: u8) -> u32 { x as u32 }\n    }\n};\nconst fn outer() {\n    fn inner() { for _ in 0..3 {} }\n}\n";
 
 #[test]
-fn modules_compiled_outside_tests_are_checked() {
+fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
     let report = ConstShape::report(&[Sources::file("a.rs", Text::new(NOT_TEST))]);
     assert_eq!(Sources::lines(&report), ["a.rs:3"]);
-}
-
-#[test]
-fn const_context_does_not_leak_into_nested_functions() {
     let report = ConstShape::report(&[Sources::file("a.rs", Text::new(NESTED))]);
     assert_eq!(Sources::lines(&report), ["a.rs:4"]);
 }

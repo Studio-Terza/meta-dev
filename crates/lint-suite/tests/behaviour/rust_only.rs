@@ -134,10 +134,6 @@ fn every_listed_extension_names_its_language_and_the_fix() {
             [format!("tools/run.{extension}:1: {name} source outside assets; {REWRITE}")]
         );
     }
-}
-
-#[test]
-fn web_languages_are_told_to_move_to_assets() {
     for (extension, name) in WEB {
         assert_eq!(
             Checked::one(&format!("site/app.{extension}")),

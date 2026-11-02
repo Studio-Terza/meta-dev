@@ -254,21 +254,17 @@ fn a_parse_failure_names_its_line() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn files_outside_every_crate_target_are_not_read() -> Result<(), Box<dyn Error>> {
+fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", CLEAN)?;
     Trees::write(root.path(), "tests/ui/bad.rs", "fn (")?;
     Trees::write(root.path(), "tooling/corpus/dirty.rs", DIRTY)?;
     assert!(Trees::reported(root.path()).is_clean());
-    Ok(())
-}
-
-#[test]
-fn modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", "pub mod target;\n")?;
-    Trees::write(root.path(), "src/target/mod.rs", DIRTY)?;
-    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    Trees::write(root.path(), "tooling/corpus/case/src/lib.rs", DIRTY)?;
+    Trees::write(root.path(), "tests/fixtures/bad/src/lib.rs", "fn (")?;
+    assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
@@ -324,10 +320,14 @@ fn the_binary_root_is_found_whichever_path_is_given() -> Result<(), Box<dyn Erro
 }
 
 #[test]
-fn bin_directory_roots_are_checked() -> Result<(), Box<dyn Error>> {
+fn bin_roots_and_modules_named_like_build_directories_are_read() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/bin/tool.rs", "struct Extra;\nfn main() {}\n")?;
     Trees::write(root.path(), "src/bin/other/main.rs", "mod m {}\nfn main() {}\n")?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", "pub mod target;\n")?;
+    Trees::write(root.path(), "src/target/mod.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
@@ -358,16 +358,6 @@ fn a_directory_named_tests_inside_src_is_not_a_package() -> Result<(), Box<dyn E
     Trees::write(root.path(), "src/request/tests/a.rs", "mod b;\n")?;
     Trees::write(root.path(), "src/request/tests/a/b.rs", "")?;
     assert_eq!(Trees::reported(root.path()).violations(), 1);
-    Ok(())
-}
-
-#[test]
-fn fixture_trees_without_a_manifest_are_not_read() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "tooling/corpus/case/src/lib.rs", DIRTY)?;
-    Trees::write(root.path(), "tests/fixtures/bad/src/lib.rs", "fn (")?;
-    assert!(Trees::reported(root.path()).is_clean());
     Ok(())
 }
 
@@ -528,11 +518,16 @@ fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Bo
 }
 
 #[test]
-fn a_conditional_path_attribute_leads_to_the_file_read_too() -> Result<(), Box<dyn Error>> {
+fn conditional_paths_and_nested_packages_are_read() -> Result<(), Box<dyn Error>> {
     let root = Trees::package()?;
     Trees::write(root.path(), "src/lib.rs", "#[cfg_attr(unix, path = \"b.rs\")]\nmod a;\n")?;
     Trees::write(root.path(), "src/a.rs", CLEAN)?;
     Trees::write(root.path(), "src/b.rs", DIRTY)?;
+    assert_eq!(Trees::reported(root.path()).violations(), 2);
+    let root = Trees::package()?;
+    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
+    Trees::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
+    Trees::write(root.path(), "inner/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
@@ -543,16 +538,6 @@ fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result
     Trees::write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n")?;
     Trees::write(root.path(), "nested/Cargo.toml", "[package]\nname = \"nested\"\n[workspace]\n")?;
     Trees::write(root.path(), "nested/src/lib.rs", DIRTY)?;
-    assert_eq!(Trees::reported(root.path()).violations(), 2);
-    Ok(())
-}
-
-#[test]
-fn a_package_inside_a_package_is_its_own_package() -> Result<(), Box<dyn Error>> {
-    let root = Trees::package()?;
-    Trees::write(root.path(), "src/lib.rs", CLEAN)?;
-    Trees::write(root.path(), "inner/Cargo.toml", "[package]\nname = \"inner\"\n")?;
-    Trees::write(root.path(), "inner/src/lib.rs", DIRTY)?;
     assert_eq!(Trees::reported(root.path()).violations(), 2);
     Ok(())
 }
