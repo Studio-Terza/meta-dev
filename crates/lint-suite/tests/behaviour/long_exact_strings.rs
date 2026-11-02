@@ -23,6 +23,9 @@ const TABLE_EQUALS: &str = "laws::table!(t, f, [a == b => \"x\\ny\"]);\n";
 const TABLE_SHIFT: &str = "laws::table!(t, f, [1 >> 2 => \"x\\ny\"]);\n";
 const METHOD: &str = "impl T {\n    fn t() {\n        let w = \"a\\nb\";\n        assert_eq!(f(), w);\n    }\n}\n";
 const ONE_LINE_BYTES: &str = "fn t() {\n    assert_eq!(f(), b\"ab\");\n}\n";
+const DERIVED: &str =
+    "fn t() {\n    assert_eq!(f(), \"a\\nb\".len());\n    assert_eq!(f(), line_count!(\"a\\nb\"));\n}\n";
+const TABLE_THEN_GROUP: &str = "laws::table!(t, f, [1 => \"a\\nb\"], {});\n";
 const ONE_LINE: &str = "fn t() {\n    assert_eq!(f(), \"a b\");\n    assert_eq!(f(), format!(\"{} b\", 1));\n}\n";
 const INPUT: &str = "fn t() {\n    assert_eq!(f(\"a\\nb\"), 2);\n    assert!(g(\"a\\nb\"));\n}\n";
 const DISPLAY: &str = "fn t() {\n    assert_eq!(f(), format!(\"{}\", g()));\n    assert_eq!(f(), \"{:?}\");\n}\n";
@@ -34,7 +37,7 @@ const OTHER_MACRO: &str = "fn t() {\n    println!(\"a\\nb {:?}\", 1);\n    let a
 const LESS: &str = "fn t() {\n    assert!(f() < \"a\\nb\");\n}\n";
 const LOOPED: &str = "const A: &str = B;\nconst B: &str = A;\nfn t() {\n    let c = c;\n    assert_eq!(f(), A);\n    assert_eq!(f(), c);\n}\n";
 
-const CASES: [Case; 29] = [
+const CASES: [Case; 31] = [
     Case::new(
         Title::new("escaped line break"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ESCAPED))],
@@ -133,6 +136,16 @@ const CASES: [Case; 29] = [
     Case::new(
         Title::new("bytes on one line"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ONE_LINE_BYTES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a table followed by another group"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(TABLE_THEN_GROUP))],
+        Flagged::new(&["tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("values derived from text by other methods and macros"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(DERIVED))],
         Flagged::new(&[]),
     ),
     Case::new(
