@@ -50,10 +50,10 @@ jobs:
       - name: fmt
         run: cargo fmt --check
       - name: clippy
-        if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $CARGO_SCOPE -- -D warnings'
+        if: env.BUILD_SCOPE != ''
+        run: '"$TOOLS/ci" timed "$MEASURED" clippy cargo clippy --locked --all-targets $BUILD_SCOPE -- -D warnings'
       - name: fuzz targets clippy
-        if: env.CARGO_SCOPE == '--workspace' || contains(format('{0} ', env.CARGO_SCOPE), '-p fuzz ')
+        if: env.BUILD_SCOPE == '--workspace' || contains(format('{0} ', env.BUILD_SCOPE), '-p fuzz ')
         run: cargo clippy --locked --all-targets -p fuzz --features campaign -- -D warnings
       - uses: ./.github/actions/judge
         with:
@@ -78,13 +78,13 @@ jobs:
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/tools
       - name: test compile
-        if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $CARGO_SCOPE'
+        if: env.BUILD_SCOPE != ''
+        run: '"$TOOLS/ci" timed "$MEASURED" test-compile cargo test --locked --no-run --timings $BUILD_SCOPE'
       - name: test run
-        if: env.CARGO_SCOPE != ''
-        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked $CARGO_SCOPE'
+        if: env.BUILD_SCOPE != ''
+        run: '"$TOOLS/ci" logged "$TESTLOG" cargo test --locked $BUILD_SCOPE'
       - name: test run seconds
-        if: env.CARGO_SCOPE != ''
+        if: env.BUILD_SCOPE != ''
         run: '"$TOOLS/ci" libtest-seconds "$MEASURED" test-run "$TESTLOG"'
       - uses: ./.github/actions/judge
         with:

@@ -59,7 +59,7 @@ impl fmt::Display for Reached {
             Cargo::Reached => self.flags(Self::CARGO_FLAG),
             Cargo::Workspace => Self::WORKSPACE_FLAG.to_owned(),
         };
-        writeln!(formatter, "CARGO_SCOPE={scope}")?;
+        writeln!(formatter, "BUILD_SCOPE={scope}")?;
         writeln!(formatter, "MUTANTS_SCOPE={}", self.flags(Self::MUTANTS_FLAG))
     }
 }

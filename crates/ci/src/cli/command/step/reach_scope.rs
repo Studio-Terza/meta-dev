@@ -27,7 +27,7 @@ impl ReachScope {
     const AFFECTED: &'static str = "affected";
     const WIDENED: &'static str = "widened";
     const MAIN: &'static str = "main";
-    const WHOLE_WORKSPACE: &'static str = "CARGO_SCOPE=--workspace\n";
+    const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
     fn recorded(&self, report: &str, out: &mut impl Write) -> Result<(), Failure> {
         write!(out, "{report}")?;
