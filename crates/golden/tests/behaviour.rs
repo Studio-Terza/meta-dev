@@ -1,3 +1,5 @@
+mod differences;
+
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
