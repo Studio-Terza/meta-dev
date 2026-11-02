@@ -4,12 +4,12 @@ use std::fmt;
 use lint_layout::Fix;
 use lint_paths::Ground;
 use lint_placement::CrateName;
-use newtype::{Counter, Display, Newtype};
+use newtype::{Arbitrary, Counter, Display, Newtype};
 
 use super::effect::Effect;
 use super::effect_site::EffectSite;
 
-#[derive(Newtype, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Count(usize);
 
 #[derive(Debug)]
