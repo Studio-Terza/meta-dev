@@ -69,7 +69,9 @@ impl ShapeIndex {
         item.items
             .iter()
             .filter_map(|member| match (member, &item.trait_) {
-                (ImplItem::Fn(function), None) if !matches!(function.vis, Visibility::Inherited) => {
+                (ImplItem::Fn(function), None)
+                    if !matches!(function.vis, Visibility::Inherited) && function.sig.constness.is_none() =>
+                {
                     Some((function, MethodShape::described(&function.sig, &erasure)))
                 }
                 _ => None,

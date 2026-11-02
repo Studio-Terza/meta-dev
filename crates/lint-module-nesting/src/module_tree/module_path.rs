@@ -1,9 +1,11 @@
 mod ancestor;
+mod index;
 mod inside_sibling;
 mod relation;
 mod same;
 
 pub use ancestor::Ancestor;
+pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
 pub use relation::Relation;
 pub use same::Same;
@@ -37,7 +39,7 @@ impl ModulePath {
         }
     }
 
-    pub fn from_use(file: &ModulePath, path: &UsePath, modules: &[ModulePath]) -> Option<ModulePath> {
+    pub fn from_use(file: &ModulePath, path: &UsePath, modules: &ModuleIndex) -> Option<ModulePath> {
         let first = path.first()?;
         let start = if *first == Self::CRATE {
             Vec::new()
@@ -47,7 +49,7 @@ impl ModulePath {
             file.segments.clone()
         };
         let skip = usize::from(first.matches::<Whole>(&Self::ANCHORS));
-        (skip != 0 || modules.iter().any(|module| module.relates::<Same>(&file.child(first)))).then_some(())?;
+        (skip != 0 || modules.same_as(&file.child(first)).is_some()).then_some(())?;
         let segments = path.segments().iter().skip(skip).try_fold(start, |mut segments, segment| {
             if *segment == Self::SUPER {
                 segments.pop().and(Some(segments))
@@ -57,17 +59,6 @@ impl ModulePath {
             }
         })?;
         Some(ModulePath { crate_root: file.crate_root.clone(), segments, file: PathBuf::new() })
-    }
-
-    pub fn deepest_module_containing<'tree>(
-        modules: &'tree [ModulePath],
-        target: &ModulePath,
-        user: &ModulePath,
-    ) -> Option<&'tree ModulePath> {
-        modules
-            .iter()
-            .filter(|module| module.relates::<Ancestor>(target) && !module.relates::<Same>(user))
-            .max_by_key(|module| module.segments.len())
     }
 
     pub fn file(&self) -> &Path {
@@ -87,11 +78,10 @@ impl ModulePath {
         R::holds(self, other)
     }
 
-    pub fn crosses_directory_boundary(&self, user: &ModulePath, modules: &[ModulePath]) -> bool {
+    pub fn crosses_directory_boundary(&self, user: &ModulePath, modules: &ModuleIndex) -> bool {
         (1..self.segments.len()).any(|cut| {
             let boundary = self.truncated_to_length(cut);
-            modules.iter().any(|module| module.relates::<Same>(&boundary) && module.is_directory_module())
-                && !boundary.relates::<Ancestor>(user)
+            modules.directory_same_as(&boundary) && !boundary.relates::<Ancestor>(user)
         })
     }
 

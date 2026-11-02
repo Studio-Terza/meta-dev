@@ -14,12 +14,24 @@ pub struct Finding {
 }
 
 impl Finding {
+    #[must_use]
     pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
         Finding { stage, measured, limit, verdict: limit.judge(measured) }
     }
 
+    #[must_use]
     pub fn blocks(&self) -> bool {
         self.verdict == Verdict::Block
+    }
+
+    #[must_use]
+    pub fn past_warn(self) -> Option<Finding> {
+        (self.verdict != Verdict::Within).then_some(self)
+    }
+
+    #[must_use]
+    pub fn stage(&self) -> &Stage {
+        &self.stage
     }
 }
 

@@ -1,0 +1,15 @@
+name: toolchain
+description: Install the pinned Rust toolchain, restored from the cache when the pin has been seen before
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.rustup/toolchains/[0-9]*
+          ~/.rustup/update-hashes
+        key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+    - name: toolchain
+      shell: bash
+      run: rustup toolchain install

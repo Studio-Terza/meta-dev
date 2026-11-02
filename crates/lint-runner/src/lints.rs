@@ -20,6 +20,7 @@ use lint_no_free_fns::NoFreeFns;
 use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
+use lint_no_plaintext::NoPlaintext;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
@@ -28,10 +29,12 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
+use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
 use lint_type_shape::TypeShape;
 use lint_vec_out_params::VecOutParams;
+use lint_workflow_run::WorkflowRun;
 
 use crate::Outcome;
 
@@ -60,6 +63,7 @@ impl Lints {
             NoForwarders::report(files),
             NoNumbersInBinaries::report(files),
             NoParameterBags::report(files),
+            NoPlaintext::report(files),
             PrimitiveBoundary::report(files),
             PrivateFns::report(files),
             ProcessStarters::report(files),
@@ -79,7 +83,10 @@ impl Lints {
 
     #[must_use]
     pub fn checked(mut readout: Readout) -> Outcome {
-        let reports = Self::reports(readout.files());
+        let reports = Self::reports(readout.files())
+            .into_iter()
+            .chain([RustOnly::report(readout.repo_files()), WorkflowRun::report(readout.repo_files())])
+            .collect();
         Outcome::from_reports(reports, readout.take_failures())
     }
 }

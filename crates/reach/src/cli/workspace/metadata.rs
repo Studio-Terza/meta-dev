@@ -23,6 +23,14 @@ impl Metadata {
             .collect()
     }
 
+    pub fn readers(&self) -> BTreeMap<CrateName, Vec<PathBuf>> {
+        self.packages
+            .iter()
+            .filter(|package| !package.readings().is_empty())
+            .map(|package| (package.name().clone(), package.readings().to_vec()))
+            .collect()
+    }
+
     pub fn dependents(&self, members: &BTreeSet<CrateName>) -> BTreeMap<CrateName, BTreeSet<CrateName>> {
         self.packages
             .iter()

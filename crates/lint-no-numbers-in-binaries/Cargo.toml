@@ -5,14 +5,15 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-named-numbers = { path = "../lint-named-numbers" }
 syn.workspace = true
-
-[dev-dependencies]
-lint-fixtures = { path = "../lint-fixtures" }
 
 [lints]
 workspace = true

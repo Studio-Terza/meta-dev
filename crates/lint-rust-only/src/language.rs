@@ -1,0 +1,290 @@
+mod content;
+mod fix;
+
+use std::ffi::OsStr;
+use std::path::Path;
+
+use content::Content;
+pub(crate) use fix::Fix;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Language {
+    Python,
+    Shell,
+    Batch,
+    PowerShell,
+    Perl,
+    Ruby,
+    Php,
+    Lua,
+    Go,
+    Java,
+    Kotlin,
+    Scala,
+    Swift,
+    ObjectiveC,
+    C,
+    Cpp,
+    CSharp,
+    Dart,
+    Haskell,
+    Elixir,
+    Erlang,
+    Clojure,
+    OCaml,
+    FSharp,
+    R,
+    Julia,
+    Groovy,
+    Zig,
+    JavaScript,
+    TypeScript,
+    Html,
+    Css,
+    Vue,
+    Svelte,
+    Awk,
+    Sed,
+    Tcl,
+    Nix,
+    Make,
+    Notebook,
+    Vim,
+    Lisp,
+    Scheme,
+    Racket,
+    Nim,
+    VisualBasic,
+    Solidity,
+    Assembly,
+    D,
+    Pascal,
+    Fortran,
+    Crystal,
+    V,
+    Arduino,
+    Starlark,
+    Astro,
+    Script,
+}
+
+impl Language {
+    const ALL: &'static [Language] = &[
+        Language::Python,
+        Language::Shell,
+        Language::Batch,
+        Language::PowerShell,
+        Language::Perl,
+        Language::Ruby,
+        Language::Php,
+        Language::Lua,
+        Language::Go,
+        Language::Java,
+        Language::Kotlin,
+        Language::Scala,
+        Language::Swift,
+        Language::ObjectiveC,
+        Language::C,
+        Language::Cpp,
+        Language::CSharp,
+        Language::Dart,
+        Language::Haskell,
+        Language::Elixir,
+        Language::Erlang,
+        Language::Clojure,
+        Language::OCaml,
+        Language::FSharp,
+        Language::R,
+        Language::Julia,
+        Language::Groovy,
+        Language::Zig,
+        Language::JavaScript,
+        Language::TypeScript,
+        Language::Html,
+        Language::Css,
+        Language::Vue,
+        Language::Svelte,
+        Language::Awk,
+        Language::Sed,
+        Language::Tcl,
+        Language::Nix,
+        Language::Make,
+        Language::Notebook,
+        Language::Vim,
+        Language::Lisp,
+        Language::Scheme,
+        Language::Racket,
+        Language::Nim,
+        Language::VisualBasic,
+        Language::Solidity,
+        Language::Assembly,
+        Language::D,
+        Language::Pascal,
+        Language::Fortran,
+        Language::Crystal,
+        Language::V,
+        Language::Arduino,
+        Language::Starlark,
+        Language::Astro,
+        Language::Script,
+    ];
+
+    const RUST: &'static str = "rs";
+
+    #[must_use]
+    pub fn detect(path: &Path) -> Option<Language> {
+        Some(path)
+            .filter(|path| !path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case(Self::RUST)))
+            .and_then(|path| {
+                path.extension()
+                    .and_then(Self::by_extension)
+                    .or_else(|| path.file_stem().map(Path::new).and_then(Path::extension).and_then(Self::by_extension))
+                    .or_else(|| Content::language_of(path))
+            })
+    }
+
+    fn by_extension(extension: &OsStr) -> Option<Language> {
+        let lowered = extension.to_ascii_lowercase();
+        let known = lowered.to_str()?;
+        Self::ALL.iter().copied().find(|language| language.extensions().contains(&known))
+    }
+
+    #[must_use]
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Language::Python => "Python",
+            Language::Shell => "shell",
+            Language::Batch => "batch",
+            Language::PowerShell => "PowerShell",
+            Language::Perl => "Perl",
+            Language::Ruby => "Ruby",
+            Language::Php => "PHP",
+            Language::Lua => "Lua",
+            Language::Go => "Go",
+            Language::Java => "Java",
+            Language::Kotlin => "Kotlin",
+            Language::Scala => "Scala",
+            Language::Swift => "Swift",
+            Language::ObjectiveC => "Objective-C",
+            Language::C => "C",
+            Language::Cpp => "C++",
+            Language::CSharp => "C#",
+            Language::Dart => "Dart",
+            Language::Haskell => "Haskell",
+            Language::Elixir => "Elixir",
+            Language::Erlang => "Erlang",
+            Language::Clojure => "Clojure",
+            Language::OCaml => "OCaml",
+            Language::FSharp => "F#",
+            Language::R => "R",
+            Language::Julia => "Julia",
+            Language::Groovy => "Groovy",
+            Language::Zig => "Zig",
+            Language::JavaScript => "JavaScript",
+            Language::TypeScript => "TypeScript",
+            Language::Html => "HTML",
+            Language::Css => "CSS",
+            Language::Vue => "Vue",
+            Language::Svelte => "Svelte",
+            Language::Awk => "awk",
+            Language::Sed => "sed",
+            Language::Tcl => "Tcl",
+            Language::Nix => "Nix",
+            Language::Make => "make",
+            Language::Notebook => "notebook",
+            Language::Vim => "Vim script",
+            Language::Lisp => "Lisp",
+            Language::Scheme => "Scheme",
+            Language::Racket => "Racket",
+            Language::Nim => "Nim",
+            Language::VisualBasic => "Visual Basic",
+            Language::Solidity => "Solidity",
+            Language::Assembly => "assembly",
+            Language::D => "D",
+            Language::Pascal => "Pascal",
+            Language::Fortran => "Fortran",
+            Language::Crystal => "Crystal",
+            Language::V => "V",
+            Language::Arduino => "Arduino",
+            Language::Starlark => "Starlark",
+            Language::Astro => "Astro",
+            Language::Script => "interpreted script",
+        }
+    }
+
+    #[must_use]
+    pub fn fix(self) -> Fix {
+        match self {
+            Language::JavaScript
+            | Language::TypeScript
+            | Language::Html
+            | Language::Css
+            | Language::Vue
+            | Language::Svelte
+            | Language::Astro => Fix::MoveToAssets,
+            _ => Fix::Rewrite,
+        }
+    }
+
+    fn extensions(self) -> &'static [&'static str] {
+        match self {
+            Language::Python => &["py", "pyw", "pyi", "pyx"],
+            Language::Shell => &["sh", "bash", "zsh", "fish", "ksh", "csh", "dash"],
+            Language::Batch => &["bat", "cmd"],
+            Language::PowerShell => &["ps1", "psm1"],
+            Language::Perl => &["pl", "pm", "t"],
+            Language::Ruby => &["rb", "rake", "erb"],
+            Language::Php => &["php"],
+            Language::Lua => &["lua"],
+            Language::Go => &["go"],
+            Language::Java => &["java"],
+            Language::Kotlin => &["kt", "kts"],
+            Language::Scala => &["scala"],
+            Language::Swift => &["swift"],
+            Language::ObjectiveC => &["m", "mm"],
+            Language::C => &["c", "h"],
+            Language::Cpp => &["cc", "cpp", "cxx", "hh", "hpp", "hxx"],
+            Language::CSharp => &["cs"],
+            Language::Dart => &["dart"],
+            Language::Haskell => &["hs"],
+            Language::Elixir => &["ex", "exs"],
+            Language::Erlang => &["erl", "hrl"],
+            Language::Clojure => &["clj", "cljs", "cljc"],
+            Language::OCaml => &["ml", "mli"],
+            Language::FSharp => &["fs", "fsx"],
+            Language::R => &["r"],
+            Language::Julia => &["jl"],
+            Language::Groovy => &["groovy"],
+            Language::Zig => &["zig"],
+            Language::JavaScript => &["js", "mjs", "cjs", "jsx"],
+            Language::TypeScript => &["ts", "tsx", "mts", "cts"],
+            Language::Html => &["html", "htm"],
+            Language::Css => &["css", "scss", "sass", "less"],
+            Language::Vue => &["vue"],
+            Language::Svelte => &["svelte"],
+            Language::Awk => &["awk"],
+            Language::Sed => &["sed"],
+            Language::Tcl => &["tcl"],
+            Language::Nix => &["nix"],
+            Language::Make => &["mk"],
+            Language::Notebook => &["ipynb"],
+            Language::Vim => &["vim"],
+            Language::Lisp => &["el", "lisp"],
+            Language::Scheme => &["scm"],
+            Language::Racket => &["rkt"],
+            Language::Nim => &["nim"],
+            Language::VisualBasic => &["vb", "vbs"],
+            Language::Solidity => &["sol"],
+            Language::Assembly => &["asm", "s"],
+            Language::D => &["d"],
+            Language::Pascal => &["pas"],
+            Language::Fortran => &["f90"],
+            Language::Crystal => &["cr"],
+            Language::V => &["v"],
+            Language::Arduino => &["ino"],
+            Language::Starlark => &["bzl"],
+            Language::Astro => &["astro"],
+            Language::Script => &[],
+        }
+    }
+}

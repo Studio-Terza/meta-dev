@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
@@ -14,6 +15,8 @@ pub enum Failure {
     Unlimited { stage: Stage },
     #[error("stage {stage} has a limit but was not measured")]
     Unmeasured { stage: Stage },
+    #[error("stage {name} was asked for but has no limit", name = name.display())]
+    UnknownStage { name: OsString },
     #[error("no stage has a limit")]
     Empty,
 }

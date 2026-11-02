@@ -1,0 +1,10 @@
+test budget, report only:
+corpus: 0 tests in 3 files, 0 of 18 lines, 0 process starts
+report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+a struct with no logic of its own that one other file consumes is a parameter bag:
+src/checked.rs:8: Entry only carries values into one other file; give it the logic that consumes it
+src/free.rs:4: Entry only carries values into one other file; give it the logic that consumes it
+data that enters from a file holds no free text; split it into typed parts, or give it a newtype that validates:
+src/free.rs:5: free text in title; split it into typed parts, or use a newtype that validates (serde try_from, or a Deserialize that calls FromStr)
+fails

@@ -20,8 +20,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: toolchain
-        run: rustup toolchain install
+      - uses: ./.github/actions/toolchain
       - name: fuzz the runner for FUZZ_SECONDS
         env:
           FUZZ_CRASHES: ${{ runner.temp }}/crashes

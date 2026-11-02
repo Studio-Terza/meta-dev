@@ -8,5 +8,9 @@ publish.workspace = true
 [dev-dependencies]
 laws = { path = "../laws" }
 
+[lib]
+test = false
+doctest = false
+
 [lints]
 workspace = true

@@ -1,10 +1,14 @@
 mod crate_count;
 mod crate_name;
 mod fan_in;
+mod history;
 mod metadata;
 mod reached;
+mod readers;
+mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -12,13 +16,17 @@ use crate::cli::failure::Failure;
 use crate_count::CrateCount;
 use crate_name::CrateName;
 use fan_in::FanIn;
+use history::History;
 use metadata::Metadata;
 use reached::Reached;
+use readers::Readers;
+use sources::Sources;
 
 #[derive(Debug)]
 pub struct Workspace {
     directories: BTreeMap<CrateName, PathBuf>,
     dependents: BTreeMap<CrateName, BTreeSet<CrateName>>,
+    readers: Readers,
 }
 
 impl FromStr for Workspace {
@@ -28,7 +36,7 @@ impl FromStr for Workspace {
         let metadata: Metadata = serde_json::from_str(metadata)?;
         let directories = metadata.directories()?;
         let dependents = metadata.dependents(&directories.keys().cloned().collect());
-        Ok(Workspace { directories, dependents })
+        Ok(Workspace { directories, dependents, readers: Readers::new(metadata.readers()) })
     }
 }
 
@@ -43,6 +51,26 @@ impl Workspace {
         )
     }
 
+    pub fn history(&self, changed: &[PathBuf]) -> History {
+        History::new(self.reached(changed), self.fan_in())
+    }
+
+    pub fn sources(&self, roots: &[OsString]) -> Sources {
+        let wanted: BTreeSet<CrateName> = self
+            .directories
+            .keys()
+            .filter(|name| roots.iter().any(|root| root.to_str() == Some(name.to_string().as_str())))
+            .cloned()
+            .collect();
+        Sources::new(
+            self.directories
+                .iter()
+                .filter(|(name, _)| !self.closure(BTreeSet::from([(*name).clone()])).is_disjoint(&wanted))
+                .map(|(_, directory)| directory.clone())
+                .collect(),
+        )
+    }
+
     pub fn fan_in(&self) -> FanIn {
         self.directories.keys().fold(FanIn::default(), |fan_in, name| {
             let reach = self.closure(BTreeSet::from([name.clone()]));
@@ -54,7 +82,7 @@ impl Workspace {
         if path.file_name().is_some_and(|name| name == Self::MANIFEST) {
             self.everything()
         } else {
-            self.owned(path).into_iter().collect()
+            self.owned(path).into_iter().chain(self.readers.reached_by(path)).collect()
         }
     }
 

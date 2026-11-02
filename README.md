@@ -21,14 +21,16 @@ The runner finds the packages under the path (a directory with a `Cargo.toml` ho
 listed by its workspace when one encloses it; hidden directories and `target` are skipped), reads each
 package's crate roots and the modules they declare, runs all lints, prints the violations, and exits
 non-zero if there are any. Whether a file is shipped code, a binary or a test is decided from its place
-inside its package, so the verdict does not depend on where the checkout lives.
+inside its package, so the verdict does not depend on where the checkout lives. A file whose brackets or angle
+brackets nest more than 256 deep is refused as a parse failure before it is parsed, since no handwritten code does
+that and the parser would run out of stack or time.
 
 Lints: no_comments, no_free_fns, thin_main, vec_out_params, named_lifetimes, enum_predicates,
 const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal_names,
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
-no_parameter_bags, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
+no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-near_duplicate_tests, mandatory_laws.
+near_duplicate_tests, mandatory_laws, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -44,16 +46,65 @@ legitimate, the lint gates where by naming convention: starting a process (`proc
 ends in the word `ports` (`meta-ports`, not `meta-reports`) or a module named `ports`. Both lints read paths through
 `use` items in any order, renames, type aliases, glob imports, re-exports across the files of a crate, qualified
 `<T>::f` calls and macro bodies, so `matches!(..., Ok(s) if s.success())` is read like any other call. Inside `ports`,
-a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. In a module named `bits` only: casts (`const_shape`), bare numbers
+a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Code a platform requires in its own language (XCUITest Swift, say) is allowed only under a directory named `platform`, and only as test code (`rust_only`). In a module named `bits` only: casts (`const_shape`), bare numbers
 (`named_numbers`) and bare primitives (`primitive_boundary`). Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
+A check that cannot run under plain `cargo test`, such as one that drives a browser or needs its own time budget,
+goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_ignored_tests` does not read
+`test = false` on an `[[example]]`, since an example is not a test.
+
+`no_test_only_api` also fails a visible `fn` or enum variant that no shipped code names but a test does, even with no
+`cfg(test)` gate or `#[doc(hidden)]`. It matches by name across the files it is given, so a name that shipped code also
+uses elsewhere passes.
+
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate) and `reach` (what a change can affect). Crates
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
+library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
+
+## Rust only
+
+`rust_only` fails a source file in another language: the file name has the extension of Python, shell, Batch,
+PowerShell, Perl, Ruby, PHP, Lua, Go, Java, Kotlin, Scala, Swift, Objective-C, C, C++, C#, Dart, Haskell, Elixir,
+Erlang, Clojure, OCaml, F#, R, Julia, Groovy, Zig, awk, sed, Tcl, Nix, make, notebooks, Vim script, Lisp, Scheme, Racket,
+Nim, Visual Basic, Solidity, assembly, D, Pascal, Fortran, Crystal, V, Arduino, Starlark, JavaScript, TypeScript, HTML,
+CSS, Vue, Svelte or Astro, in any case. Web assets (JavaScript, TypeScript, HTML, CSS, Vue, Svelte, Astro) pass below a
+directory named `assets`, anywhere under the checked path; any other language fails there too. The message names the fix: rewrite the file in Rust, or for a web
+language, move it under `assets` if it is a web asset. The lint reads every file under the path, hidden directories
+included, so `.github/` is checked. Below a directory named `platform`, source of any language passes only as test code: a directory or file name before its first dot that is `test` or `tests` in any case, or ends in `Test` or `Tests` (`UITests`, `FlowTests.swift`); other code there fails. A renamed or disguised file is source: a double extension that hides a source extension (`run.py.bak`, `Flow.swift.txt`) fails like the source itself, and so does a file whose content is source in any name: a first line `#!` naming any interpreter other than `rust-script` or `cargo` (`#![` is a Rust attribute), or lines at the start of a line that clearly are Python (`def f(...):`, `import`, `from x import y`), Swift (`import XCTest`, `import SwiftUI`, an `XCTestCase` class), shell (`set -e`, `if ...; then`, `for ...; do`) or C (`#include`), weighed so that one clear line or two weak ones suffice. Content is read from the first 8 KiB, and lines inside fenced code blocks of a document are ignored, so prose and data pass. Rust files are not read. It skips `.git`, and `target` beside a `Cargo.toml`. Configuration files
+(`toml`, `yaml`, `json`), Dockerfiles and Rust are not source files in another language. There is no allow-list.
+
+`workflow_run` keeps logic out of YAML. It parses each file under `.github/workflows`, and every `action.yml` or `action.yaml`, as
+YAML, so how a step is spelled does not matter. The value of a `run` key must be one line of at most
+120 characters, with none of the shell operators `|`, `&`, `;`, `>`, `<`, a backtick, `$(` or a `${` expansion with
+a modifier, and not start with `if`, `for`, `while`, `until`, `case`, `[`, `[[`, `!` or `(`. A value that holds several lines fails, however it is written. The
+value of a `shell` key gets the same rules and must start with `bash`, `sh`, `pwsh`, `powershell` or `cmd`. A step that uses
+`actions/github-script` fails if it has a `script`. A `uses` that starts with `./` must name a directory with an `action.yml` or `action.yaml`, or a
+workflow file in the checked tree; that action is judged like a workflow. A workflow the lint cannot read or parse fails too. There is no allow-list: anything longer is a Rust
+command.
+
+The CI helpers are Rust too, and workflows only call them. `ci` has these commands:
+
+    ci timed <measured> <stage> <program> [<argument>...]       time a stage into the measured file
+    ci logged <log> <program> [<argument>...]                   run a program, copy its output to the log
+    ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
+    ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
+    ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
+    ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
+    ci mutants-shard <shard> <output>                           one weekly shard of all mutants
+    ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
+    ci wall-times <repository> <run> <job>                      wall time per step, from the GitHub API
+    ci show <file>...                                           print files, and say which are absent
+    ci labels <base branch> <pull request>                      the golden-change and new-scenario checks
+    ci shard-summary <shards> <summary>                         outcome counts of the weekly shards
+    ci matrix <shards> <sources> <directory> <summary>          the mutation matrix report
+
+`mutation-shard` and `mutation-report` read the cargo-mutants output
+(`mutation-shard <mutants.out> <out.json>`, `mutation-report <shards> <sources> <report.md> <report.json>`). `ci`
+starts processes only in its `ports` module.
 
 ## Goldens
 
@@ -94,7 +145,7 @@ row and names the first broken row, without generated input. Attributes before t
 Each run uses one fixed seed and writes no regression files, so a run is repeatable and leaves the tree
 alone. A failure prints the smallest failing input. `PROPTEST_RNG_SEED` explores another seed.
 
-`mandatory_laws` fails a `pub` type that has a conversion pair, or a hand-written `Ord` or `PartialEq`, without a law in a
+`mandatory_laws` fails a `pub` type that has a conversion pair, or a hand-written `Ord` or `PartialEq` (a `PartialEq` whose `eq` only compares pointers, such as `Rc::ptr_eq` or `ptr::eq`, needs no law), without a law in a
 test of the same package that names the type. A pair is `Display` with `FromStr`, `Serialize` with `Deserialize`
 (also behind `cfg_attr`), `encode` with `decode`, or `to_x` with `from_x`, in inherent impls or any trait impl, in one
 file or several. Each pair needs its own `roundtrip!`: one that names the type and, for method pairs, both methods.
@@ -102,26 +153,31 @@ The test title does not count as naming the type. Only types in a crate's public
 
 ## Labels
 
-`labels.yml` fails a pull request that changes a golden (including renaming one out of `tests/goldens`) unless it
-carries the label `golden-change`, and one that adds, copies or renames a file into `tests/fixtures` or `tests/e2e`
-unless it carries `new-scenario`. A person adds the label after reviewing the change. The workflow reads label names
-only: it does not check who added a label.
+`labels.yml` runs `ci labels`. It fails a pull request that changes a golden (including renaming one out of
+`tests/goldens`) unless it carries the label `golden-change`, and one that adds, copies or renames a file into
+`tests/fixtures` or `tests/e2e` unless it carries `new-scenario`. A person adds the label after reviewing the change.
+The workflow reads label names only: it does not check who added a label. It compares the head of the branch with the
+merge base of the head and the base branch, so a branch that is behind the base branch is not charged for goldens and
+fixtures that are already on it.
 
 ## CI wall-time limits
 
 `ci/limits.toml` holds a warn and a block level in seconds for each timed CI stage: clippy, test compile,
-test run and lint. The levels assume a full run, so they apply on main only; a pull request is not judged
-by them. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
-that main reports. `ci/timed.sh` times a stage; the test run is the sum of the `finished in`
-times libtest prints, so compile time is not in it. The `limits` step runs `gate-limits`, which prints
-each stage as ok, WARN or BLOCK and fails when any stage is above its block level. A stage with a limit
+test run and lint. The levels assume a full run, so they apply on main and on pull requests into main; a pull request into
+another branch is not judged by them. A stage above its warn level on main opens, or updates, one GitHub issue titled
+with the stage name (`ci stage-issues`), so creep becomes a work item before it blocks. The toolchain install has no limit, since it is not our code; it stays in the wall time per step
+that main reports. `ci timed` times a stage; the test run is the sum of the `finished in`
+times libtest prints (`ci libtest-seconds`), so compile time is not in it. The `limits` step runs `gate-limits <limits> <measured> [<stage>...]`, which prints
+each stage as ok, WARN or BLOCK and fails when any stage is above its block level. CI runs `clippy`, `test` and `lint`
+as three parallel jobs, and each times and judges only its own stages (`clippy`; `test-compile` and `test-run`; `lint`),
+so a stage is still judged alone; a named stage with no limit, or a limit with no measurement, fails. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
-No cache is used: caching was measured and did not pay for its save time.
+The Rust toolchain, the CI tools (built in the dev profile, so they reuse the test build's compiled crates) and compiled crates (`sccache`) are cached.
 
 ## Reach
 
-A pull request pays only for what it can affect. `ci/reach.sh` lists the files the pull request changes and
+A pull request pays only for what it can affect. `ci reach` lists the files the pull request changes and
 gives them to `reach`, with the output of `cargo metadata --no-deps`:
 
     reach affected <metadata> [<changed file>...]
@@ -130,12 +186,16 @@ gives them to `reach`, with the output of `cargo metadata --no-deps`:
 A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
 normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
 that covers `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`, `.cargo/`, `.github/`, `ci/`, the
-files of a deleted crate and anything not yet known. A file `reach` cannot place fails closed.
+files of a deleted crate and anything not yet known.
+A crate whose tests read files outside its own directory declares it in its manifest, and a change to a file under a
+declared path reaches that crate too: `[package.metadata.reach]` with `reads = ["crates"]`. A file `reach` cannot place fails closed.
 
 `affected` prints the share of crates reached and the scopes CI uses, and the run summary of each pull
 request shows them. Clippy, the tests and mutants run on that scope, and are skipped when nothing is
-reached. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
-cannot judge a slice. Main ignores all this and always runs everything, with `--workspace`.
+reached. A skip is not silent: for each scope that is empty, `ci reach` prints `skipped: <scope> is empty, so the
+steps that use it do not run` in the step and in the run summary, and `ci mutants-changed` prints that mutants were
+skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
+cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first. How far a change reaches
 is the measure of tangle, so the report on main prints it.
@@ -170,9 +230,11 @@ and `total`, saturating at the largest count. The orphan rule forbids a blanket 
 are named methods. Derived code is not in the source, so `repeated_methods` does not see it, and neither does it
 count the impl of a trait (an operator, `Display`, `From`, `AsRef`, `FromStr`). A hand-written constructor or other
 public method of one shape on three types still fails, whatever their inner types are (an argument of the inner type
-counts as `Inner`); the fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
+counts as `Inner`); a `const fn` is never counted, since a trait method cannot be const on stable. The fix is `AsRef<T>` for a stored field or `From<&T>` for a computed value, on a newtype, or a derive.
 
-Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
+Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
+
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 
 ## Guards
 

@@ -1,3 +1,3 @@
 mod cli;
 
-pub use cli::Cli;
+pub use cli::{Cli, Failure, Finding, Stage};

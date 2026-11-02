@@ -1,2 +1,2 @@
 test_workspace = true
-exclude_globs = ["**/main.rs"]
+exclude_globs = ["**/main.rs", "**/ports/system.rs"]

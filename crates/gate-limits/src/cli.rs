@@ -11,13 +11,16 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use contents::Contents;
-use failure::Failure;
+pub use failure::Failure;
+pub use gate::Finding;
 use gate::Gate;
+pub use stage::Stage;
 
 #[derive(Debug)]
 pub struct Cli {
     limits: PathBuf,
     measured: PathBuf,
+    only: Vec<OsString>,
 }
 
 impl Cli {
@@ -27,7 +30,8 @@ impl Cli {
     pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Cli {
         let limits = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_LIMITS), PathBuf::from);
         let measured = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_MEASURED), PathBuf::from);
-        Cli { limits, measured }
+        let only = arguments.collect();
+        Cli { limits, measured, only }
     }
 
     #[must_use]
@@ -49,8 +53,12 @@ impl Cli {
         }
     }
 
+    pub fn past_warn(&self) -> Result<Vec<Finding>, Failure> {
+        self.gate().map(Gate::past_warn)
+    }
+
     fn gate(&self) -> Result<Gate, Failure> {
-        Gate::judge(Contents::new(&Self::read(&self.limits)?), Contents::new(&Self::read(&self.measured)?))
+        Gate::judge(Contents::new(&Self::read(&self.limits)?), Contents::new(&Self::read(&self.measured)?), &self.only)
     }
 
     fn read(path: &Path) -> Result<String, Failure> {

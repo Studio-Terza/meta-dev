@@ -11,9 +11,28 @@ pub struct FanIn {
 }
 
 impl FanIn {
+    pub fn inline(&self) -> Inline<'_> {
+        Inline(self)
+    }
+
     pub fn counted(mut self, count: CrateCount, name: CrateName) -> FanIn {
         self.by_count.entry(Reverse(count)).or_default().insert(name);
         self
+    }
+}
+
+#[derive(Debug)]
+pub struct Inline<'fan_in>(&'fan_in FanIn);
+
+impl fmt::Display for Inline<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries: Vec<String> = self
+            .0
+            .by_count
+            .iter()
+            .flat_map(|(Reverse(count), names)| names.iter().map(move |name| format!("{name}={count}")))
+            .collect();
+        write!(formatter, "{}", entries.join(" "))
     }
 }
 

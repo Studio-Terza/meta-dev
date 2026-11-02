@@ -1,0 +1,17 @@
+[package]
+name = "lint-rust-only"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+newtype = { path = "../newtype" }
+
+[lints]
+workspace = true

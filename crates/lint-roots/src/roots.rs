@@ -9,6 +9,8 @@ use package::Package;
 
 pub use target::Target;
 
+use std::path::PathBuf;
+
 use crate::tree::Tree;
 use lint_layout::Failure;
 use lint_layout::Manifest;
@@ -17,6 +19,10 @@ use lint_layout::Manifest;
 pub struct Roots;
 
 impl Roots {
+    pub fn files(tree: &Tree) -> Result<Vec<PathBuf>, Failure> {
+        Directory::new(tree.canonical().to_path_buf()).files()
+    }
+
     pub fn under(tree: &Tree) -> Result<Vec<Target>, Failure> {
         let below = Directory::new(tree.canonical().to_path_buf()).tree()?;
         let above = tree.canonical().ancestors().skip(1).map(|ancestor| Directory::new(ancestor.to_path_buf()));

@@ -1,0 +1,22 @@
+name: tools
+description: Build the CI tools in the dev profile, cached by their sources, and work out the reach of the change
+
+runs:
+  using: composite
+  steps:
+    - name: tools key
+      id: key
+      shell: bash
+      run: cargo run --locked -q --bin ci -- tools-key "$METADATA" "$GITHUB_OUTPUT"
+    - uses: actions/cache@v4
+      id: tools
+      with:
+        path: ${{ github.workspace }}/target/ci/tools
+        key: tools-${{ runner.os }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', steps.key.outputs.sources) }}
+    - name: tools
+      if: steps.tools.outputs.cache-hit != 'true'
+      shell: bash
+      run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
+    - name: reach
+      shell: bash
+      run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'

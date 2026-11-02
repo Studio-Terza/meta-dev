@@ -6,6 +6,7 @@ use lint_layout::Name;
 pub(crate) enum Finding {
     GatedOnTest,
     DocHidden,
+    OnlyTests,
     Feature(Name),
 }
 
@@ -18,6 +19,9 @@ impl fmt::Display for Finding {
             Finding::DocHidden => {
                 formatter.write_str("#[doc(hidden)] on a visible item; document it as real API, or make it private")
             }
+            Finding::OnlyTests => formatter.write_str(
+                "visible item that only tests call, no shipped code names it; remove it and test through the API shipped code uses",
+            ),
             Finding::Feature(name) => {
                 write!(formatter, "test feature {name}; remove the feature and test through the API every build has")
             }

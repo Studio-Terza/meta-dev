@@ -15,7 +15,10 @@ pub struct Cli;
 
 impl Cli {
     const AFFECTED: &'static str = "affected";
+    const WIDENED: &'static str = "widened";
     const FAN_IN: &'static str = "fan-in";
+    const HISTORY: &'static str = "history";
+    const SOURCES: &'static str = "sources";
 
     #[must_use]
     pub fn answer(arguments: impl Iterator<Item = OsString>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
@@ -35,6 +38,18 @@ impl Cli {
             Some(Self::AFFECTED) => {
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
                 Ok(write!(out, "{}", Self::workspace(&metadata)?.reached(&changed))?)
+            }
+            Some(Self::WIDENED) => {
+                let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
+                Ok(write!(out, "{}", Self::workspace(&metadata)?.reached(&changed).widened())?)
+            }
+            Some(Self::HISTORY) => {
+                let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
+                Ok(write!(out, "{}", Self::workspace(&metadata)?.history(&changed))?)
+            }
+            Some(Self::SOURCES) => {
+                let roots: Vec<OsString> = arguments.collect();
+                Ok(write!(out, "{}", Self::workspace(&metadata)?.sources(&roots))?)
             }
             Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(&metadata)?.fan_in())?),
             _ => Err(Failure::Usage),

@@ -1,3 +1,5 @@
+mod nesting;
+
 use std::path::{Path, PathBuf};
 
 use lint_layout::Failure;
@@ -6,6 +8,7 @@ use lint_layout::SourceText;
 use lint_placement::CrateFile;
 use lint_placement::Placement;
 use lint_placement::Role;
+use nesting::Nesting;
 
 #[derive(Debug)]
 pub struct SourceFile {
@@ -33,7 +36,11 @@ impl SourceFile {
     }
 
     fn parse_placed(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
-        let syntax = syn::parse_file(text.as_ref()).map_err(|source| Failure::Parse {
+        let parsed = Some(&text)
+            .filter(|text| Nesting::within_limit(text))
+            .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
+            .and_then(|text| syn::parse_file(text.as_ref()));
+        let syntax = parsed.map_err(|source| Failure::Parse {
             path: path.clone(),
             line: LineNumber::from(source.span()),
             source,
