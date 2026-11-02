@@ -45,7 +45,6 @@ impl ThinMain {
 
     fn keyword(item: &Item) -> Span {
         match item {
-            Item::Use(found) => found.use_token.span,
             Item::Fn(found) => found.sig.fn_token.span,
             Item::Struct(found) => found.struct_token.span,
             Item::Enum(found) => found.enum_token.span,
