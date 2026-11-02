@@ -285,6 +285,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-effect-sites"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-paths",
+ "lint-placement",
+ "newtype",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-enum-predicates"
 version = "0.1.0"
 dependencies = [
@@ -676,6 +689,7 @@ dependencies = [
  "lint-core",
  "lint-crate-graph",
  "lint-distinct-signatures",
+ "lint-effect-sites",
  "lint-enum-predicates",
  "lint-expression-flow",
  "lint-fakes-at-ports",
@@ -714,6 +728,7 @@ dependencies = [
  "lint-state-graph",
  "lint-test-budget",
  "lint-thin-main",
+ "lint-transition-graph",
  "lint-type-graph",
  "lint-type-shape",
  "lint-unconsumed-traits",
@@ -755,6 +770,7 @@ dependencies = [
  "lint-core",
  "lint-crate-graph",
  "lint-distinct-signatures",
+ "lint-effect-sites",
  "lint-enum-predicates",
  "lint-expression-flow",
  "lint-fakes-at-ports",
@@ -794,6 +810,7 @@ dependencies = [
  "lint-state-graph",
  "lint-test-budget",
  "lint-thin-main",
+ "lint-transition-graph",
  "lint-type-graph",
  "lint-type-shape",
  "lint-unconsumed-traits",
@@ -825,6 +842,17 @@ dependencies = [
  "lint-placement",
  "proc-macro2",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-transition-graph"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "type-facts",
 ]
 
 [[package]]

@@ -1,6 +1,8 @@
 use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
+use lint_effect_sites::EffectSites;
 use lint_repeated_bodies::RepeatedBodies;
+use lint_transition_graph::{DuplicateTransitions, TransitionGraph};
 use lint_type_graph::TypeGraph;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_walk_similarity::WalkSimilarity;
@@ -16,7 +18,10 @@ impl Elegance {
             UnconsumedTraits::report(files),
             Complexity::report(files),
             TypeGraph::report(files),
+            TransitionGraph::report(files),
+            DuplicateTransitions::report(files),
             WalkSimilarity::report(files),
+            EffectSites::report(files),
         ]
     }
 }
