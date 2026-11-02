@@ -82,6 +82,10 @@ impl Desk {
         if answer.exit == ExitCode::SUCCESS { Ok(Scope::read(&answer.out)) } else { Err(answer.out.into()) }
     }
 
+    pub fn labels_pass(&self, fake: &Fake, base: &str) -> bool {
+        self.answer(fake, &["labels", base, "1", &self.file("labels.json")]).exit == ExitCode::SUCCESS
+    }
+
     fn answer(&self, fake: &Fake, arguments: &[&str]) -> Answer {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit = Cli::answer(arguments.iter().map(OsString::from), fake, &mut out, &mut err);
