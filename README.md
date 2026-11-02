@@ -30,7 +30,7 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, fakes_at_ports, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
+no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -71,6 +71,15 @@ counts). Besides ports it may implement only std traits: a path that starts at `
 of a prelude trait such as `Clone`, `Default` or `Drop`. Derives and inherent impls are not trait impls and pass. The impls
 of a double are matched by name within its test target, across its files. A double with no port fails at its declaration,
 and any other trait impl fails at the impl; the message names the fix: implement a port, or rename the type.
+
+`long_exact_strings` keeps long text out of assertions. It fails an `assert_eq!` or `assert_ne!`, an `assert!` whose condition is
+`==` or `!=`, or a row of `laws::table!` (also when `table` is imported or renamed), when a compared side, or an expected value of
+the table, is a string or byte string literal holding a line break (a `\n` escape or a real one), or is built with Debug
+formatting: `format!` or `format_args!` whose format string has a `{:?}`, `{:#?}` or `{name:?}` placeholder. The compared side
+is read through references, `to_owned`, `to_string`, `into`, `clone` and the like, `Some`, `Ok`, `Err`, `String::from`, arrays,
+tuples, struct fields, `concat!` and `vec!`, and through a local `let` or a `const` of the file that it names. Arguments of
+other calls are inputs and are not read, nor is the failure message of an assertion. The definition is structural: there is
+no length threshold. The message names the fix: compare a golden with `golden!`, or assert on the parts, such as the lines.
 
 A check that cannot run under plain `cargo test`, such as one that drives a browser or needs its own time budget,
 goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_ignored_tests` does not read

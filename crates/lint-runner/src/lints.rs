@@ -10,6 +10,7 @@ use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
 use lint_literal_names::LiteralNames;
+use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
@@ -81,6 +82,7 @@ impl Lints {
             NoIgnoredTests::report(files),
             NoTestIo::report(files),
             FakesAtPorts::report(files),
+            LongExactStrings::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),

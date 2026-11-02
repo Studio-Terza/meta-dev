@@ -10,6 +10,7 @@ mod fakes_at_ports;
 mod fn_shape;
 mod guard_must_use;
 mod literal_names;
+mod long_exact_strings;
 mod mandatory_laws;
 mod manual_iteration;
 mod module_nesting;

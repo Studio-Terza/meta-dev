@@ -21,6 +21,7 @@ lint-fn-shape = { path = "../lint-fn-shape" }
 lint-guard-must-use = { path = "../lint-guard-must-use" }
 lint-layout = { path = "../lint-layout" }
 lint-literal-names = { path = "../lint-literal-names" }
+lint-long-exact-strings = { path = "../lint-long-exact-strings" }
 lint-mandatory-laws = { path = "../lint-mandatory-laws" }
 lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-module-nesting = { path = "../lint-module-nesting" }

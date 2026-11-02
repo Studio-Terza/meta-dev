@@ -10,15 +10,24 @@ const READING: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/readi
 const BROKEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/broken.json");
 const OUTSIDE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/outside.json");
 const ALL: [&str; 5] = ["core", "leaf", "middle", "serde-user", "tested-through"];
-const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
-const TWO_REPORT: &str = "REACH=2 of 5 crates\nBUILD_SCOPE=-p middle -p tested-through\n\
-    MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
-const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n";
-const HISTORY_LEAF: &str = "reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
-const HISTORY_CORE: &str = "reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
-const HISTORY_NONE: &str = "reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
-const FAN_IN_REPORT: &str = "fan-in, crates that depend on each crate, directly or not:\n\
-    2 core\n1 middle\n0 leaf\n0 serde-user\n0 tested-through\n";
+const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
+const TWO_REPORT: [&str; 3] = [
+    "REACH=2 of 5 crates",
+    "BUILD_SCOPE=-p middle -p tested-through",
+    "MUTANTS_SCOPE=--test-package=middle --test-package=tested-through",
+];
+const EMPTY_REPORT: [&str; 3] = ["REACH=0 of 5 crates", "BUILD_SCOPE=", "MUTANTS_SCOPE="];
+const HISTORY_LEAF: [&str; 1] = ["reach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0"];
+const HISTORY_CORE: [&str; 1] = ["reach 3 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0"];
+const HISTORY_NONE: [&str; 1] = ["reach 0 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0"];
+const FAN_IN_REPORT: [&str; 6] = [
+    "fan-in, crates that depend on each crate, directly or not:",
+    "2 core",
+    "1 middle",
+    "0 leaf",
+    "0 serde-user",
+    "0 tested-through",
+];
 
 #[derive(Debug, PartialEq)]
 struct Answer {
@@ -38,44 +47,47 @@ impl Answer {
         }
     }
 
-    fn reached_by(changed: &[&str]) -> String {
+    fn reached_by(changed: &[&str]) -> Vec<String> {
         let arguments = ["affected", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn sources_of(roots: &[&str]) -> String {
+    fn sources_of(roots: &[&str]) -> Vec<String> {
         let arguments = ["sources", WORKSPACE].iter().chain(roots).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn history_by(changed: &[&str]) -> String {
+    fn history_by(changed: &[&str]) -> Vec<String> {
         let arguments = ["history", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn reached_in(metadata: &str, changed: &[&str]) -> String {
+    fn reached_in(metadata: &str, changed: &[&str]) -> Vec<String> {
         let arguments = ["affected", metadata].iter().chain(changed).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn widened_by(changed: &[&str]) -> String {
+    fn widened_by(changed: &[&str]) -> Vec<String> {
         let arguments = ["widened", WORKSPACE].iter().chain(changed).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn beyond(arguments: &[&str]) -> String {
+    fn beyond(arguments: &[&str]) -> Vec<String> {
         let arguments = ["beyond", WORKSPACE].iter().chain(arguments).copied().collect::<Vec<&str>>();
-        Answer::to(&arguments).out
+        Text::owned(&Answer::to(&arguments).out)
     }
 
-    fn crates(names: &[&str]) -> String {
+    fn crates(names: &[&str]) -> Vec<String> {
         let flags = |flag: &str| names.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ");
-        format!(
-            "REACH={} of 5 crates\nBUILD_SCOPE={}\nMUTANTS_SCOPE={}\n",
-            names.len(),
-            flags("-p "),
-            flags("--test-package=")
-        )
+        vec![
+            format!("REACH={} of 5 crates", names.len()),
+            format!("BUILD_SCOPE={}", flags("-p ")),
+            format!("MUTANTS_SCOPE={}", flags("--test-package=")),
+        ]
+    }
+
+    fn refusal(arguments: &[&str]) -> Vec<String> {
+        Text::owned(&Answer::refused(arguments))
     }
 
     fn refused(arguments: &[&str]) -> String {
@@ -88,8 +100,8 @@ laws::table!(
     a_widened_report_keeps_the_reach_for_mutants_but_runs_cargo_on_the_whole_workspace,
     Answer::widened_by,
     [
-        ["crates/leaf/src/lib.rs"] => "REACH=1 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
-        ["README.md"] => "REACH=0 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=\n",
+        ["crates/leaf/src/lib.rs"] => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
+        ["README.md"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE="],
     ]
 );
 
@@ -97,9 +109,9 @@ laws::table!(
     a_report_gives_the_share_and_both_scopes,
     Answer::reached_by,
     [
-        ["crates/leaf/src/lib.rs"] => LEAF_REPORT,
-        ["crates/middle/src/lib.rs"] => TWO_REPORT,
-        ["README.md"] => EMPTY_REPORT,
+        ["crates/leaf/src/lib.rs"] => LEAF_REPORT.to_vec(),
+        ["crates/middle/src/lib.rs"] => TWO_REPORT.to_vec(),
+        ["README.md"] => EMPTY_REPORT.to_vec(),
     ]
 );
 
@@ -137,14 +149,14 @@ fn a_dependency_served_by_a_patch_is_still_an_edge() {
     let reached = Answer::reached_in(PATCHED, &["crates/a/src/lib.rs"]);
     assert_eq!(
         reached,
-        "REACH=2 of 2 crates\nBUILD_SCOPE=-p a -p b\nMUTANTS_SCOPE=--test-package=a --test-package=b\n"
+        ["REACH=2 of 2 crates", "BUILD_SCOPE=-p a -p b", "MUTANTS_SCOPE=--test-package=a --test-package=b"]
     );
 }
 
 #[test]
 fn a_package_at_the_workspace_root_does_not_own_every_path() {
     let everything =
-        "REACH=2 of 2 crates\nBUILD_SCOPE=-p leaf -p root\nMUTANTS_SCOPE=--test-package=leaf --test-package=root\n";
+        ["REACH=2 of 2 crates", "BUILD_SCOPE=-p leaf -p root", "MUTANTS_SCOPE=--test-package=leaf --test-package=root"];
     for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
         assert_eq!(Answer::reached_in(ROOTED, &[changed]), everything, "{changed}");
     }
@@ -152,16 +164,23 @@ fn a_package_at_the_workspace_root_does_not_own_every_path() {
 
 #[test]
 fn a_crate_that_declares_what_it_reads_is_reached_by_changes_there() {
-    let runner_and_tool =
-        "REACH=2 of 3 crates\nBUILD_SCOPE=-p runner -p tool\nMUTANTS_SCOPE=--test-package=runner --test-package=tool\n";
+    let runner_and_tool = [
+        "REACH=2 of 3 crates",
+        "BUILD_SCOPE=-p runner -p tool",
+        "MUTANTS_SCOPE=--test-package=runner --test-package=tool",
+    ];
     assert_eq!(
         Answer::reached_in(READING, &["crates/leaf/src/lib.rs"]),
-        "REACH=3 of 3 crates\nBUILD_SCOPE=-p leaf -p runner -p tool\nMUTANTS_SCOPE=--test-package=leaf --test-package=runner --test-package=tool\n"
+        [
+            "REACH=3 of 3 crates",
+            "BUILD_SCOPE=-p leaf -p runner -p tool",
+            "MUTANTS_SCOPE=--test-package=leaf --test-package=runner --test-package=tool"
+        ]
     );
     assert_eq!(Answer::reached_in(READING, &["crates/runner/src/lib.rs"]), runner_and_tool);
     assert_eq!(
         Answer::reached_in(READING, &["tool/src/lib.rs"]),
-        "REACH=1 of 3 crates\nBUILD_SCOPE=-p tool\nMUTANTS_SCOPE=--test-package=tool\n"
+        ["REACH=1 of 3 crates", "BUILD_SCOPE=-p tool", "MUTANTS_SCOPE=--test-package=tool"]
     );
 }
 
@@ -169,45 +188,54 @@ laws::table!(
     documents_outside_the_crates_reach_nothing,
     Answer::reached_by,
     [
-        ["README.md"] => EMPTY_REPORT,
-        ["specs/segmentation.md"] => EMPTY_REPORT,
-        [] => EMPTY_REPORT,
+        ["README.md"] => EMPTY_REPORT.to_vec(),
+        ["specs/segmentation.md"] => EMPTY_REPORT.to_vec(),
+        [] => EMPTY_REPORT.to_vec(),
     ]
 );
 
 laws::table!(
     every_unusable_input_fails_closed_and_says_why,
-    Answer::refused,
+    Answer::refusal,
     [
-        [] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["affected"] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["other", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["beyond", WORKSPACE] => "usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]\n",
-        ["fan-in", OUTSIDE] => "/x/Cargo.toml is not inside the workspace\n",
+        [] => vec!["usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]"],
+        ["affected"] => vec!["usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]"],
+        ["other", WORKSPACE] => vec!["usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]"],
+        ["beyond", WORKSPACE] => vec!["usage: reach affected <metadata> [<changed file>...] | reach widened <metadata> [<changed file>...] | reach history <metadata> [<changed file>...] | reach fan-in <metadata> | reach sources <metadata> <crate>... | reach beyond <metadata> <produced file> [<changed file>...]"],
+        ["fan-in", OUTSIDE] => vec!["/x/Cargo.toml is not inside the workspace"],
     ]
 );
 
 #[test]
 fn fan_in_counts_every_crate_a_crate_reaches_most_first() {
     let answer = Answer::to(&["fan-in", WORKSPACE]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: FAN_IN_REPORT.to_owned(), err: String::new() });
+    assert_eq!(
+        (answer.exit, Text::lines(&answer.out), answer.err),
+        (ExitCode::SUCCESS, FAN_IN_REPORT.to_vec(), String::new())
+    );
 }
 
-const SOURCES_OF_MIDDLE: &str =
-    "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/middle/Cargo.toml\ncrates/middle/src/**\n";
-const SOURCES_OF_TESTED_THROUGH: &str = "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/middle/Cargo.toml\n\
-    crates/middle/src/**\ncrates/tested-through/Cargo.toml\ncrates/tested-through/src/**\n";
+const SOURCES_OF_MIDDLE: [&str; 4] =
+    ["crates/core/Cargo.toml", "crates/core/src/**", "crates/middle/Cargo.toml", "crates/middle/src/**"];
+const SOURCES_OF_TESTED_THROUGH: [&str; 6] = [
+    "crates/core/Cargo.toml",
+    "crates/core/src/**",
+    "crates/middle/Cargo.toml",
+    "crates/middle/src/**",
+    "crates/tested-through/Cargo.toml",
+    "crates/tested-through/src/**",
+];
 
 laws::table!(
     the_sources_of_roots_are_their_own_and_those_of_every_crate_they_depend_on,
     Answer::sources_of,
     [
-        ["middle"] => SOURCES_OF_MIDDLE,
-        ["tested-through"] => SOURCES_OF_TESTED_THROUGH,
-        ["leaf"] => "crates/leaf/Cargo.toml\ncrates/leaf/src/**\n",
-        ["core", "leaf"] => "crates/core/Cargo.toml\ncrates/core/src/**\ncrates/leaf/Cargo.toml\ncrates/leaf/src/**\n",
-        ["absent"] => "",
-        [] => "",
+        ["middle"] => SOURCES_OF_MIDDLE.to_vec(),
+        ["tested-through"] => SOURCES_OF_TESTED_THROUGH.to_vec(),
+        ["leaf"] => vec!["crates/leaf/Cargo.toml", "crates/leaf/src/**"],
+        ["core", "leaf"] => vec!["crates/core/Cargo.toml", "crates/core/src/**", "crates/leaf/Cargo.toml", "crates/leaf/src/**"],
+        ["absent"] => Vec::<&str>::new(),
+        [] => Vec::<&str>::new(),
     ]
 );
 
@@ -215,14 +243,14 @@ laws::table!(
     a_produced_file_is_beyond_the_changes_unless_they_reach_every_crate_owning_it,
     Answer::beyond,
     [
-        ["crates/leaf/tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => "",
-        ["crates/tested-through/tests/goldens/x.txt", "crates/core/src/lib.rs"] => "",
-        ["crates/core/tests/goldens/x.txt", "crates/middle/src/lib.rs"] => "crates/core/tests/goldens/x.txt\n",
-        ["crates/leaf/tests/goldens/x.txt"] => "crates/leaf/tests/goldens/x.txt\n",
-        ["crates/leaf/tests/goldens/x.txt", "README.md"] => "crates/leaf/tests/goldens/x.txt\n",
-        ["tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => "tests/goldens/x.txt\n",
-        ["tests/goldens/x.txt", "Cargo.lock"] => "",
-        ["specs/tests/goldens/x.txt", "Cargo.lock"] => "specs/tests/goldens/x.txt\n",
+        ["crates/leaf/tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => Vec::<&str>::new(),
+        ["crates/tested-through/tests/goldens/x.txt", "crates/core/src/lib.rs"] => Vec::<&str>::new(),
+        ["crates/core/tests/goldens/x.txt", "crates/middle/src/lib.rs"] => vec!["crates/core/tests/goldens/x.txt"],
+        ["crates/leaf/tests/goldens/x.txt"] => vec!["crates/leaf/tests/goldens/x.txt"],
+        ["crates/leaf/tests/goldens/x.txt", "README.md"] => vec!["crates/leaf/tests/goldens/x.txt"],
+        ["tests/goldens/x.txt", "crates/leaf/src/lib.rs"] => vec!["tests/goldens/x.txt"],
+        ["tests/goldens/x.txt", "Cargo.lock"] => Vec::<&str>::new(),
+        ["specs/tests/goldens/x.txt", "Cargo.lock"] => vec!["specs/tests/goldens/x.txt"],
     ]
 );
 
@@ -230,9 +258,9 @@ laws::table!(
     a_history_line_gives_the_reach_and_every_fan_in,
     Answer::history_by,
     [
-        ["crates/leaf/src/lib.rs"] => HISTORY_LEAF,
-        ["crates/core/src/lib.rs"] => HISTORY_CORE,
-        ["README.md"] => HISTORY_NONE,
+        ["crates/leaf/src/lib.rs"] => HISTORY_LEAF.to_vec(),
+        ["crates/core/src/lib.rs"] => HISTORY_CORE.to_vec(),
+        ["README.md"] => HISTORY_NONE.to_vec(),
     ]
 );
 
@@ -240,4 +268,16 @@ laws::table!(
 fn metadata_that_cannot_be_read_or_parsed_is_refused() {
     assert!(Answer::refused(&["fan-in", "/no/such/metadata.json"]).contains("cannot read /no/such/metadata.json"));
     assert!(Answer::refused(&["affected", BROKEN]).contains("cannot parse cargo metadata"));
+}
+
+struct Text;
+
+impl Text {
+    fn owned(text: &str) -> Vec<String> {
+        text_lines::Lines::from(text).map(str::to_owned).collect()
+    }
+
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
+    }
 }
