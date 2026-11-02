@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::site::Site;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Violation {
     site: Site,
     message: String,
