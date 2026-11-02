@@ -29,8 +29,8 @@ laws::table!(
     input_types_joined_to_one_output_more_than_once_are_listed,
     Duplicates::shows,
     [
-        [TWO_PARSERS, "crates/x/src/lib.rs:4: x::Raw -> x::Policy has 2 transitions: x::Policy::from at crates/x/src/lib.rs:4, x::Raw::policy at crates/x/src/lib.rs:7; keep the standard conversion x::Policy::from and route the others through it"] => true,
-        [NO_CONVERSION, "x::Raw -> x::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:4, x::Raw::parsed at crates/x/src/lib.rs:5; keep one, as From, TryFrom or FromStr where it fits"] => true,
+        [TWO_PARSERS, "crates/x/src/lib.rs:4: x::Raw -> x::Policy has 2 transitions: x::Policy::from at crates/x/src/lib.rs:4, x::Raw::policy at crates/x/src/lib.rs:7; x::Policy::from is the standard conversion; keep the standard conversion and route the other transitions through it"] => true,
+        [NO_CONVERSION, "x::Raw -> x::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:4, x::Raw::parsed at crates/x/src/lib.rs:5; keep one transition, as From, TryFrom or FromStr where it fits"] => true,
         [DIFFERENT_INPUTS, "x::A, x::B -> x::C has 2 transitions: x::A::c_with at crates/x/src/lib.rs:6, x::A::b_and_a at crates/x/src/lib.rs:7"] => true,
         [DIFFERENT_INPUTS, "workspace: 3 transitions between workspace types compared, 1 input-output pairs joined more than once by 2 transitions; not compared: 0 touching a primitive or unit, 0 touching a foreign or generic type"] => true,
         [PRIMITIVE_PAIRS, "has 2 transitions"] => false,
