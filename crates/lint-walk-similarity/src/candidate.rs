@@ -2,6 +2,7 @@ mod agreement;
 
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::Site;
 use lint_layout::Name;
 
@@ -43,8 +44,14 @@ impl fmt::Display for Candidate {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{} and {} (at {}) share {} outgoing methods and trait impls; unify with a standard trait, else a generic over an existing trait, else a derive",
+            "{} and {} (at {}) share {} outgoing methods and trait impls",
             self.first, self.second, self.other, self.agreement
         )
+    }
+}
+
+impl lint_core::Finding for Candidate {
+    fn fix(&self) -> Fix {
+        Fix::new("unify with a standard trait, else a generic over an existing trait, else a derive")
     }
 }

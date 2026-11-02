@@ -3,6 +3,9 @@ use syn::visit::Visit;
 use syn::{ItemMod, LitFloat, LitInt};
 
 use lint_core::BinaryFiles;
+use lint_core::Fix;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -28,7 +31,10 @@ impl Lint for NoNumbersInBinaries {
                     numbers.0.into_iter().map(move |line| {
                         Violation::new(
                             Site::new(file.path(), line),
-                            "numeric literal in a binary; read it from the settings file or its embedded defaults",
+                            Message::new(
+                                Problem::new("numeric literal in a binary"),
+                                Fix::new("read it from the settings file or its embedded defaults"),
+                            ),
                         )
                     })
                 })

@@ -720,6 +720,7 @@ dependencies = [
  "lint-walk-similarity",
  "lint-workflow-run",
  "tempfile",
+ "text-lines",
 ]
 
 [[package]]

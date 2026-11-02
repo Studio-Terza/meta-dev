@@ -3,31 +3,61 @@ use std::path::Path;
 
 use golden::{Golden, Output};
 use ports::Corpus;
+use text_lines::Lines;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
+const SITE_END: &str = ": ";
+const FIX_START: &str = "; ";
 
 #[test]
-fn every_lint_prints_its_golden_over_its_fixture() -> Result<(), Box<dyn Error>> {
+fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
     let fixtures = Corpus::fixtures()?;
     assert_eq!(fixtures.len(), Corpus::lints()?);
-    let differences: Vec<String> = fixtures
+    let outputs = fixtures
         .iter()
-        .map(|fixture| Corpus::difference(fixture))
+        .map(|fixture| Ok((fixture.as_path(), Corpus::output(fixture)?)))
+        .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
+    let differences: Vec<String> = outputs
+        .iter()
+        .map(|(fixture, output)| Corpus::difference(fixture, output))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flatten()
         .collect();
     assert_eq!(differences, Vec::<String>::new());
+    let printed: Vec<&str> = outputs
+        .iter()
+        .flat_map(|(_, output)| Lines::from(output.as_str()))
+        .filter(|line| Corpus::is_violation(line))
+        .collect();
+    let unfixed: Vec<&str> = printed.iter().copied().filter(|line| !Corpus::names_a_fix(line)).collect();
+    assert_ne!(printed, Vec::<&str>::new());
+    assert_eq!(unfixed, Vec::<&str>::new());
     Ok(())
 }
 
 impl Corpus {
-    fn difference(fixture: &Path) -> Result<Option<String>, Box<dyn Error>> {
+    fn is_violation(line: &str) -> bool {
+        line.match_indices(SITE_END)
+            .next()
+            .and_then(|(at, _)| line.get(..at))
+            .and_then(|site| site.chars().last())
+            .is_some_and(|last| last.is_ascii_digit())
+    }
+
+    fn names_a_fix(line: &str) -> bool {
+        line.rmatch_indices(FIX_START)
+            .next()
+            .and_then(|(at, _)| line.get(at + FIX_START.len()..))
+            .is_some_and(|fix| fix.chars().any(|letter| !letter.is_whitespace()))
+    }
+
+    fn difference(fixture: &Path, output: &str) -> Result<Option<String>, Box<dyn Error>> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
         let golden = Golden::in_running_package(format!("lints/{name}.txt"))?;
-        Ok(golden.verify(Output::new(&Self::output(fixture)?)).err().map(|failure| format!("{failure:?}")))
+        Ok(golden.verify(Output::new(output)).err().map(|failure| format!("{failure:?}")))
     }
 }
 

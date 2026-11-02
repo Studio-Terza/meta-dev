@@ -3,11 +3,11 @@ corpus: 0 tests in 5 files, 0 of 13 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/feature.rs:2: fn f
-src/gated.rs:2: fn f
-src/gated.rs:4: fn g
-src/hidden.rs:2: fn f
-src/plain.rs:1: fn f
+src/feature.rs:2: fn f; make it an associated function or a method
+src/gated.rs:2: fn f; make it an associated function or a method
+src/gated.rs:4: fn g; make it an associated function or a method
+src/hidden.rs:2: fn f; make it an associated function or a method
+src/plain.rs:1: fn f; make it an associated function or a method
 function names say what the function does:
 src/feature.rs:2: fn f names nothing; say what it does
 src/hidden.rs:2: fn f names nothing; say what it does

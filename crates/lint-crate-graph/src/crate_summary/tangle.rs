@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::crate_summary::item_count::ItemCount;
+use lint_core::Fix;
 use lint_layout::Name;
 use newtype::{Arbitrary, Newtype};
 
@@ -17,5 +18,11 @@ impl fmt::Display for Tangle {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let names: Vec<String> = self.0.iter().map(ToString::to_string).collect();
         write!(formatter, "cycle of {} items: {}", self.0.len(), names.join(" "))
+    }
+}
+
+impl lint_core::Finding for Tangle {
+    fn fix(&self) -> Fix {
+        Fix::new("break the cycle with a standard trait, else a generic over an existing trait, else a derive")
     }
 }

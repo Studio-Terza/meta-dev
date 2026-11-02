@@ -3,7 +3,7 @@ mod band;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use lint_core::{Site, Violation};
+use lint_core::{Finding, Fix, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
@@ -39,6 +39,14 @@ impl fmt::Display for Distribution<'_> {
         let hairiest: &Name = self.hairiest.as_ref();
         write!(formatter, "crate {}: {} functions by complexity", self.name, self.total.len())?;
         self.bands.iter().try_for_each(|(band, members)| write!(formatter, ", {band}: {}", members.len()))?;
-        write!(formatter, "; highest {} in {hairiest}", self.hairiest.score())
+        write!(formatter, ", highest {} in {hairiest}", self.hairiest.score())
+    }
+}
+
+impl Finding for Distribution<'_> {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "turn the branches of the highest into a standard trait, a generic over an existing trait, or a derive",
+        )
     }
 }

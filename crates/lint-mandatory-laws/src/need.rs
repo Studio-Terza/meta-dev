@@ -1,5 +1,7 @@
 use std::fmt;
 
+use lint_core::Fix;
+
 use crate::pair::Pair;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,11 +15,20 @@ impl fmt::Display for Need {
         match self {
             Need::Roundtrip(pair) => write!(
                 formatter,
-                "has the conversion pair {pair} (Display and FromStr, Serialize and Deserialize, encode and decode, or to_x and from_x); add a `laws::roundtrip!` in a test of the same package that names the type and the pair"
+                "has the conversion pair {pair} (Display and FromStr, Serialize and Deserialize, encode and decode, or to_x and from_x)"
             ),
-            Need::Law => formatter.write_str(
-                "has a hand-written Ord or PartialEq; add a `laws::law!` in a test of the same package that names it",
-            ),
+            Need::Law => formatter.write_str("has a hand-written Ord or PartialEq"),
         }
+    }
+}
+
+impl lint_core::Finding for Need {
+    fn fix(&self) -> Fix {
+        Fix::new(match self {
+            Need::Roundtrip(_) => {
+                "add a `laws::roundtrip!` in a test of the same package that names the type and the pair"
+            }
+            Need::Law => "add a `laws::law!` in a test of the same package that names it",
+        })
     }
 }
