@@ -283,6 +283,7 @@ dependencies = [
  "lint-paths",
  "lint-placement",
  "newtype",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 
