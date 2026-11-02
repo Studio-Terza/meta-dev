@@ -16,6 +16,7 @@ const WORDS: &str = "struct Fakery;\nstruct Spyglass;\nstruct MockingBird;\nstru
 const GENERIC: &str = "struct FakeStore<T>(T);\nimpl<T> ports::Store for FakeStore<T> {}\n";
 const RENAMED: &str = "use ci::ports::Ports as Effects;\nstruct Fake;\nimpl Effects for Fake {}\n";
 const GLOB: &str = "use ci::ports::*;\nstruct Fake;\nimpl Ports for Fake {}\n";
+const NESTED: &str = "mod helpers {\n    pub struct FakeClock;\n}\nunion DummyBits {\n    a: u8,\n}\n";
 const DECLARED: &str = "struct FakeClock;\n";
 const IMPLEMENTED: &str = "impl ports::Clock for super::FakeClock {}\n";
 const SHIPPED_PORT: &str = "pub trait Clock {}\npub trait Calendar {}\n";
@@ -24,7 +25,7 @@ const THROUGH_RE_EXPORT: &str =
     "struct FakeClock;\nimpl x::Clock for FakeClock {}\nstruct FakeOther;\nimpl x::Other for FakeOther {}\n";
 const INLINE_SHIPPED_PORT: &str = "pub mod ports {\n    pub trait Clock {}\n}\npub use ports::Clock;\n";
 
-const CASES: [Case; 18] = [
+const CASES: [Case; 19] = [
     Case::new(
         Title::new("implements a trait of a ports module"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(PORTED))],
@@ -89,6 +90,11 @@ const CASES: [Case; 18] = [
         Title::new("shipped code"),
         &[Source::new(Located::new("src/a.rs"), Text::new(UNPORTED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inside a module, and a union"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(NESTED))],
+        Flagged::new(&["tests/a.rs:2", "tests/a.rs:4"]),
     ),
     Case::new(
         Title::new("example"),
