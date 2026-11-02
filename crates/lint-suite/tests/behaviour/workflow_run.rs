@@ -1,8 +1,9 @@
-use std::fs;
 use std::path::Path;
 
 use lint_core::RepoFile;
 use lint_workflow_run::WorkflowRun;
+
+use crate::ports::Checkout;
 
 const WORKFLOW: &str = ".github/workflows/ci.yml";
 const SPANS: &str = "a run step spans several lines; put the logic in a Rust command";
@@ -25,10 +26,7 @@ struct Checked;
 
 impl Checked {
     fn at(path: &str, text: &str) -> Vec<String> {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        let file = checkout.path().join(path);
-        file.parent().map(fs::create_dir_all);
-        fs::write(&file, text).ok();
+        let checkout = Checkout::new().with(path, text);
         Self::reported(checkout.path(), path)
     }
 
@@ -44,17 +42,10 @@ impl Checked {
     }
 
     fn tree(tree: &Tree) -> Vec<String> {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        let files: Vec<RepoFile> = tree
-            .0
-            .iter()
-            .map(|planted| {
-                let file = checkout.path().join(planted.path);
-                file.parent().map(fs::create_dir_all);
-                fs::write(&file, planted.text).ok();
-                RepoFile::new(file, planted.path)
-            })
-            .collect();
+        let checkout =
+            tree.0.iter().fold(Checkout::new(), |checkout, planted| checkout.with(planted.path, planted.text));
+        let files: Vec<RepoFile> =
+            tree.0.iter().map(|planted| RepoFile::new(checkout.file(planted.path), planted.path)).collect();
         let prefix = format!("{}/", checkout.path().display());
         WorkflowRun::report(&files)
             .violations()
@@ -184,7 +175,7 @@ laws::table!(
 
 #[test]
 fn a_workflow_that_cannot_be_read_is_reported_not_passed() {
-    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
+    let checkout = Checkout::new();
     let reported = Checked::reported(checkout.path(), WORKFLOW);
     assert_eq!(reported.len(), 1);
     assert!(reported.iter().all(|line| line.contains(&format!("{WORKFLOW}:1: cannot read the workflow: "))));

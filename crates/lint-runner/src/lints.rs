@@ -22,6 +22,7 @@ use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_plaintext::NoPlaintext;
+use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
@@ -77,6 +78,7 @@ impl Lints {
             PublicApiTests::report(files),
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
+            NoTestIo::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),

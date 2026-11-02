@@ -1,53 +1,10 @@
 use std::ffi::OsStr;
-use std::fs;
-use std::path::PathBuf;
 
 use golden::{Difference, Failure, Golden, Mode, Output, golden};
 use laws::proptest;
 use laws::{roundtrip, table};
+use ports::Fixture;
 use proptest::prelude::any;
-use tempfile::TempDir;
-
-struct Fixture {
-    directory: TempDir,
-}
-
-impl Fixture {
-    const NAME: &str = "nested/output.txt";
-    const GOLDENS: &str = "tests/goldens";
-
-    fn new() -> Result<Self, std::io::Error> {
-        Ok(Self { directory: TempDir::new()? })
-    }
-
-    fn path(&self) -> PathBuf {
-        self.directory.path().join(Self::GOLDENS).join(Self::NAME)
-    }
-
-    fn golden(&self) -> Golden {
-        match Golden::in_package(self.directory.path(), Self::NAME) {
-            Ok(golden) => golden,
-            Err(failure) => unreachable!("the fixture name stays inside the goldens directory: {failure:?}"),
-        }
-    }
-
-    fn with_recorded(text: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let fixture = Self::new()?;
-        fs::create_dir_all(fixture.directory.path().join(Self::GOLDENS).join("nested"))?;
-        fs::write(fixture.path(), text)?;
-        Ok(fixture)
-    }
-
-    fn text(&self) -> Result<String, std::io::Error> {
-        fs::read_to_string(self.path())
-    }
-
-    fn recorded_through_the_api(text: &str) -> Option<Self> {
-        let fixture = Self::new().ok()?;
-        fixture.golden().verify_in(Mode::Record, Output::new(text)).ok()?;
-        Some(fixture)
-    }
-}
 
 #[test]
 fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
@@ -74,7 +31,7 @@ fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Er
 #[test]
 fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("")?;
-    fs::write(fixture.path(), [0xff, 0xfe])?;
+    fixture.overwrite(&[0xff, 0xfe])?;
     assert!(matches!(fixture.golden().verify(Output::new("")), Err(Failure::Unreadable { .. })));
     Ok(())
 }
@@ -115,7 +72,7 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
 #[test]
 fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    fs::write(fixture.directory.path().join("Cargo.toml"), "[package]\nname = \"a\"\n")?;
+    fixture.mark_package()?;
     let recorded = fixture.golden().verify_in(Mode::Record, Output::new("new\n"));
     let chosen = Mode::current().ok() == Some(Mode::Record);
     assert_eq!(matches!(recorded, Err(Failure::NotChosen { .. })), !chosen);
@@ -151,4 +108,61 @@ fn equal_texts_have_no_difference() {
 #[test]
 fn the_golden_macro_finds_a_golden_in_the_calling_package() -> Result<(), Failure> {
     golden!("macro.txt", "found through the macro\n")
+}
+
+mod ports {
+    use std::fs;
+    use std::path::PathBuf;
+
+    use golden::{Golden, Mode, Output};
+    use tempfile::TempDir;
+
+    pub struct Fixture {
+        directory: TempDir,
+    }
+
+    impl Fixture {
+        pub const NAME: &str = "nested/output.txt";
+        pub const GOLDENS: &str = "tests/goldens";
+
+        pub fn new() -> Result<Self, std::io::Error> {
+            Ok(Self { directory: TempDir::new()? })
+        }
+
+        pub fn path(&self) -> PathBuf {
+            self.directory.path().join(Self::GOLDENS).join(Self::NAME)
+        }
+
+        pub fn golden(&self) -> Golden {
+            match Golden::in_package(self.directory.path(), Self::NAME) {
+                Ok(golden) => golden,
+                Err(failure) => unreachable!("the fixture name stays inside the goldens directory: {failure:?}"),
+            }
+        }
+
+        pub fn with_recorded(text: &str) -> Result<Self, Box<dyn std::error::Error>> {
+            let fixture = Self::new()?;
+            fs::create_dir_all(fixture.directory.path().join(Self::GOLDENS).join("nested"))?;
+            fs::write(fixture.path(), text)?;
+            Ok(fixture)
+        }
+
+        pub fn overwrite(&self, bytes: &[u8]) -> Result<(), std::io::Error> {
+            fs::write(self.path(), bytes)
+        }
+
+        pub fn mark_package(&self) -> Result<(), std::io::Error> {
+            fs::write(self.directory.path().join("Cargo.toml"), "[package]\nname = \"a\"\n")
+        }
+
+        pub fn text(&self) -> Result<String, std::io::Error> {
+            fs::read_to_string(self.path())
+        }
+
+        pub fn recorded_through_the_api(text: &str) -> Option<Self> {
+            let fixture = Self::new().ok()?;
+            fixture.golden().verify_in(Mode::Record, Output::new(text)).ok()?;
+            Some(fixture)
+        }
+    }
 }

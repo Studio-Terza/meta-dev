@@ -1,10 +1,10 @@
 use std::ffi::OsString;
-use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 
 use gate_limits::Cli;
+use ports::Disk;
 
 const LIMITS: &str = "[test-run]\nwarn = 3\nblock = 5\n[clippy]\nwarn = 10.5\nblock = 20\n";
 const LIMIT: &str = "[test-run]\nwarn = 1\nblock = 2\n";
@@ -18,12 +18,6 @@ struct Reported {
 struct Run;
 
 impl Run {
-    fn fixture(name: &str, text: &str) -> io::Result<PathBuf> {
-        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
-        fs::write(&path, text)?;
-        Ok(path)
-    }
-
     fn cli(limits: &Path, measured: &Path) -> Cli {
         Cli::from_args([limits, measured].map(|path| path.as_os_str().to_owned()).into_iter())
     }
@@ -33,8 +27,8 @@ impl Run {
     }
 
     fn reported_only(name: &str, limits: &str, measured: &str, only: &[&str]) -> io::Result<Reported> {
-        let limits = Self::fixture(&format!("{name}-limits.toml"), limits)?;
-        let measured = Self::fixture(&format!("{name}-measured.toml"), measured)?;
+        let limits = Disk::fixture(&format!("{name}-limits.toml"), limits)?;
+        let measured = Disk::fixture(&format!("{name}-measured.toml"), measured)?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let named = [limits.as_os_str().to_owned(), measured.as_os_str().to_owned()]
             .into_iter()
@@ -109,23 +103,23 @@ fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
 
 #[test]
 fn a_run_within_its_levels_exits_successfully() -> io::Result<()> {
-    let limits = Run::fixture("within-limits.toml", LIMIT)?;
-    let measured = Run::fixture("within-measured.toml", "test-run = 0.5\n")?;
+    let limits = Disk::fixture("within-limits.toml", LIMIT)?;
+    let measured = Disk::fixture("within-measured.toml", "test-run = 0.5\n")?;
     assert_eq!(Run::cli(&limits, &measured).run(), ExitCode::SUCCESS);
     Ok(())
 }
 
 #[test]
 fn a_run_above_its_block_level_exits_with_failure() -> io::Result<()> {
-    let limits = Run::fixture("blocked-limits.toml", LIMIT)?;
-    let measured = Run::fixture("blocked-measured.toml", "test-run = 3\n")?;
+    let limits = Disk::fixture("blocked-limits.toml", LIMIT)?;
+    let measured = Disk::fixture("blocked-measured.toml", "test-run = 3\n")?;
     assert_eq!(Run::cli(&limits, &measured).run(), ExitCode::FAILURE);
     Ok(())
 }
 
 #[test]
 fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
-    let limits = Run::fixture("unreadable-limits.toml", LIMIT)?;
+    let limits = Disk::fixture("unreadable-limits.toml", LIMIT)?;
     let missing = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-such-measured.toml");
     assert_eq!(Run::cli(&limits, &missing).run(), ExitCode::FAILURE);
     Ok(())
@@ -133,8 +127,8 @@ fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
 
 #[test]
 fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result<()> {
-    let limits = Run::fixture("past-limits.toml", LIMITS)?;
-    let measured = Run::fixture("past-measured.toml", "test-run = 4\nclippy = 10")?;
+    let limits = Disk::fixture("past-limits.toml", LIMITS)?;
+    let measured = Disk::fixture("past-measured.toml", "test-run = 4\nclippy = 10")?;
     let past = Run::cli(&limits, &measured).past_warn().map_err(io::Error::other)?;
     assert_eq!(past.iter().map(|finding| finding.stage().as_ref()).collect::<Vec<&str>>(), ["test-run"]);
     assert_eq!(
@@ -146,8 +140,8 @@ fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result
 
 #[test]
 fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
-    let limits = Run::fixture("block-limits.toml", LIMITS)?;
-    let measured = Run::fixture("block-measured.toml", "test-run = 6\nclippy = 10")?;
+    let limits = Disk::fixture("block-limits.toml", LIMITS)?;
+    let measured = Disk::fixture("block-measured.toml", "test-run = 6\nclippy = 10")?;
     let past = Run::cli(&limits, &measured).past_warn().map_err(io::Error::other)?;
     assert_eq!(past.iter().map(gate_limits::Finding::blocks).collect::<Vec<bool>>(), [true]);
     Ok(())
@@ -155,8 +149,8 @@ fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
 
 #[test]
 fn limits_that_cannot_be_judged_list_nothing() -> io::Result<()> {
-    let limits = Run::fixture("none-limits.toml", LIMITS)?;
-    let measured = Run::fixture("none-measured.toml", "clippy = 10")?;
+    let limits = Disk::fixture("none-limits.toml", LIMITS)?;
+    let measured = Disk::fixture("none-measured.toml", "clippy = 10")?;
     assert!(Run::cli(&limits, &measured).past_warn().is_err());
     Ok(())
 }
@@ -181,4 +175,20 @@ fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Res
     assert_eq!(stray.exit, ExitCode::FAILURE);
     assert!(stray.err.contains("no usable limit"), "{}", stray.err);
     Ok(())
+}
+
+mod ports {
+    use std::fs;
+    use std::io;
+    use std::path::{Path, PathBuf};
+
+    pub struct Disk;
+
+    impl Disk {
+        pub fn fixture(name: &str, text: &str) -> io::Result<PathBuf> {
+            let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+            fs::write(&path, text)?;
+            Ok(path)
+        }
+    }
 }

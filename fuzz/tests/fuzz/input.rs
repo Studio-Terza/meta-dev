@@ -1,7 +1,4 @@
 use std::fmt;
-use std::fs;
-use std::io;
-use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
@@ -49,18 +46,16 @@ impl Input {
         }
     }
 
-    pub fn written_into(&self, root: &Path) -> io::Result<()> {
-        let file = root.join(self.role.file());
-        if let Some(parent) = file.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        if self.role == Role::Manifest {
-            fs::write(root.join("Cargo.toml"), &self.bytes)?;
-            fs::write(file, "")
-        } else {
-            fs::write(root.join("Cargo.toml"), Role::MANIFEST_TEXT)?;
-            fs::write(file, &self.bytes)
-        }
+    pub fn file(&self) -> &'static str {
+        self.role.file()
+    }
+
+    pub fn manifest(&self) -> &[u8] {
+        if self.role == Role::Manifest { &self.bytes } else { Role::MANIFEST_TEXT.as_bytes() }
+    }
+
+    pub fn source(&self) -> &[u8] {
+        if self.role == Role::Manifest { &[] } else { &self.bytes }
     }
 }
 

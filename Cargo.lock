@@ -493,6 +493,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-no-test-io"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-paths",
+ "lint-placement",
+]
+
+[[package]]
 name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
@@ -663,6 +673,7 @@ dependencies = [
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
  "lint-no-plaintext",
+ "lint-no-test-io",
  "lint-no-test-only-api",
  "lint-paired-apis",
  "lint-primitive-boundary",
@@ -737,6 +748,7 @@ dependencies = [
  "lint-no-numbers-in-binaries",
  "lint-no-parameter-bags",
  "lint-no-plaintext",
+ "lint-no-test-io",
  "lint-no-test-only-api",
  "lint-paired-apis",
  "lint-paths",

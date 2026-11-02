@@ -1,7 +1,7 @@
-use std::fs;
-
 use lint_core::RepoFile;
 use lint_rust_only::RustOnly;
+
+use crate::ports::Checkout;
 
 const EXTENSIONS: [(&str, &str); 83] = [
     ("py", "Python"),
@@ -235,11 +235,10 @@ fn an_extensionless_file_with_a_foreign_shebang_fails() {
         "#!",
         "#!/usr/bin/env",
     ] {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        fs::write(checkout.path().join("deploy"), format!("{first}\nfor i in a b; do echo $i; done\n")).ok();
+        let checkout = Checkout::new().with("deploy", &format!("{first}\nfor i in a b; do echo $i; done\n"));
         assert_eq!(
-            Checked::within(&checkout.path().display().to_string(), "deploy"),
-            [format!("{}/deploy:1: interpreted script source outside assets; {REWRITE}", checkout.path().display())],
+            Checked::within(&checkout.shown(), "deploy"),
+            [format!("{}/deploy:1: interpreted script source outside assets; {REWRITE}", checkout.shown())],
             "{first}"
         );
     }
@@ -257,19 +256,18 @@ fn an_extensionless_file_without_a_foreign_shebang_passes() {
         " #!/bin/sh\n",
         "\n#!/bin/sh\n",
     ] {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        fs::write(checkout.path().join("tool"), text).ok();
-        assert_eq!(Checked::within(&checkout.path().display().to_string(), "tool"), Vec::<String>::new(), "{text:?}");
+        let checkout = Checkout::new().with("tool", text);
+        assert_eq!(Checked::within(&checkout.shown(), "tool"), Vec::<String>::new(), "{text:?}");
     }
 }
 
 #[test]
 fn a_foreign_shebang_in_a_file_with_a_data_extension_fails_but_a_rust_attribute_passes() {
-    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-    let root = checkout.path().display().to_string();
-    fs::write(checkout.path().join("notes.txt"), "#!/bin/bash\n").ok();
-    fs::write(checkout.path().join("lib.rs"), "#!/usr/bin/env python3\n").ok();
-    fs::write(checkout.path().join("inner.txt"), "#![allow(dead_code)]\n").ok();
+    let checkout = Checkout::new()
+        .with("notes.txt", "#!/bin/bash\n")
+        .with("lib.rs", "#!/usr/bin/env python3\n")
+        .with("inner.txt", "#![allow(dead_code)]\n");
+    let root = checkout.shown();
     assert_eq!(
         Checked::within(&root, "notes.txt"),
         [format!("{root}/notes.txt:1: interpreted script source outside assets; {REWRITE}")]
@@ -280,10 +278,8 @@ fn a_foreign_shebang_in_a_file_with_a_data_extension_fails_but_a_rust_attribute_
 
 #[test]
 fn a_shebang_below_a_directory_named_assets_still_fails() {
-    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-    fs::create_dir_all(checkout.path().join("assets")).ok();
-    fs::write(checkout.path().join("assets/run"), "#!/usr/bin/env node\n").ok();
-    assert_eq!(Checked::within(&checkout.path().display().to_string(), "assets/run").len(), 1);
+    let checkout = Checkout::new().with("assets/run", "#!/usr/bin/env node\n");
+    assert_eq!(Checked::within(&checkout.shown(), "assets/run").len(), 1);
 }
 
 #[test]
@@ -371,9 +367,8 @@ fn a_file_whose_content_is_source_fails_whatever_its_name() {
         ("deploy.cfg", "for f in a b; do\n  echo $f\ndone\n", "shell"),
         ("main.txt", "#include <stdio.h>\n", "C"),
     ] {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        let root = checkout.path().display().to_string();
-        fs::write(checkout.path().join(name), text).ok();
+        let checkout = Checkout::new().with(name, text);
+        let root = checkout.shown();
         assert_eq!(
             Checked::within(&root, name),
             [format!("{root}/{name}:1: {language} source outside assets; {REWRITE}")],
@@ -395,19 +390,13 @@ fn ordinary_text_and_data_pass() {
         ("empty.txt", ""),
         ("poem", "Roses are red\nimport this\n"),
     ] {
-        let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-        fs::write(checkout.path().join(name), text).ok();
-        assert_eq!(Checked::within(&checkout.path().display().to_string(), name), Vec::<String>::new(), "{name}");
+        let checkout = Checkout::new().with(name, text);
+        assert_eq!(Checked::within(&checkout.shown(), name), Vec::<String>::new(), "{name}");
     }
 }
 
 #[test]
 fn source_by_content_below_platform_tests_passes() {
-    let checkout = tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory"));
-    fs::create_dir_all(checkout.path().join("platform/UITests")).ok();
-    fs::write(checkout.path().join("platform/UITests/Flow.txt"), "import XCTest\n").ok();
-    assert_eq!(
-        Checked::within(&checkout.path().display().to_string(), "platform/UITests/Flow.txt"),
-        Vec::<String>::new()
-    );
+    let checkout = Checkout::new().with("platform/UITests/Flow.txt", "import XCTest\n");
+    assert_eq!(Checked::within(&checkout.shown(), "platform/UITests/Flow.txt"), Vec::<String>::new());
 }
