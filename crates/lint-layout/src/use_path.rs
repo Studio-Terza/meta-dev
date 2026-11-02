@@ -27,9 +27,10 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn ends_with<const LENGTH: usize>(&self, tail: &[Word<'_>; LENGTH]) -> bool {
-        self.0.len() >= LENGTH
-            && self.0.iter().rev().zip(tail.iter().rev()).all(|(segment, spelled)| segment == spelled)
+    pub fn ends_with<const LENGTH: usize>(&self, tail: &[Word<'_>; LENGTH]) -> Option<&UsePath> {
+        (self.0.len() >= LENGTH
+            && self.0.iter().rev().zip(tail.iter().rev()).all(|(segment, spelled)| segment == spelled))
+        .then_some(self)
     }
 
     #[must_use]
@@ -38,8 +39,9 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn spells(&self, segments: &[Word<'_>]) -> bool {
-        self.0.len() == segments.len() && self.0.iter().zip(segments).all(|(segment, spelled)| segment == spelled)
+    pub fn spells(&self, segments: &[Word<'_>]) -> Option<&UsePath> {
+        (self.0.len() == segments.len() && self.0.iter().zip(segments).all(|(segment, spelled)| segment == spelled))
+            .then_some(self)
     }
 
     #[must_use]

@@ -21,7 +21,7 @@ impl Lint for NoNumbersInBinaries {
             Headline::new("a binary is wiring: a number it needs is a setting in its config file"),
             files
                 .iter()
-                .filter(|file| binaries.contains(file.path()))
+                .filter(|file| binaries.holding(file.path()).is_some())
                 .flat_map(|file| {
                     let mut numbers = Numbers::default();
                     numbers.visit_file(file.syntax());

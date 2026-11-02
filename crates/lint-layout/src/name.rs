@@ -19,8 +19,8 @@ impl Name {
     }
 
     #[must_use]
-    pub fn matches<Rule: Matching>(&self, words: &[Word<'_>]) -> bool {
-        words.iter().any(|word| Rule::holds(self, *word))
+    pub fn matches<'word, Rule: Matching>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
+        words.iter().find_map(|word| Rule::holds(self, *word))
     }
 
     pub(crate) fn spelled(&self) -> &str {
@@ -33,8 +33,8 @@ impl Name {
     }
 
     #[must_use]
-    pub fn contains(&self, word: Word<'_>) -> bool {
-        self.0.contains(word.into_inner())
+    pub fn contains<'word>(&self, word: Word<'word>) -> Option<Word<'word>> {
+        self.0.contains(word.into_inner()).then_some(word)
     }
 
     #[must_use]

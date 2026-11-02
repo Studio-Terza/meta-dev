@@ -23,7 +23,7 @@ impl Use {
 
     #[must_use]
     pub fn spelling<const LENGTH: usize>(&self, tail: &[Word<'_>; LENGTH]) -> Option<&UsePath> {
-        self.candidates.iter().find(|candidate| candidate.ends_with(tail))
+        self.candidates.iter().find_map(|candidate| candidate.ends_with(tail))
     }
 
     #[must_use]

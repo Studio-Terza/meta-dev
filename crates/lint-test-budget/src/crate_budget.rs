@@ -47,7 +47,7 @@ impl CrateBudget {
 
 impl From<&SourceFile> for CrateBudget {
     fn from(file: &SourceFile) -> CrateBudget {
-        let share = if file.is_shipped() { TestShare::InlineModules } else { TestShare::WholeFile };
+        let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         file.test_modules()
             .iter()
             .map(|module| Self::measured(module, TestShare::WholeFile))

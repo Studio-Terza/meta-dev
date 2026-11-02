@@ -17,8 +17,8 @@ impl Slots {
 
     pub(crate) fn classified(&mut self, name: &Name, position: Position) -> ShapeToken {
         match (name.casing(), position) {
-            _ if name.matches::<Whole>(&Self::LITERAL_WORDS) => ShapeToken::Literal,
-            _ if name.matches::<Whole>(&Self::KEYWORDS) => ShapeToken::Word(name.clone()),
+            _ if name.matches::<Whole>(&Self::LITERAL_WORDS).is_some() => ShapeToken::Literal,
+            _ if name.matches::<Whole>(&Self::KEYWORDS).is_some() => ShapeToken::Word(name.clone()),
             (Casing::Lower, Position::Named) => ShapeToken::Word(name.clone()),
             (Casing::Lower, _) => ShapeToken::Local(self.numbered(name)),
             _ => ShapeToken::Word(name.clone()),

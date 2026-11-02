@@ -20,7 +20,7 @@ impl Lint for WalkSimilarity {
         let walks: Vec<Walk<'_>> = facts
             .types()
             .iter()
-            .filter(|found| facts.is_declared_once(found))
+            .filter_map(|found| facts.declared_once(found))
             .filter_map(|found| Walk::walked(found, &local))
             .collect();
         Report::new(

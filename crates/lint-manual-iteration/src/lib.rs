@@ -24,7 +24,7 @@ impl Lint for ManualIteration {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("iterators are driven by combinators, not by hand"),
-            files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
+            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
         )
     }
 }

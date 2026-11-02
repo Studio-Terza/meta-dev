@@ -21,11 +21,11 @@ impl RustFiles {
         if path.is_dir() {
             Self::below(&path)
         } else {
-            Ok(Some(path).filter(|file| Self::is_rust(file)).into_iter().collect())
+            Ok(Self::rust(path).into_iter().collect())
         }
     }
 
-    fn is_rust(file: &Path) -> bool {
-        file.extension().is_some_and(|extension| extension == Self::RUST)
+    fn rust(file: PathBuf) -> Option<PathBuf> {
+        Some(file).filter(|file| file.extension().is_some_and(|extension| extension == Self::RUST))
     }
 }

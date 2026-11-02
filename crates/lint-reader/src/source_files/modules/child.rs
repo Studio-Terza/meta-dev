@@ -19,7 +19,7 @@ impl Child {
     }
 
     #[must_use]
-    pub fn exists(&self) -> bool {
-        self.path.is_file()
+    pub fn existing(self) -> Option<Child> {
+        Some(self).filter(|child| child.path.is_file())
     }
 }

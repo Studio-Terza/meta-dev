@@ -15,15 +15,15 @@ impl Workspace {
         let manifests = Self::manifests_under(root)?;
         let members = manifests
             .iter()
-            .filter(|(directory, manifest)| manifest.is_package() && Self::is_listed(root, directory, &manifests))
+            .filter(|(directory, manifest)| manifest.package().and(Self::listed(root, directory, &manifests)).is_some())
             .map(|(directory, _)| directory.clone())
             .collect();
         Ok(Workspace { members: Self::with_path_dependencies(members, &manifests, root) })
     }
 
     #[must_use]
-    pub fn admits(&self, directory: &Path) -> bool {
-        self.members.contains(directory)
+    pub fn admits(&self, directory: &Path) -> Option<&Path> {
+        self.members.get(directory).map(PathBuf::as_path)
     }
 
     fn manifests_under(root: &Path) -> Result<BTreeMap<PathBuf, Manifest>, Failure> {
@@ -37,10 +37,15 @@ impl Workspace {
         })
     }
 
-    fn is_listed(root: &Path, directory: &Path, manifests: &BTreeMap<PathBuf, Manifest>) -> bool {
+    fn listed<'path>(
+        root: &Path,
+        directory: &'path Path,
+        manifests: &BTreeMap<PathBuf, Manifest>,
+    ) -> Option<&'path Path> {
         let relative = directory.strip_prefix(root).unwrap_or(directory);
-        directory == root
-            || manifests.get(root).and_then(Manifest::workspace).is_some_and(|members| members.admits(relative))
+        Some(directory).filter(|_| directory == root).or_else(|| {
+            manifests.get(root).and_then(Manifest::workspace).and_then(|members| members.admits(relative)).map(|_| directory)
+        })
     }
 
     fn with_path_dependencies(
@@ -54,7 +59,7 @@ impl Workspace {
             .chain([root])
             .filter_map(|directory| manifests.get(directory))
             .flat_map(Manifest::path_dependencies)
-            .filter(|path| manifests.get(path).is_some_and(Manifest::is_package) && !members.contains(path))
+            .filter(|path| manifests.get(path).and_then(Manifest::package).is_some() && !members.contains(path))
             .collect();
         if reached.is_empty() {
             members

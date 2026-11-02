@@ -22,7 +22,7 @@ impl Lint for PublicSurface {
         let binaries = BinaryFiles::collect(files);
         let references = files
             .iter()
-            .filter(|file| file.is_shipped())
+            .filter_map(SourceFile::shipped)
             .map(|file| ForeignReferences::in_file(file, &binaries))
             .fold(ForeignReferences::default(), ForeignReferences::absorb);
         Report::new(

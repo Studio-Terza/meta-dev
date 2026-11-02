@@ -39,23 +39,26 @@ impl Gate {
     }
 
     fn sliced(limits: BTreeMap<Stage, Limit>, only: &[OsString]) -> Result<BTreeMap<Stage, Limit>, Failure> {
-        match only.iter().find(|name| !limits.keys().any(|stage| Self::names(name, stage))) {
+        match only.iter().find(|name| limits.keys().find_map(|stage| Self::names(name, stage)).is_none()) {
             Some(name) => Err(Failure::UnknownStage { name: name.clone() }),
-            None => Ok(limits.into_iter().filter(|(stage, _)| Self::asked(only, stage)).collect()),
+            None => Ok(limits.into_iter().filter(|(stage, _)| Self::asked(only, stage).is_some()).collect()),
         }
     }
 
-    fn asked(only: &[OsString], stage: &Stage) -> bool {
-        only.is_empty() || only.iter().any(|name| Self::names(name, stage))
+    fn asked<'stage>(only: &[OsString], stage: &'stage Stage) -> Option<&'stage Stage> {
+        match only {
+            [] => Some(stage),
+            named => named.iter().find_map(|name| Self::names(name, stage)),
+        }
     }
 
-    fn names(name: &OsStr, stage: &Stage) -> bool {
-        name == OsStr::new(stage.as_ref())
+    fn names<'stage>(name: &OsStr, stage: &'stage Stage) -> Option<&'stage Stage> {
+        (name == OsStr::new(stage.as_ref())).then_some(stage)
     }
 
     #[must_use]
-    pub fn blocks(&self) -> bool {
-        self.findings.iter().any(Finding::blocks)
+    pub fn blocking(&self) -> Option<&Finding> {
+        self.findings.iter().find_map(Finding::blocks)
     }
 
     #[must_use]
@@ -65,7 +68,7 @@ impl Gate {
 
     fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
         let limit =
-            limit.filter(|limit| limit.is_ordered()).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
+            limit.and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
         let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
         Ok(Finding::new(stage.clone(), *measured, *limit))
     }

@@ -32,7 +32,7 @@ impl Lint for FnShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods"),
-            files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
+            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
         )
     }
 }

@@ -20,7 +20,7 @@ pub struct NoParameterBags;
 
 impl Lint for NoParameterBags {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let uses: Vec<NameUses> = shipped.iter().map(|file| NameUses::in_file(file)).collect();
         let exports = RootExports::in_files(&shipped);
         Report::new(

@@ -32,7 +32,7 @@ impl Lint for ExpressionFlow {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("control flow is an expression; every branch yields the value the function returns"),
-            files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
+            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
         )
     }
 }

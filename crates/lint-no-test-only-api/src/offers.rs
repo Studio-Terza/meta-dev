@@ -22,7 +22,7 @@ pub(crate) struct Offers<'file> {
 impl<'file> Offers<'file> {
     pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate> {
         let mut offers = Offers { path: file.path(), found: Vec::new() };
-        Some(file).filter(|file| file.is_shipped()).into_iter().for_each(|file| offers.visit_file(file.syntax()));
+        Some(file).filter_map(SourceFile::shipped).into_iter().for_each(|file| offers.visit_file(file.syntax()));
         offers.found
     }
 

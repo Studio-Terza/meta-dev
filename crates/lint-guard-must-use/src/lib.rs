@@ -10,7 +10,7 @@ pub struct GuardMustUse;
 
 impl Lint for GuardMustUse {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let guards = shipped.iter().fold(Guards::default(), |mut guards, file| {
             guards.scan(file);
             guards

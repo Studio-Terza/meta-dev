@@ -13,7 +13,7 @@ pub struct CrateGraph;
 
 impl Lint for CrateGraph {
     fn report(files: &[SourceFile]) -> Report {
-        let crates = files.iter().filter(|file| file.is_shipped()).fold(
+        let crates = files.iter().filter_map(SourceFile::shipped).fold(
             BTreeMap::<&CrateFile, Vec<&SourceFile>>::new(),
             |mut crates, file| {
                 crates.entry(file.crate_file()).or_default().push(file);

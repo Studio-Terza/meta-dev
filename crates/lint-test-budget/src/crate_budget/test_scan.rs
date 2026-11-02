@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{ItemFn, ItemMod, Macro};
+use syn::{ItemFn, ItemMod, Macro, PathSegment};
 
 use lint_core::Macros;
 use lint_core::Walk;
@@ -27,24 +27,22 @@ impl TestScan {
         Count::new(span.end().line - span.start().line + 1)
     }
 
-    fn is_property_block(invocation: &Macro) -> bool {
-        invocation.path.segments.last().is_some_and(|segment| segment.ident == Self::PROPERTY_BLOCK)
+    fn property_block(invocation: &Macro) -> Option<&PathSegment> {
+        invocation.path.segments.last().filter(|segment| segment.ident == Self::PROPERTY_BLOCK)
     }
 
     fn tests_in(invocation: &Macro) -> Count {
-        if TestMarks::is_law(invocation) {
-            Count::new(1)
-        } else if Self::is_property_block(invocation) {
-            Count::new(Macros::attributes(invocation).iter().filter(|attribute| TestMarks::is_test(attribute)).count())
-        } else {
-            Count::default()
+        match (TestMarks::law(invocation), Self::property_block(invocation)) {
+            (Some(_), _) => Count::new(1),
+            (None, Some(_)) => Count::new(Macros::attributes(invocation).iter().filter_map(TestMarks::test).count()),
+            (None, None) => Count::default(),
         }
     }
 }
 
 impl<'ast> Visit<'ast> for TestScan {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.0.tests = self.0.tests.plus(Count::new(usize::from(TestMarks::mark_test(&function.attrs))));
+        self.0.tests = self.0.tests.plus(Count::new(TestMarks::mark_test(&function.attrs).into_iter().count()));
         visit::visit_item_fn(self, function);
     }
 

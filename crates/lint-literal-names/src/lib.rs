@@ -24,7 +24,7 @@ impl Lint for LiteralNames {
             Headline::new("function names say what the function does"),
             files
                 .iter()
-                .filter(|file| file.is_shipped())
+                .filter_map(SourceFile::shipped)
                 .flat_map(|file| {
                     Self::vague_names(file.syntax()).into_iter().map(move |name| {
                         Violation::new(

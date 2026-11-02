@@ -44,7 +44,7 @@ impl Cli {
         match self.gate() {
             Ok(gate) => {
                 write!(out, "{gate}").ok();
-                if gate.blocks() { ExitCode::FAILURE } else { ExitCode::SUCCESS }
+                gate.blocking().map_or(ExitCode::SUCCESS, |_| ExitCode::FAILURE)
             }
             Err(failure) => {
                 writeln!(err, "{failure}").ok();

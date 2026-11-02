@@ -22,8 +22,8 @@ impl MacroAliases {
     }
 
     #[must_use]
-    pub fn call(&self, name: &Name) -> bool {
-        self.names.contains(name)
+    pub fn call(&self, name: &Name) -> Option<&Name> {
+        self.names.get(name)
     }
 
     fn renamed(&self, tree: &UseTree) -> Vec<Name> {

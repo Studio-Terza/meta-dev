@@ -14,7 +14,7 @@ impl Lint for RepeatedMethods {
             Headline::new(
                 "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",
             ),
-            ShapeIndex::of_files(&files.iter().filter(|file| file.is_shipped()).collect::<Vec<_>>())
+            ShapeIndex::of_files(&files.iter().filter_map(SourceFile::shipped).collect::<Vec<_>>())
                 .repeated(Self::TYPES_PER_SHAPE),
         )
     }

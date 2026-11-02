@@ -2,5 +2,5 @@ use crate::name::Name;
 use crate::word::Word;
 
 pub trait Matching {
-    fn holds(name: &Name, word: Word<'_>) -> bool;
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>>;
 }

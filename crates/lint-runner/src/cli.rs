@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
-use lint_bool_methods::BoolMethods;
 use lint_core::{Lint, Readout};
 use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
@@ -68,14 +67,7 @@ impl Cli {
         let files = readout.files();
         match self.mode {
             Mode::Gate => {
-                write!(
-                    out,
-                    "{}{}{}",
-                    TestBudget::measured(files),
-                    BoolMethods::report(files),
-                    PairedApis::report(files)
-                )
-                .ok();
+                write!(out, "{}{}", TestBudget::measured(files), PairedApis::report(files)).ok();
                 Lints::checked(readout)
             }
             Mode::Report => {

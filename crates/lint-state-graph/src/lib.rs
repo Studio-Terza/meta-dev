@@ -23,7 +23,7 @@ pub struct StateGraph;
 
 impl Lint for StateGraph {
     fn report(files: &[SourceFile]) -> Report {
-        let files: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let files: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let declarations = Declarations::from(files.as_slice());
         let edges = files.iter().fold(EdgeScan::new(&declarations), |mut edges, file| {
             edges.scan(file);

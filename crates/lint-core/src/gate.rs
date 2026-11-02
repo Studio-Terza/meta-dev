@@ -18,15 +18,16 @@ impl Gate {
     pub const BITS: Gate = Gate { module: "bits", package_suffix: None };
 
     #[must_use]
-    pub fn admits(&self, file: &SourceFile) -> bool {
+    pub fn admits<'file>(&self, file: &'file SourceFile) -> Option<&'file SourceFile> {
         let placement = file.placement();
-        self.package_suffix.is_some_and(|suffix| {
-            placement.crate_root().package().is_some_and(|package| package.matches::<Suffix>(&[Word::new(suffix)]))
-        }) || placement.module().segments().iter().any(|segment| *segment == self.module)
+        self.package_suffix
+            .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[Word::new(suffix)]))
+            .map(|_| file)
+            .or_else(|| placement.module().segments().iter().find(|segment| **segment == self.module).map(|_| file))
     }
 
     #[must_use]
-    pub fn names(&self, module: &ItemMod) -> bool {
-        module.ident == self.module
+    pub fn names<'module>(&self, module: &'module ItemMod) -> Option<&'module ItemMod> {
+        (module.ident == self.module).then_some(module)
     }
 }

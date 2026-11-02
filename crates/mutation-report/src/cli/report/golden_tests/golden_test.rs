@@ -19,14 +19,18 @@ impl GoldenTest {
         self.0
     }
 
-    fn uses_golden(text: &str) -> bool {
+    fn uses_golden(text: &str) -> Option<&str> {
         let head = text.match_indices(Self::NEXT_ATTRIBUTE).next().and_then(|(at, _)| text.get(..at)).unwrap_or(text);
-        [Self::TYPE_CALL, Self::METHOD_CALL].iter().any(|mark| head.contains(mark))
-            || head.match_indices(Self::MACRO).any(|(at, mark)| Self::opens(head.get(at + mark.len()..)))
+        [Self::TYPE_CALL, Self::METHOD_CALL]
+            .iter()
+            .find(|mark| head.contains(*mark))
+            .copied()
+            .or_else(|| head.match_indices(Self::MACRO).find_map(|(at, mark)| Self::opens(head.get(at + mark.len()..))))
+            .map(|_| text)
     }
 
-    fn opens(rest: Option<&str>) -> bool {
-        rest.and_then(|rest| rest.chars().find(|letter| !letter.is_whitespace())) == Some(Self::OPEN)
+    fn opens(rest: Option<&str>) -> Option<&str> {
+        rest.filter(|rest| rest.chars().find(|letter| !letter.is_whitespace()) == Some(Self::OPEN))
     }
 
     fn function_name(text: &str) -> Option<GoldenTest> {
@@ -49,6 +53,6 @@ impl FromStr for GoldenTest {
     type Err = NotGolden;
 
     fn from_str(text: &str) -> Result<GoldenTest, NotGolden> {
-        Some(text).filter(|text| Self::uses_golden(text)).and_then(Self::function_name).ok_or(NotGolden)
+        Self::uses_golden(text).and_then(Self::function_name).ok_or(NotGolden)
     }
 }

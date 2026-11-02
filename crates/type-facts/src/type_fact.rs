@@ -37,8 +37,8 @@ impl TypeFact {
         self
     }
 
-    pub(crate) fn is_named_like(&self, other: &TypeFact) -> bool {
-        self.krate == other.krate && self.name == other.name
+    pub(crate) fn named_like(&self, other: &TypeFact) -> Option<&TypeFact> {
+        (self.krate == other.krate && self.name == other.name).then_some(self)
     }
 
     #[must_use]

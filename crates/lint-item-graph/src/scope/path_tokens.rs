@@ -17,22 +17,21 @@ impl PathTokens {
     }
 
     pub fn root_index(&self, index: usize) -> Option<usize> {
-        if self.separator_before_index(index) {
+        self.separator_before_index(index).map_or(Some(index), |index| {
             index
                 .checked_sub(Self::SEGMENT_LENGTH)
                 .filter(|before| matches!(self.0.get(*before), Some(TokenTree::Ident(_))))
                 .and_then(|before| self.root_index(before))
-        } else {
-            Some(index)
-        }
+        })
     }
 
-    fn separator_before_index(&self, index: usize) -> bool {
-        (1..=Self::SEPARATOR_LENGTH).all(|back| {
-            index
-                .checked_sub(back)
-                .and_then(|at| self.0.get(at))
-                .is_some_and(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
-        })
+    fn separator_before_index(&self, index: usize) -> Option<usize> {
+        (1..=Self::SEPARATOR_LENGTH)
+            .all(|back| {
+                index.checked_sub(back).and_then(|at| self.0.get(at)).is_some_and(
+                    |token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR),
+                )
+            })
+            .then_some(index)
     }
 }

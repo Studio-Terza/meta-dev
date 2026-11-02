@@ -23,7 +23,7 @@ pub struct NoForwarders;
 
 impl Lint for NoForwarders {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let types = WorkspaceTypes::from(shipped.as_slice());
         Report::new(
             Headline::new("methods do their own work, they do not forward to another type of ours"),

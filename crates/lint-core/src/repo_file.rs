@@ -18,10 +18,11 @@ impl RepoFile {
     }
 
     #[must_use]
-    pub fn lies_under(&self, directory: &Path) -> bool {
+    pub fn lies_under(&self, directory: &Path) -> Option<&RepoFile> {
         self.inside
             .parent()
-            .is_some_and(|parents| parents.components().any(|part| part.as_os_str() == directory.as_os_str()))
+            .filter(|parents| parents.components().any(|part| part.as_os_str() == directory.as_os_str()))
+            .map(|_| self)
     }
 
     #[must_use]

@@ -26,9 +26,8 @@ impl Lint for NamedNumbers {
             ),
             files
                 .iter()
-                .filter(|file| {
-                    file.is_shipped() && !Gate::BITS.admits(file) && !support.contains(&file.path().to_owned())
-                })
+                .filter_map(SourceFile::shipped)
+                .filter(|file| Gate::BITS.admits(file).is_none() && !support.contains(&file.path().to_owned()))
                 .flat_map(|file| {
                     let mut numbers = Numbers::default();
                     numbers.visit_file(file.syntax());
@@ -63,7 +62,7 @@ struct Numbers(Vec<LineNumber>);
 impl<'ast> Visit<'ast> for Numbers {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if !Gate::BITS.names(module) => syn::visit::visit_item_mod(self, module),
+            Walk::Entered if Gate::BITS.names(module).is_none() => syn::visit::visit_item_mod(self, module),
             Walk::Entered | Walk::Skipped => {}
         }
     }

@@ -64,17 +64,17 @@ impl Summary {
             .into_iter()
             .filter(|mutant| {
                 !mutant.failed().is_empty()
-                    && !mutant.failed().iter().any(|test| Self::is_golden(test.as_ref(), golden))
+                    && mutant.failed().iter().find_map(|test| Self::golden(test.as_ref(), golden)).is_none()
             })
             .map(ToString::to_string)
             .collect()
     }
 
-    fn is_golden(test: &str, golden: &BTreeSet<String>) -> bool {
+    fn golden<'set>(test: &str, golden: &'set BTreeSet<String>) -> Option<&'set String> {
         let name =
             test.match_indices(Self::SCOPE).last().and_then(|(at, mark)| test.get(at + mark.len()..)).unwrap_or(test);
         let spelled: String = name.chars().skip_while(|letter| letter.is_whitespace()).collect();
-        golden.contains(&spelled)
+        golden.get(&spelled)
     }
 }
 

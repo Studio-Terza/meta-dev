@@ -7,7 +7,7 @@ pub struct Untested(Vec<PathBuf>);
 
 impl Untested {
     #[must_use]
-    pub fn holds(&self, file: &Path) -> bool {
-        self.0.iter().any(|untested| untested == file)
+    pub fn holds<'file>(&self, file: &'file Path) -> Option<&'file Path> {
+        self.0.iter().any(|untested| untested == file).then_some(file)
     }
 }
