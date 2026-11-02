@@ -3,7 +3,7 @@ use lint_layout::Name;
 
 use super::score::Score;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Function {
     name: Name,
     site: Site,
