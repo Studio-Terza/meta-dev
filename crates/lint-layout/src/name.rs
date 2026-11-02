@@ -6,6 +6,7 @@ use syn::Ident;
 
 use crate::casing::Casing;
 use crate::matching::Matching;
+use crate::whole::Whole;
 use crate::word::Word;
 use newtype::Newtype;
 use newtype::proptest::arbitrary::{Arbitrary, any};
@@ -62,6 +63,36 @@ impl Name {
             .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
             .map(|chunk| Name(chunk.iter().collect()))
             .collect()
+    }
+
+    #[must_use]
+    pub fn has_camel_word(&self, words: &[Word<'_>]) -> bool {
+        self.words().iter().flat_map(|chunk| Self::humps(&chunk.0)).any(|hump| hump.lowered().matches::<Whole>(words))
+    }
+
+    fn humps(chunk: &str) -> Vec<Name> {
+        let letters: Vec<char> = chunk.chars().collect();
+        let cuts = (0..letters.len()).filter(|index| Self::cut(&letters, *index));
+        let bounds: Vec<usize> = cuts.chain(Some(letters.len())).collect();
+        bounds
+            .iter()
+            .zip(bounds.iter().skip(1))
+            .filter_map(|(start, end)| letters.get(*start..*end))
+            .map(|hump| Name(hump.iter().collect()))
+            .collect()
+    }
+
+    fn cut(letters: &[char], index: usize) -> bool {
+        let at = |place: usize| letters.get(place).copied();
+        let previous = index.checked_sub(1).and_then(at);
+        let next = index.checked_add(1).and_then(at);
+        previous.is_none()
+            || (at(index).is_some_and(char::is_uppercase)
+                && previous.is_some_and(|before| {
+                    before.is_lowercase()
+                        || before.is_ascii_digit()
+                        || (before.is_uppercase() && next.is_some_and(char::is_lowercase))
+                }))
     }
 
     #[must_use]

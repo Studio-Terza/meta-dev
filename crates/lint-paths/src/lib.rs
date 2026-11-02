@@ -1,6 +1,7 @@
 mod collector;
 mod cover;
 mod ground;
+mod imports;
 mod module;
 mod resolver;
 mod scopes;
@@ -18,6 +19,7 @@ use wanted::Wanted;
 
 pub use cover::Cover;
 pub use ground::Ground;
+pub use imports::Imports;
 pub use module::Module;
 pub use uses::Use;
 
