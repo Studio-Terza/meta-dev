@@ -17,7 +17,6 @@ env:
   BUDGET: ${{ github.workspace }}/target/ci/budget.txt
   LIMITS: ${{ github.workspace }}/target/ci/limits.txt
   ELEGANCE: ${{ github.workspace }}/target/ci/elegance.txt
-  FAN_IN: ${{ github.workspace }}/target/ci/fan-in.txt
   HISTORY: ${{ github.workspace }}/target/ci/history.tsv
   TIMINGS: ${{ github.workspace }}/target/cargo-timings/cargo-timing.html
   COMPILE_TIMES: ${{ github.workspace }}/target/ci/compile-times.txt
@@ -126,10 +125,7 @@ jobs:
           stages: lint
       - name: fan-in
         if: github.ref == 'refs/heads/main' && always()
-        run: '"$TOOLS/ci" logged "$FAN_IN" "$TOOLS/reach" fan-in "$METADATA"'
-      - name: fan-in summary
-        if: github.ref == 'refs/heads/main' && always()
-        run: '"$TOOLS/ci" summarize "$FAN_IN" "$GITHUB_STEP_SUMMARY"'
+        run: '"$TOOLS/reach" fan-in "$METADATA"'
       - name: elegance reports
         if: github.ref == 'refs/heads/main'
         run: '"$TOOLS/ci" logged "$ELEGANCE" "$TOOLS/lint" --report .'

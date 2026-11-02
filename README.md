@@ -217,7 +217,7 @@ cannot judge a slice. Main, and every pull request into main, ignore all this an
 
 `fan-in` lists how many crates depend on each crate, directly or not, most first, as a count and a share of the
 workspace, then the distribution: crates per tenth of the share, the median and the largest. It reads only the graph
-as it stands, never its history. How far a change reaches is the measure of tangle, so main writes it to the job summary.
+as it stands, never its history. How far a change reaches is the measure of tangle, so the lint job on main prints it.
 
 ## Newtypes
 
