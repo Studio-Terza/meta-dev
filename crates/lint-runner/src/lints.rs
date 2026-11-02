@@ -21,6 +21,7 @@ use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_plaintext::NoPlaintext;
+use lint_no_suppressions::NoSuppressions;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
@@ -76,6 +77,7 @@ impl Lints {
             PublicApiTests::report(files),
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
+            NoSuppressions::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
         ]
@@ -85,7 +87,11 @@ impl Lints {
     pub fn checked(mut readout: Readout) -> Outcome {
         let reports = Self::reports(readout.files())
             .into_iter()
-            .chain([RustOnly::report(readout.repo_files()), WorkflowRun::report(readout.repo_files())])
+            .chain([
+                RustOnly::report(readout.repo_files()),
+                WorkflowRun::report(readout.repo_files()),
+                NoSuppressions::baselines(readout.repo_files()),
+            ])
             .collect();
         Outcome::from_reports(reports, readout.take_failures())
     }

@@ -57,4 +57,7 @@ src/fields.rs:2: field on of A is pub; struct fields are private
 src/real.rs:3: field on of S is pub; struct fields are private
 tests go through public APIs:
 src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
+no lint is switched off in code:
+src/fields.rs:2: lint switched off by an attribute; every lint is a lint for a reason, so fix the code and remove the attribute
+src/fields.rs:3: lint switched off by an attribute; every lint is a lint for a reason, so fix the code and remove the attribute
 fails

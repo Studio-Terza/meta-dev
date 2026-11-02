@@ -31,6 +31,7 @@ lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-plaintext = { path = "../lint-no-plaintext" }
+lint-no-suppressions = { path = "../lint-no-suppressions" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-paired-apis = { path = "../lint-paired-apis" }
 lint-paths = { path = "../lint-paths" }

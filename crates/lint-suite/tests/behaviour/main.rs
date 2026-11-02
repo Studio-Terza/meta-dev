@@ -20,6 +20,7 @@ mod no_ignored_tests;
 mod no_numbers_in_binaries;
 mod no_parameter_bags;
 mod no_plaintext;
+mod no_suppressions;
 mod no_test_only_api;
 mod paired_apis;
 mod paths;
