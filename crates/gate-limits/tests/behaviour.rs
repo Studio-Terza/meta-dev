@@ -172,3 +172,21 @@ fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Res
     assert!(stray.err.contains("no usable limit"), "{}", stray.err);
     Ok(())
 }
+
+#[test]
+fn a_record_blocks_only_above_itself_and_only_a_record_is_lowered() -> io::Result<()> {
+    let record = "cold-clippy = 50\n";
+    let within = Run::reported("record-within", record, "cold-clippy = 50")?;
+    assert_eq!(within.out, "ok: cold-clippy took 50s, record 50s, lowered only by ci ratchet-lower\n");
+    assert_eq!(within.exit, ExitCode::SUCCESS);
+    let above = Run::reported("record-above", record, "cold-clippy = 50.1")?;
+    assert_eq!(above.exit, ExitCode::FAILURE);
+    let unrecorded = Run::reported("record-missing", record, "cold-clippy = 1\ncold-test-compile = 1")?;
+    assert!(unrecorded.err.contains("no usable limit"), "{}", unrecorded.err);
+    let levels = Run::fixture("levels-limits.toml", LIMIT)?;
+    let measured = Run::fixture("levels-measured.toml", "test-run = 0.5\n")?;
+    let refused = Run::cli(&levels, &measured).lower().map_err(|failure| failure.to_string());
+    assert!(refused.is_err_and(|reason| reason.contains("only the owner changes")));
+    assert_eq!(fs::read_to_string(&levels)?, LIMIT);
+    Ok(())
+}
