@@ -341,6 +341,7 @@ dependencies = [
  "laws",
  "newtype",
  "proc-macro2",
+ "serde_core",
  "syn 2.0.119",
  "thiserror",
  "toml",
