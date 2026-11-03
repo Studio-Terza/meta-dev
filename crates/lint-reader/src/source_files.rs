@@ -1,97 +1,114 @@
+mod located;
 mod modules;
-mod repo_files;
 mod scope;
+mod shelf;
+mod staged;
 mod test_modules;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
-use lint_core::SourceFile;
-use lint_core::{Readout, SourceText};
+use lint_core::{Readout, SourceFile};
 use lint_layout::Failure;
-use lint_placement::{CrateFile, Placement};
-use lint_roots::Roots;
-use lint_roots::Tree;
+use lint_placement::CrateFile;
+use lint_roots::{Regrouped, Tree};
 use modules::Modules;
-use newtype::Newtype;
-use repo_files::RepoFiles;
 use scope::Scope;
+use shelf::Shelf;
+use staged::Staged;
 use test_modules::TestModules;
 
-#[derive(Debug, Default)]
-pub struct SourceFiles {
+#[derive(Debug)]
+pub struct SourceFiles<'tree> {
     seen: BTreeSet<PathBuf>,
     readout: Readout,
+    shelf: Shelf<'tree>,
 }
 
-impl SourceFiles {
+impl<'tree> SourceFiles<'tree> {
     pub fn read(files: &impl Files, root: &Path) -> Result<Readout, Failure> {
-        Self::read_all(files, &[root.to_path_buf()])
+        SourceFiles::read_all(files, &[root.to_path_buf()])
     }
 
     pub fn read_all(files: &impl Files, roots: &[PathBuf]) -> Result<Readout, Failure> {
-        roots
-            .iter()
-            .try_fold(SourceFiles::default(), |reading, root| reading.tree(files, &Tree::open(files, root)?))
-            .map(|reading| reading.readout.sorted())
+        let opened = Tree::open_many(files, roots);
+        let shape: Vec<Vec<&Tree>> = opened.iter().map(|opened| opened.iter().collect()).collect();
+        let staged = Regrouped::like(&shape, Staged::under(files, &shape.concat()));
+        let (trees, staged): (Vec<Tree>, Vec<Vec<Staged>>) = opened
+            .into_iter()
+            .zip(staged)
+            .map(|(opened, staged)| Ok((opened?, staged.into_iter().collect::<Result<Vec<Staged>, Failure>>()?)))
+            .collect::<Result<Vec<(Tree, Vec<Staged>)>, Failure>>()?
+            .into_iter()
+            .unzip();
+        let starts =
+            trees.iter().zip(&staged).flat_map(|(tree, staged)| staged.iter().flat_map(|staged| staged.starts(tree)));
+        let started = SourceFiles {
+            seen: BTreeSet::new(),
+            readout: Readout::default(),
+            shelf: Shelf::stocked(files, &starts.collect::<Vec<_>>()),
+        };
+        let read =
+            trees.iter().zip(staged).flat_map(|(tree, staged)| staged.into_iter().map(move |staged| (tree, staged)));
+        Ok(read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted())
     }
 
-    fn tree(self, files: &impl Files, tree: &Tree) -> Result<SourceFiles, Failure> {
-        let roots = Roots::under(files, tree)?;
-        if roots.is_empty() {
-            Err(tree.without_sources())
+    fn tree(self, tree: &'tree Tree, staged: Staged) -> SourceFiles<'tree> {
+        let targets = staged.targets().to_vec();
+        let started = SourceFiles { readout: self.readout.with_repo_files(staged.into_repo_files()), ..self };
+        targets.into_iter().fold(started, |reading, root| {
+            let package = root.package().to_path_buf();
+            let file = root.into_file();
+            let scope = Scope::new(tree, &package, CrateFile::from(tree.display(&file)));
+            let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+            reading.file(&scope, &file, &children)
+        })
+    }
+
+    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {
+        if self.seen.insert(file.to_path_buf()) {
+            let source = self.shelf.source(scope, file);
+            self.opened(scope, file, children_directory, source)
         } else {
-            let repo_files = RepoFiles::under(files, tree)?;
-            let started = SourceFiles { readout: self.readout.with_repo_files(repo_files), ..self };
-            Ok(roots.into_iter().fold(started, |reading, root| {
-                let package = root.package().to_path_buf();
-                let file = root.into_file();
-                let scope = Scope::new(files, tree, &package, CrateFile::from(tree.display(&file)));
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
-                reading.file(&scope, &file, &children)
-            }))
+            self
         }
     }
 
-    fn file(mut self, scope: &Scope<'_, impl Files>, file: &Path, children_directory: &Path) -> SourceFiles {
-        if self.seen.insert(file.to_path_buf()) { self.opened(scope, file, children_directory) } else { self }
-    }
-
-    fn opened(self, scope: &Scope<'_, impl Files>, file: &Path, children_directory: &Path) -> SourceFiles {
-        let shown = scope.tree().display(file);
-        let read = scope
-            .files()
-            .read_text(file)
-            .map(|text| SourceText::new(text.into_inner()))
-            .map_err(|failure| Failure::Io { path: shown.clone(), source: failure.into() })
-            .and_then(|text| {
-                let placement = Placement::within(scope.files(), scope.package(), file);
-                SourceFile::parse_at(shown, file.to_path_buf(), placement, text)
-            })
-            .map(|parsed| parsed.in_crate_file(scope.crate_file().clone()));
-        match read {
-            Ok(parsed) => self.parsed(scope, file, children_directory, parsed),
-            Err(failure) => SourceFiles { readout: self.readout.with_failure(failure), ..self },
+    fn opened(
+        self,
+        scope: &Scope<'tree>,
+        file: &Path,
+        children_directory: &Path,
+        source: Option<Result<SourceFile, Failure>>,
+    ) -> SourceFiles<'tree> {
+        match source {
+            Some(Ok(parsed)) => {
+                self.parsed(scope, file, children_directory, parsed.in_crate_file(scope.crate_file().clone()))
+            }
+            Some(Err(failure)) => SourceFiles { readout: self.readout.with_failure(failure), ..self },
+            None => self,
         }
     }
 
     fn parsed(
         self,
-        scope: &Scope<'_, impl Files>,
+        scope: &Scope<'tree>,
         file: &Path,
         children_directory: &Path,
         parsed: SourceFile,
-    ) -> SourceFiles {
-        let mut modules = Modules::declared_in(scope.files(), file, children_directory, &parsed.syntax().items);
-        let tests = TestModules::read(scope, modules.tests());
+    ) -> SourceFiles<'tree> {
+        let mut modules = Modules::declared_in(self.shelf.survey(), file, children_directory, &parsed.syntax().items);
+        let tests = TestModules::read(&self.shelf, scope, modules.tests());
+        let children: Vec<_> =
+            modules.take_children().into_iter().map(|child| child.canonical(self.shelf.survey())).collect();
         let with_file = SourceFiles { readout: self.readout.with_file(parsed.with_test_modules(tests)), ..self };
         let with_failures = modules.take_failures().into_iter().fold(with_file, |reading, failure| SourceFiles {
             readout: reading.readout.with_failure(failure),
             ..reading
         });
-        modules.take_children().into_iter().fold(with_failures, |reading, child| {
-            child.canonically(scope.files(), |path, directory| reading.file(scope, path, directory))
-        })
+        children
+            .into_iter()
+            .fold(with_failures, |reading, child| child.visit(|path, directory| reading.file(scope, path, directory)))
     }
 }

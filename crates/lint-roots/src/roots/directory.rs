@@ -1,4 +1,5 @@
 mod ignored;
+mod kept;
 
 use std::path::{Path, PathBuf};
 
@@ -6,49 +7,50 @@ use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype};
 
+use crate::survey::{Fact, Survey};
 use ignored::Ignored;
+use kept::Kept;
 
-#[derive(Newtype, Arbitrary, Debug)]
+#[derive(Newtype, Arbitrary, Clone, Debug)]
 pub struct Directory(PathBuf);
 
 impl Directory {
-    #[must_use]
-    pub fn real<'path>(files: &impl Files, path: &'path Path) -> Option<&'path Path> {
-        (files.kind(path) == Kind::Directory).then_some(path)
+    pub fn trees(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Vec<Directory>, Failure>> {
+        Self::walked(files, roots, &Ignored::FOR_PACKAGES, |_, _, order| order)
     }
 
-    pub fn entries(&self, files: &impl Files) -> Result<Vec<PathBuf>, Failure> {
-        files.entries(&self.0).map_err(|failure| Failure::Io { path: self.0.clone(), source: failure.into() }).map(
-            |mut entries| {
-                entries.sort();
-                entries
-            },
-        )
+    pub fn files(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Vec<PathBuf>, Failure>> {
+        Self::walked(files, roots, &Ignored::FOR_FILES, |kept, root, _| kept.files(root))
     }
 
-    pub fn tree(self, files: &impl Files) -> Result<Vec<Directory>, Failure> {
-        let below = self.entries(files)?;
-        below
-            .into_iter()
-            .filter_map(|entry| Self::real(files, &entry).map(Path::to_path_buf))
-            .map(Directory)
-            .filter(|directory| directory.skipped(files, &Ignored::FOR_PACKAGES).is_none())
-            .try_fold(vec![self], |found, directory| Ok(found.into_iter().chain(directory.tree(files)?).collect()))
-    }
-
-    pub fn files(self, files: &impl Files) -> Result<Vec<PathBuf>, Failure> {
-        self.entries(files)?.into_iter().try_fold(Vec::new(), |found, entry| {
-            let below = Directory(entry.clone());
-            Ok(match (Self::real(files, &entry), below.skipped(files, &Ignored::FOR_FILES)) {
-                (None, _) => found.into_iter().chain([entry]).collect(),
-                (Some(_), Some(_)) => found,
-                (Some(_), None) => found.into_iter().chain(below.files(files)?).collect(),
+    fn walked<Found>(
+        files: &impl Files,
+        roots: &[PathBuf],
+        ignored: &[Ignored],
+        found: impl Fn(&Kept<'_>, &Path, Vec<Directory>) -> Found,
+    ) -> Vec<Result<Found, Failure>> {
+        let mut survey = Self::surveyed(files, roots, ignored, Survey::default());
+        roots
+            .iter()
+            .map(|root| {
+                let order = Kept::new(&survey, ignored).preorder(Directory(root.clone()));
+                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, order)), Err)
             })
-        })
+            .collect()
     }
 
-    fn skipped<'rules>(&self, files: &impl Files, ignored: &'rules [Ignored]) -> Option<&'rules Ignored> {
-        ignored.iter().find(|rule| rule.applying_to(files, self).is_some())
+    fn surveyed(files: &impl Files, level: &[PathBuf], ignored: &[Ignored], survey: Survey) -> Survey {
+        let survey = survey.learn(files, Fact::Listed, level);
+        let entries: Vec<PathBuf> = level.iter().flat_map(|directory| survey.entries(directory)).cloned().collect();
+        let survey = survey.learn(files, Fact::Kind, &entries);
+        let manifests = Ignored::manifests(
+            entries.iter().filter(|entry| survey.kind(entry) == Kind::Directory).map(PathBuf::as_path),
+        );
+        let survey = survey.learn(files, Fact::Followed, &manifests);
+        let kept = Kept::new(&survey, ignored);
+        let next: Vec<PathBuf> =
+            level.iter().flat_map(|directory| kept.below(directory)).map(Newtype::into_inner).collect();
+        if next.is_empty() { survey } else { Self::surveyed(files, &next, ignored, survey) }
     }
 }
 

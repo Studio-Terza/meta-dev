@@ -2,6 +2,7 @@ mod build_script;
 mod source_directory;
 mod target_directory;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
@@ -36,10 +37,27 @@ impl Placement {
 
     #[must_use]
     pub fn within(files: &impl Files, package: &Path, file: &Path) -> Placement {
-        file.strip_prefix(package)
-            .ok()
-            .and_then(|inside| Self::in_package(files, package, inside))
+        Self::within_many(files, &[package.to_path_buf()], &[file.to_path_buf()])
+            .pop()
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
+    }
+
+    #[must_use]
+    pub fn within_many(files: &impl Files, packages: &[PathBuf], paths: &[PathBuf]) -> Vec<Placement> {
+        let distinct: Vec<PathBuf> = packages.iter().cloned().collect::<BTreeSet<PathBuf>>().into_iter().collect();
+        let roots: BTreeMap<PathBuf, PackageRoot> =
+            distinct.iter().cloned().zip(PackageRoot::read_many(files, &distinct)).collect();
+        packages
+            .iter()
+            .zip(paths)
+            .map(|(package, file)| {
+                file.strip_prefix(package)
+                    .ok()
+                    .zip(roots.get(package).cloned())
+                    .and_then(|(inside, root)| Self::in_package(root, package, inside))
+                    .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.clone())))
+            })
+            .collect()
     }
 
     #[must_use]
@@ -95,11 +113,10 @@ impl Placement {
         }
     }
 
-    fn in_package(files: &impl Files, package: &Path, inside: &Path) -> Option<Placement> {
+    fn in_package(root: PackageRoot, package: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let directory = first.as_os_str().to_str()?;
-        let root = PackageRoot::read(files, package);
         if directory == Self::SOURCE_DIRECTORY {
             Some(SourceDirectory::place(root, rest))
         } else if directory == Self::BUILD_FILE && rest.as_os_str().is_empty() {

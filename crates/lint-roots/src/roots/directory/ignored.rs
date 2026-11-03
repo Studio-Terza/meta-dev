@@ -1,12 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use file_ports::Files;
 use lint_layout::Name;
 use lint_layout::Prefix;
 use lint_layout::Word;
 
-use super::Directory;
-use crate::followed::Followed;
+use crate::survey::Survey;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Ignored {
@@ -24,8 +22,15 @@ impl Ignored {
     const HIDDEN: Word<'static> = Word::new(".");
     const VERSION_CONTROL: &'static str = ".git";
 
-    pub fn applying_to(self, files: &impl Files, directory: &Directory) -> Option<Ignored> {
-        let path: &Path = directory.as_ref();
+    pub fn manifests<'path>(directories: impl Iterator<Item = &'path Path>) -> Vec<PathBuf> {
+        directories
+            .filter(|directory| directory.file_name().is_some_and(|name| name == Self::BUILD_DIRECTORY))
+            .filter_map(Path::parent)
+            .map(|parent| parent.join(Self::MANIFEST))
+            .collect()
+    }
+
+    pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {
         let named = path.file_name();
         let applies = match self {
             Ignored::Hidden => named.is_some_and(|name| Name::from(name).matches::<Prefix>(&[Self::HIDDEN]).is_some()),
@@ -35,7 +40,7 @@ impl Ignored {
                     && path
                         .parent()
                         .map(|parent| parent.join(Self::MANIFEST))
-                        .is_some_and(|manifest| Followed::file(files, &manifest).is_some())
+                        .is_some_and(|manifest| survey.file(&manifest).is_some())
             }
         };
         applies.then_some(self)
