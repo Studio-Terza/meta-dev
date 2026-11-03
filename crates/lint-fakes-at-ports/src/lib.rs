@@ -4,7 +4,8 @@ mod port_traits;
 use doubles::Doubles;
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_paths::Imports;
-use port_traits::PortTraits;
+pub use doubles::Kind;
+pub use port_traits::PortTraits;
 
 #[derive(Debug)]
 pub struct FakesAtPorts;
