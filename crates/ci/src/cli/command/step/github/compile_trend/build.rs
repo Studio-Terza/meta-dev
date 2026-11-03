@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use file_ports::Files;
+use file_ports::{FileFailure, Files};
 use text_lines::OneLine;
 
 use crate::cli::command::failure::Failure;
@@ -23,21 +23,23 @@ enum Part {
 }
 
 impl Source {
-    fn journals(sources: &[Source]) -> Vec<Journal> {
-        sources
-            .iter()
-            .map(|source| match source {
-                Source::Measured(journal) | Source::Page(journal) => journal.clone(),
-            })
-            .collect()
-    }
-
-    fn parsed(&self, text: &Text) -> Result<Part, Failure> {
-        match self {
-            Source::Measured(measured) => toml::from_str(text.as_ref())
+    fn parsed(self, read: Result<Text, FileFailure>) -> Result<Part, Failure<'static>> {
+        match (self, read) {
+            (Source::Measured(journal) | Source::Page(journal), Err(failure)) => {
+                Err(Failure::unusable(journal, failure))
+            }
+            (Source::Measured(measured), Ok(text)) => toml::from_str(text.as_ref())
                 .map(Part::Stages)
-                .map_err(|source| Failure::Measured { path: measured.as_ref().to_path_buf(), source }),
-            Source::Page(page) => CompileTimes::per_crate(page, text).map(Part::Crates),
+                .map_err(|source| Failure::Measured { path: measured.into(), source }),
+            (Source::Page(page), Ok(text)) => CompileTimes::per_crate(page, &text).map(Part::Crates),
+        }
+    }
+}
+
+impl AsRef<Path> for Source {
+    fn as_ref(&self) -> &Path {
+        match self {
+            Source::Measured(journal) | Source::Page(journal) => journal.as_ref(),
         }
     }
 }
@@ -67,18 +69,21 @@ impl Build {
 }
 
 impl Build {
-    pub(super) fn measured_in(files: &impl Files, directory: &Path) -> Result<Build, Failure> {
+    pub(super) fn measured_in(files: &impl Files, directory: &Path) -> Result<Build, Failure<'static>> {
         let sources = Build::sources(directory);
-        Build::tallied(&sources, Journal::read_all(files, &Source::journals(&sources)))
+        let read = files.read_text_many(&sources);
+        Build::tallied(sources, read)
     }
 
-    pub(super) fn measured_in_all(files: &impl Files, directories: &[PathBuf]) -> Result<Vec<Build>, Failure> {
+    pub(super) fn measured_in_all(files: &impl Files, directories: &[PathBuf]) -> Result<Vec<Build>, Failure<'static>> {
         let sources: Vec<Vec<Source>> = directories.iter().map(|directory| Build::sources(directory)).collect();
-        let journals: Vec<Vec<Journal>> = sources.iter().map(|group| Source::journals(group)).collect();
+        let read = files.read_text_many(&sources.iter().flatten().collect::<Vec<&Source>>());
         sources
-            .iter()
-            .zip(Journal::read_groups(files, &journals))
-            .map(|(group, read)| Build::tallied(group, read))
+            .into_iter()
+            .scan(read.into_iter(), |read, group| {
+                let size = group.len();
+                Some(Build::tallied(group, read.take(size).collect()))
+            })
             .collect()
     }
 
@@ -89,12 +94,12 @@ impl Build {
             .collect()
     }
 
-    fn tallied(sources: &[Source], read: Vec<Result<Text, Failure>>) -> Result<Build, Failure> {
+    fn tallied(sources: Vec<Source>, read: Vec<Result<Text, FileFailure>>) -> Result<Build, Failure<'static>> {
         let parts = sources
-            .iter()
+            .into_iter()
             .zip(read)
-            .map(|(source, text)| source.parsed(&text?))
-            .collect::<Result<Vec<Part>, Failure>>()?;
+            .map(|(source, text)| source.parsed(text))
+            .collect::<Result<Vec<Part>, Failure<'static>>>()?;
         Ok(parts.into_iter().fold(Build { total: Seconds::default(), crates: BTreeMap::new() }, Build::adding))
     }
 

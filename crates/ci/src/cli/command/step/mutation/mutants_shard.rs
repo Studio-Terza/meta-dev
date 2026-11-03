@@ -17,17 +17,18 @@ impl MutantsShard {
     const SHARDING: [&'static str; 2] = ["--sharding", "round-robin"];
     const PASSED_ON: [&'static str; 2] = ["--", "--no-fail-fast"];
     const SHARD: &'static str = "--shard";
+    const ARGUMENTS: usize = 2;
 }
 
 impl Step for MutantsShard {
-    fn from_arguments(arguments: &[OsString]) -> Result<MutantsShard, Failure> {
-        match arguments {
-            [shard, output] => Ok(MutantsShard { shard: shard.clone(), output: PathBuf::from(output) }),
-            _ => Err(Failure::Usage),
+    fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsShard, Failure<'static>> {
+        match <[OsString; Self::ARGUMENTS]>::try_from(arguments) {
+            Ok([shard, output]) => Ok(MutantsShard { shard, output: PathBuf::from(output) }),
+            Err(_) => Err(Failure::Usage),
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let selection: Vec<&OsStr> = [OsStr::new(Self::SHARD), self.shard.as_os_str()]
             .into_iter()
             .chain(Self::SHARDING.iter().map(OsStr::new))

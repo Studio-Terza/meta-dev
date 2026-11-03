@@ -2,7 +2,7 @@ mod boundary;
 
 use std::ffi::OsString;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use boundary::Finished;
 use text_lines::Lines;
@@ -19,29 +19,29 @@ use crate::cli::ports::{Exit, Ports};
 pub struct LibtestSeconds {
     measured: Measured,
     stage: Stage,
-    output: PathBuf,
+    output: Journal,
 }
 
 impl Step for LibtestSeconds {
-    fn from_arguments(arguments: &[OsString]) -> Result<LibtestSeconds, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
+        match arguments.as_slice() {
             [measured, stage, output] => Ok(LibtestSeconds {
                 measured: Measured::file(Path::new(measured)),
                 stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
-                output: PathBuf::from(output),
+                output: Journal::file(Path::new(output)),
             }),
             _ => Err(Failure::Usage),
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
-        let text = Journal::file(&self.output).read(ports.files())?;
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+        let text = self.output.read(ports.files())?;
         let results: Vec<Finished> =
             Lines::from(text.as_ref()).filter_map(|line| line.parse::<Finished>().ok()).collect();
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         (!results.is_empty())
             .then_some(total)
-            .ok_or_else(|| Failure::NoTestResult { path: self.output.clone() })
+            .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
             .and_then(|total| self.measured.append(ports.files(), &self.stage, total))
             .map(|()| Exit::Success)
     }

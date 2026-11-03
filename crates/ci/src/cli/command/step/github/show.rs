@@ -11,14 +11,18 @@ use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
 pub struct Show {
-    files: Vec<PathBuf>,
+    journals: Vec<Journal>,
 }
 
 impl Show {
     const ABSENT: &'static str = "not produced\n";
 
-    pub(super) fn shown(files: &impl Files, journals: &[Journal], out: &mut impl Write) -> Result<(), Failure> {
-        journals.iter().zip(Journal::read_present(files, journals)).try_for_each(|(journal, text)| {
+    pub(super) fn shown<'journal>(
+        files: &impl Files,
+        journals: &'journal [Journal],
+        out: &mut impl Write,
+    ) -> Result<(), Failure<'journal>> {
+        journals.iter().zip(Journal::read_present(files, journals.iter().collect())).try_for_each(|(journal, text)| {
             writeln!(out, "{journal}:")?;
             let text = text.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
             Ok(write!(out, "{text}")?)
@@ -27,15 +31,14 @@ impl Show {
 }
 
 impl Step for Show {
-    fn from_arguments(arguments: &[OsString]) -> Result<Show, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Show, Failure<'static>> {
+        match arguments.as_slice() {
             [] => Err(Failure::Usage),
-            files => Ok(Show { files: files.iter().map(PathBuf::from).collect() }),
+            _ => Ok(Show { journals: arguments.into_iter().map(|file| Journal::from(PathBuf::from(file))).collect() }),
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let journals: Vec<Journal> = self.files.iter().map(|file| Journal::file(file)).collect();
-        Self::shown(ports.files(), &journals, out).map(|()| Exit::Success)
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+        Self::shown(ports.files(), &self.journals, out).map(|()| Exit::Success)
     }
 }

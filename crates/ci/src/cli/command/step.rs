@@ -33,7 +33,7 @@ pub use timed::Timed;
 pub use tools_key::ToolsKey;
 
 pub trait Step: Sized {
-    fn from_arguments(arguments: &[OsString]) -> Result<Self, Failure>;
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>>;
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure>;
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>>;
 }

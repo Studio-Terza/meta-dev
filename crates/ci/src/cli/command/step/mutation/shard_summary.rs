@@ -5,7 +5,7 @@ mod report;
 mod tally;
 
 use std::ffi::OsString;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
@@ -28,34 +28,31 @@ pub struct ShardSummary {
 }
 
 impl ShardSummary {
-    fn directories(&self, files: &impl Files) -> Result<Vec<PathBuf>, Failure> {
-        let mut found = files
-            .entries(&self.shards)
-            .map_err(|failure| Failure::Io { path: self.shards.clone(), source: io::Error::from(failure) })?;
+    fn directories(&self, files: &impl Files) -> Result<Vec<PathBuf>, Failure<'_>> {
+        let mut found = files.entries(&self.shards).map_err(|failure| Failure::unusable(&self.shards, failure))?;
         found.sort();
         Ok(found)
     }
 
-    fn texts(&self, files: &impl Files) -> Result<Vec<Text>, Failure> {
+    fn texts(&self, files: &impl Files) -> Result<Vec<Text>, Failure<'_>> {
         let directories = self.directories(files)?;
-        let tagged: Vec<(Outcome, Journal)> = Outcome::ALL
+        let (tags, journals): (Vec<Outcome>, Vec<Journal>) = Outcome::ALL
             .into_iter()
             .flat_map(|outcome| directories.iter().map(move |directory| (outcome, directory.join(outcome.file_name()))))
-            .map(|(outcome, path)| (outcome, Journal::file(&path)))
-            .collect();
-        let journals: Vec<Journal> = tagged.iter().map(|(_, journal)| journal.clone()).collect();
+            .map(|(outcome, path)| (outcome, Journal::from(path)))
+            .unzip();
         let read: Vec<Option<Text>> =
-            Journal::read_present(files, &journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
+            Journal::read_present(files, journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
         Ok(Outcome::ALL
             .into_iter()
             .map(|outcome| {
-                let texts = tagged.iter().zip(&read).filter(|((tag, _), _)| *tag == outcome).flat_map(|(_, text)| text);
+                let texts = tags.iter().zip(&read).filter(|(tag, _)| **tag == outcome).flat_map(|(_, text)| text);
                 Text::new(texts.map(AsRef::as_ref).collect())
             })
             .collect())
     }
 
-    fn report(&self, files: &impl Files) -> Result<Report, Failure> {
+    fn report(&self, files: &impl Files) -> Result<Report, Failure<'_>> {
         let texts = self.texts(files)?;
         let tallies = Outcome::ALL
             .into_iter()
@@ -75,8 +72,8 @@ impl ShardSummary {
 }
 
 impl Step for ShardSummary {
-    fn from_arguments(arguments: &[OsString]) -> Result<ShardSummary, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
+        match arguments.as_slice() {
             [shards, summary] => {
                 Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
             }
@@ -84,7 +81,7 @@ impl Step for ShardSummary {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let report = self.report(ports.files())?;
         write!(out, "{report}")?;
         self.summary.append(ports.files(), report)?;

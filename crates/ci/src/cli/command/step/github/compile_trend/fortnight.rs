@@ -45,7 +45,7 @@ impl Fortnight {
         Fortnight { downloads }
     }
 
-    pub(super) fn downloaded(&self, ports: &impl Ports) -> Result<Vec<Build>, Failure> {
+    pub(super) fn downloaded(&self, ports: &impl Ports) -> Result<Vec<Build>, Failure<'static>> {
         let invocation = Invocation::new(
             "gh",
             [
@@ -89,7 +89,7 @@ impl Fortnight {
         )
     }
 
-    pub(super) fn merged(ports: &impl Ports) -> Result<Text, Failure> {
+    pub(super) fn merged(ports: &impl Ports) -> Result<Text, Failure<'static>> {
         let invocation = Invocation::new(
             "gh",
             [

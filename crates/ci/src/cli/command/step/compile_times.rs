@@ -1,6 +1,7 @@
 mod listing;
 mod unit;
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::io::Write;
@@ -28,7 +29,10 @@ pub struct CompileTimes {
 impl CompileTimes {
     const UNIT_DATA: &'static str = "const UNIT_DATA = ";
 
-    pub(crate) fn per_crate(page: &Journal, read: &Text) -> Result<BTreeMap<OneLine, Seconds>, Failure> {
+    pub(crate) fn per_crate<'path>(
+        page: impl Into<Cow<'path, Path>>,
+        read: &Text,
+    ) -> Result<BTreeMap<OneLine, Seconds>, Failure<'path>> {
         let text = read.as_ref();
         let units: Vec<Unit> = text
             .match_indices(Self::UNIT_DATA)
@@ -36,18 +40,14 @@ impl CompileTimes {
             .and_then(|(at, found)| text.get(at + found.len()..))
             .and_then(|rest| Deserializer::from_str(rest).into_iter::<Vec<Unit>>().next())
             .and_then(Result::ok)
-            .ok_or_else(|| Failure::NoTimings { path: page.as_ref().to_path_buf() })?;
-        Ok(units.iter().fold(BTreeMap::new(), |mut totals, unit| {
-            let total = totals.entry(unit.label().clone()).or_default();
-            *total = [*total, unit.took()].into_iter().sum();
-            totals
-        }))
+            .ok_or_else(|| Failure::NoTimings { path: page.into() })?;
+        Ok(units.into_iter().fold(BTreeMap::new(), |totals, unit| unit.tallied(totals)))
     }
 }
 
 impl Step for CompileTimes {
-    fn from_arguments(arguments: &[OsString]) -> Result<CompileTimes, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
+        match arguments.as_slice() {
             [page, report] => {
                 Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
             }
@@ -55,7 +55,7 @@ impl Step for CompileTimes {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let listing = Listing::totalled(Self::per_crate(&self.page, &self.page.read(ports.files())?)?);
         write!(out, "{listing}")?;
         self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success)

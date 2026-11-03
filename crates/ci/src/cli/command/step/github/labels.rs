@@ -39,8 +39,8 @@ impl fmt::Display for Labels {
 }
 
 impl Step for Labels {
-    fn from_arguments(arguments: &[OsString]) -> Result<Labels, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Labels, Failure<'static>> {
+        match arguments.as_slice() {
             [base, pull_request, metadata] => Ok(Labels {
                 base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
                 pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
@@ -50,7 +50,7 @@ impl Step for Labels {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let changes = Git::with_ports(ports).changes_since_fork(&self.base)?;
         let pull_request = Hub::with_ports(ports).pull_request(&self.pull_request)?;
         Changed::stored_metadata(ports, &self.metadata)?;

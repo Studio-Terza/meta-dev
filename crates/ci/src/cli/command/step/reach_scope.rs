@@ -29,7 +29,7 @@ impl ReachScope {
     const MAIN: &'static str = "main";
     const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
-    fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure> {
+    fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure<'_>> {
         let skipped = Skips::from(report.as_ref());
         write!(out, "{report}")?;
         self.environment.append(files, report)?;
@@ -39,8 +39,8 @@ impl ReachScope {
 }
 
 impl Step for ReachScope {
-    fn from_arguments(arguments: &[OsString]) -> Result<ReachScope, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<ReachScope, Failure<'static>> {
+        match arguments.as_slice() {
             [metadata, event, base, environment, summary] => Ok(ReachScope {
                 metadata: Journal::file(Path::new(metadata)),
                 event: Event::from(event.to_str().ok_or(Failure::Usage)?),
@@ -52,7 +52,7 @@ impl Step for ReachScope {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         Changed::stored_metadata(ports, &self.metadata)?;
         let report = match (self.event, self.base.as_ref() == Self::MAIN) {
             (Event::PullRequest, false) => Changed::answered(Question::Affected, &self.metadata, ports)?,
