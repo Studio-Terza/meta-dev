@@ -3,6 +3,7 @@ mod boundary;
 mod contents;
 mod declared_type;
 mod gate;
+mod headline;
 mod home;
 mod lint;
 mod macro_aliases;
@@ -20,10 +21,11 @@ mod type_name;
 mod walk;
 
 pub use binary_files::BinaryFiles;
-pub use boundary::{Bound, Violation};
+pub use boundary::{Bound, Finding, Fix, Message, Problem, Violation};
 pub use contents::Contents;
 pub use declared_type::DeclaredType;
 pub use gate::Gate;
+pub use headline::Headline;
 pub use home::Home;
 pub use lint::Lint;
 pub use macro_aliases::MacroAliases;
@@ -40,4 +42,4 @@ pub use type_homes::TypeHomes;
 pub use type_name::TypeName;
 pub use walk::Walk;
 
-pub use lint_layout::{Finding, Fix, Headline, Message, Problem, SourceText};
+pub use lint_layout::SourceText;

@@ -1,7 +1,7 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
 use lint_placement::CrateName;
 
 use super::tally::Tally;
@@ -42,7 +42,7 @@ impl fmt::Display for CrateMutation<'_, '_> {
     }
 }
 
-impl lint_layout::Finding for CrateMutation<'_, '_> {
+impl lint_core::Finding for CrateMutation<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "move each mutation into a store operation, a &mut self method in a store module, or return a new value",

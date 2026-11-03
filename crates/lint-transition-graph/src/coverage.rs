@@ -2,8 +2,8 @@ mod share;
 
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
 use newtype::Counter;
 
 use crate::count::Count;
@@ -63,7 +63,7 @@ impl fmt::Display for Workspace {
     }
 }
 
-impl lint_layout::Finding for Workspace {
+impl lint_core::Finding for Workspace {
     fn fix(&self) -> Fix {
         Fix::new(
             "give each bare primitive a newtype, an enum or a standard trait, so every written edge joins nodes the graph can see",

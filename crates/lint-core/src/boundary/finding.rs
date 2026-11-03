@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::fix::Fix;
+use super::Fix;
 
 pub trait Finding: fmt::Display {
     fn fix(&self) -> Fix;

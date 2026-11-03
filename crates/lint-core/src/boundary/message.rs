@@ -1,8 +1,9 @@
+mod problem;
+
 use std::fmt;
 
-use crate::finding::Finding;
-use crate::fix::Fix;
-use crate::problem::Problem;
+use super::{Finding, Fix};
+pub use problem::Problem;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Message {
