@@ -1,4 +1,4 @@
-use syn::{Generics, Ident, Type, TypeParamBound, WherePredicate};
+use syn::{Generics, Ident, PredicateType, Type, TypeParamBound, WherePredicate};
 
 use lint_layout::Name;
 
@@ -25,17 +25,22 @@ impl<'generics> Constraint<'generics> {
     }
 
     fn required(predicate: &'generics WherePredicate) -> Vec<Constraint<'generics>> {
-        let typed = match predicate {
-            WherePredicate::Type(typed) => Some(typed),
-            _ => None,
-        };
-        let named = typed.and_then(|typed| match &typed.bounded_ty {
+        match predicate {
+            WherePredicate::Type(typed) => Self::typed(typed),
+            _ => Vec::new(),
+        }
+    }
+
+    fn typed(typed: &'generics PredicateType) -> Vec<Constraint<'generics>> {
+        Self::ident_of(&typed.bounded_ty)
+            .map(|name| typed.bounds.iter().map(|bound| Constraint { name, bound }).collect())
+            .unwrap_or_default()
+    }
+
+    fn ident_of(bounded: &Type) -> Option<&Ident> {
+        match bounded {
             Type::Path(path) => path.path.get_ident(),
             _ => None,
-        });
-        typed
-            .zip(named)
-            .map(|(typed, name)| typed.bounds.iter().map(|bound| Constraint { name, bound }).collect())
-            .unwrap_or_default()
+        }
     }
 }

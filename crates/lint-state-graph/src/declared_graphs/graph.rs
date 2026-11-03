@@ -60,6 +60,6 @@ impl Parse for Graph {
         input.parse::<Ident>()?;
         let content;
         braced!(content in input);
-        iter::from_fn(|| (!content.is_empty()).then(|| content.parse())).collect::<syn::Result<_>>().map(Graph)
+        iter::from_fn(|| content.cursor().token_tree().map(|_| content.parse())).collect::<syn::Result<_>>().map(Graph)
     }
 }
