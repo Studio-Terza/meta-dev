@@ -37,7 +37,10 @@ impl Finding {
     }
 
     pub fn lowered(self) -> Result<Entry, Failure<'static>> {
-        self.limit.lowered(self.stage, self.measured)
+        match self.limit.lowered(self.measured) {
+            Ok(seconds) => Ok(Entry::new(self.stage, seconds)),
+            Err(refusal) => Err(refusal.refusing(self.stage, self.measured)),
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 mod finding;
 mod limit;
+mod pairing;
 mod record;
 mod seconds;
 mod verdict;
@@ -15,6 +16,7 @@ use crate::cli::stage::Stage;
 pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
+use pairing::Pairing;
 pub use record::Record;
 pub(crate) use seconds::Seconds;
 
@@ -30,9 +32,9 @@ impl Gate {
         let limits = Self::sliced(limits, only)?;
         let measured: BTreeMap<Stage, Seconds> = toml::from_str(&measured.into_inner())
             .map_err(|source| Failure::Parse { file: Document::Measured, source })?;
-        Self::joined(limits, measured)
+        Pairing::joined(limits, measured)
             .into_iter()
-            .map(|(stage, (limit, measured))| Self::finding(stage, limit, measured))
+            .map(|(stage, pairing)| pairing.finding(stage))
             .collect::<Result<Vec<Finding>, Failure<'_>>>()
             .and_then(|findings| if findings.is_empty() { Err(Failure::Empty) } else { Ok(Gate { findings }) })
     }
@@ -70,27 +72,6 @@ impl Gate {
     #[must_use]
     pub fn past_warn(self) -> Vec<Finding> {
         self.findings.into_iter().filter_map(Finding::past_warn).collect()
-    }
-
-    fn joined(
-        limits: BTreeMap<Stage, Limit>,
-        measured: BTreeMap<Stage, Seconds>,
-    ) -> BTreeMap<Stage, (Option<Limit>, Option<Seconds>)> {
-        measured.into_iter().fold(
-            limits.into_iter().map(|(stage, limit)| (stage, (Some(limit), None))).collect(),
-            |mut joined, (stage, seconds)| {
-                joined.entry(stage).or_insert((None, None)).1 = Some(seconds);
-                joined
-            },
-        )
-    }
-
-    fn finding(stage: Stage, limit: Option<Limit>, measured: Option<Seconds>) -> Result<Finding, Failure<'static>> {
-        match (limit.and_then(Limit::ordered), measured) {
-            (None, _) => Err(Failure::Unlimited { stage }),
-            (Some(_), None) => Err(Failure::Unmeasured { stage }),
-            (Some(limit), Some(measured)) => Ok(Finding::new(stage, measured, limit)),
-        }
     }
 }
 

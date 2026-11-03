@@ -3,7 +3,6 @@ use std::fmt;
 use serde::Deserialize;
 
 use crate::cli::failure::Failure;
-use crate::cli::gate::record::Entry;
 use crate::cli::gate::seconds::Seconds;
 use crate::cli::gate::verdict::Verdict;
 use crate::cli::stage::Stage;
@@ -35,11 +34,26 @@ impl Limit {
         }
     }
 
-    pub fn lowered(self, stage: Stage, measured: Seconds) -> Result<Entry, Failure<'static>> {
+    pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
-            Limit::Levels { .. } => Err(Failure::Levels { stage }),
-            Limit::Record(record) if measured > record => Err(Failure::Above { stage, measured, record }),
-            Limit::Record(_) => Ok(Entry::new(stage, measured)),
+            Limit::Levels { .. } => Err(Refusal::Levels),
+            Limit::Record(record) if measured > record => Err(Refusal::Above { record }),
+            Limit::Record(_) => Ok(measured),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Refusal {
+    Levels,
+    Above { record: Seconds },
+}
+
+impl Refusal {
+    pub fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
+        match self {
+            Refusal::Levels => Failure::Levels { stage },
+            Refusal::Above { record } => Failure::Above { stage, measured, record },
         }
     }
 }
