@@ -33,14 +33,14 @@ enum Scenario {
 }
 
 impl Outcome {
-    pub(crate) fn baseline(&self, log: &TestLog) -> Option<Vec<TestName>> {
+    pub(crate) fn baseline<'log>(&self, log: &'log TestLog) -> Option<Vec<&'log TestName>> {
         match self.scenario {
-            Scenario::Baseline => Some(log.names().into_iter().collect()),
+            Scenario::Baseline => Some(log.names().collect()),
             Scenario::Mutant(_) => None,
         }
     }
 
-    pub fn mutant(&self, log: &TestLog) -> Option<MutantResult> {
+    pub fn mutant<'log>(&self, log: &'log TestLog) -> Option<MutantResult<'log>> {
         match &self.scenario {
             Scenario::Mutant(named) => Some(MutantResult::new(Title::from(named), self.summary, log.failed())),
             Scenario::Baseline => None,
