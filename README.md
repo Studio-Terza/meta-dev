@@ -31,7 +31,7 @@ manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_bi
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, no_early_exits, rust_only, workflow_run.
+effects_in_ports, no_early_exits, one_edge, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -49,6 +49,16 @@ declaration is read instead. A unit return is not flagged, nor are consts, stati
 as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
+
+`one_edge` keeps one transition per pair. In shipped code, a set of domain input types reaches one domain output type
+by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
+`Result` and collections to the type inside. A trait impl also takes its implementing type when no input or output carries
+it, so impls of one trait on different types are different edges, while a `From`, `TryFrom` or `FromStr` impl meets a
+function between the same pair. Type names resolve through their path or `use` import; a name declared in several crates
+and not imported, or twice in one crate, is a leaf. Edges touching a bare primitive, an interface or a foreign type are not
+compared, nor are derived lifts (a map, field focus or match routing) and store operations. The message names the fix:
+keep the standard conversion, or one transition, and route the others through it; delete a hand-written copy of a map,
+filter or fold over the element transition; where the transitions mean different things, give each its own output type.
 
 `effects_in_ports` keeps effects in ports. In shipped code, a call into files, the environment, the clock, the network,
 processes, randomness or stdio (`std::fs`, `std::env`, `SystemTime::now`, `Instant::now`, `thread::sleep`, `std::net`,
