@@ -24,8 +24,9 @@ struct Followed<'trail> {
 impl<'trail> Trail<'trail> {
     pub(crate) fn followed(&self, module: &Module<'_>, name: &Name) -> Option<&'trail Name> {
         let step = self.followed?;
-        (step.module == module && step.name == name)
-            .then_some(step.name)
+        Some(step.name)
+            .filter(|&followed| followed == name)
+            .filter(|_| step.module == module)
             .or_else(|| self.earlier?.followed(module, name))
     }
 

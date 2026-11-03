@@ -28,7 +28,8 @@ impl<'found, 'file> Family<'found, 'file> {
         );
         keyed
             .into_iter()
-            .filter(|(key, members)| members.len() > 1 && key.algebraic().is_none())
+            .filter(|(_, members)| members.len() > 1)
+            .filter(|(key, _)| key.algebraic().is_none())
             .map(|(key, members)| Family { key, members })
             .collect()
     }
@@ -54,10 +55,7 @@ impl fmt::Display for Family<'_, '_> {
         let paths: Vec<String> =
             self.members.iter().map(|member| format!("{member} at {}", AsRef::<Site>::as_ref(*member))).collect();
         write!(formatter, "{} has {} transitions: {}", self.key, self.members.len(), paths.join(", "))?;
-        match self.canonical() {
-            Some(conversion) => write!(formatter, "; {conversion} is the standard conversion"),
-            None => Ok(()),
-        }
+        self.canonical().map_or(Ok(()), |conversion| write!(formatter, "; {conversion} is the standard conversion"))
     }
 }
 

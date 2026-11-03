@@ -1,7 +1,7 @@
 use std::fmt;
 
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
+use lint_layout::{Fix, Name};
 use newtype::Counter;
 use transition_facts::{Ground, Mutation};
 
@@ -18,30 +18,42 @@ pub(super) struct Tally {
 
 impl Tally {
     pub(super) fn counts<'edge, 'found, 'file>(edge: &'edge Edge<'found, 'file>) -> Option<&'edge Edge<'found, 'file>> {
-        match (edge.role(), *AsRef::<Ground>::as_ref(edge.transition()), edge.transition().function().mutation()) {
-            (Role::Operation, _, _) | (_, Ground::Core, Mutation::ThroughSelf | Mutation::ThroughParameter) => {
-                Some(edge)
-            }
-            _ => None,
-        }
+        let mutating =
+            Some(edge).filter(|edge| *AsRef::<Ground>::as_ref(edge.transition()) == Ground::Core).filter(|edge| {
+                matches!(edge.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
+            });
+        Some(edge).filter(|edge| edge.role() == Role::Operation).or(mutating)
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Tally {
         edges.fold(Tally::default(), |tally, edge| {
-            let counted = match (edge.role(), edge.transition().function().mutation()) {
-                (Role::Operation, _) => Tally { operations: tally.operations.incremented(), ..tally },
-                (_, Mutation::ThroughSelf) => Tally { through_self: tally.through_self.incremented(), ..tally },
-                (_, Mutation::ThroughParameter | Mutation::Absent) => {
-                    Tally { through_parameter: tally.through_parameter.incremented(), ..tally }
-                }
-            };
-            match (edge.role(), edge.fixed_by()) {
-                (Role::Written | Role::Lift, Some(_)) => Tally { fixed: counted.fixed.incremented(), ..counted },
-                _ => counted,
-            }
+            tally.by_role(edge.role(), edge.transition().function().mutation()).fixed(edge.role(), edge.fixed_by())
         })
+    }
+
+    fn by_role(self, role: Role, mutation: Mutation) -> Tally {
+        match role {
+            Role::Operation => Tally { operations: self.operations.incremented(), ..self },
+            Role::Written | Role::Lift => self.by_mutation(mutation),
+        }
+    }
+
+    fn by_mutation(self, mutation: Mutation) -> Tally {
+        match mutation {
+            Mutation::ThroughSelf => Tally { through_self: self.through_self.incremented(), ..self },
+            Mutation::ThroughParameter | Mutation::Absent => {
+                Tally { through_parameter: self.through_parameter.incremented(), ..self }
+            }
+        }
+    }
+
+    fn fixed(self, role: Role, fixed_by: Option<&Name>) -> Tally {
+        match role {
+            Role::Operation => self,
+            Role::Written | Role::Lift => fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self }),
+        }
     }
 
     pub(super) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {

@@ -44,8 +44,8 @@ impl<'found> WorkspaceTypes<'found> {
             |mut twice: BTreeMap<&'found CrateName, BTreeSet<&'found Name>>, found| {
                 let krate: &'found CrateName = found.as_ref();
                 let name: &'found Name = found.as_ref();
-                let fresh = seen.entry(krate).or_default().insert(name);
-                twice.entry(krate).or_default().extend((!fresh).then_some(name));
+                let again = seen.entry(krate).or_default().replace(name);
+                twice.entry(krate).or_default().extend(again);
                 twice
             },
         )
@@ -56,7 +56,8 @@ impl<'found> WorkspaceTypes<'found> {
     }
 
     pub(crate) fn edge<'file>(&self, transition: Transition<'found, 'file>) -> Edge<'found, 'file> {
-        let fixed_by = transition.context().trait_name().filter(|name| !self.traits.contains(*name));
+        let fixed_by =
+            transition.context().trait_name().and_then(|name| self.traits.get(name).map_or(Some(name), |_| None));
         let from: &CrateName = transition.as_ref();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);
@@ -67,31 +68,27 @@ impl<'found> WorkspaceTypes<'found> {
     }
 
     fn end(&self, from: &CrateName, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {
-        let name: &Name = endpoint.as_ref();
-        match (endpoint.nature(), fixed_by) {
-            (Nature::Named, _) => self.named(endpoint.origin().unwrap_or(from), name),
-            (Nature::Interface, _) => End::placed(Place::Interface, name),
-            (Nature::Primitive, Some(fixing)) => End::placed(Place::Interface, fixing),
-            (Nature::Primitive, None) => End::placed(Place::Primitive, name),
-            (Nature::Boxed, _) => End::placed(Place::External, name),
+        match endpoint.nature() {
+            Nature::Named => self.named(endpoint.origin().unwrap_or(from), endpoint.as_ref()),
+            Nature::Interface => End::placed(Place::Interface, endpoint.as_ref()),
+            Nature::Primitive => fixed_by.map_or_else(
+                || End::placed(Place::Primitive, endpoint.as_ref()),
+                |fixing| End::placed(Place::Interface, fixing),
+            ),
+            Nature::Boxed => End::placed(Place::External, endpoint.as_ref()),
         }
     }
 
     fn named(&self, from: &CrateName, name: &'found Name) -> End<'found> {
         let declaring = self.types.get(name).filter(|_| self.crates.contains(from));
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
-        match resolved.map(|found| found.and_then(|node| self.unambiguous(node))) {
-            None => End::placed(Place::External, name),
-            Some(None) => End::placed(Place::Shared, name),
-            Some(Some(node)) => End::domain(node),
-        }
+        resolved.map_or(End::placed(Place::External, name), |found| {
+            found.and_then(|node| self.unambiguous(node)).map_or(End::placed(Place::Shared, name), End::domain)
+        })
     }
 
     fn unambiguous(&self, node: Node<'found>) -> Option<Node<'found>> {
         let twice = self.ambiguous.get(AsRef::<CrateName>::as_ref(&node));
-        match twice.and_then(|names| names.get(AsRef::<Name>::as_ref(&node))) {
-            Some(_) => None,
-            None => Some(node),
-        }
+        twice.and_then(|names| names.get(AsRef::<Name>::as_ref(&node))).map_or(Some(node), |_| None)
     }
 }
