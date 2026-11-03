@@ -30,20 +30,61 @@ impl fmt::Display for Node {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Step {
-    from: Node,
-    to: Node,
-}
+pub(crate) struct Tuple(BTreeSet<Node>);
 
-impl Step {
-    pub(crate) fn reached(&self) -> &Node {
-        &self.to
+impl Tuple {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Node> {
+        self.0.iter()
+    }
+
+    pub(crate) fn first(&self) -> Option<&Node> {
+        self.0.first()
+    }
+
+    pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node>) -> Option<&'tuple Tuple> {
+        self.0.iter().all(|node| available.contains(node)).then_some(self)
     }
 }
 
-impl AsRef<Node> for Step {
-    fn as_ref(&self) -> &Node {
-        &self.from
+impl fmt::Display for Tuple {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let nodes: Vec<String> = self.0.iter().map(ToString::to_string).collect();
+        match nodes.as_slice() {
+            [single] => write!(formatter, "{single}"),
+            _ => write!(formatter, "({})", nodes.join(", ")),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Hop {
+    takes: Tuple,
+    gives: Node,
+}
+
+impl Hop {
+    pub(crate) fn reached(&self) -> &Node {
+        &self.gives
+    }
+
+    pub(crate) fn onward(self) -> Option<Hop> {
+        (!self.takes.0.contains(&self.gives)).then_some(self)
+    }
+
+    pub(crate) fn fired(&self, available: &BTreeSet<&Node>) -> Option<&Node> {
+        self.takes.within(available).map(|_| &self.gives)
+    }
+}
+
+impl AsRef<Tuple> for Hop {
+    fn as_ref(&self) -> &Tuple {
+        &self.takes
+    }
+}
+
+impl fmt::Display for Hop {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} -> {}", self.takes, self.gives)
     }
 }
 
@@ -125,18 +166,10 @@ impl Ends {
         self.takes.iter().chain([&self.gives])
     }
 
-    pub(crate) fn edges(&self) -> Vec<Key> {
-        self.steps().into_iter().map(|step| Key { takes: vec![step.from], gives: step.to }).collect()
-    }
-
-    pub(crate) fn steps(&self) -> Vec<Step> {
-        self.gives.node.as_ref().map_or_else(Vec::new, |to| {
-            self.takes
-                .iter()
-                .filter_map(|taken| taken.node.as_ref())
-                .map(|from| Step { from: from.clone(), to: to.clone() })
-                .collect()
-        })
+    pub(crate) fn hop(&self) -> Option<Hop> {
+        let takes: BTreeSet<Node> = self.taken().cloned().collect();
+        let gives = self.gives.node.clone()?;
+        (!takes.is_empty()).then_some(Hop { takes: Tuple(takes), gives })
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node> {

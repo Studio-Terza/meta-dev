@@ -1,7 +1,7 @@
 use syn::visit::{self, Visit};
 use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
-use body_lifts::Branches;
+use body_lifts::{Branches, Propagation};
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
 
@@ -24,7 +24,7 @@ impl Functions<'_> {
             Function::new(
                 Name::from(name),
                 Site::new(self.file.path(), LineNumber::from(name.span())),
-                Branches::scored(body),
+                Branches::scored(body, Propagation::Branch),
             )
         };
         let found = body

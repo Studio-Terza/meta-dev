@@ -5,17 +5,17 @@ use lint_layout::Fix;
 use newtype::Counter;
 
 use crate::count::Count;
-use crate::end::{Node, Step};
-use crate::graph::Arc;
+use crate::end::Hop;
+use crate::graph::Hyperedge;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Detour<'graph, 'found> {
-    first: &'graph Arc<'found>,
-    second: &'graph Arc<'found>,
+    first: &'graph Hyperedge<'found>,
+    second: &'graph Hyperedge<'found>,
 }
 
 impl<'graph, 'found> Detour<'graph, 'found> {
-    pub(super) fn new(first: &'graph Arc<'found>, second: &'graph Arc<'found>) -> Detour<'graph, 'found> {
+    pub(super) fn new(first: &'graph Hyperedge<'found>, second: &'graph Hyperedge<'found>) -> Detour<'graph, 'found> {
         Detour { first, second }
     }
 }
@@ -25,7 +25,7 @@ impl fmt::Display for Detour<'_, '_> {
         write!(
             formatter,
             "through {} by {} at {} and {} at {}",
-            AsRef::<Step>::as_ref(self.first).reached(),
+            AsRef::<Hop>::as_ref(self.first).reached(),
             self.first.transition(),
             AsRef::<Site>::as_ref(self.first),
             self.second.transition(),
@@ -36,7 +36,7 @@ impl fmt::Display for Detour<'_, '_> {
 
 #[derive(Debug)]
 pub(super) struct Triangle<'graph, 'found> {
-    direct: &'graph Arc<'found>,
+    direct: &'graph Hyperedge<'found>,
     paths: Vec<Detour<'graph, 'found>>,
 }
 
@@ -44,7 +44,7 @@ impl<'graph, 'found> Triangle<'graph, 'found> {
     const SHOWN: usize = 3;
 
     pub(super) fn closing(
-        direct: &'graph Arc<'found>,
+        direct: &'graph Hyperedge<'found>,
         paths: Vec<Detour<'graph, 'found>>,
     ) -> Option<Triangle<'graph, 'found>> {
         (!paths.is_empty()).then_some(Triangle { direct, paths })
@@ -59,13 +59,11 @@ impl From<&Triangle<'_, '_>> for Violation {
 
 impl fmt::Display for Triangle<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let step: &Step = self.direct.as_ref();
+        let hop: &Hop = self.direct.as_ref();
         let paths: Vec<String> = self.paths.iter().take(Self::SHOWN).map(ToString::to_string).collect();
         write!(
             formatter,
-            "{} -> {} by {} also goes {} path(s): {}",
-            AsRef::<Node>::as_ref(step),
-            step.reached(),
+            "{hop} by {} also goes {} path(s): {}",
             self.direct.transition(),
             self.paths.len(),
             paths.join("; ")

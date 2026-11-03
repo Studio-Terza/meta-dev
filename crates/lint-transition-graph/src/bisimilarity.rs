@@ -31,11 +31,11 @@ impl GraphLint for Bisimilarity {
         );
         Report::new(
             Headline::new(
-                "report only, bisimilar types: partition refinement over the domain types, each edge labelled by its trait (written for inherent and free functions, lift for a derived lift, the operation for a store operation) and leading to an equivalent type or to the same black box; types in one group answer the same labelled moves into the same groups, so they behave identically; groups whose types make fewer than two moves are left out; candidates to merge into one type or one generic",
+                "report only, bisimilar types: partition refinement over the domain types on their moves beyond any trait, each labelled written for inherent and free functions, lift for a derived lift and the operation for a store operation, carrying the other domain inputs of a multi-input edge, and leading to an equivalent type or to the same black box; trait impls are the shared interface the fillers of a trait already group under (D7), so they are not evidence; types in one group answer the same labelled moves into the same groups, so they behave identically; groups whose types make fewer than two such moves are left out; candidates to merge into one type or one generic",
             ),
             Summary::placed(
                 graph.nodes().values().copied().min(),
-                Tally::counted(Count::new(graph.nodes().len()), &groups),
+                Tally::counted(Count::new(graph.nodes().len()), &behaviour, &groups),
             )
             .into_iter()
             .chain(groups.iter().map(Violation::from))
