@@ -20,7 +20,7 @@ use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
-use lint_layout::Name;
+use lint_layout::{Length, Name};
 
 pub struct EdgeScan<'scan> {
     declarations: &'scan Declarations,
@@ -52,15 +52,16 @@ impl<'scan> EdgeScan<'scan> {
                 fan_out
             },
         );
-        let crowded = fan_out.into_iter().filter(|(_, names)| most.allows(names.len()).is_none()).filter_map(
-            |(source, names)| {
+        let crowded = fan_out
+            .into_iter()
+            .filter(|(_, names)| most.allows(Length::new(names.len())).is_none())
+            .filter_map(|(source, names)| {
                 let site = (*names.values().min()?).clone();
                 Some(Violation::new(
                     site,
                     Finding::CrowdedVertex { source: source.clone(), edges: EdgeCount::new(names.len()), most },
                 ))
-            },
-        );
+            });
         let structural: Vec<Violation> = duplicates.chain(crowded).collect();
         self.violations.extend(structural);
         self.violations

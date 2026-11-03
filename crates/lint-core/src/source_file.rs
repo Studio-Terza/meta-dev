@@ -1,14 +1,14 @@
-mod nesting;
+mod boundary;
 
 use std::path::{Path, PathBuf};
 
+use boundary::Nesting;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
 use lint_placement::CrateFile;
 use lint_placement::Placement;
 use lint_placement::Role;
-use nesting::Nesting;
 
 #[derive(Debug)]
 pub struct SourceFile {

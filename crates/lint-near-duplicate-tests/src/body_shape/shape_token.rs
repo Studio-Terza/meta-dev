@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
 use lint_layout::Whole;
-use lint_layout::{Casing, Name, Word, words};
+use lint_layout::{Casing, Length, Name, Word, words};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum ShapeToken {
@@ -44,7 +44,7 @@ impl ShapeToken {
     fn of_word(word: Name) -> ShapeToken {
         match (word.matches::<Whole>(&Self::LITERAL_WORDS), word.casing()) {
             (Some(_), _) => ShapeToken::Literal,
-            (None, Casing::Shouting) if word.length() > 1 => ShapeToken::Literal,
+            (None, Casing::Shouting) if word.length() > Length::new(1) => ShapeToken::Literal,
             _ => ShapeToken::Word(word),
         }
     }

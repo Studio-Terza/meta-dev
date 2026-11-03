@@ -10,7 +10,7 @@ use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Type, Visibility};
 
 use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
-use lint_layout::{LineNumber, Name};
+use lint_layout::{Length, LineNumber, Name};
 
 use inners::Inners;
 use method_shape::{Erasure, MethodShape};
@@ -41,7 +41,7 @@ impl ShapeIndex {
     pub fn repeated(self, most: Most) -> Vec<Violation> {
         self.shapes
             .into_iter()
-            .filter(|(_, types)| most.allows(types.len()).is_none())
+            .filter(|(_, types)| most.allows(Length::new(types.len())).is_none())
             .filter_map(|(shape, types)| {
                 let site = types.values().min().cloned()?;
                 let repeated = RepeatedShape::new(shape, types.into_keys().collect());

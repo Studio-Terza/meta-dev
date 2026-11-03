@@ -1,5 +1,5 @@
 use lint_core::{Site, SourceFile};
-use lint_layout::{Word, words};
+use lint_layout::{PathTail, Word, words};
 use lint_paths::{Ground, Paths, Use};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +28,7 @@ impl CommandPaths {
 
     fn among(uses: Vec<Use>, scope: Scope) -> Vec<Site> {
         uses.into_iter()
-            .filter(|used| used.spelling(&Self::STARTER).is_some())
+            .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
             .filter(|used| scope == Scope::Everywhere || used.ground() == Ground::Open)
             .map(|used| used.place().clone())
             .collect()
