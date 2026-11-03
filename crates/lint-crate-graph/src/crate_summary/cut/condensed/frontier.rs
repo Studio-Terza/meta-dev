@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use super::Condensed;
+use super::link::Link;
 use super::spectrum::Weight;
 use super::tangle_index::TangleIndex;
 use crate::crate_summary::cut::conductance::Conductance;
@@ -35,7 +36,11 @@ impl<'condensed> Frontier<'condensed> {
             row.iter().filter(|link| wanted(&link.target())).map(|link| link.weight()).sum()
         };
         let inward = weight(&|target| self.inside.contains(target));
-        let outward = weight(&|target| *target != tangle && !self.inside.contains(target));
+        let held = |target: &TangleIndex| {
+            Some(*target).filter(|held| *held == tangle).or_else(|| self.inside.get(target).copied())
+        };
+        let (_, leaving): (Vec<&Link>, Vec<&Link>) = row.iter().partition(|link| held(&link.target()).is_some());
+        let outward: Weight = leaving.iter().map(|link| link.weight()).sum();
         self.crossing = self.crossing + (outward - inward);
         self.volume = self.volume + weight(&|_| true);
         self.items = self.items.plus(self.condensed.size(tangle));

@@ -5,4 +5,6 @@ report only, a clone in the core allocates where a borrow could share; take a re
 test doubles stand in for ports:
 tests/beside.rs:7: MockClock implements Ticker, which is neither a port nor a std trait; a test double implements only traits declared in a ports crate or module, besides derives and std traits
 tests/unported.rs:1: StubCalendar is named as a test double but implements no port; implement a trait declared in a ports crate or module, or rename it
+a local trait with methods has a consumer in shipped code: a bound (generic, where clause, supertrait), impl Trait, dyn Trait, or a call to one of its provided methods:
+src/ports.rs:1: trait Clock has methods but nothing consumes it; delete the trait and keep its methods inherent, or give it a consumer: a bound, impl Trait, dyn Trait, or a provided method its callers use
 fails

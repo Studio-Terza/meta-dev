@@ -39,43 +39,20 @@ impl Setting {
 impl Parse for Setting {
     fn parse(input: ParseStream<'_>) -> syn::Result<Setting> {
         let look = input.lookahead1();
-        let key = [
-            (look.peek(keyword::check), Key::Check),
-            (look.peek(keyword::error), Key::Error),
-            (look.peek(keyword::strategy), Key::Strategy),
-        ]
-        .into_iter()
-        .find(|(peeked, _)| *peeked)
-        .map(|(_, key)| key);
-        key.map_or_else(|| Err(look.error()), |key| key.parsed(input))
-    }
-}
-
-#[derive(Clone, Copy)]
-enum Key {
-    Check,
-    Error,
-    Strategy,
-}
-
-impl Key {
-    fn parsed(self, input: ParseStream<'_>) -> syn::Result<Setting> {
-        match self {
-            Key::Check => input
-                .parse::<keyword::check>()
-                .and_then(|_| input.parse::<Token![=]>())
-                .and_then(|_| input.parse())
-                .map(Setting::Check),
-            Key::Error => input
-                .parse::<keyword::error>()
-                .and_then(|_| input.parse::<Token![=]>())
-                .and_then(|_| input.parse())
-                .map(Setting::Error),
-            Key::Strategy => input
-                .parse::<keyword::strategy>()
-                .and_then(|_| input.parse::<Token![=]>())
-                .and_then(|_| input.parse())
-                .map(Setting::Strategy),
+        if look.peek(keyword::check) {
+            input.parse::<keyword::check>()?;
+            input.parse::<Token![=]>()?;
+            input.parse().map(Setting::Check)
+        } else if look.peek(keyword::error) {
+            input.parse::<keyword::error>()?;
+            input.parse::<Token![=]>()?;
+            input.parse().map(Setting::Error)
+        } else if look.peek(keyword::strategy) {
+            input.parse::<keyword::strategy>()?;
+            input.parse::<Token![=]>()?;
+            input.parse().map(Setting::Strategy)
+        } else {
+            Err(look.error())
         }
     }
 }

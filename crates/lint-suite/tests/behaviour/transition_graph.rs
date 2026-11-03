@@ -1,23 +1,18 @@
 use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::TransitionGraph;
+use lint_transition_graph::{OnGraph, TransitionGraph};
+
+use crate::shown::Shown;
 
 struct Graphed;
 
 impl Graphed {
     fn of(sources: &[Source]) -> String {
-        TransitionGraph::report(&Sources::parsed(sources)).to_string()
+        OnGraph::<TransitionGraph>::report(&Sources::parsed(sources)).to_string()
     }
 
     fn at(path: &'static str, text: &str) -> Source {
         Source::new(Located::new(path), Text::new(Box::leak(text.to_owned().into_boxed_str())))
-    }
-
-    fn shows(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => Self::of(&[Self::at("crates/x/src/lib.rs", text)]).contains(expected),
-            _ => false,
-        }
     }
 }
 
@@ -30,7 +25,7 @@ const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n      
 
 laws::table!(
     the_transition_graph_of_a_crate_is_measured_with_its_coverage,
-    Graphed::shows,
+    Shown::of::<OnGraph<TransitionGraph>>,
     [
         [CONVERSIONS, "crates/x/src/lib.rs:4: crate x: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"] => true,
         [PRIMITIVES, "crate x: 1 domain types, 0 interface nodes, 1 black boxes, 0 domain pairs, 4 written edges, coverage 1 of 4, share 0.250, 3 touch a bare primitive; not written: 0 derived lifts, 0 store operations"] => true,

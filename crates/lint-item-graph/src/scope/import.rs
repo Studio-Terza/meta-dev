@@ -11,8 +11,20 @@ pub struct Import<'file> {
 }
 
 impl<'file> Import<'file> {
+    const SELF_IMPORT: &'static str = "self";
+
     pub fn renamed(first: Option<&'file Ident>, leaf: &'file Ident, original: &'file Ident) -> Import<'file> {
         Import { leaf, root: first.unwrap_or(original), original }
+    }
+
+    pub fn of_name(
+        first: Option<&'file Ident>,
+        last: Option<&'file Ident>,
+        name: &'file Ident,
+    ) -> Option<Import<'file>> {
+        Some(name)
+            .filter(|name| *name == Self::SELF_IMPORT)
+            .map_or_else(|| Some(Import::renamed(first, name, name)), |_| Import::itself(first, last))
     }
 
     pub fn itself(first: Option<&'file Ident>, last: Option<&'file Ident>) -> Option<Import<'file>> {

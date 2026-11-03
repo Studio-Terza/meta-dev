@@ -21,6 +21,11 @@ const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> 
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
 const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\n";
 const MODULES: &str = "mod one;\nmod two;\n";
+const CHAIN_A: &str =
+    "pub struct A0(A1);\npub struct A1(A2);\npub struct A2(A3);\npub struct A3(A4);\npub struct A4;\n";
+const CHAIN_B: &str =
+    "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3(B4);\npub struct B4;\n";
+const SHORT_CHAIN_B: &str = "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
@@ -44,7 +49,12 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let workspace = golden::fixtures!("..")?;
     let implemented = workspace.entries(&crates)?.iter().try_fold(0, |found, entry| {
-        Ok::<usize, FileFailure>(found + Trees::occurrences(&workspace, &entry.join("src"), "impl Lint for")?)
+        let source = entry.join("src");
+        Ok::<usize, FileFailure>(
+            found
+                + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+        )
     })?;
     let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
@@ -91,14 +101,10 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", &format!("{DIRTY}{MODULES}"))?;
-    root.write("src/one.rs", REPEATED)?;
-    root.write("src/two.rs", REPEATED_AGAIN)?;
+    root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
-    assert!(run.out.contains("2 shipped copies, also at "), "{}", run.out);
-    assert!(run.out.contains("/src/two.rs:3; "), "{}", run.out);
+    assert!(run.out.contains("/src/lib.rs:2: crate r: 1 functions by complexity"), "{}", run.out);
     assert_eq!(run.err, "");
     Ok(())
 }
@@ -106,11 +112,22 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
 #[test]
 fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
+    root.write("src/lib.rs", DIRTY)?;
+    let run = root.flagged(&[]);
+    assert!(!run.out.contains("functions by complexity"), "{}", run.out);
+    Ok(())
+}
+
+#[test]
+fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
     root.write("src/lib.rs", MODULES)?;
     root.write("src/one.rs", REPEATED)?;
     root.write("src/two.rs", REPEATED_AGAIN)?;
     let run = root.flagged(&[]);
-    assert_eq!(run.out.matches("copies").count(), 0, "{}", run.out);
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("/src/one.rs:3: "), "{}", run.err);
+    assert!(run.err.contains("2 shipped copies, also at ") && run.err.contains("/src/two.rs:3; "), "{}", run.err);
     Ok(())
 }
 
@@ -156,14 +173,6 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 struct Trees;
 
 impl Trees {
-    fn chain(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> = (1..size)
-            .map(|next| format!("pub struct {prefix}{}({prefix}{next});\n", next - 1))
-            .chain(size.checked_sub(1).map(|last| format!("pub struct {prefix}{last};\n")))
-            .collect();
-        lines.concat()
-    }
-
     fn occurrences(files: &impl Files, path: &Path, needle: &str) -> Result<usize, FileFailure> {
         match files.kind(path) {
             Kind::Directory => files
@@ -266,7 +275,7 @@ impl Reported {
     const SITE: &'static str = ".rs:";
 
     fn is_clean(&self) -> bool {
-        (self.exit, self.err.as_str()) == (ExitCode::SUCCESS, "\n")
+        self.exit == ExitCode::SUCCESS && self.err == "\n"
     }
 
     fn headlines(&self) -> usize {
@@ -325,7 +334,7 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
     root.write("src/tests.rs", "struct S { on: bool }\n")?;
     let run = root.reported();
     assert_eq!(run.violations(), 1);
-    assert_eq!(run.err.matches("src/tests.rs").count(), 0);
+    assert!(!run.err.contains("src/tests.rs"));
     Ok(())
 }
 
@@ -499,8 +508,8 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
 #[test]
 fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", &Trees::chain("A", 5))?;
-    let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
+    root.write("src/lib.rs", CHAIN_A)?;
+    let main = format!("use r::A0;\n{SHORT_CHAIN_B}fn main() {{\n    let _ = (B0, A0);\n}}\n");
     root.write("src/main.rs", &main)?;
     assert_eq!(root.crate_graph_lines()?, Lines::default());
     Ok(())
@@ -510,8 +519,8 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    root.write("code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
-    root.write("code/a.rs", &Trees::chain("B", 5))?;
+    root.write("code/lib.rs", &format!("pub mod a;\n{CHAIN_A}"))?;
+    root.write("code/a.rs", CHAIN_B)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
     assert_eq!(root.crate_graph_lines()?, [named.as_str()]);
     Ok(())

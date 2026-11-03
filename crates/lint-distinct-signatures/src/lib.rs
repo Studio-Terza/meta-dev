@@ -15,7 +15,7 @@ impl Lint for DistinctSignatures {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("two functions on one type with the same signature hide a missing type or type parameter"),
-            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
+            Self::in_shipped(files),
         )
     }
 }

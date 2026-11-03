@@ -1,13 +1,11 @@
 mod ancestor;
 mod index;
 mod inside_sibling;
-mod relation;
 mod target;
 
 pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
-pub use relation::Relation;
 pub use target::Target;
 
 use std::fmt;

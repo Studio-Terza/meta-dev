@@ -16,12 +16,23 @@ impl<'raw> Slots<'raw> {
     ];
 
     pub(crate) fn classified(&mut self, name: &'raw Name, position: Position) -> ShapeToken<'raw> {
-        match (name.casing(), position) {
-            _ if name.matches::<Whole>(&Self::LITERAL_WORDS).is_some() => ShapeToken::Literal,
-            _ if name.matches::<Whole>(&Self::KEYWORDS).is_some() => ShapeToken::Word(name),
-            (Casing::Lower, Position::Named) => ShapeToken::Word(name),
-            (Casing::Lower, _) => ShapeToken::Local(self.numbered(name)),
-            _ => ShapeToken::Word(name),
+        name.matches::<Whole>(&Self::LITERAL_WORDS)
+            .map(|_| ShapeToken::Literal)
+            .or_else(|| name.matches::<Whole>(&Self::KEYWORDS).map(|_| ShapeToken::Word(name)))
+            .unwrap_or_else(|| self.cased(name, name.casing(), position))
+    }
+
+    fn cased(&mut self, name: &'raw Name, casing: Casing, position: Position) -> ShapeToken<'raw> {
+        match casing {
+            Casing::Lower => self.lowered(name, position).map_or(ShapeToken::Word(name), ShapeToken::Local),
+            Casing::Camel | Casing::Shouting | Casing::Other => ShapeToken::Word(name),
+        }
+    }
+
+    fn lowered(&mut self, name: &'raw Name, position: Position) -> Option<Slot> {
+        match position {
+            Position::Named => None,
+            Position::BeforeLiteral | Position::Plain => Some(self.numbered(name)),
         }
     }
 

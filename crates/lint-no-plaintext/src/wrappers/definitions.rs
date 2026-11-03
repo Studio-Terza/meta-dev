@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use syn::visit::Visit;
 use syn::{Field, ItemImpl, ItemMod, ItemStruct};
 
-use lint_core::{SourceFile, Syntax, Walk};
-use lint_layout::Name;
+use lint_core::{SourceFile, Walk};
+use lint_layout::{Name, Word};
 
 use crate::attributes::Attributes;
 use crate::wrappers::Wrappers;
@@ -33,29 +33,29 @@ impl<'file> Definitions<'file> {
 
     pub fn plain_among(&self, settled: &Wrappers) -> BTreeSet<Name> {
         self.names
-            .difference(&self.validated)
+            .iter()
             .filter(|name| {
-                self.shapes
-                    .iter()
-                    .filter_map(|shape| shape.answers_to(name))
-                    .all(|shape| shape.holds_text(settled).is_some())
+                !self.validated.contains(*name)
+                    && self
+                        .shapes
+                        .iter()
+                        .filter_map(|shape| shape.answers_to(name))
+                        .all(|shape| shape.holds_text(settled).is_some())
             })
             .cloned()
             .collect()
     }
 
     fn only_field(item: &ItemStruct) -> Option<&Field> {
-        Some(&item.fields).filter(|fields| fields.len() == 1).and_then(|fields| fields.iter().next())
+        let fields: Vec<&Field> = item.fields.iter().collect();
+        match fields.as_slice() {
+            [only] => Some(*only),
+            _ => None,
+        }
     }
 
     fn validated_owner(item: &ItemImpl) -> Option<Name> {
-        let deserializing = item
-            .trait_
-            .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
-            .filter(|last| last.ident == Self::DESERIALIZE);
-        let owner = Syntax::last_name(&item.self_ty);
-        deserializing.and(Conversions::called_in(item)).and(owner)
+        Conversions::called_in(item).and(Name::implementing(item, Word::new(Self::DESERIALIZE)))
     }
 }
 

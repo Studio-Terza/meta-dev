@@ -1,5 +1,6 @@
-use syn::{Arm, Expr, Pat, Stmt};
+use syn::{Arm, Expr, ExprMatch, Pat};
 
+use super::BodyReading;
 use super::applied::Applied;
 
 #[derive(Debug)]
@@ -11,12 +12,20 @@ impl Route {
         Self::body(&arm.body).and_then(Applied::traced)
     }
 
+    pub(super) fn routed(found: &Expr) -> Option<&ExprMatch> {
+        match found {
+            Expr::Match(routed) => Self::all_taken(routed),
+            _ => None,
+        }
+    }
+
+    fn all_taken(routed: &ExprMatch) -> Option<&ExprMatch> {
+        Some(routed).filter(|routed| routed.arms.iter().all(|arm| Self::taken(arm).is_some()))
+    }
+
     fn body(found: &Expr) -> Option<&Expr> {
         match found {
-            Expr::Block(block) => match block.block.stmts.as_slice() {
-                [Stmt::Expr(only, None)] => Some(only),
-                _ => None,
-            },
+            Expr::Block(block) => BodyReading::only(&block.block),
             other => Some(other),
         }
     }

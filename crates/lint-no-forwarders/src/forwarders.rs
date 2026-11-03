@@ -104,10 +104,7 @@ impl<'file> Forwarders<'_, 'file> {
 
 impl<'file> Visit<'file> for Forwarders<'_, 'file> {
     fn visit_item_mod(&mut self, module: &'file ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_struct(&mut self, item: &'file ItemStruct) {
