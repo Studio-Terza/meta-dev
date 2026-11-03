@@ -123,9 +123,6 @@ jobs:
       - uses: ./.github/actions/judge
         with:
           stages: lint
-      - name: fan-in
-        if: github.ref == 'refs/heads/main' && always()
-        run: '"$TOOLS/reach" fan-in "$METADATA"'
       - name: elegance reports
         if: github.ref == 'refs/heads/main'
         run: '"$TOOLS/ci" logged "$ELEGANCE" "$TOOLS/lint" --report .'

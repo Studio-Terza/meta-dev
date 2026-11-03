@@ -1,9 +1,6 @@
 use std::fmt;
 
-use newtype::Newtype;
-
 use crate::cli::workspace::crate_count::CrateCount;
-use crate::cli::workspace::percent::Percent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Share {
@@ -14,20 +11,6 @@ pub struct Share {
 impl Share {
     pub fn new(reached: CrateCount, total: CrateCount) -> Share {
         Share { reached, total }
-    }
-
-    pub fn reached(self) -> CrateCount {
-        self.reached
-    }
-
-    pub fn majority(self) -> Option<Share> {
-        (self.reached.into_inner() + self.reached.into_inner() > self.total.into_inner()).then_some(self)
-    }
-
-    pub fn percent(self) -> Percent {
-        Percent::new(
-            (self.reached.into_inner() * Percent::WHOLE).checked_div(self.total.into_inner()).unwrap_or_default(),
-        )
     }
 }
 

@@ -12,7 +12,6 @@ use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
-use crate::arity::Arity;
 use crate::dependency::Dependency;
 use crate::facts::Facts;
 use crate::generic_impl::GenericImpl;
@@ -62,7 +61,7 @@ impl<'file> Collector<'file> {
             ReturnType::Default => None,
         };
         let shape = MethodShape::of_signature(signature, selfish);
-        Method::new(Name::from(&signature.ident), Arity::new(signature.inputs.len()), returns, shape)
+        Method::new(Name::from(&signature.ident), returns, shape)
     }
 
     fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape, dependencies: Vec<Dependency<'file>>) {

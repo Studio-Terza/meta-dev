@@ -1,24 +1,17 @@
 use lint_layout::Name;
 
-use crate::arity::Arity;
 use crate::method_shape::MethodShape;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Method {
     name: Name,
-    arity: Arity,
     returns: Option<Name>,
     shape: MethodShape,
 }
 
 impl Method {
-    pub(crate) fn new(name: Name, arity: Arity, returns: Option<Name>, shape: MethodShape) -> Method {
-        Method { name, arity, returns, shape }
-    }
-
-    #[must_use]
-    pub fn arity(&self) -> Arity {
-        self.arity
+    pub(crate) fn new(name: Name, returns: Option<Name>, shape: MethodShape) -> Method {
+        Method { name, returns, shape }
     }
 
     #[must_use]

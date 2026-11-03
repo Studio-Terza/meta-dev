@@ -30,7 +30,7 @@ const EMPTY_REPORT_AND_NOTES: [&str; 5] = [
     "skipped: BUILD_SCOPE is empty, so the steps that use it do not run",
     "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run",
 ];
-const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0";
+const HISTORY_LINE: &str = "abc123\treach 1 of 5";
 const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
@@ -410,7 +410,7 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_history_line_names_the_revision_the_reach_and_every_fan_in_and_is_appended() -> Result<(), Box<dyn Error>> {
+fn a_history_line_names_the_revision_and_the_reach_and_is_appended() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.write("metadata.json", METADATA)?;
     scratch.write("history.tsv", "older\n")?;

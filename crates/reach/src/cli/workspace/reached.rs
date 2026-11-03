@@ -1,9 +1,11 @@
+mod share;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::cli::workspace::crate_count::CrateCount;
-use crate::cli::workspace::crate_name::CrateName;
-use crate::cli::workspace::share::Share;
+use share::Share;
+use workspace_metadata::CrateName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cargo {

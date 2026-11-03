@@ -877,11 +877,9 @@ dependencies = [
  "lint-test-budget",
  "lint-thin-main",
  "lint-transition-graph",
- "lint-type-graph",
  "lint-type-shape",
  "lint-unconsumed-traits",
  "lint-vec-out-params",
- "lint-walk-similarity",
  "lint-workflow-run",
  "text-lines",
  "transition-facts",
@@ -968,11 +966,9 @@ dependencies = [
  "lint-test-budget",
  "lint-thin-main",
  "lint-transition-graph",
- "lint-type-graph",
  "lint-type-shape",
  "lint-unconsumed-traits",
  "lint-vec-out-params",
- "lint-walk-similarity",
  "lint-workflow-run",
  "transition-facts",
 ]
@@ -1015,18 +1011,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-type-graph"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-item-graph",
- "lint-layout",
- "lint-placement",
- "newtype",
- "type-facts",
-]
-
-[[package]]
 name = "lint-type-shape"
 version = "0.1.0"
 dependencies = [
@@ -1053,17 +1037,6 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "lint-walk-similarity"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-layout",
- "lint-placement",
- "newtype",
- "type-facts",
 ]
 
 [[package]]
@@ -1244,16 +1217,11 @@ dependencies = [
  "file-ports",
  "golden",
  "laws",
- "lint-complexity",
- "lint-core",
- "lint-layout",
- "lint-placement",
- "lint-reader",
  "newtype",
- "serde",
  "serde_json",
  "text-lines",
  "thiserror",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1490,7 +1458,6 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
- "newtype",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -1533,6 +1500,16 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+
+[[package]]
+name = "workspace-metadata"
+version = "0.1.0"
+dependencies = [
+ "newtype",
+ "serde",
+ "text-lines",
+ "thiserror",
+]
 
 [[package]]
 name = "zmij"
