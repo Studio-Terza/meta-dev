@@ -1,11 +1,11 @@
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::DuplicateTransitions;
+use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
 struct Duplicates;
 
 impl Duplicates {
     fn of(sources: &[Source]) -> String {
-        Sources::report::<DuplicateTransitions>(sources).to_string()
+        format!("{}{}", Sources::report::<OneEdge>(sources), Sources::report::<DuplicateTransitions>(sources))
     }
 
     fn at(path: &'static str, text: &str) -> Source {
