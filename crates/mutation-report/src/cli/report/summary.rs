@@ -1,10 +1,10 @@
-mod bits;
+mod boundary;
 mod section;
 
 use std::collections::BTreeSet;
 use std::fmt;
 
-use bits::Count;
+use boundary::Count;
 use section::Section;
 use serde::Serialize;
 

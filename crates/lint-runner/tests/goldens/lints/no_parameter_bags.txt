@@ -8,7 +8,7 @@ src/second.rs:1: fn walk; make it an associated function or a method
 src/user.rs:1: fn run; make it an associated function or a method
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/bag.rs:1: Options only carries values into one other file; give it the logic that consumes it
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/bag.rs:2: bare u8 in depth; name what it counts with a newtype
 src/logic.rs:2: bare u8 in depth; name what it counts with a newtype
 src/logic.rs:5: bare u8 in deeper; name what it counts with a newtype

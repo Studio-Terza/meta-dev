@@ -74,7 +74,9 @@ impl StringSites {
 impl<'ast> Visit<'ast> for StringSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::PORTS.names(module).is_none() => syn::visit::visit_item_mod(self, module),
+            Walk::Entered if Gate::PORTS.names(module).or_else(|| Gate::BOUNDARY.names(module)).is_none() => {
+                syn::visit::visit_item_mod(self, module);
+            }
             Walk::Entered | Walk::Skipped => {}
         }
     }

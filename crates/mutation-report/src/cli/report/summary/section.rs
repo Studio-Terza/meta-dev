@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::bits::Count;
+use super::boundary::Count;
 
 #[derive(Debug)]
 pub struct Section<'items> {

@@ -26,7 +26,7 @@ iterators are driven by combinators, not by hand:
 src/accumulating.rs:2: loop that only accumulates; extend or collect from an iterator instead
 src/filtered.rs:2: loop that only accumulates; extend or collect from an iterator instead
 src/mutable.rs:2: mutable iterator local; drive it with combinators such as format, collect, or fold
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/accumulating.rs:1: bare u8 in f; name what it counts with a newtype
 src/accumulating.rs:1: bare u8 in f; name what it counts with a newtype
 src/counter.rs:1: bare u8 in f; name what it counts with a newtype

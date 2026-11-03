@@ -13,7 +13,7 @@ src/crowded.rs:5: fn d names nothing; say what it does
 src/crowded.rs:6: fn e names nothing; say what it does
 src/crowded.rs:7: fn f names nothing; say what it does
 src/crowded.rs:8: fn g names nothing; say what it does
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/area.rs:1: bare u8 in area; name what it counts with a newtype
 src/exposed.rs:2: bare u8 in depth; name what it counts with a newtype
 src/exposed.rs:3: bare u8 in hidden; name what it counts with a newtype

@@ -25,12 +25,12 @@ impl Lint for NamedNumbers {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         Report::new(
             Headline::new(
-                "a number has a name: outside tests and bits modules, a literal other than 0 and 1 sits in a const item",
+                "a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item",
             ),
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BITS.admits(file).is_none() && !support.contains(&file.path().to_owned()))
+                .filter(|file| Gate::BOUNDARY.admits(file).is_none() && !support.contains(&file.path().to_owned()))
                 .flat_map(|file| {
                     let mut numbers = Numbers::default();
                     numbers.visit_file(file.syntax());
@@ -67,7 +67,7 @@ struct Numbers(Vec<LineNumber>);
 impl<'ast> Visit<'ast> for Numbers {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::BITS.names(module).is_none() => syn::visit::visit_item_mod(self, module),
+            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
             Walk::Entered | Walk::Skipped => {}
         }
     }

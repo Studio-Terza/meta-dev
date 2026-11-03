@@ -5,7 +5,7 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(x: u32) {}\n}\n";
 
-const INLINE_BITS: &str = "mod bits {\n    pub fn f(x: u32) {}\n}\n";
+const INLINE_BOUNDARY: &str = "mod boundary {\n    pub fn f(x: u32) {}\n}\n";
 const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u32) {}\n}\n";
 
 const METHOD: &str = "struct A;\nimpl A {\n    fn f(x: u32) {}\n}\n";
@@ -72,6 +72,8 @@ const TEXT_IN_BODY: &str = "pub fn f() {\n    pub fn g(x: &str) {}\n}\n";
 const FOREIGN_PATHS: &str = "pub fn f(x: other::String, y: &other::str) {}\n";
 const INLINE_TEXT_MODULE: &str = "mod inner {\n    pub fn f(x: &str) {}\n}\n";
 const PORTS_MODULE: &str = "mod ports {\n    pub fn f(x: &str) {}\n}\n";
+const BOUNDARY_TEXT: &str =
+    "mod boundary {\n    pub fn f(x: &str) -> String {\n        x.trim().to_string()\n    }\n}\n";
 const TEXT_TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    pub fn f(x: &str) {}\n}\n";
 const WIDER_0: &str = "pub fn m(a: std::borrow::Cow<'_, str>) {}\n";
 const WIDER_1: &str = "pub struct A {\n    pub a: Box<str>,\n}\n";
@@ -92,25 +94,25 @@ const BORROW_IMPL: &str = "pub struct A(Name);\nimpl std::borrow::Borrow<str> fo
 const AS_REF_HELPER: &str = "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        \"\"\n    }\n}\nimpl A {\n    fn g(&self) {\n        self.0.trim();\n    }\n}\n";
 const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
 
-const CASES: [Case; 87] = [
+const CASES: [Case; 89] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("bits module file"),
-        &[Source::new(Located::new("crates/x/src/bits/mask.rs"), Text::new(BARE))],
+        Title::new("boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/mask.rs"), Text::new(BARE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("bits module root"),
-        &[Source::new(Located::new("crates/x/src/bits.rs"), Text::new(BARE))],
+        Title::new("boundary module root"),
+        &[Source::new(Located::new("crates/x/src/boundary.rs"), Text::new(BARE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("inline bits module"),
-        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BITS))],
+        Title::new("inline boundary module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BOUNDARY))],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -412,6 +414,16 @@ const CASES: [Case; 87] = [
     Case::new(
         Title::new("an inline ports module"),
         &[Source::new(Located::new("a.rs"), Text::new(PORTS_MODULE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in an inline boundary module"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDARY_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in a boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/parse.rs"), Text::new(PUBLIC_STR))],
         Flagged::new(&[]),
     ),
     Case::new(
