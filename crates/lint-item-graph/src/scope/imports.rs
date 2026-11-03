@@ -21,7 +21,7 @@ impl Imports {
         let original = paths.iter().find_map(|path| path.segments().last());
         paths
             .iter()
-            .all(|path| path.first().is_some_and(|root| local_roots.contains(root)))
+            .all(|path| path.segments().first().is_some_and(|root| local_roots.contains(root)))
             .then(|| original.unwrap_or(name).clone())
     }
 }

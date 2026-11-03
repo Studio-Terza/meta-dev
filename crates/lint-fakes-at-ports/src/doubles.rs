@@ -1,6 +1,5 @@
 mod finding;
 mod kind;
-mod words;
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -10,14 +9,13 @@ use syn::visit::{self, Visit};
 use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath, Type};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_layout::{LineNumber, Name, UsePath};
+use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module};
 use lint_placement::Role;
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
 pub use kind::Kind;
-use words::DoubleWords;
 
 #[derive(Debug, Default)]
 pub struct Doubles {
@@ -92,10 +90,12 @@ struct Reader<'run> {
 }
 
 impl Reader<'_> {
+    const DOUBLES: [Word<'static>; 5] = words!["fake", "stub", "mock", "spy", "dummy"];
+
     fn declared(&mut self, name: &Ident) {
         let double = DoubleKey { target: self.target.clone(), name: Name::from(name) };
         let site = Site::new(self.file.path(), LineNumber::from(name.span()));
-        self.doubles.declared.extend(DoubleWords::name(&double.name).map(|_| (double, site)));
+        self.doubles.declared.extend(double.name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (double, site)));
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey> {
@@ -103,7 +103,7 @@ impl Reader<'_> {
             Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
             _ => None,
         };
-        name.filter(|name| DoubleWords::name(name).is_some())
+        name.filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
             .map(|name| DoubleKey { target: self.target.clone(), name })
     }
 

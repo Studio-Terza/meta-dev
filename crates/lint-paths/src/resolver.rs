@@ -26,7 +26,7 @@ impl<'scopes> Resolver<'scopes> {
 
     fn resolved(&self, module: &Module, path: &UsePath, trail: &Trail) -> Vec<UsePath> {
         let rest = path.rest();
-        match path.first() {
+        match path.segments().first() {
             Some(head) if *head == Self::CRATE => self.resolved(&module.root(), &rest, trail),
             Some(head) if *head == Self::SELF => self.resolved(module, &rest, trail),
             Some(head) if *head == Self::SUPER => {

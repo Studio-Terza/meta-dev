@@ -25,13 +25,10 @@ impl Lint for LiteralNames {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .flat_map(|file| {
-                    Self::vague_names(file.syntax()).into_iter().map(move |name| {
-                        Violation::new(
-                            Site::new(file.path(), LineNumber::from(name.span())),
-                            Finding::VagueName { name: Name::from(&name) },
-                        )
-                    })
+                .flat_map(|file| Self::fn_names(file.syntax()).into_iter().map(move |name| (file, name)))
+                .filter_map(|(file, name)| {
+                    Self::vague(Name::from(&name))
+                        .map(|finding| Violation::new(Site::new(file.path(), LineNumber::from(name.span())), finding))
                 })
                 .collect(),
         )
@@ -45,31 +42,30 @@ impl LiteralNames {
         "helper", "util", "data", "value", "item", "thing", "execute", "perform", "update", "compute", "manage",
     ];
 
-    fn vague(name: &Name) -> Option<&Name> {
-        match Self::SHORTEST.allows(name.length()) {
-            None => Some(name),
-            Some(_) => name.matches::<Whole>(&Self::VAGUE).map(|_| name),
-        }
+    fn vague(name: Name) -> Option<Finding> {
+        Some(Finding::VagueName { name }).filter(|Finding::VagueName { name }| {
+            Self::SHORTEST.allows(name.length()).is_none() || name.matches::<Whole>(&Self::VAGUE).is_some()
+        })
     }
 
-    fn vague_names(file: &syn::File) -> Vec<Ident> {
-        let mut names = VagueNames { found: Vec::new() };
+    fn fn_names(file: &syn::File) -> Vec<Ident> {
+        let mut names = FnNames { found: Vec::new() };
         names.visit_file(file);
         names.found
     }
 }
 
-struct VagueNames {
+struct FnNames {
     found: Vec<Ident>,
 }
 
-impl VagueNames {
+impl FnNames {
     fn note(&mut self, name: &Ident) {
-        self.found.extend(LiteralNames::vague(&Name::from(name)).map(|_| name.clone()));
+        self.found.push(name.clone());
     }
 }
 
-impl<'ast> Visit<'ast> for VagueNames {
+impl<'ast> Visit<'ast> for FnNames {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
