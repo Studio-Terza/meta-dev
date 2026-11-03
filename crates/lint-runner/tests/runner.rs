@@ -97,7 +97,7 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
     let run = root.flagged(&["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
     assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
-    assert!(run.out.contains("2 copies, also at ") && run.out.contains("/src/two.rs:3; "), "{}", run.out);
+    assert!(run.out.contains("2 shipped copies, also at ") && run.out.contains("/src/two.rs:3; "), "{}", run.out);
     assert_eq!(run.err, "");
     Ok(())
 }

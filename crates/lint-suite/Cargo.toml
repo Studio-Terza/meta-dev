@@ -52,14 +52,15 @@ lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
 lint-raw-resources = { path = "../lint-raw-resources" }
 lint-reader = { path = "../lint-reader" }
-lint-repeated-bodies = { path = "../lint-repeated-bodies" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-repeated-shapes = { path = "../lint-repeated-shapes" }
 lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 transition-facts = { path = "../transition-facts" }
+lint-layering = { path = "../lint-layering" }
 lint-type-graph = { path = "../lint-type-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
