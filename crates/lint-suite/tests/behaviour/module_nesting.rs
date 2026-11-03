@@ -15,6 +15,9 @@ const THROUGH: Source = Source::new(Located::new("crates/a/src/user.rs"), Text::
 const OTHER_THROUGH: Source =
     Source::new(Located::new("crates/a/src/other.rs"), Text::new("use crate::outer::Thing;\n"));
 
+const BARE_ROOT: Source =
+    Source::new(Located::new("crates/a/src/lib.rs"), Text::new("mod outer;\nuse outer::inner::Thing;\n"));
+
 const HIDDEN_WIDE: Source = Source::new(
     Located::new("crates/a/src/wide.rs"),
     Text::new("pub(crate) use crate::x::{A, B, C, D, E, F, G, H, I};\n"),
@@ -30,12 +33,17 @@ const FIRST: Source =
 const SECOND: Source =
     Source::new(Located::new("crates/a/src/outer/second.rs"), Text::new("use crate::outer::inner::Thing;\n"));
 
-const CASES: [Case; 6] = [
+const CASES: [Case; 7] = [
     Case::new(Title::new("used by two siblings"), &[ROOT, PARENT, SECOND_PARENT, HELPER], Flagged::new(&[])),
     Case::new(Title::new("through the parent"), &[OUTER, INNER, THROUGH, OTHER_THROUGH], Flagged::new(&[])),
     Case::new(Title::new("crate-only re-exports"), &[HIDDEN_WIDE], Flagged::new(&[])),
     Case::new(Title::new("a parent without mod.rs"), &[OUTER_FILE, INNER, REACHING], Flagged::new(&[])),
     Case::new(Title::new("users inside the boundary"), &[FAMILY, INNER, FIRST, SECOND], Flagged::new(&[])),
+    Case::new(
+        Title::new("a bare path past mod.rs"),
+        &[BARE_ROOT, OUTER, INNER],
+        Flagged::new(&["crates/a/src/lib.rs:1"]),
+    ),
     Case::new(Title::new("used by one sibling"), &[ROOT, PARENT, HELPER], Flagged::new(&["crates/a/src/helper.rs:1"])),
 ];
 
