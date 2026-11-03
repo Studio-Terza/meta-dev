@@ -24,7 +24,7 @@ use cluster::Cluster;
 use declaration::Declaration;
 use link::Link;
 use member::Member;
-use resolver::Resolver;
+use resolver::{Resolver, StandIns};
 
 pub use connected::ConnectedClusters;
 pub use depth::DeepClusters;
@@ -79,21 +79,24 @@ impl<'found, 'file> Containment<'found, 'file> {
                 modules.get(site.path()).and_then(|segments| named.within(segments)).map(|member| (member, declaration))
             })
             .collect();
-        let resolver = &Resolver::of_members(placed.keys().copied());
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
+        let crates =
+            shipped.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&SourceFile>>, file| {
+                crates.entry(file.placement().package().crate_name()).or_default().push(file);
+                crates
+            });
+        let graphs: Vec<(&CrateName, ItemGraph)> =
+            crates.iter().map(|(krate, files)| (*krate, ItemGraph::of_files(files))).collect();
+        let stand_ins =
+            graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
+        let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
         let defined: BTreeSet<Link<'found>> = placed
             .iter()
             .flat_map(|(member, declaration)| declaration.links(*member, resolver))
             .filter_map(Link::apart)
             .collect();
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let crates = files.iter().filter_map(SourceFile::shipped).fold(
-            BTreeMap::new(),
-            |mut crates: BTreeMap<&CrateName, Vec<&SourceFile>>, file| {
-                crates.entry(file.placement().package().crate_name()).or_default().push(file);
-                crates
-            },
-        );
-        let bodies = crates.iter().flat_map(|(krate, files)| resolver.bodies(krate, &ItemGraph::of_files(files)));
+        let bodies = graphs.iter().flat_map(|(krate, graph)| resolver.bodies(krate, graph));
         let links: BTreeSet<Link<'found>> =
             defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
         Containment {
