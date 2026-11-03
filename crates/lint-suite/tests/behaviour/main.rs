@@ -3,6 +3,7 @@ mod bool_methods;
 mod clones;
 mod complexity;
 mod const_shape;
+mod containment;
 mod core_mutation;
 mod crate_graph;
 mod distinct_signatures;

@@ -1002,6 +1002,7 @@ version = "0.1.0"
 dependencies = [
  "body-lifts",
  "lint-core",
+ "lint-item-graph",
  "lint-layout",
  "lint-placement",
  "newtype",

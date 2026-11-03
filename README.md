@@ -105,6 +105,17 @@ fixes: combinators on `Option`, `Result` and iterators; extract an arm's logic i
 condition as an enum or a predicate type. `flow_shapes` counts per crate the functions that are a pipeline, a pure
 router, or neither.
 
+The `--report` run also prints the containment reports of `lint-transition-graph`, report only until the owner has
+reviewed them. The crates, modules and files are a nested clustering of the type and trait graph: types and traits are
+linked by fields, variants, bounds, trait impls and the signatures of their methods, read through the same facts as
+`layering` and the transition graph. One engine (`Containment`, with a `ClusterLint` per check) runs every check at the
+crate and the module level: `connected_clusters` (each crate and each directory module is one connected piece),
+`acyclic_quotients` (the crates of the workspace, and the own file and child modules of each crate and module, collapsed
+to single nodes, form no cycle), `interface_by_consumers` and `interface_by_internals` (a cluster's exports, the types and
+traits used from outside it, form one group when linked by a shared outside user, or by a shared private item),
+`lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users) and `deep_clusters` (a
+cluster with an interface that exports fewer items than it keeps private). There are no thresholds.
+
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
 compile, and each violation prints as `path:line: problem; fix`. A constant message is a `Message` of a `Problem` and a `Fix`. Limits are constants inside each lint, not
