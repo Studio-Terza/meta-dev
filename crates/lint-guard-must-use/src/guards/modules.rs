@@ -45,7 +45,8 @@ impl<'file> Modules<'file> {
             let root = <&CrateFile>::from(module);
             self.0
                 .iter()
-                .filter(|(other, others)| others.declares(name).is_some() && <&CrateFile>::from(*other) == root)
+                .filter(|(_, others)| others.declares(name).is_some())
+                .filter(|(other, _)| <&CrateFile>::from(*other) == root)
                 .map(|(other, _)| TypeKey::new(other, name))
                 .collect()
         };

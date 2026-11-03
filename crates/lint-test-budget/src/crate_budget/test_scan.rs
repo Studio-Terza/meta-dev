@@ -32,11 +32,13 @@ impl TestScan {
     }
 
     fn tests_in(invocation: &Macro) -> Count {
-        match (TestMarks::law(invocation), Self::property_block(invocation)) {
-            (Some(_), _) => Count::new(1),
-            (None, Some(_)) => Count::new(Macros::attributes(invocation).iter().filter_map(TestMarks::test).count()),
-            (None, None) => Count::default(),
-        }
+        TestMarks::law(invocation)
+            .map(|_| Count::new(1))
+            .or_else(|| {
+                Self::property_block(invocation)
+                    .map(|_| Count::new(Macros::attributes(invocation).iter().filter_map(TestMarks::test).count()))
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -49,10 +51,9 @@ impl<'ast> Visit<'ast> for TestScan {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let before = self.0.test_lines;
         visit::visit_item_mod(self, module);
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Skipped => self.0.test_lines = before.plus(Self::line_count(module.span())),
-            Walk::Entered => {}
-        }
+        self.0.test_lines = Some(Walk::outside_tests(&module.attrs))
+            .filter(|walk| *walk == Walk::Skipped)
+            .map_or(self.0.test_lines, |_| before.plus(Self::line_count(module.span())));
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {

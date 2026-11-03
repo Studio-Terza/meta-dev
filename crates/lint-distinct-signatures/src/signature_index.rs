@@ -5,9 +5,10 @@ mod shape;
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro};
+use syn::{ImplItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Macros;
+use lint_core::Syntax;
 use lint_core::Walk;
 
 use finding::Finding;
@@ -39,10 +40,7 @@ impl SignatureIndex {
     }
 
     fn functions(item: &ItemImpl) -> impl Iterator<Item = &ImplItemFn> {
-        item.items.iter().filter_map(|member| match member {
-            ImplItem::Fn(function) => Some(function),
-            _ => None,
-        })
+        item.items.iter().filter_map(Syntax::impl_fn)
     }
 }
 

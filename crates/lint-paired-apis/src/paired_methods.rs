@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use syn::visit::{self, Visit};
-use syn::{Ident, ImplItem, ItemImpl, ItemMod, ItemTrait, TraitItem, Type, Visibility};
+use syn::{Ident, ItemImpl, ItemMod, ItemTrait, Visibility};
 
-use lint_core::{Site, SourceFile, Walk};
+use lint_core::{Site, SourceFile, Syntax, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_paths::Module;
 
@@ -29,22 +29,14 @@ impl<'file> PairedMethods<'file> {
         block
             .items
             .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(method) if matches!(method.vis, Visibility::Public(_)) => Some(&method.sig.ident),
-                _ => None,
-            })
+            .filter_map(Syntax::impl_fn)
+            .filter(|method| matches!(method.vis, Visibility::Public(_)))
+            .map(|method| &method.sig.ident)
             .collect()
     }
 
     fn declared_methods(block: &ItemTrait) -> Vec<&Ident> {
-        block
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                TraitItem::Fn(method) => Some(&method.sig.ident),
-                _ => None,
-            })
-            .collect()
+        block.items.iter().filter_map(Syntax::trait_fn).map(|method| &method.sig.ident).collect()
     }
 
     fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
@@ -64,14 +56,11 @@ impl<'ast> Visit<'ast> for PairedMethods<'_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let methods = match (Walk::inherent_impls(block), Walk::outside_tests(&block.attrs)) {
-            (Walk::Entered, Walk::Entered) => Self::public_methods(block),
-            _ => Vec::new(),
-        };
-        let owner = match block.self_ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
+        let methods = Syntax::inherent(block)
+            .filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered)
+            .map(Self::public_methods)
+            .unwrap_or_default();
+        let owner = Syntax::last_name(&block.self_ty);
         self.owned_by(owner, &methods);
     }
 
