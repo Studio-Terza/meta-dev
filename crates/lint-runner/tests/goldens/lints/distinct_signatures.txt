@@ -12,4 +12,6 @@ src/different.rs:3: bare u8 in left; take and return a domain type (a newtype, a
 src/different.rs:4: bare u16 in right; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/same.rs:3: bare u8 in left; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/same.rs:4: bare u8 in right; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/different.rs:1: crate corpus falls into 2 groups: [A] [A] with no link between them; split it along the groups, or link them through a type they share
 fails

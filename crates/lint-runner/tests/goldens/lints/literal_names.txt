@@ -11,4 +11,6 @@ function names say what the function does:
 src/vague.rs:1: fn get names nothing; say what it does
 src/vague.rs:4: fn handle names nothing; say what it does
 src/vague.rs:5: fn go names nothing; say what it does
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/said.rs:2: crate corpus falls into 2 groups: [A] [A] with no link between them; split it along the groups, or link them through a type they share
 fails

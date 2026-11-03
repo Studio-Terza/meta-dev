@@ -8,4 +8,6 @@ src/enough.rs:3: one, two, three, four share the signature A::(&self); distingui
 src/public.rs:3: one, two, three, four, five share the signature A::(&self); distinguish the types they take or return
 too many private fns; a type's logic belongs in its interface or in more types:
 src/crowded.rs:1: A has 5 private fns, at most 4 allowed: one, two, three, four, five; move the logic into its public interface or into more types
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/crowded.rs:1: crate corpus falls into 3 groups: [A] [A] [A] with no link between them; split it along the groups, or link them through a type they share
 fails

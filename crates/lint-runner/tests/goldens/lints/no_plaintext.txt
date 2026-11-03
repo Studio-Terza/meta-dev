@@ -9,4 +9,6 @@ data that enters from a file holds no free text; split it into typed parts, or g
 src/free.rs:5: free text in title; split it into typed parts, or use a newtype that validates (serde try_from, or a Deserialize that calls FromStr)
 primitives appear in signatures and fields only inside a boundary:
 src/free.rs:5: bare String in title; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/checked.rs:5: crate corpus falls into 2 groups: [Entry Title] [Entry] with no link between them; split it along the groups, or link them through a type they share
 fails

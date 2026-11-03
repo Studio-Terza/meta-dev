@@ -76,8 +76,8 @@ fn a_name_declared_in_two_modules_of_one_crate_resolves_by_its_own_module_and_it
     assert_eq!(
         Clustered::lines(&twins, |view| view.report::<LowestCluster>().violations().to_vec()),
         [
-            "crates/x/src/a.rs:2: x::a::Leg is used only within x::b; move it into the lowest cluster that holds all its users",
-            "crates/x/src/b.rs:2: x::b::Platform is used only within x::c; move it into the lowest cluster that holds all its users",
+            "crates/x/src/a.rs:2: x::a::Leg is used only within x::b; move it into the lowest module that holds all its users",
+            "crates/x/src/b.rs:2: x::b::Platform is used only within x::c; move it into the lowest module that holds all its users",
         ]
     );
 }
@@ -309,14 +309,19 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
     assert_eq!(
         Clustered::lines(&pathed, |view| view.report::<LowestCluster>().violations().to_vec()),
         [
-            "crates/x/src/lib.rs:3: x::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
-            "crates/x/src/a/mod.rs:3: x::a::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
+            "crates/x/src/lib.rs:3: x::Platform is used only within x::a::inner; move it into the lowest module that holds all its users",
+            "crates/x/src/a/mod.rs:3: x::a::Platform is used only within x::a::inner; move it into the lowest module that holds all its users",
         ]
     );
     assert_eq!(
         Clustered::lines(&pathed, |view| view.report::<ConnectedClusters>().violations().to_vec()),
         [
             "crates/x/src/a/deep/kid.rs:1: crate x falls into 6 groups: [Bench Lounge Seat] [Gauge Holder] [Gauge] [Platform Root] [Platform Uses] [Seat] with no link between them; split it along the groups, or link them through a type they share",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&pathed, |view| view.report::<ConnectedDirectories>().violations().to_vec()),
+        [
             "crates/x/src/a/deep/kid.rs:1: x::a falls into 4 groups: [Bench Seat] [Gauge Holder] [Platform Uses] [Root] with no link between them; split it along the groups, or link them through a type they share",
         ]
     );
