@@ -40,17 +40,15 @@ impl BinaryFiles {
     ) -> BTreeSet<PathBuf> {
         match members.get(file.path()).map(|_| ()) {
             Some(()) => members,
-            None => Self::entered(file, by_path, members),
+            None => Self::children(file, by_path)
+                .into_iter()
+                .fold(Self::with(members, file.path()), |members, child| Self::gather(child, by_path, members)),
         }
     }
 
-    fn entered(
-        file: &SourceFile,
-        by_path: &BTreeMap<&Path, &SourceFile>,
-        mut members: BTreeSet<PathBuf>,
-    ) -> BTreeSet<PathBuf> {
-        members.insert(file.path().to_owned());
-        Self::children(file, by_path).into_iter().fold(members, |members, child| Self::gather(child, by_path, members))
+    fn with(mut members: BTreeSet<PathBuf>, path: &Path) -> BTreeSet<PathBuf> {
+        members.insert(path.to_owned());
+        members
     }
 
     fn children<'files>(file: &SourceFile, by_path: &BTreeMap<&Path, &'files SourceFile>) -> Vec<&'files SourceFile> {
