@@ -25,7 +25,10 @@ const THROUGH_RE_EXPORT: &str =
     "struct FakeClock;\nimpl x::Clock for FakeClock {}\nstruct FakeOther;\nimpl x::Other for FakeOther {}\n";
 const INLINE_SHIPPED_PORT: &str = "pub mod ports {\n    pub trait Clock {}\n}\npub use ports::Clock;\n";
 
-const CASES: [Case; 19] = [
+const IMPORTED_IN_MODULE: &str =
+    "mod inner {\n    use ci::ports::Ports;\n    struct Fake;\n    impl Ports for Fake {}\n}\n";
+
+const CASES: [Case; 20] = [
     Case::new(
         Title::new("implements a trait of a ports module"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(PORTED))],
@@ -133,6 +136,11 @@ const CASES: [Case; 19] = [
             Source::new(Located::new("crates/x/tests/a.rs"), Text::new(THROUGH_RE_EXPORT)),
         ],
         Flagged::new(&["crates/x/tests/a.rs:3", "crates/x/tests/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("implements a port imported only inside its module"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(IMPORTED_IN_MODULE))],
+        Flagged::new(&[]),
     ),
 ];
 
