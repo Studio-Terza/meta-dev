@@ -19,10 +19,16 @@ impl Constructor {
     }
 
     fn mention(tokens: TokenStream, owner: &Ident) -> Option<Ident> {
-        tokens.into_iter().find_map(|tree| match tree {
-            TokenTree::Ident(ident) => (ident == Self::SELF || ident == *owner).then_some(ident),
+        tokens.into_iter().find_map(|tree| Self::mentioned(tree, owner))
+    }
+
+    fn mentioned(tree: TokenTree, owner: &Ident) -> Option<Ident> {
+        match tree {
+            TokenTree::Ident(ident) => {
+                (ident == Self::SELF).then_some(()).or((ident == *owner).then_some(())).map(|()| ident)
+            }
             TokenTree::Group(group) => Self::mention(group.stream(), owner),
             TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-        })
+        }
     }
 }

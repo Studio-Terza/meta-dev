@@ -1,7 +1,7 @@
 mod comparison;
 mod family;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Report};
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -28,12 +28,6 @@ impl GraphLint for DuplicateTransitions {
     }
 }
 
-impl Lint for DuplicateTransitions {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
-    }
-}
-
 #[derive(Debug)]
 pub struct OneEdge;
 
@@ -47,11 +41,5 @@ impl GraphLint for OneEdge {
             ),
             Family::repeated_among(&edges).iter().filter_map(Family::violation).collect(),
         )
-    }
-}
-
-impl Lint for OneEdge {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

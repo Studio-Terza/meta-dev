@@ -10,8 +10,6 @@ control flow is an expression; every branch yields the value the function return
 src/lib.rs:16: while loop; drive an iterator with combinators, const fns excepted
 tests go through public APIs:
 src/lib.rs:22: test code in src; move it to the package's tests directory and call the public API from there
-tests differ by more than their literals:
-tests/leaves.rs:2: test leaves differs from leaves only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!
 a body leaves through its tail value or ?, never through return, break or continue:
 src/lib.rs:6: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 src/lib.rs:12: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions

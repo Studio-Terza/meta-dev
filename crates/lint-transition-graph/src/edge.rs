@@ -1,6 +1,9 @@
+use std::collections::BTreeMap;
+
 use body_lifts::Body;
 use lint_core::Site;
 use lint_layout::Name;
+use lint_placement::CrateName;
 use transition_facts::{Ground, Mutation, Transition};
 
 use crate::end::Ends;
@@ -58,5 +61,14 @@ impl<'found, 'file> Edge<'found, 'file> {
 
     pub(crate) fn fixed_by(&self) -> Option<&'found Name> {
         self.fixed_by
+    }
+
+    pub(crate) fn by_crate<'edge>(
+        edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
+    ) -> BTreeMap<&'edge CrateName, Vec<&'edge Edge<'found, 'file>>> {
+        edges.fold(BTreeMap::new(), |mut crates, edge| {
+            crates.entry(edge.transition().as_ref()).or_default().push(edge);
+            crates
+        })
     }
 }

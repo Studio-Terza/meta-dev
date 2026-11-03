@@ -7,9 +7,9 @@ use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath};
 
-use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
+use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
-use lint_paths::{Imports, Module};
+use lint_paths::{Imports, Module, Nested};
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
@@ -49,15 +49,13 @@ impl<'file> Doubles<'file> {
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
+        let ported = |double: &DoubleKey| {
+            self.implemented.iter().any(|implemented| implemented.double == *double && implemented.kind == Kind::Port)
+        };
         let unported = self
             .declared
             .iter()
-            .filter(|(double, _)| {
-                self.implemented
-                    .iter()
-                    .filter(|implemented| implemented.double == **double)
-                    .all(|implemented| implemented.kind != Kind::Port)
-            })
+            .filter(|(double, _)| !ported(double))
             .map(|(double, site)| Violation::new(*site, Finding::Unported(&double.name)));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
             Violation::new(
@@ -90,7 +88,7 @@ impl<'file> Reader<'file, '_> {
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey<'file>> {
-        Syntax::last_name(&item.self_ty)
+        Name::of_type(&item.self_ty)
             .filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
             .map(|name| DoubleKey { target: self.target, name })
     }
@@ -109,11 +107,15 @@ impl<'file> Reader<'file, '_> {
     }
 }
 
+impl<'file> Nested<'file> for Reader<'file, '_> {
+    fn module(&mut self) -> &mut Module<'file> {
+        &mut self.module
+    }
+}
+
 impl<'file> Visit<'file> for Reader<'file, '_> {
     fn visit_item_mod(&mut self, module: &'file ItemMod) {
-        self.module.enter(Name::from(&module.ident));
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module.leave();
+        self.nested(module, |reader| visit::visit_item_mod(reader, module));
     }
 
     fn visit_item_impl(&mut self, item: &'file ItemImpl) {

@@ -27,9 +27,10 @@ impl TestMarks {
     #[must_use]
     pub fn law(invocation: &Macro) -> Option<&Macro> {
         let segments = &invocation.path.segments;
-        Self::ends_in(segments, &Self::LAWS)
-            .and(segments.first())
-            .filter(|first| segments.len() == 1 || first.ident == Self::LAW_CRATE)
+        let named = Self::ends_in(segments, &Self::LAWS).and(segments.first());
+        named
+            .filter(|_| segments.len() == 1)
+            .or_else(|| named.filter(|first| first.ident == Self::LAW_CRATE))
             .map(|_| invocation)
     }
 

@@ -15,7 +15,7 @@ use syn::{
 
 use lint_core::{Macros, SourceFile, Violation, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_paths::Module;
+use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
 
 use crate::holders::Holders;
@@ -78,11 +78,15 @@ impl<'run, 'file> Reader<'run, 'file> {
     }
 }
 
+impl<'file> Nested<'file> for Reader<'_, 'file> {
+    fn module(&mut self) -> &mut Module<'file> {
+        &mut self.module
+    }
+}
+
 impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.module.enter(Name::from(&module.ident));
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module.leave();
+        self.nested(module, |reader| visit::visit_item_mod(reader, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

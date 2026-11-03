@@ -5,7 +5,7 @@ use crate::module::Module;
 use crate::scopes::Scopes;
 use crate::walker::Walker;
 use lint_core::SourceFile;
-use lint_layout::{Name, UsePath};
+use lint_layout::{Name, UsePath, Word};
 
 pub(crate) struct Collector<'file> {
     scopes: Scopes<'file>,
@@ -42,11 +42,6 @@ impl<'file> Collector<'file> {
         let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
         self.scopes.import(&self.module, local, target);
     }
-
-    fn dropped(item: &ItemImpl) -> Option<Name> {
-        item.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).filter(|last| last.ident == Self::DROP)?;
-        Walker::type_path(&item.self_ty).and_then(|path| path.segments.last()).map(|segment| Name::from(&segment.ident))
-    }
 }
 
 impl<'ast> Visit<'ast> for Collector<'_> {
@@ -68,7 +63,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        self.scopes.guard(&self.module, Self::dropped(item));
+        self.scopes.guard(&self.module, Name::implementing(item, Word::new(Self::DROP)));
         visit::visit_item_impl(self, item);
     }
 }

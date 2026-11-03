@@ -8,11 +8,12 @@ use impl_target::ImplTarget;
 use parameter::Parameter;
 use struct_fields::StructFields;
 use syn::visit::Visit;
-use syn::{Expr, ExprField, Ident, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt};
+use syn::{Expr, Ident, ImplItemFn, ItemImpl, ItemMod, ItemStruct, PathSegment, Stmt};
 
 use super::callee::Callee;
 use super::forwarder::Forwarder;
 use super::workspace_types::WorkspaceTypes;
+use lint_core::Syntax;
 use lint_core::Walk;
 use lint_layout::{Casing, Name};
 
@@ -43,86 +44,67 @@ impl<'types, 'file> Forwarders<'types, 'file> {
 
     fn classify(&self, function: &'file ImplItemFn) -> Option<Forwarder<'file>> {
         let params: Vec<Parameter> = function.sig.inputs.iter().filter_map(Parameter::describe).collect();
-        let callee = match function.block.stmts.as_slice() {
-            [Stmt::Expr(Expr::MethodCall(call), None)]
-                if self
-                    .receiver_type(&call.receiver, &params)
-                    .is_some_and(|name| self.types.declares(name).is_some())
-                    && call.args.iter().all(|arg| Self::forwarded(arg, &params).is_some()) =>
-            {
-                Some(Callee::method(&call.method))
-            }
-            [Stmt::Expr(Expr::Call(call), None)]
-                if call.args.iter().all(|arg| Self::forwarded(arg, &params).is_some()) =>
-            {
-                self.workspace_callee(&call.func)
-            }
-            _ => None,
-        }?;
-        Some(Forwarder::new(&function.sig.ident, callee))
+        Some(function.block.stmts.as_slice())
+            .filter(|statements| statements.len() == 1)
+            .and_then(<[Stmt]>::first)
+            .and_then(Syntax::tail)
+            .and_then(|tail| self.callee(tail, &params))
+            .map(|callee| Forwarder::new(&function.sig.ident, callee))
     }
 
-    fn receiver_type<'name>(&'name self, expr: &'file Expr, params: &'name [Parameter]) -> Option<&'name Name> {
-        match expr {
-            Expr::Path(path) if path.path.is_ident("self") => Some(&self.self_type),
-            Expr::Path(path) => Parameter::named_by(params, &path.path)?.type_name(),
-            Expr::Field(field) => self.field_type(field),
+    fn callee(&self, tail: &'file Expr, params: &[Parameter]) -> Option<Callee<'file>> {
+        match tail {
+            Expr::MethodCall(call) => Parameter::forwarding(&call.args, params)
+                .and_then(|()| self.receiver_type(&call.receiver, params))
+                .filter(|name| self.types.declares(name).is_some())
+                .map(|_| Callee::method(&call.method)),
+            Expr::Call(call) => {
+                Parameter::forwarding(&call.args, params).and_then(|()| self.workspace_callee(&call.func))
+            }
             _ => None,
         }
     }
 
-    fn field_type(&self, field: &'file ExprField) -> Option<&Name> {
-        match &*field.base {
-            Expr::Path(base) if base.path.is_ident("self") => {
-                self.structs.get(&self.self_type)?.field_type(&field.member, &self.concrete)
-            }
+    fn receiver_type<'name>(&'name self, expr: &'file Expr, params: &'name [Parameter]) -> Option<&'name Name> {
+        match expr {
+            Expr::Path(path) => path
+                .path
+                .is_ident("self")
+                .then_some(&self.self_type)
+                .or_else(|| Parameter::named_by(params, &path.path).and_then(Parameter::type_name)),
+            Expr::Field(field) => Syntax::expr_path(&field.base)
+                .filter(|base| base.path.is_ident("self"))
+                .and_then(|_| self.structs.get(&self.self_type))
+                .and_then(|fields| fields.field_type(&field.member, &self.concrete)),
             _ => None,
         }
     }
 
     fn workspace_callee(&self, func: &'file Expr) -> Option<Callee<'file>> {
-        let segments = Self::path_segments(func)?;
-        match segments.as_slice() {
-            [.., owner, method] => {
-                let owner = if *owner == "Self" { self.self_ident? } else { owner };
-                (self.types.declares(&Name::from(owner)).is_some() && Name::from(*method).casing() == Casing::Lower)
-                    .then(|| Callee::associated(owner, method))
-            }
-            _ => None,
-        }
+        let segments: Vec<&Ident> =
+            Syntax::expr_path(func)?.path.segments.iter().map(|segment| &segment.ident).collect();
+        let (method, leading) = segments.split_last()?;
+        let owner =
+            leading.last().copied().filter(|owner| *owner != "Self").or_else(|| leading.last().and(self.self_ident))?;
+        self.types
+            .declares(&Name::from(owner))
+            .filter(|_| Name::from(*method).casing() == Casing::Lower)
+            .map(|_| Callee::associated(owner, method))
     }
 }
 
 impl<'file> Forwarders<'_, 'file> {
-    fn path_segments(func: &'file Expr) -> Option<Vec<&'file Ident>> {
-        match func {
-            Expr::Path(path) => Some(path.path.segments.iter().map(|segment| &segment.ident).collect()),
-            _ => None,
-        }
-    }
-
-    fn targeting(&mut self, segment: &'file PathSegment) {
+    pub fn targeted(&mut self, segment: &'file PathSegment, item: &'file ItemImpl) {
         self.self_type = Name::from(&segment.ident);
         self.self_ident = Some(&segment.ident);
         self.concrete = StructFields::type_arguments(segment);
-    }
-
-    fn forwarded<'expr>(expr: &'expr Expr, params: &[Parameter]) -> Option<&'expr Expr> {
-        match expr {
-            Expr::Path(path) => Parameter::named_by(params, &path.path).map(|_| expr),
-            Expr::Field(field) => Self::forwarded(&field.base, params),
-            Expr::Reference(reference) => Self::forwarded(&reference.expr, params),
-            _ => None,
-        }
+        syn::visit::visit_item_impl(self, item);
     }
 }
 
 impl<'file> Visit<'file> for Forwarders<'_, 'file> {
     fn visit_item_mod(&mut self, module: &'file ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_struct(&mut self, item: &'file ItemStruct) {

@@ -1,0 +1,19 @@
+[package]
+name = "workspace-metadata"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+text-lines = { path = "../text-lines" }
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

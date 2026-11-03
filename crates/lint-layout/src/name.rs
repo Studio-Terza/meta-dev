@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
 
-use syn::Ident;
+use syn::{Ident, ItemImpl, Type};
 
 use crate::casing::Casing;
 use crate::length::Length;
@@ -23,6 +23,23 @@ pub use prefix::Prefix;
 pub struct Name(String);
 
 impl Name {
+    #[must_use]
+    pub fn of_type(found: &Type) -> Option<Name> {
+        match found {
+            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn implementing(item: &ItemImpl, wanted: Word<'_>) -> Option<Name> {
+        item.trait_
+            .as_ref()
+            .and_then(|(_, path, _)| path.segments.last())
+            .filter(|last| last.ident == wanted.into_inner())
+            .and_then(|_| Self::of_type(&item.self_ty))
+    }
+
     #[must_use]
     pub fn length(&self) -> Length {
         Length::new(self.0.chars().count())
@@ -52,7 +69,7 @@ impl Name {
     pub fn words(&self) -> Vec<Name> {
         let letters: Vec<char> = self.0.chars().collect();
         letters
-            .chunk_by(|left, right| left.is_alphanumeric() && right.is_alphanumeric())
+            .chunk_by(|left, right| left.is_alphanumeric() == right.is_alphanumeric())
             .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
             .map(|chunk| Name(chunk.iter().collect()))
             .collect()
@@ -60,17 +77,20 @@ impl Name {
 
     #[must_use]
     pub fn casing(&self) -> Casing {
-        let rest = || self.0.chars().skip(1);
-        match self.0.chars().next() {
-            Some(first) if first.is_ascii_lowercase() => Casing::Lower,
-            Some(first)
-                if first.is_ascii_uppercase()
-                    && rest().any(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit()) =>
-            {
-                Casing::Camel
-            }
-            Some(first) if first.is_ascii_uppercase() => Casing::Shouting,
-            _ => Casing::Other,
+        self.0.chars().next().map_or(Casing::Other, |first| self.cased(Initial::from(first)))
+    }
+
+    fn cased(&self, initial: Initial) -> Casing {
+        match initial {
+            Initial::Lower => Casing::Lower,
+            Initial::Upper => self
+                .0
+                .chars()
+                .skip(1)
+                .find(char::is_ascii_lowercase)
+                .or_else(|| self.0.chars().skip(1).find(char::is_ascii_digit))
+                .map_or(Casing::Shouting, |_| Casing::Camel),
+            Initial::Other => Casing::Other,
         }
     }
 }
@@ -135,5 +155,22 @@ impl Arbitrary for Name {
 
     fn arbitrary_with((): ()) -> BoxedStrategy<Name> {
         any::<String>().prop_map(Name).boxed()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Initial {
+    Lower,
+    Upper,
+    Other,
+}
+
+impl From<char> for Initial {
+    fn from(first: char) -> Initial {
+        Some(first)
+            .filter(char::is_ascii_lowercase)
+            .map(|_| Initial::Lower)
+            .or_else(|| Some(first).filter(char::is_ascii_uppercase).map(|_| Initial::Upper))
+            .unwrap_or(Initial::Other)
     }
 }

@@ -2,7 +2,7 @@ mod ground;
 
 use std::collections::BTreeSet;
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::TokenTree;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, Signature, Variant};
 
@@ -47,12 +47,12 @@ impl Mentions {
         self.names.extend((self.ground == self.wanted).then_some(name));
     }
 
-    fn scanned(&mut self, tokens: TokenStream) {
-        tokens.into_iter().for_each(|tree| match tree {
+    fn scanned(&mut self, tree: TokenTree) {
+        match tree {
             TokenTree::Ident(ident) => self.named(Name::from(&ident)),
-            TokenTree::Group(group) => self.scanned(group.stream()),
+            TokenTree::Group(group) => group.stream().into_iter().for_each(|tree| self.scanned(tree)),
             TokenTree::Punct(_) | TokenTree::Literal(_) => {}
-        });
+        }
     }
 }
 
@@ -62,7 +62,7 @@ impl<'ast> Visit<'ast> for Mentions {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        self.scanned(invocation.tokens.clone());
+        invocation.tokens.clone().into_iter().for_each(|tree| self.scanned(tree));
         visit::visit_macro(self, invocation);
     }
 

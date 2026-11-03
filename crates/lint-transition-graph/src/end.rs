@@ -4,7 +4,6 @@ use std::fmt;
 use lint_layout::Name;
 use lint_placement::CrateName;
 use newtype::Counter;
-use transition_facts::Ground;
 
 use crate::count::Count;
 
@@ -15,10 +14,6 @@ pub(crate) struct Node<'found> {
 }
 
 impl<'found> Node<'found> {
-    pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Node<'found> {
-        Node { krate, name }
-    }
-
     pub(crate) fn resolved(
         declaring: &BTreeSet<&'found CrateName>,
         from: &CrateName,
@@ -50,16 +45,6 @@ impl fmt::Display for Node<'_> {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Tuple<'found>(BTreeSet<Node<'found>>);
 
-impl<'found> Tuple<'found> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Node<'found>> {
-        self.0.iter()
-    }
-
-    pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node<'_>>) -> Option<&'tuple Tuple<'found>> {
-        self.0.iter().all(|node| available.contains(node)).then_some(self)
-    }
-}
-
 impl fmt::Display for Tuple<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.first().filter(|_| self.0.len() == 1) {
@@ -75,27 +60,6 @@ impl fmt::Display for Tuple<'_> {
 pub(crate) struct Hop<'found> {
     takes: Tuple<'found>,
     gives: Node<'found>,
-}
-
-impl<'found> Hop<'found> {
-    pub(crate) fn reached(&self) -> &Node<'found> {
-        &self.gives
-    }
-
-    pub(crate) fn onward(self) -> Option<Hop<'found>> {
-        let looped = self.takes.0.get(&self.gives).copied();
-        looped.map_or(Some(self), |_| None)
-    }
-
-    pub(crate) fn fired(&self, available: &BTreeSet<&Node<'_>>) -> Option<&Node<'found>> {
-        self.takes.within(available).map(|_| &self.gives)
-    }
-}
-
-impl<'found> AsRef<Tuple<'found>> for Hop<'found> {
-    fn as_ref(&self) -> &Tuple<'found> {
-        &self.takes
-    }
 }
 
 impl fmt::Display for Hop<'_> {
@@ -160,10 +124,6 @@ impl<'found> End<'found> {
     pub(crate) fn place(&self) -> Place {
         self.place
     }
-
-    pub(crate) fn node(&self) -> Option<&Node<'found>> {
-        self.node.as_ref()
-    }
 }
 
 impl fmt::Display for End<'_> {
@@ -219,13 +179,6 @@ impl<'found> Ends<'found> {
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
         self.takes.iter().filter_map(|taken| taken.node.as_ref())
-    }
-
-    pub(crate) fn entered(&self, ground: Ground) -> Option<&Node<'found>> {
-        match ground {
-            Ground::Ports | Ground::Boundary => self.gives.node.as_ref(),
-            Ground::Core | Ground::Store => self.taken().next().map_or(self.gives.node.as_ref(), |_| None),
-        }
     }
 
     pub(crate) fn class(&self) -> Class {

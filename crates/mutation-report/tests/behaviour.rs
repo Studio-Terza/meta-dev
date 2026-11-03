@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use mutation_report::Cli;
 use serde_json::{Value, json};
 
@@ -81,6 +81,10 @@ impl Answer {
         let mut err = Vec::new();
         let exit = Cli::answer(arguments, files, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
+    }
+
+    fn usage() -> Answer {
+        Answer { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
     }
 }
 
@@ -208,7 +212,7 @@ fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error
     let markdown = checkout.markdown();
     assert!(markdown.contains("### Surviving mutants (305)\n\n- m000\n- m001\n"));
     assert!(markdown.contains("- m299\n- ... 5 more in report.json\n"));
-    assert_eq!(markdown.matches("- m300").count(), 0);
+    assert!(!markdown.contains("- m300"));
     assert_eq!(checkout.field("surviving").as_array().map(Vec::len), Some(305));
     Ok(())
 }
@@ -222,7 +226,7 @@ fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Err
     checkout.report();
     let markdown = checkout.markdown();
     assert!(markdown.contains("- m299\n\n### Timed out mutants (0)"));
-    assert_eq!(markdown.matches("more in report.json").count(), 0);
+    assert!(!markdown.contains("more in report.json"));
     Ok(())
 }
 
@@ -232,9 +236,8 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<d
     checkout.write("shards/shard-0/matrix.json", "not json")?;
     let answer = checkout.report();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse"));
-    assert!(answer.err.contains("shard-0/matrix.json"));
-    assert_eq!(checkout.files.kind(&checkout.path("report.md")), Kind::Missing);
+    assert!(answer.err.contains("cannot parse") && answer.err.contains("shard-0/matrix.json"));
+    assert!(!checkout.path("report.md").exists());
     Ok(())
 }
 
@@ -243,13 +246,11 @@ fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Err
     let checkout = Checkout::new()?;
     let answer = checkout.report_of("absent", "sources");
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("absent"));
+    assert!(answer.err.contains("cannot use") && answer.err.contains("absent"));
     checkout.directory("bare")?;
     let answer = checkout.report_of("shards", "bare");
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("crates"));
+    assert!(answer.err.contains("cannot use") && answer.err.contains("crates"));
     Ok(())
 }
 
@@ -281,25 +282,17 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[test]
-fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
-    let answers: Vec<(ExitCode, Vec<String>)> =
-        [&[][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..], &["a".as_ref(); 5][..]]
-            .into_iter()
-            .map(|arguments| Answer::to(&Memory::default(), arguments))
-            .map(|answer| (answer.exit, Text::lines(&answer.err).into_iter().map(String::from).collect()))
-            .collect();
-    let usage = String::from("usage: mutation-report <shards> <sources> <report.md> <report.json>");
-    assert_eq!(answers, vec![(ExitCode::FAILURE, vec![usage]); 3]);
-}
+const USAGE: &str = "usage: mutation-report <shards> <sources> <report.md> <report.json>";
 
-struct Text;
-
-impl Text {
-    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
-        text_lines::Lines::from(text.as_ref()).collect()
-    }
-}
+laws::table!(
+    the_wrong_number_of_arguments_is_refused_with_the_usage,
+    |arguments: &[&OsStr]| Answer::to(&Memory::default(), arguments),
+    [
+        [] => Answer::usage(),
+        [OsStr::new("a"), OsStr::new("b"), OsStr::new("c")] => Answer::usage(),
+        [OsStr::new("a"); 5] => Answer::usage(),
+    ]
+);
 
 struct Checkout {
     files: Memory,

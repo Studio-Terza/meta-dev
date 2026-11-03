@@ -42,11 +42,9 @@ impl TestFeatures {
 
     fn flagged(line: LineNumber, value: Literal) -> Option<Flagged> {
         match Lit::new(value) {
-            Lit::Str(feature) => {
-                let name = Name::from(feature.value().as_str());
-                name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
-                    .map(|_| Flagged::new(line, Finding::Feature(Cow::Owned(name))))
-            }
+            Lit::Str(feature) => Some(Name::from(feature.value().as_str()))
+                .filter(|name| name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS).is_some())
+                .map(|name| Flagged::new(line, Finding::Feature(Cow::Owned(name)))),
             _ => None,
         }
     }
