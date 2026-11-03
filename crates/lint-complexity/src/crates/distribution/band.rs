@@ -1,8 +1,7 @@
 use std::fmt;
 
+use body_lifts::Branching;
 use lint_core::Most;
-
-use super::super::score::Score;
 use newtype::Counter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,7 +19,7 @@ impl Band {
     const SEVERAL: Most = Most::new(6);
     const MANY: Most = Most::new(10);
 
-    pub(crate) fn containing(score: Score) -> Band {
+    pub(crate) fn containing(score: Branching) -> Band {
         [
             (Self::STRAIGHT, Band::Straight),
             (Self::FEW, Band::Few),

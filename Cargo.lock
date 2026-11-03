@@ -25,6 +25,7 @@ name = "body-lifts"
 version = "0.1.0"
 dependencies = [
  "lint-layout",
+ "newtype",
  "syn 2.0.119",
 ]
 
@@ -253,6 +254,7 @@ dependencies = [
 name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
+ "body-lifts",
  "lint-core",
  "lint-layout",
  "lint-placement",

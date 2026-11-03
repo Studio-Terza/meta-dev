@@ -3,6 +3,7 @@ use std::fmt;
 
 use lint_layout::Name;
 use lint_placement::CrateName;
+use transition_facts::Ground;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Node {
@@ -11,6 +12,10 @@ pub(crate) struct Node {
 }
 
 impl Node {
+    pub(crate) fn declared(krate: &CrateName, name: &Name) -> Node {
+        Node { krate: krate.clone(), name: name.clone() }
+    }
+
     pub(crate) fn resolved(declaring: &BTreeSet<CrateName>, from: &CrateName, name: &Name) -> Option<Node> {
         let krate =
             if declaring.contains(from) { Some(from) } else { declaring.first().filter(|_| declaring.len() == 1) };
@@ -21,6 +26,24 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}::{}", self.krate, self.name)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Step {
+    from: Node,
+    to: Node,
+}
+
+impl Step {
+    pub(crate) fn reached(&self) -> &Node {
+        &self.to
+    }
+}
+
+impl AsRef<Node> for Step {
+    fn as_ref(&self) -> &Node {
+        &self.from
     }
 }
 
@@ -99,13 +122,28 @@ impl Ends {
     }
 
     pub(crate) fn edges(&self) -> Vec<Key> {
+        self.steps().into_iter().map(|step| Key { takes: vec![step.from], gives: step.to }).collect()
+    }
+
+    pub(crate) fn steps(&self) -> Vec<Step> {
         self.gives.node.as_ref().map_or_else(Vec::new, |to| {
             self.takes
                 .iter()
                 .filter_map(|taken| taken.node.as_ref())
-                .map(|from| Key { takes: vec![from.clone()], gives: to.clone() })
+                .map(|from| Step { from: from.clone(), to: to.clone() })
                 .collect()
         })
+    }
+
+    pub(crate) fn taken(&self) -> impl Iterator<Item = &Node> {
+        self.takes.iter().filter_map(|taken| taken.node.as_ref())
+    }
+
+    pub(crate) fn entered(&self, ground: Ground) -> Option<&Node> {
+        match (ground, self.taken().next()) {
+            (Ground::Ports | Ground::Boundary, _) | (_, None) => self.gives.node.as_ref(),
+            (Ground::Core | Ground::Store, Some(_)) => None,
+        }
     }
 
     pub(crate) fn class(&self) -> Class {

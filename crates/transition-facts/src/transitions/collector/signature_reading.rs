@@ -2,7 +2,7 @@ mod type_scope;
 
 use syn::{Block, FnArg, ItemImpl, ItemTrait, ReturnType, Signature, Type};
 
-use body_lifts::BodyReading;
+use body_lifts::{BodyReading, Branches};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -74,6 +74,7 @@ impl SignatureReading {
         Transition::new(self.krate.clone(), site, self.owner.clone(), Name::from(&signature.ident))
             .taking(takes, gives, Self::mutation(signature))
             .placed(self.ground, self.filler.clone(), BodyReading::classified(body))
+            .branching(Branches::scored(body))
     }
 
     fn mutation(signature: &Signature) -> Mutation {

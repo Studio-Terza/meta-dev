@@ -4,8 +4,12 @@ mod crate_transitions;
 mod duplicates;
 mod edge;
 mod end;
+mod graph;
 mod graph_lint;
+mod hidden_states;
+mod live_nodes;
 mod mutation;
+mod summary;
 mod workspace_types;
 
 use std::collections::BTreeMap;
@@ -22,6 +26,8 @@ use workspace_types::WorkspaceTypes;
 
 pub use duplicates::DuplicateTransitions;
 pub use graph_lint::GraphLint;
+pub use hidden_states::HiddenStates;
+pub use live_nodes::LiveNodes;
 pub use mutation::CoreMutation;
 
 #[derive(Debug)]

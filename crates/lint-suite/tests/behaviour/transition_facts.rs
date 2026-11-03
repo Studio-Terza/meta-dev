@@ -12,7 +12,7 @@ impl Read {
 
     fn signature(found: &Transition) -> String {
         let takes: Vec<String> = found.takes().iter().map(Self::endpoint).collect();
-        let fixed = found.filler().implemented().map(ToString::to_string).unwrap_or_default();
+        let fixed = found.filler().trait_name().map(ToString::to_string).unwrap_or_default();
         format!(
             "{found}({}) -> {} {:?} {:?} {fixed}",
             takes.join(", "),
