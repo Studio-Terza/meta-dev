@@ -1,0 +1,51 @@
+mod behaviour;
+mod group;
+
+use std::collections::BTreeMap;
+
+use lint_core::{Headline, Lint, Report, SourceFile, Violation};
+use transition_facts::Transitions;
+use type_facts::Facts;
+
+use crate::GraphLint;
+use crate::count::Count;
+use crate::graph::Graph;
+use crate::summary::Summary;
+use behaviour::Behaviour;
+use group::{Group, Tally};
+
+#[derive(Debug)]
+pub struct Bisimilarity;
+
+impl GraphLint for Bisimilarity {
+    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+        let graph = Graph::built(facts, transitions);
+        let behaviour = Behaviour::read(&graph);
+        let blocks = behaviour.refined();
+        let grouped = blocks.iter().fold(BTreeMap::new(), |mut groups: BTreeMap<_, Vec<_>>, (node, block)| {
+            groups.entry(*block).or_default().push(*node);
+            groups
+        });
+        let groups = Group::ranked(
+            grouped.into_values().filter_map(|members| Group::alike(members, &graph, &behaviour)).collect(),
+        );
+        Report::new(
+            Headline::new(
+                "report only, bisimilar types: partition refinement over the domain types, each edge labelled by its trait (written for inherent and free functions, lift for a derived lift, the operation for a store operation) and leading to an equivalent type or to the same black box; types in one group answer the same labelled moves into the same groups, so they behave identically; groups whose types make fewer than two moves are left out; candidates to merge into one type or one generic",
+            ),
+            Summary::placed(
+                graph.nodes().values().copied().min(),
+                Tally::counted(Count::new(graph.nodes().len()), &groups),
+            )
+            .into_iter()
+            .chain(groups.iter().map(Violation::from))
+            .collect(),
+        )
+    }
+}
+
+impl Lint for Bisimilarity {
+    fn report(files: &[SourceFile]) -> Report {
+        Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
+    }
+}

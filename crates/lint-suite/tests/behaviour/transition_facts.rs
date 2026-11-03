@@ -70,7 +70,7 @@ fn transitions_carry_their_ground_their_trait_and_provided_trait_bodies() {
     assert_eq!(
         found,
         [
-            "x::Shape::scaled(Interface:Shape, Named:Factor) -> Interface:Shape Absent Core ",
+            "x::Shape::scaled(Interface:Shape, Named:Factor) -> Interface:Shape Absent Core Shape",
             "x::S::area(Named:S) -> Named:Area Absent Core Shape",
             "x::free(Named:S) -> Named:S ThroughParameter Core ",
             "x::P::read(Named:P) -> Named:S ThroughSelf Ports ",

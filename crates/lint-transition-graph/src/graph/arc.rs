@@ -3,7 +3,7 @@ use transition_facts::Transition;
 
 use super::label::Label;
 use crate::edge::Edge;
-use crate::end::Step;
+use crate::end::{Node, Step};
 
 #[derive(Debug)]
 pub(crate) struct Arc<'found> {
@@ -20,6 +20,10 @@ impl<'found> Arc<'found> {
             .into_iter()
             .map(|step| Arc { step, label: label.clone(), transition: edge.transition() })
             .collect()
+    }
+
+    pub(crate) fn written(&self) -> Option<&Arc<'found>> {
+        self.label.written().filter(|_| AsRef::<Node>::as_ref(&self.step) != self.step.reached()).map(|_| self)
     }
 
     pub(crate) fn transition(&self) -> &'found Transition {

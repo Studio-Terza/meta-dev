@@ -88,6 +88,10 @@ impl End {
     pub(crate) fn place(&self) -> Place {
         self.place
     }
+
+    pub(crate) fn node(&self) -> Option<&Node> {
+        self.node.as_ref()
+    }
 }
 
 impl fmt::Display for End {
@@ -162,6 +166,12 @@ impl Ends {
 
     pub(crate) fn applied(&self) -> Applied<'_> {
         Applied(self)
+    }
+}
+
+impl AsRef<End> for Ends {
+    fn as_ref(&self) -> &End {
+        &self.gives
     }
 }
 

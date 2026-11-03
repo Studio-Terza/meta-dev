@@ -5,7 +5,7 @@ use transition_facts::{Transition, Transitions};
 use type_facts::Facts;
 
 use crate::GraphLint;
-use crate::edge::Role;
+use crate::edge::{Edge, Role};
 use crate::graph::Graph;
 use crate::summary::Summary;
 use hidden::{Hidden, Tally};
@@ -21,7 +21,7 @@ impl GraphLint for HiddenStates {
     fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
         let graph = Graph::built(facts, transitions);
         let written: Vec<&Transition> =
-            graph.edges().iter().filter(|edge| edge.role() == Role::Written).map(|edge| edge.transition()).collect();
+            graph.edges().iter().filter(|edge| edge.role() == Role::Written).map(Edge::transition).collect();
         let mut above: Vec<&Transition> =
             written.iter().copied().filter(|found| Self::FLOOR.allows(found.branches()).is_some()).collect();
         above.sort_by(|left, right| {
