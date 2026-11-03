@@ -27,12 +27,18 @@ impl<'file> Declared<'file> {
         })
     }
 
-    fn bare(block: &ItemTrait) -> Option<&ItemTrait> {
+    fn with_methods(block: &ItemTrait) -> Option<&ItemTrait> {
         Self::methods(block)
             .next()
-            .filter(|_| Self::methods(block).all(|method| method.default.is_none()))
             .filter(|_| !block.attrs.iter().any(|attribute| attribute.path().is_ident(Self::DISPATCHING)))
             .map(|_| block)
+    }
+
+    fn provided(block: &ItemTrait) -> Vec<Name> {
+        Self::methods(block)
+            .filter(|method| method.default.is_some())
+            .map(|method| Name::from(&method.sig.ident))
+            .collect()
     }
 }
 
@@ -43,9 +49,11 @@ impl<'ast> Visit<'ast> for Declared<'_> {
 
     fn visit_item_trait(&mut self, block: &'ast ItemTrait) {
         let site = Site::new(self.file.path(), LineNumber::from(block.ident.span()));
-        let declaration = Declaration::new(Name::from(&block.ident), site);
+        let declaration = Declaration::new(Name::from(&block.ident), Self::provided(block), site);
         self.found.extend(
-            Self::bare(block).filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered).map(|_| declaration),
+            Self::with_methods(block)
+                .filter(|block| Walk::outside_tests(&block.attrs) == Walk::Entered)
+                .map(|_| declaration),
         );
     }
 }

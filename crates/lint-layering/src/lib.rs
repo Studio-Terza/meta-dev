@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Headline, Lint, Report, SourceFile, Violation};
 use lint_item_graph::ItemGraph;
-use type_facts::{Facts, FactsLint};
+use type_facts::Facts;
 
 use definition::{Declared, Definition};
 use link::Link;
@@ -44,8 +44,9 @@ impl Layering {
     }
 }
 
-impl FactsLint for Layering {
-    fn report_facts<'file>(facts: &Facts<'file>) -> Report<'file> {
+impl Layering {
+    #[must_use]
+    pub fn report_facts<'file>(facts: &Facts<'file>) -> Report<'file> {
         let declared = Declared::of_facts(facts);
         let links: Vec<Link<'_, 'file>> = declared.links(facts);
         Report::new(

@@ -1,12 +1,12 @@
 use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::TransitionGraph;
+use lint_transition_graph::{OnGraph, TransitionGraph};
 
 struct Graphed;
 
 impl Graphed {
     fn of(sources: &[Source]) -> String {
-        TransitionGraph::report(&Sources::parsed(sources)).to_string()
+        OnGraph::<TransitionGraph>::report(&Sources::parsed(sources)).to_string()
     }
 
     fn at(path: &'static str, text: &str) -> Source {

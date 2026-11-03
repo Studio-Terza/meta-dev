@@ -1,13 +1,13 @@
 use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::{DuplicateTransitions, OneEdge};
+use lint_transition_graph::{DuplicateTransitions, OnGraph, OneEdge};
 
 struct Duplicates;
 
 impl Duplicates {
     fn of(sources: &[Source]) -> String {
         let files = Sources::parsed(sources);
-        format!("{}{}", OneEdge::report(&files), DuplicateTransitions::report(&files))
+        format!("{}{}", OnGraph::<OneEdge>::report(&files), OnGraph::<DuplicateTransitions>::report(&files))
     }
 
     fn at(path: &'static str, text: &str) -> Source {

@@ -3,7 +3,7 @@ mod tally;
 
 use std::collections::BTreeMap;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Report};
 use lint_placement::CrateName;
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -37,11 +37,5 @@ impl GraphLint for CoreMutation {
                 .chain(Tally::counted(counted.iter().copied()).violation(counted.iter().map(|edge| edge.site()).min()))
                 .collect(),
         )
-    }
-}
-
-impl Lint for CoreMutation {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

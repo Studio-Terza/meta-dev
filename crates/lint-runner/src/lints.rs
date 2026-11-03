@@ -40,8 +40,9 @@ use lint_repeated_methods::RepeatedMethods;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::OneEdge;
+use lint_transition_graph::{OnGraph, OneEdge};
 use lint_type_shape::TypeShape;
+use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
@@ -96,7 +97,8 @@ impl Lints {
             BoolMethods::report(files),
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
-            OneEdge::report(files),
+            OnGraph::<OneEdge>::report(files),
+            UnconsumedTraits::report(files),
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),
         ];
