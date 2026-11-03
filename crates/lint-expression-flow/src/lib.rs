@@ -11,9 +11,8 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
-    BinOp, Block, Expr, ExprAssign, ExprBinary, ExprBreak, ExprContinue, ExprForLoop, ExprIf, ExprLoop, ExprReturn,
-    ExprWhile, Ident, ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat,
-    PatIdent, Stmt, Token, TraitItemFn,
+    BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident, ImplItemConst,
+    ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, PatIdent, Stmt, Token, TraitItemFn,
 };
 
 use lint_core::Fix;
@@ -189,32 +188,6 @@ impl<'ast> Visit<'ast> for Flows<'_> {
             )
         }));
         syn::visit::visit_expr_if(self, expr);
-    }
-
-    fn visit_expr_return(&mut self, expr: &'ast ExprReturn) {
-        self.report(
-            expr.return_token.span,
-            Message::new(
-                Problem::new("early return"),
-                Fix::new("make the value the tail expression or exit through ? on a Result"),
-            ),
-        );
-        syn::visit::visit_expr_return(self, expr);
-    }
-
-    fn visit_expr_break(&mut self, expr: &'ast ExprBreak) {
-        self.report(
-            expr.break_token.span,
-            Message::new(Problem::new("break"), Fix::new("fold with ControlFlow or find the element with an iterator")),
-        );
-        syn::visit::visit_expr_break(self, expr);
-    }
-
-    fn visit_expr_continue(&mut self, expr: &'ast ExprContinue) {
-        self.report(
-            expr.continue_token.span,
-            Message::new(Problem::new("continue"), Fix::new("filter the iterator instead")),
-        );
     }
 
     fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {

@@ -1,0 +1,4 @@
+#[test]
+fn leaves() {
+    return;
+}

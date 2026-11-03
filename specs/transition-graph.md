@@ -41,7 +41,7 @@ D19 Records: store data are typed records with constraints: newtype fields, uniq
 
 ## Bodies and effects
 
-D20 Function bodies have no `return`, `break` or `continue`; `?` stays allowed. No function-size lint. Status: open.
+D20 Function bodies have no `return`, `break` or `continue`; `?` stays allowed. No function-size lint. Status: done, blocking lint `no_early_exits` over shipped and test code; 3 violations before, 0 after.
 D21 No port call inside per-element code: closures passed to `map`, `for_each`, `filter` and the like, and loops. Ports offer batch operations, and the refusal names that fix. Consuming a stream from a port element by element is fine; deliberate pacing is a named reason on the port method, a `Pacing` parameter. A port call is a parameter or field whose type is bounded by a port trait, or a struct holding one, used inside such a closure or loop body; `map`, `filter` and the like count only on an iterator, not on an `Option`. after: D3. Status: done, blocking lint `port_batching`; ci's `Ports` gained `runs` and `outputs`, and its two per-element callers were fixed.
 D22 Migration order: strict bool (newtype#D4), strict boundary (D3), effects into ports (D9), port batching (D21) alongside, store lints (D12, D18), then one edge per pair (D8); named invariants (D15) after. Status: open, strict bool done #233.
 
