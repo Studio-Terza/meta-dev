@@ -14,8 +14,8 @@ use referenced_names::ReferencedNames;
 use scope::Scope;
 
 #[derive(Clone, Debug, Default)]
-pub struct ItemGraph {
-    names: Vec<Name>,
+pub struct ItemGraph<Node = Name> {
+    names: Vec<Node>,
     links: Vec<Vec<NodeIndex>>,
 }
 
@@ -28,22 +28,7 @@ impl ItemGraph {
             .iter()
             .map(|file| ReferencedNames::of_items(&file.syntax().items, &Scope::of_file(file.syntax())))
             .fold(ReferencedNames::default(), ReferencedNames::merged);
-        Self::of_references(&references.into_map())
-    }
-
-    #[must_use]
-    pub fn of_references(references: &BTreeMap<Name, Vec<Name>>) -> ItemGraph {
-        let index_of: BTreeMap<&Name, NodeIndex> =
-            references.keys().enumerate().map(|(index, name)| (name, NodeIndex::from(index))).collect();
-        let links = references
-            .iter()
-            .map(|(owner, uses)| {
-                let linked: BTreeSet<NodeIndex> =
-                    uses.iter().filter(|name| *name != owner).filter_map(|name| index_of.get(name).copied()).collect();
-                linked.into_iter().collect()
-            })
-            .collect();
-        ItemGraph { names: references.keys().cloned().collect(), links }
+        ItemGraph::of_references(references.into_map())
     }
 
     #[must_use]
@@ -54,9 +39,32 @@ impl ItemGraph {
             .flat_map(|(from, links)| links.iter().map(move |to| [NodeIndex::from(from), *to]))
             .collect()
     }
+}
+
+impl<Node: Ord> ItemGraph<Node> {
+    #[must_use]
+    pub fn of_references<Uses>(references: BTreeMap<Node, Uses>) -> ItemGraph<Node>
+    where
+        for<'uses> &'uses Uses: IntoIterator<Item = &'uses Node>,
+    {
+        let index_of: BTreeMap<&Node, NodeIndex> =
+            references.keys().enumerate().map(|(index, name)| (name, NodeIndex::from(index))).collect();
+        let links = references
+            .iter()
+            .map(|(owner, uses)| {
+                let linked: BTreeSet<NodeIndex> = uses
+                    .into_iter()
+                    .filter(|name| *name != owner)
+                    .filter_map(|name| index_of.get(name).copied())
+                    .collect();
+                linked.into_iter().collect()
+            })
+            .collect();
+        ItemGraph { names: references.into_keys().collect(), links }
+    }
 
     #[must_use]
-    pub fn name_at(&self, node: NodeIndex) -> Option<&Name> {
+    pub fn name_at(&self, node: NodeIndex) -> Option<&Node> {
         self.names.get(node.into_inner())
     }
 

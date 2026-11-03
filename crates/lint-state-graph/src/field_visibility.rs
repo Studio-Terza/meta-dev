@@ -2,7 +2,7 @@ use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use syn::{Index, ItemMod, ItemStruct, Member, Visibility};
+use syn::{Index, ItemMod, ItemStruct, Visibility};
 
 use super::finding::Finding;
 use lint_core::FileLint;
@@ -38,21 +38,15 @@ impl<'ast> Visit<'ast> for FieldVisibility<'_> {
 
 impl FieldVisibility<'_> {
     fn exposed(&mut self, item: &ItemStruct) {
-        let exposed = item
-            .fields
-            .iter()
-            .enumerate()
-            .filter(|(_, field)| !matches!(field.vis, Visibility::Inherited))
-            .map(|(index, field)| {
-                Violation::new(
-                    Site::new(self.path, LineNumber::from(field.span())),
-                    Finding::ExposedField {
-                        field: field.ident.clone().map_or_else(|| Member::Unnamed(Index::from(index)), Member::Named),
-                        owner: Name::from(&item.ident),
-                        visibility: field.vis.clone(),
-                    },
-                )
-            });
+        let exposed =
+            item.fields.iter().enumerate().filter(|(_, field)| !matches!(field.vis, Visibility::Inherited)).map(
+                |(index, field)| {
+                    Violation::new(
+                        Site::new(self.path, LineNumber::from(field.span())),
+                        Finding::ExposedField { field, index: Index::from(index), owner: Name::from(&item.ident) },
+                    )
+                },
+            );
         self.violations.extend(exposed);
     }
 }

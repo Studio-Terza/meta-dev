@@ -1,15 +1,15 @@
-use std::ffi::OsString;
+use std::ffi::OsStr;
 use std::io;
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::document::Document;
 use crate::cli::gate::Seconds;
 use crate::cli::stage::Stage;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Failure {
+pub enum Failure<'cli> {
     #[error("cannot read {path}: {source}", path = path.display())]
-    Io { path: PathBuf, source: io::Error },
+    Io { path: &'cli Path, source: io::Error },
     #[error("cannot parse {file}: {source}")]
     Parse { file: Document, source: toml::de::Error },
     #[error("stage {stage} has no usable limit: it needs numeric warn and block with warn not above block")]
@@ -17,7 +17,7 @@ pub enum Failure {
     #[error("stage {stage} has a limit but was not measured")]
     Unmeasured { stage: Stage },
     #[error("stage {name} was asked for but has no limit", name = name.display())]
-    UnknownStage { name: OsString },
+    UnknownStage { name: &'cli OsStr },
     #[error("no stage has a limit")]
     Empty,
     #[error("stage {stage} has warn and block levels, which only the owner changes; only a record is lowered")]

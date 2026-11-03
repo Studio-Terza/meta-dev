@@ -5,56 +5,59 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Ground;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Node {
-    krate: CrateName,
-    name: Name,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Node<'found> {
+    krate: &'found CrateName,
+    name: &'found Name,
 }
 
-impl Node {
-    pub(crate) fn declared(krate: &CrateName, name: &Name) -> Node {
-        Node { krate: krate.clone(), name: name.clone() }
+impl<'found> Node<'found> {
+    pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Node<'found> {
+        Node { krate, name }
     }
 
-    pub(crate) fn resolved(declaring: &BTreeSet<CrateName>, from: &CrateName, name: &Name) -> Option<Node> {
-        let krate =
-            if declaring.contains(from) { Some(from) } else { declaring.first().filter(|_| declaring.len() == 1) };
-        krate.map(|krate| Node { krate: krate.clone(), name: name.clone() })
+    pub(crate) fn resolved(
+        declaring: &BTreeSet<&'found CrateName>,
+        from: &CrateName,
+        name: &'found Name,
+    ) -> Option<Node<'found>> {
+        let krate = declaring.get(from).or_else(|| declaring.first().filter(|_| declaring.len() == 1));
+        krate.map(|krate| Node { krate, name })
     }
 }
 
-impl AsRef<CrateName> for Node {
+impl AsRef<CrateName> for Node<'_> {
     fn as_ref(&self) -> &CrateName {
-        &self.krate
+        self.krate
     }
 }
 
-impl AsRef<Name> for Node {
+impl AsRef<Name> for Node<'_> {
     fn as_ref(&self) -> &Name {
-        &self.name
+        self.name
     }
 }
 
-impl fmt::Display for Node {
+impl fmt::Display for Node<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}::{}", self.krate, self.name)
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Tuple(BTreeSet<Node>);
+pub(crate) struct Tuple<'found>(BTreeSet<Node<'found>>);
 
-impl Tuple {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Node> {
+impl<'found> Tuple<'found> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Node<'found>> {
         self.0.iter()
     }
 
-    pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node>) -> Option<&'tuple Tuple> {
+    pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node<'_>>) -> Option<&'tuple Tuple<'found>> {
         self.0.iter().all(|node| available.contains(node)).then_some(self)
     }
 }
 
-impl fmt::Display for Tuple {
+impl fmt::Display for Tuple<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let nodes: Vec<String> = self.0.iter().map(ToString::to_string).collect();
         match nodes.as_slice() {
@@ -65,44 +68,44 @@ impl fmt::Display for Tuple {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Hop {
-    takes: Tuple,
-    gives: Node,
+pub(crate) struct Hop<'found> {
+    takes: Tuple<'found>,
+    gives: Node<'found>,
 }
 
-impl Hop {
-    pub(crate) fn reached(&self) -> &Node {
+impl<'found> Hop<'found> {
+    pub(crate) fn reached(&self) -> &Node<'found> {
         &self.gives
     }
 
-    pub(crate) fn onward(self) -> Option<Hop> {
+    pub(crate) fn onward(self) -> Option<Hop<'found>> {
         (!self.takes.0.contains(&self.gives)).then_some(self)
     }
 
-    pub(crate) fn fired(&self, available: &BTreeSet<&Node>) -> Option<&Node> {
+    pub(crate) fn fired(&self, available: &BTreeSet<&Node<'_>>) -> Option<&Node<'found>> {
         self.takes.within(available).map(|_| &self.gives)
     }
 }
 
-impl AsRef<Tuple> for Hop {
-    fn as_ref(&self) -> &Tuple {
+impl<'found> AsRef<Tuple<'found>> for Hop<'found> {
+    fn as_ref(&self) -> &Tuple<'found> {
         &self.takes
     }
 }
 
-impl fmt::Display for Hop {
+impl fmt::Display for Hop<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} -> {}", self.takes, self.gives)
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Key {
-    takes: Vec<Node>,
-    gives: Node,
+pub(crate) struct Key<'found> {
+    takes: Vec<Node<'found>>,
+    gives: Node<'found>,
 }
 
-impl fmt::Display for Key {
+impl fmt::Display for Key<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let takes: Vec<String> = self.takes.iter().map(ToString::to_string).collect();
         write!(formatter, "{} -> {}", takes.join(", "), self.gives)
@@ -118,32 +121,32 @@ pub(crate) enum Place {
     Primitive,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct End {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct End<'found> {
     place: Place,
-    name: Name,
-    node: Option<Node>,
+    name: &'found Name,
+    node: Option<Node<'found>>,
 }
 
-impl End {
-    pub(crate) fn placed(place: Place, name: &Name) -> End {
-        End { place, name: name.clone(), node: None }
+impl<'found> End<'found> {
+    pub(crate) fn placed(place: Place, name: &'found Name) -> End<'found> {
+        End { place, name, node: None }
     }
 
-    pub(crate) fn domain(node: Node) -> End {
-        End { place: Place::Domain, name: node.name.clone(), node: Some(node) }
+    pub(crate) fn domain(node: Node<'found>) -> End<'found> {
+        End { place: Place::Domain, name: node.name, node: Some(node) }
     }
 
     pub(crate) fn place(&self) -> Place {
         self.place
     }
 
-    pub(crate) fn node(&self) -> Option<&Node> {
+    pub(crate) fn node(&self) -> Option<&Node<'found>> {
         self.node.as_ref()
     }
 }
 
-impl fmt::Display for End {
+impl fmt::Display for End<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (&self.node, self.place) {
             (Some(node), _) => write!(formatter, "{node}"),
@@ -160,36 +163,36 @@ pub(crate) enum Class {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Ends {
-    takes: Vec<End>,
-    gives: End,
-    implementer: Option<End>,
+pub(crate) struct Ends<'found> {
+    takes: Vec<End<'found>>,
+    gives: End<'found>,
+    implementer: Option<End<'found>>,
 }
 
-impl Ends {
-    pub(crate) fn new(takes: Vec<End>, gives: End) -> Ends {
+impl<'found> Ends<'found> {
+    pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Ends<'found> {
         Ends { takes, gives, implementer: None }
     }
 
-    pub(crate) fn implemented_by(self, implementer: Option<End>) -> Ends {
+    pub(crate) fn implemented_by(self, implementer: Option<End<'found>>) -> Ends<'found> {
         Ends { implementer, ..self }
     }
 
-    pub(crate) fn all(&self) -> impl Iterator<Item = &End> {
+    pub(crate) fn all(&self) -> impl Iterator<Item = &End<'found>> {
         self.takes.iter().chain([&self.gives])
     }
 
-    pub(crate) fn hop(&self) -> Option<Hop> {
-        let takes: BTreeSet<Node> = self.taken().cloned().collect();
-        let gives = self.gives.node.clone()?;
+    pub(crate) fn hop(&self) -> Option<Hop<'found>> {
+        let takes: BTreeSet<Node<'found>> = self.taken().copied().collect();
+        let gives = self.gives.node?;
         (!takes.is_empty()).then_some(Hop { takes: Tuple(takes), gives })
     }
 
-    pub(crate) fn taken(&self) -> impl Iterator<Item = &Node> {
+    pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
         self.takes.iter().filter_map(|taken| taken.node.as_ref())
     }
 
-    pub(crate) fn entered(&self, ground: Ground) -> Option<&Node> {
+    pub(crate) fn entered(&self, ground: Ground) -> Option<&Node<'found>> {
         match (ground, self.taken().next()) {
             (Ground::Ports | Ground::Boundary, _) | (_, None) => self.gives.node.as_ref(),
             (Ground::Core | Ground::Store, Some(_)) => None,
@@ -203,34 +206,34 @@ impl Ends {
         }
     }
 
-    pub(crate) fn key(&self) -> Option<Key> {
-        let mut takes: Vec<Node> = self.takes.iter().map(|taken| taken.node.clone()).collect::<Option<Vec<Node>>>()?;
-        let gives = self.gives.node.clone()?;
+    pub(crate) fn key(&self) -> Option<Key<'found>> {
+        let mut takes: Vec<Node<'found>> = self.takes.iter().map(|taken| taken.node).collect::<Option<Vec<Node>>>()?;
+        let gives = self.gives.node?;
         let selector = self
             .implementer
             .as_ref()
-            .and_then(|implementer| implementer.node.clone())
+            .and_then(|implementer| implementer.node)
             .filter(|implementer| *implementer != gives && !takes.contains(implementer));
         takes.extend(selector);
         takes.sort();
         (!takes.is_empty()).then_some(Key { takes, gives })
     }
 
-    pub(crate) fn applied(&self) -> Applied<'_> {
+    pub(crate) fn applied(&self) -> Applied<'_, 'found> {
         Applied(self)
     }
 }
 
-impl AsRef<End> for Ends {
-    fn as_ref(&self) -> &End {
+impl<'found> AsRef<End<'found>> for Ends<'found> {
+    fn as_ref(&self) -> &End<'found> {
         &self.gives
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct Applied<'ends>(&'ends Ends);
+pub(crate) struct Applied<'ends, 'found>(&'ends Ends<'found>);
 
-impl fmt::Display for Applied<'_> {
+impl fmt::Display for Applied<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let takes: Vec<String> = self.0.takes.iter().skip(1).map(ToString::to_string).collect();
         write!(formatter, "{} -> {}", takes.join(", "), self.0.gives)

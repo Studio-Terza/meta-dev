@@ -20,10 +20,10 @@ pub struct DuplicateTransitions;
 impl GraphLint for DuplicateTransitions {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let types = WorkspaceTypes::declared(facts, transitions);
-        let edges: Vec<Edge<'_, 'file>> = transitions.all().iter().map(|found| types.edge(found)).collect();
+        let edges: Vec<Edge<'_, 'file>> = transitions.all().map(|found| types.edge(found)).collect();
         let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(
             BTreeMap::new(),
-            |mut keys: BTreeMap<Key, Vec<&Transition<'file>>>, edge| {
+            |mut keys: BTreeMap<Key<'_>, Vec<&Transition<'_, 'file>>>, edge| {
                 edge.ends().key().into_iter().for_each(|key| keys.entry(key).or_default().push(edge.transition()));
                 keys
             },
@@ -32,10 +32,10 @@ impl GraphLint for DuplicateTransitions {
             keyed.into_iter().filter_map(|(key, found)| Family::repeated(key, found)).collect();
         Report::new(
             Headline::new(
-                "report only, duplicate transitions: input types joined to one output type by more than one written edge (function, method or trait impl) in shipped code, compared only where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it, so impls of one trait on different types are different edges; derived lifts and store operations are left out; keep one, a standard conversion (From, TryFrom, FromStr) where it fits, and route the others through it",
+                "report only, duplicate transitions: input types joined to one output type by more than one written edge (function, method or trait impl) in shipped code, compared only where every type is a domain type; derived lifts and store operations are left out; keep one, a standard conversion (From, TryFrom, FromStr) where it fits, and route the others through it",
             ),
             Comparison::of_families(&edges, &families)
-                .violation(transitions.all())
+                .violation(transitions)
                 .into_iter()
                 .chain(families.iter().filter_map(Family::violation))
                 .collect(),

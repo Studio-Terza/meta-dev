@@ -21,32 +21,39 @@ pub trait Files {
 
     fn kind(&self, path: &Path) -> Kind;
 
-    fn read_many(&self, paths: &[PathBuf]) -> Vec<Result<Bytes, FileFailure>> {
-        paths.iter().map(|path| self.read(path)).collect()
+    fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
+        paths.iter().map(|path| self.read(path.as_ref())).collect()
     }
 
-    fn read_text_many(&self, paths: &[PathBuf]) -> Vec<Result<Text, FileFailure>> {
-        paths.iter().map(|path| self.read_text(path)).collect()
+    fn read_text_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Text, FileFailure>> {
+        paths.iter().map(|path| self.read_text(path.as_ref())).collect()
     }
 
-    fn copy_into(&self, paths: &[PathBuf], directory: &Path) -> Result<(), FileFailure> {
-        paths.iter().try_for_each(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
+    fn copy_into(&self, paths: &[impl AsRef<Path>], directory: &Path) -> Result<(), FileFailure> {
+        paths
+            .iter()
+            .map(AsRef::as_ref)
+            .try_for_each(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
     }
 
-    fn copy_each_into(&self, paths: &[PathBuf], directory: &Path) -> Vec<Result<(), FileFailure>> {
-        paths.iter().map(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default()))).collect()
+    fn copy_each_into(&self, paths: &[impl AsRef<Path>], directory: &Path) -> Vec<Result<(), FileFailure>> {
+        paths
+            .iter()
+            .map(AsRef::as_ref)
+            .map(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
+            .collect()
     }
 
-    fn entries_many(&self, directories: &[PathBuf]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
-        directories.iter().map(|directory| self.entries(directory)).collect()
+    fn entries_many(&self, directories: &[impl AsRef<Path>]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
+        directories.iter().map(|directory| self.entries(directory.as_ref())).collect()
     }
 
-    fn canonical_many(&self, paths: &[PathBuf]) -> Vec<Result<PathBuf, FileFailure>> {
-        paths.iter().map(|path| self.canonical(path)).collect()
+    fn canonical_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<PathBuf, FileFailure>> {
+        paths.iter().map(|path| self.canonical(path.as_ref())).collect()
     }
 
-    fn kinds(&self, paths: &[PathBuf]) -> Vec<Kind> {
-        paths.iter().map(|path| self.kind(path)).collect()
+    fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
+        paths.iter().map(|path| self.kind(path.as_ref())).collect()
     }
 
     fn mirror(&self, root: &Path, into: &impl Files) -> Result<(), FileFailure>

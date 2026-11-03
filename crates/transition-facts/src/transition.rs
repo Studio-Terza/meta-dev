@@ -1,138 +1,71 @@
 use std::fmt;
 
-use body_lifts::{Body, Branching};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
-use crate::endpoint::{Endpoint, Unnamed};
-use crate::filler::Filler;
+use crate::context::Context;
+use crate::endpoint::Endpoint;
+use crate::function::Function;
 use crate::ground::Ground;
-use crate::mutation::Mutation;
 
-#[derive(Clone, Debug)]
-pub struct Transition<'file> {
-    krate: CrateName,
-    site: Site<'file>,
-    owner: Option<Name>,
-    name: Name,
-    takes: Vec<Endpoint>,
-    gives: Endpoint,
-    implementer: Option<Endpoint>,
-    mutation: Mutation,
-    body: Body,
-    branching: Branching,
-    ground: Ground,
-    filler: Filler,
+#[derive(Clone, Copy, Debug)]
+pub struct Transition<'found, 'file> {
+    context: &'found Context<'file>,
+    function: &'found Function<'file>,
 }
 
-impl<'file> Transition<'file> {
-    pub(crate) fn new(krate: CrateName, site: Site<'file>, owner: Option<Name>, name: Name) -> Transition<'file> {
-        Transition {
-            krate,
-            site,
-            owner,
-            name,
-            takes: Vec::new(),
-            gives: Endpoint::from(Unnamed::Unit),
-            implementer: None,
-            mutation: Mutation::Absent,
-            body: Body::Written,
-            branching: Branching::new(1),
-            ground: Ground::Core,
-            filler: Filler::Free,
-        }
+impl<'found, 'file> Transition<'found, 'file> {
+    pub(crate) fn new(context: &'found Context<'file>, function: &'found Function<'file>) -> Transition<'found, 'file> {
+        Transition { context, function }
     }
 
-    pub(crate) fn taking(mut self, takes: Vec<Endpoint>, gives: Endpoint, mutation: Mutation) -> Transition<'file> {
-        self.takes = takes;
-        self.gives = gives;
-        self.mutation = mutation;
-        self
-    }
-
-    pub(crate) fn placed(mut self, ground: Ground, filler: Filler, body: Body) -> Transition<'file> {
-        self.ground = ground;
-        self.filler = filler;
-        self.body = body;
-        self
-    }
-
-    pub(crate) fn implemented_by(mut self, implementer: Option<Endpoint>) -> Transition<'file> {
-        self.implementer = implementer;
-        self
-    }
-
-    pub(crate) fn branching(mut self, branching: Branching) -> Transition<'file> {
-        self.branching = branching;
-        self
+    pub fn takes(&self) -> impl Iterator<Item = &'found Endpoint> {
+        let selfish = self.context.selfish();
+        self.function.takes().iter().map(move |taken| taken.resolved_with(selfish))
     }
 
     #[must_use]
-    pub fn takes(&self) -> &[Endpoint] {
-        &self.takes
+    pub fn gives(&self) -> &'found Endpoint {
+        self.function.gives().resolved_with(self.context.selfish())
     }
 
     #[must_use]
-    pub fn gives(&self) -> &Endpoint {
-        &self.gives
+    pub fn implementer(&self) -> Option<&'found Endpoint> {
+        self.context.filler().implementer(self.context.selfish())
     }
 
     #[must_use]
-    pub fn implementer(&self) -> Option<&Endpoint> {
-        self.implementer.as_ref()
+    pub fn context(&self) -> &'found Context<'file> {
+        self.context
     }
 
     #[must_use]
-    pub fn mutation(&self) -> Mutation {
-        self.mutation
-    }
-
-    #[must_use]
-    pub fn body(&self) -> Body {
-        self.body
-    }
-
-    #[must_use]
-    pub fn branches(&self) -> Branching {
-        self.branching
-    }
-
-    #[must_use]
-    pub fn filler(&self) -> &Filler {
-        &self.filler
+    pub fn function(&self) -> &'found Function<'file> {
+        self.function
     }
 }
 
-impl AsRef<Ground> for Transition<'_> {
+impl AsRef<Ground> for Transition<'_, '_> {
     fn as_ref(&self) -> &Ground {
-        &self.ground
+        self.context.as_ref()
     }
 }
 
-impl AsRef<CrateName> for Transition<'_> {
+impl AsRef<CrateName> for Transition<'_, '_> {
     fn as_ref(&self) -> &CrateName {
-        &self.krate
+        self.context.as_ref()
     }
 }
 
-impl AsRef<Name> for Transition<'_> {
-    fn as_ref(&self) -> &Name {
-        &self.name
-    }
-}
-
-impl<'file> AsRef<Site<'file>> for Transition<'file> {
+impl<'file> AsRef<Site<'file>> for Transition<'_, 'file> {
     fn as_ref(&self) -> &Site<'file> {
-        &self.site
+        self.function.as_ref()
     }
 }
 
-impl fmt::Display for Transition<'_> {
+impl fmt::Display for Transition<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.owner {
-            Some(owner) => write!(formatter, "{}::{owner}::{}", self.krate, self.name),
-            None => write!(formatter, "{}::{}", self.krate, self.name),
-        }
+        write!(formatter, "{}::{}", self.context, AsRef::<Name>::as_ref(self.function))
     }
 }

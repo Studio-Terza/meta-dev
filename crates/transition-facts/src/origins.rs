@@ -6,32 +6,56 @@ use syn::{File, ItemMod, ItemUse, Path, UseTree};
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 
+use crate::endpoint::Endpoint;
+use crate::resolved::Resolved;
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum Spelling {
+    Bare(Name),
+    Pathed(Name),
+}
+
+impl Spelling {
+    pub(crate) fn of_path(path: &Path) -> Option<Spelling> {
+        let first = Name::from(&path.segments.first()?.ident);
+        match path.segments.len() {
+            1 => Some(Spelling::Bare(first)),
+            _ => Some(Spelling::Pathed(first)),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub(super) struct Origins {
-    own: CrateName,
+pub(crate) struct Origins<'file> {
+    own: &'file CrateName,
     modules: BTreeSet<Name>,
     imported: BTreeMap<Name, Name>,
 }
 
-impl Origins {
+impl<'file> Origins<'file> {
     const LOCAL: [Word<'static>; 3] = words!["crate", "self", "super"];
 
-    pub(super) fn of_file(own: CrateName, syntax: &File) -> Origins {
+    pub(crate) fn of_file(own: &'file CrateName, syntax: &File) -> Origins<'file> {
         let mut origins = Origins { own, modules: BTreeSet::new(), imported: BTreeMap::new() };
         origins.visit_file(syntax);
         origins
     }
 
-    pub(super) fn own(&self) -> &CrateName {
-        &self.own
+    pub(crate) fn own(&self) -> &'file CrateName {
+        self.own
     }
 
-    pub(super) fn of_path(&self, path: &Path) -> Option<CrateName> {
-        let first = Name::from(&path.segments.first()?.ident);
-        match path.segments.len() {
-            1 => self.imported.get(&first).map(|head| self.crate_of(head)),
-            _ => Some(self.crate_of(&first)),
-        }
+    pub(crate) fn located(&self, resolved: Resolved) -> Resolved {
+        resolved.map_found(|endpoint| self.endpoint(endpoint))
+    }
+
+    pub(crate) fn endpoint(&self, endpoint: Endpoint) -> Endpoint {
+        let origin = match endpoint.spelling() {
+            Some(Spelling::Bare(head)) => self.imported.get(head).map(|imported| self.crate_of(imported)),
+            Some(Spelling::Pathed(head)) => Some(self.crate_of(head)),
+            None => None,
+        };
+        endpoint.originating(origin)
     }
 
     fn crate_of(&self, head: &Name) -> CrateName {
@@ -61,7 +85,7 @@ struct Import {
     head: Name,
 }
 
-impl<'ast> Visit<'ast> for Origins {
+impl<'ast> Visit<'ast> for Origins<'_> {
     fn visit_item_use(&mut self, found: &'ast ItemUse) {
         self.imported.extend(Self::imports(None, &found.tree).into_iter().map(|import| (import.name, import.head)));
     }

@@ -1,29 +1,14 @@
-use std::collections::BTreeMap;
-
 use lint_layout::Name;
 use lint_paths::Module;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TypeKey {
-    module: Module,
-    name: Name,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypeKey<'guards> {
+    module: &'guards Module,
+    name: &'guards Name,
 }
 
-impl TypeKey {
-    pub fn new(module: Module, name: Name) -> TypeKey {
+impl<'guards> TypeKey<'guards> {
+    pub fn new(module: &'guards Module, name: &'guards Name) -> TypeKey<'guards> {
         TypeKey { module, name }
-    }
-
-    pub fn type_name(&self) -> &Name {
-        &self.name
-    }
-
-    pub fn aliased(&self, aliases: &BTreeMap<TypeKey, Name>) -> TypeKey {
-        let name = aliases.get(self).unwrap_or(&self.name).clone();
-        TypeKey { module: self.module.clone(), name }
-    }
-
-    pub fn sharing_crate<'other>(&self, other: &'other TypeKey) -> Option<&'other TypeKey> {
-        (self.module.root() == other.module.root()).then_some(other)
     }
 }

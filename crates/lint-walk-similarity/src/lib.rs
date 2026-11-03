@@ -15,12 +15,12 @@ pub struct WalkSimilarity;
 
 impl FactsLint for WalkSimilarity {
     fn report_facts<'file>(facts: &Facts<'file>) -> Report<'file> {
-        let local: BTreeSet<Name> = facts.traits().iter().map(|found| AsRef::<Name>::as_ref(found).clone()).collect();
+        let local: BTreeSet<&Name> = facts.traits().iter().map(AsRef::as_ref).collect();
         let walks: Vec<Walk<'_, 'file>> = facts
             .types()
             .iter()
             .filter_map(|found| facts.declared_once(found))
-            .filter_map(|found| Walk::walked(found, &local))
+            .filter_map(|found| Walk::walked(facts, found, &local))
             .collect();
         Report::new(
             Headline::new(

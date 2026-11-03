@@ -4,18 +4,18 @@ use lint_layout::Name;
 use crate::package::Package;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Subject {
-    package: Package,
+pub(crate) struct Subject<'file> {
+    package: Package<'file>,
     name: Name,
 }
 
-impl Subject {
-    pub(crate) fn new(file: &SourceFile, name: Name) -> Subject {
+impl<'file> Subject<'file> {
+    pub(crate) fn new(file: &'file SourceFile, name: Name) -> Subject<'file> {
         Subject { package: Package::containing(file), name }
     }
 
-    pub(crate) fn package(&self) -> &Package {
-        &self.package
+    pub(crate) fn package(&self) -> Package<'file> {
+        self.package
     }
 
     pub(crate) fn owner(&self) -> &Name {

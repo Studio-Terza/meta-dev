@@ -9,13 +9,13 @@ use super::function_shape::FunctionShape;
 use lint_core::TypeName;
 use lint_layout::Name;
 
-pub struct ImplContext {
+pub struct ImplContext<'found> {
     self_type: TypeName,
-    kind: ImplKind,
+    kind: ImplKind<'found>,
 }
 
-impl ImplContext {
-    pub fn describe(item: &ItemImpl, declarations: &Declarations) -> ImplContext {
+impl<'found> ImplContext<'found> {
+    pub fn describe(item: &ItemImpl, declarations: &'found Declarations) -> ImplContext<'found> {
         let self_type = declarations.resolve(TypeName::from_type(&item.self_ty));
         let trait_name = item
             .trait_
@@ -23,9 +23,9 @@ impl ImplContext {
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| Name::from(&segment.ident));
         let kind = match (trait_name, declarations.vertex_named(&self_type)) {
-            (Some(name), Some(_)) => ImplKind::TraitOnVertex(name),
+            (Some(name), Some(vertex)) => ImplKind::TraitOnVertex(name, vertex),
             (Some(name), None) => ImplKind::TraitOnValue(name),
-            (None, Some(_)) => ImplKind::InherentOnVertex,
+            (None, Some(vertex)) => ImplKind::InherentOnVertex(vertex),
             (None, None) => ImplKind::InherentOnValue,
         };
         ImplContext { self_type, kind }
@@ -35,7 +35,7 @@ impl ImplContext {
         &self.self_type
     }
 
-    pub fn kind(&self) -> &ImplKind {
+    pub fn kind(&self) -> &ImplKind<'found> {
         &self.kind
     }
 
@@ -50,7 +50,7 @@ impl ImplContext {
         self.kind.trait_name().map_or_else(|| Name::from(&function.sig.ident), Name::clone)
     }
 
-    pub fn edge_source(&self, shape: &FunctionShape<'_>) -> Option<TypeName> {
-        self.kind.edge_source(&self.self_type, shape.vertex_parameters().first())
+    pub fn edge_source(&self, shape: &FunctionShape<'found, '_>) -> Option<&'found TypeName> {
+        self.kind.edge_source(shape.vertex_parameters().first())
     }
 }

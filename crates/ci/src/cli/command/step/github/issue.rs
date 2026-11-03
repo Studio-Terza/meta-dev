@@ -21,18 +21,22 @@ pub struct Issue<'title> {
 impl<'title> Issue<'title> {
     const SEEN: &'static str = "100";
 
-    pub(super) fn titled(titles: &[Title<'title>], ports: &impl Ports) -> Result<Vec<Issue<'title>>, Failure> {
+    pub(super) fn titled(titles: &[Title<'title>], ports: &impl Ports) -> Result<Vec<Issue<'title>>, Failure<'static>> {
         let invocations: Vec<Invocation> = titles.iter().map(|title| Self::search(*title)).collect();
         let texts = Failure::started(ports.outputs(&invocations), &invocations)?;
         titles.iter().zip(&texts).map(|(title, text)| Self::listed(*title, text)).collect()
     }
 
-    pub(super) fn filed(filings: &[Invocation], ports: &impl Ports) -> Result<Exit, Failure> {
+    pub(super) fn filed(filings: &[Invocation], ports: &impl Ports) -> Result<Exit, Failure<'static>> {
         let runs = Failure::started(ports.runs(filings), filings)?;
         Ok(runs.iter().map(Run::exit).find(|exit| *exit != Exit::Success).unwrap_or(Exit::Success))
     }
 
-    pub(super) fn filing(&self, body: &impl fmt::Display, out: &mut impl Write) -> Result<Invocation, Failure> {
+    pub(super) fn filing(
+        &self,
+        body: &impl fmt::Display,
+        out: &mut impl Write,
+    ) -> Result<Invocation, Failure<'static>> {
         let body = body.to_string();
         if let Some(number) = self.number {
             writeln!(out, "updating issue {number}: {}", self.title)?;
@@ -51,7 +55,7 @@ impl<'title> Issue<'title> {
         )
     }
 
-    fn listed(title: Title<'title>, text: &Text) -> Result<Issue<'title>, Failure> {
+    fn listed(title: Title<'title>, text: &Text) -> Result<Issue<'title>, Failure<'static>> {
         let listed: Vec<Listed> = serde_json::from_str(text.as_ref()).map_err(Failure::Issues)?;
         Ok(Issue { title, number: listed.iter().find_map(|issue| issue.numbered(title)) })
     }

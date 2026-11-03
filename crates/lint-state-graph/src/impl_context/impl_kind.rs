@@ -2,25 +2,25 @@ use lint_core::TypeName;
 use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ImplKind {
-    InherentOnVertex,
+pub enum ImplKind<'found> {
+    InherentOnVertex(&'found TypeName),
     InherentOnValue,
-    TraitOnVertex(Name),
+    TraitOnVertex(Name, &'found TypeName),
     TraitOnValue(Name),
 }
 
-impl ImplKind {
+impl<'found> ImplKind<'found> {
     pub fn trait_name(&self) -> Option<&Name> {
         match self {
-            ImplKind::TraitOnVertex(name) | ImplKind::TraitOnValue(name) => Some(name),
-            ImplKind::InherentOnVertex | ImplKind::InherentOnValue => None,
+            ImplKind::TraitOnVertex(name, _) | ImplKind::TraitOnValue(name) => Some(name),
+            ImplKind::InherentOnVertex(_) | ImplKind::InherentOnValue => None,
         }
     }
 
-    pub fn edge_source(&self, self_type: &TypeName, first_vertex_parameter: Option<&TypeName>) -> Option<TypeName> {
+    pub fn edge_source(&self, first_vertex_parameter: Option<&&'found TypeName>) -> Option<&'found TypeName> {
         match self {
-            ImplKind::InherentOnVertex | ImplKind::TraitOnVertex(_) => Some(self_type.clone()),
-            ImplKind::TraitOnValue(_) => first_vertex_parameter.cloned(),
+            ImplKind::InherentOnVertex(vertex) | ImplKind::TraitOnVertex(_, vertex) => Some(vertex),
+            ImplKind::TraitOnValue(_) => first_vertex_parameter.copied(),
             ImplKind::InherentOnValue => None,
         }
     }

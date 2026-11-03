@@ -1,5 +1,6 @@
+use std::borrow::Cow;
 use std::io;
-use std::path::Path;
+use std::path::PathBuf;
 
 use file_ports::{FileFailure, Text};
 use serde::Deserialize;
@@ -17,10 +18,13 @@ pub struct ShardMatrix {
 impl ShardMatrix {
     pub const FILE: &'static str = "matrix.json";
 
-    pub fn parsed(path: &Path, text: Result<Text, FileFailure>) -> Result<ShardMatrix, Failure> {
-        let text =
-            text.map_err(|failure| Failure::Io { path: path.to_path_buf(), source: io::Error::from(failure) })?;
-        serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })
+    pub fn parsed(path: PathBuf, text: Result<Text, FileFailure>) -> Result<ShardMatrix, Failure<'static>> {
+        match text {
+            Ok(text) => {
+                serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path: Cow::Owned(path), source })
+            }
+            Err(failure) => Err(Failure::Io { path: Cow::Owned(path), source: io::Error::from(failure) }),
+        }
     }
 
     pub(crate) fn baseline(&self) -> &[OneLine] {

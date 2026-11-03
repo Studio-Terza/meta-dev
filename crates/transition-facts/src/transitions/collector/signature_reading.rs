@@ -5,87 +5,81 @@ use syn::{Block, FnArg, ItemImpl, ItemTrait, ReturnType, Signature, Type};
 use body_lifts::{BodyReading, Branches, Propagation};
 use lint_core::Site;
 use lint_layout::Name;
-use lint_placement::CrateName;
 
-use super::origins::Origins;
+use crate::context::Context;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::filler::Filler;
+use crate::function::Function;
 use crate::ground::Ground;
 use crate::mutation::Mutation;
-use crate::transition::Transition;
+use crate::origins::Origins;
+use crate::resolved::Resolved;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
-pub(super) struct SignatureReading<'origins> {
-    krate: CrateName,
-    owner: Option<Name>,
-    scope: TypeScope<'origins>,
-    ground: Ground,
-    filler: Filler,
+pub(super) struct SignatureReading<'origins, 'file> {
+    context: Context<'file>,
+    scope: TypeScope<'static>,
+    origins: &'origins Origins<'file>,
 }
 
-impl<'origins> SignatureReading<'origins> {
-    pub(super) fn free(origins: &'origins Origins, ground: Ground) -> SignatureReading<'origins> {
-        let scope = TypeScope::new(Endpoint::from(Unnamed::Opaque), origins);
-        SignatureReading { krate: origins.own().clone(), owner: None, scope, ground, filler: Filler::Free }
+impl<'origins, 'file> SignatureReading<'origins, 'file> {
+    pub(super) fn free(origins: &'origins Origins<'file>, ground: Ground) -> SignatureReading<'origins, 'file> {
+        let selfish = Endpoint::from(Unnamed::Opaque);
+        let scope = TypeScope::root(selfish.nature());
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Free), scope, origins }
     }
 
-    pub(super) fn of_impl(origins: &'origins Origins, found: &ItemImpl, ground: Ground) -> SignatureReading<'origins> {
+    pub(super) fn of_impl(
+        origins: &'origins Origins<'file>,
+        found: &ItemImpl,
+        ground: Ground,
+    ) -> SignatureReading<'origins, 'file> {
+        let outer = Endpoint::from(Unnamed::Opaque).nature();
         let selfish =
-            TypeScope::new(Endpoint::from(Unnamed::Opaque), origins).extended(&found.generics).endpoint(&found.self_ty);
+            origins.endpoint(TypeScope::declaring(outer, None, &found.generics).endpoint(&found.self_ty).or_opaque());
         let filler = found
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map_or(Filler::Inherent, |segment| Filler::Implemented(Name::from(&segment.ident)));
-        SignatureReading {
-            krate: origins.own().clone(),
-            owner: Some(AsRef::<Name>::as_ref(&selfish).clone()),
-            scope: TypeScope::new(selfish, origins).extended(&found.generics),
-            ground,
-            filler,
-        }
+        let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins }
     }
 
     pub(super) fn of_trait(
-        origins: &'origins Origins,
+        origins: &'origins Origins<'file>,
         found: &ItemTrait,
         ground: Ground,
-    ) -> SignatureReading<'origins> {
-        let name = Name::from(&found.ident);
-        SignatureReading {
-            krate: origins.own().clone(),
-            owner: Some(name.clone()),
-            scope: TypeScope::new(Endpoint::new(Nature::Interface, name.clone()), origins).extended(&found.generics),
-            ground,
-            filler: Filler::Provided(name),
-        }
+    ) -> SignatureReading<'origins, 'file> {
+        let selfish = Endpoint::new(Nature::Interface, Name::from(&found.ident));
+        let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Provided), scope, origins }
     }
 
-    pub(super) fn transition<'file>(
-        &self,
-        site: Site<'file>,
-        signature: &Signature,
-        body: &Block,
-    ) -> Transition<'file> {
+    pub(super) fn function(&self, site: Site<'file>, signature: &Signature, body: &Block) -> Function<'file> {
         let scope = self.scope.extended(&signature.generics);
         let takes = signature
             .inputs
             .iter()
             .map(|input| match input {
                 FnArg::Receiver(receiver) => scope.endpoint(&receiver.ty),
-                FnArg::Typed(typed) => scope.endpoint(&typed.ty),
+                FnArg::Typed(typed) => self.origins.located(scope.endpoint(&typed.ty)),
             })
             .collect();
         let gives = match &signature.output {
-            ReturnType::Default => Endpoint::from(Unnamed::Unit),
-            ReturnType::Type(_, returned) => scope.endpoint(returned),
+            ReturnType::Default => Resolved::Found(Endpoint::from(Unnamed::Unit)),
+            ReturnType::Type(_, returned) => self.origins.located(scope.endpoint(returned)),
         };
-        Transition::new(self.krate.clone(), site, self.owner.clone(), Name::from(&signature.ident))
-            .taking(takes, gives, Self::mutation(signature))
-            .placed(self.ground, self.filler.clone(), BodyReading::classified(body))
-            .implemented_by(self.filler.implementer(self.scope.selfish()))
-            .branching(Branches::scored(body, Propagation::Ambient))
+        Function::new(site, Name::from(&signature.ident), takes, gives).shaped(
+            Self::mutation(signature),
+            BodyReading::classified(body),
+            Branches::scored(body, Propagation::Ambient),
+        )
+    }
+
+    pub(super) fn into_context(self) -> Context<'file> {
+        self.context
     }
 
     fn mutation(signature: &Signature) -> Mutation {

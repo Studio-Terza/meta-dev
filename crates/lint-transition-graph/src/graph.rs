@@ -17,15 +17,15 @@ pub(crate) use label::{Interface, Label};
 
 #[derive(Debug)]
 pub(crate) struct Graph<'found, 'file> {
-    nodes: BTreeMap<Node, Site<'file>>,
+    nodes: BTreeMap<Node<'found>, Site<'file>>,
     edges: Vec<Edge<'found, 'file>>,
     hyperedges: Vec<Hyperedge<'found, 'file>>,
 }
 
 impl<'found, 'file> Graph<'found, 'file> {
-    pub(crate) fn built(facts: &Facts<'file>, transitions: &'found Transitions<'file>) -> Graph<'found, 'file> {
+    pub(crate) fn built(facts: &'found Facts<'file>, transitions: &'found Transitions<'file>) -> Graph<'found, 'file> {
         let types = WorkspaceTypes::declared(facts, transitions);
-        let edges: Vec<Edge<'found, 'file>> = transitions.all().iter().map(|found| types.edge(found)).collect();
+        let edges: Vec<Edge<'found, 'file>> = transitions.all().map(|found| types.edge(found)).collect();
         let hyperedges = edges.iter().filter_map(Hyperedge::of_edge).collect();
         let nodes = facts.types().iter().fold(BTreeMap::new(), |mut nodes, found| {
             nodes.entry(Node::declared(found.as_ref(), found.as_ref())).or_insert(*AsRef::<Site<'file>>::as_ref(found));
@@ -34,7 +34,7 @@ impl<'found, 'file> Graph<'found, 'file> {
         Graph { nodes, edges, hyperedges }
     }
 
-    pub(crate) fn nodes(&self) -> &BTreeMap<Node, Site<'file>> {
+    pub(crate) fn nodes(&self) -> &BTreeMap<Node<'found>, Site<'file>> {
         &self.nodes
     }
 

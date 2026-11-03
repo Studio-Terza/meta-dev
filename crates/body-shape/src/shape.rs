@@ -39,7 +39,7 @@ impl From<TokenStream> for Shape {
     fn from(tokens: TokenStream) -> Shape {
         let raw = RawToken::flattened(tokens);
         let mut slots = Slots::default();
-        let shaped: Vec<ShapeToken> = raw
+        let shaped: Vec<ShapeToken<'_>> = raw
             .iter()
             .zip(Neighbours::all(&raw))
             .filter_map(|(token, neighbours)| token.shaped(neighbours.position(), &mut slots))

@@ -1,27 +1,35 @@
 use std::collections::BTreeSet;
 
-use lint_layout::{Name, UsePath};
+use lint_layout::Name;
+use proc_macro2::Ident;
 
 use super::import::Import;
 
 #[derive(Debug, Default)]
-pub struct Imports(Vec<Import>);
+pub struct Imports<'file>(Vec<Import<'file>>);
 
-impl Imports {
-    pub fn add(&mut self, import: Import) {
-        self.0.push(import);
+impl<'file> Imports<'file> {
+    pub fn add(&mut self, import: Option<Import<'file>>) {
+        self.0.extend(import);
     }
 
-    pub fn holds(&self, name: &Name) -> Option<&UsePath> {
+    pub fn holds<Spelled: PartialEq<Ident>>(&self, name: &Spelled) -> Option<&Import<'file>> {
         self.0.iter().find_map(|import| import.names(name))
     }
 
-    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<Name> {
-        let paths: Vec<&UsePath> = self.0.iter().filter_map(|import| import.names(name)).collect();
-        let original = paths.iter().find_map(|path| path.segments().last());
-        paths
+    pub fn local_item<Spelled: PartialEq<Ident>>(
+        &self,
+        name: &Spelled,
+        local_roots: &BTreeSet<Name>,
+    ) -> Option<&Imports<'file>> {
+        self.0
             .iter()
-            .all(|path| path.segments().first().is_some_and(|root| local_roots.contains(root)))
-            .then(|| original.unwrap_or(name).clone())
+            .filter_map(|import| import.names(name))
+            .all(|import| import.rooted_in(local_roots).is_some())
+            .then_some(self)
+    }
+
+    pub fn original(&self, name: Name) -> Name {
+        self.holds(&name).map(Import::original).map_or(name, Name::from)
     }
 }

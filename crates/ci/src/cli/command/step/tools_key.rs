@@ -19,7 +19,7 @@ impl ToolsKey {
     const SOURCES: &'static str = "sources";
     const DELIMITER: &'static str = "TOOLS_SOURCES";
 
-    fn listed(&self, ports: &impl Ports) -> Result<Text, Failure> {
+    fn listed(&self, ports: &impl Ports) -> Result<Text, Failure<'static>> {
         let arguments = [OsString::from(Self::SOURCES), self.metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(InstallTools::PROGRAMS.iter().map(|tool| tool.as_ref().to_owned()));
@@ -28,8 +28,8 @@ impl ToolsKey {
 }
 
 impl Step for ToolsKey {
-    fn from_arguments(arguments: &[OsString]) -> Result<ToolsKey, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
+        match arguments.as_slice() {
             [metadata, output] => {
                 Ok(ToolsKey { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
             }
@@ -37,7 +37,7 @@ impl Step for ToolsKey {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         Changed::stored_metadata(ports, &self.metadata)?;
         let listed = self.listed(ports)?;
         self.output.append(

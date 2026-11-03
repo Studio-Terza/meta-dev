@@ -1,6 +1,8 @@
 use lint_layout::{Name, Word};
 use lint_placement::CrateName;
 
+use crate::origins::Spelling;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Nature {
     Named,
@@ -19,6 +21,7 @@ pub(crate) enum Unnamed {
 pub struct Endpoint {
     nature: Nature,
     name: Name,
+    spelling: Option<Spelling>,
     origin: Option<CrateName>,
 }
 
@@ -27,21 +30,22 @@ impl Endpoint {
     const OPAQUE: Word<'static> = Word::new("_");
 
     pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
-        Endpoint { nature, name, origin: None }
+        Endpoint { nature, name, spelling: None, origin: None }
+    }
+
+    pub(crate) fn spelled(self, spelling: Option<Spelling>) -> Endpoint {
+        Endpoint { spelling, ..self }
+    }
+
+    pub(crate) fn spelling(&self) -> Option<&Spelling> {
+        self.spelling.as_ref()
     }
 
     pub(crate) fn originating(self, origin: Option<CrateName>) -> Endpoint {
         match self.nature {
-            Nature::Named => Endpoint { origin, ..self },
-            Nature::Interface | Nature::Primitive | Nature::Boxed => self,
+            Nature::Named => Endpoint { origin, spelling: None, ..self },
+            Nature::Interface | Nature::Primitive | Nature::Boxed => Endpoint { spelling: None, ..self },
         }
-    }
-
-    pub(crate) fn tupled(elements: impl Iterator<Item = Endpoint>) -> Endpoint {
-        elements
-            .into_iter()
-            .find(|element| element.nature == Nature::Primitive)
-            .unwrap_or_else(|| Endpoint::from(Unnamed::Opaque))
     }
 
     #[must_use]
@@ -61,7 +65,7 @@ impl From<Unnamed> for Endpoint {
             Unnamed::Unit => Self::UNIT,
             Unnamed::Opaque => Self::OPAQUE,
         };
-        Endpoint { nature: Nature::Boxed, name: Name::from(name), origin: None }
+        Endpoint { nature: Nature::Boxed, name: Name::from(name), spelling: None, origin: None }
     }
 }
 

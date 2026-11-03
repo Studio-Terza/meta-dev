@@ -10,13 +10,13 @@ use super::mutant_result::MutantResult;
 use crate::cli::shard::failure::Failure;
 
 #[derive(Debug, Serialize)]
-pub struct Matrix {
-    baseline: Vec<TestName>,
-    mutants: Vec<MutantResult>,
+pub struct Matrix<'log> {
+    baseline: Vec<&'log TestName>,
+    mutants: Vec<MutantResult<'log>>,
 }
 
-impl Matrix {
-    pub(crate) fn new(baseline: Vec<TestName>, mutants: Vec<MutantResult>) -> Matrix {
+impl<'log> Matrix<'log> {
+    pub(crate) fn new(baseline: Vec<&'log TestName>, mutants: Vec<MutantResult<'log>>) -> Matrix<'log> {
         Matrix { baseline, mutants }
     }
 

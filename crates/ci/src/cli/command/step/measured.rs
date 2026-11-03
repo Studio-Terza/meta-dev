@@ -10,7 +10,7 @@ use super::stage::Stage;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::Text;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Measured(Journal);
 
 impl Measured {
@@ -21,11 +21,11 @@ impl Measured {
         Measured(Journal::file(path))
     }
 
-    pub(crate) fn append(&self, files: &impl Files, stage: &Stage, seconds: Seconds) -> Result<(), Failure> {
+    pub(crate) fn append(&self, files: &impl Files, stage: &Stage, seconds: Seconds) -> Result<(), Failure<'_>> {
         self.0.append(files, format_args!("{stage}{}{seconds}\n", Self::ASSIGN))
     }
 
-    pub(crate) fn row(&self, files: &impl Files) -> Result<Text, Failure> {
+    pub(crate) fn row(&self, files: &impl Files) -> Result<Text, Failure<'_>> {
         let text = self.0.read(files)?;
         Ok(Text::new(Lines::from(text.as_ref()).collect::<Vec<&str>>().join(Self::TAB)))
     }

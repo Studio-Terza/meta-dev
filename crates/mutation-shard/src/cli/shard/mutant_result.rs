@@ -5,14 +5,14 @@ use super::outcomes::Title;
 use super::verdict::Verdict;
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub struct MutantResult {
+pub struct MutantResult<'log> {
     name: Title,
     summary: Verdict,
-    failed: Vec<TestName>,
+    failed: Vec<&'log TestName>,
 }
 
-impl MutantResult {
-    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<TestName>) -> MutantResult {
+impl<'log> MutantResult<'log> {
+    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<&'log TestName>) -> MutantResult<'log> {
         MutantResult { name, summary, failed }
     }
 }

@@ -9,14 +9,17 @@ use crate::end::Key;
 
 #[derive(Debug)]
 pub(super) struct Family<'found, 'file> {
-    key: Key,
-    members: Vec<&'found Transition<'file>>,
+    key: Key<'found>,
+    members: Vec<&'found Transition<'found, 'file>>,
 }
 
 impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
-    pub(super) fn repeated(key: Key, members: Vec<&'found Transition<'file>>) -> Option<Family<'found, 'file>> {
+    pub(super) fn repeated(
+        key: Key<'found>,
+        members: Vec<&'found Transition<'found, 'file>>,
+    ) -> Option<Family<'found, 'file>> {
         (members.len() > 1).then_some(Family { key, members })
     }
 
@@ -29,10 +32,10 @@ impl<'found, 'file> Family<'found, 'file> {
         Count::new(self.members.len())
     }
 
-    fn canonical(&self) -> Option<&&'found Transition<'file>> {
+    fn canonical(&self) -> Option<&&'found Transition<'found, 'file>> {
         self.members
             .iter()
-            .find(|member| AsRef::<Name>::as_ref(**member).matches::<Whole>(&Self::CONVERSIONS).is_some())
+            .find(|member| AsRef::<Name>::as_ref(member.function()).matches::<Whole>(&Self::CONVERSIONS).is_some())
     }
 }
 
