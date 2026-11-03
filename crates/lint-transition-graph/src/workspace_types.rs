@@ -14,6 +14,7 @@ pub(crate) struct WorkspaceTypes {
     types: BTreeMap<Name, BTreeSet<CrateName>>,
     traits: BTreeSet<Name>,
     crates: BTreeSet<CrateName>,
+    ambiguous: BTreeMap<CrateName, BTreeSet<Name>>,
 }
 
 impl WorkspaceTypes {
@@ -37,7 +38,19 @@ impl WorkspaceTypes {
                 },
             ),
             traits: facts.traits().iter().map(|found| AsRef::<Name>::as_ref(found).clone()).collect(),
+            ambiguous: Self::ambiguous(facts),
         }
+    }
+
+    fn ambiguous(facts: &Facts) -> BTreeMap<CrateName, BTreeSet<Name>> {
+        let mut seen: BTreeMap<&CrateName, BTreeSet<&Name>> = BTreeMap::new();
+        facts.types().iter().fold(BTreeMap::new(), |mut twice: BTreeMap<CrateName, BTreeSet<Name>>, found| {
+            let krate: &CrateName = found.as_ref();
+            let name: &Name = found.as_ref();
+            let fresh = seen.entry(krate).or_default().insert(name);
+            twice.entry(krate.clone()).or_default().extend((!fresh).then(|| name.clone()));
+            twice
+        })
     }
 
     pub(crate) fn declared_in(&self, krate: &CrateName) -> Count {
@@ -67,10 +80,18 @@ impl WorkspaceTypes {
     fn named(&self, from: &CrateName, name: &Name) -> End {
         let declaring = self.types.get(name).filter(|_| self.crates.contains(from));
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
-        match resolved {
+        match resolved.map(|found| found.and_then(|node| self.unambiguous(node))) {
             None => End::placed(Place::External, name),
             Some(None) => End::placed(Place::Shared, name),
             Some(Some(node)) => End::domain(node),
+        }
+    }
+
+    fn unambiguous(&self, node: Node) -> Option<Node> {
+        let twice = self.ambiguous.get(AsRef::<CrateName>::as_ref(&node));
+        match twice.and_then(|names| names.get(AsRef::<Name>::as_ref(&node))) {
+            Some(_) => None,
+            None => Some(node),
         }
     }
 }
