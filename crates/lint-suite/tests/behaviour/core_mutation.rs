@@ -1,4 +1,4 @@
-use lint_transition_graph::CoreMutation;
+use lint_transition_graph::{CoreMutation, OnGraph};
 
 use crate::shown::Shown;
 
@@ -7,7 +7,7 @@ const PURE: &str = "struct A;\nimpl A {\n    fn pure(&self) -> A {}\n}\nmod port
 
 laws::table!(
     core_edges_taking_mut_are_counted_apart_from_ports_boundaries_stores_and_foreign_trait_signatures,
-    Shown::of::<CoreMutation>,
+    Shown::of::<OnGraph<CoreMutation>>,
     [
         [MUTATION, "crates/x/src/lib.rs:3: crate x: 7 core edges take &mut, 5 through &mut self, 2 through a &mut parameter only, 3 with a signature fixed by a foreign trait, 4 to migrate; 1 store operations, x::Records::insert applies x::A, impl Fn -> usize; move each mutation into a store operation, a &mut self method in a store module, or return a new value"] => true,
         [MUTATION, "crates/x/src/lib.rs:3: workspace: 7 core edges take &mut, 5 through &mut self, 2 through a &mut parameter only, 3 with a signature fixed by a foreign trait, 4 to migrate; 1 store operations; move each mutation"] => true,

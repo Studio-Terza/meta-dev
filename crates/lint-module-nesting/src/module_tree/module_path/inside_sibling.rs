@@ -1,11 +1,10 @@
 use super::ModulePath;
 use super::ancestor::Ancestor;
-use super::relation::Relation;
 
 pub struct InsideSibling;
 
-impl Relation for InsideSibling {
-    fn holds<'module, 'file>(
+impl InsideSibling {
+    pub fn holds<'module, 'file>(
         this: &ModulePath<'_>,
         module: &'module ModulePath<'file>,
     ) -> Option<&'module ModulePath<'file>> {

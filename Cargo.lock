@@ -458,7 +458,6 @@ dependencies = [
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
- "newtype",
  "type-facts",
 ]
 

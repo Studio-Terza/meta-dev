@@ -49,7 +49,12 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let workspace = golden::fixtures!("..")?;
     let implemented = workspace.entries(&crates)?.iter().try_fold(0, |found, entry| {
-        Ok::<usize, FileFailure>(found + Trees::occurrences(&workspace, &entry.join("src"), "impl Lint for")?)
+        let source = entry.join("src");
+        Ok::<usize, FileFailure>(
+            found
+                + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+        )
     })?;
     let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
@@ -96,10 +101,10 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
+    root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    assert!(run.out.contains("/src/lib.rs:3: trait Index has no generic consumer"), "{}", run.out);
+    assert!(run.out.contains("/src/lib.rs:2: crate r: 1 functions by complexity"), "{}", run.out);
     assert_eq!(run.err, "");
     Ok(())
 }
@@ -107,9 +112,9 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
 #[test]
 fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", INDEX)?;
+    root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&[]);
-    assert!(!run.out.contains("no generic consumer"), "{}", run.out);
+    assert!(!run.out.contains("functions by complexity"), "{}", run.out);
     Ok(())
 }
 

@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Relation, Target};
+use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
 
 use lint_core::Site;
 use lint_core::SourceFile;

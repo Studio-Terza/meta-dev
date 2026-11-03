@@ -11,6 +11,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
+use lint_layering::Layering;
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -40,8 +41,9 @@ use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::OneEdge;
+use lint_transition_graph::{OnGraph, OneEdge};
 use lint_type_shape::TypeShape;
+use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
@@ -96,7 +98,9 @@ impl Lints {
             BoolMethods::report(files),
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
-            OneEdge::report(files),
+            OnGraph::<OneEdge>::report(files),
+            UnconsumedTraits::report(files),
+            Layering::report(files),
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),
         ];

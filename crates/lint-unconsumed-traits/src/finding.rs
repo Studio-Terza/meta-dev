@@ -15,14 +15,14 @@ impl<'declaration> From<&'declaration Declaration<'declaration>> for Finding<'de
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "trait {} has no generic consumer", AsRef::<Name>::as_ref(self.0))
+        write!(formatter, "trait {} has methods but nothing consumes it", AsRef::<Name>::as_ref(self.0))
     }
 }
 
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "use a standard trait such as From, AsRef or Display, else write the generic over an existing trait, else a derive",
+            "delete the trait and keep its methods inherent, or give it a consumer: a bound, impl Trait, dyn Trait, or a provided method its callers use",
         )
     }
 }

@@ -26,7 +26,7 @@ pub struct ManualIteration;
 
 impl Lint for ManualIteration {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::shipped(files, Headline::new("iterators are driven by combinators, not by hand"))
+        Report::new(Headline::new("iterators are driven by combinators, not by hand"), Self::in_shipped(files))
     }
 }
 

@@ -8,7 +8,7 @@ mod graph_lint;
 mod mutation;
 mod workspace_types;
 
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Report};
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -18,7 +18,7 @@ use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::GraphLint;
+pub use graph_lint::{GraphLint, OnGraph};
 pub use mutation::CoreMutation;
 
 #[derive(Debug)]
@@ -39,11 +39,5 @@ impl GraphLint for TransitionGraph {
                 .chain(Coverage::tallied(edges.iter()).violation(edges.iter().map(Edge::site).min()))
                 .collect(),
         )
-    }
-}
-
-impl Lint for TransitionGraph {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

@@ -13,9 +13,9 @@ pub struct DistinctSignatures;
 
 impl Lint for DistinctSignatures {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::shipped(
-            files,
+        Report::new(
             Headline::new("two functions on one type with the same signature hide a missing type or type parameter"),
+            Self::in_shipped(files),
         )
     }
 }

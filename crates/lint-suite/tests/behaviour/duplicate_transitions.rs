@@ -1,6 +1,6 @@
 use lint_core::{Lint, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::{DuplicateTransitions, OneEdge};
+use lint_transition_graph::{DuplicateTransitions, OnGraph, OneEdge};
 
 use crate::shown::Shown;
 
@@ -12,7 +12,7 @@ impl Duplicates {
     }
 
     fn reported(files: &[SourceFile]) -> String {
-        format!("{}{}", OneEdge::report(files), DuplicateTransitions::report(files))
+        format!("{}{}", OnGraph::<OneEdge>::report(files), OnGraph::<DuplicateTransitions>::report(files))
     }
 
     fn at(path: &'static str, text: &str) -> Source {
