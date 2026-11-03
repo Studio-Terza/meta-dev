@@ -35,7 +35,7 @@ impl Cli {
     pub fn report_to(&self, out: &mut (impl Write + Send), err: &mut (impl Write + Send)) -> ExitCode {
         let spawned = thread::scope(|scope| {
             thread::Builder::new()
-                .stack_size(StackSize::LINT.bytes())
+                .stack_size(StackSize::LINT.into_inner())
                 .spawn_scoped(scope, || self.reported_to(out, err))
                 .map(ScopedJoinHandle::join)
         });

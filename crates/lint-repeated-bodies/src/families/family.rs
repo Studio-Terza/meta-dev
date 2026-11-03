@@ -28,10 +28,9 @@ impl Family {
     pub(crate) fn violation(&self) -> Violation {
         let mut sites: Vec<&Site> = self.copies.iter().map(Occurrence::as_ref).collect();
         sites.sort();
-        let others: Vec<String> = sites.iter().skip(1).map(ToString::to_string).collect();
         sites.first().map_or_else(
             || unreachable!("a family has copies"),
-            |site| Violation::new((*site).clone(), Finding::new(self.size, &others)),
+            |site| Violation::new((*site).clone(), Finding::new(self.size, sites.get(1..).unwrap_or_default())),
         )
     }
 }

@@ -2,27 +2,26 @@ use std::fmt;
 
 use body_shape::TokenCount;
 use lint_core::Fix;
+use lint_core::Site;
 
 pub(super) struct Finding<'sites> {
     size: TokenCount,
-    others: &'sites [String],
+    others: &'sites [&'sites Site],
 }
 
 impl<'sites> Finding<'sites> {
-    pub(super) fn new(size: TokenCount, others: &'sites [String]) -> Finding<'sites> {
+    pub(super) fn new(size: TokenCount, others: &'sites [&'sites Site]) -> Finding<'sites> {
         Finding { size, others }
     }
 }
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "{} tokens in {} copies, also at {}",
-            self.size,
-            self.others.len() + 1,
-            self.others.join(", ")
-        )
+        write!(formatter, "{} tokens in {} copies, also at ", self.size, self.others.len() + 1)?;
+        self.others.iter().enumerate().try_for_each(|(index, site)| match index {
+            0 => write!(formatter, "{site}"),
+            _ => write!(formatter, ", {site}"),
+        })
     }
 }
 

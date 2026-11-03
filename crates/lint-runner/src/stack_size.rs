@@ -8,7 +8,7 @@ impl StackSize {
     pub const LINT: StackSize = StackSize(Self::LINT_MEBIBYTES * Self::BYTES_PER_MEBIBYTE);
 
     #[must_use]
-    pub const fn bytes(self) -> usize {
+    pub const fn into_inner(self) -> usize {
         self.0
     }
 }
