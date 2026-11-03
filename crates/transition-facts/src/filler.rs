@@ -1,6 +1,7 @@
 use lint_layout::Name;
 
 use crate::endpoint::Endpoint;
+use crate::implementer::Implementer;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Filler {
@@ -19,9 +20,9 @@ impl Filler {
         }
     }
 
-    pub(crate) fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<&'selfish Endpoint> {
+    pub(crate) fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Implementer<'selfish>> {
         match self {
-            Filler::Implemented(_) => Some(selfish),
+            Filler::Implemented(_) => Some(Implementer::new(selfish)),
             Filler::Free | Filler::Inherent | Filler::Provided => None,
         }
     }
