@@ -10,6 +10,7 @@ use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
 use build_script::BuildScript;
+use file_ports::Files;
 use lint_layout::{Name, Whole, Word};
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
@@ -29,15 +30,15 @@ impl Placement {
     const BUILD_FILE: &'static str = "build.rs";
 
     #[must_use]
-    pub fn locate(path: &Path) -> Placement {
-        Self::within(&Self::guessed_package(path), path)
+    pub fn locate(files: &impl Files, path: &Path) -> Placement {
+        Self::within(files, &Self::guessed_package(path), path)
     }
 
     #[must_use]
-    pub fn within(package: &Path, file: &Path) -> Placement {
+    pub fn within(files: &impl Files, package: &Path, file: &Path) -> Placement {
         file.strip_prefix(package)
             .ok()
-            .and_then(|inside| Self::in_package(package, inside))
+            .and_then(|inside| Self::in_package(files, package, inside))
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
     }
 
@@ -94,11 +95,11 @@ impl Placement {
         }
     }
 
-    fn in_package(package: &Path, inside: &Path) -> Option<Placement> {
+    fn in_package(files: &impl Files, package: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let directory = first.as_os_str().to_str()?;
-        let root = PackageRoot::read(package);
+        let root = PackageRoot::read(files, package);
         if directory == Self::SOURCE_DIRECTORY {
             Some(SourceDirectory::place(root, rest))
         } else if directory == Self::BUILD_FILE && rest.as_os_str().is_empty() {

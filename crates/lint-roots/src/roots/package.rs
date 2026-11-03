@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 
 use super::directory::Directory;
 use super::target::Target;
+use crate::followed::Followed;
 use crate::tree::Tree;
+use file_ports::Files;
 use lint_layout::Failure;
 
 #[derive(Debug)]
@@ -24,30 +26,43 @@ impl Package {
         Package { directory, declared }
     }
 
-    pub fn targets_under(&self, tree: &Tree) -> Result<Vec<Target>, Failure> {
+    pub fn targets_under(&self, files: &impl Files, tree: &Tree) -> Result<Vec<Target>, Failure> {
+        let roots: Vec<PathBuf> = Self::ROOT_FILES
+            .iter()
+            .map(|file| self.directory.join(file))
+            .filter(|file| Followed::file(files, file).is_some())
+            .collect();
         let roots: Vec<PathBuf> =
-            Self::ROOT_FILES.iter().map(|file| self.directory.join(file)).filter(|file| file.is_file()).collect();
-        let roots: Vec<PathBuf> = self.declared.iter().filter(|file| file.is_file()).cloned().chain(roots).collect();
-        let files = Self::TARGET_DIRECTORIES.iter().try_fold(roots, |found, directory| {
-            Ok(found.into_iter().chain(Self::crate_roots(&self.directory.join(directory))?).collect::<Vec<PathBuf>>())
+            self.declared.iter().filter(|file| Followed::file(files, file).is_some()).cloned().chain(roots).collect();
+        let found = Self::TARGET_DIRECTORIES.iter().try_fold(roots, |found, directory| {
+            Ok(found
+                .into_iter()
+                .chain(Self::crate_roots(files, &self.directory.join(directory))?)
+                .collect::<Vec<PathBuf>>())
         })?;
-        Ok(files
+        Ok(found
             .into_iter()
             .filter(|file| file.starts_with(tree.canonical()))
             .map(|file| Target::new(self.directory.clone(), file))
             .collect())
     }
 
-    fn crate_roots(directory: &Path) -> Result<Vec<PathBuf>, Failure> {
-        Directory::real(directory).map_or_else(
+    fn crate_roots(files: &impl Files, directory: &Path) -> Result<Vec<PathBuf>, Failure> {
+        Directory::real(files, directory).map_or_else(
             || Ok(Vec::new()),
-            |real| Ok(Directory::new(real.to_path_buf()).entries()?.into_iter().filter_map(Self::crate_root).collect()),
+            |real| {
+                Ok(Directory::new(real.to_path_buf())
+                    .entries(files)?
+                    .into_iter()
+                    .filter_map(|entry| Self::crate_root(files, entry))
+                    .collect())
+            },
         )
     }
 
-    fn crate_root(entry: PathBuf) -> Option<PathBuf> {
-        match Directory::real(&entry) {
-            Some(real) => Some(real.join(Self::BINARY_ROOT)).filter(|main| main.is_file()),
+    fn crate_root(files: &impl Files, entry: PathBuf) -> Option<PathBuf> {
+        match Directory::real(files, &entry) {
+            Some(real) => Some(real.join(Self::BINARY_ROOT)).filter(|main| Followed::file(files, main).is_some()),
             None => Some(entry).filter(|file| file.extension() == Some(OsStr::new(Self::SOURCE_EXTENSION))),
         }
     }

@@ -5,6 +5,7 @@ mod redirects;
 use std::io;
 use std::path::Path;
 
+use file_ports::Files;
 use syn::Item;
 
 use lint_core::Walk;
@@ -27,17 +28,17 @@ impl Modules {
     const MODULE_FILE: &'static str = "mod.rs";
 
     #[must_use]
-    pub fn declared_in(file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
+    pub fn declared_in(files: &impl Files, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
         let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
         let entered = Self::declarations(items, children_directory, Walk::Entered);
         let skipped = Self::declarations(items, children_directory, Walk::Skipped);
         let tests = skipped
             .iter()
-            .flat_map(|declaration| Self::resolve(&file_directory, declaration).unwrap_or_default())
+            .flat_map(|declaration| Self::resolve(files, &file_directory, declaration).unwrap_or_default())
             .collect();
         entered.into_iter().fold(
             Modules { children: Vec::new(), tests, failures: Vec::new() },
-            |modules, declaration| match Self::resolve(&file_directory, &declaration) {
+            |modules, declaration| match Self::resolve(files, &file_directory, &declaration) {
                 Ok(found) => Modules { children: modules.children.into_iter().chain(found).collect(), ..modules },
                 Err(failure) => {
                     Modules { failures: modules.failures.into_iter().chain([failure]).collect(), ..modules }
@@ -76,7 +77,11 @@ impl Modules {
             .collect()
     }
 
-    fn resolve(file_directory: &Path, declaration: &Declaration<'_>) -> Result<Vec<Child>, Failure> {
+    fn resolve(
+        files: &impl Files,
+        file_directory: &Path,
+        declaration: &Declaration<'_>,
+    ) -> Result<Vec<Child>, Failure> {
         let own = declaration.directory().join(Name::from(&declaration.module().ident));
         let explicit = Redirects::explicit(declaration.module()).map(|path| file_directory.join(path));
         let expected = explicit.clone().unwrap_or_else(|| own.with_extension(Self::SOURCE_EXTENSION));
@@ -90,10 +95,10 @@ impl Modules {
                 Child::new(own.join(Self::MODULE_FILE), own),
             ],
         };
-        let primary = choices.into_iter().find_map(Child::existing);
+        let primary = choices.into_iter().find_map(|choice| choice.existing(files));
         let found: Vec<Child> = primary.iter().cloned().collect();
         let conditional = Redirects::conditional(file_directory, declaration.module());
-        let found = conditional.into_iter().filter_map(Child::existing).fold(found, |found, child| {
+        let found = conditional.into_iter().filter_map(|child| child.existing(files)).fold(found, |found, child| {
             if found.contains(&child) { found } else { found.into_iter().chain([child]).collect() }
         });
         if found.is_empty() {

@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dev-dependencies]
+file-ports = { path = "../file-ports" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-bool-methods = { path = "../lint-bool-methods" }
 lint-complexity = { path = "../lint-complexity" }
@@ -61,7 +62,6 @@ lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-walk-similarity = { path = "../lint-walk-similarity" }
 lint-workflow-run = { path = "../lint-workflow-run" }
 laws = { path = "../laws" }
-tempfile.workspace = true
 
 [lints]
 workspace = true

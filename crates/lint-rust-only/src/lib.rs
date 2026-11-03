@@ -19,7 +19,7 @@ impl RustOnly {
                 .iter()
                 .filter_map(|file| {
                     let place = Place::locating(file);
-                    Language::detect(file.shown())
+                    Language::detect(file)
                         .and_then(|language| place.refusing(language))
                         .map(|language| Violation::new(Site::of_file(file.shown()), Finding::new(language, place)))
                 })

@@ -1,9 +1,11 @@
-use lint_core::Lint;
+use std::path::{Path, PathBuf};
+
+use file_ports::{Absent, Bytes, FileFailure, Files, Kind};
+use lint_core::{Lint, SourceFile, SourceText};
+use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
-
-use crate::ports::Checkout;
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
@@ -227,10 +229,12 @@ fn starting_a_process_is_flagged() {
 fn a_crate_whose_name_ends_in_ports_may_start_processes() {
     let mut wrong = Vec::new();
     for (name, flagged) in PACKAGES {
-        let root =
-            Checkout::new().with("Cargo.toml", &format!("[package]\nname = \"{name}\"\n")).with("src/lib.rs", IMPORTED);
-        let file = Sources::file(root.file("src/lib.rs"), Text::new(IMPORTED));
-        let found = ProcessStarters::report(&[file]).violations().len();
+        let manifest = format!("[package]\nname = \"{name}\"\n");
+        let files = FakeManifest(file_ports::Text::new(manifest));
+        let path = PathBuf::from("/r/src/lib.rs");
+        let placement = Placement::locate(&files, &path);
+        let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
+        let found = parsed.map_or(usize::MAX, |file| ProcessStarters::report(&[file]).violations().len());
         if found != flagged {
             wrong.push(format!("{name} flagged {found}"));
         }
@@ -246,4 +250,51 @@ fn every_start_is_counted_including_those_behind_ports() {
     let counts: Vec<usize> =
         [ported, inline, other].iter().map(|file| CommandPaths::found(file, Scope::Everywhere).len()).collect();
     assert_eq!(counts, vec![1, 1, 0]);
+}
+
+struct FakeManifest(file_ports::Text);
+
+impl FakeManifest {
+    const AT: &str = "/r/Cargo.toml";
+}
+
+impl Files for FakeManifest {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.read_text(path).map(|text| Bytes::from(text.as_ref()))
+    }
+
+    fn read_text(&self, path: &Path) -> Result<file_ports::Text, FileFailure> {
+        if path == Path::new(Self::AT) { Ok(self.0.clone()) } else { Absent.read_text(path) }
+    }
+
+    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        Absent.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        Absent.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        Absent.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        Absent.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        Absent.entries(directory)
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        match self.kind(path) {
+            Kind::Missing => Absent.canonical(path),
+            _ => Ok(path.to_path_buf()),
+        }
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        if path == Path::new(Self::AT) { Kind::File } else { Absent.kind(path) }
+    }
 }
