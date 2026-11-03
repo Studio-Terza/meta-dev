@@ -63,6 +63,7 @@ lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
+lint-layering = { path = "../lint-layering" }
 lint-type-graph = { path = "../lint-type-graph" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-walk-similarity = { path = "../lint-walk-similarity" }
