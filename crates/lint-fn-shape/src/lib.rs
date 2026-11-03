@@ -11,7 +11,7 @@ use syn::visit::Visit;
 
 use syn::{
     Arm, BinOp, Expr, ExprClosure, ExprForLoop, ExprIf, ExprLoop, ExprMethodCall, ExprWhile, FnArg, ImplItemFn, ItemFn,
-    ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, Type, UnOp,
+    ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
 };
 
 use lint_core::Macros;
@@ -19,6 +19,7 @@ use lint_core::Most;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
@@ -43,41 +44,44 @@ impl FnShape {
     const BOOLEAN_PREFIXES: [Word<'static>; 2] = words!["is_", "has_"];
     const NESTING: Most = Most::new(2);
     const PARAMETERS: Most = Most::new(4);
+    const FOLDS: [&'static str; 2] = ["fold", "try_fold"];
 
     fn boolean(expr: &Expr) -> Option<&Expr> {
         match expr {
-            Expr::Binary(binary)
-                if matches!(
-                    binary.op,
-                    BinOp::Eq(_)
-                        | BinOp::Ne(_)
-                        | BinOp::Lt(_)
-                        | BinOp::Le(_)
-                        | BinOp::Gt(_)
-                        | BinOp::Ge(_)
-                        | BinOp::And(_)
-                        | BinOp::Or(_)
-                ) =>
-            {
-                Some(expr)
-            }
-            Expr::Unary(unary) if matches!(unary.op, UnOp::Not(_)) => Some(expr),
-            Expr::Lit(literal) if matches!(literal.lit, Lit::Bool(_)) => Some(expr),
+            Expr::Binary(binary) => matches!(
+                binary.op,
+                BinOp::Eq(_)
+                    | BinOp::Ne(_)
+                    | BinOp::Lt(_)
+                    | BinOp::Le(_)
+                    | BinOp::Gt(_)
+                    | BinOp::Ge(_)
+                    | BinOp::And(_)
+                    | BinOp::Or(_)
+            )
+            .then_some(expr),
+            Expr::Unary(unary) => matches!(unary.op, UnOp::Not(_)).then_some(expr),
+            Expr::Lit(literal) => matches!(literal.lit, Lit::Bool(_)).then_some(expr),
             Expr::Paren(paren) => Self::boolean(&paren.expr).map(|_| expr),
-            Expr::MethodCall(call) => {
-                let name = Name::from(&call.method);
-                name.matches::<Prefix>(&Self::BOOLEAN_PREFIXES)
-                    .or_else(|| name.matches::<Whole>(Self::BOOLEAN_METHODS))
-                    .map(|_| expr)
-            }
+            Expr::MethodCall(call) => Self::boolean_method(&Name::from(&call.method)).map(|_| expr),
             _ => None,
         }
     }
 
+    fn boolean_method(name: &Name) -> Option<Word<'static>> {
+        name.matches::<Prefix>(&Self::BOOLEAN_PREFIXES).or_else(|| name.matches::<Whole>(Self::BOOLEAN_METHODS))
+    }
+
     fn binds_bool(local: &Local) -> Option<&Local> {
-        match &local.pat {
-            Pat::Type(typed) if matches!(&*typed.ty, Type::Path(path) if path.path.is_ident("bool")) => Some(local),
-            _ => local.init.as_ref().and_then(|init| Self::boolean(&init.expr)).map(|_| local),
+        Self::typed_bool(&local.pat)
+            .map(|_| local)
+            .or_else(|| local.init.as_ref().and_then(|init| Self::boolean(&init.expr)).map(|_| local))
+    }
+
+    fn typed_bool(pattern: &Pat) -> Option<&Pat> {
+        match pattern {
+            Pat::Type(typed) => Syntax::type_path(&typed.ty).filter(|path| path.path.is_ident("bool")).map(|_| pattern),
+            _ => None,
         }
     }
 }
@@ -99,6 +103,14 @@ struct Shapes<'scan> {
 impl<'scan> Shapes<'scan> {
     fn found(path: &'scan Path, span: Span, finding: Finding) -> Violation<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), finding)
+    }
+
+    fn otherwise(&mut self, branch: Option<&Expr>) {
+        match branch {
+            None => {}
+            Some(Expr::If(chained)) => self.visit_expr_if(chained),
+            Some(other) => self.nested(other.span(), |this| this.visit_expr(other)),
+        }
     }
 
     fn nested(&mut self, span: Span, visit: impl FnOnce(&mut Self)) {
@@ -165,7 +177,7 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
             call.args
                 .first()
                 .filter(|seed| matches!(seed, Expr::Tuple(_)))
-                .filter(|_| call.method == "fold" || call.method == "try_fold")
+                .filter(|_| FnShape::FOLDS.iter().any(|fold| call.method == fold))
                 .map(|_| Self::found(self.path, call.method.span(), Finding::TupleAccumulator)),
         );
         syn::visit::visit_expr_method_call(self, call);
@@ -176,11 +188,7 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
         self.nested(expr.if_token.span, |this| {
             this.visit_block(&expr.then_branch);
         });
-        match expr.else_branch.as_ref().map(|(_, branch)| &**branch) {
-            None => {}
-            Some(Expr::If(chained)) => self.visit_expr_if(chained),
-            Some(other) => self.nested(other.span(), |this| this.visit_expr(other)),
-        }
+        self.otherwise(expr.else_branch.as_ref().map(|(_, branch)| &**branch));
     }
 
     fn visit_arm(&mut self, arm: &'ast Arm) {

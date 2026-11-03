@@ -2,8 +2,9 @@ mod erasure;
 
 use std::fmt;
 
-use quote::ToTokens;
-use syn::{FnArg, ReturnType, Signature};
+use syn::Signature;
+
+use lint_core::Syntax;
 
 use lint_layout::Name;
 
@@ -22,18 +23,10 @@ pub struct MethodShape {
 impl MethodShape {
     #[must_use]
     pub fn described(signature: &Signature, erasure: &Erasure<'_>) -> MethodShape {
-        let inputs: Vec<String> = signature
-            .inputs
-            .iter()
-            .map(|argument| match argument {
-                FnArg::Receiver(receiver) => erasure.spelled(receiver).to_string(),
-                FnArg::Typed(typed) => erasure.spelled_input(&typed.ty).to_string(),
-            })
-            .collect();
-        let output = match &signature.output {
-            ReturnType::Default => String::new(),
-            ReturnType::Type(arrow, ty) => format!(" {} {}", arrow.to_token_stream(), erasure.spelled(ty)),
-        };
+        let inputs: Vec<String> =
+            signature.inputs.iter().map(|argument| erasure.spelled_argument(argument).to_string()).collect();
+        let output =
+            Syntax::returned(&signature.output).map_or_else(String::new, |ty| format!(" -> {}", erasure.spelled(ty)));
         MethodShape {
             name: Name::from(&signature.ident),
             signature: Spelling::new(format!(

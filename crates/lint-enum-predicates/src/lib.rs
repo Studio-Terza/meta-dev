@@ -54,20 +54,19 @@ impl EnumPredicates<'_> {
 
     fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
         let crate_root = file.placement().crate_root();
-        let local = (path.qself.is_none() && path.path.segments.len() == 1)
-            .then(|| {
+        let local = Some(path)
+            .filter(|path| path.qself.is_none())
+            .filter(|path| path.path.segments.len() == 1)
+            .and_then(|_| {
                 self.declarations
                     .iter()
                     .filter_map(|declaration| declaration.in_module(module))
                     .find_map(|declaration| declaration.kinds(crate_root, name).next())
-            })
-            .flatten();
+            });
         let candidates: Vec<Kind> =
             self.declarations.iter().flat_map(|declaration| declaration.kinds(crate_root, name)).collect();
-        match (local, candidates.as_slice()) {
-            (Some(kind), _) => kind,
-            (None, all @ [_, ..]) if all.iter().all(|kind| *kind == Kind::Enum) => Kind::Enum,
-            (None, _) => Kind::Other,
-        }
+        let enums =
+            candidates.first().filter(|_| candidates.iter().all(|kind| *kind == Kind::Enum)).map(|_| Kind::Enum);
+        local.or(enums).unwrap_or(Kind::Other)
     }
 }

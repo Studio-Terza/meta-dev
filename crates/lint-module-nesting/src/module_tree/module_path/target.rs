@@ -5,6 +5,21 @@ use lint_placement::CrateRoot;
 
 use super::{ModuleIndex, ModulePath};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Start {
+    Crate,
+    Super,
+    Relative,
+}
+
+impl Start {
+    const NAMED: [(&'static str, Start); 2] = [("crate", Start::Crate), ("super", Start::Super)];
+
+    fn spelled(name: &Name) -> Start {
+        Self::NAMED.iter().find(|(word, _)| *name == *word).map_or(Start::Relative, |(_, start)| *start)
+    }
+}
+
 #[derive(Debug)]
 pub struct Target<'path> {
     crate_root: &'path CrateRoot,
@@ -12,8 +27,6 @@ pub struct Target<'path> {
 }
 
 impl<'path> Target<'path> {
-    const CRATE: &'static str = "crate";
-    const SUPER: &'static str = "super";
     const ANCHORS: [Word<'static>; 3] = words!["crate", "super", "self"];
 
     pub fn from_use(
@@ -22,28 +35,12 @@ impl<'path> Target<'path> {
         modules: &ModuleIndex<'_>,
     ) -> Option<Target<'path>> {
         let first = path.segments().first()?;
-        let start = if *first == Self::CRATE {
-            &[]
-        } else if *first == Self::SUPER {
-            file.parent()?.segments
-        } else {
-            file.segments
-        };
+        let start = Self::start(Start::spelled(first), file)?;
         let anchor = first.matches::<Whole>(&Self::ANCHORS);
         let child: Vec<&Name> = file.segments.iter().chain([first]).collect();
         anchor.map(|_| ()).or_else(|| modules.same_as(file.crate_root, &child).map(|_| ()))?;
         let skip = anchor.into_iter().count();
-        let segments = path.segments().iter().skip(skip).try_fold(
-            start.iter().collect(),
-            |mut segments: Vec<&Name>, segment| {
-                if *segment == Self::SUPER {
-                    segments.pop().and(Some(segments))
-                } else {
-                    segments.push(segment);
-                    Some(segments)
-                }
-            },
-        )?;
+        let segments = path.segments().iter().skip(skip).try_fold(start.iter().collect(), Self::step)?;
         Some(Target { crate_root: file.crate_root, segments })
     }
 
@@ -55,10 +52,8 @@ impl<'path> Target<'path> {
         self.prefixes()
             .take(self.segments.len())
             .skip(1)
-            .find(|boundary| {
-                modules.directory_same_as(self.crate_root, boundary).is_some()
-                    && self.enclosing(boundary, user).is_none()
-            })
+            .filter(|boundary| modules.directory_same_as(self.crate_root, boundary).is_some())
+            .find(|boundary| self.enclosing(boundary, user).is_none())
             .map(|_| self)
     }
 
@@ -67,9 +62,24 @@ impl<'path> Target<'path> {
     }
 
     fn enclosing<'user>(&self, boundary: &[&Name], user: &'user ModulePath<'_>) -> Option<&'user ModulePath<'user>> {
-        (self.crate_root == user.crate_root
-            && user.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied())))
-        .then_some(user)
+        Some(user).filter(|user| self.crate_root == user.crate_root).filter(|user| {
+            user.segments.get(..boundary.len()).is_some_and(|head| head.iter().eq(boundary.iter().copied()))
+        })
+    }
+
+    fn start<'file>(start: Start, file: &ModulePath<'file>) -> Option<&'file [Name]> {
+        match start {
+            Start::Crate => Some(&[]),
+            Start::Super => file.parent().map(|parent| parent.segments),
+            Start::Relative => Some(file.segments),
+        }
+    }
+
+    fn step(mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {
+        match Start::spelled(segment) {
+            Start::Super => segments.pop().and(Some(segments)),
+            Start::Crate | Start::Relative => Some(segments.into_iter().chain([segment]).collect()),
+        }
     }
 }
 
