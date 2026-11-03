@@ -19,6 +19,10 @@ impl<'found> Target<'found> {
         Target { krate, module, here }
     }
 
+    pub(crate) fn unhinted(self) -> Target<'found> {
+        Target { module: None, ..self }
+    }
+
     pub(crate) fn krate(&self) -> &'found CrateName {
         self.krate
     }

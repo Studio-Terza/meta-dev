@@ -326,3 +326,53 @@ fn a_const_or_a_macro_used_in_a_body_links_the_types_it_names() {
         .collect();
     assert_eq!(reported, [Vec::<String>::new(), Vec::new()]);
 }
+
+#[test]
+fn a_twin_resolves_through_self_super_and_child_module_paths() {
+    let pathed = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\npub struct Platform;\n"),
+        Clustered::at(
+            "crates/x/src/a/mod.rs",
+            "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\n",
+        ),
+        Clustered::at(
+            "crates/x/src/a/inner.rs",
+            "pub struct Uses(super::Platform);\npub struct Root(super::super::Platform);\npub struct Seat;\n",
+        ),
+        Clustered::at("crates/x/src/a/deep/mod.rs", "mod kid;\npub struct Holder(kid::Gauge);\n"),
+        Clustered::at("crates/x/src/a/deep/kid.rs", "pub struct Gauge;\n"),
+        Clustered::at("crates/x/src/b.rs", "pub struct Gauge;\npub struct Seat;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&pathed, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:3: x::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
+            "crates/x/src/a/mod.rs:3: x::a::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&pathed, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/x/src/a/deep/kid.rs:1: crate x falls into 6 groups: [Bench Seat] [Gauge Holder] [Gauge] [Platform Root] [Platform Uses] [Seat] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/a/deep/kid.rs:1: x::a falls into 4 groups: [Bench Seat] [Gauge Holder] [Platform Uses] [Root] with no link between them; split it along the groups, or link them through a type they share",
+        ]
+    );
+}
+
+#[test]
+fn a_bare_twin_resolves_to_the_one_in_its_own_module() {
+    let own = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct Cart;\n"),
+        Clustered::at(
+            "crates/x/src/a/mod.rs",
+            "mod inner;\npub struct Cart;\npub struct Train(Cart);\npub struct Wagon;\nimpl Wagon {\n    fn cart(&self) -> crate::a::Cart {}\n}\n",
+        ),
+        Clustered::at("crates/x/src/a/inner.rs", "pub struct Seat(super::Cart);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&own, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/x/src/a/inner.rs:1: crate x falls into 2 groups: [Cart] [Cart Seat Train Wagon] with no link between them; split it along the groups, or link them through a type they share"
+        ]
+    );
+}

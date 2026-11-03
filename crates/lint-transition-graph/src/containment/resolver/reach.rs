@@ -28,11 +28,11 @@ impl<'place, 'found> Reach<'place, 'found> {
 
     pub(crate) fn target(&self, name: &Name, written: &[Name], origin: Option<&Name>) -> Option<Target<'found>> {
         let spelled = self.place.scope().path_to(name, written);
-        let path = match spelled.first() {
-            Some(_) => spelled,
-            None => origin.into_iter().cloned().collect(),
-        };
-        path.first().map_or_else(|| Some(self.place.target(None)), |_| self.pathed(&path))
+        match (spelled.first(), origin) {
+            (Some(_), _) => self.pathed(&spelled),
+            (None, Some(origin)) => self.pathed(std::slice::from_ref(origin)).map(Target::unhinted),
+            (None, None) => Some(self.place.target(None)),
+        }
     }
 
     fn pathed(&self, path: &[Name]) -> Option<Target<'found>> {
