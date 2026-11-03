@@ -1,7 +1,8 @@
+use syn::punctuated::Punctuated;
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, ImplItem, ImplItemFn, Item,
-    ItemImpl, ItemMod, ItemUse, Lit, LitStr, PatType, PathArguments, ReturnType, TraitItem, TraitItemFn, Type,
-    TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, Item,
+    ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, PatType, PathArguments, ReturnType, Token, TraitBound, TraitItem,
+    TraitItemFn, Type, TypeParamBound, TypePath,
 };
 
 use lint_layout::Name;
@@ -84,6 +85,31 @@ impl Syntax {
         match item {
             Item::Mod(module) => Some(module),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn bounds(ty: &Type) -> Option<&Punctuated<TypeParamBound, Token![+]>> {
+        match ty {
+            Type::ImplTrait(bounded) => Some(&bounded.bounds),
+            Type::TraitObject(bounded) => Some(&bounded.bounds),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn trait_bound(bound: &TypeParamBound) -> Option<&TraitBound> {
+        match bound {
+            TypeParamBound::Trait(traited) => Some(traited),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn named_member(member: &Member) -> Option<&Ident> {
+        match member {
+            Member::Named(named) => Some(named),
+            Member::Unnamed(_) => None,
         }
     }
 
