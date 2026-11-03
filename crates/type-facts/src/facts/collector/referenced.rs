@@ -61,7 +61,7 @@ impl<'item, 'file> Referenced<'item, 'file> {
     }
 
     fn dependency(&self, path: &syn::Path, segment: &PathSegment) -> Option<Dependency<'file>> {
-        let qualifier = path.segments.first().filter(|_| path.segments.len() > 1).map(|first| Name::from(&first.ident));
+        let written = path.segments.iter().rev().skip(1).rev().map(|step| Name::from(&step.ident)).collect();
         let named = Name::from(&segment.ident);
         let resolved = match named.matches::<Whole>(&Self::ITSELF) {
             Some(_) => Name::from(self.own),
@@ -69,7 +69,7 @@ impl<'item, 'file> Referenced<'item, 'file> {
         };
         let site = Site::new(self.file, LineNumber::from(segment.ident.span()));
         (!self.parameters.contains(&&segment.ident))
-            .then(|| Dependency::new(resolved, site, self.via).qualified(qualifier))
+            .then(|| Dependency::new(resolved, site, self.via).qualified(written))
     }
 
     fn visit_arguments(&mut self, segment: &PathSegment) {

@@ -64,13 +64,8 @@ impl<'found, 'file> Containment<'found, 'file> {
             .map(|file| (file.path(), file.placement().module().segments()))
             .collect();
         let declarations = Declaration::all(facts);
-        let declared = declarations.iter().fold(BTreeMap::new(), |mut declared: BTreeMap<_, Vec<_>>, declaration| {
-            declared.entry(*AsRef::<Member<'found>>::as_ref(declaration)).or_default().push(declaration);
-            declared
-        });
-        let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declared
-            .into_values()
-            .filter_map(|twins| twins.first().copied().filter(|_| twins.len() == 1))
+        let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declarations
+            .iter()
             .filter_map(|declaration| {
                 let site: &Site<'file> = declaration.as_ref();
                 let named: &Member<'found> = declaration.as_ref();
@@ -94,7 +89,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             .filter_map(Link::apart)
             .collect();
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let bodies = graphs.iter().flat_map(|(krate, graph)| resolver.bodies(krate, graph));
+        let bodies = shipped.iter().flat_map(|file| resolver.bodies(file));
         let links: BTreeSet<Link<'found>> =
             defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
         Containment {
