@@ -1,9 +1,10 @@
 use proc_macro2::{Group, Punct, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, GenericParam, Ident, ImplItem,
-    ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType, PathArguments,
-    ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, Field, Fields, FnArg, GenericArgument, GenericParam,
+    Ident, ImplItem, ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType,
+    PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound,
+    TypePath,
 };
 
 use lint_layout::Name;
@@ -123,6 +124,14 @@ impl Syntax {
     }
 
     #[must_use]
+    pub fn literal(expr: &Expr) -> Option<&Lit> {
+        match expr {
+            Expr::Lit(literal) => Some(&literal.lit),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn string_literal(value: &Expr) -> Option<&LitStr> {
         match value {
             Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
@@ -151,6 +160,16 @@ impl Syntax {
         match param {
             GenericParam::Type(parameter) => Some(parameter),
             _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn newtype_field(fields: &Fields) -> Option<&Field> {
+        match fields {
+            Fields::Unnamed(fields) => {
+                Some(fields).filter(|fields| fields.unnamed.len() == 1).and_then(|fields| fields.unnamed.first())
+            }
+            Fields::Named(_) | Fields::Unit => None,
         }
     }
 

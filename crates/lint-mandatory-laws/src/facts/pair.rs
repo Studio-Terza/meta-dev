@@ -18,7 +18,7 @@ impl<'facts> Pair<'facts> {
         &self,
         mentions: &'mentions BTreeSet<Name>,
     ) -> Option<&'mentions BTreeSet<Name>> {
-        (mentions.contains(self.left) && mentions.contains(self.right)).then_some(mentions)
+        Some(mentions).filter(|mentions| mentions.contains(self.left)).filter(|mentions| mentions.contains(self.right))
     }
 }
 

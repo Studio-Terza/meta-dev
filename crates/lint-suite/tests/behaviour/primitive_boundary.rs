@@ -3,6 +3,7 @@ use lint_primitive_boundary::PrimitiveBoundary;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
+const SUPPORT_MODULE: &str = "#[cfg(test)]\nmod fixtures;\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(x: u32) {}\n}\n";
 const INLINE_BOUNDARY: &str = "mod boundary {\n    pub fn f(x: u32) -> String {\n        x.to_string()\n    }\n}\n";
 const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u32) {}\n}\n";
@@ -47,11 +48,20 @@ const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &
 const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 
-const CASES: [Case; 46] = [
+const CASES: [Case; 47] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("support module beside a plain file"),
+        &[
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("crates/x/src/fixtures.rs"), Text::new(BARE)),
+            Source::new(Located::new("crates/x/src/clock.rs"), Text::new(BARE)),
+        ],
+        Flagged::new(&["crates/x/src/clock.rs:1", "crates/x/src/clock.rs:1"]),
     ),
     Case::new(
         Title::new("boundary module file"),

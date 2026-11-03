@@ -26,10 +26,7 @@ impl<'file> Profile<'file> {
     }
 
     pub(crate) fn filed_in(self, profiles: &mut BTreeMap<Subject<'file>, Facets<'file>>) {
-        let merged = match profiles.remove(&self.subject) {
-            Some(earlier) => earlier.merged(self.facets),
-            None => self.facets,
-        };
+        let merged = self.facets.after(profiles.remove(&self.subject));
         profiles.insert(self.subject, merged);
     }
 }
