@@ -1,4 +1,6 @@
-use std::cell::RefCell;
+mod locked;
+mod resolved;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,11 +8,13 @@ use std::path::{Path, PathBuf};
 use newtype::Newtype;
 
 use crate::{Bytes, FileFailure, Files, Kind, Text};
+use locked::Locked;
+use resolved::Resolved;
 
 #[derive(Debug, Default)]
 pub struct Memory {
-    files: RefCell<BTreeMap<PathBuf, Bytes>>,
-    directories: RefCell<BTreeSet<PathBuf>>,
+    files: Locked<BTreeMap<PathBuf, Bytes>>,
+    directories: Locked<BTreeSet<PathBuf>>,
 }
 
 impl Memory {
@@ -19,7 +23,14 @@ impl Memory {
     }
 
     fn stored(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        self.files.borrow().get(path).cloned().ok_or_else(Self::missing)
+        let found = self.files.held().get(path).cloned();
+        match found {
+            Some(bytes) => Ok(bytes),
+            None if self.kind(path) == Kind::Directory => {
+                Err(FileFailure::Failed(io::Error::from(io::ErrorKind::IsADirectory)))
+            }
+            None => Err(Self::missing()),
+        }
     }
 
     fn placed<'path>(&self, path: &'path Path) -> Result<&'path Path, FileFailure> {
@@ -31,8 +42,8 @@ impl Memory {
     }
 
     fn holds_below(&self, path: &Path) -> Option<Kind> {
-        let files = self.files.borrow();
-        let directories = self.directories.borrow();
+        let files = self.files.held();
+        let directories = self.directories.held();
         files
             .keys()
             .chain(directories.iter())
@@ -43,7 +54,7 @@ impl Memory {
 
 impl FromIterator<(PathBuf, Bytes)> for Memory {
     fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Memory {
-        Memory { files: RefCell::new(entries.into_iter().collect()), directories: RefCell::default() }
+        Memory { files: Locked::new(entries.into_iter().collect()), directories: Locked::default() }
     }
 }
 
@@ -60,7 +71,7 @@ impl Files for Memory {
 
     fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
         let placed = self.placed(path)?.to_path_buf();
-        self.files.borrow_mut().insert(placed, bytes.clone());
+        self.files.held().insert(placed, bytes.clone());
         Ok(())
     }
 
@@ -71,10 +82,10 @@ impl Files for Memory {
     }
 
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        if path.ancestors().any(|ancestor| self.files.borrow().contains_key(ancestor)) {
+        if path.ancestors().any(|ancestor| self.files.held().contains_key(ancestor)) {
             Err(FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory)))
         } else {
-            self.directories.borrow_mut().insert(path.to_path_buf());
+            self.directories.held().insert(path.to_path_buf());
             Ok(())
         }
     }
@@ -86,8 +97,8 @@ impl Files for Memory {
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
         match self.kind(directory) {
             Kind::Directory => {
-                let files = self.files.borrow();
-                let directories = self.directories.borrow();
+                let files = self.files.held();
+                let directories = self.directories.held();
                 let children: BTreeSet<PathBuf> = files
                     .keys()
                     .chain(directories.iter())
@@ -102,15 +113,16 @@ impl Files for Memory {
     }
 
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        match self.kind(path) {
+        let resolved = Resolved::from(path).into_inner();
+        match self.kind(&resolved) {
             Kind::Missing => Err(Self::missing()),
-            _ => Ok(path.to_path_buf()),
+            _ => Ok(resolved),
         }
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        let file = self.files.borrow().contains_key(path).then_some(Kind::File);
-        let directory = self.directories.borrow().contains(path).then_some(Kind::Directory);
+        let file = self.files.held().contains_key(path).then_some(Kind::File);
+        let directory = self.directories.held().contains(path).then_some(Kind::Directory);
         file.or(directory).or_else(|| self.holds_below(path)).unwrap_or(Kind::Missing)
     }
 }
