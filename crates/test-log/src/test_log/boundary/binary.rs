@@ -30,24 +30,26 @@ impl Binary {
         let (at, mark) = rest.match_indices(Self::DEPS).last()?;
         let after = rest.get(at + mark.len()..)?;
         let (split, directory) = after.match_indices(Self::DEPS_DIRECTORY).next()?;
-        let profile = after.get(..split)?;
-        let tail = after.get(split + directory.len()..)?;
+        let tail = after
+            .get(..split)
+            .and_then(|profile| Self::word(profile, |letter| letter == Self::SLASH))
+            .and(after.get(split + directory.len()..))?;
         let (close, _) = tail.match_indices(Self::CLOSE).next()?;
-        let name = tail.get(..close)?;
-        (!name.is_empty()
-            && !name.contains(char::is_whitespace)
-            && !profile.is_empty()
-            && !profile.contains(Self::SLASH))
-        .then(|| Binary(name.to_owned()))
+        let name = tail.get(..close).and_then(|name| Self::word(name, char::is_whitespace))?;
+        Some(Binary(name.to_owned()))
+    }
+
+    fn word(text: &str, mut separator: impl FnMut(char) -> bool) -> Option<&str> {
+        let end = text.char_indices().find(|(_, letter)| separator(*letter)).map_or(text.len(), |(at, _)| at);
+        text.get(..end).filter(|word| word.len() == text.len()).filter(|_| end > 0)
     }
 
     fn doctests(line: &str) -> Option<String> {
-        let name: String = Self::after_indent(line, Self::DOCTESTS)?
-            .chars()
-            .skip_while(|letter| letter.is_whitespace())
-            .take_while(|letter| !letter.is_whitespace())
-            .collect();
-        (!name.is_empty()).then(|| format!("{}{name}", Self::DOCTEST_PREFIX))
+        let rest = Self::after_indent(line, Self::DOCTESTS)?;
+        let leading: usize = rest.chars().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+        let name = rest.get(leading..)?;
+        let end = name.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(name.len(), |(at, _)| at);
+        name.get(..end).filter(|_| end > 0).map(|name| format!("{}{name}", Self::DOCTEST_PREFIX))
     }
 }
 
