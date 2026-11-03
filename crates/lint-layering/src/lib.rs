@@ -4,7 +4,7 @@ mod link;
 mod tally;
 mod tangle;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::{Headline, Lint, Report, SourceFile, Violation};
 use lint_item_graph::ItemGraph;
@@ -19,12 +19,9 @@ use tangle::Tangle;
 pub struct Layering;
 
 impl Layering {
-    fn groups<'facts>(
-        declared: &Declared<'facts, '_>,
-        links: &[Link<'facts, '_>],
-    ) -> Vec<BTreeSet<Definition<'facts>>> {
-        let nodes = declared.definitions().map(|node| (node, BTreeSet::new())).collect();
-        let graph = ItemGraph::of_references(links.iter().fold(nodes, |references, link| link.added_to(references)));
+    fn groups<'facts>(links: &[Link<'facts, '_>]) -> Vec<BTreeSet<Definition<'facts>>> {
+        let graph =
+            ItemGraph::of_references(links.iter().fold(BTreeMap::new(), |references, link| link.added_to(references)));
         let cycles = graph
             .tangles()
             .into_iter()
@@ -36,7 +33,7 @@ impl Layering {
 
     fn violations<'file>(declared: &Declared<'_, 'file>, links: &[Link<'_, 'file>]) -> Vec<Violation<'file>> {
         let tangles = Tangle::ranked(
-            Self::groups(declared, links).into_iter().map(|members| Tangle::closed(members, links, declared)).collect(),
+            Self::groups(links).into_iter().map(|members| Tangle::closed(members, links, declared)).collect(),
         );
         let tally = Tally::counted(declared.count(), links, &tangles);
         declared

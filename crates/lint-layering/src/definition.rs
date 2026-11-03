@@ -51,10 +51,6 @@ impl<'facts, 'file> Declared<'facts, 'file> {
         Declared { declaring, sites }
     }
 
-    pub(crate) fn definitions(&self) -> impl Iterator<Item = Definition<'facts>> {
-        self.sites.keys().copied()
-    }
-
     pub(crate) fn count(&self) -> Count {
         Count::new(self.sites.len())
     }

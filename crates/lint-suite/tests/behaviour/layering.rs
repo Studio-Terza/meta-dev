@@ -53,3 +53,14 @@ fn a_qualified_path_resolves_to_the_crate_it_names() {
         "{text}"
     );
 }
+
+#[test]
+fn an_unqualified_name_resolves_to_the_one_other_crate_declaring_it_and_an_ambiguous_one_is_dropped() {
+    let x = || Source::new(Located::new("crates/x/src/lib.rs"), Text::new("struct A {\n    b: B,\n}\n"));
+    let y = || Source::new(Located::new("crates/y/src/lib.rs"), Text::new("struct B {\n    a: A,\n}\n"));
+    let resolved = Layered::of(&[x(), y()]);
+    assert!(resolved.contains("x::A -> y::B (field) at crates/x/src/lib.rs:2, y::B -> x::A (field)"), "{resolved}");
+    let ambiguous =
+        Layered::of(&[x(), y(), Source::new(Located::new("crates/z/src/lib.rs"), Text::new("struct B;\n"))]);
+    assert!(ambiguous.contains("0 tangles"), "{ambiguous}");
+}
