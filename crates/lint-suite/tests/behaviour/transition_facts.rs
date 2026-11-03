@@ -12,7 +12,7 @@ impl Read {
 
     fn signature(found: &Transition) -> String {
         let takes: Vec<String> = found.takes().iter().map(Self::endpoint).collect();
-        let fixed = found.filler().implemented().map(ToString::to_string).unwrap_or_default();
+        let fixed = found.filler().trait_name().map(ToString::to_string).unwrap_or_default();
         format!(
             "{found}({}) -> {} {:?} {:?} {fixed}",
             takes.join(", "),
@@ -70,7 +70,7 @@ fn transitions_carry_their_ground_their_trait_and_provided_trait_bodies() {
     assert_eq!(
         found,
         [
-            "x::Shape::scaled(Interface:Shape, Named:Factor) -> Interface:Shape Absent Core ",
+            "x::Shape::scaled(Interface:Shape, Named:Factor) -> Interface:Shape Absent Core Shape",
             "x::S::area(Named:S) -> Named:Area Absent Core Shape",
             "x::free(Named:S) -> Named:S ThroughParameter Core ",
             "x::P::read(Named:P) -> Named:S ThroughSelf Ports ",

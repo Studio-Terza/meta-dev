@@ -1,6 +1,6 @@
 use std::fmt;
 
-use body_lifts::Body;
+use body_lifts::{Body, Branching};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -20,6 +20,7 @@ pub struct Transition {
     gives: Endpoint,
     mutation: Mutation,
     body: Body,
+    branching: Branching,
     ground: Ground,
     filler: Filler,
 }
@@ -35,6 +36,7 @@ impl Transition {
             gives: Endpoint::from(Unnamed::Unit),
             mutation: Mutation::Absent,
             body: Body::Written,
+            branching: Branching::new(1),
             ground: Ground::Core,
             filler: Filler::Free,
         }
@@ -51,6 +53,11 @@ impl Transition {
         self.ground = ground;
         self.filler = filler;
         self.body = body;
+        self
+    }
+
+    pub(crate) fn branching(mut self, branching: Branching) -> Transition {
+        self.branching = branching;
         self
     }
 
@@ -72,6 +79,11 @@ impl Transition {
     #[must_use]
     pub fn body(&self) -> Body {
         self.body
+    }
+
+    #[must_use]
+    pub fn branches(&self) -> Branching {
+        self.branching
     }
 
     #[must_use]
