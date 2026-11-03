@@ -1,7 +1,10 @@
+mod fake_files;
+
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory, Text};
+use fake_files::FakeFiles;
+use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -102,15 +105,15 @@ fn disk_keeps_the_contract() -> Result<(), FileFailure> {
 }
 
 #[test]
-fn memory_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = Memory::default();
+fn fake_keeps_the_contract() -> Result<(), FileFailure> {
+    let memory = FakeFiles::default();
     memory.create_directories(Path::new("/scratch"))?;
     Checks::on(&memory, Path::new("/scratch"))
 }
 
 #[test]
-fn memory_starts_from_its_entries() -> Result<(), FileFailure> {
-    let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
+fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
+    let memory: FakeFiles = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
     assert_eq!(memory.entries(Path::new("/a"))?, [PathBuf::from("/a/b.txt")]);
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
