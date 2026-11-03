@@ -23,9 +23,11 @@ impl ShapeToken {
         let signs: Vec<Option<Symbol>> = shaped
             .iter()
             .zip(shaped.iter().skip(1).map(Some).chain([None]))
-            .map(|pair| match pair {
-                (ShapeToken::Mark(sign), Some(ShapeToken::Literal)) if *sign == Self::MINUS => Some(*sign),
-                _ => None,
+            .map(|(token, next)| {
+                Some(token)
+                    .filter(|token| **token == ShapeToken::Mark(Self::MINUS))
+                    .filter(|_| next == Some(&ShapeToken::Literal))
+                    .map(|_| Self::MINUS)
             })
             .collect();
         shaped.into_iter().zip(signs).filter(|(_, sign)| sign.is_none()).map(|(token, _)| token).collect()
@@ -36,24 +38,28 @@ impl ShapeToken {
             TokenTree::Literal(_) => vec![ShapeToken::Literal],
             TokenTree::Punct(punct) => vec![ShapeToken::Mark(Symbol::new(punct.as_char()))],
             TokenTree::Ident(ident) => vec![Self::of_word(Name::from(&ident))],
-            TokenTree::Group(group) => {
-                let inner = Self::normalized(group.stream());
-                match group.delimiter() {
-                    Delimiter::Parenthesis => Self::between(Symbol::new('('), inner, Symbol::new(')')),
-                    Delimiter::Brace => Self::between(Symbol::new('{'), inner, Symbol::new('}')),
-                    Delimiter::Bracket => Self::between(Symbol::new('['), inner, Symbol::new(']')),
-                    Delimiter::None => inner,
-                }
-            }
+            TokenTree::Group(group) => Self::grouped(group.delimiter(), Self::normalized(group.stream())),
+        }
+    }
+
+    fn grouped(delimiter: Delimiter, inner: Vec<ShapeToken>) -> Vec<ShapeToken> {
+        match delimiter {
+            Delimiter::Parenthesis => Self::between(Symbol::new('('), inner, Symbol::new(')')),
+            Delimiter::Brace => Self::between(Symbol::new('{'), inner, Symbol::new('}')),
+            Delimiter::Bracket => Self::between(Symbol::new('['), inner, Symbol::new(']')),
+            Delimiter::None => inner,
         }
     }
 
     fn of_word(word: Name) -> ShapeToken {
-        match (word.matches::<Whole>(&Self::LITERAL_WORDS), word.casing()) {
-            (Some(_), _) => ShapeToken::Literal,
-            (None, Casing::Shouting) if word.length() > Length::new(1) => ShapeToken::Literal,
-            _ => ShapeToken::Word(word),
-        }
+        let shouted = Some(word.casing())
+            .filter(|casing| *casing == Casing::Shouting)
+            .filter(|_| word.length() > Length::new(1))
+            .map(|_| ShapeToken::Literal);
+        word.matches::<Whole>(&Self::LITERAL_WORDS)
+            .map(|_| ShapeToken::Literal)
+            .or(shouted)
+            .unwrap_or(ShapeToken::Word(word))
     }
 
     fn between(open: Symbol, inner: Vec<ShapeToken>, close: Symbol) -> Vec<ShapeToken> {

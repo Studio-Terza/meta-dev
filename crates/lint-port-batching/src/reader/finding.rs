@@ -46,11 +46,11 @@ impl fmt::Display for Port {
 
 impl fmt::Display for Looping {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Looping::For => "for",
-            Looping::While => "while",
-            Looping::Bare => "loop",
-        })
+        match self {
+            Looping::For => formatter.write_str("for"),
+            Looping::While => formatter.write_str("while"),
+            Looping::Bare => formatter.write_str("loop"),
+        }
     }
 }
 

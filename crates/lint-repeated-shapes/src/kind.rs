@@ -19,11 +19,7 @@ impl Kind {
     }
 
     pub(crate) fn joined(self, other: Kind) -> Kind {
-        match (self, other) {
-            (Kind::Tests, Kind::Tests) => Kind::Tests,
-            (Kind::Shipped, Kind::Shipped) => Kind::Shipped,
-            _ => Kind::Mixed,
-        }
+        Some(self).filter(|kind| *kind == other).unwrap_or(Kind::Mixed)
     }
 
     pub(crate) fn fix(self) -> Fix {
@@ -43,10 +39,10 @@ impl Kind {
 
 impl fmt::Display for Kind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Kind::Tests => "test",
-            Kind::Shipped => "shipped",
-            Kind::Mixed => "test and shipped",
-        })
+        match self {
+            Kind::Tests => formatter.write_str("test"),
+            Kind::Shipped => formatter.write_str("shipped"),
+            Kind::Mixed => formatter.write_str("test and shipped"),
+        }
     }
 }
