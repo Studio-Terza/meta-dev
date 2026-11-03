@@ -41,12 +41,6 @@ impl Memory {
         }
     }
 
-    fn kept(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
-        let placed = self.placed(path)?.to_path_buf();
-        self.files.held().insert(placed, bytes);
-        Ok(())
-    }
-
     fn holds_below(&self, path: &Path) -> Option<Kind> {
         let files = self.files.held();
         let directories = self.directories.held();
@@ -76,13 +70,15 @@ impl Files for Memory {
     }
 
     fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        self.kept(path, bytes.clone())
+        let placed = self.placed(path)?.to_path_buf();
+        self.files.held().insert(placed, bytes.clone());
+        Ok(())
     }
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
         let held = self.stored(path).unwrap_or_default().into_inner();
         let joined = held.into_iter().chain(bytes.as_ref().iter().copied()).collect();
-        self.kept(path, Bytes::new(joined))
+        self.write(path, &Bytes::new(joined))
     }
 
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
