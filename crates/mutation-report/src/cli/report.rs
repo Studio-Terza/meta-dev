@@ -5,7 +5,8 @@ mod shard_matrix;
 mod summary;
 mod test_name;
 
-use std::ffi::OsString;
+use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -14,51 +15,49 @@ use golden_tests::GoldenTests;
 use shard_matrix::ShardMatrix;
 use summary::Summary;
 
-use failure::Failure;
+pub use failure::Failure;
 
 #[derive(Debug)]
-pub struct Report {
-    shards: PathBuf,
-    sources: PathBuf,
-    markdown: PathBuf,
-    json: PathBuf,
+pub struct Report<'arguments> {
+    shards: &'arguments Path,
+    sources: &'arguments Path,
+    markdown: &'arguments Path,
+    json: &'arguments Path,
 }
 
-impl Report {
-    pub fn from_arguments(arguments: &[OsString]) -> Result<Report, Failure> {
+impl<'arguments> Report<'arguments> {
+    pub fn from_arguments(arguments: &'arguments [impl AsRef<OsStr>]) -> Result<Report<'arguments>, Failure<'static>> {
         match arguments {
             [shards, sources, markdown, json] => Ok(Report {
-                shards: PathBuf::from(shards),
-                sources: PathBuf::from(sources),
-                markdown: PathBuf::from(markdown),
-                json: PathBuf::from(json),
+                shards: Path::new(shards),
+                sources: Path::new(sources),
+                markdown: Path::new(markdown),
+                json: Path::new(json),
             }),
             _ => Err(Failure::Usage),
         }
     }
 
-    pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure> {
+    pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure<'arguments>> {
         let matrices = self.matrices(files)?;
-        let summary = Summary::from_results(&matrices, &GoldenTests::under(files, &self.sources)?);
+        let summary = Summary::from_results(&matrices, &GoldenTests::under(files, self.sources)?);
         files
-            .write(&self.markdown, &Bytes::from(&summary))
-            .map_err(|failure| Failure::Io { path: self.markdown.clone(), source: io::Error::from(failure) })?;
-        summary.written_as_json(files, &self.json)
+            .write(self.markdown, &Bytes::from(&summary))
+            .map_err(|failure| Failure::Io { path: Cow::Borrowed(self.markdown), source: io::Error::from(failure) })?;
+        summary.written_as_json(files, self.json)
     }
 
-    fn matrices(&self, files: &impl Files) -> Result<Vec<ShardMatrix>, Failure> {
+    fn matrices(&self, files: &impl Files) -> Result<Vec<ShardMatrix>, Failure<'arguments>> {
         let mut directories = files
-            .entries(&self.shards)
-            .map_err(|failure| Failure::Io { path: self.shards.clone(), source: io::Error::from(failure) })?;
+            .entries(self.shards)
+            .map_err(|failure| Failure::Io { path: Cow::Borrowed(self.shards), source: io::Error::from(failure) })?;
         directories.sort();
         let shard_files: Vec<PathBuf> = directories.iter().map(|directory| Self::shard_file(directory)).collect();
-        let present: Vec<PathBuf> = shard_files
-            .iter()
-            .zip(files.kinds(&shard_files))
-            .filter(|(_, kind)| *kind == Kind::File)
-            .map(|(file, _)| file.clone())
-            .collect();
-        present.iter().zip(files.read_text_many(&present)).map(|(file, text)| ShardMatrix::parsed(file, text)).collect()
+        let kinds = files.kinds(&shard_files);
+        let present: Vec<PathBuf> =
+            shard_files.into_iter().zip(kinds).filter(|(_, kind)| *kind == Kind::File).map(|(file, _)| file).collect();
+        let read = files.read_text_many(&present);
+        present.into_iter().zip(read).map(|(file, text)| ShardMatrix::parsed(file, text)).collect()
     }
 
     fn shard_file(directory: &Path) -> PathBuf {

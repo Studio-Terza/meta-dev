@@ -26,8 +26,8 @@ impl CompileTrend {
 }
 
 impl Step for CompileTrend {
-    fn from_arguments(arguments: &[OsString]) -> Result<CompileTrend, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
+        match arguments.as_slice() {
             [today, downloads] => Ok(CompileTrend {
                 today: PathBuf::from(today),
                 fortnight: Fortnight::downloading_to(PathBuf::from(downloads)),
@@ -36,7 +36,7 @@ impl Step for CompileTrend {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let today = Build::measured_in(ports.files(), &self.today)?;
         let earlier = self.fortnight.downloaded(ports)?;
         let notice = Notice::new(&today, &earlier, &self.fortnight);
@@ -45,7 +45,8 @@ impl Step for CompileTrend {
             let report = slower.reported(&merged);
             write!(out, "{report}")?;
             let issues = Issue::titled(&[Self::TITLE], ports)?;
-            let filings = issues.iter().map(|issue| issue.filing(&report, out)).collect::<Result<Vec<_>, Failure>>()?;
+            let filings =
+                issues.iter().map(|issue| issue.filing(&report, out)).collect::<Result<Vec<_>, Failure<'static>>>()?;
             Issue::filed(&filings, ports)
         } else {
             writeln!(out, "{notice}")?;

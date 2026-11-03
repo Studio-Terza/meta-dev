@@ -1241,6 +1241,17 @@ fn cold_builds_that_cannot_be_listed_downloaded_or_read_are_reported() -> Result
 }
 
 #[test]
+fn a_cold_build_that_cannot_be_read_is_reported_by_the_path_of_its_file() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Cold::fortnight(&scratch, "45")?;
+    let undownloaded = Script::answering(Cold::answers("[13]", "[]"));
+    assert!(scratch.answer(&undownloaded, &arguments).err.contains(&scratch.file("runs/13/measured.toml")));
+    scratch.write("today/measured.toml", "cold-clippy = soon\n")?;
+    assert!(scratch.answer(&Script::new(), &arguments).err.contains(&scratch.file("today/measured.toml")));
+    Ok(())
+}
+
+#[test]
 fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.write("a.txt", "one\n")?;

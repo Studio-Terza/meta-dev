@@ -28,41 +28,45 @@ impl Golden {
             .ok_or_else(|| Failure::Escapes { name: name.to_path_buf() })
     }
 
-    pub fn verify(
-        &self,
-        environment: &impl Environment,
-        files: &impl Files,
-        actual: Output<'_>,
-    ) -> Result<(), Failure> {
-        self.verify_in(environment, files, Mode::current(environment)?, actual)
+    pub fn verify(self, environment: &impl Environment, files: &impl Files, actual: Output<'_>) -> Result<(), Failure> {
+        let mode = Mode::current(environment)?;
+        self.verify_in(environment, files, mode, actual)
     }
 
     pub fn verify_in(
-        &self,
+        self,
         environment: &impl Environment,
         files: &impl Files,
         mode: Mode,
         actual: Output<'_>,
     ) -> Result<(), Failure> {
         match mode {
-            Mode::Check => {
-                let recorded = files.read_text(&self.path).map_err(|failure| self.unread(files, failure))?;
-                Difference::between(Output::new(recorded.as_ref()), actual).map_or(Ok(()), |difference| {
-                    Err(Failure::Differs { path: self.path.clone(), difference: Box::new(difference) })
-                })
+            Mode::Check => self.checked(files, actual),
+            Mode::Record => {
+                let written = (files.kind(&self.package.join(Self::MANIFEST)) == Kind::Missing
+                    || Mode::current(environment).ok() == Some(Mode::Record))
+                .then(|| self.written(files, actual));
+                self.recorded(written)
             }
-            Mode::Record => self
-                .chosen_for_package(environment, files)
-                .ok_or_else(|| Failure::NotChosen { path: self.path.clone() })?
-                .written(files, actual)
-                .map_err(|failure| Failure::Unwritable { path: self.path.clone(), source: io::Error::from(failure) }),
         }
     }
 
-    fn chosen_for_package(&self, environment: &impl Environment, files: &impl Files) -> Option<&Self> {
-        (files.kind(&self.package.join(Self::MANIFEST)) == Kind::Missing
-            || Mode::current(environment).ok() == Some(Mode::Record))
-        .then_some(self)
+    fn recorded(self, written: Option<Result<(), FileFailure>>) -> Result<(), Failure> {
+        match written {
+            Some(written) => {
+                written.map_err(|failure| Failure::Unwritable { path: self.path, source: io::Error::from(failure) })
+            }
+            None => Err(Failure::NotChosen { path: self.path }),
+        }
+    }
+
+    fn checked(self, files: &impl Files, actual: Output<'_>) -> Result<(), Failure> {
+        match files.read_text(&self.path) {
+            Ok(recorded) => Difference::between(Output::new(recorded.as_ref()), actual).map_or(Ok(()), |difference| {
+                Err(Failure::Differs { path: self.path, difference: Box::new(difference) })
+            }),
+            Err(failure) => Err(self.unread(files, failure)),
+        }
     }
 
     fn written(&self, files: &impl Files, actual: Output<'_>) -> Result<(), FileFailure> {
@@ -71,11 +75,11 @@ impl Golden {
             .and_then(|()| files.write(&self.path, &Bytes::from(actual.into_inner())))
     }
 
-    fn unread(&self, files: &impl Files, failure: FileFailure) -> Failure {
+    fn unread(self, files: &impl Files, failure: FileFailure) -> Failure {
         if files.kind(&self.path) == Kind::Missing {
-            Failure::Missing { path: self.path.clone() }
+            Failure::Missing { path: self.path }
         } else {
-            Failure::Unreadable { path: self.path.clone(), source: io::Error::from(failure) }
+            Failure::Unreadable { path: self.path, source: io::Error::from(failure) }
         }
     }
 }

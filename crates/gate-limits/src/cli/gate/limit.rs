@@ -34,13 +34,26 @@ impl Limit {
         }
     }
 
-    pub fn lowered(self, stage: &Stage, measured: Seconds) -> Result<Seconds, Failure> {
+    pub fn lowered(self, measured: Seconds) -> Result<Seconds, Refusal> {
         match self {
-            Limit::Levels { .. } => Err(Failure::Levels { stage: stage.clone() }),
-            Limit::Record(record) if measured > record => {
-                Err(Failure::Above { stage: stage.clone(), measured, record })
-            }
+            Limit::Levels { .. } => Err(Refusal::Levels),
+            Limit::Record(record) if measured > record => Err(Refusal::Above { record }),
             Limit::Record(_) => Ok(measured),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Refusal {
+    Levels,
+    Above { record: Seconds },
+}
+
+impl Refusal {
+    pub fn refusing(self, stage: Stage, measured: Seconds) -> Failure<'static> {
+        match self {
+            Refusal::Levels => Failure::Levels { stage },
+            Refusal::Above { record } => Failure::Above { stage, measured, record },
         }
     }
 }

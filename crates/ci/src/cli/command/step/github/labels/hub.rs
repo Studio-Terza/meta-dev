@@ -15,7 +15,7 @@ impl<'ports, Host: Ports> Hub<'ports, Host> {
         Hub { ports }
     }
 
-    pub(crate) fn pull_request(&self, pull_request: &PullNumber) -> Result<PullRequest, Failure> {
+    pub(crate) fn pull_request(&self, pull_request: &PullNumber) -> Result<PullRequest, Failure<'static>> {
         let kind = PullRequest::KIND;
         let invocation =
             Invocation::new("gh", ["pr", "view", pull_request.as_ref(), "--json", "title,labels", "--jq", kind]);

@@ -44,8 +44,8 @@ impl fmt::Display for WallTimes {
 }
 
 impl Step for WallTimes {
-    fn from_arguments(arguments: &[OsString]) -> Result<WallTimes, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
+        match arguments.as_slice() {
             [repository, run, job] => Ok(WallTimes {
                 repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
                 run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
@@ -55,7 +55,7 @@ impl Step for WallTimes {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let invocation = self.invocation();
         let table = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         writeln!(out, "{self}")?;

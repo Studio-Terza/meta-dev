@@ -26,7 +26,7 @@ impl<'change> Owed<'change> {
         (!self.failing.is_empty()).then_some(self)
     }
 
-    pub(crate) fn complained(&self, out: &mut impl Write) -> Result<(), Failure> {
+    pub(crate) fn complained(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {
         self.failing.iter().try_for_each(|change| writeln!(out, "{}", change.now_at().display()))?;
         Ok(writeln!(out, "::error::{}", self.fault)?)
     }

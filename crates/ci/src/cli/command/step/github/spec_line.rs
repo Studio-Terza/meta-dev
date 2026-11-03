@@ -20,8 +20,8 @@ impl SpecLine {
 }
 
 impl Step for SpecLine {
-    fn from_arguments(arguments: &[OsString]) -> Result<SpecLine, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
+        match arguments.as_slice() {
             [pull_request] => {
                 Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
             }
@@ -29,7 +29,7 @@ impl Step for SpecLine {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let invocation = Invocation::new(
             "gh",
             ["pr", "view", self.pull_request.as_ref(), "--json", Self::BODY, "--jq", Self::RAW_BODY],

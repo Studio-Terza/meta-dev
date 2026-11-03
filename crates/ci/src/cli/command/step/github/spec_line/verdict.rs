@@ -32,7 +32,7 @@ impl<'body> Verdict<'body> {
         }
     }
 
-    pub(crate) fn reported(&self, out: &mut impl Write) -> Result<(), Failure> {
+    pub(crate) fn reported(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {
         match self {
             Verdict::Repair => Ok(writeln!(
                 out,

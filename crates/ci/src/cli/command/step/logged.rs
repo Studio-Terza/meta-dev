@@ -13,8 +13,8 @@ pub struct Logged {
 }
 
 impl Step for Logged {
-    fn from_arguments(arguments: &[OsString]) -> Result<Logged, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Logged, Failure<'static>> {
+        match arguments.as_slice() {
             [log, program, rest @ ..] => {
                 Ok(Logged { log: PathBuf::from(log), invocation: Invocation::new(program, rest) })
             }
@@ -22,7 +22,7 @@ impl Step for Logged {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         ports
             .logged(&self.invocation, &self.log)
             .map(|run| run.exit())

@@ -11,14 +11,14 @@ pub struct RatchetLower {
 }
 
 impl Step for RatchetLower {
-    fn from_arguments(arguments: &[OsString]) -> Result<RatchetLower, Failure> {
-        match arguments {
-            [_, _] => Ok(RatchetLower { record: gate_limits::Cli::from_args(arguments.iter().cloned()) }),
+    fn from_arguments(arguments: Vec<OsString>) -> Result<RatchetLower, Failure<'static>> {
+        match arguments.as_slice() {
+            [_, _] => Ok(RatchetLower { record: gate_limits::Cli::from_args(arguments.into_iter()) }),
             _ => Err(Failure::Usage),
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let record = self.record.lower(ports.files())?;
         write!(out, "record lowered to:\n{record}")?;
         Ok(Exit::Success)

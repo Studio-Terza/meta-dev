@@ -4,14 +4,15 @@ mod settings;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, WherePredicate, parse_quote};
+use syn::{DeriveInput, Generics, Ident, WherePredicate, parse_quote};
 
 use check::Check;
 use only_field::OnlyField;
 use settings::Settings;
 
 pub struct Wrapped {
-    input: DeriveInput,
+    ident: Ident,
+    generics: Generics,
     field: OnlyField,
     settings: Settings,
 }
@@ -22,8 +23,8 @@ impl Wrapped {
     }
 
     pub fn constructors(&self) -> TokenStream {
-        let name = &self.input.ident;
-        let (implemented, arguments, bounds) = self.input.generics.split_for_impl();
+        let name = &self.ident;
+        let (implemented, arguments, bounds) = self.generics.split_for_impl();
         let member = self.field.member();
         let inner = self.field.inner();
         match self.settings.checking() {
@@ -82,9 +83,9 @@ impl Wrapped {
     }
 
     pub fn arbitrary(mut self) -> TokenStream {
-        let name = &self.input.ident;
-        let inner = self.field.inner().clone();
-        let chosen = self.settings.strategy().cloned();
+        let name = &self.ident;
+        let inner = self.field.inner();
+        let chosen = self.settings.strategy();
         let required: Vec<WherePredicate> = match chosen {
             None => vec![
                 parse_quote!(Self: ::core::fmt::Debug),
@@ -93,8 +94,8 @@ impl Wrapped {
             ],
             Some(_) => vec![parse_quote!(Self: ::core::fmt::Debug), parse_quote!(Self: 'static)],
         };
-        self.input.generics.make_where_clause().predicates.extend(required);
-        let (implemented, arguments, bounds) = self.input.generics.split_for_impl();
+        self.generics.make_where_clause().predicates.extend(required);
+        let (implemented, arguments, bounds) = self.generics.split_for_impl();
         let mapped = self.settings.checking().map_or_else(Self::plain_strategy, |_| Check::strategy());
         let (parameters, source) = match chosen {
             Some(strategy) => (quote!(()), quote!(let _ = parameters; let inner = #strategy;)),
@@ -117,10 +118,10 @@ impl Wrapped {
     }
 
     pub fn display(self) -> TokenStream {
-        let name = &self.input.ident;
+        let name = &self.ident;
         let inner = self.field.inner();
         let member = self.field.member();
-        let mut generics = self.input.generics.clone();
+        let mut generics = self.generics;
         generics.make_where_clause().predicates.push(parse_quote!(#inner: ::core::fmt::Display));
         let (implemented, arguments, bounds) = generics.split_for_impl();
         quote! {
@@ -139,9 +140,11 @@ impl Wrapped {
     }
 
     fn parsed(tokens: TokenStream) -> syn::Result<Wrapped> {
-        let input: DeriveInput = syn::parse2(tokens)?;
-        let settings = Settings::declared(&input.attrs)?;
-        let field = OnlyField::found_in(&input)?;
-        Ok(Wrapped { input, field, settings })
+        let DeriveInput { attrs, vis, ident, generics, data } = syn::parse2(tokens)?;
+        let settings = Settings::declared(&attrs)?;
+        match OnlyField::taken(data) {
+            Ok(field) => Ok(Wrapped { ident, generics, field, settings }),
+            Err(data) => Err(OnlyField::refused(DeriveInput { attrs, vis, ident, generics, data })),
+        }
     }
 }

@@ -1,10 +1,11 @@
 mod finding;
 mod limit;
+mod pairing;
 mod record;
 mod seconds;
 mod verdict;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 
@@ -15,6 +16,7 @@ use crate::cli::stage::Stage;
 pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
+use pairing::Pairing;
 pub use record::Record;
 pub(crate) use seconds::Seconds;
 
@@ -24,29 +26,26 @@ pub struct Gate {
 }
 
 impl Gate {
-    pub fn judge(limits: Contents, measured: Contents, only: &[OsString]) -> Result<Gate, Failure> {
+    pub fn judge(limits: Contents, measured: Contents, only: &[OsString]) -> Result<Gate, Failure<'_>> {
         let limits: BTreeMap<Stage, Limit> =
             toml::from_str(&limits.into_inner()).map_err(|source| Failure::Parse { file: Document::Limits, source })?;
         let limits = Self::sliced(limits, only)?;
         let measured: BTreeMap<Stage, Seconds> = toml::from_str(&measured.into_inner())
             .map_err(|source| Failure::Parse { file: Document::Measured, source })?;
-        limits
-            .keys()
-            .chain(measured.keys())
-            .collect::<BTreeSet<&Stage>>()
+        Pairing::joined(limits, measured)
             .into_iter()
-            .map(|stage| Self::finding(stage, limits.get(stage), measured.get(stage)))
-            .collect::<Result<Vec<Finding>, Failure>>()
+            .map(|(stage, pairing)| pairing.finding(stage))
+            .collect::<Result<Vec<Finding>, Failure<'_>>>()
             .and_then(|findings| if findings.is_empty() { Err(Failure::Empty) } else { Ok(Gate { findings }) })
     }
 
-    pub fn lowered(self) -> Result<Record, Failure> {
+    pub fn lowered(self) -> Result<Record, Failure<'static>> {
         self.findings.into_iter().map(Finding::lowered).collect()
     }
 
-    fn sliced(limits: BTreeMap<Stage, Limit>, only: &[OsString]) -> Result<BTreeMap<Stage, Limit>, Failure> {
+    fn sliced(limits: BTreeMap<Stage, Limit>, only: &[OsString]) -> Result<BTreeMap<Stage, Limit>, Failure<'_>> {
         match only.iter().find(|name| limits.keys().find_map(|stage| Self::names(name, stage)).is_none()) {
-            Some(name) => Err(Failure::UnknownStage { name: name.clone() }),
+            Some(name) => Err(Failure::UnknownStage { name }),
             None => Ok(limits.into_iter().filter(|(stage, _)| Self::asked(only, stage).is_some()).collect()),
         }
     }
@@ -73,13 +72,6 @@ impl Gate {
     #[must_use]
     pub fn past_warn(self) -> Vec<Finding> {
         self.findings.into_iter().filter_map(Finding::past_warn).collect()
-    }
-
-    fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
-        let limit =
-            limit.copied().and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
-        let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
-        Ok(Finding::new(stage.clone(), *measured, limit))
     }
 }
 

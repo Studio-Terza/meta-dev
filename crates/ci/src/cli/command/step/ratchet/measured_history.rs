@@ -15,8 +15,8 @@ pub struct MeasuredHistory {
 }
 
 impl Step for MeasuredHistory {
-    fn from_arguments(arguments: &[OsString]) -> Result<MeasuredHistory, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<MeasuredHistory, Failure<'static>> {
+        match arguments.as_slice() {
             [measured, file, revision] => Ok(MeasuredHistory {
                 measured: Measured::file(Path::new(measured)),
                 file: Journal::file(Path::new(file)),
@@ -26,7 +26,7 @@ impl Step for MeasuredHistory {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let row = self.measured.row(ports.files())?;
         writeln!(out, "{}\t{row}", self.revision)?;
         self.file.append(ports.files(), format_args!("{}\t{row}\n", self.revision)).map(|()| Exit::Success)
