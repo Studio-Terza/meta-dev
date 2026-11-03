@@ -69,7 +69,6 @@ dependencies = [
  "reach",
  "serde",
  "serde_json",
- "tempfile",
  "text-lines",
  "thiserror",
  "toml",
@@ -99,9 +98,9 @@ name = "e2e"
 version = "0.1.0"
 dependencies = [
  "ci",
+ "console-ports",
  "file-ports",
  "serde_json",
- "tempfile",
  "toml",
 ]
 
@@ -1023,7 +1022,6 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
- "tempfile",
  "text-lines",
  "thiserror",
 ]
@@ -1037,7 +1035,6 @@ dependencies = [
  "laws",
  "serde",
  "serde_json",
- "tempfile",
  "test-log",
  "text-lines",
  "thiserror",
@@ -1167,6 +1164,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "golden",
  "laws",
  "lint-complexity",
  "lint-core",
@@ -1176,7 +1174,6 @@ dependencies = [
  "newtype",
  "serde",
  "serde_json",
- "tempfile",
  "text-lines",
  "thiserror",
 ]

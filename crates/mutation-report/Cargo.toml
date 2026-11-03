@@ -21,7 +21,6 @@ thiserror.workspace = true
 [dev-dependencies]
 golden = { path = "../golden" }
 laws = { path = "../laws" }
-tempfile.workspace = true
 
 [lints]
 workspace = true

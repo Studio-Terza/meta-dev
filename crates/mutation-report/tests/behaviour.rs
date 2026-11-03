@@ -1,11 +1,10 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::io;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use file_ports::Disk;
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use mutation_report::Cli;
-use ports::Checkout;
 use serde_json::{Value, json};
 
 const GOLDEN_SOURCE: &str = "\
@@ -78,9 +77,9 @@ struct Answer {
 }
 
 impl Answer {
-    fn to(arguments: &[&OsStr]) -> Answer {
+    fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
         let mut err = Vec::new();
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &Disk, &mut err);
+        let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 }
@@ -92,7 +91,7 @@ impl Shards {
         json!({ "name": name, "summary": summary, "failed": failed })
     }
 
-    fn two(checkout: &Checkout) -> Result<(), io::Error> {
+    fn two(checkout: &Checkout) -> Result<(), FileFailure> {
         checkout.shard(
             "shard-0",
             &json!({
@@ -254,20 +253,26 @@ fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Err
 #[test]
 fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    let answer = Answer::to(&[
-        checkout.path("shards").as_os_str(),
-        checkout.path("sources").as_os_str(),
-        "/no/such/dir/report.md".as_ref(),
-        checkout.path("report.json").as_os_str(),
-    ]);
+    let answer = Answer::to(
+        &checkout.files,
+        &[
+            checkout.path("shards").as_os_str(),
+            checkout.path("sources").as_os_str(),
+            "/no/such/dir/report.md".as_ref(),
+            checkout.path("report.json").as_os_str(),
+        ],
+    );
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use /no/such/dir/report.md"));
-    let answer = Answer::to(&[
-        checkout.path("shards").as_os_str(),
-        checkout.path("sources").as_os_str(),
-        checkout.path("report.md").as_os_str(),
-        "/no/such/dir/report.json".as_ref(),
-    ]);
+    let answer = Answer::to(
+        &checkout.files,
+        &[
+            checkout.path("shards").as_os_str(),
+            checkout.path("sources").as_os_str(),
+            checkout.path("report.md").as_os_str(),
+            "/no/such/dir/report.json".as_ref(),
+        ],
+    );
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use /no/such/dir/report.json"));
     Ok(())
@@ -276,7 +281,7 @@ fn a_report_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
     for arguments in [&[][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..], &["a".as_ref(); 5][..]] {
-        let answer = Answer::to(arguments);
+        let answer = Answer::to(&Memory::default(), arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
         assert_eq!(Text::lines(&answer.err), ["usage: mutation-report <shards> <sources> <report.md> <report.json>"]);
     }
@@ -290,70 +295,67 @@ impl Text {
     }
 }
 
-mod ports {
-    use std::fs;
-    use std::io;
-    use std::path::{Path, PathBuf};
+struct Checkout {
+    files: Memory,
+    root: PathBuf,
+}
 
-    use serde_json::Value;
+impl Checkout {
+    fn new() -> Result<Checkout, FileFailure> {
+        let checkout = Checkout { files: Memory::default(), root: PathBuf::from("/checkout") };
+        checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
+        checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
+        checkout.directory("shards")?;
+        Ok(checkout)
+    }
 
-    use super::{Answer, GOLDEN_SOURCE};
+    fn path(&self, name: &str) -> PathBuf {
+        self.root.join(name)
+    }
 
-    pub struct Checkout(tempfile::TempDir);
+    fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), FileFailure> {
+        let file = self.path(name);
+        file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
+        self.files.write(&file, &Bytes::new(text.as_ref().to_vec()))
+    }
 
-    impl Checkout {
-        pub fn new() -> Result<Checkout, io::Error> {
-            let checkout = Checkout(tempfile::tempdir()?);
-            checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
-            checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
-            fs::create_dir(checkout.path("shards"))?;
-            Ok(checkout)
-        }
+    fn directory(&self, name: &str) -> Result<(), FileFailure> {
+        self.files.create_directories(&self.path(name))
+    }
 
-        pub fn path(&self, name: &str) -> PathBuf {
-            self.0.path().join(name)
-        }
+    fn shard(&self, name: &str, matrix: &Value) -> Result<(), FileFailure> {
+        self.write(&format!("shards/{name}/matrix.json"), matrix.to_string())
+    }
 
-        pub fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
-            let file = self.path(name);
-            fs::create_dir_all(file.parent().unwrap_or(Path::new("")))?;
-            fs::write(file, text)
-        }
+    fn report(&self) -> Answer {
+        self.report_of("shards", "sources")
+    }
 
-        pub fn directory(&self, name: &str) -> Result<(), io::Error> {
-            fs::create_dir(self.path(name))
-        }
-
-        pub fn shard(&self, name: &str, matrix: &Value) -> Result<(), io::Error> {
-            self.write(&format!("shards/{name}/matrix.json"), matrix.to_string())
-        }
-
-        pub fn report(&self) -> Answer {
-            self.report_of("shards", "sources")
-        }
-
-        pub fn report_of(&self, shards: &str, sources: &str) -> Answer {
-            Answer::to(&[
+    fn report_of(&self, shards: &str, sources: &str) -> Answer {
+        Answer::to(
+            &self.files,
+            &[
                 self.path(shards).as_os_str(),
                 self.path(sources).as_os_str(),
                 self.path("report.md").as_os_str(),
                 self.path("report.json").as_os_str(),
-            ])
-        }
+            ],
+        )
+    }
 
-        pub fn markdown(&self) -> String {
-            fs::read_to_string(self.path("report.md")).unwrap_or_default()
-        }
+    fn text(&self, name: &str) -> Option<String> {
+        self.files.read_text(&self.path(name)).ok().map(|text| text.to_string())
+    }
 
-        pub fn field(&self, name: &str) -> Value {
-            self.json().get(name).cloned().unwrap_or_default()
-        }
+    fn markdown(&self) -> String {
+        self.text("report.md").unwrap_or_default()
+    }
 
-        pub fn json(&self) -> Value {
-            fs::read_to_string(self.path("report.json"))
-                .ok()
-                .and_then(|text| serde_json::from_str(&text).ok())
-                .unwrap_or_default()
-        }
+    fn field(&self, name: &str) -> Value {
+        self.json().get(name).cloned().unwrap_or_default()
+    }
+
+    fn json(&self) -> Value {
+        self.text("report.json").and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
     }
 }

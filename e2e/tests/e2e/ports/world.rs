@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
-use std::fs;
 use std::path::{Path, PathBuf};
 
+use e2e::ports::Checkout;
+use file_ports::{Files, Kind};
 use serde_json::{Value as Json, json};
 use toml::{Table, Value};
 
@@ -26,8 +27,11 @@ impl World {
     const DEPENDENCY_TABLES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
     pub fn of_this_repository() -> Result<World, Box<dyn Error>> {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().map(Path::to_path_buf).unwrap_or_default();
-        let manifest = Self::table(&root.join(Self::MANIFEST))?;
+        World::of(&Checkout::manifests()?, Checkout::root())
+    }
+
+    fn of(files: &impl Files, root: PathBuf) -> Result<World, Box<dyn Error>> {
+        let manifest = Self::table(files, &root.join(Self::MANIFEST))?;
         let patterns: Vec<String> = manifest
             .get("workspace")
             .and_then(|workspace| workspace.get("members"))
@@ -36,8 +40,8 @@ impl World {
             .unwrap_or_default();
         let mut members = BTreeMap::new();
         for pattern in &patterns {
-            for directory in Self::directories(&root, pattern)? {
-                let member = Self::member(&root, directory)?;
+            for directory in Self::directories(files, &root, pattern)? {
+                let member = Self::member(files, &root, directory)?;
                 members.insert(member.name.clone(), member);
             }
         }
@@ -105,15 +109,14 @@ impl World {
         if grown.len() == reached.len() { reached } else { self.closure(grown) }
     }
 
-    fn directories(root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    fn directories(files: &impl Files, root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
         match pattern.strip_suffix(Self::ALL_BELOW) {
             None => Ok(vec![PathBuf::from(pattern)]),
             Some(parent) => {
                 let mut found = Vec::new();
-                for entry in fs::read_dir(root.join(parent))? {
-                    let name = entry?.file_name();
-                    let directory = Path::new(parent).join(name);
-                    if root.join(&directory).join(Self::MANIFEST).is_file() {
+                for entry in files.entries(&root.join(parent))? {
+                    let directory = Path::new(parent).join(entry.file_name().unwrap_or_default());
+                    if files.kind(&root.join(&directory).join(Self::MANIFEST)) == Kind::File {
                         found.push(directory);
                     }
                 }
@@ -122,8 +125,8 @@ impl World {
         }
     }
 
-    fn member(root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {
-        let manifest = Self::table(&root.join(&directory).join(Self::MANIFEST))?;
+    fn member(files: &impl Files, root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {
+        let manifest = Self::table(files, &root.join(&directory).join(Self::MANIFEST))?;
         let package = manifest.get("package");
         let name =
             package.and_then(|package| package.get("name")).and_then(Value::as_str).unwrap_or_default().to_owned();
@@ -146,7 +149,7 @@ impl World {
         Ok(Member { name, directory, dependencies, reads })
     }
 
-    fn table(path: &Path) -> Result<Table, Box<dyn Error>> {
-        Ok(fs::read_to_string(path)?.parse::<Table>()?)
+    fn table(files: &impl Files, path: &Path) -> Result<Table, Box<dyn Error>> {
+        Ok(files.read_text(path)?.as_ref().parse::<Table>()?)
     }
 }

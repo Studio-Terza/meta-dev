@@ -82,8 +82,12 @@ impl Files for Memory {
     }
 
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        self.directories.held().insert(path.to_path_buf());
-        Ok(())
+        if path.ancestors().any(|ancestor| self.files.held().contains_key(ancestor)) {
+            Err(FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory)))
+        } else {
+            self.directories.held().insert(path.to_path_buf());
+            Ok(())
+        }
     }
 
     fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {

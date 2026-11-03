@@ -71,6 +71,11 @@ impl<Port: Files> Contract<'_, Port> {
         Self::named(&written.and_then(|()| self.files.read_text(&path).map(|_| ())))
     }
 
+    fn beneath_a_file(&self) -> String {
+        let written = self.files.write(&self.at("blocker"), &Bytes::from(""));
+        Self::named(&written.and_then(|()| self.files.create_directories(&self.at("blocker/inner"))))
+    }
+
     fn resolved(&self) -> Result<[PathBuf; 2], FileFailure> {
         let real = self.files.canonical(&self.at("outer/a.txt"))?;
         let dotted = self.files.canonical(&self.at("outer/./inner/../a.txt"))?;
@@ -100,6 +105,7 @@ impl Checks {
         assert_eq!(dotted, real);
         assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
         assert_eq!(contract.not_text(), "failed");
+        assert_eq!(contract.beneath_a_file(), "failed");
         assert_eq!(contract.canonical_file()?.file_name(), Some(std::ffi::OsStr::new("here.txt")));
         Ok(())
     }

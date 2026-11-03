@@ -16,11 +16,13 @@ name = "e2e"
 path = "tests/e2e/main.rs"
 required-features = ["measure"]
 
+[dependencies]
+console-ports = { path = "../crates/console-ports" }
+file-ports = { path = "../crates/file-ports" }
+
 [dev-dependencies]
 ci = { path = "../crates/ci" }
-file-ports = { path = "../crates/file-ports" }
 serde_json.workspace = true
-tempfile.workspace = true
 toml.workspace = true
 
 [lints]
