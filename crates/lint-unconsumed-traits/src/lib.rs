@@ -1,14 +1,11 @@
-mod bounds;
+mod consumers;
 mod declaration;
 mod declared;
 mod finding;
 
-use std::collections::BTreeSet;
-
 use lint_core::{Headline, Lint, Report, Site, SourceFile, Violation};
-use lint_layout::Name;
 
-use bounds::Bounds;
+use consumers::Consumers;
 use declared::Declared;
 use finding::Finding;
 
@@ -18,10 +15,10 @@ pub struct UnconsumedTraits;
 impl Lint for UnconsumedTraits {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
-        let consumers: BTreeSet<Name> = shipped.iter().flat_map(|file| Bounds::of_file(file)).collect();
+        let consumers = Consumers::of_files(shipped.iter().copied());
         Report::new(
             Headline::new(
-                "report only, a local trait has methods but no generic consumer, no bound, impl Trait, dyn Trait or provided method",
+                "a local trait with methods has a consumer in shipped code: a bound (generic, where clause, supertrait), impl Trait, dyn Trait, or a call to one of its provided methods",
             ),
             shipped
                 .iter()

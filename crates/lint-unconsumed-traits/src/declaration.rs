@@ -1,21 +1,22 @@
-use std::collections::BTreeSet;
-
 use lint_core::Site;
 use lint_layout::Name;
+
+use crate::consumers::Consumers;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Declaration<'file> {
     name: Name,
+    provided: Vec<Name>,
     site: Site<'file>,
 }
 
 impl<'file> Declaration<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>) -> Declaration<'file> {
-        Declaration { name, site }
+    pub(crate) fn new(name: Name, provided: Vec<Name>, site: Site<'file>) -> Declaration<'file> {
+        Declaration { name, provided, site }
     }
 
-    pub(crate) fn unconsumed(self, consumers: &BTreeSet<Name>) -> Option<Declaration<'file>> {
-        Some(self).filter(|declaration| consumers.get(&declaration.name).is_none())
+    pub(crate) fn unconsumed(self, consumers: &Consumers) -> Option<Declaration<'file>> {
+        consumers.consuming(&self.name, &self.provided).is_none().then_some(self)
     }
 }
 

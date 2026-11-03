@@ -7,12 +7,10 @@ use lint_core::Fix;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Report;
-use lint_core::Site;
 use lint_core::SourceFile;
-use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::{LineNumber, Word};
-use lint_named_numbers::NamedNumbers;
+use lint_named_numbers::{Literals, NamedNumbers};
 
 #[derive(Debug)]
 pub struct NoNumbersInBinaries;
@@ -26,17 +24,13 @@ impl Lint for NoNumbersInBinaries {
                 .iter()
                 .filter(|file| binaries.holding(file.path()).is_some())
                 .flat_map(|file| {
-                    let mut numbers = Numbers::default();
-                    numbers.visit_file(file.syntax());
-                    numbers.0.into_iter().map(move |line| {
-                        Violation::new(
-                            Site::new(file.path(), line),
-                            Message::new(
-                                Problem::new("numeric literal in a binary"),
-                                Fix::new("read it from the settings file or its embedded defaults"),
-                            ),
-                        )
-                    })
+                    NamedNumbers::flagged::<Numbers>(
+                        file,
+                        Message::new(
+                            Problem::new("numeric literal in a binary"),
+                            Fix::new("read it from the settings file or its embedded defaults"),
+                        ),
+                    )
                 })
                 .collect(),
         )
@@ -48,10 +42,7 @@ struct Numbers(Vec<LineNumber>);
 
 impl<'ast> Visit<'ast> for Numbers {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_lit_int(&mut self, literal: &'ast LitInt) {
@@ -60,5 +51,11 @@ impl<'ast> Visit<'ast> for Numbers {
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
         self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+    }
+}
+
+impl Literals for Numbers {
+    fn lines(self) -> Vec<LineNumber> {
+        self.0
     }
 }

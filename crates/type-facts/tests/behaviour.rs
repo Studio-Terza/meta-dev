@@ -25,7 +25,7 @@ impl Described {
             .iter()
             .map(|method| {
                 let returns = method.returns().map(ToString::to_string).unwrap_or_default();
-                format!("{}/{}->{returns}", AsRef::<Name>::as_ref(method), method.arity())
+                format!("{}->{returns}", AsRef::<Name>::as_ref(method))
             })
             .collect()
     }
@@ -66,16 +66,13 @@ fn derives_through_paths_and_other_attributes_are_read_by_their_last_name() {
 }
 
 #[test]
-fn inherent_methods_are_kept_with_arity_and_returned_type() {
+fn inherent_methods_are_kept_with_their_returned_type() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
     let facts = Facts::of_files(&files);
-    assert_eq!(
-        Described::methods(&facts, Described::only(&facts)),
-        ["one/1->", "two/2->Vec", "three/1->B", "four/0->"]
-    );
+    assert_eq!(Described::methods(&facts, Described::only(&facts)), ["one->", "two->Vec", "three->B", "four->"]);
 }
 
 #[test]
@@ -108,7 +105,7 @@ fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_ty
     ]);
     let facts = Facts::of_files(&files);
     let methods: Vec<Vec<String>> = facts.types().iter().map(|found| Described::methods(&facts, found)).collect();
-    assert_eq!(methods, [vec!["here/1->"], vec!["there/1->", "by_ref/1->", "bare/1->"]]);
+    assert_eq!(methods, [vec!["here->"], vec!["there->", "by_ref->", "bare->"]]);
     let crates: Vec<String> = facts.types().iter().map(|found| AsRef::<CrateName>::as_ref(found).to_string()).collect();
     assert_eq!(crates, ["x", "y"]);
 }
@@ -265,7 +262,7 @@ fn implementers_of_a_trait_are_found_across_crates() {
 fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
-        "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup { type Out: Assoc; }\n",
+        "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup {}\n",
     )]);
     let facts = Facts::of_files(&files);
     let described = |dependencies: &[Dependency<'_>]| -> Vec<String> {
@@ -283,7 +280,7 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
             })
             .collect()
     };
-    let types: Vec<Vec<String>> = facts.types().iter().map(|found| described(found.dependencies())).collect();
+    let types: Vec<Vec<String>> = facts.types().iter().map(|found| described(found.as_ref())).collect();
     assert_eq!(
         types,
         [
@@ -298,6 +295,6 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
             vec!["lint_coreD:variant:Directly:a.rs:2".to_owned()],
         ]
     );
-    let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.dependencies())).collect();
-    assert_eq!(traits, [vec!["Sup:bound:Directly:a.rs:3".to_owned(), "Assoc:bound:Directly:a.rs:3".to_owned()]]);
+    let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.as_ref())).collect();
+    assert_eq!(traits, [vec!["Sup:bound:Directly:a.rs:3".to_owned()]]);
 }

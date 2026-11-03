@@ -79,7 +79,10 @@ const BOXED: &str = ported!(
     "fn f(store: Box<dyn Store>, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().map(|id| store.fetch(*id)).collect()\n}\n"
 );
 
-const CASES: [Case; 25] = [
+const HELD_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    struct Shelf<'a> {\n        store: &'a dyn Store,\n    }\n    impl Shelf<'_> {\n        fn all(&self, ids: &[u8]) {\n            for id in ids {\n                self.store.fetch(*id);\n            }\n        }\n    }\n}\n";
+const PASSED_IN_MODULE: &str = "mod ports {\n    pub trait Store {\n        fn fetch(&self, id: u8) -> u8;\n    }\n}\nmod inner {\n    use crate::ports::Store;\n    fn f(store: &dyn Store, ids: Vec<u8>) {\n        for id in ids {\n            store.fetch(id);\n        }\n    }\n}\n";
+
+const CASES: [Case; 27] = [
     Case::new(
         Title::new("closure passed to map over an iterator"),
         &[Source::new(Located::new("a.rs"), Text::new(MAPPED))],
@@ -200,6 +203,16 @@ const CASES: [Case; 25] = [
         Title::new("boxed port"),
         &[Source::new(Located::new("a.rs"), Text::new(BOXED))],
         Flagged::new(&["a.rs:9"]),
+    ),
+    Case::new(
+        Title::new("a field holding a port imported only inside its module"),
+        &[Source::new(Located::new("a.rs"), Text::new(HELD_IN_MODULE))],
+        Flagged::new(&["a.rs:14"]),
+    ),
+    Case::new(
+        Title::new("a parameter of a port imported only inside its module"),
+        &[Source::new(Located::new("a.rs"), Text::new(PASSED_IN_MODULE))],
+        Flagged::new(&["a.rs:10"]),
     ),
 ];
 

@@ -19,6 +19,10 @@ impl Reads {
     fn of_one(text: &&str) -> Vec<String> {
         Self::spelled(&[Sources::file("a.rs", Text::new(text))])
     }
+
+    fn of_two(pair: &[[&str; 2]; 2]) -> Vec<String> {
+        Self::spelled(&pair.map(|[path, text]| Sources::file(path, Text::new(text))))
+    }
 }
 
 laws::table!(
@@ -56,19 +60,24 @@ fn import_cycles_end() {
     assert_eq!(Reads::of_one(&text), Vec::<String>::new());
 }
 
-#[test]
-fn a_re_export_in_the_crate_root_reaches_other_files() {
-    let root = Sources::file("crates/x/src/lib.rs", Text::new("pub use std::fs::remove_dir_all;\nmod user;\n"));
-    let user = Sources::file("crates/x/src/user.rs", Text::new("fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"));
-    assert_eq!(Reads::spelled(&[root, user]), vec!["crates/x/src/user.rs:2".to_owned()]);
-}
-
-#[test]
-fn the_same_name_in_another_crate_is_not_a_re_export() {
-    let one = Sources::file("crates/one/src/lib.rs", Text::new("pub use std::fs::remove_dir_all;\n"));
-    let two = Sources::file("crates/two/src/lib.rs", Text::new("fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"));
-    assert_eq!(Reads::spelled(&[one, two]), Vec::<String>::new());
-}
+laws::table!(
+    a_re_export_reaches_other_files_of_its_crate_and_modules_without_a_file_are_entered,
+    Reads::of_two,
+    [
+        [
+            ["crates/x/src/lib.rs", "pub use std::fs::remove_dir_all;\nmod user;\n"],
+            ["crates/x/src/user.rs", "fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"],
+        ] => vec!["crates/x/src/user.rs:2".to_owned()],
+        [
+            ["crates/one/src/lib.rs", "pub use std::fs::remove_dir_all;\n"],
+            ["crates/two/src/lib.rs", "fn f() {\n    crate::remove_dir_all(\"x\");\n}\n"],
+        ] => Vec::<String>::new(),
+        [
+            ["crates/x/src/lib.rs", "mod a;\nfn f() {\n    a::b::remove_dir_all(\"x\");\n}\n"],
+            ["crates/x/src/a/b.rs", "pub use std::fs::remove_dir_all;\n"],
+        ] => vec!["crates/x/src/lib.rs:3".to_owned()],
+    ]
+);
 
 #[test]
 fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
@@ -80,14 +89,6 @@ fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
         .map(|used| (used.ground(), used.cover()))
         .collect();
     assert_eq!(seen, vec![(Ground::Ports, Cover::Guarded), (Ground::Ports, Cover::Bare), (Ground::Open, Cover::Bare)]);
-}
-
-#[test]
-fn a_module_with_no_file_of_its_own_is_entered() {
-    let root =
-        Sources::file("crates/x/src/lib.rs", Text::new("mod a;\nfn f() {\n    a::b::remove_dir_all(\"x\");\n}\n"));
-    let nested = Sources::file("crates/x/src/a/b.rs", Text::new("pub use std::fs::remove_dir_all;\n"));
-    assert_eq!(Reads::spelled(&[root, nested]), vec!["crates/x/src/lib.rs:3".to_owned()]);
 }
 
 laws::table!(
