@@ -1,9 +1,11 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::quote;
 use syn::parse::discouraged::Speculative;
 use syn::parse::{ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Block, Expr, Macro, Stmt, Token};
+
+use crate::syntax::Syntax;
 
 #[derive(Debug)]
 pub struct Macros;
@@ -13,13 +15,15 @@ impl Macros {
 
     #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {
-        let tokens = invocation.tokens.clone();
-        let parsed = |tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default();
-        if invocation.path.is_ident("macro_rules") {
-            Self::transcribers(tokens).into_iter().flat_map(parsed).collect()
-        } else {
-            parsed(tokens)
-        }
+        let bodies = invocation
+            .path
+            .get_ident()
+            .filter(|ident| *ident == "macro_rules")
+            .map_or_else(|| vec![invocation.tokens.clone()], |_| Self::transcribers(invocation.tokens.clone()));
+        bodies
+            .into_iter()
+            .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
+            .collect()
     }
 
     pub fn walk(invocation: &Macro, visit: impl FnMut(&Stmt)) {
@@ -33,26 +37,24 @@ impl Macros {
 
     fn attributes_in(tokens: TokenStream) -> Vec<Attribute> {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
-        let here = trees.iter().zip(trees.iter().skip(1)).filter_map(|(mark, body)| match (mark, body) {
-            (TokenTree::Punct(_), TokenTree::Group(_)) => Attribute::parse_outer.parse2(quote!(#mark #body)).ok(),
-            _ => None,
+        let here = trees.iter().zip(trees.iter().skip(1)).filter_map(|(mark, body)| {
+            Syntax::punct(mark)
+                .and(Syntax::group(body))
+                .and_then(|_| Attribute::parse_outer.parse2(quote!(#mark #body)).ok())
         });
-        let nested = trees.iter().filter_map(|tree| match tree {
-            TokenTree::Group(group) => Some(group.stream()),
-            _ => None,
-        });
+        let nested = trees.iter().filter_map(Syntax::group).map(Group::stream);
         here.flatten().chain(nested.flat_map(Self::attributes_in)).collect()
     }
 
     fn statements_or_expressions(input: ParseStream) -> syn::Result<Vec<Stmt>> {
         let attempt = input.fork();
-        match Block::parse_within(&attempt) {
-            Ok(statements) => {
+        Block::parse_within(&attempt).map_or_else(
+            |_| Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),
+            |statements| {
                 input.advance_to(&attempt);
                 Ok(statements)
-            }
-            Err(_) => Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),
-        }
+            },
+        )
     }
 
     fn expressions(arguments: Punctuated<Expr, Token![,]>) -> Vec<Stmt> {
@@ -64,12 +66,10 @@ impl Macros {
         trees
             .iter()
             .zip(trees.iter().skip(1))
-            .filter_map(|(arrow, body)| match (arrow, body) {
-                (TokenTree::Punct(punct), TokenTree::Group(group)) if punct.as_char() == Self::ARROW_END => {
-                    Some(group.stream())
-                }
-                _ => None,
+            .filter_map(|(arrow, body)| {
+                Syntax::punct(arrow).filter(|punct| punct.as_char() == Self::ARROW_END).and(Syntax::group(body))
             })
+            .map(Group::stream)
             .collect()
     }
 }

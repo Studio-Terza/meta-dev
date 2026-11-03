@@ -1,3 +1,4 @@
+use proc_macro2::{Group, Punct, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::{
     AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, GenericParam, Ident, ImplItem,
@@ -158,6 +159,22 @@ impl Syntax {
         match item.trait_ {
             None => Some(item),
             Some(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn group(tree: &TokenTree) -> Option<&Group> {
+        match tree {
+            TokenTree::Group(group) => Some(group),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn punct(tree: &TokenTree) -> Option<&Punct> {
+        match tree {
+            TokenTree::Punct(punct) => Some(punct),
+            _ => None,
         }
     }
 }

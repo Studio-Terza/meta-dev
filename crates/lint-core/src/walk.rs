@@ -1,4 +1,6 @@
 use syn::punctuated::Punctuated;
+
+use crate::syntax::Syntax;
 use syn::{Attribute, ItemImpl, Meta, MetaList, Token};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,12 +10,11 @@ pub enum Walk {
 }
 
 impl Walk {
+    const DECIDING: [(&'static str, Walk); 2] = [("all", Walk::Skipped), ("any", Walk::Entered)];
+
     #[must_use]
     pub fn inherent_impls(item: &ItemImpl) -> Walk {
-        match item.trait_ {
-            None => Walk::Entered,
-            Some(_) => Walk::Skipped,
-        }
+        Syntax::inherent(item).map_or(Walk::Skipped, |_| Walk::Entered)
     }
 
     #[must_use]
@@ -29,32 +30,32 @@ impl Walk {
     }
 
     fn of_attribute(attribute: &Attribute) -> Walk {
-        if attribute.path().is_ident("cfg") {
-            attribute.parse_args::<Meta>().map_or(Walk::Entered, |condition| Self::of_condition(&condition))
-        } else {
-            Walk::Entered
-        }
+        Some(attribute)
+            .filter(|attribute| attribute.path().is_ident("cfg"))
+            .and_then(|attribute| attribute.parse_args::<Meta>().ok())
+            .map_or(Walk::Entered, |condition| Self::of_condition(&condition))
     }
 
     fn of_condition(condition: &Meta) -> Walk {
         match condition {
-            Meta::Path(path) if path.is_ident("test") => Walk::Skipped,
+            Meta::Path(path) => {
+                path.get_ident().filter(|ident| *ident == "test").map_or(Walk::Entered, |_| Walk::Skipped)
+            }
             Meta::List(list) => list
                 .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
                 .map_or(Walk::Entered, |nested| Self::of_nested(list, &nested)),
-            Meta::Path(_) | Meta::NameValue(_) => Walk::Entered,
+            Meta::NameValue(_) => Walk::Entered,
         }
     }
 
     fn of_nested(list: &MetaList, nested: &Punctuated<Meta, Token![,]>) -> Walk {
         let walks: Vec<Walk> = nested.iter().map(Self::of_condition).collect();
-        let skipped = |walk: &Walk| *walk == Walk::Skipped;
-        let judged = if list.path.is_ident("all") {
-            walks.iter().any(skipped)
-        } else {
-            list.path.is_ident("any") && !walks.is_empty() && walks.iter().all(skipped)
-        };
-        if judged { Walk::Skipped } else { Walk::Entered }
+        Self::DECIDING
+            .into_iter()
+            .find(|(junction, _)| list.path.is_ident(junction))
+            .and_then(|(_, deciding)| walks.iter().find(|walk| **walk == deciding).or(walks.first()))
+            .copied()
+            .unwrap_or(Walk::Entered)
     }
 
     fn skipped_by_any(walks: impl Iterator<Item = Walk>) -> Walk {
