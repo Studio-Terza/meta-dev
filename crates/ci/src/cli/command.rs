@@ -64,29 +64,33 @@ impl Command {
         let name = arguments.next().and_then(|name| name.into_string().ok());
         let rest: Vec<OsString> = arguments.collect();
         match name.as_deref() {
-            Some(Self::TIMED) => Timed::from_arguments(rest).map(Command::Timed),
-            Some(Self::LIBTEST_SECONDS) => LibtestSeconds::from_arguments(rest).map(Command::LibtestSeconds),
-            Some(Self::REACH) => ReachScope::from_arguments(rest).map(Command::Reach),
-            Some(Self::HISTORY) => History::from_arguments(rest).map(Command::History),
-            Some(Self::MEASURED_HISTORY) => MeasuredHistory::from_arguments(rest).map(Command::MeasuredHistory),
-            Some(Self::RATCHET_LOWER) => RatchetLower::from_arguments(rest).map(Command::RatchetLower),
-            Some(Self::COMPILE_TIMES) => CompileTimes::from_arguments(rest).map(Command::CompileTimes),
-            Some(Self::LOGGED) => Logged::from_arguments(rest).map(Command::Logged),
-            Some(Self::TOOLS) => InstallTools::from_arguments(rest).map(Command::Tools),
-            Some(Self::TOOLS_KEY) => ToolsKey::from_arguments(rest).map(Command::ToolsKey),
-            Some(Self::MUTANTS_SHARD) => MutantsShard::from_arguments(rest).map(Command::MutantsShard),
-            Some(Self::MUTANTS_CHANGED) => MutantsChanged::from_arguments(rest).map(Command::MutantsChanged),
-            Some(Self::WALL_TIMES) => WallTimes::from_arguments(rest).map(Command::WallTimes),
-            Some(Self::SHOW) => Show::from_arguments(rest).map(Command::Show),
-            Some(Self::SUMMARIZE) => Summarize::from_arguments(rest).map(Command::Summarize),
-            Some(Self::LABELS) => Labels::from_arguments(rest).map(Command::Labels),
-            Some(Self::SPEC_LINE) => SpecLine::from_arguments(rest).map(Command::SpecLine),
-            Some(Self::STAGE_ISSUES) => StageIssues::from_arguments(rest).map(Command::StageIssues),
-            Some(Self::COMPILE_TREND) => CompileTrend::from_arguments(rest).map(Command::CompileTrend),
-            Some(Self::SHARD_SUMMARY) => ShardSummary::from_arguments(rest).map(Command::ShardSummary),
-            Some(Self::MATRIX) => Matrix::from_arguments(rest).map(Command::Matrix),
+            Some(Self::TIMED) => Self::parsed(rest, Command::Timed),
+            Some(Self::LIBTEST_SECONDS) => Self::parsed(rest, Command::LibtestSeconds),
+            Some(Self::REACH) => Self::parsed(rest, Command::Reach),
+            Some(Self::HISTORY) => Self::parsed(rest, Command::History),
+            Some(Self::MEASURED_HISTORY) => Self::parsed(rest, Command::MeasuredHistory),
+            Some(Self::RATCHET_LOWER) => Self::parsed(rest, Command::RatchetLower),
+            Some(Self::COMPILE_TIMES) => Self::parsed(rest, Command::CompileTimes),
+            Some(Self::LOGGED) => Self::parsed(rest, Command::Logged),
+            Some(Self::TOOLS) => Self::parsed(rest, Command::Tools),
+            Some(Self::TOOLS_KEY) => Self::parsed(rest, Command::ToolsKey),
+            Some(Self::MUTANTS_SHARD) => Self::parsed(rest, Command::MutantsShard),
+            Some(Self::MUTANTS_CHANGED) => Self::parsed(rest, Command::MutantsChanged),
+            Some(Self::WALL_TIMES) => Self::parsed(rest, Command::WallTimes),
+            Some(Self::SHOW) => Self::parsed(rest, Command::Show),
+            Some(Self::SUMMARIZE) => Self::parsed(rest, Command::Summarize),
+            Some(Self::LABELS) => Self::parsed(rest, Command::Labels),
+            Some(Self::SPEC_LINE) => Self::parsed(rest, Command::SpecLine),
+            Some(Self::STAGE_ISSUES) => Self::parsed(rest, Command::StageIssues),
+            Some(Self::COMPILE_TREND) => Self::parsed(rest, Command::CompileTrend),
+            Some(Self::SHARD_SUMMARY) => Self::parsed(rest, Command::ShardSummary),
+            Some(Self::MATRIX) => Self::parsed(rest, Command::Matrix),
             _ => Err(Failure::Usage),
         }
+    }
+
+    fn parsed<S: Step>(arguments: Vec<OsString>, variant: fn(S) -> Command) -> Result<Command, Failure<'static>> {
+        S::from_arguments(arguments).map(variant)
     }
 
     pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

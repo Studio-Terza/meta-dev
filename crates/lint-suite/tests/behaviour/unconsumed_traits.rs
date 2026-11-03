@@ -11,6 +11,9 @@ const WHERE: &str =
 const DYN: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nfn total(item: &dyn Shape) -> u32 { item.area() }\n";
 const IMPL: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nfn total(item: impl Shape) -> u32 { item.area() }\n";
 const PROVIDED: &str = "trait Shape {\n    fn area(&self) -> u32 { 1 }\n}\n";
+const PROVIDED_CALLED: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> u32 { item.area() }\n";
+const PROVIDED_PATH: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> u32 { Square::area() }\n";
+const PROVIDED_ONLY_IN_TESTS: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\n#[cfg(test)]\nmod tests {\n    fn total(item: &u8) -> u32 { item.area() }\n}\n";
 const DISPATCHED: &str = "#[enum_dispatch]\ntrait Shape {\n    fn area(&self) -> u32;\n}\n";
 const MARKER: &str = "trait Shape {}\n";
 const CONSTANT_ONLY: &str = "trait Shape {\n    const SIDES: u32;\n}\n";
@@ -24,7 +27,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 16] = [
+const CASES: [Case; 19] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -35,9 +38,24 @@ const CASES: [Case; 16] = [
     Case::new(Title::new("dyn"), &[Source::new(Located::new("a.rs"), Text::new(DYN))], Flagged::new(&[])),
     Case::new(Title::new("impl trait"), &[Source::new(Located::new("a.rs"), Text::new(IMPL))], Flagged::new(&[])),
     Case::new(
-        Title::new("provided method"),
+        Title::new("provided method nobody calls"),
         &[Source::new(Located::new("a.rs"), Text::new(PROVIDED))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("provided method called as a method"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_CALLED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("provided method called through a path"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_PATH))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("provided method called only in tests"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_ONLY_IN_TESTS))],
+        Flagged::new(&["a.rs:1"]),
     ),
     Case::new(
         Title::new("enum dispatch"),
@@ -79,15 +97,15 @@ const CASES: [Case; 16] = [
 ];
 
 #[test]
-fn traits_with_methods_and_no_generic_consumer_are_flagged() {
+fn traits_with_methods_and_no_consumer_are_flagged() {
     assert_eq!(Sources::mismatches::<UnconsumedTraits>(&CASES), Lines::default());
 }
 
 #[test]
-fn a_finding_names_the_trait_and_the_fixes_in_order() {
+fn a_finding_names_the_trait_and_both_fixes() {
     let text =
         UnconsumedTraits::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(BARE))])).to_string();
-    assert!(text.contains("trait Shape has no generic consumer"), "{text}");
-    assert!(text.contains("a standard trait such as From, AsRef or Display, else write the generic over an existing trait, else a derive"), "{text}");
+    assert!(text.contains("trait Shape has methods but nothing consumes it"), "{text}");
+    assert!(text.contains("delete the trait and keep its methods inherent, or give it a consumer"), "{text}");
     assert!(!text.contains("helper"));
 }

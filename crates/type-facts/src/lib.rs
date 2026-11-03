@@ -1,6 +1,5 @@
 mod dependency;
 mod facts;
-mod facts_lint;
 mod generic_impl;
 mod held;
 mod implementation;
@@ -14,7 +13,6 @@ mod via;
 
 pub use dependency::Dependency;
 pub use facts::Facts;
-pub use facts_lint::FactsLint;
 pub use generic_impl::GenericImpl;
 pub use held::Held;
 pub use implementation::Implementation;

@@ -5,9 +5,8 @@ use lint_layering::Layering;
 use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
 use lint_repeated_shapes::RepeatedShapes;
 use lint_transition_graph::{CoreMutation, DuplicateTransitions, GraphLint, TransitionGraph};
-use lint_unconsumed_traits::UnconsumedTraits;
 use transition_facts::Transitions;
-use type_facts::{Facts, FactsLint};
+use type_facts::Facts;
 
 #[derive(Debug)]
 pub struct Elegance;
@@ -19,7 +18,6 @@ impl Elegance {
         let transitions = Transitions::of_files(files);
         vec![
             RepeatedShapes::report(files),
-            UnconsumedTraits::report(files),
             Complexity::report(files),
             Layering::report_facts(&facts),
             TransitionGraph::report_graph(&facts, &transitions),

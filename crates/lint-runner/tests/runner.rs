@@ -44,7 +44,12 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let workspace = golden::fixtures!("..")?;
     let implemented = workspace.entries(&crates)?.iter().try_fold(0, |found, entry| {
-        Ok::<usize, FileFailure>(found + Trees::occurrences(&workspace, &entry.join("src"), "impl Lint for")?)
+        let source = entry.join("src");
+        Ok::<usize, FileFailure>(
+            found
+                + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+        )
     })?;
     let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();

@@ -1,6 +1,6 @@
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use newtype::{Counter, Display, Newtype, Validated};
+use newtype::{Counter, Display, Newtype};
 use newtype_derive::Arbitrary;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,7 +27,7 @@ impl Word {
     }
 
     fn checked(text: &&str) -> Result<String, Empty> {
-        Word::try_new((*text).to_owned()).map(Validated::into_inner)
+        Word::try_new((*text).to_owned()).map(Word::into_inner)
     }
 }
 

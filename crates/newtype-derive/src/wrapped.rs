@@ -54,16 +54,14 @@ impl Wrapped {
                 let function = check.function();
                 let error = check.error();
                 quote! {
-                    impl #implemented ::newtype::Validated for #name #arguments #bounds {
-                        type Inner = #inner;
-                        type Error = #error;
-
-                        fn try_new(inner: Self::Inner) -> ::core::result::Result<Self, Self::Error> {
+                    impl #implemented #name #arguments #bounds {
+                        pub fn try_new(inner: #inner) -> ::core::result::Result<Self, #error> {
                             #function(&inner)?;
                             ::core::result::Result::Ok(Self { #member: inner })
                         }
 
-                        fn into_inner(self) -> Self::Inner {
+                        #[must_use]
+                        pub fn into_inner(self) -> #inner {
                             self.#member
                         }
                     }
