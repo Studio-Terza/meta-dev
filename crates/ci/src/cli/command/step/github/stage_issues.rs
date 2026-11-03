@@ -20,7 +20,7 @@ impl Step for StageIssues {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        self.limits.past_warn()?.iter().try_fold(Exit::Success, |exit, finding| {
+        self.limits.past_warn(ports.files())?.iter().try_fold(Exit::Success, |exit, finding| {
             exit.followed_by(|| {
                 let stage = finding.stage();
                 writeln!(out, "{stage} is past its warn level")?;

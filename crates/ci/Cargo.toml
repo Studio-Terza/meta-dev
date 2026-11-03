@@ -10,6 +10,8 @@ test = false
 doctest = false
 
 [dependencies]
+console-ports = { path = "../console-ports" }
+file-ports = { path = "../file-ports" }
 gate-limits = { path = "../gate-limits" }
 newtype = { path = "../newtype" }
 mutation-report = { path = "../mutation-report" }

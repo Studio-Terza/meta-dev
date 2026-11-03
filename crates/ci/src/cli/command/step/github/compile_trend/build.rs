@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use file_ports::Files;
 use text_lines::OneLine;
 
 use crate::cli::command::failure::Failure;
@@ -32,16 +33,14 @@ impl Build {
     }
 }
 
-impl TryFrom<&Path> for Build {
-    type Error = Failure;
-
-    fn try_from(directory: &Path) -> Result<Build, Failure> {
+impl Build {
+    pub(super) fn measured_in(files: &impl Files, directory: &Path) -> Result<Build, Failure> {
         let measured = Journal::file(&directory.join(Build::MEASURED));
-        let stages: BTreeMap<OneLine, Seconds> = toml::from_str(measured.read()?.as_ref())
+        let stages: BTreeMap<OneLine, Seconds> = toml::from_str(measured.read(files)?.as_ref())
             .map_err(|source| Failure::Measured { path: measured.as_ref().to_path_buf(), source })?;
         let pages = Build::PAGES
             .iter()
-            .map(|page| CompileTimes::per_crate(&Journal::file(&directory.join(page))))
+            .map(|page| CompileTimes::per_crate(files, &Journal::file(&directory.join(page))))
             .collect::<Result<Vec<BTreeMap<OneLine, Seconds>>, Failure>>()?;
         let crates = pages.into_iter().flatten().fold(BTreeMap::new(), |mut crates, (name, seconds)| {
             let total: &mut Seconds = crates.entry(name).or_default();

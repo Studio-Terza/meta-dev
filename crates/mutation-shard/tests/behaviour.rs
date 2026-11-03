@@ -2,6 +2,7 @@ use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::process::ExitCode;
 
+use file_ports::Disk;
 use mutation_shard::Cli;
 use ports::Mutants;
 use serde_json::{Value, json};
@@ -21,7 +22,7 @@ struct Answer {
 impl Answer {
     fn to(arguments: &[&OsStr]) -> Answer {
         let mut err = Vec::new();
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &mut err);
+        let exit = Cli::answer(arguments.iter().map(OsString::from), &Disk, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 }

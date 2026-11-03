@@ -7,6 +7,8 @@ mod verdict;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use file_ports::Files;
+
 use matrix::Matrix;
 use outcomes::Outcomes;
 
@@ -28,8 +30,9 @@ impl Shard {
         }
     }
 
-    pub fn write_matrix(&self) -> Result<(), Failure> {
-        let outcomes = Outcomes::read(&self.directory)?;
-        Matrix::new(outcomes.baseline(&self.directory), outcomes.mutants(&self.directory)).write(&self.destination)
+    pub fn write_matrix(&self, files: &impl Files) -> Result<(), Failure> {
+        let outcomes = Outcomes::read(files, &self.directory)?;
+        Matrix::new(outcomes.baseline(files, &self.directory), outcomes.mutants(files, &self.directory))
+            .write(files, &self.destination)
     }
 }

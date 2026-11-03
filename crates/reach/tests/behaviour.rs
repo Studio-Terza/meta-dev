@@ -2,6 +2,7 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
+use file_ports::Disk;
 use ports::Repository;
 use reach::Cli;
 
@@ -66,7 +67,7 @@ struct Answer {
 impl Answer {
     fn to(arguments: &[&str]) -> Answer {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &mut out, &mut err);
+        let exit = Cli::answer(arguments.iter().map(OsString::from), &Disk, &mut out, &mut err);
         Answer {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),

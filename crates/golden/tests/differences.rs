@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use golden::{Difference, Failure, Golden, Mode, Output, golden};
+use golden::{Difference, Disk, Failure, Golden, Mode, Output, Process, golden};
 
 struct Row {
     golden: &'static str,
@@ -26,7 +26,7 @@ impl Shown {
 
     fn golden_mismatch(row: &Row) -> String {
         Golden::in_package(env!("CARGO_MANIFEST_DIR"), row.golden)
-            .and_then(|golden| golden.verify(Output::new(&Self::between(row.recorded, row.actual))))
+            .and_then(|golden| golden.verify(&Process, &Disk, Output::new(&Self::between(row.recorded, row.actual))))
             .map_or_else(|failure| failure.to_string(), |()| String::new())
     }
 }

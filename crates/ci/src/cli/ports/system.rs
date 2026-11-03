@@ -5,6 +5,8 @@ use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Instant;
 
+use file_ports::Disk;
+
 use super::{Exit, Invocation, Ports, Run, Tee, Text};
 
 #[derive(Debug)]
@@ -33,6 +35,12 @@ impl System {
 }
 
 impl Ports for System {
+    type Files = Disk;
+
+    fn files(&self) -> &Disk {
+        &Disk
+    }
+
     fn run(&self, invocation: &Invocation) -> io::Result<Run> {
         let started = Instant::now();
         let status = Self::command(invocation).status()?;

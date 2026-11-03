@@ -59,7 +59,7 @@ impl Step for Labels {
         let judged: Vec<Owed> = Check::ALL
             .into_iter()
             .filter(|check| pull_request.carrying(*check).is_none())
-            .map(|check| scope.judged(check, pull_request.refactor(), &changes))
+            .map(|check| scope.judged(ports, check, pull_request.refactor(), &changes))
             .collect::<Result<_, Failure>>()?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
         faults.iter().try_for_each(|owed| owed.complained(out))?;

@@ -8,6 +8,8 @@ use std::path::Path;
 
 use serde_json::Deserializer;
 
+use file_ports::Files;
+
 use super::Step;
 use super::journal::Journal;
 use super::seconds::Seconds;
@@ -26,8 +28,8 @@ pub struct CompileTimes {
 impl CompileTimes {
     const UNIT_DATA: &'static str = "const UNIT_DATA = ";
 
-    pub(crate) fn per_crate(page: &Journal) -> Result<BTreeMap<OneLine, Seconds>, Failure> {
-        let read = page.read()?;
+    pub(crate) fn per_crate(files: &impl Files, page: &Journal) -> Result<BTreeMap<OneLine, Seconds>, Failure> {
+        let read = page.read(files)?;
         let text = read.as_ref();
         let units: Vec<Unit> = text
             .match_indices(Self::UNIT_DATA)
@@ -54,9 +56,9 @@ impl Step for CompileTimes {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let listing = Listing::totalled(Self::per_crate(&self.page)?);
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+        let listing = Listing::totalled(Self::per_crate(ports.files(), &self.page)?);
         write!(out, "{listing}")?;
-        self.report.emptied()?.append(&listing).map(|()| Exit::Success)
+        self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success)
     }
 }
