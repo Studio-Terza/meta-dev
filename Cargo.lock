@@ -194,7 +194,6 @@ dependencies = [
  "file-ports",
  "laws",
  "newtype",
- "tempfile",
  "text-lines",
  "thiserror",
 ]

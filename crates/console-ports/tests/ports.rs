@@ -1,9 +1,7 @@
 use std::ffi::{OsStr, OsString};
 use std::process::ExitCode;
 
-use std::collections::BTreeMap;
-
-use console_ports::{Environment, Process};
+use console_ports::{Environment, Process, Variables};
 
 #[test]
 fn the_process_answers_with_its_arguments() {
@@ -23,22 +21,7 @@ fn the_process_reads_its_variables() {
 
 #[test]
 fn fake_variables_answer_from_their_pairs() {
-    let variables: FakeVariables = [(OsString::from("CI"), OsString::from("true"))].into_iter().collect();
+    let variables: Variables = [(OsString::from("CI"), OsString::from("true"))].into_iter().collect();
     assert_eq!(variables.variable(OsStr::new("CI")), Some(OsString::from("true")));
     assert_eq!(variables.variable(OsStr::new("HOME")), None);
-}
-
-#[derive(Debug, Default)]
-struct FakeVariables(BTreeMap<OsString, OsString>);
-
-impl FromIterator<(OsString, OsString)> for FakeVariables {
-    fn from_iter<Pairs: IntoIterator<Item = (OsString, OsString)>>(pairs: Pairs) -> FakeVariables {
-        FakeVariables(pairs.into_iter().collect())
-    }
-}
-
-impl Environment for FakeVariables {
-    fn variable(&self, name: &OsStr) -> Option<OsString> {
-        self.0.get(name).cloned()
-    }
 }

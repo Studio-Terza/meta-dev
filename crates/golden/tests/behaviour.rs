@@ -1,32 +1,41 @@
 mod differences;
 
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 
-use golden::{Difference, Disk, Failure, Golden, Mode, Output, Process, golden};
+use console_ports::Variables;
+use file_ports::{Files, Kind};
+use fixture::Fixture;
+use golden::{Difference, Failure, Golden, Mode, Output, golden};
 use laws::proptest;
 use laws::{roundtrip, table};
-use ports::Fixture;
 use proptest::prelude::any;
 
 #[test]
 fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
-    Fixture::with_recorded("same\n")?.golden().verify(&Process, &Disk, Output::new("same\n"))?;
+    let fixture = Fixture::with_recorded("same\n")?;
+    Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("same\n"))?;
     Ok(())
 }
 
 #[test]
 fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("new\n")), Err(Failure::Differs { .. })));
-    assert!(fixture.golden().verify(&Process, &Disk, Output::new("old\n")).is_ok());
+    assert!(matches!(
+        Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("new\n")),
+        Err(Failure::Differs { .. })
+    ));
+    assert!(Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("old\n")).is_ok());
     Ok(())
 }
 
 #[test]
 fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("new\n")), Err(Failure::Missing { .. })));
-    assert!(!fixture.path().exists());
+    assert!(matches!(
+        Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("new\n")),
+        Err(Failure::Missing { .. })
+    ));
+    assert_eq!(fixture.files().kind(&Fixture::path()), Kind::Missing);
     Ok(())
 }
 
@@ -34,7 +43,10 @@ fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Er
 fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("")?;
     fixture.overwrite(&[0xff, 0xfe])?;
-    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("")), Err(Failure::Unreadable { .. })));
+    assert!(matches!(
+        Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("")),
+        Err(Failure::Unreadable { .. })
+    ));
     Ok(())
 }
 
@@ -62,9 +74,11 @@ roundtrip!(
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    let printed =
-        fixture.golden().verify(&Process, &Disk, Output::new("new\n")).err().map(|failure| format!("{failure:?}"));
-    let heading = format!("{}: output differs from the golden", fixture.path().display());
+    let printed = Fixture::golden()
+        .verify(&Variables::default(), fixture.files(), Output::new("new\n"))
+        .err()
+        .map(|failure| format!("{failure:?}"));
+    let heading = format!("{}: output differs from the golden", Fixture::path().display());
     let lines = printed.as_deref().map(|text| text_lines::Lines::from(text).collect::<Vec<&str>>());
     let wanted = [
         heading.as_str(),
@@ -80,20 +94,30 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
 
 #[test]
 fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = Fixture::with_recorded("old\n")?;
+    let fixture = Fixture::with_recorded("old")?;
     fixture.mark_package()?;
-    let recorded = fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new("new\n"));
-    let chosen = Mode::current(&Process).ok() == Some(Mode::Record);
-    assert_eq!(matches!(recorded, Err(Failure::NotChosen { .. })), !chosen);
-    assert_eq!(fixture.text()? == "old\n", !chosen);
+    let recorded =
+        Fixture::golden().verify_in(&Variables::default(), fixture.files(), Mode::Record, Output::new("new"));
+    assert!(matches!(recorded, Err(Failure::NotChosen { .. })));
+    assert_eq!(fixture.text()?, "old");
+    Ok(())
+}
+
+#[test]
+fn recording_chosen_by_the_environment_rewrites_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::with_recorded("old")?;
+    fixture.mark_package()?;
+    let chosen: Variables = [(OsString::from(Mode::VARIABLE), OsString::from(Mode::ON))].into_iter().collect();
+    Fixture::golden().verify_in(&chosen, fixture.files(), Mode::Record, Output::new("new"))?;
+    assert_eq!(fixture.text()?, "new");
     Ok(())
 }
 
 #[test]
 fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new("placed\n"))?;
-    assert!(fixture.golden().verify(&Process, &Disk, Output::new("placed\n")).is_ok());
+    Fixture::golden().verify_in(&Variables::default(), fixture.files(), Mode::Record, Output::new("placed\n"))?;
+    assert!(Fixture::golden().verify(&Variables::default(), fixture.files(), Output::new("placed\n")).is_ok());
     Ok(())
 }
 
@@ -119,58 +143,76 @@ fn the_golden_macro_finds_a_golden_in_the_calling_package() -> Result<(), Failur
     golden!("macro.txt", "found through the macro\n")
 }
 
-mod ports {
-    use std::fs;
-    use std::path::PathBuf;
+#[test]
+fn the_fixtures_macro_reads_a_tree_of_the_calling_package() -> Result<(), Box<dyn std::error::Error>> {
+    let goldens = golden::fixtures!("tests/goldens")?;
+    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/goldens");
+    assert_eq!(goldens.kind(&directory.join("macro.txt")), Kind::File);
+    assert_eq!(goldens.kind(&directory.join("changed_line.diff")), Kind::File);
+    Ok(())
+}
 
-    use golden::{Disk, Golden, Mode, Output, Process};
-    use tempfile::TempDir;
+mod fixture {
+    use std::path::{Path, PathBuf};
 
+    use console_ports::Variables;
+    use file_ports::{Bytes, FileFailure, Files, Memory};
+    use golden::{Golden, Mode, Output};
+    use newtype::Newtype;
+
+    #[derive(Default)]
     pub struct Fixture {
-        directory: TempDir,
+        files: Memory,
     }
 
     impl Fixture {
         pub const NAME: &str = "nested/output.txt";
         pub const GOLDENS: &str = "tests/goldens";
+        pub const PACKAGE: &str = "/package";
 
-        pub fn new() -> Result<Self, std::io::Error> {
-            Ok(Self { directory: TempDir::new()? })
+        pub fn new() -> Result<Self, FileFailure> {
+            let fixture = Self::default();
+            fixture.files.create_directories(Path::new(Self::PACKAGE))?;
+            Ok(fixture)
         }
 
-        pub fn path(&self) -> PathBuf {
-            self.directory.path().join(Self::GOLDENS).join(Self::NAME)
+        pub fn files(&self) -> &Memory {
+            &self.files
         }
 
-        pub fn golden(&self) -> Golden {
-            match Golden::in_package(self.directory.path(), Self::NAME) {
+        pub fn path() -> PathBuf {
+            Path::new(Self::PACKAGE).join(Self::GOLDENS).join(Self::NAME)
+        }
+
+        pub fn golden() -> Golden {
+            match Golden::in_package(Self::PACKAGE, Self::NAME) {
                 Ok(golden) => golden,
                 Err(failure) => unreachable!("the fixture name stays inside the goldens directory: {failure:?}"),
             }
         }
 
-        pub fn with_recorded(text: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        pub fn with_recorded(text: &str) -> Result<Self, FileFailure> {
             let fixture = Self::new()?;
-            fs::create_dir_all(fixture.directory.path().join(Self::GOLDENS).join("nested"))?;
-            fs::write(fixture.path(), text)?;
+            fixture.files.create_directories(&Path::new(Self::PACKAGE).join(Self::GOLDENS).join("nested"))?;
+            fixture.files.write(&Self::path(), &Bytes::from(text))?;
             Ok(fixture)
         }
 
-        pub fn overwrite(&self, bytes: &[u8]) -> Result<(), std::io::Error> {
-            fs::write(self.path(), bytes)
+        pub fn overwrite(&self, bytes: &[u8]) -> Result<(), FileFailure> {
+            self.files.write(&Self::path(), &Bytes::new(bytes.to_vec()))
         }
 
-        pub fn mark_package(&self) -> Result<(), std::io::Error> {
-            fs::write(self.directory.path().join("Cargo.toml"), "[package]\nname = \"a\"\n")
+        pub fn mark_package(&self) -> Result<(), FileFailure> {
+            self.files.write(&Path::new(Self::PACKAGE).join("Cargo.toml"), &Bytes::from("[package]\nname = \"a\"\n"))
         }
 
-        pub fn text(&self) -> Result<String, std::io::Error> {
-            fs::read_to_string(self.path())
+        pub fn text(&self) -> Result<String, FileFailure> {
+            self.files.read_text(&Self::path()).map(Newtype::into_inner)
         }
 
         pub fn recorded_through_the_api(text: &str) -> Option<Self> {
             let fixture = Self::new().ok()?;
-            fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new(text)).ok()?;
+            Self::golden().verify_in(&Variables::default(), &fixture.files, Mode::Record, Output::new(text)).ok()?;
             Some(fixture)
         }
     }
