@@ -14,15 +14,13 @@ impl Spelling {
     pub fn inner(ty: &Type) -> Option<&Type> {
         match ty {
             Type::Reference(reference) => Some(reference.elem.as_ref()),
-            Type::Paren(inner) => Some(inner.elem.as_ref()),
-            Type::Group(inner) => Some(inner.elem.as_ref()),
             _ => Self::segment(ty).and_then(Pointer::pointee),
         }
     }
 
     pub fn ident(ty: &Type) -> Option<&Ident> {
         match ty {
-            Type::Path(path) if path.qself.is_none() => path.path.get_ident(),
+            Type::Path(path) => path.path.get_ident(),
             _ => None,
         }
     }
@@ -38,8 +36,6 @@ impl Spelling {
     fn peeled(ty: &Type) -> &Type {
         match ty {
             Type::Reference(reference) => Self::peeled(&reference.elem),
-            Type::Paren(inner) => Self::peeled(&inner.elem),
-            Type::Group(inner) => Self::peeled(&inner.elem),
             _ => ty,
         }
     }

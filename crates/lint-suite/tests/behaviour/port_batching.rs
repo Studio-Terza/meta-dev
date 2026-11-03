@@ -48,13 +48,35 @@ const OTHER: &str = ported!(
     "trait Other {\n    fn fetch(&self, id: u8) -> u8;\n}\nfn f(other: &impl Other, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().map(|id| other.fetch(*id)).collect()\n}\n"
 );
 const SHADOWED: &str = ported!(
-    "fn f(store: &impl Store, stores: Vec<u8>) -> Vec<u8> {\n    stores.iter().map(|store| store + 1).collect()\n}\n"
+    "fn f(store: &impl Store, stores: Vec<u8>) -> Vec<u8> {\n    stores.iter().map(|store: &u8| store + 1).collect()\n}\n"
 );
 const TEST_MODULE: &str = ported!(
     "#[cfg(test)]\nmod tests {\n    fn f(store: &impl super::Store, ids: Vec<u8>) {\n        for id in ids {\n            store.fetch(id);\n        }\n    }\n}\n"
 );
+const PLAIN_FIELD: &str = ported!(
+    "struct Shelf<'a> {\n    store: &'a dyn Store,\n}\nstruct Plain {\n    store: u8,\n}\nimpl Plain {\n    fn all(&self, ids: &[u8]) -> Vec<u8> {\n        ids.iter().map(|id| self.store + id).collect()\n    }\n}\nfn f(plain: &Plain, ids: Vec<u8>) {\n    ids.iter().for_each(|id| plain.all(&[*id]));\n}\n"
+);
+const INLINE_MODULE: &str = ported!(
+    "mod inner {\n    use crate::ports::Store;\n    struct Shelf<'a> {\n        store: &'a dyn Store,\n    }\n    impl Shelf<'_> {\n        fn all(&self, ids: &[u8]) {\n            for id in ids {\n                self.store.fetch(*id);\n            }\n        }\n    }\n}\n"
+);
+const DEFAULT_METHOD: &str = ported!(
+    "trait Shelf {\n    fn all(store: &impl Store, ids: Vec<u8>) -> Vec<u8> {\n        ids.iter().map(|id| store.fetch(*id)).collect()\n    }\n}\n"
+);
+const GENERATED: &str = ported!(
+    "macro_rules! shelf {\n    () => {\n        fn f(store: &impl Store, ids: Vec<u8>) -> Vec<u8> {\n            ids.iter().map(|id| store.fetch(*id)).collect()\n        }\n    };\n}\n"
+);
+const PACED_FIELD: &str = ported!(
+    "struct Shelf<'a> {\n    store: &'a dyn Store,\n}\nimpl Shelf<'_> {\n    fn all(&self, ids: &[u8]) {\n        ids.iter().for_each(|id| {\n            self.store.paced(*id, Pacing::RateLimit);\n        });\n    }\n}\n"
+);
+const BARE_LOOP: &str = ported!("fn f(store: &impl Store) {\n    loop {\n        store.fetch(1);\n    }\n}\n");
+const IMPL_GENERIC: &str = ported!(
+    "struct Shelf;\nimpl<S: Store> Shelf {\n    fn all(store: &S, ids: Vec<u8>) -> Vec<u8> {\n        ids.iter().map(|id| store.fetch(*id)).collect()\n    }\n}\n"
+);
+const BOXED: &str = ported!(
+    "fn f(store: Box<dyn Store>, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().map(|id| store.fetch(*id)).collect()\n}\n"
+);
 
-const CASES: [Case; 16] = [
+const CASES: [Case; 24] = [
     Case::new(
         Title::new("closure passed to map over an iterator"),
         &[Source::new(Located::new("a.rs"), Text::new(MAPPED))],
@@ -130,6 +152,46 @@ const CASES: [Case; 16] = [
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("plain field named like a held one"),
+        &[Source::new(Located::new("a.rs"), Text::new(PLAIN_FIELD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("inside an inline module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_MODULE))],
+        Flagged::new(&["a.rs:16"]),
+    ),
+    Case::new(
+        Title::new("trait default method"),
+        &[Source::new(Located::new("a.rs"), Text::new(DEFAULT_METHOD))],
+        Flagged::new(&["a.rs:10"]),
+    ),
+    Case::new(
+        Title::new("inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(GENERATED))],
+        Flagged::new(&["a.rs:11"]),
+    ),
+    Case::new(
+        Title::new("paced through a held field"),
+        &[Source::new(Located::new("a.rs"), Text::new(PACED_FIELD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("bare loop"),
+        &[Source::new(Located::new("a.rs"), Text::new(BARE_LOOP))],
+        Flagged::new(&["a.rs:10"]),
+    ),
+    Case::new(
+        Title::new("port generic declared on the impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(IMPL_GENERIC))],
+        Flagged::new(&["a.rs:11"]),
+    ),
+    Case::new(
+        Title::new("boxed port"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOXED))],
+        Flagged::new(&["a.rs:9"]),
     ),
 ];
 
