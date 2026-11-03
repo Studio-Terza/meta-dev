@@ -1,6 +1,7 @@
 use lint_core::{Lint, Readout, Report, SourceFile};
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
+use lint_bool_methods::BoolMethods;
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
 use lint_distinct_signatures::DistinctSignatures;
@@ -86,6 +87,7 @@ impl Lints {
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),
+            BoolMethods::report(files),
         ]
     }
 

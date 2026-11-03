@@ -24,12 +24,13 @@ impl EffectPaths {
     ];
     const VALUES: [&[Word<'static>]; 1] = [&words!["std", "process", "ExitCode"]];
 
-    pub fn tested(file: &SourceFile) -> bool {
+    pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
         let placement = file.placement();
         let target = placement.crate_root().directory();
-        placement.role() == Role::Target
+        (placement.role() == Role::Target
             && target.parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
-            && target.file_stem() != Some(OsStr::new(Self::PORTS))
+            && target.file_stem() != Some(OsStr::new(Self::PORTS)))
+        .then_some(file)
     }
 
     pub fn effect(used: &Use) -> Option<&UsePath> {

@@ -42,10 +42,11 @@ struct Implemented {
 impl Doubles {
     const TESTS: &str = "tests";
 
-    pub fn tested(file: &SourceFile) -> bool {
+    pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
         let placement = file.placement();
-        placement.role() == Role::Target
-            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
+        (placement.role() == Role::Target
+            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS)))
+        .then_some(file)
     }
 
     pub fn scan(&mut self, file: &SourceFile, imports: &Imports, ports: &PortTraits) {
@@ -94,7 +95,7 @@ impl Reader<'_> {
     fn declared(&mut self, name: &Ident) {
         let double = DoubleKey { target: self.target.clone(), name: Name::from(name) };
         let site = Site::new(self.file.path(), LineNumber::from(name.span()));
-        self.doubles.declared.extend(DoubleWords::name(&double.name).then_some((double, site)));
+        self.doubles.declared.extend(DoubleWords::name(&double.name).map(|_| (double, site)));
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey> {
@@ -102,7 +103,8 @@ impl Reader<'_> {
             Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
             _ => None,
         };
-        name.filter(DoubleWords::name).map(|name| DoubleKey { target: self.target.clone(), name })
+        name.filter(|name| DoubleWords::name(name).is_some())
+            .map(|name| DoubleKey { target: self.target.clone(), name })
     }
 
     fn implementation(&self, double: DoubleKey, path: &TraitPath) -> Implemented {

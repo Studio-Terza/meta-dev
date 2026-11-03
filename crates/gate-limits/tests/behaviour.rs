@@ -138,7 +138,7 @@ fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
     let limits = Disk::fixture("block-limits.toml", LIMITS)?;
     let measured = Disk::fixture("block-measured.toml", "test-run = 6\nclippy = 10")?;
     let past = Run::cli(&limits, &measured).past_warn().map_err(io::Error::other)?;
-    assert_eq!(past.iter().map(gate_limits::Finding::blocks).collect::<Vec<bool>>(), [true]);
+    assert_eq!(past.iter().map(|finding| finding.blocks().is_some()).collect::<Vec<bool>>(), [true]);
     Ok(())
 }
 

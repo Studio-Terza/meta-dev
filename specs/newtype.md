@@ -13,7 +13,7 @@ Out: changing chess, typestate, RAII lints.
 
 ## History
 
-D4, made strict (owner 1139c842, 2605e95a): it was report only, listing public `is_*` and `has_*` methods returning `bool`. It now blocks every function returning `bool`, and the pull request that tightened it fixed every violation, 145 of them.
+D4, made strict (owner 1139c842, 2605e95a): it was report only, listing public `is_*` and `has_*` methods returning `bool`. It now blocks every function returning `bool`, and the pull request that tightened it fixed every violation, 151 of them.
 
 D3, measured, not built: the phantom form is not simpler. A prototype on main at a4e6e6e moved all 19 `usize` newtypes to `newtype::Count<Tag>`, with hand-written generic impls of `Clone`, `Copy`, `Debug`, `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Display`, `Serialize` and `Newtype`. It compiled and passed clippy.
 

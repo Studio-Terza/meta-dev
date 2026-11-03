@@ -44,9 +44,9 @@ impl ModuleTree {
             .reexports
             .iter()
             .filter(|(module, _)| module.segment_length() != 0)
-            .filter(move |(_, count)| count.exceeds(most))
+            .filter_map(move |(module, count)| count.beyond(most).map(|count| (module, count)))
             .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count: *count, most })
+                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
             });
         self.modules
             .modules()
@@ -70,8 +70,8 @@ impl ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
                 let used = target.deepest_in(&self.modules);
-                self.users.record(used.cloned(), module);
-                self.deep_uses.extend(target.crosses_directory_boundary(module, &self.modules).then(|| {
+                self.users = std::mem::take(&mut self.users).recorded(used.cloned(), module);
+                self.deep_uses.extend(target.crossed_directory(module, &self.modules).map(|_| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })
                 }));
                 self
@@ -82,10 +82,10 @@ impl ModuleTree {
 
     fn home_of(&self, module: &ModulePath) -> Option<ModulePath> {
         let outsiders: Vec<&ModulePath> =
-            self.users.callers_of(module)?.iter().filter(|user| !module.relates::<Ancestor>(user)).collect();
+            self.users.callers_of(module)?.iter().filter(|user| module.relates::<Ancestor>(user).is_none()).collect();
         outsiders
             .iter()
-            .all(|user| user.relates::<InsideSibling>(module))
+            .all(|user| user.relates::<InsideSibling>(module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath> =
                     outsiders.iter().map(|user| user.truncated_to_length(module.segment_length())).collect();

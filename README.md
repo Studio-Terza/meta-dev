@@ -30,14 +30,18 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
+no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods, rust_only,
+workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
-It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`, in impls and in public traits
-(`bool_methods`), with each entry naming the alternatives, and public methods that form a pair such as
-`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. Those lists are report only too,
-so they are outside the lints above and never change the exit code.
+It is report only, no number blocks. The run also lists public methods that form a pair such as
+`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. That list is report only too,
+so it is outside the lints above and never changes the exit code.
+
+`bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
+declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
+like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
@@ -91,7 +95,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 

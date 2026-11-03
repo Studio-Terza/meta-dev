@@ -13,8 +13,8 @@ pub struct Directory(PathBuf);
 
 impl Directory {
     #[must_use]
-    pub fn is_real(path: &Path) -> bool {
-        std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
+    pub fn real(path: &Path) -> Option<&Path> {
+        std::fs::symlink_metadata(path).ok().filter(std::fs::Metadata::is_dir).map(|_| path)
     }
 
     pub fn entries(&self) -> Result<Vec<PathBuf>, Failure> {
@@ -33,27 +33,25 @@ impl Directory {
         let below = self.entries()?;
         below
             .into_iter()
-            .filter(|entry| Self::is_real(entry))
+            .filter_map(|entry| Self::real(&entry).map(Path::to_path_buf))
             .map(Directory)
-            .filter(|directory| !directory.is_skipped(&Ignored::FOR_PACKAGES))
+            .filter(|directory| directory.skipped(&Ignored::FOR_PACKAGES).is_none())
             .try_fold(vec![self], |found, directory| Ok(found.into_iter().chain(directory.tree()?).collect()))
     }
 
     pub fn files(self) -> Result<Vec<PathBuf>, Failure> {
         self.entries()?.into_iter().try_fold(Vec::new(), |found, entry| {
             let below = Directory(entry.clone());
-            Ok(if !Self::is_real(&entry) {
-                found.into_iter().chain([entry]).collect()
-            } else if below.is_skipped(&Ignored::FOR_FILES) {
-                found
-            } else {
-                found.into_iter().chain(below.files()?).collect()
+            Ok(match (Self::real(&entry), below.skipped(&Ignored::FOR_FILES)) {
+                (None, _) => found.into_iter().chain([entry]).collect(),
+                (Some(_), Some(_)) => found,
+                (Some(_), None) => found.into_iter().chain(below.files()?).collect(),
             })
         })
     }
 
-    fn is_skipped(&self, ignored: &[Ignored]) -> bool {
-        ignored.iter().any(|rule| rule.applying_to(self).is_some())
+    fn skipped<'rules>(&self, ignored: &'rules [Ignored]) -> Option<&'rules Ignored> {
+        ignored.iter().find(|rule| rule.applying_to(self).is_some())
     }
 }
 

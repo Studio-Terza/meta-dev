@@ -13,7 +13,6 @@ use std::process::ExitCode;
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
-const PREDICATE: &str = "pub struct A;\nimpl A {\n    pub fn is_on(&self) -> bool { true }\n}\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n}\n";
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
@@ -74,7 +73,7 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
 #[test]
 fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Disk::package()?;
-    Disk::write(root.path(), "src/lib.rs", PREDICATE)?;
+    Disk::write(root.path(), "src/lib.rs", "pub struct A;\n")?;
     Disk::write(root.path(), "src/paired.rs", PAIRED)?;
     assert!(Trees::reported(root.path()).is_clean());
     assert_eq!(Trees::reported(root.path()).exit, ExitCode::SUCCESS);

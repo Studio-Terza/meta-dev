@@ -64,15 +64,15 @@ impl Kind {
         match modules.first() {
             _ if modules.iter().any(|module| *module == Self::PORTS) => Kind::Port,
             Some(first) if first.words().last().is_some_and(|word| *word == Self::PORTS) => Kind::Port,
-            Some(first) if ports.declares(first, last) => Kind::Port,
-            Some(first) if first.matches::<Whole>(&Self::STD) => Kind::Std,
+            Some(first) if ports.declares(first, last).is_some() => Kind::Port,
+            Some(first) if first.matches::<Whole>(&Self::STD).is_some() => Kind::Std,
             _ => Kind::Other,
         }
     }
 
     fn bare(written: &UsePath) -> Kind {
         match written.segments() {
-            [only] if only.matches::<Whole>(&Self::PRELUDE) => Kind::Std,
+            [only] if only.matches::<Whole>(&Self::PRELUDE).is_some() => Kind::Std,
             _ => Kind::Other,
         }
     }

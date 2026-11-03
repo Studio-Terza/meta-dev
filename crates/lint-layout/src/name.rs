@@ -22,8 +22,8 @@ impl Name {
     }
 
     #[must_use]
-    pub fn matches<Rule: Matching>(&self, words: &[Word<'_>]) -> bool {
-        words.iter().any(|word| Rule::holds(self, *word))
+    pub fn matches<'word, Rule: Matching>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
+        words.iter().find_map(|word| Rule::holds(self, *word))
     }
 
     pub(crate) fn spelled(&self) -> &str {
@@ -36,8 +36,8 @@ impl Name {
     }
 
     #[must_use]
-    pub fn contains(&self, word: Word<'_>) -> bool {
-        self.0.contains(word.into_inner())
+    pub fn contains<'word>(&self, word: Word<'word>) -> Option<Word<'word>> {
+        self.0.contains(word.into_inner()).then_some(word)
     }
 
     #[must_use]
@@ -66,13 +66,16 @@ impl Name {
     }
 
     #[must_use]
-    pub fn has_camel_word(&self, words: &[Word<'_>]) -> bool {
-        self.words().iter().flat_map(|chunk| Self::humps(&chunk.0)).any(|hump| hump.lowered().matches::<Whole>(words))
+    pub fn camel_word<'word>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
+        self.words()
+            .iter()
+            .flat_map(|chunk| Self::humps(&chunk.0))
+            .find_map(|hump| hump.lowered().matches::<Whole>(words))
     }
 
     fn humps(chunk: &str) -> Vec<Name> {
         let letters: Vec<char> = chunk.chars().collect();
-        let cuts = (0..letters.len()).filter(|index| Self::cut(&letters, *index));
+        let cuts = (0..letters.len()).filter(|index| Self::cut(&letters, *index).is_some());
         let bounds: Vec<usize> = cuts.chain(Some(letters.len())).collect();
         bounds
             .iter()
@@ -82,17 +85,19 @@ impl Name {
             .collect()
     }
 
-    fn cut(letters: &[char], index: usize) -> bool {
+    fn cut(letters: &[char], index: usize) -> Option<&char> {
         let at = |place: usize| letters.get(place).copied();
         let previous = index.checked_sub(1).and_then(at);
         let next = index.checked_add(1).and_then(at);
-        previous.is_none()
+        (previous.is_none()
             || (at(index).is_some_and(char::is_uppercase)
                 && previous.is_some_and(|before| {
                     before.is_lowercase()
                         || before.is_ascii_digit()
                         || (before.is_uppercase() && next.is_some_and(char::is_lowercase))
-                }))
+                })))
+        .then(|| letters.get(index))
+        .flatten()
     }
 
     #[must_use]

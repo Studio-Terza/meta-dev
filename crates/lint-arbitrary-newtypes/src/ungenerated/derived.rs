@@ -11,9 +11,14 @@ impl Derived {
     const WRAPPING: [Word<'static>; 1] = words!["Newtype"];
     const GENERATING: [Word<'static>; 1] = words!["Arbitrary"];
 
-    pub fn lacks_generator(&self) -> bool {
-        self.0.iter().any(|name| name.matches::<Whole>(&Self::WRAPPING))
-            && !self.0.iter().any(|name| name.matches::<Whole>(&Self::GENERATING))
+    pub fn lacks_generator(&self) -> Option<&Name> {
+        match (
+            self.0.iter().find(|name| name.matches::<Whole>(&Self::WRAPPING).is_some()),
+            self.0.iter().find(|name| name.matches::<Whole>(&Self::GENERATING).is_some()),
+        ) {
+            (Some(wrapping), None) => Some(wrapping),
+            _ => None,
+        }
     }
 }
 

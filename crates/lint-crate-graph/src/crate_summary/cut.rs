@@ -46,7 +46,7 @@ impl Cut {
         let inside = Self::balanced(whole, islands, &total);
         let outside: BTreeSet<TangleIndex> = total.difference(&inside).copied().collect();
         let smaller = whole.items(&inside).count().min(whole.items(&outside).count());
-        floor.allows(smaller).then(|| Split::new(whole.conductance(&inside), inside, outside))
+        floor.allows(smaller).map(|_| Split::new(whole.conductance(&inside), inside, outside))
     }
 
     fn balanced(
