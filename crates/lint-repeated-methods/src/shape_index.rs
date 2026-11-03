@@ -7,9 +7,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Visibility};
+use syn::{ItemImpl, ItemMod, Visibility};
 
-use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
+use lint_core::{DeclaredType, Home, Most, Site, SourceFile, Syntax, TypeHomes, Violation, Walk};
 use lint_layout::{Length, LineNumber, Name};
 
 use inners::Inners;
@@ -72,17 +72,11 @@ impl<'file> ShapeIndex<'file> {
     fn placed(&self, item: &ItemImpl, written: Name) -> Placed<'file> {
         let self_type = self.homes.resolve(written, self.home);
         let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type.home(), self_type.as_ref()));
-        let shapes = item
-            .items
-            .iter()
-            .filter_map(|member| match (member, &item.trait_) {
-                (ImplItem::Fn(function), None)
-                    if !matches!(function.vis, Visibility::Inherited) && function.sig.constness.is_none() =>
-                {
-                    Some(function)
-                }
-                _ => None,
-            })
+        let shapes = Syntax::inherent(item)
+            .into_iter()
+            .flat_map(|item| item.items.iter().filter_map(Syntax::impl_fn))
+            .filter(|function| matches!(function.vis, Visibility::Public(_) | Visibility::Restricted(_)))
+            .filter(|function| function.sig.constness.is_none())
             .fold(BTreeMap::new(), |mut shapes, function| {
                 let site = Site::new(self.file, LineNumber::from(function.sig.ident.span()));
                 shapes.entry(MethodShape::described(&function.sig, &erasure)).or_insert(site);
