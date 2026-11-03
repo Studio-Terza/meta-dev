@@ -10,16 +10,15 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
 
-use super::StateGraph;
 use super::declarations::Declarations;
 use super::finding::Finding;
 use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::{ImplContext, ImplKind};
-use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_core::{Bound, Site};
 use lint_layout::{Length, Name};
 
 pub struct EdgeScan<'scan, 'file> {
@@ -30,6 +29,8 @@ pub struct EdgeScan<'scan, 'file> {
 }
 
 impl<'scan, 'file> EdgeScan<'scan, 'file> {
+    const EDGES_PER_VERTEX: Bound = Bound::Most(4);
+
     pub fn new(declarations: &'scan Declarations<'scan>) -> Self {
         EdgeScan { declarations, path: Path::new(""), edges: BTreeMap::new(), violations: Vec::new() }
     }
@@ -40,7 +41,7 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
     }
 
     pub fn violations(mut self) -> Vec<Violation<'file>> {
-        let most = StateGraph::EDGES_PER_VERTEX;
+        let most = Self::EDGES_PER_VERTEX;
         let duplicates = self.edges.iter().filter(|(_, names)| names.len() > 1).filter_map(|(edge, names)| {
             let site = *names.values().min()?;
             Some(Violation::new(site, Finding::DuplicateEdge { edge, sites: names }))
