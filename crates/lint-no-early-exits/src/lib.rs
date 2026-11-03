@@ -3,8 +3,8 @@ mod finding;
 
 use exits::Exits;
 use finding::Finding;
-use lint_core::FileLint;
 use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_file::FileLint;
 
 #[derive(Debug)]
 pub struct NoEarlyExits;

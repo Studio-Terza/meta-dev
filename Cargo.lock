@@ -257,6 +257,7 @@ name = "lint-arbitrary-newtypes"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -266,6 +267,7 @@ name = "lint-bool-methods"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -296,6 +298,7 @@ name = "lint-const-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -330,6 +333,7 @@ name = "lint-distinct-signatures"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "quote",
  "syn 2.0.119",
@@ -363,6 +367,7 @@ name = "lint-expression-flow"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -380,6 +385,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-file"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+]
+
+[[package]]
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
@@ -393,6 +405,7 @@ name = "lint-fn-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "newtype",
  "proc-macro2",
@@ -469,6 +482,7 @@ name = "lint-manual-iteration"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -531,6 +545,7 @@ name = "lint-no-early-exits"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",
@@ -608,6 +623,7 @@ name = "lint-no-test-only-api"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "lint-placement",
  "proc-macro2",
@@ -663,6 +679,7 @@ name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -841,6 +858,7 @@ name = "lint-state-graph"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "newtype",
  "quote",
@@ -967,6 +985,7 @@ name = "lint-type-shape"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-file",
  "lint-layout",
  "proc-macro2",
  "syn 2.0.119",

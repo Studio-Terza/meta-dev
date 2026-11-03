@@ -20,12 +20,15 @@ impl ShapeToken {
 
     pub(super) fn normalized(tokens: TokenStream) -> Vec<ShapeToken> {
         let shaped: Vec<ShapeToken> = tokens.into_iter().flat_map(Self::of_tree).collect();
-        shaped
+        let signs: Vec<Option<Symbol>> = shaped
             .iter()
             .zip(shaped.iter().skip(1).map(Some).chain([None]))
-            .filter(|(token, next)| !(**token == ShapeToken::Mark(Self::MINUS) && *next == Some(&ShapeToken::Literal)))
-            .map(|(token, _)| token.clone())
-            .collect()
+            .map(|pair| match pair {
+                (ShapeToken::Mark(sign), Some(ShapeToken::Literal)) if *sign == Self::MINUS => Some(*sign),
+                _ => None,
+            })
+            .collect();
+        shaped.into_iter().zip(signs).filter(|(_, sign)| sign.is_none()).map(|(token, _)| token).collect()
     }
 
     fn of_tree(tree: TokenTree) -> Vec<ShapeToken> {

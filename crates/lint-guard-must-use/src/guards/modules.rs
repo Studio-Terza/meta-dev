@@ -9,10 +9,10 @@ use super::members::Members;
 use super::type_key::TypeKey;
 
 #[derive(Debug, Default)]
-pub struct Modules<'file>(BTreeMap<Module, Members<'file>>);
+pub struct Modules<'file>(BTreeMap<Module<'file>, Members<'file>>);
 
 impl<'file> Modules<'file> {
-    pub fn file(&mut self, module: Module, members: Members<'file>) {
+    pub fn file(&mut self, module: Module<'file>, members: Members<'file>) {
         let filed = self.0.remove(&module).unwrap_or_default().merged(members);
         self.0.insert(module, filed);
     }
@@ -37,15 +37,15 @@ impl<'file> Modules<'file> {
 
     fn binding<'modules>(
         &'modules self,
-        module: &'modules Module,
+        module: &'modules Module<'file>,
         members: &Members<'file>,
         name: &'modules Name,
     ) -> Vec<TypeKey<'modules>> {
         let shared = || {
-            let root: &CrateFile = module.as_ref();
+            let root = <&CrateFile>::from(module);
             self.0
                 .iter()
-                .filter(|(other, others)| others.declares(name).is_some() && AsRef::<CrateFile>::as_ref(*other) == root)
+                .filter(|(other, others)| others.declares(name).is_some() && <&CrateFile>::from(*other) == root)
                 .map(|(other, _)| TypeKey::new(other, name))
                 .collect()
         };

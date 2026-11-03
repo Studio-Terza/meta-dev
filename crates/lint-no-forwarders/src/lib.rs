@@ -16,7 +16,6 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::LineNumber;
-use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct NoForwarders;
@@ -33,10 +32,7 @@ impl Lint for NoForwarders {
                     Self::forwarders(file, &types).into_iter().map(move |forwarder| {
                         Violation::new(
                             Site::new(file.path(), LineNumber::from(forwarder.name().span())),
-                            Finding::Forwards {
-                                name: Name::from(forwarder.name()),
-                                callee: forwarder.callee().clone(),
-                            },
+                            Finding::Forwards { name: forwarder.name(), callee: forwarder.callee() },
                         )
                     })
                 })
@@ -46,7 +42,7 @@ impl Lint for NoForwarders {
 }
 
 impl NoForwarders {
-    fn forwarders(file: &SourceFile, types: &WorkspaceTypes) -> Vec<Forwarder> {
+    fn forwarders<'file>(file: &'file SourceFile, types: &WorkspaceTypes) -> Vec<Forwarder<'file>> {
         let mut scan = Forwarders::new(types);
         scan.visit_file(file.syntax());
         scan.found()

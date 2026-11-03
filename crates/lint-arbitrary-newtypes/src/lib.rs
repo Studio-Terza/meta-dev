@@ -1,7 +1,7 @@
 mod ungenerated;
 
-use lint_core::FileLint;
 use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_file::FileLint;
 use ungenerated::Ungenerated;
 
 #[derive(Debug)]

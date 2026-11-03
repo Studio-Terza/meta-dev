@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 proc-macro2.workspace = true
 syn.workspace = true

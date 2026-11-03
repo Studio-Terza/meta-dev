@@ -16,7 +16,7 @@ pub struct Packages;
 impl Packages {
     pub fn targets_of(
         files: &impl Files,
-        trees: &[&Tree],
+        trees: &[&Tree<'_>],
         admitted: Vec<Result<Vec<Manifest>, Failure>>,
     ) -> Vec<Result<Vec<Target>, Failure>> {
         let named: Vec<PathBuf> = admitted.iter().flatten().flatten().flat_map(Manifest::named_paths).collect();
@@ -31,7 +31,7 @@ impl Packages {
             .map(|(tree, group)| {
                 let packages = group?;
                 Self::checked(&mut survey, &packages)?;
-                Ok(packages.iter().flat_map(|package| package.targets(&survey, tree)).collect())
+                Ok(packages.into_iter().filter_map(|package| package.into_target(&survey, tree)).collect())
             })
             .collect()
     }

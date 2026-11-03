@@ -7,6 +7,7 @@ mod mentions;
 mod offers;
 mod test_features;
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
@@ -14,12 +15,12 @@ use candidate::Candidate;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
-use lint_core::FileLint;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use lint_layout::Name;
 use lint_placement::PackageRoot;
 use mentions::{Ground, Mentions};
@@ -37,7 +38,7 @@ impl NoTestOnlyApi {
             .iter()
             .filter_map(|(name, line)| {
                 name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
-                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(name.clone())))
+                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(Cow::Borrowed(name))))
             })
             .collect()
     }

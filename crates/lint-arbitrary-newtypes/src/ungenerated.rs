@@ -10,8 +10,8 @@ use syn::visit::{self, Visit};
 use borrows::Borrows;
 use derived::Derived;
 use finding::Finding;
-use lint_core::FileLint;
 use lint_core::{Site, SourceFile, Violation};
+use lint_file::FileLint;
 use lint_layout::{LineNumber, Name};
 
 #[derive(Debug)]

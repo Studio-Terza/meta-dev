@@ -1,15 +1,15 @@
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Target {
     package: PathBuf,
-    file: PathBuf,
+    files: Vec<PathBuf>,
 }
 
 impl Target {
     #[must_use]
-    pub fn new(package: PathBuf, file: PathBuf) -> Target {
-        Target { package, file }
+    pub fn new(package: PathBuf, files: Vec<PathBuf>) -> Target {
+        Target { package, files }
     }
 
     #[must_use]
@@ -18,7 +18,7 @@ impl Target {
     }
 
     #[must_use]
-    pub fn into_file(self) -> PathBuf {
-        self.file
+    pub fn files(&self) -> &[PathBuf] {
+        &self.files
     }
 }

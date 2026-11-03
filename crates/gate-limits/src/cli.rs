@@ -61,7 +61,7 @@ impl Cli {
     pub fn lower(&self, files: &impl Files) -> Result<Record, Failure<'_>> {
         let record = self.gate(files)?.lowered()?;
         files
-            .write(&self.limits, &Bytes::from(&record))
+            .write(&self.limits, Bytes::from(&record))
             .map(|()| record)
             .map_err(|failure| Failure::Io { path: &self.limits, source: io::Error::from(failure) })
     }

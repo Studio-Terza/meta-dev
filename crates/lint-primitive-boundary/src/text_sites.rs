@@ -7,11 +7,11 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 
-use lint_core::FileLint;
 use lint_core::Gate;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_file::FileLint;
 use lint_layout::{Name, Whole, Word, words};
 
 use sighting::Sighting;

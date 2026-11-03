@@ -18,11 +18,11 @@ use lint_layout::Name;
 use lint_placement::ModulePath;
 
 #[derive(Debug, Default)]
-pub struct EnumPredicates {
-    declarations: Vec<Declaration>,
+pub struct EnumPredicates<'file> {
+    declarations: Vec<Declaration<'file>>,
 }
 
-impl Lint for EnumPredicates {
+impl Lint for EnumPredicates<'_> {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
         Report::new(
@@ -34,7 +34,7 @@ impl Lint for EnumPredicates {
     }
 }
 
-impl EnumPredicates {
+impl EnumPredicates<'_> {
     fn violations<'file>(&self, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let mut scan = Predicates::new(self, file);
         scan.visit_file(file.syntax());
@@ -53,18 +53,20 @@ impl EnumPredicates {
     }
 
     fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
-        let candidates: Vec<&Declaration> = self
-            .declarations
-            .iter()
-            .filter_map(|declaration| declaration.named(file.placement().crate_root(), name))
-            .collect();
+        let crate_root = file.placement().crate_root();
         let local = (path.qself.is_none() && path.path.segments.len() == 1)
-            .then(|| candidates.iter().find_map(|declaration| declaration.in_module(module)))
+            .then(|| {
+                self.declarations
+                    .iter()
+                    .filter_map(|declaration| declaration.in_module(module))
+                    .find_map(|declaration| declaration.kinds(crate_root, name).next())
+            })
             .flatten();
+        let candidates: Vec<Kind> =
+            self.declarations.iter().flat_map(|declaration| declaration.kinds(crate_root, name)).collect();
         match (local, candidates.as_slice()) {
-            (Some(declaration), _) => declaration.kind(),
-            (None, []) => Kind::Other,
-            (None, all) if all.iter().all(|declaration| declaration.kind() == Kind::Enum) => Kind::Enum,
+            (Some(kind), _) => kind,
+            (None, all @ [_, ..]) if all.iter().all(|kind| *kind == Kind::Enum) => Kind::Enum,
             (None, _) => Kind::Other,
         }
     }

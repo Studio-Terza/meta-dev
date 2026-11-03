@@ -15,7 +15,7 @@ impl<'ast> ImplTarget<'ast> {
         }
     }
 
-    pub fn walked_by(self, forwarders: &mut Forwarders<'_>, item: &'ast ItemImpl) {
+    pub fn walked_by(self, forwarders: &mut Forwarders<'_, 'ast>, item: &'ast ItemImpl) {
         match self {
             ImplTarget::Inherent(segment) => {
                 forwarders.targeting(segment);

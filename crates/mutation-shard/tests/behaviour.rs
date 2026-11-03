@@ -220,7 +220,7 @@ impl Mutants {
     }
 
     fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), FileFailure> {
-        self.files.write(&self.root.join("log").join(name), &Bytes::new(text.as_ref().to_vec()))
+        self.files.write(&self.root.join("log").join(name), Bytes::new(text.as_ref().to_vec()))
     }
 
     fn outcomes(&self, outcomes: &Value) -> Result<(), FileFailure> {
@@ -232,7 +232,7 @@ impl Mutants {
     }
 
     fn broken_outcomes(&self, text: &str) -> Result<(), FileFailure> {
-        self.files.write(&self.root.join("outcomes.json"), &Bytes::from(text))
+        self.files.write(&self.root.join("outcomes.json"), Bytes::from(text))
     }
 
     fn path(&self) -> &Path {

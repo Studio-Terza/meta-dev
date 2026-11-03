@@ -18,6 +18,25 @@ impl UsePath {
         UsePath(self.0.iter().cloned().chain(Some(segment)).collect())
     }
 
+    pub(crate) fn push(&mut self, segment: Name) {
+        self.0.push(segment);
+    }
+
+    pub(crate) fn pop(&mut self) {
+        self.0.pop();
+    }
+
+    #[must_use]
+    pub fn then(mut self, segment: Name) -> UsePath {
+        self.0.push(segment);
+        self
+    }
+
+    #[must_use]
+    pub fn joined(&self, rest: &[Name]) -> UsePath {
+        UsePath(self.0.iter().chain(rest).cloned().collect())
+    }
+
     #[must_use]
     pub fn rerooted(&self, root: &UsePath) -> UsePath {
         UsePath(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())

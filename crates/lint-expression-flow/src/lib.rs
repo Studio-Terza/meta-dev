@@ -1,7 +1,7 @@
 mod fn_body;
 
-use lint_core::FileLint;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use std::collections::BTreeMap;
 
 use fn_body::FnBody;

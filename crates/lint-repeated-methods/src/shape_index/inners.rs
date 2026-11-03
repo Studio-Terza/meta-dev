@@ -9,7 +9,7 @@ use lint_layout::Name;
 
 #[derive(Debug, Default)]
 pub struct Inners<'file> {
-    by_home: BTreeMap<Home, BTreeMap<Name, &'file Type>>,
+    by_home: BTreeMap<Home<'file>, BTreeMap<Name, &'file Type>>,
     reading: BTreeMap<Name, &'file Type>,
 }
 
@@ -22,7 +22,7 @@ impl<'file> Inners<'file> {
         })
     }
 
-    pub fn inner_of(&self, home: &Home, name: &Name) -> Option<&'file Type> {
+    pub fn inner_of(&self, home: &Home<'file>, name: &Name) -> Option<&'file Type> {
         self.by_home.get(home)?.get(name).copied()
     }
 }

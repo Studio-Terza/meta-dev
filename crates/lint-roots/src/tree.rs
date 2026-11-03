@@ -4,19 +4,19 @@ use file_ports::Files;
 use lint_layout::Failure;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tree {
+pub struct Tree<'given> {
     canonical: PathBuf,
-    given: PathBuf,
+    given: &'given Path,
 }
 
-impl Tree {
-    pub fn open_many(files: &impl Files, given: &[PathBuf]) -> Vec<Result<Tree, Failure>> {
+impl<'given> Tree<'given> {
+    pub fn open_many(files: &impl Files, given: &'given [PathBuf]) -> Vec<Result<Tree<'given>, Failure>> {
         given
             .iter()
             .zip(files.canonical_many(given))
             .map(|(given, canonical)| {
                 canonical
-                    .map(|canonical| Tree { canonical, given: given.clone() })
+                    .map(|canonical| Tree { canonical, given })
                     .map_err(|failure| Failure::Io { path: given.clone(), source: failure.into() })
             })
             .collect()
@@ -29,7 +29,7 @@ impl Tree {
 
     #[must_use]
     pub fn without_sources(&self) -> Failure {
-        Failure::NoSources { path: self.given.clone() }
+        Failure::NoSources { path: self.given.to_path_buf() }
     }
 
     #[must_use]

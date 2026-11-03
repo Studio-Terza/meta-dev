@@ -69,16 +69,16 @@ impl Files for Memory {
             .map_err(|_| FileFailure::Failed(io::Error::from(io::ErrorKind::InvalidData)))
     }
 
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
         let placed = self.placed(path)?.to_path_buf();
-        self.files.held().insert(placed, bytes.clone());
+        self.files.held().insert(placed, bytes);
         Ok(())
     }
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
         let held = self.stored(path).unwrap_or_default().into_inner();
         let joined = held.into_iter().chain(bytes.as_ref().iter().copied()).collect();
-        self.write(path, &Bytes::new(joined))
+        self.write(path, Bytes::new(joined))
     }
 
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
@@ -91,7 +91,7 @@ impl Files for Memory {
     }
 
     fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
-        self.write(to, &self.stored(from)?)
+        self.write(to, self.stored(from)?)
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use syn::visit::{self, Visit};
 use syn::{Ident, ImplItem, ItemImpl, ItemMod, ItemTrait, TraitItem, Type, Visibility};
 
@@ -10,15 +12,17 @@ use crate::owner::Owner;
 
 pub struct PairedMethods<'file> {
     file: &'file SourceFile,
-    module: Module,
-    found: Vec<Declared<'file>>,
+    module: Module<'file>,
+    found: BTreeMap<Owner<'file>, Vec<Declared<'file>>>,
 }
 
 impl<'file> PairedMethods<'file> {
-    pub fn of_file(file: &'file SourceFile) -> Vec<Declared<'file>> {
-        let mut scan = PairedMethods { file, module: Module::of_file(file), found: Vec::new() };
-        scan.visit_file(file.syntax());
-        scan.found
+    pub fn of_files(files: &'file [SourceFile]) -> BTreeMap<Owner<'file>, Vec<Declared<'file>>> {
+        files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |found, file| {
+            let mut scan = PairedMethods { file, module: Module::of_file(file), found };
+            scan.visit_file(file.syntax());
+            scan.found
+        })
     }
 
     fn public_methods(block: &ItemImpl) -> Vec<&Ident> {
@@ -44,25 +48,19 @@ impl<'file> PairedMethods<'file> {
     }
 
     fn owned_by(&mut self, owner: Option<Name>, methods: &[&Ident]) {
-        let owner = owner.map(|name| Owner::new(&self.module, name));
-        let declared: Vec<Declared> = owner
+        let path = self.file.path();
+        let declared = methods
             .iter()
-            .flat_map(|owner| methods.iter().map(move |method| (owner, method)))
-            .map(|(owner, method)| {
-                let site = Site::new(self.file.path(), LineNumber::from(method.span()));
-                Declared::new(owner.clone(), Name::from(*method), site)
-            })
-            .collect();
-        self.found.extend(declared);
+            .map(|method| Declared::new(Name::from(*method), Site::new(path, LineNumber::from(method.span()))));
+        owner.zip(Some(declared)).into_iter().for_each(|(name, declared)| {
+            self.found.entry(Owner::new(&self.module, name)).or_default().extend(declared);
+        });
     }
 }
 
 impl<'ast> Visit<'ast> for PairedMethods<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let outer = self.module.clone();
-        self.module = outer.within(&Name::from(&module.ident));
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module = outer;
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {

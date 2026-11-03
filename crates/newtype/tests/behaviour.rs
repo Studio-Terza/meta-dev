@@ -77,7 +77,7 @@ struct Pairs;
 impl Pairs {
     const LARGEST: Rounds = Rounds(usize::MAX);
     const THREE: Rounds = Rounds::new(3);
-    const NONE: Rounds = Rounds::zero();
+    const NONE: Rounds = Rounds::new(0);
 
     fn counts(rounds: &[Rounds]) -> Vec<usize> {
         rounds.iter().copied().map(Counter::count).collect()

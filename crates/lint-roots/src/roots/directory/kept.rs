@@ -1,3 +1,4 @@
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use file_ports::Kind;
@@ -30,9 +31,14 @@ impl<'survey> Kept<'survey> {
     }
 
     #[must_use]
-    pub fn preorder(&self, directory: Directory) -> Vec<Directory> {
-        let below = self.below(directory.as_ref());
-        [directory].into_iter().chain(below.into_iter().flat_map(|subdirectory| self.preorder(subdirectory))).collect()
+    pub fn preorder(&self, directories: Vec<Directory>) -> Vec<Directory> {
+        directories
+            .into_iter()
+            .flat_map(|directory| {
+                let deeper = self.preorder(self.below(directory.as_ref()));
+                iter::once(directory).chain(deeper)
+            })
+            .collect()
     }
 
     #[must_use]

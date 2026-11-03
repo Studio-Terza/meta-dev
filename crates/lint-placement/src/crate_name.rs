@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt;
 
 use syn::Ident;
@@ -28,6 +29,12 @@ impl From<&CrateRoot> for CrateName {
         );
         let underscored: String = spelled.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect();
         CrateName(Name::from(underscored.as_str()))
+    }
+}
+
+impl Borrow<Name> for CrateName {
+    fn borrow(&self) -> &Name {
+        &self.0
     }
 }
 

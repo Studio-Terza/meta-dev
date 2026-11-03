@@ -33,13 +33,13 @@ impl<'tree> SourceFiles<'tree> {
 
     pub fn read_all(files: &impl Files, roots: &[PathBuf]) -> Result<Readout, Failure> {
         let opened = Tree::open_many(files, roots);
-        let shape: Vec<Vec<&Tree>> = opened.iter().map(|opened| opened.iter().collect()).collect();
+        let shape: Vec<Vec<&Tree<'_>>> = opened.iter().map(|opened| opened.iter().collect()).collect();
         let staged = Regrouped::like(&shape, Staged::under(files, &shape.concat()));
-        let (trees, staged): (Vec<Tree>, Vec<Vec<Staged>>) = opened
+        let (trees, staged): (Vec<Tree<'_>>, Vec<Vec<Staged>>) = opened
             .into_iter()
             .zip(staged)
             .map(|(opened, staged)| Ok((opened?, staged.into_iter().collect::<Result<Vec<Staged>, Failure>>()?)))
-            .collect::<Result<Vec<(Tree, Vec<Staged>)>, Failure>>()?
+            .collect::<Result<Vec<(Tree<'_>, Vec<Staged>)>, Failure>>()?
             .into_iter()
             .unzip();
         let starts =
@@ -54,16 +54,15 @@ impl<'tree> SourceFiles<'tree> {
         Ok(read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted())
     }
 
-    fn tree(self, tree: &'tree Tree, staged: Staged) -> SourceFiles<'tree> {
-        let targets = staged.targets().to_vec();
-        let started = SourceFiles { readout: self.readout.with_repo_files(staged.into_repo_files()), ..self };
-        targets.into_iter().fold(started, |reading, root| {
-            let package = root.package().to_path_buf();
-            let file = root.into_file();
-            let scope = Scope::new(tree, &package, CrateFile::from(tree.display(&file)));
-            let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
-            reading.file(&scope, &file, &children)
-        })
+    fn tree(self, tree: &'tree Tree<'tree>, staged: Staged) -> SourceFiles<'tree> {
+        let read = staged.targets().iter().fold(self, |reading, target| {
+            target.files().iter().fold(reading, |reading, file| {
+                let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
+                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                reading.file(&scope, file, &children)
+            })
+        });
+        SourceFiles { readout: read.readout.with_repo_files(staged.into_repo_files()), ..read }
     }
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {

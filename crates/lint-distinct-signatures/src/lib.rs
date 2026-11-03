@@ -4,9 +4,9 @@ use signature_index::SignatureIndex;
 
 use syn::visit::Visit;
 
-use lint_core::FileLint;
 use lint_core::Lint;
 use lint_core::{Headline, Report, SourceFile, Violation};
+use lint_file::FileLint;
 
 #[derive(Debug)]
 pub struct DistinctSignatures;

@@ -19,6 +19,6 @@ impl SourceDirectory {
             Role::BinaryRoot if inside == Path::new(Self::MAIN_FILE) => ModulePath::default(),
             Role::BinaryRoot | Role::Other | Role::Target => ModulePath::of_file(inside),
         };
-        Placement { crate_root: package.root().clone(), package, module, role }
+        Placement { target_root: None, package, module, role }
     }
 }

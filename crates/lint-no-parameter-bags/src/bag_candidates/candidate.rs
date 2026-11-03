@@ -1,22 +1,27 @@
+use std::path::Path;
+
+use lint_core::{Site, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Candidate {
-    name: Name,
+use crate::Finding;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Candidate<'name> {
+    name: &'name Name,
     line: LineNumber,
 }
 
-impl Candidate {
-    pub fn new(name: Name, line: LineNumber) -> Candidate {
+impl<'name> Candidate<'name> {
+    pub fn new(name: &'name Name, line: LineNumber) -> Candidate<'name> {
         Candidate { name, line }
     }
 
-    pub fn name(&self) -> &Name {
-        &self.name
+    pub fn name(&self) -> &'name Name {
+        self.name
     }
 
-    pub fn line(&self) -> LineNumber {
-        self.line
+    pub fn violation<'file>(&self, path: &'file Path) -> Violation<'file> {
+        Violation::new(Site::new(path, self.line), Finding::ParameterBag { name: self.name })
     }
 }

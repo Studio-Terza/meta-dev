@@ -45,11 +45,19 @@ impl Kind {
     ];
 
     #[must_use]
-    pub fn judged(written: &UsePath, candidates: &[UsePath], ports: &PortTraits) -> Kind {
+    pub fn written(written: &UsePath) -> Kind {
+        match written.segments() {
+            [only] if only.matches::<Whole>(&Self::PRELUDE).is_some() => Kind::Std,
+            _ => Kind::Other,
+        }
+    }
+
+    #[must_use]
+    pub fn judged(self, candidates: &[UsePath], ports: &PortTraits) -> Kind {
         candidates
             .iter()
             .map(|candidate| Self::resolved(candidate, ports))
-            .chain(iter::once(Self::bare(written)))
+            .chain(iter::once(self))
             .min()
             .unwrap_or(Kind::Other)
     }
@@ -67,13 +75,6 @@ impl Kind {
             Some(first) if first.words().last().is_some_and(|word| *word == Self::PORTS) => Kind::Port,
             Some(first) if ports.declares(first, last).is_some() => Kind::Port,
             Some(first) if first.matches::<Whole>(&Self::STD).is_some() => Kind::Std,
-            _ => Kind::Other,
-        }
-    }
-
-    fn bare(written: &UsePath) -> Kind {
-        match written.segments() {
-            [only] if only.matches::<Whole>(&Self::PRELUDE).is_some() => Kind::Std,
             _ => Kind::Other,
         }
     }

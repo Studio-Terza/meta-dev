@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
 use syn::{FnArg, ItemMod, ItemTrait, Path as TraitPath, TraitItem, TraitItemFn, Type};
@@ -12,14 +12,8 @@ use crate::doubles::Kind;
 
 #[derive(Debug, Default)]
 pub struct PortTraits {
-    declared: BTreeSet<PortTrait>,
+    declared: BTreeMap<CrateName, BTreeSet<Name>>,
     paced: BTreeSet<Name>,
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct PortTrait {
-    crate_name: CrateName,
-    trait_name: Name,
 }
 
 impl PortTraits {
@@ -29,23 +23,23 @@ impl PortTraits {
     pub fn declared(files: &[SourceFile]) -> PortTraits {
         files.iter().filter_map(SourceFile::shipped).fold(PortTraits::default(), |found, file| {
             let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
-            let mut reader = Reader { crate_name: CrateName::from(file.placement().crate_root()), ground, found };
+            let mut reader = Reader { ground, found, traits: BTreeSet::new() };
             reader.visit_file(file.syntax());
-            reader.found
+            let mut found = reader.found;
+            found.declared.entry(CrateName::from(file.placement().crate_root())).or_default().extend(reader.traits);
+            found
         })
     }
 
     #[must_use]
     pub fn declares(&self, crate_name: &Name, trait_name: &Name) -> Option<&Name> {
-        self.declared
-            .get(&PortTrait { crate_name: CrateName::from(crate_name), trait_name: trait_name.clone() })
-            .map(|port| &port.trait_name)
+        self.declared.get(crate_name)?.get(trait_name)
     }
 
     #[must_use]
-    pub fn judged(&self, imports: &Imports, module: &Module, path: &TraitPath) -> Kind {
+    pub fn judged(&self, imports: &Imports<'_>, module: &Module<'_>, path: &TraitPath) -> Kind {
         let written = UsePath::from(path);
-        Kind::judged(&written, &imports.candidates(module, &written), self)
+        Kind::written(&written).judged(&imports.candidates(module, written), self)
     }
 
     #[must_use]
@@ -68,9 +62,9 @@ impl PortTraits {
 }
 
 struct Reader {
-    crate_name: CrateName,
     ground: Ground,
     found: PortTraits,
+    traits: BTreeSet<Name>,
 }
 
 impl<'ast> Visit<'ast> for Reader {
@@ -82,13 +76,12 @@ impl<'ast> Visit<'ast> for Reader {
     }
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        let declared = PortTrait { crate_name: self.crate_name.clone(), trait_name: Name::from(&item.ident) };
-        let ported = (self.ground == Ground::Ports).then_some(declared);
+        let ported = (self.ground == Ground::Ports).then(|| Name::from(&item.ident));
         let paced = ported.iter().flat_map(|_| &item.items).filter_map(|member| match member {
             TraitItem::Fn(method) => PortTraits::paced_by(method),
             _ => None,
         });
         self.found.paced.extend(paced);
-        self.found.declared.extend(ported);
+        self.traits.extend(ported);
     }
 }

@@ -21,8 +21,8 @@ impl Pair {
         Pair { opening: Word::new("begin"), closing: Word::new("end") },
     ];
 
-    pub fn violations<'file>(&self, methods: &[&Declared<'file>]) -> Vec<Violation<'file>> {
-        let names: BTreeSet<&Name> = methods.iter().map(|method| method.method()).collect();
+    pub fn violations<'file>(&self, methods: &[Declared<'file>]) -> Vec<Violation<'file>> {
+        let names: BTreeSet<&Name> = methods.iter().map(Declared::method).collect();
         methods
             .iter()
             .filter_map(|method| {
@@ -30,7 +30,7 @@ impl Pair {
                     .method()
                     .reprefixed(self.opening, self.closing)
                     .filter(|partner| names.contains(partner))
-                    .map(|partner| Violation::new(method.location(), Finding::new(method.method().clone(), partner)))
+                    .map(|partner| Violation::new(method.location(), Finding::new(method.method(), partner)))
             })
             .collect()
     }

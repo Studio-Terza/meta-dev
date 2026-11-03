@@ -19,6 +19,8 @@ const ASYNC: &str =
     "#[tokio::test]\nasync fn a() {\n    f(1).await;\n}\n#[tokio::test]\nasync fn b() {\n    f(2).await;\n}\n";
 const SIGNED: &str =
     "#[test]\nfn a() {\n    assert_eq!(h(1), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(-1), 1);\n}\n";
+const REFERENCED: &str =
+    "#[test]\nfn a() {\n    assert_eq!(h(1), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(&1), 1);\n}\n";
 
 const CONSTANTS: &str =
     "#[test]\nfn a() {\n    assert_eq!(h(LOW), 1);\n}\n#[test]\nfn b() {\n    assert_eq!(h(HIGH_END), 1);\n}\n";
@@ -26,7 +28,7 @@ const OTHER_NAMES: &str = "#[test]\nfn a() {\n    assert_eq!(h(T), 1);\n}\n#[tes
 
 const GATED: &str = "#[test]\n#[cfg(unix)]\nfn a() {\n    f(1);\n}\n#[test]\n#[cfg(unix)]\nfn b() {\n    f(2);\n}\n";
 
-const CASES: [Case; 16] = [
+const CASES: [Case; 17] = [
     Case::new(
         Title::new("other test attributes"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(ROWS_ELSEWHERE))],
@@ -96,6 +98,11 @@ const CASES: [Case; 16] = [
             Source::new(Located::new("crates/a/tests/x.rs"), Text::new(FIRST_FILE)),
             Source::new(Located::new("crates/b/tests/x.rs"), Text::new(SECOND_FILE)),
         ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a mark other than minus before a literal"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(REFERENCED))],
         Flagged::new(&[]),
     ),
     Case::new(

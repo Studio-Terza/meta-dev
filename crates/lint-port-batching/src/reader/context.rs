@@ -27,11 +27,12 @@ impl<'run> Context<'run> {
         self.judge
     }
 
-    pub fn held(&self, owner: &Type) -> BTreeSet<Name> {
-        Spelling::last(owner).map(|owner| self.holders.fields(&self.crate_name, &owner)).unwrap_or_default()
+    pub fn held(&self, owner: &Type) -> Option<&'run BTreeSet<Name>> {
+        let holders = self.holders;
+        Spelling::last(owner).and_then(|owner| holders.fields(&self.crate_name, &owner))
     }
 
-    pub fn bindings(&self, module: &Module, generics: &BTreeSet<Name>, signature: &Signature) -> BTreeSet<Name> {
+    pub fn bindings(&self, module: &Module<'_>, generics: &BTreeSet<Name>, signature: &Signature) -> BTreeSet<Name> {
         signature
             .inputs
             .iter()
@@ -44,9 +45,11 @@ impl<'run> Context<'run> {
             .collect()
     }
 
-    fn parameter(&self, module: &Module, generics: &BTreeSet<Name>, ty: &Type) -> Option<Name> {
-        self.judge
-            .port_type(module, generics, ty)
-            .or_else(|| Spelling::last(ty).filter(|owner| !self.holders.fields(&self.crate_name, owner).is_empty()))
+    fn parameter(&self, module: &Module<'_>, generics: &BTreeSet<Name>, ty: &Type) -> Option<()> {
+        self.judge.port_type(module, generics, ty).map(|_| ()).or_else(|| self.holding(ty).map(|_| ()))
+    }
+
+    fn holding(&self, ty: &Type) -> Option<Name> {
+        Spelling::last(ty).filter(|owner| self.holders.fields(&self.crate_name, owner).is_some())
     }
 }

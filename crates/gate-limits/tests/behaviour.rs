@@ -240,7 +240,7 @@ struct Fixture(Memory);
 impl Fixture {
     fn stored(&self, name: &str, text: &str) -> io::Result<PathBuf> {
         let path = PathBuf::from(name);
-        self.0.write(&path, &Bytes::from(text))?;
+        self.0.write(&path, Bytes::from(text))?;
         Ok(path)
     }
 

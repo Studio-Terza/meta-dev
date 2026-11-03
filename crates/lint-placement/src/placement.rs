@@ -19,7 +19,7 @@ use target_directory::TargetDirectory;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
     package: PackageRoot,
-    crate_root: CrateRoot,
+    target_root: Option<CrateRoot>,
     module: ModulePath,
     role: Role,
 }
@@ -37,16 +37,16 @@ impl Placement {
 
     #[must_use]
     pub fn within(files: &impl Files, package: &Path, file: &Path) -> Placement {
-        Self::within_many(files, &[package.to_path_buf()], &[file.to_path_buf()])
+        Self::within_many(files, &[package], &[file])
             .pop()
             .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
     }
 
     #[must_use]
-    pub fn within_many(files: &impl Files, packages: &[PathBuf], paths: &[PathBuf]) -> Vec<Placement> {
-        let distinct: Vec<PathBuf> = packages.iter().cloned().collect::<BTreeSet<PathBuf>>().into_iter().collect();
-        let roots: BTreeMap<PathBuf, PackageRoot> =
-            distinct.iter().cloned().zip(PackageRoot::read_many(files, &distinct)).collect();
+    pub fn within_many(files: &impl Files, packages: &[&Path], paths: &[&Path]) -> Vec<Placement> {
+        let distinct: Vec<&Path> = packages.iter().copied().collect::<BTreeSet<&Path>>().into_iter().collect();
+        let roots: BTreeMap<&Path, PackageRoot> =
+            distinct.iter().copied().zip(PackageRoot::read_many(files, &distinct)).collect();
         packages
             .iter()
             .zip(paths)
@@ -55,7 +55,7 @@ impl Placement {
                     .ok()
                     .zip(roots.get(package).cloned())
                     .and_then(|(inside, root)| Self::in_package(root, package, inside))
-                    .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.clone())))
+                    .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
             })
             .collect()
     }
@@ -67,7 +67,7 @@ impl Placement {
 
     #[must_use]
     pub fn crate_root(&self) -> &CrateRoot {
-        &self.crate_root
+        self.target_root.as_ref().unwrap_or_else(|| self.package.root())
     }
 
     #[must_use]
@@ -82,7 +82,7 @@ impl Placement {
 
     #[must_use]
     pub fn crate_file(&self, file: &Path) -> CrateFile {
-        let source = self.crate_root.directory().join(Self::SOURCE_DIRECTORY);
+        let source = self.crate_root().directory().join(Self::SOURCE_DIRECTORY);
         CrateFile::from(match self.role {
             Role::Other if file.starts_with(&source) => source.join(Self::LIBRARY_FILE),
             Role::Other | Role::LibraryRoot | Role::BinaryRoot | Role::Target => file.to_path_buf(),
@@ -106,8 +106,8 @@ impl Placement {
 
     fn unplaced(crate_root: CrateRoot) -> Placement {
         Placement {
-            package: PackageRoot::unplaced(crate_root.clone()),
-            crate_root,
+            package: PackageRoot::unplaced(crate_root),
+            target_root: None,
             module: ModulePath::default(),
             role: Role::Other,
         }

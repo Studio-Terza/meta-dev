@@ -1,5 +1,5 @@
-use lint_core::FileLint;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;

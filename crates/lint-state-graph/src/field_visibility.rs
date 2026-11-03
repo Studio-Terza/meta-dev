@@ -5,11 +5,11 @@ use syn::visit::Visit;
 use syn::{Index, ItemMod, ItemStruct, Visibility};
 
 use super::finding::Finding;
-use lint_core::FileLint;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_file::FileLint;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 

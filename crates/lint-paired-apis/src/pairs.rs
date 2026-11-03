@@ -9,11 +9,7 @@ use lint_core::Violation;
 pub struct Pairs;
 
 impl Pairs {
-    pub fn listed<'file>(declared: &[Declared<'file>]) -> Vec<Violation<'file>> {
-        let grouped = declared.iter().fold(BTreeMap::<&Owner, Vec<&Declared<'file>>>::new(), |mut groups, method| {
-            groups.entry(method.owner()).or_default().push(method);
-            groups
-        });
-        grouped.values().flat_map(|methods| Pair::ALL.iter().flat_map(|pair| pair.violations(methods))).collect()
+    pub fn listed<'file>(declared: &BTreeMap<Owner<'file>, Vec<Declared<'file>>>) -> Vec<Violation<'file>> {
+        declared.values().flat_map(|methods| Pair::ALL.iter().flat_map(|pair| pair.violations(methods))).collect()
     }
 }

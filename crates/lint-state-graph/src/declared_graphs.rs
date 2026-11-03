@@ -5,8 +5,8 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ItemMod, Macro};
 
-use lint_core::FileLint;
 use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
+use lint_file::FileLint;
 use lint_layout::{Name, Word};
 
 use graph::Graph;

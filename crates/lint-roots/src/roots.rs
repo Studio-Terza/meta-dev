@@ -9,6 +9,7 @@ use packages::Packages;
 
 pub use target::Target;
 
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use crate::regrouped::Regrouped;
@@ -21,11 +22,11 @@ use lint_layout::Manifest;
 pub struct Roots;
 
 impl Roots {
-    pub fn files(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Vec<PathBuf>, Failure>> {
+    pub fn files(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<PathBuf>, Failure>> {
         Directory::files(files, &Self::canonical(trees))
     }
 
-    pub fn under(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Vec<Target>, Failure>> {
+    pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<Target>, Failure>> {
         let below = Directory::trees(files, &Self::canonical(trees));
         let directories: Vec<Vec<PathBuf>> =
             trees.iter().zip(&below).map(|(tree, below)| Self::searched(tree, below)).collect();
@@ -41,16 +42,16 @@ impl Roots {
         Packages::targets_of(files, trees, Admission::members_among(files, manifests))
     }
 
-    fn searched(tree: &Tree, below: &Result<Vec<Directory>, Failure>) -> Vec<PathBuf> {
+    fn searched(tree: &Tree<'_>, below: &Result<Vec<Directory>, Failure>) -> Vec<PathBuf> {
         below
             .iter()
-            .flatten()
-            .map(|directory| directory.as_ref().to_path_buf())
+            .flat_map(|below| iter::once(tree.canonical()).chain(below.iter().map(AsRef::as_ref)))
+            .map(Path::to_path_buf)
             .chain(below.iter().flat_map(|_| tree.canonical().ancestors().skip(1).map(Path::to_path_buf)))
             .collect()
     }
 
-    fn canonical(trees: &[&Tree]) -> Vec<PathBuf> {
+    fn canonical(trees: &[&Tree<'_>]) -> Vec<PathBuf> {
         trees.iter().map(|tree| tree.canonical().to_path_buf()).collect()
     }
 }

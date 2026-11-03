@@ -53,7 +53,7 @@ impl Checkout {
     fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
         let file = self.root.join(path);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, &Bytes::from(text))
+        self.files.write(&file, Bytes::from(text))
     }
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {

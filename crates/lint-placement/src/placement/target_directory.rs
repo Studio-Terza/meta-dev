@@ -15,6 +15,11 @@ impl TargetDirectory {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let module = if rest.as_os_str().is_empty() { ModulePath::default() } else { ModulePath::of_file(rest) };
-        Some(Placement { package, crate_root: CrateRoot::new(directory.join(first)), module, role: Role::Target })
+        Some(Placement {
+            package,
+            target_root: Some(CrateRoot::new(directory.join(first))),
+            module,
+            role: Role::Target,
+        })
     }
 }

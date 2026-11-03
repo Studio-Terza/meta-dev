@@ -19,10 +19,10 @@ use repeated_shape::RepeatedShape;
 
 #[derive(Debug)]
 pub struct ShapeIndex<'file> {
-    owners: BTreeMap<DeclaredType, BTreeMap<MethodShape, Site<'file>>>,
+    owners: BTreeMap<DeclaredType<'file>, BTreeMap<MethodShape, Site<'file>>>,
     inners: Inners<'file>,
-    homes: TypeHomes,
-    home: Home,
+    homes: TypeHomes<'file>,
+    home: Home<'file>,
     file: &'file Path,
 }
 
@@ -47,7 +47,8 @@ impl<'file> ShapeIndex<'file> {
             .flat_map(|(owner, methods)| methods.iter().map(move |(shape, site)| (shape, owner, *site)))
             .fold(
                 BTreeMap::new(),
-                |mut shapes: BTreeMap<&MethodShape, BTreeMap<&DeclaredType, Site<'file>>>, (shape, owner, site)| {
+                |mut shapes: BTreeMap<&MethodShape, BTreeMap<&DeclaredType<'file>, Site<'file>>>,
+                 (shape, owner, site)| {
                     shapes.entry(shape).or_default().insert(owner, site);
                     shapes
                 },
@@ -75,9 +76,9 @@ impl<'file> ShapeIndex<'file> {
         }
     }
 
-    fn placed(&self, item: &ItemImpl, written: &Name) -> Placed<'file> {
-        let self_type = self.homes.resolve(written, &self.home);
-        let erasure = Erasure::around(written, self.inners.inner_of(self_type.home(), written));
+    fn placed(&self, item: &ItemImpl, written: Name) -> Placed<'file> {
+        let self_type = self.homes.resolve(written, self.home);
+        let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type.home(), self_type.as_ref()));
         let shapes = item
             .items
             .iter()
@@ -108,7 +109,7 @@ impl<'ast> Visit<'ast> for ShapeIndex<'_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed = self_type.map(|self_type| self.placed(item, &self_type));
+        let placed = self_type.map(|self_type| self.placed(item, self_type));
         placed.into_iter().fold(&mut self.owners, |owners, placed| {
             placed.recorded_in(owners);
             owners

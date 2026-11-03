@@ -1,8 +1,8 @@
 use syn::visit::{self, Visit};
 use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
 
-use lint_core::FileLint;
 use lint_core::{Site, SourceFile, Violation, Walk};
+use lint_file::FileLint;
 use lint_layout::LineNumber;
 
 use super::Finding;

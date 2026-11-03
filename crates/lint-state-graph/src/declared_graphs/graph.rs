@@ -32,8 +32,8 @@ impl Graph {
     pub fn violations<'file>(&self, path: &'file Path) -> Vec<Violation<'file>> {
         let edges: Vec<Edge<'_>> = self.0.iter().flat_map(Block::edges).collect();
         let reversed: Vec<Edge<'_>> = edges.iter().copied().map(Edge::reversed).collect();
-        let reachable = Self::closed(&self.states(Kind::Start), &edges);
-        let ending = Self::closed(&self.states(Kind::Terminal), &reversed);
+        let reachable = self.closed(Kind::Start, &edges);
+        let ending = self.closed(Kind::Terminal, &reversed);
         self.0.iter().flat_map(|block| block.violations(path, &reachable, &ending)).collect()
     }
 
@@ -41,10 +41,14 @@ impl Graph {
         self.0.iter().filter_map(|block| block.state_of(kind)).collect()
     }
 
-    fn closed<'found>(seen: &BTreeSet<&'found TypeName>, edges: &[Edge<'found>]) -> BTreeSet<&'found TypeName> {
-        let grown: BTreeSet<&TypeName> =
-            edges.iter().filter_map(|edge| edge.target_from(seen)).chain(seen.iter().copied()).collect();
-        if grown.len() == seen.len() { grown } else { Self::closed(&grown, edges) }
+    fn closed<'graph>(&'graph self, kind: Kind, edges: &[Edge<'graph>]) -> BTreeSet<&'graph TypeName> {
+        iter::successors(Some(self.states(kind)), |seen| {
+            let grown: BTreeSet<&TypeName> =
+                edges.iter().filter_map(|edge| edge.target_from(seen)).chain(seen.iter().copied()).collect();
+            (grown.len() > seen.len()).then_some(grown)
+        })
+        .last()
+        .unwrap_or_default()
     }
 }
 

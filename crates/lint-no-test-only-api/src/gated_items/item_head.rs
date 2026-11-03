@@ -5,7 +5,7 @@ use syn::{Attribute, Field, ImplItem, Item, Meta, MetaList, Visibility};
 use lint_core::Walk;
 use lint_layout::LineNumber;
 
-use crate::finding::Finding;
+use crate::finding::{Finding, Gate};
 use crate::flagged::Flagged;
 
 #[derive(Debug)]
@@ -47,17 +47,17 @@ impl<'item> ItemHead<'item> {
         ItemHead { attributes: &field.attrs, visibility: &field.vis }
     }
 
-    pub(super) fn flagged(&self, enclosing: Option<Finding>) -> Option<Flagged> {
+    pub(super) fn flagged(&self, enclosing: Option<Gate>) -> Option<Flagged> {
         Self::gate_of(self.attributes)
             .or(enclosing)
             .filter(|_| !matches!(self.visibility, Visibility::Inherited))
-            .map(|finding| Flagged::new(LineNumber::from(self.visibility.span()), finding))
+            .map(|gate| Flagged::new(LineNumber::from(self.visibility.span()), Finding::from(gate)))
     }
 
-    pub(super) fn gate_of(attributes: &[Attribute]) -> Option<Finding> {
+    pub(super) fn gate_of(attributes: &[Attribute]) -> Option<Gate> {
         (Walk::outside_tests(attributes) == Walk::Skipped)
-            .then_some(Finding::GatedOnTest)
-            .or_else(|| attributes.iter().find_map(Self::hiding).map(|_| Finding::DocHidden))
+            .then_some(Gate::GatedOnTest)
+            .or_else(|| attributes.iter().find_map(Self::hiding).map(|_| Gate::DocHidden))
     }
 
     fn hiding(attribute: &Attribute) -> Option<&Attribute> {

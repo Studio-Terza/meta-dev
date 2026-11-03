@@ -4,20 +4,22 @@ use crate::scopes::Scopes;
 use lint_layout::{Name, Word};
 
 #[derive(Debug)]
-pub(crate) struct Wanted(Option<BTreeSet<Name>>);
+pub(crate) enum Wanted<'run> {
+    Every,
+    Among { finals: &'run [Word<'run>], renamed: BTreeSet<&'run Name> },
+}
 
-impl Wanted {
-    pub(crate) const EVERY: Wanted = Wanted(None);
-
-    pub(crate) fn among(scopes: &Scopes, finals: &[Word<'_>]) -> Wanted {
-        let renamed = scopes.renamed_to(finals);
-        Wanted(Some(finals.iter().map(|name| Name::from(*name)).chain(renamed).collect()))
+impl<'run> Wanted<'run> {
+    pub(crate) fn among(scopes: &'run Scopes<'_>, finals: &'run [Word<'run>]) -> Wanted<'run> {
+        Wanted::Among { finals, renamed: scopes.renamed_to(finals).collect() }
     }
 
     pub(crate) fn holds<'name>(&self, name: &'name Name) -> Option<&'name Name> {
-        match &self.0 {
-            None => Some(name),
-            Some(names) => names.contains(name).then_some(name),
+        match self {
+            Wanted::Every => Some(name),
+            Wanted::Among { finals, renamed } => {
+                (finals.iter().any(|word| name == word) || renamed.contains(name)).then_some(name)
+            }
         }
     }
 }
