@@ -22,12 +22,8 @@ impl Ignored {
     const HIDDEN: Word<'static> = Word::new(".");
     const VERSION_CONTROL: &'static str = ".git";
 
-    pub fn manifests<'path>(directories: impl Iterator<Item = &'path Path>) -> Vec<PathBuf> {
-        directories
-            .filter(|directory| directory.file_name().is_some_and(|name| name == Self::BUILD_DIRECTORY))
-            .filter_map(Path::parent)
-            .map(|parent| parent.join(Self::MANIFEST))
-            .collect()
+    pub fn manifests(directories: &[PathBuf]) -> Vec<PathBuf> {
+        directories.iter().map(|directory| directory.join(Self::MANIFEST)).collect()
     }
 
     pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {

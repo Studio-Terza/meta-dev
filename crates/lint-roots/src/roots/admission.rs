@@ -45,7 +45,8 @@ impl Admission {
             .collect();
         let roots: BTreeSet<PathBuf> = found
             .iter()
-            .filter(|manifest| manifest.package().is_some() && manifest.workspace().is_none())
+            .filter(|manifest| manifest.package().is_some())
+            .filter(|manifest| manifest.workspace().is_none())
             .filter_map(|package| Self::enclosing(&workspaces, package.directory()))
             .collect();
         roots.into_iter().collect()

@@ -258,6 +258,7 @@ fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
     let run = Trees::reported(root.path());
     assert_eq!(run.failures(), 1);
     assert!(run.err.contains("cannot read"));
+    assert!(run.err.contains("src/absent.rs"), "{}", run.err);
     Ok(())
 }
 

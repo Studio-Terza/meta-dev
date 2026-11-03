@@ -3,7 +3,7 @@ mod kept;
 
 use std::path::{Path, PathBuf};
 
-use file_ports::{Files, Kind};
+use file_ports::Files;
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype};
 
@@ -43,9 +43,7 @@ impl Directory {
         let survey = survey.learn(files, Fact::Listed, level);
         let entries: Vec<PathBuf> = level.iter().flat_map(|directory| survey.entries(directory)).cloned().collect();
         let survey = survey.learn(files, Fact::Kind, &entries);
-        let manifests = Ignored::manifests(
-            entries.iter().filter(|entry| survey.kind(entry) == Kind::Directory).map(PathBuf::as_path),
-        );
+        let manifests = Ignored::manifests(level);
         let survey = survey.learn(files, Fact::Followed, &manifests);
         let kept = Kept::new(&survey, ignored);
         let next: Vec<PathBuf> =

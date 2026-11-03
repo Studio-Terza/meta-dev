@@ -46,8 +46,6 @@ impl<'tree> Shelf<'tree> {
         let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Followed, &candidates), ..stocked };
         let found: Vec<(&Node<'tree>, Child)> =
             level.iter().flat_map(|node| stocked.declared(node).into_iter().map(move |child| (node, child))).collect();
-        let paths: Vec<PathBuf> = found.iter().map(|(_, child)| child.as_ref().to_path_buf()).collect();
-        let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Canonical, &paths), ..stocked };
         let visited: BTreeSet<Node<'tree>> = visited.iter().chain(level).cloned().collect();
         let next: BTreeSet<Node<'tree>> = found
             .into_iter()
