@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use lint_layout::Fix;
+use lint_core::Fix;
 use lint_paths::Ground;
 use lint_placement::CrateName;
 use newtype::{Arbitrary, Counter, Display, Newtype};
@@ -54,7 +54,7 @@ impl fmt::Display for Summary<'_> {
     }
 }
 
-impl lint_layout::Finding for Summary<'_> {
+impl lint_core::Finding for Summary<'_> {
     fn fix(&self) -> Fix {
         Fix::new("move each effect site outside ports behind a port, until none remain outside")
     }

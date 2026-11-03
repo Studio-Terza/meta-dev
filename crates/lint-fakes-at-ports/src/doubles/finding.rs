@@ -1,6 +1,7 @@
 use std::fmt;
 
-use lint_layout::{Fix, Name, UsePath};
+use lint_core::Fix;
+use lint_layout::{Name, UsePath};
 
 #[derive(Debug)]
 pub enum Finding<'double> {
@@ -19,7 +20,7 @@ impl fmt::Display for Finding<'_> {
     }
 }
 
-impl lint_layout::Finding for Finding<'_> {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::Unported(_) => "implement a trait declared in a ports crate or module, or rename it",

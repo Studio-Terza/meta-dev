@@ -1,7 +1,7 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
 use transition_facts::Transitions;
 
 use super::family::Family;
@@ -54,7 +54,7 @@ impl fmt::Display for Comparison {
     }
 }
 
-impl lint_layout::Finding for Comparison {
+impl lint_core::Finding for Comparison {
     fn fix(&self) -> Fix {
         Fix::new(
             "route each repeated input-output pair through one transition, as From, TryFrom or FromStr where it fits",
