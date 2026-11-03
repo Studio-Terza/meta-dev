@@ -40,10 +40,7 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     }
 
     fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation<'file> {
-        Violation::new(
-            Site::new(self.path, LineNumber::from(pat.span())),
-            Finding::ForeignMatch { enum_name: enum_name.clone() },
-        )
+        Violation::new(Site::new(self.path, LineNumber::from(pat.span())), Finding::ForeignMatch { enum_name })
     }
 
     fn foreign_match(&self, arm: &Arm) -> Option<Violation<'file>> {

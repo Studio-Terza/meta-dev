@@ -3,31 +3,32 @@ use std::fmt;
 
 use lint_core::TypeName;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Edge {
-    source: TypeName,
-    target: TypeName,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Edge<'found> {
+    source: &'found TypeName,
+    target: &'found TypeName,
 }
 
-impl Edge {
-    pub fn new(source: TypeName, target: TypeName) -> Edge {
+impl<'found> Edge<'found> {
+    pub fn new(source: &'found TypeName, target: &'found TypeName) -> Edge<'found> {
         Edge { source, target }
     }
 
-    pub fn source(&self) -> &TypeName {
-        &self.source
+    pub fn source(&self) -> &'found TypeName {
+        self.source
     }
 
-    pub fn target_from(&self, seen: &BTreeSet<TypeName>) -> Option<TypeName> {
-        seen.contains(&self.source).then(|| self.target.clone())
+    pub fn target_from(&self, seen: &BTreeSet<&TypeName>) -> Option<&'found TypeName> {
+        seen.contains(self.source).then_some(self.target)
     }
 
-    pub fn reversed(&self) -> Edge {
-        Edge { source: self.target.clone(), target: self.source.clone() }
+    #[must_use]
+    pub fn reversed(self) -> Edge<'found> {
+        Edge { source: self.target, target: self.source }
     }
 }
 
-impl fmt::Display for Edge {
+impl fmt::Display for Edge<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} -> {}", self.source, self.target)
     }
