@@ -406,6 +406,7 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-paths",
+ "lint-placement",
  "syn 2.0.119",
 ]
 
@@ -621,6 +622,7 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-paths",
+ "lint-placement",
  "syn 2.0.119",
 ]
 

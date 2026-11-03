@@ -12,7 +12,7 @@ impl Relation for InsideSibling {
         let length = module.segments.len();
         module
             .parent()
-            .and_then(|parent| parent.relates::<Ancestor>(this).map(|_| module))
+            .and_then(|parent| Ancestor::holds(&parent, this).map(|_| module))
             .filter(|_| this.segments.len() >= length)
     }
 }
