@@ -26,7 +26,7 @@ impl GoldenTests {
     const ASYNC_TEST: &'static str = "#[tokio::test]";
 
     pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure<'static>> {
-        let found = RustFiles::below(files, sources.join(Self::CRATES))?;
+        let found = RustFiles::below(files, &sources.join(Self::CRATES))?;
         let read = files.read_many(&found);
         found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
             let bytes =

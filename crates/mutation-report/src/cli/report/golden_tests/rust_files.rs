@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use file_ports::{Files, Kind};
+use file_ports::{FileFailure, Files, Kind};
 
 use crate::cli::report::failure::Failure;
 
@@ -12,55 +12,72 @@ pub struct RustFiles;
 #[derive(Debug)]
 enum Entry {
     Rust(PathBuf),
-    Directory,
+    Directory(PathBuf),
 }
 
 type Listing = Result<Vec<PathBuf>, Failure<'static>>;
 
+impl Entry {
+    fn kinded(path: PathBuf, kind: Kind) -> Option<Entry> {
+        match kind {
+            Kind::Directory => Some(Entry::Directory(path)),
+            Kind::File | Kind::Link | Kind::Missing => RustFiles::rust(path).map(Entry::Rust),
+        }
+    }
+
+    fn listed(
+        directory: &Path,
+        listing: Result<Vec<PathBuf>, FileFailure>,
+        kinds: &mut impl Iterator<Item = Kind>,
+    ) -> Result<Vec<Entry>, Failure<'static>> {
+        listing
+            .map(|paths| paths.into_iter().zip(kinds).filter_map(|(path, kind)| Entry::kinded(path, kind)).collect())
+            .map_err(|failure| Failure::Io {
+                path: Cow::Owned(directory.to_path_buf()),
+                source: io::Error::from(failure),
+            })
+    }
+
+    fn directory(&self) -> Option<&Path> {
+        match self {
+            Entry::Directory(path) => Some(path),
+            Entry::Rust(_) => None,
+        }
+    }
+
+    fn found(self, below: &mut impl Iterator<Item = Listing>) -> Listing {
+        match self {
+            Entry::Rust(path) => Ok(vec![path]),
+            Entry::Directory(_) => below.next().unwrap_or_else(|| Ok(Vec::new())),
+        }
+    }
+}
+
 impl RustFiles {
     const RUST: &'static str = "rs";
 
-    pub fn below(files: &impl Files, directory: PathBuf) -> Listing {
-        Self::listed(files, vec![directory]).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))
+    pub fn below(files: &impl Files, directory: &Path) -> Listing {
+        Self::listed(files, &[directory]).into_iter().next().unwrap_or_else(|| Ok(Vec::new()))
     }
 
-    fn listed(files: &impl Files, level: Vec<PathBuf>) -> Vec<Listing> {
-        let listings = files.entries_many(&level);
-        let mut kinds = files.kinds(&listings.iter().flatten().flatten().collect::<Vec<&PathBuf>>()).into_iter();
-        let mut deeper = Vec::new();
+    fn listed(files: &impl Files, level: &[&Path]) -> Vec<Listing> {
+        let listings = files.entries_many(level);
+        let kinds = files.kinds(&listings.iter().flatten().flatten().collect::<Vec<&PathBuf>>());
         let entries: Vec<Result<Vec<Entry>, Failure<'static>>> = level
-            .into_iter()
+            .iter()
             .zip(listings)
-            .map(|(directory, listing)| {
-                listing
-                    .map(|paths| {
-                        paths
-                            .into_iter()
-                            .zip(&mut kinds)
-                            .filter_map(|(path, kind)| match kind {
-                                Kind::Directory => {
-                                    deeper.push(path);
-                                    Some(Entry::Directory)
-                                }
-                                Kind::File | Kind::Link | Kind::Missing => Self::rust(path).map(Entry::Rust),
-                            })
-                            .collect()
-                    })
-                    .map_err(|failure| Failure::Io { path: Cow::Owned(directory), source: io::Error::from(failure) })
-            })
+            .scan(kinds.into_iter(), |kinds, (directory, listing)| Some(Entry::listed(directory, listing, kinds)))
             .collect();
-        let mut below = if deeper.is_empty() { Vec::new() } else { Self::listed(files, deeper) }.into_iter();
-        entries.into_iter().map(|listing| Self::flattened(listing?, &mut below)).collect()
+        let deeper: Vec<&Path> = entries.iter().flatten().flatten().filter_map(Entry::directory).collect();
+        let below = if deeper.is_empty() { Vec::new() } else { Self::listed(files, &deeper) };
+        entries
+            .into_iter()
+            .scan(below.into_iter(), |below, entries| Some(entries.and_then(|entries| Self::flattened(entries, below))))
+            .collect()
     }
 
     fn flattened(entries: Vec<Entry>, below: &mut impl Iterator<Item = Listing>) -> Listing {
-        let found: Vec<Listing> = entries
-            .into_iter()
-            .map(|entry| match entry {
-                Entry::Rust(path) => Ok(vec![path]),
-                Entry::Directory => below.next().unwrap_or_else(|| Ok(Vec::new())),
-            })
-            .collect();
+        let found: Vec<Listing> = entries.into_iter().map(|entry| entry.found(below)).collect();
         found.into_iter().try_fold(Vec::new(), |found, more| Ok(found.into_iter().chain(more?).collect()))
     }
 
