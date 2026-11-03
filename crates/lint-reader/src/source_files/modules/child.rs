@@ -23,11 +23,6 @@ impl Child {
     pub fn visit<Output>(self, then: impl FnOnce(&Path, &Path) -> Output) -> Output {
         then(&self.path, &self.children_directory)
     }
-
-    #[must_use]
-    pub fn existing(self, survey: &Survey) -> Option<Child> {
-        Some(self).filter(|child| survey.file(&child.path).is_some())
-    }
 }
 
 impl AsRef<Path> for Child {
