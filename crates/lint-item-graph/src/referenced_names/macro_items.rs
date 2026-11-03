@@ -1,6 +1,7 @@
 use syn::{Item, ItemMacro, Stmt};
 
 use lint_core::Macros;
+use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct MacroItems;
@@ -14,6 +15,10 @@ impl MacroItems {
         } else {
             Macros::statements(&call.mac).into_iter().filter_map(Self::declared_item).collect()
         }
+    }
+
+    pub fn defined_by(call: &ItemMacro) -> Option<Name> {
+        call.ident.as_ref().filter(|_| call.mac.path.is_ident(Self::DEFINITION)).map(Name::from)
     }
 
     fn declared_item(statement: Stmt) -> Option<Item> {

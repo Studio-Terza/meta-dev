@@ -42,14 +42,11 @@ impl<'found, 'file> Declaration<'found, 'file> {
     }
 
     pub(crate) fn links(&self, placed: Member<'found>, resolver: &Resolver<'found>) -> Vec<Link<'found>> {
-        let held = self
-            .dependencies
-            .iter()
-            .filter_map(|dependency| resolver.member(self.krate, dependency.as_ref(), dependency.qualifier()));
+        let held = self.dependencies.iter().flat_map(|dependency| resolver.dependency(self.krate, dependency));
         let implemented = self
             .implementations
             .iter()
-            .filter_map(|implemented| resolver.member(self.krate, implemented.as_ref(), None));
+            .flat_map(|implemented| resolver.members(self.krate, implemented.as_ref(), None));
         held.chain(implemented).map(|used| Link::new(placed, used)).collect()
     }
 }

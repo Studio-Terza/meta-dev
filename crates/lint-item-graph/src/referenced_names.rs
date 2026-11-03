@@ -1,7 +1,7 @@
 mod macro_items;
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use quote::ToTokens;
 use syn::{Attribute, Item};
@@ -9,6 +9,7 @@ use syn::{Attribute, Item};
 use lint_core::Walk;
 use lint_layout::Name;
 
+use crate::ItemGraph;
 use crate::scope::Scope;
 use macro_items::MacroItems;
 
@@ -16,6 +17,7 @@ use macro_items::MacroItems;
 pub struct ReferencedNames {
     declared: BTreeMap<Name, Vec<Name>>,
     implemented: BTreeMap<Name, Vec<Name>>,
+    stand_ins: BTreeSet<Name>,
 }
 
 impl ReferencedNames {
@@ -29,13 +31,14 @@ impl ReferencedNames {
         ReferencedNames {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
+            stand_ins: self.stand_ins.into_iter().chain(other.stand_ins).collect(),
         }
     }
 
-    pub fn into_map(self) -> BTreeMap<Name, Vec<Name>> {
-        let ReferencedNames { declared, implemented } = self;
+    pub fn into_graph(self) -> ItemGraph {
+        let ReferencedNames { declared, implemented, stand_ins } = self;
         let foreign = implemented.into_iter().filter(|(owner, _)| declared.contains_key(owner)).collect();
-        Self::united(declared, foreign)
+        ItemGraph::of_references(Self::united(declared, foreign)).standing_in(&stand_ins)
     }
 
     fn united(all: BTreeMap<Name, Vec<Name>>, more: BTreeMap<Name, Vec<Name>>) -> BTreeMap<Name, Vec<Name>> {
@@ -60,7 +63,7 @@ impl ReferencedNames {
                 None,
                 module.content.as_ref().map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
             ),
-            Item::Macro(call) => (&call.attrs, None, Cow::Owned(MacroItems::declared_by(call))),
+            Item::Macro(call) => (&call.attrs, MacroItems::defined_by(call), Cow::Owned(MacroItems::declared_by(call))),
             _ => (&[], None, Cow::Borrowed(&[])),
         };
         match Walk::outside_tests(attributes) {
@@ -71,10 +74,23 @@ impl ReferencedNames {
                         implemented: Self::named(Name::of_type(&item.self_ty), scope, item),
                         ..ReferencedNames::default()
                     },
-                    _ => ReferencedNames { declared: Self::named(owner, scope, item), ..ReferencedNames::default() },
+                    _ => ReferencedNames {
+                        stand_ins: Self::standing_in(item).into_iter().collect(),
+                        declared: Self::named(owner, scope, item),
+                        ..ReferencedNames::default()
+                    },
                 };
                 self.merged(own).merged(Self::of_items(&nested, scope))
             }
+        }
+    }
+
+    fn standing_in(item: &Item) -> Option<Name> {
+        match item {
+            Item::Type(alias) => Some(Name::from(&alias.ident)),
+            Item::Const(constant) => Some(Name::from(&constant.ident)),
+            Item::Macro(call) => MacroItems::defined_by(call),
+            _ => None,
         }
     }
 

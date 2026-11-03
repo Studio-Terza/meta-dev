@@ -252,3 +252,61 @@ fn a_field_with_an_unqualified_name_and_a_method_signature_both_link_across_crat
         ]
     );
 }
+
+#[test]
+fn an_imported_name_resolves_to_the_crate_it_is_imported_from() {
+    let external = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct Command;\n"),
+        Clustered::at("crates/y/src/lib.rs", "use std::process::Command;\npub struct Tool(Command);\n"),
+    ];
+    let workspace = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct P;\n"),
+        Clustered::at("crates/y/src/lib.rs", "use x::P;\npub struct U(P);\n"),
+        Clustered::at("crates/z/src/lib.rs", "pub struct P;\n"),
+    ];
+    let reported: Vec<Vec<String>> = [external.as_slice(), workspace.as_slice()]
+        .iter()
+        .map(|sources| Clustered::lines(sources, |view| view.report::<LowestCluster>().violations().to_vec()))
+        .collect();
+    assert_eq!(
+        reported,
+        [
+            Vec::new(),
+            vec![
+                "crates/x/src/lib.rs:1: x::P is used only within crate y; move it into the lowest cluster that holds all its users"
+                    .to_owned()
+            ]
+        ]
+    );
+}
+
+#[test]
+fn a_type_alias_stands_for_the_type_it_names() {
+    let aliased = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct B;\npub type A = B;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct U(x::A);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&aliased, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::B is used only within crate y; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_const_or_a_macro_used_in_a_body_links_the_types_it_names() {
+    let constant = [Clustered::at(
+        "crates/x/src/lib.rs",
+        "pub struct A;\npub struct B;\nconst LIMIT: B = B;\nimpl A {\n    fn f(&self) {\n        LIMIT;\n    }\n}\n",
+    )];
+    let macro_rules = [Clustered::at(
+        "crates/x/src/lib.rs",
+        "pub struct A;\npub struct B;\nmacro_rules! made {\n    () => {\n        B\n    };\n}\nimpl A {\n    fn f(&self) {\n        made!();\n    }\n}\n",
+    )];
+    let reported: Vec<Vec<String>> = [constant, macro_rules]
+        .iter()
+        .map(|sources| Clustered::lines(sources, |view| view.report::<ConnectedClusters>().violations().to_vec()))
+        .collect();
+    assert_eq!(reported, [Vec::<String>::new(), Vec::new()]);
+}
