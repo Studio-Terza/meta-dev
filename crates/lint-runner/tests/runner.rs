@@ -45,7 +45,10 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let listed_by_the_cli = Disk::occurrences(&here.join("src/cli.rs"), "::report(files)")?;
     let listed_by_the_runner = Disk::occurrences(&here.join("src/lints.rs"), "::report(files)")?;
     assert!(listed_by_the_cli < implemented);
-    let listed_by_elegance = Disk::occurrences(&here.join("src/elegance.rs"), "::report(files)")?;
+    let elegance = here.join("src/elegance.rs");
+    let listed_by_elegance = Disk::occurrences(&elegance, "::report(files)")?
+        + Disk::occurrences(&elegance, "::report_facts(&facts)")?
+        + Disk::occurrences(&elegance, "::report_graph(&facts, &transitions)")?;
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli - listed_by_elegance);
     Ok(())
 }

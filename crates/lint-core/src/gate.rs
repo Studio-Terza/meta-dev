@@ -16,6 +16,7 @@ pub struct Gate {
 impl Gate {
     pub const PORTS: Gate = Gate { module: Word::new("ports"), package_suffix: Some(Word::new("ports")) };
     pub const BOUNDARY: Gate = Gate { module: Word::new("boundary"), package_suffix: Some(Word::new("boundary")) };
+    pub const STORE: Gate = Gate { module: Word::new("store"), package_suffix: Some(Word::new("store")) };
 
     #[must_use]
     pub fn admits<'file>(&self, file: &'file SourceFile) -> Option<&'file SourceFile> {

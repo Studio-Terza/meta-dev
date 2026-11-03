@@ -1,11 +1,10 @@
 mod impl_block;
-mod signature_reading;
 mod spelled;
 
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Fields, Generics, Ident, ImplItem, ItemEnum, ItemFn, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta,
-    ReturnType, Signature, punctuated::Punctuated,
+    Attribute, Fields, Ident, ImplItem, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, ReturnType,
+    Signature, punctuated::Punctuated,
 };
 
 use lint_core::{Site, SourceFile, Walk};
@@ -17,10 +16,8 @@ use crate::implementation::Implementation;
 use crate::method::Method;
 use crate::shape::Shape;
 use crate::trait_fact::TraitFact;
-use crate::transition::Transition;
 use crate::type_fact::TypeFact;
 use impl_block::ImplBlock;
-use signature_reading::SignatureReading;
 use spelled::Spelled;
 
 pub(crate) struct Collector<'file> {
@@ -29,7 +26,6 @@ pub(crate) struct Collector<'file> {
     types: Vec<TypeFact>,
     traits: Vec<TraitFact>,
     blocks: Vec<ImplBlock>,
-    transitions: Vec<Transition>,
 }
 
 impl<'file> Collector<'file> {
@@ -40,7 +36,6 @@ impl<'file> Collector<'file> {
             types: Vec::new(),
             traits: Vec::new(),
             blocks: Vec::new(),
-            transitions: Vec::new(),
         };
         scan.visit_file(file.syntax());
         scan
@@ -56,10 +51,6 @@ impl<'file> Collector<'file> {
 
     pub(super) fn blocks(&self) -> &[ImplBlock] {
         &self.blocks
-    }
-
-    pub(super) fn transitions(&self) -> &[Transition] {
-        &self.transitions
     }
 
     fn site(&self, name: &Ident) -> Site {
@@ -133,28 +124,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let inherent = implementation.as_ref().map_or(methods, |_| Vec::new());
         let target = Spelled::last_of(&found.self_ty);
         let walk = Walk::outside_tests(&found.attrs);
-        let reading = SignatureReading::within(target.as_ref(), &found.generics);
-        let transitions: Vec<Transition> = found
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => {
-                    Some(reading.transition(self.krate.clone(), self.site(&function.sig.ident), &function.sig))
-                }
-                _ => None,
-            })
-            .collect();
-        self.transitions.extend(transitions.into_iter().filter(|_| walk == Walk::Entered));
         let block = target.map(|target| ImplBlock::new(self.krate.clone(), target, implementation, inherent));
         self.blocks.extend(block.filter(|_| walk == Walk::Entered));
-    }
-
-    fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let found = SignatureReading::within(None, &Generics::default()).transition(
-            self.krate.clone(),
-            self.site(&function.sig.ident),
-            &function.sig,
-        );
-        self.transitions.extend((Walk::outside_tests(&function.attrs) == Walk::Entered).then_some(found));
     }
 }

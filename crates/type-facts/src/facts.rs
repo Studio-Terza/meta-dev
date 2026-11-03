@@ -3,7 +3,6 @@ mod collector;
 use lint_core::SourceFile;
 
 use crate::trait_fact::TraitFact;
-use crate::transition::Transition;
 use crate::type_fact::TypeFact;
 use collector::Collector;
 
@@ -11,7 +10,6 @@ use collector::Collector;
 pub struct Facts {
     types: Vec<TypeFact>,
     traits: Vec<TraitFact>,
-    transitions: Vec<Transition>,
 }
 
 impl Facts {
@@ -27,7 +25,6 @@ impl Facts {
                 .map(|declared| blocks.iter().fold(declared, |fact, block| block.applied_to(fact)))
                 .collect(),
             traits: collected.iter().flat_map(|found| found.traits().iter().cloned()).collect(),
-            transitions: collected.iter().flat_map(|found| found.transitions().iter().cloned()).collect(),
         }
     }
 
@@ -44,10 +41,5 @@ impl Facts {
     #[must_use]
     pub fn traits(&self) -> &[TraitFact] {
         &self.traits
-    }
-
-    #[must_use]
-    pub fn transitions(&self) -> &[Transition] {
-        &self.transitions
     }
 }
