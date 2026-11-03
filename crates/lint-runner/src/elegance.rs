@@ -1,7 +1,7 @@
 use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
-use lint_repeated_bodies::RepeatedBodies;
+use lint_repeated_shapes::RepeatedShapes;
 use lint_transition_graph::{
     Bisimilarity, CommutingTriangles, CoreMutation, DuplicateTransitions, GraphLint, HiddenStates, LiveNodes,
     RepeatedMotifs, Tangles, TransitionGraph,
@@ -21,7 +21,7 @@ impl Elegance {
         let facts = Facts::of_files(files);
         let transitions = Transitions::of_files(files);
         vec![
-            RepeatedBodies::report(files),
+            RepeatedShapes::report(files),
             UnconsumedTraits::report(files),
             Complexity::report(files),
             TypeGraph::report_facts(&facts),

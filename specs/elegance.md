@@ -4,7 +4,7 @@ Problem: agents add copies instead of generalizing, and we lack data on how much
 
 L1 Everything here reports and blocks nothing, until the owner decides otherwise from the data.
 L2 Syntax only, no per-repository configuration.
-D1 Report: repeated code bodies in shipped code, with names and literals erased, at a 40-token floor, listing sizes so other floors can be read from the same run.
+D1 Report: repeated shapes (`repeated_shapes`): a function or method body, closure, block or match expression of 40 tokens or more that repeats with its names and literals erased, grouped across the workspace over all code (shipped, tests, examples), a group nested inside a larger group dropped, each group named by where its copies live: tests only, shipped only, or both. The fix follows the place: for tests, one table-driven test or a law; for shipped code, extract it once, a generic over an existing trait, or a derive; for both, the test re-implements shipped logic and should test through it. It becomes a blocking lint once its fix pass lands, and then replaces `near_duplicate_tests`.
 D2 Report: local traits with methods but no consumer: no bound, impl, dyn or provided method.
 D3 Report: reach per PR and fan-in per crate over time, as a history file written on main.
 D4 Report: cyclomatic complexity per function, as a distribution per crate. after: D1
@@ -15,3 +15,7 @@ D8 The reports are scored against the smell inventory, hits and misses per repor
 Out: gates, repository-wide scores, repeated-switch checks, widening raw-call bans.
 
 Each finding's message names real fixes in order: a standard trait, a generic over an existing trait, a derive. Never "extract a helper". `lint --report` prints these separately from failures. On main, CI writes them to the job summary.
+
+## History
+
+D1: widened from shipped code to all code and named `repeated_shapes`, with the fix chosen by where the copies live, owner's message 0bcc860a.

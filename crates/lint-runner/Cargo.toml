@@ -54,8 +54,8 @@ lint-process-starters = { path = "../lint-process-starters" }
 lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
 lint-raw-resources = { path = "../lint-raw-resources" }
-lint-repeated-bodies = { path = "../lint-repeated-bodies" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-repeated-shapes = { path = "../lint-repeated-shapes" }
 lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }
