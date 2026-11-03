@@ -17,7 +17,7 @@ src/wire.rs:2: fn f names nothing; say what it does
 src/wire.rs:3: fn g names nothing; say what it does
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/sizes.rs:2: A only carries values into one other file; give it the logic that consumes it
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/bare.rs:1: bare u32 in f; name what it counts with a newtype
 src/bare.rs:1: bare f64 in f; name what it counts with a newtype
 src/sizes.rs:1: usize in items is neither a length nor an index; a count gets a newtype, a size says so in its name
