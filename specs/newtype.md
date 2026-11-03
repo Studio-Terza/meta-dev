@@ -13,6 +13,8 @@ Out: changing chess, typestate, RAII lints.
 
 ## History
 
+D2, blankets over derives (owner, 2026-11-03; lint-queue D2): the derive no longer writes a per-type `zero` for the 31 `usize` newtypes; `Counter::zero`, a blanket over `Newtype`, serves them all. The derive keeps the inherent `const fn new` only because trait functions cannot be `const`, and the `Newtype` and `Validated` impls, which a blanket cannot write. `Display`, `FromStr` and `Arbitrary` are foreign traits and stay derived.
+
 D4, made strict (owner 1139c842, 2605e95a): it was report only, listing public `is_*` and `has_*` methods returning `bool`. It now blocks every function returning `bool`, and the pull request that tightened it fixed every violation, 151 of them.
 
 D3, measured, not built: the phantom form is not simpler. A prototype on main at a4e6e6e moved all 19 `usize` newtypes to `newtype::Count<Tag>`, with hand-written generic impls of `Clone`, `Copy`, `Debug`, `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Display`, `Serialize` and `Newtype`. It compiled and passed clippy.

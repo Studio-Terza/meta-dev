@@ -8,7 +8,6 @@ pub struct OnlyField {
 }
 
 impl OnlyField {
-    const COUNT: &str = "usize";
     const REFUSED: &str = "a newtype is a struct with exactly one field";
     const ONLY: usize = 1;
     const FIRST: u32 = 0;
@@ -32,12 +31,6 @@ impl OnlyField {
 
     pub fn inner(&self) -> &Type {
         &self.inner
-    }
-
-    pub fn counts(&self) -> Option<&Type> {
-        Some(&self.inner).filter(
-            |inner| matches!(inner, Type::Path(path) if path.qself.is_none() && path.path.is_ident(Self::COUNT)),
-        )
     }
 
     fn among(fields: Fields) -> Result<OnlyField, Fields> {

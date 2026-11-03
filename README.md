@@ -325,8 +325,9 @@ or a generator for the inner type: `text_lines::OneLine` and `lint_layout::Name`
 
 `#[newtype(strategy = ...)]` gives the derived `Arbitrary` its own proptest strategy for the inner value, for checks
 that admit a small share of it (`strategy = 0u32..1000`, `strategy = "[0-9a-f]{40}"`). A validated newtype with a
-strategy still goes through its check. The derive also writes an inherent `const fn new` for a plain newtype, and
-`const fn zero` when the inner type is `usize`, so constants can be built. `#[derive(Display)]` forwards `Display` to
+strategy still goes through its check. The derive also writes an inherent `const fn new` for a plain newtype, so constants can be
+built; trait functions cannot yet be `const`. Every other shared helper comes from a blanket trait over `Newtype`,
+not from the derive: a zero count is `Counter::zero`. `#[derive(Display)]` forwards `Display` to
 the inner value.
 
 `Counter` is a blanket trait over every `Copy` newtype of `usize`: `zero`, `count`, `plus`, `incremented`
