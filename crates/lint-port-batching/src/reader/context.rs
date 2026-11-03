@@ -47,6 +47,6 @@ impl<'run> Context<'run> {
     fn parameter(&self, module: &Module, generics: &BTreeSet<Name>, ty: &Type) -> Option<Name> {
         self.judge
             .port_type(module, generics, ty)
-            .or_else(|| Spelling::last(ty).and_then(|owner| self.holders.holder(&self.crate_name, &owner)))
+            .or_else(|| Spelling::last(ty).filter(|owner| !self.holders.fields(&self.crate_name, owner).is_empty()))
     }
 }

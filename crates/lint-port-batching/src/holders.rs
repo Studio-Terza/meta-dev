@@ -41,10 +41,6 @@ impl Holders {
             .map(|held| held.field.clone())
             .collect()
     }
-
-    pub fn holder(&self, crate_name: &CrateName, owner: &Name) -> Option<Name> {
-        self.0.iter().find(|held| held.crate_name == *crate_name && held.owner == *owner).map(|held| held.owner.clone())
-    }
 }
 
 struct Reader<'run> {

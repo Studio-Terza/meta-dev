@@ -9,12 +9,6 @@ use newtype::{Arbitrary, Newtype};
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Weight(f64);
 
-impl Weight {
-    pub fn lesser(self, other: Weight) -> Weight {
-        Weight(self.0.min(other.0))
-    }
-}
-
 impl Add for Weight {
     type Output = Weight;
 

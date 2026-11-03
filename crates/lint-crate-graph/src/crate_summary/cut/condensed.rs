@@ -35,8 +35,10 @@ impl Condensed {
             .flat_map(|(tangle, members)| members.iter().map(move |member| (*member, tangle)))
             .collect();
         let crossings = graph
-            .edges()
-            .into_iter()
+            .links()
+            .iter()
+            .enumerate()
+            .flat_map(|(from, links)| links.iter().map(move |to| [NodeIndex::from(from), *to]))
             .filter_map(|[from, to]| Some([*tangle_of.get(&from)?, *tangle_of.get(&to)?]))
             .flat_map(|[near, far]| [[near, far], [far, near]])
             .fold(BTreeMap::<[usize; Self::EDGE_LENGTH], f64>::new(), |mut crossings, pair| {
@@ -54,10 +56,6 @@ impl Condensed {
             rows,
             origins: (0..tangles.len()).map(TangleIndex::from).collect(),
         }
-    }
-
-    pub fn all(&self) -> BTreeSet<TangleIndex> {
-        (0..self.sizes.len()).map(TangleIndex::from).collect()
     }
 
     pub fn islands(&self) -> Vec<BTreeSet<TangleIndex>> {
@@ -89,10 +87,6 @@ impl Condensed {
         }
     }
 
-    pub fn items(&self, side: &BTreeSet<TangleIndex>) -> ItemCount {
-        ItemCount::total(side.iter().map(|tangle| self.size(*tangle)))
-    }
-
     pub fn size(&self, tangle: TangleIndex) -> ItemCount {
         self.sizes.get(tangle.into_inner()).copied().unwrap_or_default()
     }
@@ -109,12 +103,16 @@ impl Condensed {
         let origin = |side: &BTreeSet<TangleIndex>| -> BTreeSet<TangleIndex> {
             side.iter().filter_map(|tangle| self.origins.get(tangle.into_inner()).copied()).collect()
         };
-        Split::new(self.conductance(inside), origin(inside), origin(&self.all().difference(inside).copied().collect()))
+        Split::new(
+            self.conductance(inside),
+            origin(inside),
+            origin(&(0..self.sizes.len()).map(TangleIndex::from).filter(|tangle| !inside.contains(tangle)).collect()),
+        )
     }
 
     pub fn sweep(&self, floor: Least) -> Option<Split> {
         let order = Spectrum::new(&self.rows).sweep_order();
-        let total = self.items(&self.all());
+        let total = ItemCount::total(self.sizes.iter().copied());
         let candidates: Vec<(Conductance, ItemCount)> = order
             .iter()
             .scan(Frontier::new(self), |frontier, tangle| {

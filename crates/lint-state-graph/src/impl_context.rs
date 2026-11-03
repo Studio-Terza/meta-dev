@@ -22,7 +22,7 @@ impl ImplContext {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| Name::from(&segment.ident));
-        let kind = match (trait_name, declarations.vertex_named(&self_type)) {
+        let kind = match (trait_name, declarations.as_vertex(&self_type)) {
             (Some(name), Some(_)) => ImplKind::TraitOnVertex(name),
             (Some(name), None) => ImplKind::TraitOnValue(name),
             (None, Some(_)) => ImplKind::InherentOnVertex,

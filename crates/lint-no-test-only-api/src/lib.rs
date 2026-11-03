@@ -30,10 +30,6 @@ use test_features::TestFeatures;
 pub struct NoTestOnlyApi;
 
 impl NoTestOnlyApi {
-    fn mentioned(files: &[SourceFile], ground: Ground) -> BTreeSet<Name> {
-        files.iter().flat_map(|file| Mentions::in_file(file, ground)).collect()
-    }
-
     fn in_manifest<'file>(package: &PackageRoot, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let manifest = file.manifest_file();
         package
@@ -59,8 +55,8 @@ impl Lint for NoTestOnlyApi {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
-        let shipped = Self::mentioned(files, Ground::Shipped);
-        let tested = Self::mentioned(files, Ground::Tests);
+        let shipped: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Shipped)).collect();
+        let tested: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Tests)).collect();
         let only_tests = files
             .iter()
             .flat_map(Offers::in_file)

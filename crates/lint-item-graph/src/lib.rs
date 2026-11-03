@@ -20,8 +20,6 @@ pub struct ItemGraph {
 }
 
 impl ItemGraph {
-    const EDGE_LENGTH: usize = 2;
-
     #[must_use]
     pub fn of_files(files: &[&SourceFile]) -> ItemGraph {
         let references = files
@@ -47,12 +45,8 @@ impl ItemGraph {
     }
 
     #[must_use]
-    pub fn edges(&self) -> Vec<[NodeIndex; Self::EDGE_LENGTH]> {
-        self.links
-            .iter()
-            .enumerate()
-            .flat_map(|(from, links)| links.iter().map(move |to| [NodeIndex::from(from), *to]))
-            .collect()
+    pub fn links(&self) -> &[Vec<NodeIndex>] {
+        &self.links
     }
 
     #[must_use]

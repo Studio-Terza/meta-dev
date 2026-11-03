@@ -247,7 +247,9 @@ fn every_start_is_counted_including_those_behind_ports() {
     let ported = Sources::file("crates/x/src/ports/run.rs", Text::new(IMPORTED));
     let inline = Sources::file("a.rs", Text::new(INLINE_PORTS));
     let other = Sources::file("b.rs", Text::new(OTHER_COMMAND));
-    let counts: Vec<usize> =
-        [ported, inline, other].iter().map(|file| CommandPaths::found(file, Scope::Everywhere).len()).collect();
+    let counts: Vec<usize> = [ported, inline, other]
+        .iter()
+        .map(|file| CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len())
+        .collect();
     assert_eq!(counts, vec![1, 1, 0]);
 }

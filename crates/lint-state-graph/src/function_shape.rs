@@ -30,7 +30,7 @@ impl<'file> FunctionShape<'file> {
     ) -> FunctionShape<'file> {
         let vertex = |ty: &Type| {
             let name = declarations.resolve(TypeName::from_type(ty).or_self(context.self_type()));
-            declarations.vertex_named(&name).map(|_| name)
+            declarations.as_vertex(&name).map(|_| name)
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),

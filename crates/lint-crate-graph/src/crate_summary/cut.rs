@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::crate_summary::cut::conductance::Conductance;
+use crate::crate_summary::item_count::ItemCount;
 use condensed::{Condensed, TangleIndex};
 use lint_core::Fix;
 use lint_core::Least;
@@ -45,7 +46,9 @@ impl Cut {
         let total: BTreeSet<TangleIndex> = islands.iter().flatten().copied().collect();
         let inside = Self::balanced(whole, islands, &total);
         let outside: BTreeSet<TangleIndex> = total.difference(&inside).copied().collect();
-        let smaller = whole.items(&inside).min(whole.items(&outside));
+        let inside_items = ItemCount::total(inside.iter().map(|tangle| whole.size(*tangle)));
+        let outside_items = ItemCount::total(outside.iter().map(|tangle| whole.size(*tangle)));
+        let smaller = inside_items.min(outside_items);
         floor.allows(smaller).map(|_| Split::new(whole.conductance(&inside), inside, outside))
     }
 
@@ -55,14 +58,13 @@ impl Cut {
         total: &BTreeSet<TangleIndex>,
     ) -> BTreeSet<TangleIndex> {
         let mut islands = islands.to_vec();
-        islands.sort_by_key(|island| std::cmp::Reverse(condensed.items(island)));
-        let whole = condensed.items(total);
+        islands.sort_by_key(|island| {
+            std::cmp::Reverse(ItemCount::total(island.iter().map(|tangle| condensed.size(*tangle))))
+        });
+        let whole = ItemCount::total(total.iter().map(|tangle| condensed.size(*tangle)));
         islands.into_iter().fold(BTreeSet::new(), |inside, island| {
-            if condensed.items(&inside).plus(condensed.items(&inside)) < whole {
-                inside.into_iter().chain(island).collect()
-            } else {
-                inside
-            }
+            let held = ItemCount::total(inside.iter().map(|tangle| condensed.size(*tangle)));
+            if held.plus(held) < whole { inside.into_iter().chain(island).collect() } else { inside }
         })
     }
 
