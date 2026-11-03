@@ -10,7 +10,7 @@ impl Lint for Clones {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new(
-                "report only, a clone in the core copies what a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value",
+                "report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value",
             ),
             files
                 .iter()

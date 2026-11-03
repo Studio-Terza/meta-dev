@@ -1,6 +1,7 @@
 test budget, report only:
 corpus: 0 tests in 3 files, 0 of 22 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 primitives appear in signatures and fields only inside a boundary:
 src/three.rs:5: bare u8 in show; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/three.rs:8: bare u8 in show; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary

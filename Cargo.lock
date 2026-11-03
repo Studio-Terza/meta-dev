@@ -853,6 +853,7 @@ dependencies = [
  "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
+ "lint-clones",
  "lint-complexity",
  "lint-const-shape",
  "lint-core",
