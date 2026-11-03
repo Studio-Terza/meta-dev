@@ -22,23 +22,18 @@ impl Lint for PrimitiveBoundary {
     fn report(files: &[SourceFile]) -> Report {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         Report::new(
-            Headline::new("primitives appear only at a type's boundary"),
+            Headline::new("primitives appear only at a type's boundary or in a boundary module"),
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| !support.contains(&file.path().to_owned()))
+                .filter(|file| !support.contains(&file.path().to_owned()) && Gate::BOUNDARY.admits(file).is_none())
                 .flat_map(|file| {
-                    Some(file)
-                        .filter(|file| Gate::BITS.admits(file).is_none())
-                        .into_iter()
-                        .flat_map(NumberSites::violations)
-                        .chain(TextSites::violations(file))
-                        .chain(
-                            Some(file)
-                                .filter(|file| Gate::PORTS.admits(file).is_none())
-                                .into_iter()
-                                .flat_map(StringSites::exposed_in),
-                        )
+                    NumberSites::violations(file).into_iter().chain(TextSites::violations(file)).chain(
+                        Some(file)
+                            .filter(|file| Gate::PORTS.admits(file).is_none())
+                            .into_iter()
+                            .flat_map(StringSites::exposed_in),
+                    )
                 })
                 .collect(),
         )

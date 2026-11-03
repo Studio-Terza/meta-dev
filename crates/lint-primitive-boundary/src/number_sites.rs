@@ -121,7 +121,7 @@ impl NumberSites {
 impl<'ast> Visit<'ast> for NumberSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::BITS.names(module).is_none() => syn::visit::visit_item_mod(self, module),
+            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
             Walk::Entered | Walk::Skipped => {}
         }
     }

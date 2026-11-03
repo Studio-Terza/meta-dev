@@ -15,7 +15,7 @@ pub struct Gate {
 
 impl Gate {
     pub const PORTS: Gate = Gate { module: "ports", package_suffix: Some("ports") };
-    pub const BITS: Gate = Gate { module: "bits", package_suffix: None };
+    pub const BOUNDARY: Gate = Gate { module: "boundary", package_suffix: Some("boundary") };
 
     #[must_use]
     pub fn admits<'file>(&self, file: &'file SourceFile) -> Option<&'file SourceFile> {

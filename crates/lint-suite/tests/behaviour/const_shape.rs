@@ -13,11 +13,11 @@ fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
     assert_eq!(Sources::lines(&report), ["a.rs:4"]);
 }
 
-const BITS_CAST: &str = "fn f(x: u8) -> u32 { x as u32 }\n";
-const INLINE_BITS: &str = "mod bits {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
+const BOUNDARY_CAST: &str = "fn f(x: u8) -> u32 { x as u32 }\n";
+const INLINE_BOUNDARY: &str = "mod boundary {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
 const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
-const BITS_LOOP: &str = "mod bits {\n    pub const fn f() {\n        for _ in 0..3 {}\n    }\n}\n";
-const BITS_LEAK: &str = "mod bits {}\nfn f(x: u8) -> u32 { x as u32 }\n";
+const BOUNDARY_LOOP: &str = "mod boundary {\n    pub const fn f() {\n        for _ in 0..3 {}\n    }\n}\n";
+const BOUNDARY_LEAK: &str = "mod boundary {}\nfn f(x: u8) -> u32 { x as u32 }\n";
 
 const PLATFORM_MODULE: &str = "#[cfg(unix)]\nmod real {\n    pub fn f(x: u8) -> u32 { x as u32 }\n}\n";
 const TRAIT_FN: &str = "pub trait T {\n    fn f(x: u8) -> u32 { x as u32 }\n}\n";
@@ -30,18 +30,18 @@ const DISCRIMINANT: &str = "enum E {\n    A = { let mut i = 0; while i < 3 { i +
 
 const CASES: [Case; 15] = [
     Case::new(
-        Title::new("bits module file"),
-        &[Source::new(Located::new("crates/x/src/bits/mask.rs"), Text::new(BITS_CAST))],
+        Title::new("boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/mask.rs"), Text::new(BOUNDARY_CAST))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("bits module root"),
-        &[Source::new(Located::new("crates/x/src/bits.rs"), Text::new(BITS_CAST))],
+        Title::new("boundary module root"),
+        &[Source::new(Located::new("crates/x/src/boundary.rs"), Text::new(BOUNDARY_CAST))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("inline bits module"),
-        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BITS))],
+        Title::new("inline boundary module"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BOUNDARY))],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -51,17 +51,17 @@ const CASES: [Case; 15] = [
     ),
     Case::new(
         Title::new("other module file"),
-        &[Source::new(Located::new("crates/x/src/masks/mask.rs"), Text::new(BITS_CAST))],
+        &[Source::new(Located::new("crates/x/src/masks/mask.rs"), Text::new(BOUNDARY_CAST))],
         Flagged::new(&["crates/x/src/masks/mask.rs:1"]),
     ),
     Case::new(
-        Title::new("bits keep the loop rule"),
-        &[Source::new(Located::new("a.rs"), Text::new(BITS_LOOP))],
+        Title::new("boundary keeps the loop rule"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDARY_LOOP))],
         Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
-        Title::new("bits do not leak out"),
-        &[Source::new(Located::new("a.rs"), Text::new(BITS_LEAK))],
+        Title::new("boundary does not leak out"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUNDARY_LEAK))],
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
@@ -107,6 +107,6 @@ const CASES: [Case; 15] = [
 ];
 
 #[test]
-fn casts_are_allowed_only_inside_a_bits_module() {
+fn casts_are_allowed_only_inside_a_boundary_module() {
     assert_eq!(Sources::mismatches::<ConstShape>(&CASES), Lines::default());
 }
