@@ -1,7 +1,7 @@
 use syn::visit::Visit;
 use syn::{Fields, ItemStruct};
 
-use crate::text_sites::Owner;
+use crate::owner::Owner;
 use lint_core::SourceFile;
 use lint_layout::Name;
 
