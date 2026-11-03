@@ -4,11 +4,12 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 
 const CLONED: &str = "fn f(text: &String) -> String {\n    text.clone()\n}\n";
 const INLINE_BOUNDARY: &str = "mod boundary {\n    fn f(text: &String) -> String {\n        text.clone()\n    }\n}\n";
+const INLINE_OTHER: &str = "mod core {\n    fn f(text: &String) -> String {\n        text.clone()\n    }\n}\n";
 const TESTED: &str = "#[cfg(test)]\nmod tests {\n    fn f(text: &String) -> String {\n        text.clone()\n    }\n}\n";
 const ARGUED: &str = "fn f(pool: &Pool) -> Pool {\n    pool.clone(1)\n}\n";
 const CLONED_ITEMS: &str = "fn f(texts: &[String]) -> Vec<String> {\n    texts.iter().cloned().collect()\n}\n";
 
-const CASES: [Case; 7] = [
+const CASES: [Case; 8] = [
     Case::new(
         Title::new("a clone in shipped code"),
         &[Source::new(Located::new("src/a.rs"), Text::new(CLONED))],
@@ -23,6 +24,11 @@ const CASES: [Case; 7] = [
         Title::new("an inline boundary module"),
         &[Source::new(Located::new("src/a.rs"), Text::new(INLINE_BOUNDARY))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an inline module of the core"),
+        &[Source::new(Located::new("src/a.rs"), Text::new(INLINE_OTHER))],
+        Flagged::new(&["src/a.rs:3"]),
     ),
     Case::new(
         Title::new("test code"),
