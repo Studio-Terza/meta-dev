@@ -7,8 +7,8 @@ use super::ShapeToken;
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ShapeKey(u64);
 
-impl From<&[ShapeToken]> for ShapeKey {
-    fn from(tokens: &[ShapeToken]) -> ShapeKey {
+impl From<&[ShapeToken<'_>]> for ShapeKey {
+    fn from(tokens: &[ShapeToken<'_>]) -> ShapeKey {
         let mut hasher = DefaultHasher::new();
         tokens.hash(&mut hasher);
         ShapeKey::new(hasher.finish())

@@ -19,7 +19,7 @@ impl RawToken {
         tokens.into_iter().flat_map(Self::of_tree).collect()
     }
 
-    pub(crate) fn shaped(&self, position: Position, slots: &mut Slots) -> Option<ShapeToken> {
+    pub(crate) fn shaped<'raw>(&'raw self, position: Position, slots: &mut Slots<'raw>) -> Option<ShapeToken<'raw>> {
         match self {
             RawToken::Literal => Some(ShapeToken::Literal),
             RawToken::Mark(Mark::MINUS) if position == Position::BeforeLiteral => None,
