@@ -91,3 +91,21 @@ fn an_import_from_a_child_module_stays_in_the_crate() {
     ]);
     assert!(text.contains("y::Raw -> y::Policy has 2 transitions"), "{text}");
 }
+
+#[test]
+fn impls_of_one_trait_on_different_types_are_different_edges() {
+    let text = Duplicates::of(&[Duplicates::at(
+        "crates/x/src/lib.rs",
+        "struct File;\nstruct Report;\nstruct One;\nstruct Two;\nimpl Check for One {\n    fn report(file: &File) -> Report {}\n}\nimpl Check for Two {\n    fn report(file: &File) -> Report {}\n}\n",
+    )]);
+    assert!(!text.contains("has 2 transitions"), "{text}");
+}
+
+#[test]
+fn an_inherent_function_beside_a_trait_impl_on_another_type_is_a_duplicate() {
+    let text = Duplicates::of(&[Duplicates::at(
+        "crates/x/src/lib.rs",
+        "struct File;\nstruct Report;\nstruct One;\nstruct Two;\nimpl Check for One {\n    fn report(file: &File) -> Report {}\n}\nimpl Two {\n    fn report(file: &File) -> Report {}\n    fn again(file: &File) -> Report {}\n}\n",
+    )]);
+    assert!(text.contains("x::File -> x::Report has 2 transitions: x::Two::report"), "{text}");
+}

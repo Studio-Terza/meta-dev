@@ -18,6 +18,7 @@ pub struct Transition {
     name: Name,
     takes: Vec<Endpoint>,
     gives: Endpoint,
+    implementer: Option<Endpoint>,
     mutation: Mutation,
     body: Body,
     branching: Branching,
@@ -34,6 +35,7 @@ impl Transition {
             name,
             takes: Vec::new(),
             gives: Endpoint::from(Unnamed::Unit),
+            implementer: None,
             mutation: Mutation::Absent,
             body: Body::Written,
             branching: Branching::new(1),
@@ -56,6 +58,11 @@ impl Transition {
         self
     }
 
+    pub(crate) fn implemented_by(mut self, implementer: Option<Endpoint>) -> Transition {
+        self.implementer = implementer;
+        self
+    }
+
     pub(crate) fn branching(mut self, branching: Branching) -> Transition {
         self.branching = branching;
         self
@@ -69,6 +76,11 @@ impl Transition {
     #[must_use]
     pub fn gives(&self) -> &Endpoint {
         &self.gives
+    }
+
+    #[must_use]
+    pub fn implementer(&self) -> Option<&Endpoint> {
+        self.implementer.as_ref()
     }
 
     #[must_use]
