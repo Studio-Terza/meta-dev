@@ -25,7 +25,7 @@ pub use containment::{
     LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{GraphLint, OnGraph};
+pub use graph_lint::{GraphLint, OnContainment, OnGraph};
 pub use mutation::CoreMutation;
 
 #[derive(Debug)]

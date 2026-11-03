@@ -52,17 +52,19 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
-                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
+                + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/cli/mode/lints.rs").matches("::report(files)").count();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
-    let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]
-        .iter()
-        .map(|call| elegance.matches(call).count())
-        .sum::<usize>();
+    let listed_by_elegance =
+        ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)", "containment.report::<"]
+            .iter()
+            .map(|call| elegance.matches(call).count())
+            .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
