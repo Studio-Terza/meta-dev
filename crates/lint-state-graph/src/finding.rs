@@ -4,7 +4,8 @@ use std::fmt;
 use quote::ToTokens;
 use syn::{Field, Index};
 
-use super::edge_scan::{Edge, EdgeCount};
+use super::edge::Edge;
+use super::edge_count::EdgeCount;
 use lint_core::Bound;
 use lint_core::Fix;
 use lint_core::Site;

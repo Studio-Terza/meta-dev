@@ -1,5 +1,7 @@
 mod declarations;
 mod declared_graphs;
+mod edge;
+mod edge_count;
 mod edge_scan;
 mod field_visibility;
 mod finding;

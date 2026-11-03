@@ -1,9 +1,3 @@
-mod edge;
-mod edge_count;
-
-pub use edge::Edge;
-pub use edge_count::EdgeCount;
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -11,6 +5,8 @@ use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::declarations::Declarations;
+use super::edge::Edge;
+use super::edge_count::EdgeCount;
 use super::finding::Finding;
 use super::function_shape::{Body, FunctionShape, Returns};
 use super::impl_context::{ImplContext, ImplKind};
