@@ -1,6 +1,6 @@
-use super::binary::Binary;
+use super::boundary::Binary;
+use super::boundary::TestResult;
 use super::reading::Reading;
-use super::test_result::TestResult;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Line {

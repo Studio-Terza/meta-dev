@@ -1,4 +1,4 @@
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug)]
-pub struct Contents<'text>(&'text str);
+#[derive(Newtype, Arbitrary, Clone, Debug)]
+pub struct Contents(String);

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::binary::Binary;
+use super::boundary::Binary;
+use super::boundary::TestResult;
 use super::test_name::TestName;
-use super::test_result::TestResult;
 use super::verdict::Verdict;
 
 #[derive(Debug, Default)]
