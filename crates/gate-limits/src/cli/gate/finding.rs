@@ -8,9 +8,6 @@ use crate::cli::gate::verdict::Verdict;
 use crate::cli::stage::Stage;
 
 #[derive(Debug)]
-pub struct Blocking<'finding>(&'finding Finding);
-
-#[derive(Debug)]
 pub struct Finding {
     stage: Stage,
     measured: Seconds,
@@ -18,24 +15,15 @@ pub struct Finding {
     verdict: Verdict,
 }
 
-impl Blocking<'_> {
-    #[must_use]
-    pub fn stage(&self) -> &Stage {
-        &self.0.stage
-    }
-}
-
 impl Finding {
-    pub(crate) fn new(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
-        let limit =
-            limit.copied().and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
-        let measured = *measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
-        Ok(Finding { stage: stage.clone(), measured, limit, verdict: limit.judge(measured) })
+    #[must_use]
+    pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
+        Finding { stage, measured, limit, verdict: limit.judge(measured) }
     }
 
     #[must_use]
-    pub fn blocks(&self) -> Option<Blocking<'_>> {
-        (self.verdict == Verdict::Block).then_some(Blocking(self))
+    pub fn blocks(&self) -> Option<&Finding> {
+        (self.verdict == Verdict::Block).then_some(self)
     }
 
     #[must_use]

@@ -12,7 +12,7 @@ use crate::cli::contents::Contents;
 use crate::cli::document::Document;
 use crate::cli::failure::Failure;
 use crate::cli::stage::Stage;
-pub use finding::{Blocking, Finding};
+pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
 pub use record::Record;
@@ -35,7 +35,7 @@ impl Gate {
             .chain(measured.keys())
             .collect::<BTreeSet<&Stage>>()
             .into_iter()
-            .map(|stage| Finding::new(stage, limits.get(stage), measured.get(stage)))
+            .map(|stage| Self::finding(stage, limits.get(stage), measured.get(stage)))
             .collect::<Result<Vec<Finding>, Failure>>()
             .and_then(|findings| if findings.is_empty() { Err(Failure::Empty) } else { Ok(Gate { findings }) })
     }
@@ -63,16 +63,23 @@ impl Gate {
     }
 
     #[must_use]
-    pub fn blocking(&self, report_only: &[OsString]) -> Option<Blocking<'_>> {
+    pub fn blocking(&self, report_only: &[OsString]) -> Option<&Finding> {
         self.findings
             .iter()
             .filter_map(Finding::blocks)
-            .find(|blocking| report_only.iter().find_map(|name| Self::names(name, blocking.stage())).is_none())
+            .find(|finding| report_only.iter().find_map(|name| Self::names(name, finding.stage())).is_none())
     }
 
     #[must_use]
     pub fn past_warn(self) -> Vec<Finding> {
         self.findings.into_iter().filter_map(Finding::past_warn).collect()
+    }
+
+    fn finding(stage: &Stage, limit: Option<&Limit>, measured: Option<&Seconds>) -> Result<Finding, Failure> {
+        let limit =
+            limit.copied().and_then(Limit::ordered).ok_or_else(|| Failure::Unlimited { stage: stage.clone() })?;
+        let measured = measured.ok_or_else(|| Failure::Unmeasured { stage: stage.clone() })?;
+        Ok(Finding::new(stage.clone(), *measured, limit))
     }
 }
 
