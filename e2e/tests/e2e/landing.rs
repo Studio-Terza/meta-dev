@@ -55,16 +55,16 @@ fn a_project_landed_through_its_branch_against_its_changes_sent_to_main_one_by_o
     let runs = Runs { world: &world, metadata: world.metadata(), desk: Desk::default() };
     let names: Vec<&String> = world.names().collect();
     let (mut project, mut direct) = (Spend::default(), Spend::default());
-    for members in names.chunks(PROJECT_SIZE) {
+    names.chunks(PROJECT_SIZE).try_for_each(|members| -> Result<(), Box<dyn Error>> {
         let changed: Vec<PathBuf> = members.iter().map(|name| world.source_of(name)).collect();
-        for one in changed.chunks(1) {
+        changed.chunks(1).try_for_each(|one| -> Result<(), Box<dyn Error>> {
             runs.spent(&mut project, one, Runs::PULL_REQUEST, Runs::PROJECT)?;
             runs.spent(&mut direct, one, Runs::PULL_REQUEST, Runs::MAIN)?;
-            runs.spent(&mut direct, one, Runs::PUSH, Runs::NO_BASE)?;
-        }
+            runs.spent(&mut direct, one, Runs::PUSH, Runs::NO_BASE)
+        })?;
         runs.spent(&mut project, &changed, Runs::PULL_REQUEST, Runs::MAIN)?;
-        runs.spent(&mut project, &changed, Runs::PUSH, Runs::NO_BASE)?;
-    }
+        runs.spent(&mut project, &changed, Runs::PUSH, Runs::NO_BASE)
+    })?;
     let report = Report::named("landing");
     report.line("changes", names.len())?;
     report.line("crates", world.total())?;
