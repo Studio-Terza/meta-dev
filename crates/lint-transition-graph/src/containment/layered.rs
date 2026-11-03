@@ -63,7 +63,6 @@ impl<'found> Cycle<'found> {
         graph
             .tangles()
             .into_iter()
-            .filter(|tangle| tangle.len() > 1)
             .map(|tangle| {
                 let parts: BTreeSet<Part<'found>> =
                     tangle.into_iter().filter_map(|index| graph.name_at(index).copied()).collect();

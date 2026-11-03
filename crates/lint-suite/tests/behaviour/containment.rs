@@ -174,20 +174,6 @@ fn a_type_named_only_in_a_method_body_is_linked_within_its_crate() {
 }
 
 #[test]
-fn an_unqualified_name_resolves_to_the_one_crate_declaring_it() {
-    let apart = [
-        Clustered::at("crates/x/src/lib.rs", "pub struct W;\n"),
-        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\n"),
-    ];
-    assert_eq!(
-        Clustered::lines(&apart, |view| view.report::<LowestCluster>().violations().to_vec()),
-        [
-            "crates/x/src/lib.rs:1: x::W is used only within crate y; move it into the lowest cluster that holds all its users"
-        ]
-    );
-}
-
-#[test]
 fn a_cycle_closed_only_through_a_signature_is_not_reported() {
     let signed = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
@@ -197,5 +183,72 @@ fn a_cycle_closed_only_through_a_signature_is_not_reported() {
     assert_eq!(
         Clustered::lines(&signed, |view| view.report::<AcyclicQuotients>().violations().to_vec()),
         Vec::<String>::new()
+    );
+}
+
+#[test]
+fn exports_that_reach_only_one_another_share_no_private_item() {
+    let chained = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct P(Q);\npub struct Q;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct U(x::P);\npub struct V(x::Q);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&chained, |view| view.report::<InterfaceByInternals>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P] [Q] that no private item joins; split it along the groups, since they share no implementation"
+        ]
+    );
+}
+
+#[test]
+fn a_name_declared_in_two_crates_resolves_to_its_qualifier_else_to_the_own_crate() {
+    let qualified = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct P;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct P;\npub struct U(x::P);\n"),
+    ];
+    let bare = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct P;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct P;\npub struct W(P);\n"),
+    ];
+    let reported: Vec<Vec<String>> = [qualified, bare]
+        .iter()
+        .map(|sources| Clustered::lines(sources, |view| view.report::<LowestCluster>().violations().to_vec()))
+        .collect();
+    assert_eq!(
+        reported,
+        [
+            vec![
+                "crates/x/src/lib.rs:1: x::P is used only within crate y; move it into the lowest cluster that holds all its users"
+                    .to_owned()
+            ],
+            Vec::new()
+        ]
+    );
+}
+
+#[test]
+fn a_field_with_an_unqualified_name_and_a_method_signature_both_link_across_crates() {
+    let apart = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct W;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\n"),
+    ];
+    let signed = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct B;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct A;\nimpl A {\n    fn b(&self) -> x::B {}\n}\n"),
+    ];
+    let reported: Vec<Vec<String>> = [apart, signed]
+        .iter()
+        .map(|sources| Clustered::lines(sources, |view| view.report::<LowestCluster>().violations().to_vec()))
+        .collect();
+    assert_eq!(
+        reported,
+        [
+            [
+                "crates/x/src/lib.rs:1: x::W is used only within crate y; move it into the lowest cluster that holds all its users"
+            ],
+            [
+                "crates/x/src/lib.rs:1: x::B is used only within crate y; move it into the lowest cluster that holds all its users"
+            ]
+        ]
     );
 }

@@ -171,7 +171,7 @@ impl<'found, 'file> Containment<'found, 'file> {
     ) -> Vec<Link<'found>> {
         self.reach(export, members)
             .into_iter()
-            .filter(|reached| members.contains(reached) && !exports.contains(reached))
+            .filter(|reached| !exports.contains(reached))
             .map(|reached| Link::new(reached, export))
             .collect()
     }
