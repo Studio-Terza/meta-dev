@@ -27,11 +27,21 @@ impl Label {
 #[derive(Debug)]
 pub(crate) struct Lifted;
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Interface(Name);
+
 impl Label {
     pub(crate) fn written(&self) -> Option<&Label> {
         match self {
             Label::Written | Label::Trait(_) => Some(self),
             Label::Lift | Label::Operation(_) => None,
+        }
+    }
+
+    pub(crate) fn interface(&self) -> Option<Interface> {
+        match self {
+            Label::Trait(name) => Some(Interface(name.clone())),
+            Label::Written | Label::Lift | Label::Operation(_) => None,
         }
     }
 

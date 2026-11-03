@@ -5,8 +5,9 @@ use std::iter;
 use newtype::{Arbitrary, Display, Newtype};
 
 use crate::count::Count;
+use crate::edge::Edge;
 use crate::end::{End, Node};
-use crate::graph::{Graph, Label};
+use crate::graph::{Graph, Interface, Label};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Block(usize);
@@ -21,6 +22,7 @@ enum Destination<'graph> {
 pub(super) struct Move<'graph> {
     label: Label,
     destination: Destination<'graph>,
+    with: BTreeSet<&'graph Node>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,6 +35,7 @@ enum Reached<'graph> {
 struct Seen<'graph> {
     label: &'graph Label,
     reached: Reached<'graph>,
+    with: BTreeSet<Block>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -41,32 +44,80 @@ struct Class<'graph> {
     seen: BTreeSet<Seen<'graph>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Filler<'graph> {
+    interface: Interface,
+    node: &'graph Node,
+}
+
+#[derive(Debug)]
+pub(super) struct SetAside {
+    interfaces: Count,
+    fillers: Count,
+}
+
+impl fmt::Display for SetAside {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} interface nodes with {} fillers", self.interfaces, self.fillers)
+    }
+}
+
+#[derive(Debug)]
+struct Labelled<'graph> {
+    node: &'graph Node,
+    found: Move<'graph>,
+}
+
+impl<'graph> Labelled<'graph> {
+    fn of_edge(edge: &'graph Edge<'_>) -> Vec<Labelled<'graph>> {
+        let label = Label::read(edge.role(), edge.transition());
+        let gives: &'graph End = edge.ends().as_ref();
+        let destination = gives.node().map_or(Destination::Outside(gives), Destination::Domain);
+        let taken: BTreeSet<&'graph Node> = edge.ends().taken().collect();
+        taken
+            .iter()
+            .map(|node| Labelled {
+                node,
+                found: Move {
+                    label: label.clone(),
+                    destination,
+                    with: taken.iter().copied().filter(|other| other != node).collect(),
+                },
+            })
+            .collect()
+    }
+
+    fn filler(&self) -> Option<Filler<'graph>> {
+        self.found.label.interface().map(|interface| Filler { interface, node: self.node })
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Behaviour<'graph> {
     moves: BTreeMap<&'graph Node, BTreeSet<Move<'graph>>>,
+    fillers: BTreeSet<Filler<'graph>>,
 }
 
 impl<'graph> Behaviour<'graph> {
     pub(super) fn read(graph: &'graph Graph<'_>) -> Behaviour<'graph> {
         let start: BTreeMap<&'graph Node, BTreeSet<Move<'graph>>> =
             graph.nodes().keys().map(|node| (node, BTreeSet::new())).collect();
-        let moves = graph
-            .edges()
-            .iter()
-            .flat_map(|edge| {
-                let label = Label::read(edge.role(), edge.transition());
-                let gives: &'graph End = edge.ends().as_ref();
-                let destination = gives.node().map_or(Destination::Outside(gives), Destination::Domain);
-                edge.ends()
-                    .taken()
-                    .map(|node| (node, Move { label: label.clone(), destination }))
-                    .collect::<Vec<(&'graph Node, Move<'graph>)>>()
-            })
-            .fold(start, |mut moves, (node, found)| {
-                moves.entry(node).or_default().insert(found);
-                moves
-            });
-        Behaviour { moves }
+        let labelled: Vec<Labelled<'graph>> = graph.edges().iter().flat_map(Labelled::of_edge).collect();
+        let fillers = labelled.iter().filter_map(Labelled::filler).collect();
+        let moves = labelled.into_iter().filter(|found| found.filler().is_none()).fold(start, |mut moves, found| {
+            moves.entry(found.node).or_default().insert(found.found);
+            moves
+        });
+        Behaviour { moves, fillers }
+    }
+
+    pub(super) fn set_aside(&self) -> SetAside {
+        SetAside {
+            interfaces: Count::new(
+                self.fillers.iter().map(|filler| &filler.interface).collect::<BTreeSet<&Interface>>().len(),
+            ),
+            fillers: Count::new(self.fillers.len()),
+        }
     }
 
     pub(super) fn refined(&'graph self) -> BTreeMap<&'graph Node, Block> {
@@ -114,7 +165,8 @@ impl<'graph> Move<'graph> {
             Destination::Domain(node) => Reached::Block(blocks.get(node).copied().unwrap_or_default()),
             Destination::Outside(end) => Reached::Outside(end),
         };
-        Seen { label: &self.label, reached }
+        let with = self.with.iter().map(|node| blocks.get(*node).copied().unwrap_or_default()).collect();
+        Seen { label: &self.label, reached, with }
     }
 }
 
@@ -123,6 +175,11 @@ impl fmt::Display for Move<'_> {
         match self.destination {
             Destination::Domain(node) => write!(formatter, "{} to {node}", self.label),
             Destination::Outside(end) => write!(formatter, "{} to {end}", self.label),
+        }?;
+        let with: Vec<String> = self.with.iter().map(ToString::to_string).collect();
+        match with.as_slice() {
+            [] => Ok(()),
+            _ => write!(formatter, " with {}", with.join(", ")),
         }
     }
 }
