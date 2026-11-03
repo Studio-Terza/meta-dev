@@ -116,6 +116,9 @@ fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
     memory.write(Path::new("top.txt"), &Bytes::from("top"))?;
     assert_eq!(memory.kind(Path::new("top.txt")), Kind::File);
+    let empty = Memory::default();
+    empty.write(Path::new("alone.txt"), &Bytes::from("alone"))?;
+    assert_eq!(empty.kind(Path::new("alone.txt")), Kind::File);
     Ok(())
 }
 
