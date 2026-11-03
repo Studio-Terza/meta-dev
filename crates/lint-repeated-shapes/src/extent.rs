@@ -8,7 +8,7 @@ pub(crate) struct Extent {
 
 impl Extent {
     pub(crate) fn holds<'inner>(&self, inner: &'inner Extent) -> Option<&'inner Extent> {
-        (self.start <= inner.start && inner.end <= self.end).then_some(inner)
+        Some(inner).filter(|inner| self.start <= inner.start).filter(|inner| inner.end <= self.end)
     }
 }
 

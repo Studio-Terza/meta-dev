@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::iter;
 use std::path::Path;
 use std::time::Instant;
 
@@ -35,22 +36,30 @@ impl Campaign {
         Ok(())
     }
 
+    fn batch(crashes: Crashes, target: &str, strategy: &impl Strategy<Value = Input>) -> Result<(), Crash> {
+        let config = Config { cases: BATCH, failure_persistence: None, ..Config::default() };
+        TestRunner::new(config)
+            .run(strategy, |input| Self::linted(crashes, target, &input))
+            .map_err(|failure| Self::crashed(crashes, target, failure))
+    }
+
+    fn crashed(crashes: Crashes, target: &str, failure: TestError<Input>) -> Crash {
+        match failure {
+            TestError::Fail(reason, input) => Crash::Panicked {
+                kept: crashes.keep(&Self::case(target, &input)),
+                reason: reason.message().to_owned(),
+                input,
+            },
+            TestError::Abort(reason) => Crash::Aborted { reason: reason.message().to_owned() },
+        }
+    }
+
     pub fn run(target: &str, strategy: impl Strategy<Value = Input>) -> Result<(), Crash> {
         let crashes = Crashes;
         let deadline = Instant::now() + crashes.budget();
-        while Instant::now() < deadline {
-            let config = Config { cases: BATCH, failure_persistence: None, ..Config::default() };
-            TestRunner::new(config).run(&strategy, |input| Self::linted(crashes, target, &input)).map_err(
-                |failure| match failure {
-                    TestError::Fail(reason, input) => Crash::Panicked {
-                        kept: crashes.keep(&Self::case(target, &input)),
-                        reason: reason.message().to_owned(),
-                        input,
-                    },
-                    TestError::Abort(reason) => Crash::Aborted { reason: reason.message().to_owned() },
-                },
-            )?;
-        }
+        iter::repeat_with(Instant::now)
+            .take_while(|now| *now < deadline)
+            .try_for_each(|_| Self::batch(crashes, target, &strategy))?;
         crashes.clear(&Text::new(target.to_owned())).map_err(|failure| Crash::Aborted { reason: failure.to_string() })
     }
 }

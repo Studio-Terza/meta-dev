@@ -31,14 +31,12 @@ impl<'facts, 'file> Link<'facts, 'file> {
     }
 
     pub(crate) fn direct_loop(&self) -> Option<Definition<'facts>> {
-        (self.from == self.to && self.dependency.held() == Held::Directly).then_some(self.from)
+        (self.from == self.to).then_some(self.from).filter(|_| self.dependency.held() == Held::Directly)
     }
 
     pub(crate) fn closing(&self, members: &BTreeSet<Definition<'facts>>) -> Option<Link<'facts, 'file>> {
-        (members.contains(&self.from)
-            && members.contains(&self.to)
-            && (self.from != self.to || self.dependency.held() == Held::Directly))
-            .then_some(*self)
+        let crossing = (self.from != self.to).then_some(self.from).or_else(|| self.direct_loop());
+        members.get(&self.from).and(members.get(&self.to)).and(crossing).map(|_| *self)
     }
 }
 

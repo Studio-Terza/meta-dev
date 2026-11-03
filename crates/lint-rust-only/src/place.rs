@@ -42,12 +42,12 @@ impl Place {
 
 impl fmt::Display for Place {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Place::Outside => "source outside assets",
-            Place::Vendored => "vendored source",
-            Place::Assets => "source below assets is not a web asset",
-            Place::PlatformTests => "platform test source",
-            Place::Platform => "source below platform is not test code",
-        })
+        match self {
+            Place::Outside => formatter.write_str("source outside assets"),
+            Place::Vendored => formatter.write_str("vendored source"),
+            Place::Assets => formatter.write_str("source below assets is not a web asset"),
+            Place::PlatformTests => formatter.write_str("platform test source"),
+            Place::Platform => formatter.write_str("source below platform is not test code"),
+        }
     }
 }

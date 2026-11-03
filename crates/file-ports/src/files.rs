@@ -61,9 +61,10 @@ pub trait Files {
         Self: Sized,
     {
         into.create_directories(root)?;
-        self.entries(root)?.iter().try_for_each(|path| match self.kind(path) {
-            Kind::Directory => self.mirror(path, into),
-            _ => into.write(path, self.read(path)?),
+        self.entries(root)?.iter().try_for_each(|path| {
+            Some(path)
+                .filter(|path| self.kind(path) == Kind::Directory)
+                .map_or_else(|| into.write(path, self.read(path)?), |path| self.mirror(path, into))
         })
     }
 }

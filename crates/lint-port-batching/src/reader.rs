@@ -118,11 +118,7 @@ impl<'ast> Visit<'ast> for Reader<'_, '_> {
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        let receiver = match call.receiver.as_ref() {
-            Expr::Path(path) => self.scope.reached_path(path),
-            Expr::Field(field) => self.scope.reached_field(field),
-            _ => None,
-        };
+        let receiver = self.scope.reached_receiver(&call.receiver);
         let paced = receiver.and_then(|_| self.context.judge().ports().paces(&Name::from(&call.method))).map(|_| ());
         self.within(|outer| outer.filter(|_| paced.is_none()), |reader| reader.visit_expr(&call.receiver));
         let within = PerElement::adaptor(call).map(Within::Closure);
@@ -157,10 +153,8 @@ impl<'ast> Visit<'ast> for Reader<'_, '_> {
     }
 
     fn visit_expr_field(&mut self, field: &'ast ExprField) {
-        let reached = self.scope.reached_field(field);
-        let line = LineNumber::from(field.member.span());
-        match reached {
-            Some(port) => self.found(Some(port), line),
+        match self.scope.reached_field(field) {
+            Some(port) => self.found(Some(port), LineNumber::from(field.member.span())),
             None => visit::visit_expr_field(self, field),
         }
     }

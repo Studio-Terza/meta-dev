@@ -1,7 +1,9 @@
 use proc_macro2::{Group, Punct, TokenTree};
+use syn::punctuated::Punctuated;
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprLit, FnArg, GenericArgument, ImplItem, ImplItemFn, Item, ItemImpl,
-    ItemMod, ItemUse, Lit, LitStr, PatType, PathArguments, ReturnType, TraitItem, TraitItemFn, Type, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, GenericParam, Ident, ImplItem,
+    ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType, PathArguments,
+    ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound, TypePath,
 };
 
 use lint_layout::Name;
@@ -88,9 +90,66 @@ impl Syntax {
     }
 
     #[must_use]
+    pub fn bounds(ty: &Type) -> Option<&Punctuated<TypeParamBound, Token![+]>> {
+        match ty {
+            Type::ImplTrait(bounded) => Some(&bounded.bounds),
+            Type::TraitObject(bounded) => Some(&bounded.bounds),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn trait_bound(bound: &TypeParamBound) -> Option<&TraitBound> {
+        match bound {
+            TypeParamBound::Trait(traited) => Some(traited),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn named_member(member: &Member) -> Option<&Ident> {
+        match member {
+            Member::Named(named) => Some(named),
+            Member::Unnamed(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn expr_path(expr: &Expr) -> Option<&ExprPath> {
+        match expr {
+            Expr::Path(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn string_literal(value: &Expr) -> Option<&LitStr> {
         match value {
             Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn tail(statement: &Stmt) -> Option<&Expr> {
+        match statement {
+            Stmt::Expr(expr, None) => Some(expr),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn pat_ident(pattern: &Pat) -> Option<&PatIdent> {
+        match pattern {
+            Pat::Ident(binding) => Some(binding),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn type_param(param: &GenericParam) -> Option<&TypeParam> {
+        match param {
+            GenericParam::Type(parameter) => Some(parameter),
             _ => None,
         }
     }

@@ -36,11 +36,9 @@ impl TestBodies<'_> {
     }
 
     fn row_attribute(attribute: &Attribute) -> Option<&Attribute> {
-        match (attribute.path().is_ident(Self::PANICKING), TestMarks::test(attribute)) {
-            (true, _) => None,
-            (false, Some(_)) if !attribute.path().is_ident(Self::PLAIN_TEST) => None,
-            (false, _) => Some(attribute),
-        }
+        Some(attribute)
+            .filter(|attribute| attribute.path().get_ident().is_none_or(|ident| ident != Self::PANICKING))
+            .filter(|attribute| TestMarks::test(attribute).is_none_or(|_| attribute.path().is_ident(Self::PLAIN_TEST)))
     }
 }
 

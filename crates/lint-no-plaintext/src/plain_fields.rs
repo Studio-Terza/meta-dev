@@ -27,10 +27,11 @@ impl<'scan, 'file> PlainFields<'scan, 'file> {
 
     fn read_in(attributes: &[Attribute]) -> Walk {
         let attrs = Attributes::flattened_from(attributes);
-        match (Walk::outside_tests(attributes), attrs.deserialize_derive(), attrs.validation()) {
-            (Walk::Entered, Some(_), None) => Walk::Entered,
-            _ => Walk::Skipped,
-        }
+        Some(Walk::outside_tests(attributes))
+            .filter(|walk| *walk == Walk::Entered)
+            .and(attrs.deserialize_derive())
+            .filter(|_| attrs.validation().is_none())
+            .map_or(Walk::Skipped, |_| Walk::Entered)
     }
 
     fn inspect(&mut self, owner: &Ident, fields: &Fields) {

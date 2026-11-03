@@ -15,10 +15,13 @@ impl Focus {
         match found {
             Expr::Reference(reference) => Self::reached(&reference.expr),
             Expr::Paren(paren) => Self::reached(&paren.expr),
-            Expr::Unary(unary) if matches!(unary.op, UnOp::Deref(_)) => Self::reached(&unary.expr),
-            Expr::MethodCall(call) if call.args.is_empty() => {
-                Name::from(&call.method).matches::<Whole>(&Self::VIEWS).and_then(|_| Self::reached(&call.receiver))
-            }
+            Expr::Unary(unary) => Some(unary)
+                .filter(|unary| matches!(unary.op, UnOp::Deref(_)))
+                .and_then(|unary| Self::reached(&unary.expr)),
+            Expr::MethodCall(call) => Some(call)
+                .filter(|call| call.args.is_empty())
+                .filter(|call| Name::from(&call.method).matches::<Whole>(&Self::VIEWS).is_some())
+                .and_then(|call| Self::reached(&call.receiver)),
             Expr::Field(field) => Self::rooted(field),
             _ => None,
         }

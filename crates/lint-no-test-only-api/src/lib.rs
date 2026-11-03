@@ -58,10 +58,11 @@ impl Lint for NoTestOnlyApi {
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
         let shipped: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Shipped)).collect();
         let tested: BTreeSet<Name> = files.iter().flat_map(|file| Mentions::in_file(file, Ground::Tests)).collect();
+        let test_only: BTreeSet<&Name> = tested.difference(&shipped).collect();
         let only_tests = files
             .iter()
             .flat_map(Offers::in_file)
-            .filter(|candidate| !shipped.contains(candidate.called()) && tested.contains(candidate.called()))
+            .filter(|candidate| test_only.contains(candidate.called()))
             .map(Candidate::violation);
         Report::new(
             Headline::new("shipped code has no test-only API"),

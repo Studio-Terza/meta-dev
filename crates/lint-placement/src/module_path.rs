@@ -20,10 +20,8 @@ impl ModulePath {
             directory
                 .into_iter()
                 .flat_map(Path::components)
-                .filter_map(|component| match component {
-                    Component::Normal(segment) => Some(Name::from(segment)),
-                    _ => None,
-                })
+                .filter(|component| matches!(component, Component::Normal(_)))
+                .map(|component| Name::from(component.as_os_str()))
                 .collect(),
         )
     }

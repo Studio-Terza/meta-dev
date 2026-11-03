@@ -64,7 +64,8 @@ impl Cut {
         let whole = ItemCount::total(total.iter().map(|tangle| condensed.size(*tangle)));
         islands.into_iter().fold(BTreeSet::new(), |inside, island| {
             let held = ItemCount::total(inside.iter().map(|tangle| condensed.size(*tangle)));
-            if held.plus(held) < whole { inside.into_iter().chain(island).collect() } else { inside }
+            let joined = (held.plus(held) < whole).then_some(island).into_iter().flatten();
+            inside.into_iter().chain(joined).collect()
         })
     }
 

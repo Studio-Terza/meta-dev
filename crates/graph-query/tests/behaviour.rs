@@ -87,11 +87,11 @@ fn malformed_arguments_are_refused_with_the_reason() {
 
 #[test]
 fn terms_match_camel_and_snake_words_and_plurals() {
-    let term: Term = "Records".parse().unwrap_or_else(|never| match never {});
+    let Ok(term) = "Records".parse::<Term>();
     assert!(term.found_in(&Name::from("AllRecords")).is_some());
     assert!(term.found_in(&Name::from("read_record")).is_some());
     assert!(term.found_in(&Name::from("Recorder")).is_none());
-    let short: Term = "bus".parse().unwrap_or_else(|never| match never {});
+    let Ok(short) = "bus".parse::<Term>();
     assert!(short.found_in(&Name::from("BuReader")).is_none());
 }
 

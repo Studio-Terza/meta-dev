@@ -63,7 +63,7 @@ impl Condensed {
         Traversal::trees((0..self.sizes.len()).map(TangleIndex::from), neighbours)
             .into_iter()
             .map(|island| island.into_iter().collect::<BTreeSet<TangleIndex>>())
-            .filter(|island| island.iter().any(|tangle| !self.row(*tangle).is_empty()))
+            .filter(|island| island.iter().flat_map(|tangle| self.row(*tangle)).next().is_some())
             .collect()
     }
 
@@ -133,11 +133,9 @@ impl Condensed {
         let volume = |inside: bool| -> f64 {
             rows(inside).flat_map(|(_, row)| row).map(|link| link.weight().into_inner()).sum()
         };
-        let crossing: f64 = rows(true)
-            .flat_map(|(_, row)| row)
-            .filter(|link| !side.contains(&link.target()))
-            .map(|link| link.weight().into_inner())
-            .sum();
+        let (_, leaving): (Vec<&Link>, Vec<&Link>) =
+            rows(true).flat_map(|(_, row)| row).partition(|link| side.contains(&link.target()));
+        let crossing: f64 = leaving.iter().map(|link| link.weight().into_inner()).sum();
         Conductance::new(crossing / volume(true).min(volume(false)))
     }
 }

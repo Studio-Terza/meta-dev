@@ -15,9 +15,15 @@ impl<'ty> TextMention<'ty> {
     pub fn in_type(ty: &'ty Type, wrappers: &Wrappers) -> Option<&'ty Ident> {
         let mut mention = TextMention { named: Vec::new() };
         mention.visit_type(ty);
-        mention.named.into_iter().find(|ident| {
-            Self::TEXT.iter().any(|text| *ident == text) || wrappers.holds_text(&Name::from(*ident)).is_some()
-        })
+        mention.named.into_iter().find(|ident| Self::text(ident, wrappers).is_some())
+    }
+
+    fn text(ident: &'ty Ident, wrappers: &Wrappers) -> Option<&'ty Ident> {
+        Self::TEXT
+            .iter()
+            .find(|text| ident == *text)
+            .map(|_| ident)
+            .or_else(|| wrappers.holds_text(&Name::from(ident)).map(|_| ident))
     }
 }
 
