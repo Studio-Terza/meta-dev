@@ -1,19 +1,61 @@
 # transition-graph
 
-Problem: the same behaviour written with different control flow passes a body-shape report. Effects spread through the code, and signatures over bare primitives, hide what a function does.
+Problem: the same behaviour written with different control flow passes a body-shape report. Effects spread through the code, and signatures over bare primitives, hide what a function does. This spec is the single home for the graph design.
 
-L1 Everything here reports and blocks nothing, until the owner decides otherwise from the data.
-L2 Syntax only, no per-repository configuration, no allow-lists.
+L1 Everything here reports and blocks nothing until a detail says it blocks; D3's `primitive_boundary` blocks. A gate comes from the owner with its numbers.
+L2 Syntax only, one pass, no rustc internals, no per-repository configuration, no allow-lists. Performance stays reasonable: the graph runs within the lint stage's existing time limit.
 L3 One model: the graph is read from `type-facts`, as `lint-type-graph` is, in its own crate since `crate_graph` splits unrelated graphs; paths resolve through `lint-paths`, crates come from `lint-placement` and `reach`, and findings go through `lint-core` reports and `lint --report`. No parallel graph or report path.
 L4 Shipped code only: files under `tests`, `examples` and `benches`, and code under `#[cfg(test)]`, are not read.
-D1 Report: effect sites outside ports, per crate. An effect is a call into files, environment, clock, network, processes, randomness or stdio. Ports are what `process_starters` and `raw_resources` already allow: a crate whose name ends in the word `ports`, or a module named `ports`. Sites are counted everywhere, in ports or not, by kind, as process starts are in the test budget; only those outside ports are findings.
-D2 Report: the transition graph of shipped code. Nodes are types; edges are functions, methods and trait impls, from each input type, the receiver included, to the output type, read through references, `Option`, `Result` and collections to the type inside. A type name resolves to the crate's own type first, else to the one workspace crate declaring it; a name declared in several other crates, a foreign type or a generic is a leaf. On main, CI writes per-crate nodes, edges and coverage to the job summary. after: D1
-D3 Coverage: per crate, the share of edges whose inputs and output are all domain types rather than bare primitives (`bool`, integers, floats, `char`, `String`, `&str`, unit). A primitive edge is invisible to the graph. Coverage is printed with D2, as the number the `primitive_boundary` and `bool_methods` lists should raise. after: D2
-D4 Report: duplicate transitions, input types joined to one output type by more than one transition in shipped code, across crates, naming the types and each path. A standard conversion trait (`From`, `TryFrom`, `FromStr`) is the canonical edge, and the message says to route the others through it. Only transitions whose types are all workspace types are compared; those touching a primitive, unit, foreign or generic type are counted apart, since many legitimate functions share `Foo` to `bool`. after: D2
-D5 D1 and D4 are scored against the repo1 smell inventory as elegance#D8 was: recall, act rate in a sample, determinism, gate material, outside this repository. after: D1, D4
-D6 Gate candidates go to the owner with their numbers. after: D5
-Out: gates, moving effects into ports, cyclomatic complexity (elegance#D4), `states!` lifecycle graphs (`state_graph`).
+L5 Each migration pass fixes every violation before its rule blocks; no ratchets.
+
+## Reports
+
+D1 Report: effect sites outside ports, per crate. An effect is a call into files, environment, clock, network, processes, randomness or stdio. Ports are what `process_starters` and `raw_resources` already allow: a crate whose name ends in the word `ports`, or a module named `ports`. Sites are counted everywhere, in ports or not, by kind, as process starts are in the test budget; only those outside ports are findings. Status: done, #211.
+D2 Report: the transition graph of shipped code. Nodes are types; edges are functions, methods and trait impls, from each input type, the receiver included, to the output type, read through references, `Option`, `Result` and collections to the type inside. A type name resolves to the crate's own type first, else to the one workspace crate declaring it; a name declared in several other crates, a foreign type or a generic is a leaf. On main, CI writes per-crate nodes, edges and coverage to the job summary. after: D1. Status: done, #202.
+D3 Coverage: per crate, the share of edges whose inputs and output are all domain types rather than bare primitives (`bool`, integers, floats, `char`, `String`, `&str`, unit). A primitive edge is invisible to the graph. Coverage is printed with D2. Blocking lint `primitive_boundary` raises it: in shipped code, primitives (`bool`, integers, floats, `char`, `String`, `str`, and tuples of them) appear in a function signature or a struct, variant or union field only inside a module named `boundary` or a crate whose name ends in the word `boundary`, by convention as `ports` is, with no configuration. Allowed everywhere: a newtype and its own `new`, `try_new` and `into_inner`, and trait impls, whose trait fixes the signature (`Display`, `FromStr`, `From`, `TryFrom`, `Debug`, `Hash`, `Ord`); the trait declaration is read instead. A unit return is not flagged. `boundary` replaces `bits`: casts and bare numbers live there too. after: D2. Status: open, report done #202, strict lint landing in #256.
+D4 Report: duplicate transitions, input types joined to one output type by more than one transition in shipped code, across crates, naming the types and each path. A standard conversion trait (`From`, `TryFrom`, `FromStr`) is the canonical edge, and the message says to route the others through it. Only transitions whose types are all workspace types are compared; those touching a primitive, unit, foreign or generic type are counted apart, since many legitimate functions share `Foo` to `bool`. after: D2. Status: done, #202.
+D5 D1 and D4 are scored against the repo1 smell inventory as elegance#D8 was: recall, act rate in a sample, determinism, gate material, outside this repository. after: D1, D4. Status: done: effects outside ports 54 on main, 19 of 74 smells against about 10 by chance; coverage 27.2%; duplicates 1 of 74, blind while coverage is low.
+D6 Gate candidates go to the owner with their numbers. after: D5. Status: done, ruled as D8 and D9.
+
+## Definition
+
+D7 Nodes: domain types and their typestates; interface nodes, meaning traits including the `Fn` traits; external types (std and library collections and types) as black boxes, never analysed. Edges: a body with a signature, outside stores, from its input types to its output type; ownership in the signature says whether an input survives. Holes: trait-bounded parameters (closure, `impl Trait`, generic, `dyn`). Fillers: `impl` blocks and closure literals, each analysed once where written; a generic function is one edge from an interface node, so the graph stays finite. `dyn` over our own traits is fine; `dyn` over unseen implementations belongs at a boundary. Store operations are `&mut self` methods inside a store node (D18), labelled by the element transition they apply, not edges. Derived lifts (`map` through containers, field focus, match routing over sums) never count as written edges; a hand-written copy of one is flagged. D2 and D4 move to this definition. after: D3. Status: open.
+D8 One edge per node pair, a blocking gate: duplicate transitions to zero. Trait impls are edges (`From`, `TryFrom`, `FromStr`, `Display`, our own traits), so a trait impl and a function between the same pair are a duplicate, and the fix keeps the trait; blanket impls and generic trait methods count per concrete type used. Multi-input and method edges are settled with data when the gate is built. after: D7, D22. Status: open.
+D9 No side effects outside ports, blocking once D1 is at zero. Ports are traits whose fillers touch the world, and are thin: they translate types, map errors to enums and decide nothing. World edges get no generated tests; callers' tests use the port's in-memory fake. after: D1. Status: open.
+D10 Every node is live: reachable from a boundary entry, and reaches an exit or a terminal. Report. after: D7. Status: open.
+D11 The core is acyclic; cycles appear only as declared lifecycles (D14) or round trips carrying a `roundtrip!` law. Report. after: D7. Status: open.
+D12 No mutation in the core: an edge from a type to the same type is banned, and `&mut` parameters, `&mut self` included, appear only as store operations (D18); `let mut` locals inside a body stay allowed. Widen only for a concurrent project that needs it. after: D18. Status: open.
+D13 Levels: the crate graph is the quotient of the type and trait graph, and crate structure is judged that way (crate-graph-shape); the level inside a function is D19. Status: done, crate-graph-shape reports.
+
+## Contracts
+
+D14 Invariants are states in the type (`Sorted<Vec<T>>`, `Order<Paid>`), so requirements and guarantees are checked by the compiler. `states!` (resources#D4) is the one declaration for lifecycles; ordinary data edges use signatures plus law derives, with no macro. Status: open.
+D15 Requirements as named invariants: a panic outside a port is an assertion naming an invariant enum value (`invariant!(cond, Invariant::X)`); bare `unwrap` and `expect` are banned. A named invariant is a requirement on an input, marking a refinement type not yet written; requirements compose along paths; non-termination is out of scope. Error types are enums handled exhaustively: each arm recovers, crashes on a named invariant, or ignores with an enum reason; errors travel to the nearest port or boundary. Named assertions are counted in a report. after: D22. Status: open.
+D16 Laws, tiers 1 and 2: every edge carries at least one law, declared as a type-level label, from which plain property tests are generated; `Arbitrary` for state types generates through constructors, so values satisfy invariants. Law coverage is reported. Tier 3, composition across the graph, later. after: D14. Status: open.
+D17 Mutation adequacy: the generated tests of an edge's laws kill every mutant of that edge, judged from mutation#D3's kill matrix. Generated tests stay within the existing test-time limits. after: D16. Status: open.
+
+## Collections
+
+D18 Store port: CRUD data goes through a store port. Persistent stores are a database behind it: constraints in the schema, the transaction as the unit of an invariant, bulk operations as queries. In-memory stores sit behind the same port and contract, with an in-memory database as the test double. One generic CRUD contract (create, read, update, delete) with generic laws generated for every store. after: D9. Status: open, spike done on the transcript tool.
+D19 Records: store data are typed records with constraints: newtype fields, unique keys, valid references, cross-field and cross-record constraints. Typestate only for lifecycle fields whose value gates behaviour. A store operation is one CRUD command or one lifecycle transition. Collections outside stores are values: black boxes in the graph, with no CRUD methods added to collections used for transport. after: D18. Status: open.
+
+## Bodies and effects
+
+D20 Function bodies have no `return`, `break` or `continue`; `?` stays allowed. No function-size lint. Status: open.
+D21 No port call inside per-element code: closures passed to `map`, `for_each`, `filter` and the like, and loops. Ports offer batch operations, and the refusal names that fix. Consuming a stream from a port element by element is fine; deliberate pacing is a named reason on the port method. after: D3. Status: open.
+D22 Migration order: strict bool (newtype#D4), strict boundary (D3), effects into ports (D9), port batching (D21) alongside, store lints (D12, D18), then one edge per pair (D8); named invariants (D15) after. Status: open, strict bool done #233.
+
+## Elegance
+
+D23 Measures on the graph to explore, each scored as D5: hidden states from edge complexity, bisimilarity with trait labels, commuting triangles, repeated motifs, tangles. after: D22. Status: open.
+
+Deferred: concurrency as its own flow graph intersecting typestate and crates, with data lifespan as ownership typestate and process spawning as an effect; shared state and interior mutability; handling of autogenerated tests apart from the current test lints, its own project after the feature work; a collection algebra over iterators and streams (proposal, set aside for D18); performance work such as rayon until measured.
+Out: cyclomatic complexity as a number (elegance#D4).
 
 ## History
 
 Owner's messages 871be1b4, ccce1a26, eed62ccb; newtypes as distinct nodes, 673813ba. Bare primitives as edges the graph cannot capture: owner's message of 2026-11-02, not yet indexed.
+
+D3, made blocking (owner d4c76a83, 2605e95a, 1139c842): `primitive_boundary` allowed primitives at a type's boundary, which passed most signatures. It now allows them only in a `boundary` module or crate, `bits` folded into it, and the project fixed every violation crate by crate before the rule landed.
+
+D7 to D23 (owner a2585941, 14191674, ab1ec1bb, 39dfbae7, ca643ba0, 63ed3454, 54944b54, 7843235c, 6c0c07c8, 45f8be56, 8171861c, 292bbbaa, 1475feed, df7d1890, 80e3d6e4, 2102f24c, 12db197a, b50d4bde, 50c1e74c, 8da657a2, 9eeba395, 5800a1b1, 8e683769, feb75f91, a4ac4ed2, 6c716c59, a3b8e0a3, 781e8c91, fcfa672d, 941fab4f): folded in from the discussion queue of 2026-11-02 and 2026-11-03.
