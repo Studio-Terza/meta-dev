@@ -1,7 +1,8 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use ci::ports::{Invocation, Ports, Run};
+use ci::ports::{Invocation, Ports, Run, Text};
+use file_ports::Disk;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Edit {
@@ -73,15 +74,21 @@ impl Fake {
 }
 
 impl Ports for Fake {
+    type Files = Disk;
+
+    fn files(&self) -> &Disk {
+        &Disk
+    }
+
     fn run(&self, invocation: &Invocation) -> io::Result<Run> {
         Err(Self::refused(invocation))
     }
 
-    fn output(&self, invocation: &Invocation) -> io::Result<String> {
+    fn output(&self, invocation: &Invocation) -> io::Result<Text> {
         match invocation.program().to_str() {
-            Some("cargo") => Ok(self.metadata.clone()),
-            Some("git") => Ok(self.git(invocation)),
-            Some("gh") => Ok(Self::UNLABELLED_CHANGE.to_owned()),
+            Some("cargo") => Ok(Text::new(self.metadata.clone())),
+            Some("git") => Ok(Text::new(self.git(invocation))),
+            Some("gh") => Ok(Text::new(Self::UNLABELLED_CHANGE.to_owned())),
             _ => Err(Self::refused(invocation)),
         }
     }
