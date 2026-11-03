@@ -57,7 +57,9 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         )
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
-    let listed_by_the_runner = include_str!("../src/cli/mode/lints.rs").matches("::report(files)").count();
+    let runner = include_str!("../src/cli/mode/lints.rs");
+    let listed_by_the_runner =
+        runner.matches("::report(files)").count() + runner.matches("containment.report::<").count();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance =

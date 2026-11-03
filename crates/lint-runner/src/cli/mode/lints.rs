@@ -41,12 +41,15 @@ use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
 use lint_transition_graph::{
-    AcyclicQuotients, ConnectedClusters, InterfaceByConsumers, LowestCluster, OnContainment, OnGraph, OneEdge,
+    AcyclicQuotients, ConnectedClusters, Containment, InterfaceByConsumers, LowestCluster, OnGraph, OneEdge,
 };
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
+
+use transition_facts::Transitions;
+use type_facts::Facts;
 
 use crate::cli::Outcome;
 
@@ -57,6 +60,9 @@ impl Lints {
     #[must_use]
     pub fn checked(readout: &Readout) -> Outcome<'_> {
         let files = readout.files();
+        let facts = Facts::of_files(files);
+        let transitions = Transitions::of_files(files);
+        let containment = Containment::clustered(files, &facts, &transitions);
         let reports = vec![
             NoComments::report(files),
             NoFreeFns::report(files),
@@ -100,10 +106,10 @@ impl Lints {
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
             OnGraph::<OneEdge>::report(files),
-            OnContainment::<ConnectedClusters>::report(files),
-            OnContainment::<InterfaceByConsumers>::report(files),
-            OnContainment::<AcyclicQuotients>::report(files),
-            OnContainment::<LowestCluster>::report(files),
+            containment.report::<ConnectedClusters>(),
+            containment.report::<InterfaceByConsumers>(),
+            containment.report::<AcyclicQuotients>(),
+            containment.report::<LowestCluster>(),
             UnconsumedTraits::report(files),
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),

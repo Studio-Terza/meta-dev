@@ -74,7 +74,7 @@ impl Corpus {
     fn lints() -> usize {
         [include_str!("../src/cli/mode/lints.rs"), include_str!("../src/cli/mode.rs")]
             .iter()
-            .map(|source| source.matches("::report(files)").count())
+            .map(|source| source.matches("::report(files)").count() + source.matches("containment.report::<").count())
             .sum()
     }
 

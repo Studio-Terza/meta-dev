@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_item_graph::ItemGraph;
+use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
@@ -79,13 +79,22 @@ impl<'found, 'file> Containment<'found, 'file> {
             })
             .collect();
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
-        let crates =
-            shipped.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&SourceFile>>, file| {
-                crates.entry(file.placement().package().crate_name()).or_default().push(file);
+        let named: Vec<(&SourceFile, ReferencedNames)> =
+            shipped.iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
+        let crates = named.iter().fold(
+            BTreeMap::new(),
+            |mut crates: BTreeMap<&CrateName, Vec<&ReferencedNames>>, (file, names)| {
+                crates.entry(file.placement().package().crate_name()).or_default().push(names);
                 crates
-            });
-        let graphs: Vec<(&CrateName, ItemGraph)> =
-            crates.iter().map(|(krate, files)| (*krate, ItemGraph::of_files(files))).collect();
+            },
+        );
+        let graphs: Vec<(&CrateName, ItemGraph)> = crates
+            .into_iter()
+            .map(|(krate, names)| {
+                let merged = names.into_iter().cloned().fold(ReferencedNames::default(), ReferencedNames::merged);
+                (krate, merged.into_graph())
+            })
+            .collect();
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
         let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
@@ -95,7 +104,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             .filter_map(Link::apart)
             .collect();
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let bodies = shipped.iter().flat_map(|file| resolver.bodies(file));
+        let bodies = named.iter().flat_map(|(file, names)| resolver.bodies(file, names));
         let links: BTreeSet<Link<'found>> =
             defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
         Containment {
