@@ -3,7 +3,7 @@ mod workspace;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::regrouped::Regrouped;
+use super::regrouped::Regrouped;
 use file_ports::Files;
 use lint_layout::Failure;
 use lint_layout::Manifest;
