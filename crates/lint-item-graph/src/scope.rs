@@ -48,10 +48,11 @@ impl<'file> Scope<'file> {
             .tokens()
             .iter()
             .zip(path.roots())
-            .filter_map(|(token, root)| match token {
-                TokenTree::Ident(ident) => root.zip(self.kept(token, root, Name::from(ident))),
-                TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
+            .filter_map(|(token, root)| match (token, root) {
+                (TokenTree::Ident(ident), Some(root)) => Some((token, root, Name::from(ident))),
+                _ => None,
             })
+            .flat_map(|(token, root, name)| self.kept(token, root, name).into_iter().map(move |kept| (root, kept)))
             .collect();
         let nested = path.tokens().iter().flat_map(|token| match token {
             TokenTree::Group(group) => self.referenced(group.stream()),
@@ -83,15 +84,17 @@ impl<'file> Scope<'file> {
         self.local_roots.get(head)
     }
 
-    fn kept(&self, token: &TokenTree, root: Option<&TokenTree>, name: Name) -> Option<Name> {
-        match (root, self.breadth) {
-            (Some(root), Breadth::Crate) if ptr::eq(root, token) => {
-                self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name))
-            }
-            (Some(root), Breadth::Workspace) if ptr::eq(root, token) => Some(self.imports.original(name)),
-            (Some(root), Breadth::Crate) => self.local_root(Some(root)).map(|_| name),
-            (Some(_), Breadth::Workspace) => Some(name),
-            (None, _) => None,
+    fn kept(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
+        match self.breadth {
+            Breadth::Crate if ptr::eq(root, token) => self
+                .imports
+                .local_item(&name, &self.local_roots)
+                .map(|imports| imports.original(name))
+                .into_iter()
+                .collect(),
+            Breadth::Workspace if ptr::eq(root, token) => self.imports.path_of(&name).unwrap_or_else(|| vec![name]),
+            Breadth::Crate => self.local_root(Some(root)).map(|_| name).into_iter().collect(),
+            Breadth::Workspace => vec![name],
         }
     }
 

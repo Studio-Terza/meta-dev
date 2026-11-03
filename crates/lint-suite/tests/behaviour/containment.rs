@@ -524,3 +524,81 @@ fn a_const_standing_for_a_variant_stands_for_its_enum() {
         ]
     );
 }
+
+#[test]
+fn a_const_through_a_foreign_enum_stands_for_no_local_variant_twin() {
+    let foreign = [
+        Clustered::at("crates/x/src/lib.rs", "mod fast;\nmod user;\n"),
+        Clustered::at("crates/x/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at(
+            "crates/x/src/user.rs",
+            "use y::Mode;\nconst DEFAULT: Mode = Mode::Fast;\npub struct User;\nimpl User {\n    fn mode(&self) {\n        DEFAULT;\n    }\n}\n",
+        ),
+        Clustered::at("crates/y/src/lib.rs", "pub enum Mode {\n    Fast,\n}\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&foreign, |view| view.report::<LowestCluster>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_body_path_reads_through_a_renamed_import_and_keeps_its_module_qualifier() {
+    let renamed = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct Mark;\n"),
+        Clustered::at("crates/y/src/lib.rs", "mod fast;\nmod view;\n"),
+        Clustered::at("crates/y/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at(
+            "crates/y/src/view.rs",
+            "mod inner;\nuse x::Mark as Badge;\nuse crate::fast::Fast;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        Badge::new();\n        inner::Fast::new();\n    }\n}\n",
+        ),
+        Clustered::at("crates/y/src/view/inner.rs", "pub struct Fast;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&renamed, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::Mark is used only within y::view; move it into the lowest cluster that holds all its users"
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&renamed, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/y/src/fast.rs:1: crate y falls into 2 groups: [Fast] [Fast View] with no link between them; split it along the groups, or link them through a type they share"
+        ]
+    );
+}
+
+#[test]
+fn field_and_variant_names_are_not_references_but_their_values_are() {
+    let declared = [
+        Clustered::at(
+            "crates/x/src/lib.rs",
+            "mod a;\npub struct B;\nimpl B {\n    const VALUE: isize = 1;\n}\nconst LIMIT: isize = B::VALUE;\nmacro_rules! made {\n    () => {\n        B\n    };\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "pub struct S {\n    made: u8,\n}\npub enum E {\n    V = crate::LIMIT,\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&declared, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/x/src/a.rs:1: crate x falls into 2 groups: [B E] [S] with no link between them; split it along the groups, or link them through a type they share"
+        ]
+    );
+}
+
+#[test]
+fn a_cycle_closed_through_a_trait_impl_is_reported() {
+    let implemented = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl crate::b::Tr for A {}\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait Tr {}\npub struct B(crate::a::A);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&implemented, |view| view.report::<AcyclicQuotients>().violations().to_vec()),
+        [
+            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::Tr, x::b::B -> x::a::A; move the shared types into one part that the others use, so the parts form layers"
+        ]
+    );
+}
