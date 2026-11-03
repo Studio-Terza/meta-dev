@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use mutation_report::Cli;
 use serde_json::{Value, json};
 
@@ -212,7 +212,7 @@ fn a_section_shows_300_bullets_and_counts_the_rest() -> Result<(), Box<dyn Error
     let markdown = checkout.markdown();
     assert!(markdown.contains("### Surviving mutants (305)\n\n- m000\n- m001\n"));
     assert!(markdown.contains("- m299\n- ... 5 more in report.json\n"));
-    assert!(!markdown.contains("- m300"));
+    assert_eq!(markdown.matches("- m300").count(), 0);
     assert_eq!(checkout.field("surviving").as_array().map(Vec::len), Some(305));
     Ok(())
 }
@@ -226,7 +226,7 @@ fn exactly_300_items_are_all_shown_with_no_remainder() -> Result<(), Box<dyn Err
     checkout.report();
     let markdown = checkout.markdown();
     assert!(markdown.contains("- m299\n\n### Timed out mutants (0)"));
-    assert!(!markdown.contains("more in report.json"));
+    assert_eq!(markdown.matches("more in report.json").count(), 0);
     Ok(())
 }
 
@@ -236,8 +236,9 @@ fn a_shard_matrix_that_cannot_be_parsed_is_refused_by_name() -> Result<(), Box<d
     checkout.write("shards/shard-0/matrix.json", "not json")?;
     let answer = checkout.report();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse") && answer.err.contains("shard-0/matrix.json"));
-    assert!(!checkout.path("report.md").exists());
+    assert!(answer.err.contains("cannot parse"));
+    assert!(answer.err.contains("shard-0/matrix.json"));
+    assert_eq!(checkout.files.kind(&checkout.path("report.md")), Kind::Missing);
     Ok(())
 }
 
@@ -246,11 +247,13 @@ fn shards_or_sources_that_cannot_be_read_are_refused() -> Result<(), Box<dyn Err
     let checkout = Checkout::new()?;
     let answer = checkout.report_of("absent", "sources");
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use") && answer.err.contains("absent"));
+    assert!(answer.err.contains("cannot use"));
+    assert!(answer.err.contains("absent"));
     checkout.directory("bare")?;
     let answer = checkout.report_of("shards", "bare");
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use") && answer.err.contains("crates"));
+    assert!(answer.err.contains("cannot use"));
+    assert!(answer.err.contains("crates"));
     Ok(())
 }
 

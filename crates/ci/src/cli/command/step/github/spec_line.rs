@@ -6,6 +6,7 @@ use std::io::Write;
 use super::Step;
 use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use verdict::Verdict;
 
@@ -21,12 +22,10 @@ impl SpecLine {
 
 impl Step for SpecLine {
     fn from_arguments(arguments: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
-        match arguments.as_slice() {
-            [pull_request] => {
-                Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let pull_request = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

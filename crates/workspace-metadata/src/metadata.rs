@@ -20,10 +20,9 @@ impl Metadata {
         let Metadata { workspace_root, packages } = self;
         let (inside, outside): (Vec<Package>, Vec<Package>) =
             packages.into_iter().partition(|package| package.directory_under(&workspace_root).is_some());
-        match outside.into_iter().next() {
-            Some(package) => Err(Outside::new(package.into_manifest())),
-            None => Ok(Metadata { workspace_root, packages: inside }),
-        }
+        outside.into_iter().next().map_or(Ok(Metadata { workspace_root, packages: inside }), |package| {
+            Err(Outside::new(package.into_manifest()))
+        })
     }
 
     #[must_use]
@@ -38,8 +37,7 @@ impl Metadata {
     pub fn readers(&self) -> BTreeMap<&CrateName, &[PathBuf]> {
         self.packages
             .iter()
-            .filter(|package| !package.readings().is_empty())
-            .map(|package| (package.name(), package.readings()))
+            .filter_map(|package| package.readings().first().map(|_| (package.name(), package.readings())))
             .collect()
     }
 

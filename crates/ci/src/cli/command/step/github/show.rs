@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::io::Write;
+use std::iter;
 use std::path::PathBuf;
 
 use file_ports::Files;
@@ -7,6 +8,7 @@ use file_ports::Files;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
@@ -32,10 +34,14 @@ impl Show {
 
 impl Step for Show {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Show, Failure<'static>> {
-        match arguments.as_slice() {
-            [] => Err(Failure::Usage),
-            _ => Ok(Show { journals: arguments.into_iter().map(|file| Journal::from(PathBuf::from(file))).collect() }),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let first = arguments.taken()?;
+        Ok(Show {
+            journals: iter::once(first)
+                .chain(arguments.rest())
+                .map(|file| Journal::from(PathBuf::from(file)))
+                .collect(),
+        })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

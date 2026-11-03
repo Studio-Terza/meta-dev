@@ -87,10 +87,9 @@ impl Script {
 
     fn recorded(&self, invocation: &Invocation) -> io::Result<()> {
         self.calls.borrow_mut().push(invocation.clone());
-        match self.failing {
-            Some(program) if invocation.program() == program => Err(io::Error::other("boom")),
-            _ => Ok(()),
-        }
+        self.failing
+            .filter(|program| invocation.program() == *program)
+            .map_or(Ok(()), |_| Err(io::Error::other("boom")))
     }
 
     fn answer_to(&self, invocation: &Invocation) -> String {
@@ -101,7 +100,11 @@ impl Script {
         ]
         .concat();
         self.answers.iter().find(|reply| reply.key == key).map_or_else(
-            || if invocation.program() == "git" { self.changed.clone() } else { self.metadata.clone() },
+            || {
+                Some(invocation.program())
+                    .filter(|program| *program == "git")
+                    .map_or_else(|| self.metadata.clone(), |_| self.changed.clone())
+            },
             |reply| reply.text.clone(),
         )
     }
@@ -170,7 +173,7 @@ impl Answer {
 
     fn refused(arguments: &[&str]) -> bool {
         let answer = Scratch::fresh().answer(&Script::new(), arguments);
-        answer.exit == ExitCode::FAILURE && answer.out.is_empty() && answer.err.contains("usage: ci ")
+        (answer.exit, answer.out.as_str(), answer.err.contains("usage: ci ")) == (ExitCode::FAILURE, "", true)
     }
 }
 
@@ -534,12 +537,16 @@ fn only_the_thirty_longest_crates_are_listed_but_all_are_counted() -> Result<(),
 
 #[test]
 fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> {
-    for page in ["<html></html>", "const UNIT_DATA = nope;", "const UNIT_DATA = [{\"name\": 3}];"] {
-        let Timings { answer, stored } = Page::timed(page)?;
-        assert_eq!(answer.exit, ExitCode::FAILURE, "{page}");
-        assert!(answer.err.contains("no unit timings in"), "{page}");
-        assert_eq!((answer.out.as_str(), stored.as_str()), ("", ""));
-    }
+    let pages = ["<html></html>", "const UNIT_DATA = nope;", "const UNIT_DATA = [{\"name\": 3}];"];
+    let refused = pages
+        .iter()
+        .map(|page| {
+            Page::timed(page).map(|Timings { answer, stored }| {
+                (*page, answer.exit, answer.err.contains("no unit timings in"), answer.out, stored)
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(refused, pages.map(|page| (page, ExitCode::FAILURE, true, String::new(), String::new())));
     let scratch = Scratch::new()?;
     let missing =
         scratch.answer(&Script::new(), &["compile-times", &scratch.file("none.html"), &scratch.file("report.txt")]);
@@ -674,7 +681,7 @@ fn an_empty_scope_is_said_in_the_output_and_the_summary_but_not_put_in_the_envir
 fn a_scope_with_crates_says_nothing_is_skipped() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let fake = Script { changed: "crates/leaf/src/lib.rs\n".to_owned(), ..Script::new() };
-    assert!(!scratch.answer(&fake, &Reach::on(&scratch, "pull_request")).out.contains("skipped"));
+    assert_eq!(scratch.answer(&fake, &Reach::on(&scratch, "pull_request")).out.matches("skipped").count(), 0);
     Ok(())
 }
 
@@ -696,7 +703,7 @@ fn tools_that_failed_to_build_are_not_copied() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let answer = scratch.answer(&Script::exiting(101), &["tools", &scratch.file("built"), &scratch.file("tools")]);
     assert_eq!(answer.exit, ExitCode::from(101));
-    assert!(!scratch.holds("tools"));
+    assert_eq!(scratch.kind_of("tools"), Kind::Missing);
     Ok(())
 }
 
@@ -762,7 +769,7 @@ fn a_tools_key_needs_metadata_cargo_can_give_and_reach_can_read() -> Result<(), 
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     let broken = Script { metadata: "not json".to_owned(), ..Script::new() };
     assert!(scratch.answer(&broken, &arguments).err.contains("reach failed: cannot parse cargo metadata"));
-    assert!(!scratch.holds("out"));
+    assert_eq!(scratch.kind_of("out"), Kind::Missing);
     Ok(())
 }
 
@@ -1203,18 +1210,23 @@ fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_wit
 
 #[test]
 fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<(), Box<dyn Error>> {
-    for (today, runs, said) in [
+    let cases = [
         ("39", "[11, 12]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
         ("41", "[12, 11]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
         ("45", "[]", "; no run of the previous 14 days to compare with, so no trend issue."),
-    ] {
-        let scratch = Scratch::new()?;
-        let fake = Script::answering(Cold::answers(runs, "[]"));
-        let answer = scratch.answer(&fake, &Cold::fortnight(&scratch, today)?);
-        assert_eq!(answer.exit, ExitCode::SUCCESS, "{}", answer.err);
-        assert_eq!(answer.out.matches(&format!("{said}\n")).count(), 1, "{}", answer.out);
-        assert!(fake.calls.borrow().iter().all(|call| call.arguments().first().is_some_and(|first| first == "run")));
-    }
+    ];
+    let concluded = cases
+        .iter()
+        .map(|(today, runs, said)| -> Result<(ExitCode, usize, bool), Box<dyn Error>> {
+            let scratch = Scratch::new()?;
+            let fake = Script::answering(Cold::answers(runs, "[]"));
+            let answer = scratch.answer(&fake, &Cold::fortnight(&scratch, today)?);
+            let only_runs =
+                fake.calls.borrow().iter().all(|call| call.arguments().first().is_some_and(|first| first == "run"));
+            Ok((answer.exit, answer.out.matches(&format!("{said}\n")).count(), only_runs))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(concluded, cases.map(|_| (ExitCode::SUCCESS, 1, true)));
     Ok(())
 }
 
@@ -1560,7 +1572,7 @@ fn a_shard_summary_without_shards_is_reported() -> Result<(), Box<dyn Error>> {
     let answer = scratch.answer(&Script::new(), &["shard-summary", &scratch.file("absent"), &scratch.file("sum")]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("absent"));
-    assert!(!scratch.holds("sum"));
+    assert_eq!(scratch.kind_of("sum"), Kind::Missing);
     Ok(())
 }
 
@@ -1727,8 +1739,8 @@ impl Scratch {
         self.files.write(&self.root.join(name), Bytes::from(text))
     }
 
-    fn holds(&self, name: &str) -> bool {
-        self.files.kind(&self.root.join(name)) != Kind::Missing
+    fn kind_of(&self, name: &str) -> Kind {
+        self.files.kind(&self.root.join(name))
     }
 
     fn path(&self) -> &Path {

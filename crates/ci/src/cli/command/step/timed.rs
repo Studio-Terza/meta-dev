@@ -7,6 +7,7 @@ use super::measured::Measured;
 use super::seconds::Seconds;
 use super::stage::Stage;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 
 #[derive(Debug)]
@@ -18,14 +19,16 @@ pub struct Timed {
 
 impl Step for Timed {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Timed, Failure<'static>> {
-        match arguments.as_slice() {
-            [measured, stage, program, rest @ ..] => Ok(Timed {
-                measured: Measured::file(Path::new(measured)),
-                stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
-                invocation: Invocation::new(program, rest),
-            }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let measured = &arguments.taken()?;
+        let stage = &arguments.taken()?;
+        let program = &arguments.taken()?;
+        let rest = arguments.rest();
+        Ok(Timed {
+            measured: Measured::file(Path::new(measured)),
+            stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
+            invocation: Invocation::new(program, rest),
+        })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

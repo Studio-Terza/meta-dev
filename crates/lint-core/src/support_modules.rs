@@ -36,19 +36,21 @@ impl SupportModules {
     }
 
     fn directory_of(path: &Path) -> PathBuf {
-        if path.file_name().is_some_and(|name| Self::ROOT_FILES.iter().any(|root| name == *root)) {
-            path.parent().map(Path::to_path_buf).unwrap_or_default()
-        } else {
-            path.with_extension("")
-        }
+        path.file_name()
+            .filter(|name| Self::ROOT_FILES.iter().any(|root| name == root))
+            .map_or_else(|| path.with_extension(""), |_| path.parent().map(Path::to_path_buf).unwrap_or_default())
     }
 }
 
 impl<'ast> Visit<'ast> for SupportModules {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         self.names.extend(
-            (module.content.is_none() && Walk::outside_tests(&module.attrs) == Walk::Skipped)
-                .then(|| Name::from(&module.ident)),
+            module
+                .content
+                .as_ref()
+                .map_or(Some(module), |_| None)
+                .filter(|module| Walk::outside_tests(&module.attrs) == Walk::Skipped)
+                .map(|module| Name::from(&module.ident)),
         );
         syn::visit::visit_item_mod(self, module);
     }

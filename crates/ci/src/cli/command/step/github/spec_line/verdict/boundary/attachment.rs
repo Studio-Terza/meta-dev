@@ -13,15 +13,15 @@ impl Attachment<'_> {
     const SHORTEST_ID_LEN: usize = 8;
 
     fn id_letter(letter: char) -> Option<char> {
-        Some(letter).filter(|letter| letter.is_ascii_hexdigit() || *letter == Self::DASH)
+        Some(letter).filter(char::is_ascii_hexdigit).or_else(|| Some(letter).filter(|letter| *letter == Self::DASH))
     }
 
     fn owner(value: &str) -> Option<&str> {
         let (_, id) = value.split_at_checked(Self::OWNER.len()).filter(|(head, _)| *head == Self::OWNER)?;
-        let start = id.get(..Self::SHORTEST_ID_LEN)?;
-        (start.chars().all(|letter| letter.is_ascii_hexdigit())
-            && id.chars().all(|letter| Self::id_letter(letter).is_some()))
-        .then_some(id)
+        id.get(..Self::SHORTEST_ID_LEN)
+            .filter(|start| start.chars().all(|letter| letter.is_ascii_hexdigit()))
+            .and(Some(id))
+            .filter(|id| id.chars().all(|letter| Self::id_letter(letter).is_some()))
     }
 
     fn labels(value: &str) -> Option<Reading> {
@@ -33,8 +33,11 @@ impl<'line> TryFrom<&'line str> for Attachment<'line> {
     type Error = NotWellFormed;
 
     fn try_from(value: &'line str) -> Result<Attachment<'line>, NotWellFormed> {
-        (value == Self::NONE || Self::owner(value).is_some() || Self::labels(value).is_some())
-            .then_some(Attachment(value))
+        Some(value)
+            .filter(|value| *value == Self::NONE)
+            .or_else(|| Self::owner(value).map(|_| value))
+            .or_else(|| Self::labels(value).map(|_| value))
+            .map(Attachment)
             .ok_or(NotWellFormed)
     }
 }
@@ -55,14 +58,61 @@ enum Reading {
 }
 
 impl Reading {
+    const TRANSITIONS: [(Reading, Mark, Reading); 12] = [
+        (Reading::Gap, Mark::Lower, Reading::Project),
+        (Reading::Gap, Mark::Digit, Reading::Project),
+        (Reading::Gap, Mark::Dash, Reading::Project),
+        (Reading::Project, Mark::Lower, Reading::Project),
+        (Reading::Project, Mark::Digit, Reading::Project),
+        (Reading::Project, Mark::Dash, Reading::Project),
+        (Reading::Project, Mark::Hash, Reading::Kind),
+        (Reading::Kind, Mark::KindLetter, Reading::Number),
+        (Reading::Number, Mark::Digit, Reading::Digits),
+        (Reading::Digits, Mark::Digit, Reading::Digits),
+        (Reading::Gap, Mark::Space, Reading::Gap),
+        (Reading::Digits, Mark::Comma, Reading::Gap),
+    ];
+
     fn after(self, letter: char) -> Option<Reading> {
-        match (self, letter) {
-            (Reading::Gap | Reading::Project, 'a'..='z' | '0'..='9' | '-') => Some(Reading::Project),
-            (Reading::Project, '#') => Some(Reading::Kind),
-            (Reading::Kind, 'D' | 'L') => Some(Reading::Number),
-            (Reading::Number | Reading::Digits, '0'..='9') => Some(Reading::Digits),
-            (Reading::Gap, ' ') | (Reading::Digits, ',') => Some(Reading::Gap),
-            _ => None,
-        }
+        let mark = Mark::from(letter);
+        Self::TRANSITIONS
+            .into_iter()
+            .filter(|(from, _, _)| *from == self)
+            .find(|(_, read, _)| *read == mark)
+            .map(|(_, _, to)| to)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mark {
+    Lower,
+    Digit,
+    Dash,
+    Hash,
+    KindLetter,
+    Space,
+    Comma,
+    Other,
+}
+
+impl Mark {
+    const SIGNS: [(char, Mark); 6] = [
+        ('-', Mark::Dash),
+        ('#', Mark::Hash),
+        ('D', Mark::KindLetter),
+        ('L', Mark::KindLetter),
+        (' ', Mark::Space),
+        (',', Mark::Comma),
+    ];
+}
+
+impl From<char> for Mark {
+    fn from(letter: char) -> Mark {
+        Some(letter)
+            .filter(char::is_ascii_lowercase)
+            .map(|_| Mark::Lower)
+            .or_else(|| Some(letter).filter(char::is_ascii_digit).map(|_| Mark::Digit))
+            .or_else(|| Self::SIGNS.into_iter().find(|(sign, _)| *sign == letter).map(|(_, mark)| mark))
+            .unwrap_or(Mark::Other)
     }
 }

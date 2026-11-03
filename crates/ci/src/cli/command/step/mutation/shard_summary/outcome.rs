@@ -22,11 +22,11 @@ impl Outcome {
 
 impl fmt::Display for Outcome {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Outcome::Caught => "caught",
-            Outcome::Missed => "missed",
-            Outcome::Timeout => "timeout",
-            Outcome::Unviable => "unviable",
-        })
+        match self {
+            Outcome::Caught => formatter.write_str("caught"),
+            Outcome::Missed => formatter.write_str("missed"),
+            Outcome::Timeout => formatter.write_str("timeout"),
+            Outcome::Unviable => formatter.write_str("unviable"),
+        }
     }
 }

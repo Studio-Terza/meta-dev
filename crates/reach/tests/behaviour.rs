@@ -60,7 +60,11 @@ impl Answer {
 
     fn refused(arguments: &[&str]) -> String {
         let answer = Answer::to(arguments);
-        if answer.exit == ExitCode::FAILURE && answer.out.is_empty() { answer.err } else { String::new() }
+        Some(answer)
+            .filter(|answer| answer.exit == ExitCode::FAILURE)
+            .filter(|answer| answer.out.is_empty())
+            .map(|answer| answer.err)
+            .unwrap_or_default()
     }
 }
 
@@ -125,9 +129,10 @@ fn a_dependency_served_by_a_patch_is_still_an_edge() {
 fn a_package_at_the_workspace_root_does_not_own_every_path() {
     let everything =
         ["REACH=2 of 2 crates", "BUILD_SCOPE=-p leaf -p root", "MUTANTS_SCOPE=--test-package=leaf --test-package=root"];
-    for changed in ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"] {
-        assert_eq!(Answer::said(&["affected", ROOTED, changed]), everything, "{changed}");
-    }
+    let changes = ["Cargo.lock", "rust-toolchain.toml", "crates/deleted/src/lib.rs", "src/lib.rs"];
+    let reached: Vec<(&str, Vec<String>)> =
+        changes.into_iter().map(|changed| (changed, Answer::said(&["affected", ROOTED, changed]))).collect();
+    assert_eq!(reached, changes.map(|changed| (changed, everything.map(String::from).to_vec())));
 }
 
 #[test]

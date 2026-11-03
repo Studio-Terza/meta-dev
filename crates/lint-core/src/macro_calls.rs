@@ -17,13 +17,13 @@ impl MacroCalls {
     fn step(input: ParseStream) -> syn::Result<Vec<Macro>> {
         let metavariable = input.parse::<Option<Token![$]>>()?;
         let attempt = input.fork();
-        match attempt.parse::<Macro>() {
-            Ok(found) => {
+        attempt.parse::<Macro>().map_or_else(
+            |_| input.parse().and_then(Self::skipped),
+            |found| {
                 input.advance_to(&attempt);
-                Ok(vec![found].into_iter().filter(|_| metavariable.is_none()).collect())
-            }
-            Err(_) => Self::skipped(input.parse()?),
-        }
+                Ok(metavariable.map_or_else(|| vec![found], |_| Vec::new()))
+            },
+        )
     }
 
     fn skipped(tree: TokenTree) -> syn::Result<Vec<Macro>> {
@@ -36,7 +36,7 @@ impl MacroCalls {
 
 impl Parse for MacroCalls {
     fn parse(input: ParseStream) -> syn::Result<MacroCalls> {
-        let steps = iter::from_fn(|| (!input.is_empty()).then(|| Self::step(input)));
+        let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::step(input)));
         steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|steps| MacroCalls(steps.into_iter().flatten().collect()))
     }
 }

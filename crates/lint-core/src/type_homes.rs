@@ -46,7 +46,7 @@ impl<'file> TypeHomes<'file> {
 
     fn declare(&mut self, name: Name) {
         let known = self.declared.entry(name).or_default();
-        let fresh = Some(self.reading).filter(|home| !known.contains(home));
+        let fresh = known.iter().find(|home| **home == self.reading).map_or(Some(self.reading), |_| None);
         known.extend(fresh);
     }
 }

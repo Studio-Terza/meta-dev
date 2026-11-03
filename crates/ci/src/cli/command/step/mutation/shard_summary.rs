@@ -14,6 +14,7 @@ use text_lines::Lines;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports, Text};
 use count::Count;
 use mutant::Mutant;
@@ -73,12 +74,11 @@ impl ShardSummary {
 
 impl Step for ShardSummary {
     fn from_arguments(arguments: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
-        match arguments.as_slice() {
-            [shards, summary] => {
-                Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let shards = &arguments.taken()?;
+        let summary = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

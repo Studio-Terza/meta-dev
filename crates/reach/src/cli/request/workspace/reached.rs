@@ -3,7 +3,7 @@ mod share;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use crate::cli::workspace::crate_count::CrateCount;
+use crate::cli::request::workspace::crate_count::CrateCount;
 use share::Share;
 use workspace_metadata::CrateName;
 
@@ -21,10 +21,10 @@ enum Flag {
 
 impl fmt::Display for Flag {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Flag::Cargo => "-p ",
-            Flag::Mutants => "--test-package=",
-        })
+        match self {
+            Flag::Cargo => formatter.write_str("-p "),
+            Flag::Mutants => formatter.write_str("--test-package="),
+        }
     }
 }
 

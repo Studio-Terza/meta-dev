@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use syn::visit::Visit;
-use syn::{File, ItemUse, UseTree};
+use syn::{File, ItemUse, UseRename, UseTree};
 
 use lint_layout::Name;
 use lint_layout::Word;
@@ -28,10 +28,18 @@ impl MacroAliases {
     fn renamed(&self, tree: &UseTree) -> Vec<Name> {
         match tree {
             UseTree::Path(path) => self.renamed(&path.tree),
-            UseTree::Rename(rename) if self.original == rename.ident => vec![Name::from(&rename.rename)],
+            UseTree::Rename(rename) => self.alias(rename),
             UseTree::Group(group) => group.items.iter().flat_map(|item| self.renamed(item)).collect(),
-            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => Vec::new(),
+            UseTree::Name(_) | UseTree::Glob(_) => Vec::new(),
         }
+    }
+
+    fn alias(&self, rename: &UseRename) -> Vec<Name> {
+        Some(rename)
+            .filter(|rename| self.original == rename.ident)
+            .map(|rename| Name::from(&rename.rename))
+            .into_iter()
+            .collect()
     }
 }
 

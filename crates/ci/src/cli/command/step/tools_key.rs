@@ -7,6 +7,7 @@ use super::changed::Changed;
 use super::install_tools::InstallTools;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
@@ -29,12 +30,11 @@ impl ToolsKey {
 
 impl Step for ToolsKey {
     fn from_arguments(arguments: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
-        match arguments.as_slice() {
-            [metadata, output] => {
-                Ok(ToolsKey { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let metadata = &arguments.taken()?;
+        let output = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(ToolsKey { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

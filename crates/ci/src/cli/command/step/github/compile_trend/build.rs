@@ -24,14 +24,24 @@ enum Part {
 
 impl Source {
     fn parsed(self, read: Result<Text, FileFailure>) -> Result<Part, Failure<'static>> {
-        match (self, read) {
-            (Source::Measured(journal) | Source::Page(journal), Err(failure)) => {
-                Err(Failure::unusable(journal, failure))
-            }
-            (Source::Measured(measured), Ok(text)) => toml::from_str(text.as_ref())
+        match read {
+            Ok(text) => self.part(&text),
+            Err(failure) => Err(Failure::unusable(self.into_journal(), failure)),
+        }
+    }
+
+    fn part(self, text: &Text) -> Result<Part, Failure<'static>> {
+        match self {
+            Source::Measured(measured) => toml::from_str(text.as_ref())
                 .map(Part::Stages)
                 .map_err(|source| Failure::Measured { path: measured.into(), source }),
-            (Source::Page(page), Ok(text)) => CompileTimes::per_crate(page, &text).map(Part::Crates),
+            Source::Page(page) => CompileTimes::per_crate(page, text).map(Part::Crates),
+        }
+    }
+
+    fn into_journal(self) -> Journal {
+        match self {
+            Source::Measured(journal) | Source::Page(journal) => journal,
         }
     }
 }

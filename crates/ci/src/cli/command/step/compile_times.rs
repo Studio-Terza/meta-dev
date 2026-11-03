@@ -15,6 +15,7 @@ use super::Step;
 use super::journal::Journal;
 use super::seconds::Seconds;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 use listing::Listing;
 use text_lines::OneLine;
@@ -47,12 +48,11 @@ impl CompileTimes {
 
 impl Step for CompileTimes {
     fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
-        match arguments.as_slice() {
-            [page, report] => {
-                Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let page = &arguments.taken()?;
+        let report = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

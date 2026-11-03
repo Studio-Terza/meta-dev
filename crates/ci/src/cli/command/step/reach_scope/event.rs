@@ -10,6 +10,6 @@ impl Event {
 
 impl From<&str> for Event {
     fn from(name: &str) -> Event {
-        if name == Self::PULL_REQUEST { Event::PullRequest } else { Event::Other }
+        Some(name).filter(|name| *name == Self::PULL_REQUEST).map_or(Event::Other, |_| Event::PullRequest)
     }
 }
