@@ -23,6 +23,18 @@ impl Node {
     }
 }
 
+impl AsRef<CrateName> for Node {
+    fn as_ref(&self) -> &CrateName {
+        &self.krate
+    }
+}
+
+impl AsRef<Name> for Node {
+    fn as_ref(&self) -> &Name {
+        &self.name
+    }
+}
+
 impl fmt::Display for Node {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}::{}", self.krate, self.name)

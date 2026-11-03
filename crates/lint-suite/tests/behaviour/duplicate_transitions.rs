@@ -109,3 +109,13 @@ fn an_inherent_function_beside_a_trait_impl_on_another_type_is_a_duplicate() {
     )]);
     assert!(text.contains("x::File -> x::Report has 2 transitions: x::Two::report"), "{text}");
 }
+
+#[test]
+fn a_name_declared_twice_in_one_crate_is_a_leaf() {
+    let text = Duplicates::of(&[
+        Duplicates::at("crates/x/src/lib.rs", "mod one;\nmod two;\nstruct Fix;\n"),
+        Duplicates::at("crates/x/src/one.rs", "struct Tally;\nimpl Tally {\n    fn fix(&self) -> Fix {}\n}\n"),
+        Duplicates::at("crates/x/src/two.rs", "struct Tally;\nimpl Tally {\n    fn fix(&self) -> Fix {}\n}\n"),
+    ]);
+    assert!(!text.contains("has 2 transitions"), "{text}");
+}
