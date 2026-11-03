@@ -4,7 +4,7 @@ use lint_core::Lint;
 use module_tree::ModuleTree;
 
 use lint_core::SourceFile;
-use lint_core::{Headline, Most, Report};
+use lint_core::{Bound, Headline, Report};
 
 #[derive(Debug)]
 pub struct ModuleNesting;
@@ -21,5 +21,5 @@ impl Lint for ModuleNesting {
 }
 
 impl ModuleNesting {
-    const REEXPORTS: Most = Most::new(8);
+    const REEXPORTS: Bound = Bound::Most(8);
 }

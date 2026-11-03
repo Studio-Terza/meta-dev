@@ -2,7 +2,7 @@ mod cut;
 mod item_count;
 mod tangle;
 
-use lint_core::{Least, Most, Site, Violation};
+use lint_core::{Bound, Site, Violation};
 use lint_placement::CrateFile;
 
 use cut::Cut;
@@ -17,8 +17,8 @@ pub struct CrateSummary<'file> {
 }
 
 impl<'file> CrateSummary<'file> {
-    const TANGLE_ITEMS: Most = Most::new(40);
-    const CUT_SIDE: Least = Least::new(5);
+    const TANGLE_ITEMS: Bound = Bound::Most(40);
+    const CUT_SIDE: Bound = Bound::Least(5);
 
     pub fn of_graph(crate_file: &'file CrateFile, graph: &ItemGraph) -> CrateSummary<'file> {
         let members = graph.tangles();

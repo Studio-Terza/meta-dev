@@ -12,7 +12,7 @@ use crate::crate_summary::cut::split::Split;
 use crate::crate_summary::item_count::ItemCount;
 use frontier::Frontier;
 use link::Link;
-use lint_core::Least;
+use lint_core::Bound;
 use lint_item_graph::Traversal;
 use lint_item_graph::{ItemGraph, NodeIndex};
 use newtype::{Counter, Newtype};
@@ -107,7 +107,7 @@ impl Condensed {
         Split::new(self.conductance(inside), origin(inside), origin(&every.difference(inside).copied().collect()))
     }
 
-    pub fn sweep(&self, floor: Least) -> Option<Split> {
+    pub fn sweep(&self, floor: Bound) -> Option<Split> {
         let order = Spectrum::new(&self.rows).sweep_order();
         let total = ItemCount::total(self.sizes.iter().copied());
         let candidates: Vec<(Conductance, ItemCount)> = order

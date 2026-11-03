@@ -8,8 +8,8 @@ use std::fmt;
 use crate::crate_summary::cut::conductance::Conductance;
 use crate::crate_summary::item_count::ItemCount;
 use condensed::{Condensed, TangleIndex};
+use lint_core::Bound;
 use lint_core::Fix;
-use lint_core::Least;
 use lint_item_graph::{ItemGraph, NodeIndex};
 use lint_layout::Name;
 use newtype::Counter;
@@ -23,7 +23,7 @@ pub struct Cut {
 }
 
 impl Cut {
-    pub fn best(graph: &ItemGraph, tangles: &[Vec<NodeIndex>], floor: Least) -> Option<Cut> {
+    pub fn best(graph: &ItemGraph, tangles: &[Vec<NodeIndex>], floor: Bound) -> Option<Cut> {
         let whole = Condensed::of_tangles(graph, tangles);
         let islands = whole.islands();
         let sweeps = islands.iter().filter_map(|island| whole.restricted(island).sweep(floor));
@@ -42,7 +42,7 @@ impl Cut {
         self.conductance
     }
 
-    fn apart(whole: &Condensed, islands: &[BTreeSet<TangleIndex>], floor: Least) -> Option<Split> {
+    fn apart(whole: &Condensed, islands: &[BTreeSet<TangleIndex>], floor: Bound) -> Option<Split> {
         let total: BTreeSet<TangleIndex> = islands.iter().flatten().copied().collect();
         let inside = Self::balanced(whole, islands, &total);
         let outside: BTreeSet<TangleIndex> = total.difference(&inside).copied().collect();

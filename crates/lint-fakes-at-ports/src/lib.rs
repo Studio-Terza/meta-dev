@@ -3,8 +3,8 @@ mod port_traits;
 
 use doubles::Doubles;
 pub use doubles::Kind;
-use lint_core::{Headline, Lint, Report, SourceFile};
-use lint_paths::{Imports, TestFile};
+use lint_core::{Headline, Lint, Report, SourceFile, TestFile};
+use lint_paths::Imports;
 pub use port_traits::PortTraits;
 
 #[derive(Debug)]

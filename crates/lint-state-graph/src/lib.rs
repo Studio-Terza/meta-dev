@@ -15,7 +15,7 @@ use lint_core::{Headline, Lint};
 use lint_file::FileLint;
 use variant_matches::VariantMatches;
 
-use lint_core::Most;
+use lint_core::Bound;
 use lint_core::Report;
 use lint_core::SourceFile;
 
@@ -47,5 +47,5 @@ impl Lint for StateGraph {
 }
 
 impl StateGraph {
-    const EDGES_PER_VERTEX: Most = Most::new(4);
+    const EDGES_PER_VERTEX: Bound = Bound::Most(4);
 }

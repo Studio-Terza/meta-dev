@@ -7,8 +7,8 @@ use finding::Finding;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Macro, Visibility};
 
+use lint_core::Bound;
 use lint_core::Macros;
-use lint_core::Most;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -44,7 +44,7 @@ impl Lint for PrivateFns {
 }
 
 impl PrivateFns {
-    const PER_TYPE: Most = Most::new(4);
+    const PER_TYPE: Bound = Bound::Most(4);
 
     fn private_fns(file: &syn::File) -> BTreeMap<TypeName, Vec<Name>> {
         let mut counter = PrivateFnCounter::default();

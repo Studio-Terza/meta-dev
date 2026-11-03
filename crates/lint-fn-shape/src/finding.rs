@@ -1,11 +1,11 @@
 use std::fmt;
 
+use lint_core::Bound;
 use lint_core::Fix;
-use lint_core::Most;
 
 pub enum Finding {
-    DeepNesting { most: Most },
-    WideSignature { most: Most },
+    DeepNesting { most: Bound },
+    WideSignature { most: Bound },
     BooleanLocal,
     TupleLocal,
     TupleAccumulator,

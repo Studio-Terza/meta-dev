@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use lint_core::SourceFile;
+use crate::source_file::SourceFile;
 use lint_placement::Role;
 
 #[derive(Clone, Copy, Debug)]

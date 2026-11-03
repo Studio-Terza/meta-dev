@@ -5,8 +5,8 @@ use quote::ToTokens;
 use syn::{Field, Index};
 
 use super::edge_scan::{Edge, EdgeCount};
+use lint_core::Bound;
 use lint_core::Fix;
-use lint_core::Most;
 use lint_core::Site;
 use lint_core::TypeName;
 use lint_layout::Name;
@@ -19,7 +19,7 @@ pub enum Finding<'found> {
     MutatesVertex { vertex: &'found TypeName },
     ViewReturnsVertex { target: &'found TypeName },
     DuplicateEdge { edge: &'found Edge<'found>, sites: &'found BTreeMap<Name, Site<'found>> },
-    CrowdedVertex { source: &'found TypeName, edges: EdgeCount, most: Most },
+    CrowdedVertex { source: &'found TypeName, edges: EdgeCount, most: Bound },
     ExposedField { field: &'found Field, index: Index, owner: Name },
     ForeignMatch { enum_name: &'found Name },
     UnreadableGraph,
