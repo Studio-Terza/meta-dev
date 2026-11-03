@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use crate::boundary::query_failure::QueryFailure;
+use crate::boundary::QueryFailure;
 use crate::query::Query;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
