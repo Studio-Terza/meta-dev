@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
 
-use syn::Ident;
+use syn::{Ident, ItemImpl, Type};
 
 use crate::casing::Casing;
 use crate::length::Length;
@@ -23,6 +23,23 @@ pub use prefix::Prefix;
 pub struct Name(String);
 
 impl Name {
+    #[must_use]
+    pub fn of_type(found: &Type) -> Option<Name> {
+        match found {
+            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn implementing(item: &ItemImpl, wanted: Word<'_>) -> Option<Name> {
+        item.trait_
+            .as_ref()
+            .and_then(|(_, path, _)| path.segments.last())
+            .filter(|last| last.ident == wanted.into_inner())
+            .and_then(|_| Self::of_type(&item.self_ty))
+    }
+
     #[must_use]
     pub fn length(&self) -> Length {
         Length::new(self.0.chars().count())

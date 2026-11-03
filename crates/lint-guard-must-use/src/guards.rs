@@ -7,10 +7,10 @@ use std::path::Path;
 
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, Token, Type};
+use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, Token};
 
 use lint_core::{Site, SourceFile, Walk};
-use lint_layout::{LineNumber, Name};
+use lint_layout::{LineNumber, Name, Word};
 use lint_paths::Module;
 
 use members::Members;
@@ -47,14 +47,6 @@ impl<'file> Guards<'file> {
             .modules
     }
 
-    fn dropped_type(item: &ItemImpl) -> Option<Name> {
-        item.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).filter(|last| last.ident == Self::DROP)?;
-        match item.self_ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
-    }
-
     fn declared(&mut self, attributes: &[Attribute], name: &Ident) {
         let site = Site::new(self.path, LineNumber::from(name.span()));
         self.members.declare(Name::from(name), attributes.iter().find_map(Self::mark).map_or(Some(site), |_| None));
@@ -87,7 +79,7 @@ impl<'ast> Visit<'ast> for Guards<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || self.members.drop_implemented(Self::dropped_type(item)));
+        Walk::enter(&item.attrs, || self.members.drop_implemented(Name::implementing(item, Word::new(Self::DROP))));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
@@ -103,10 +95,7 @@ impl<'ast> Visit<'ast> for Guards<'_> {
     }
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
-        let target = match item.ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
+        let target = Name::of_type(&item.ty);
         Walk::enter(&item.attrs, || self.members.alias(Name::from(&item.ident), target));
     }
 }
