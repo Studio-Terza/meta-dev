@@ -1,11 +1,10 @@
 use std::ffi::OsString;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::Disk;
+use file_ports::{Bytes, Files, Memory};
 use gate_limits::Cli;
-use ports::Fixture;
 
 const LIMITS: &str = "[test-run]\nwarn = 3\nblock = 5\n[clippy]\nwarn = 10.5\nblock = 20\n";
 const LIMIT: &str = "[test-run]\nwarn = 1\nblock = 2\n";
@@ -28,13 +27,14 @@ impl Run {
     }
 
     fn reported_only(name: &str, limits: &str, measured: &str, only: &[&str]) -> io::Result<Reported> {
-        let limits = Fixture::stored(&format!("{name}-limits.toml"), limits)?;
-        let measured = Fixture::stored(&format!("{name}-measured.toml"), measured)?;
+        let fixture = Fixture::default();
+        let limits = fixture.stored(&format!("{name}-limits.toml"), limits)?;
+        let measured = fixture.stored(&format!("{name}-measured.toml"), measured)?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let named = [limits.as_os_str().to_owned(), measured.as_os_str().to_owned()]
             .into_iter()
             .chain(only.iter().map(OsString::from));
-        let exit = Cli::from_args(named).report_to(&Disk, &mut out, &mut err);
+        let exit = Cli::from_args(named).report_to(&fixture.0, &mut out, &mut err);
         Ok(Reported {
             exit,
             out: String::from_utf8(out).map_err(io::Error::other)?,
@@ -104,28 +104,31 @@ fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
 
 #[test]
 fn a_run_fails_only_above_its_block_level() -> io::Result<()> {
-    let limits = Fixture::stored("within-limits.toml", LIMIT)?;
-    let measured = Fixture::stored("within-measured.toml", "test-run = 0.5\n")?;
-    assert_eq!(Run::cli(&limits, &measured).report_to(&Disk, &mut Vec::new(), &mut Vec::new()), ExitCode::SUCCESS);
-    let limits = Fixture::stored("blocked-limits.toml", LIMIT)?;
-    let measured = Fixture::stored("blocked-measured.toml", "test-run = 3\n")?;
-    assert_eq!(Run::cli(&limits, &measured).report_to(&Disk, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
+    let fixture = Fixture::default();
+    let limits = fixture.stored("within-limits.toml", LIMIT)?;
+    let measured = fixture.stored("within-measured.toml", "test-run = 0.5\n")?;
+    assert_eq!(Run::cli(&limits, &measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::SUCCESS);
+    let limits = fixture.stored("blocked-limits.toml", LIMIT)?;
+    let measured = fixture.stored("blocked-measured.toml", "test-run = 3\n")?;
+    assert_eq!(Run::cli(&limits, &measured).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
     Ok(())
 }
 
 #[test]
 fn an_unreadable_measurement_exits_with_failure() -> io::Result<()> {
-    let limits = Fixture::stored("unreadable-limits.toml", LIMIT)?;
-    let missing = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-such-measured.toml");
-    assert_eq!(Run::cli(&limits, &missing).report_to(&Disk, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
+    let fixture = Fixture::default();
+    let limits = fixture.stored("unreadable-limits.toml", LIMIT)?;
+    let missing = PathBuf::from("no-such-measured.toml");
+    assert_eq!(Run::cli(&limits, &missing).report_to(&fixture.0, &mut Vec::new(), &mut Vec::new()), ExitCode::FAILURE);
     Ok(())
 }
 
 #[test]
 fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result<()> {
-    let limits = Fixture::stored("past-limits.toml", LIMITS)?;
-    let measured = Fixture::stored("past-measured.toml", "test-run = 4\nclippy = 10")?;
-    let past = Run::cli(&limits, &measured).past_warn(&Disk).map_err(io::Error::other)?;
+    let fixture = Fixture::default();
+    let limits = fixture.stored("past-limits.toml", LIMITS)?;
+    let measured = fixture.stored("past-measured.toml", "test-run = 4\nclippy = 10")?;
+    let past = Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(io::Error::other)?;
     assert_eq!(past.iter().map(|finding| finding.stage().as_ref()).collect::<Vec<&str>>(), ["test-run"]);
     assert_eq!(
         past.iter().map(ToString::to_string).collect::<Vec<String>>(),
@@ -136,18 +139,20 @@ fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result
 
 #[test]
 fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
-    let limits = Fixture::stored("block-limits.toml", LIMITS)?;
-    let measured = Fixture::stored("block-measured.toml", "test-run = 6\nclippy = 10")?;
-    let past = Run::cli(&limits, &measured).past_warn(&Disk).map_err(io::Error::other)?;
+    let fixture = Fixture::default();
+    let limits = fixture.stored("block-limits.toml", LIMITS)?;
+    let measured = fixture.stored("block-measured.toml", "test-run = 6\nclippy = 10")?;
+    let past = Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(io::Error::other)?;
     assert_eq!(past.iter().map(|finding| finding.blocks().is_some()).collect::<Vec<bool>>(), [true]);
     Ok(())
 }
 
 #[test]
 fn limits_that_cannot_be_judged_list_nothing() -> io::Result<()> {
-    let limits = Fixture::stored("none-limits.toml", LIMITS)?;
-    let measured = Fixture::stored("none-measured.toml", "clippy = 10")?;
-    assert!(Run::cli(&limits, &measured).past_warn(&Disk).is_err());
+    let fixture = Fixture::default();
+    let limits = fixture.stored("none-limits.toml", LIMITS)?;
+    let measured = fixture.stored("none-measured.toml", "clippy = 10")?;
+    assert!(Run::cli(&limits, &measured).past_warn(&fixture.0).is_err());
     Ok(())
 }
 
@@ -192,6 +197,7 @@ fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Res
 
 #[test]
 fn a_record_blocks_only_above_itself_and_only_a_record_is_lowered() -> io::Result<()> {
+    let fixture = Fixture::default();
     let record = "cold-clippy = 50\n";
     let within = Run::reported("record-within", record, "cold-clippy = 50")?;
     assert_eq!(Text::lines(&within.out), ["ok: cold-clippy took 50s, record 50s, lowered only by ci ratchet-lower"]);
@@ -200,11 +206,11 @@ fn a_record_blocks_only_above_itself_and_only_a_record_is_lowered() -> io::Resul
     assert_eq!(above.exit, ExitCode::FAILURE);
     let unrecorded = Run::reported("record-missing", record, "cold-clippy = 1\ncold-test-compile = 1")?;
     assert!(unrecorded.err.contains("no usable limit"), "{}", unrecorded.err);
-    let levels = Fixture::stored("levels-limits.toml", LIMIT)?;
-    let measured = Fixture::stored("levels-measured.toml", "test-run = 0.5\n")?;
-    let refused = Run::cli(&levels, &measured).lower(&Disk).map_err(|failure| failure.to_string());
+    let levels = fixture.stored("levels-limits.toml", LIMIT)?;
+    let measured = fixture.stored("levels-measured.toml", "test-run = 0.5\n")?;
+    let refused = Run::cli(&levels, &measured).lower(&fixture.0).map_err(|failure| failure.to_string());
     assert!(refused.is_err_and(|reason| reason.contains("only the owner changes")));
-    assert_eq!(Text::lines(&Fixture::text(&levels)?), Text::lines(&LIMIT));
+    assert_eq!(Text::lines(&fixture.text(&levels)?), Text::lines(&LIMIT));
     Ok(())
 }
 
@@ -218,29 +224,25 @@ impl Text {
 
 #[test]
 fn a_record_is_lowered_to_the_measured_time() -> io::Result<()> {
-    let record = Fixture::stored("lowered-limits.toml", "cold-clippy = 50\n")?;
-    let measured = Fixture::stored("lowered-measured.toml", "cold-clippy = 40")?;
-    Run::cli(&record, &measured).lower(&Disk).map_err(io::Error::other)?;
-    assert_eq!(Text::lines(&Fixture::text(&record)?), ["cold-clippy = 40"]);
+    let fixture = Fixture::default();
+    let record = fixture.stored("lowered-limits.toml", "cold-clippy = 50\n")?;
+    let measured = fixture.stored("lowered-measured.toml", "cold-clippy = 40")?;
+    Run::cli(&record, &measured).lower(&fixture.0).map_err(io::Error::other)?;
+    assert_eq!(Text::lines(&fixture.text(&record)?), ["cold-clippy = 40"]);
     Ok(())
 }
 
-mod ports {
-    use std::fs;
-    use std::io;
-    use std::path::{Path, PathBuf};
+#[derive(Default)]
+struct Fixture(Memory);
 
-    pub struct Fixture;
+impl Fixture {
+    fn stored(&self, name: &str, text: &str) -> io::Result<PathBuf> {
+        let path = PathBuf::from(name);
+        self.0.write(&path, &Bytes::from(text))?;
+        Ok(path)
+    }
 
-    impl Fixture {
-        pub fn stored(name: &str, text: &str) -> io::Result<PathBuf> {
-            let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
-            fs::write(&path, text)?;
-            Ok(path)
-        }
-
-        pub fn text(path: &Path) -> io::Result<String> {
-            fs::read_to_string(path)
-        }
+    fn text(&self, path: &Path) -> io::Result<String> {
+        Ok(self.0.read_text(path)?.to_string())
     }
 }
