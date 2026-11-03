@@ -19,8 +19,13 @@ impl GraphLint for Tangles {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::Unlifted);
-        let reach: BTreeMap<&Node, BTreeSet<&Node>> =
-            consuming.nodes().map(|node| (node, Self::reached(node, &consuming))).collect();
+        let reach: BTreeMap<&Node, BTreeSet<&Node>> = consuming
+            .nodes()
+            .map(|node| {
+                let reached = consuming.closure(BTreeSet::from([node]));
+                (node, reached.into_iter().filter(|other| *other != node).collect())
+            })
+            .collect();
         let groups: BTreeSet<BTreeSet<&Node>> = reach
             .iter()
             .map(|(node, reached)| Self::component(node, reached, &reach))
@@ -52,12 +57,6 @@ impl Tangles {
             .filter(|other| reach.get(other).and_then(|back| back.get(node)).is_some())
             .chain([node])
             .collect()
-    }
-
-    fn reached<'graph>(start: &'graph Node, consuming: &Consuming<'graph, '_>) -> BTreeSet<&'graph Node> {
-        let mut reached = consuming.closure(BTreeSet::from([start]));
-        reached.remove(start);
-        reached
     }
 }
 

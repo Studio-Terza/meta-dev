@@ -49,10 +49,6 @@ impl Tuple {
         self.0.iter()
     }
 
-    pub(crate) fn first(&self) -> Option<&Node> {
-        self.0.first()
-    }
-
     pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node>) -> Option<&'tuple Tuple> {
         self.0.iter().all(|node| available.contains(node)).then_some(self)
     }
