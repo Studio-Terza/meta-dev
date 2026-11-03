@@ -4,7 +4,7 @@ use lint_core::{Site, Violation};
 use lint_layout::Fix;
 use newtype::Counter;
 
-use super::behaviour::{Behaviour, Move};
+use super::behaviour::{Behaviour, Move, SetAside};
 use crate::count::Count;
 use crate::end::Node;
 use crate::graph::Graph;
@@ -81,12 +81,14 @@ pub(super) struct Tally {
     nodes: Count,
     groups: Count,
     grouped: Count,
+    set_aside: SetAside,
 }
 
 impl Tally {
-    pub(super) fn counted(nodes: Count, groups: &[Group<'_>]) -> Tally {
+    pub(super) fn counted(nodes: Count, behaviour: &Behaviour<'_>, groups: &[Group<'_>]) -> Tally {
         Tally {
             nodes,
+            set_aside: behaviour.set_aside(),
             groups: Count::new(groups.len()),
             grouped: Count::total(groups.iter().map(|group| Count::new(group.members.len()))),
         }
@@ -97,8 +99,8 @@ impl fmt::Display for Tally {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "workspace: {} domain types, {} groups of bisimilar types holding {}",
-            self.nodes, self.groups, self.grouped
+            "workspace: {} domain types, {} groups of bisimilar types holding {}; set aside as grouped under their interface: {}",
+            self.nodes, self.groups, self.grouped, self.set_aside
         )
     }
 }
