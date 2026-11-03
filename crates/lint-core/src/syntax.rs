@@ -1,4 +1,4 @@
-use proc_macro2::{Group, Punct, TokenTree};
+use proc_macro2::{Group, Literal, Punct, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::{
     AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, Field, Fields, FnArg, GenericArgument, GenericParam,
@@ -193,6 +193,22 @@ impl Syntax {
     pub fn punct(tree: &TokenTree) -> Option<&Punct> {
         match tree {
             TokenTree::Punct(punct) => Some(punct),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn token_ident(tree: &TokenTree) -> Option<&Ident> {
+        match tree {
+            TokenTree::Ident(ident) => Some(ident),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn token_literal(tree: &TokenTree) -> Option<&Literal> {
+        match tree {
+            TokenTree::Literal(literal) => Some(literal),
             _ => None,
         }
     }
