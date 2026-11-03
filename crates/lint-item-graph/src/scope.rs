@@ -1,27 +1,22 @@
-mod breadth;
 mod import;
 mod imports;
-mod path_tokens;
 
 use std::collections::BTreeSet;
 use std::ptr;
 
 use lint_core::Walk;
-use lint_layout::{Name, UsePath};
-use proc_macro2::{Ident, TokenStream, TokenTree};
+use lint_layout::Name;
+use proc_macro2::{Ident, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};
 
-pub use breadth::Breadth;
 use import::Import;
 use imports::Imports;
-use path_tokens::PathTokens;
 
 #[derive(Debug, Default)]
 pub struct Scope<'file> {
     local_roots: BTreeSet<Name>,
     imports: Imports<'file>,
-    breadth: Breadth,
 }
 
 impl<'file> Scope<'file> {
@@ -34,35 +29,6 @@ impl<'file> Scope<'file> {
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
         scope.visit_file(file);
         scope
-    }
-
-    #[must_use]
-    pub fn reading(self, breadth: Breadth) -> Scope<'file> {
-        Scope { breadth, ..self }
-    }
-
-    #[must_use]
-    pub fn referenced(&self, tokens: TokenStream) -> Vec<UsePath> {
-        let path = PathTokens::new(tokens);
-        let segments: Vec<(&TokenTree, Name)> = path
-            .tokens()
-            .iter()
-            .zip(path.roots())
-            .filter_map(|(token, root)| match (token, root) {
-                (TokenTree::Ident(ident), Some(root)) => Some((token, root, Name::from(ident))),
-                _ => None,
-            })
-            .flat_map(|(token, root, name)| self.kept(token, root, name).into_iter().map(move |kept| (root, kept)))
-            .collect();
-        let nested = path.tokens().iter().flat_map(|token| match token {
-            TokenTree::Group(group) => self.referenced(group.stream()),
-            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => Vec::new(),
-        });
-        segments
-            .chunk_by(|(left, _), (right, _)| ptr::eq(*left, *right))
-            .map(|path| path.iter().map(|(_, segment)| segment.clone()).collect())
-            .chain(nested)
-            .collect()
     }
 
     #[must_use]
@@ -84,25 +50,19 @@ impl<'file> Scope<'file> {
         self.local_roots.get(head)
     }
 
-    fn kept(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
-        match self.breadth {
-            Breadth::Crate if ptr::eq(root, token) => self
-                .imports
-                .local_item(&name, &self.local_roots)
-                .map(|imports| imports.original(name))
-                .into_iter()
-                .collect(),
-            Breadth::Workspace if ptr::eq(root, token) => self.imports.path_of(&name).unwrap_or_else(|| vec![name]),
-            Breadth::Crate => self.local_root(Some(root)).map(|_| name).into_iter().collect(),
-            Breadth::Workspace => vec![name],
+    pub(crate) fn kept(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Option<Name> {
+        match root {
+            TokenTree::Ident(_) if ptr::eq(root, token) => {
+                self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name))
+            }
+            TokenTree::Ident(ident) => self.reaches(ident).map(|_| name),
+            TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         }
     }
 
-    fn local_root<'token>(&self, token: Option<&'token TokenTree>) -> Option<&'token Ident> {
-        match token? {
-            TokenTree::Ident(ident) => self.reaches(ident),
-            TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-        }
+    pub(crate) fn spelled(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Vec<Name> {
+        let imported = Some(root).filter(|root| ptr::eq(*root, token)).and_then(|_| self.imports.path_of(&name));
+        imported.unwrap_or_else(|| vec![name])
     }
 
     fn reaches<'token>(&self, ident: &'token Ident) -> Option<&'token Ident> {

@@ -5,7 +5,7 @@ mod traversal;
 
 pub use node_index::NodeIndex;
 pub use referenced_names::ReferencedNames;
-pub use scope::{Breadth, Scope};
+pub use scope::Scope;
 pub use traversal::Traversal;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,7 +25,7 @@ impl ItemGraph {
     pub fn of_files(files: &[&SourceFile]) -> ItemGraph {
         let references = files
             .iter()
-            .map(|file| ReferencedNames::of_file(file, Breadth::Crate))
+            .map(|file| ReferencedNames::of_file(file))
             .fold(ReferencedNames::default(), ReferencedNames::merged);
         references.into_graph()
     }

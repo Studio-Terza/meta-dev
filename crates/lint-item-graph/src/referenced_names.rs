@@ -1,6 +1,7 @@
 mod kind;
 mod macro_items;
 mod parameters;
+mod referenced;
 mod spoken;
 
 use std::borrow::Cow;
@@ -13,16 +14,18 @@ use lint_core::{SourceFile, Walk};
 use lint_layout::{Name, UsePath};
 
 use crate::ItemGraph;
-use crate::scope::{Breadth, Scope};
+use crate::scope::Scope;
 use kind::Kind;
 use macro_items::MacroItems;
 use parameters::Parameters;
+use referenced::Referenced;
 use spoken::Spoken;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ReferencedNames {
     declared: BTreeMap<Name, Vec<UsePath>>,
     implemented: BTreeMap<Name, Vec<UsePath>>,
+    across: BTreeMap<Name, Vec<UsePath>>,
     stand_ins: BTreeSet<Name>,
     types: BTreeSet<Name>,
 }
@@ -31,32 +34,34 @@ impl ReferencedNames {
     const UNNAMED: &str = "_";
 
     #[must_use]
-    pub fn of_file(file: &SourceFile, breadth: Breadth) -> ReferencedNames {
-        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()).reading(breadth))
+    pub fn of_file(file: &SourceFile) -> ReferencedNames {
+        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
     }
 
     #[must_use]
-    pub fn into_uses(self) -> BTreeMap<Name, BTreeSet<UsePath>> {
-        let all = Self::united(self.declared, self.implemented);
-        all.into_iter().map(|(owner, uses)| (owner, uses.into_iter().collect())).collect()
+    pub fn uses(&self) -> BTreeMap<&Name, BTreeSet<&UsePath>> {
+        self.across.iter().map(|(owner, uses)| (owner, uses.iter().collect())).collect()
     }
 
     pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
-    pub(crate) fn merged(mut self, other: ReferencedNames) -> ReferencedNames {
+    #[must_use]
+    pub fn merged(mut self, other: ReferencedNames) -> ReferencedNames {
         self.stand_ins.extend(other.stand_ins);
         self.types.extend(other.types);
         ReferencedNames {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
+            across: Self::united(self.across, other.across),
             ..self
         }
     }
 
-    pub(crate) fn into_graph(self) -> ItemGraph {
-        let ReferencedNames { declared, implemented, stand_ins, types } = self;
+    #[must_use]
+    pub fn into_graph(self) -> ItemGraph {
+        let ReferencedNames { declared, implemented, stand_ins, types, .. } = self;
         let foreign = implemented.into_iter().filter(|(owner, _)| declared.contains_key(owner)).collect();
         let named =
             Self::united(declared, foreign).into_iter().map(|(owner, uses)| (owner, Self::naming(&uses, &types)));
@@ -99,30 +104,25 @@ impl ReferencedNames {
             Walk::Entered => {
                 let parameters = &Parameters::of_item(item);
                 let own = match item {
-                    Item::Impl(item) => ReferencedNames {
-                        implemented: Self::named(Name::of_type(&item.self_ty), scope, parameters, item),
-                        ..ReferencedNames::default()
-                    },
-                    _ => Kind::of_item(item).declaring(owner.clone()).merged(ReferencedNames {
-                        declared: Self::named(owner, scope, parameters, Spoken::of_item(item)),
-                        ..ReferencedNames::default()
-                    }),
+                    Item::Impl(item) => {
+                        let read = Self::named(Name::of_type(&item.self_ty), scope, parameters, item);
+                        ReferencedNames { implemented: read.declared, declared: BTreeMap::new(), ..read }
+                    }
+                    _ => Kind::of_item(item).declaring(owner.clone()).merged(Self::named(
+                        owner,
+                        scope,
+                        parameters,
+                        Spoken::of_item(item),
+                    )),
                 };
                 self.merged(own).merged(Self::of_items(&nested, scope))
             }
         }
     }
 
-    fn named(
-        owner: Option<Name>,
-        scope: &Scope<'_>,
-        parameters: &Parameters,
-        item: impl ToTokens,
-    ) -> BTreeMap<Name, Vec<UsePath>> {
-        owner
-            .filter(|owner| *owner != Self::UNNAMED)
-            .map(|owner| (owner, parameters.unbound(scope.referenced(item.into_token_stream()))))
-            .into_iter()
-            .collect()
+    fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
+        owner.filter(|owner| *owner != Self::UNNAMED).map_or_else(ReferencedNames::default, |owner| {
+            Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
+        })
     }
 }
