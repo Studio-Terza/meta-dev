@@ -6,6 +6,7 @@ pub(crate) struct Expansion;
 impl Expansion {
     const OPEN: char = '{';
     const CLOSE: char = '}';
+    const UNDERSCORE: char = '_';
 }
 
 impl<'text> TryFrom<Text<'text>> for Expansion {
@@ -17,7 +18,10 @@ impl<'text> TryFrom<Text<'text>> for Expansion {
         spelled
             .get(..end)
             .filter(|_| spelled.chars().next().is_none_or(|letter| letter != Self::OPEN))
-            .filter(|name| name.chars().any(|letter| !letter.is_alphanumeric() && letter != '_'))
+            .filter(|name| {
+                name.chars().filter(|letter| letter.is_alphanumeric()).count() + name.matches(Self::UNDERSCORE).count()
+                    < name.chars().count()
+            })
             .map(|_| Expansion)
             .ok_or(rest)
     }

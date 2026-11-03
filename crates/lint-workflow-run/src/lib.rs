@@ -26,10 +26,10 @@ impl WorkflowRun {
             .read()
             .map_err(Excerpt::from)
             .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from));
-        match text {
-            Ok(text) => Self::violations_in(file, Document::try_from(text.as_str()), actions),
-            Err(reason) => vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
-        }
+        text.map_or_else(
+            |reason| vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
+            |text| Self::violations_in(file, Document::try_from(text.as_str()), actions),
+        )
     }
 
     fn violations_in<'file>(
