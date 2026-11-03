@@ -17,7 +17,7 @@ pub struct Staged {
 }
 
 impl Staged {
-    pub fn under(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Staged, Failure>> {
+    pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Staged, Failure>> {
         let targets = Roots::under(files, trees);
         let repo_files = RepoFiles::under(files, trees);
         trees
@@ -36,13 +36,14 @@ impl Staged {
     }
 
     #[must_use]
-    pub fn starts<'tree>(&self, tree: &'tree Tree) -> Vec<Node<'tree>> {
+    pub fn starts<'tree>(&self, tree: &'tree Tree<'tree>) -> Vec<Node<'tree>> {
         self.targets
             .iter()
-            .map(|root| {
-                let file = root.clone().into_file();
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
-                Located::new(tree, root.package(), &file).node(&children)
+            .flat_map(|target| {
+                target.files().iter().map(move |file| {
+                    let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
+                    Located::new(tree, target.package(), file).node(&children)
+                })
             })
             .collect()
     }

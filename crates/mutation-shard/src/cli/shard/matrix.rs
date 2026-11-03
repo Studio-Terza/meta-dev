@@ -23,7 +23,7 @@ impl<'log> Matrix<'log> {
     pub fn write(&self, files: &impl Files, destination: &Path) -> Result<(), Failure> {
         let failed = |source| Failure::Parse { path: destination.to_path_buf(), source };
         files
-            .write(destination, &Bytes::from(serde_json::to_string(self).map_err(failed)?.as_str()))
+            .write(destination, Bytes::from(serde_json::to_string(self).map_err(failed)?.as_str()))
             .map_err(|failure| Failure::Io { path: destination.to_path_buf(), source: io::Error::from(failure) })
     }
 }

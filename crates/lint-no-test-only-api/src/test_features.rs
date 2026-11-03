@@ -1,4 +1,7 @@
-use proc_macro2::{Ident, Literal, TokenStream, TokenTree};
+use std::borrow::Cow;
+use std::iter;
+
+use proc_macro2::{Literal, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Lit, Macro};
@@ -30,12 +33,18 @@ impl TestFeatures {
         Self::CONDITIONS.iter().find(|condition| path.is_ident(condition)).map(|_| path)
     }
 
-    fn flagged(key: &Ident, value: &Literal) -> Option<Flagged> {
-        match Lit::new(value.clone()) {
-            Lit::Str(feature) if key == Self::FEATURE => {
+    fn feature_key(tree: &TokenTree) -> Option<LineNumber> {
+        match tree {
+            TokenTree::Ident(key) if key == Self::FEATURE => Some(LineNumber::from(key.span())),
+            _ => None,
+        }
+    }
+
+    fn flagged(line: LineNumber, value: Literal) -> Option<Flagged> {
+        match Lit::new(value) {
+            Lit::Str(feature) => {
                 let name = Name::from(feature.value().as_str());
-                FeatureWord::test_word(&name)
-                    .map(|_| Flagged::new(LineNumber::from(key.span()), Finding::Feature(name)))
+                FeatureWord::test_word(&name).map(|_| Flagged::new(line, Finding::Feature(Cow::Owned(name))))
             }
             _ => None,
         }
@@ -43,15 +52,26 @@ impl TestFeatures {
 
     fn scanned(tokens: TokenStream) -> Vec<Flagged> {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
-        let here = trees.iter().zip(trees.iter().skip(Self::VALUE_INDEX)).filter_map(|pair| match pair {
-            (TokenTree::Ident(key), TokenTree::Literal(value)) => Self::flagged(key, value),
-            _ => None,
-        });
-        let nested = trees.iter().filter_map(|tree| match tree {
-            TokenTree::Group(group) => Some(group.stream()),
-            _ => None,
-        });
-        here.chain(nested.flat_map(Self::scanned)).collect()
+        let keys: Vec<Option<LineNumber>> =
+            iter::repeat_n(None, Self::VALUE_INDEX).chain(trees.iter().map(Self::feature_key)).collect();
+        let nested: Vec<Flagged> = trees
+            .iter()
+            .filter_map(|tree| match tree {
+                TokenTree::Group(group) => Some(group.stream()),
+                _ => None,
+            })
+            .flat_map(Self::scanned)
+            .collect();
+        let mut here: Vec<Flagged> = trees
+            .into_iter()
+            .zip(keys)
+            .filter_map(|pair| match pair {
+                (TokenTree::Literal(value), Some(line)) => Self::flagged(line, value),
+                _ => None,
+            })
+            .collect();
+        here.extend(nested);
+        here
     }
 }
 

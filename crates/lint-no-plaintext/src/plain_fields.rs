@@ -2,10 +2,10 @@ mod finding;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{Attribute, Field, Fields, ItemEnum, ItemMod, ItemStruct};
+use syn::{Attribute, Field, Fields, Ident, ItemEnum, ItemMod, ItemStruct};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_layout::{LineNumber, Name};
+use lint_layout::LineNumber;
 
 use crate::attributes::Attributes;
 use crate::text_mention::TextMention;
@@ -33,12 +33,12 @@ impl<'scan, 'file> PlainFields<'scan, 'file> {
         }
     }
 
-    fn inspect(&mut self, owner: &Name, fields: &Fields) {
+    fn inspect(&mut self, owner: &Ident, fields: &Fields) {
         let file = self.file;
         let wrappers = self.wrappers;
         self.found.extend(fields.iter().filter(|field| TextMention::in_type(&field.ty, wrappers).is_some()).map(
             |field: &Field| {
-                let context = field.ident.as_ref().map_or_else(|| owner.clone(), Name::from);
+                let context = field.ident.as_ref().unwrap_or(owner);
                 Violation::new(Site::new(file.path(), LineNumber::from(field.ty.span())), Finding::FreeText { context })
             },
         ));
@@ -52,7 +52,7 @@ impl<'ast> Visit<'ast> for PlainFields<'_, '_> {
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         match Self::read_in(&item.attrs) {
-            Walk::Entered => self.inspect(&Name::from(&item.ident), &item.fields),
+            Walk::Entered => self.inspect(&item.ident, &item.fields),
             Walk::Skipped => {}
         }
     }
@@ -60,7 +60,7 @@ impl<'ast> Visit<'ast> for PlainFields<'_, '_> {
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         match Self::read_in(&item.attrs) {
             Walk::Entered => {
-                item.variants.iter().for_each(|variant| self.inspect(&Name::from(&variant.ident), &variant.fields));
+                item.variants.iter().for_each(|variant| self.inspect(&variant.ident, &variant.fields));
             }
             Walk::Skipped => {}
         }

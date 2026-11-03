@@ -32,7 +32,7 @@ impl Checkout {
         let mirrored = Memory::default();
         manifests.iter().zip(Disk.read_many(&manifests)).try_for_each(|(manifest, read)| {
             manifest.parent().map_or(Ok(()), |parent| mirrored.create_directories(parent))?;
-            mirrored.write(manifest, &read?)
+            mirrored.write(manifest, read?)
         })?;
         Ok(mirrored)
     }

@@ -356,15 +356,15 @@ impl Repository {
     fn new() -> Result<Repository, Box<dyn Error>> {
         let repository = Repository { files: Repository::metadata(), root: PathBuf::from("/repository") };
         repository.files.create_directories(&repository.root)?;
-        repository.files.write(&repository.root.join("Cargo.toml"), &Bytes::from(WORKSPACE_MANIFEST))?;
+        repository.files.write(&repository.root.join("Cargo.toml"), Bytes::from(WORKSPACE_MANIFEST))?;
         Ok(repository)
     }
 
     fn with_crate(self, name: &str, source: &str) -> Result<Repository, Box<dyn Error>> {
         let directory = self.root.join("crates").join(name);
         self.files.create_directories(&directory.join("src"))?;
-        self.files.write(&directory.join("Cargo.toml"), &Bytes::from(&format!("[package]\nname = \"{name}\"\n")))?;
-        self.files.write(&directory.join("src/lib.rs"), &Bytes::from(source))?;
+        self.files.write(&directory.join("Cargo.toml"), Bytes::from(&format!("[package]\nname = \"{name}\"\n")))?;
+        self.files.write(&directory.join("src/lib.rs"), Bytes::from(source))?;
         Ok(self)
     }
 

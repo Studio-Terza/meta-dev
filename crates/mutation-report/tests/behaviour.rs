@@ -316,7 +316,7 @@ impl Checkout {
     fn write(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), FileFailure> {
         let file = self.path(name);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, &Bytes::new(text.as_ref().to_vec()))
+        self.files.write(&file, Bytes::new(text.as_ref().to_vec()))
     }
 
     fn directory(&self, name: &str) -> Result<(), FileFailure> {

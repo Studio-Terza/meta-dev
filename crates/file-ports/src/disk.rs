@@ -16,7 +16,7 @@ impl Files for Disk {
         Ok(Text::new(fs::read_to_string(path)?))
     }
 
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
         Ok(fs::write(path, bytes)?)
     }
 

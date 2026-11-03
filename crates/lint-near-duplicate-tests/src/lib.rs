@@ -11,32 +11,22 @@ use lint_core::Violation;
 use lint_core::{Headline, Lint};
 use lint_placement::PackageRoot;
 use test_bodies::TestBodies;
-use test_body::TestBody;
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct RepeatKey {
-    package: PackageRoot,
-    shape: BodyShape,
-}
+use test_body::Repeat;
 
 #[derive(Debug)]
 pub struct NearDuplicateTests;
 
 impl NearDuplicateTests {
-    fn grouped(files: &[SourceFile]) -> BTreeMap<RepeatKey, Vec<TestBody<'_>>> {
+    fn grouped(files: &[SourceFile]) -> BTreeMap<&PackageRoot, BTreeMap<BodyShape, Vec<Repeat<'_>>>> {
         files.iter().fold(BTreeMap::new(), |groups, file| {
-            TestBodies::found(file).into_iter().fold(
-                groups,
-                |mut groups: BTreeMap<RepeatKey, Vec<TestBody<'_>>>, body| {
-                    let key = RepeatKey { package: file.placement().package().clone(), shape: body.shape().clone() };
-                    groups.entry(key).or_default().push(body);
-                    groups
-                },
-            )
+            TestBodies::found(file).into_iter().fold(groups, |mut groups, body| {
+                body.filed(file.placement().package(), &mut groups);
+                groups
+            })
         })
     }
 
-    fn repeats<'file>(group: &[TestBody<'file>]) -> Vec<Violation<'file>> {
+    fn repeats<'file>(group: &[Repeat<'file>]) -> Vec<Violation<'file>> {
         group
             .iter()
             .skip(1)
@@ -50,7 +40,7 @@ impl Lint for NearDuplicateTests {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("tests differ by more than their literals"),
-            Self::grouped(files).values().flat_map(|group| Self::repeats(group)).collect(),
+            Self::grouped(files).values().flat_map(BTreeMap::values).flat_map(|group| Self::repeats(group)).collect(),
         )
     }
 }

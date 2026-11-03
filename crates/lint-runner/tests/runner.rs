@@ -199,7 +199,7 @@ impl Scratch {
     fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
         let file = self.at(path);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, &Bytes::from(text))
+        self.files.write(&file, Bytes::from(text))
     }
 
     fn write_below(&self, directory: &str, path: &str, text: &str) -> Result<(), FileFailure> {

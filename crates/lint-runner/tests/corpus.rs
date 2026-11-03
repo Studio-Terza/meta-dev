@@ -55,7 +55,7 @@ impl Corpus {
                     .iter()
                     .try_for_each(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
             }
-            _ => into.write(target, &corpus.read(found)?),
+            _ => into.write(target, corpus.read(found)?),
         }
     }
 

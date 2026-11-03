@@ -7,7 +7,7 @@ pub trait Files {
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure>;
 
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure>;
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure>;
 
     fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure>;
 
@@ -63,7 +63,7 @@ pub trait Files {
         into.create_directories(root)?;
         self.entries(root)?.iter().try_for_each(|path| match self.kind(path) {
             Kind::Directory => self.mirror(path, into),
-            _ => into.write(path, &self.read(path)?),
+            _ => into.write(path, self.read(path)?),
         })
     }
 }

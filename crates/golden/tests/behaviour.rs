@@ -194,16 +194,16 @@ mod fixture {
         pub fn with_recorded(text: &str) -> Result<Self, FileFailure> {
             let fixture = Self::new()?;
             fixture.files.create_directories(&Path::new(Self::PACKAGE).join(Self::GOLDENS).join("nested"))?;
-            fixture.files.write(&Self::path(), &Bytes::from(text))?;
+            fixture.files.write(&Self::path(), Bytes::from(text))?;
             Ok(fixture)
         }
 
         pub fn overwrite(&self, bytes: &[u8]) -> Result<(), FileFailure> {
-            self.files.write(&Self::path(), &Bytes::new(bytes.to_vec()))
+            self.files.write(&Self::path(), Bytes::new(bytes.to_vec()))
         }
 
         pub fn mark_package(&self) -> Result<(), FileFailure> {
-            self.files.write(&Path::new(Self::PACKAGE).join("Cargo.toml"), &Bytes::from("[package]\nname = \"a\"\n"))
+            self.files.write(&Path::new(Self::PACKAGE).join("Cargo.toml"), Bytes::from("[package]\nname = \"a\"\n"))
         }
 
         pub fn text(&self) -> Result<String, FileFailure> {

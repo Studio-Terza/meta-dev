@@ -9,11 +9,11 @@ use crate::finding::Finding;
 #[derive(Debug)]
 pub(crate) struct Flagged {
     line: LineNumber,
-    finding: Finding,
+    finding: Finding<'static>,
 }
 
 impl Flagged {
-    pub(crate) fn new(line: LineNumber, finding: Finding) -> Flagged {
+    pub(crate) fn new(line: LineNumber, finding: Finding<'static>) -> Flagged {
         Flagged { line, finding }
     }
 
