@@ -7,14 +7,14 @@ use lint_item_graph::ItemGraph;
 use super::cluster::{Cluster, Part};
 use super::link::Link;
 use super::member::Member;
-use super::{ClusterLint, Containment};
+use super::{ClusterLint, Containment, Toward};
 
 #[derive(Debug)]
 pub struct AcyclicQuotients;
 
 impl ClusterLint for AcyclicQuotients {
     const HEADLINE: Headline = Headline::new(
-        "report only, the parts of each cluster are layered: collapse the crates of the workspace, and the own file and child modules of each crate and module, into single nodes of the type and trait graph, and no group of them uses one another in a cycle",
+        "report only, the parts of each cluster are layered: collapse the crates of the workspace, and the own file and child modules of each crate and module, into single nodes of the definition graph that layering reads (fields, variants and bounds), and no group of them depends on one another in a cycle; signatures and bodies may cycle, as functions do",
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
@@ -40,7 +40,7 @@ impl<'found> Cycle<'found> {
         let part = |member: Member<'found>| Part::toward(cluster, member.cluster());
         let parts = |link: &Link<'found>| link.ends().map(part);
         let crossing: Vec<Link<'found>> = view
-            .links_within(&members)
+            .links_within(&members, Toward::Defined)
             .into_iter()
             .filter(|link| {
                 let [from, to] = parts(link);

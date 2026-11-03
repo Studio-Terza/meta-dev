@@ -42,6 +42,7 @@ pub trait ClusterLint {
 pub(crate) enum Toward {
     Used,
     Users,
+    Defined,
 }
 
 #[derive(Debug)]
@@ -49,6 +50,7 @@ pub struct Containment<'found, 'file> {
     sites: BTreeMap<Member<'found>, Site<'file>>,
     uses: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     users: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
+    defines: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
 }
 
 impl<'found, 'file> Containment<'found, 'file> {
@@ -78,7 +80,11 @@ impl<'found, 'file> Containment<'found, 'file> {
             })
             .collect();
         let resolver = &Resolver::of_members(placed.keys().copied());
-        let defined = placed.iter().flat_map(|(member, declaration)| declaration.links(*member, resolver));
+        let defined: BTreeSet<Link<'found>> = placed
+            .iter()
+            .flat_map(|(member, declaration)| declaration.links(*member, resolver))
+            .filter_map(Link::apart)
+            .collect();
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
         let crates = files.iter().filter_map(SourceFile::shipped).fold(
             BTreeMap::new(),
@@ -88,7 +94,8 @@ impl<'found, 'file> Containment<'found, 'file> {
             },
         );
         let bodies = crates.iter().flat_map(|(krate, files)| resolver.bodies(krate, &ItemGraph::of_files(files)));
-        let links: BTreeSet<Link<'found>> = defined.chain(signed).chain(bodies).filter_map(Link::apart).collect();
+        let links: BTreeSet<Link<'found>> =
+            defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
         Containment {
             sites: placed
                 .iter()
@@ -96,6 +103,7 @@ impl<'found, 'file> Containment<'found, 'file> {
                 .collect(),
             uses: Self::adjacency(links.iter().copied()),
             users: Self::adjacency(links.iter().copied().map(Link::reversed)),
+            defines: Self::adjacency(defined.into_iter()),
         }
     }
 
@@ -128,14 +136,15 @@ impl<'found, 'file> Containment<'found, 'file> {
         let adjacency = match toward {
             Toward::Used => &self.uses,
             Toward::Users => &self.users,
+            Toward::Defined => &self.defines,
         };
         adjacency.get(&member).into_iter().flatten().copied()
     }
 
-    pub(crate) fn links_within(&self, members: &BTreeSet<Member<'found>>) -> Vec<Link<'found>> {
+    pub(crate) fn links_within(&self, members: &BTreeSet<Member<'found>>, toward: Toward) -> Vec<Link<'found>> {
         members
             .iter()
-            .flat_map(|member| self.adjacent(*member, Toward::Used).map(|used| Link::new(*member, used)))
+            .flat_map(|member| self.adjacent(*member, toward).map(|used| Link::new(*member, used)))
             .filter(|link| link.ends().iter().all(|end| members.contains(end)))
             .collect()
     }

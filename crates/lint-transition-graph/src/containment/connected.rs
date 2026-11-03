@@ -6,7 +6,7 @@ use lint_core::{Fix, Headline, Violation};
 use super::cluster::{Cluster, Level, Part};
 use super::groups::Groups;
 use super::member::Member;
-use super::{ClusterLint, Containment};
+use super::{ClusterLint, Containment, Toward};
 
 #[derive(Debug)]
 pub struct ConnectedClusters;
@@ -41,7 +41,7 @@ impl<'found> Divided<'found> {
             Level::Module => nested.map(|_| cluster),
             Level::Workspace => None,
         };
-        let links = view.links_within(&members);
+        let links = view.links_within(&members, Toward::Used);
         let groups = judged.and_then(|_| Groups::linked(&members, links.into_iter()).split())?;
         Some(Divided { cluster, members, groups })
     }

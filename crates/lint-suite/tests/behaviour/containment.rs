@@ -193,3 +193,16 @@ fn an_unqualified_name_resolves_to_the_one_crate_declaring_it() {
         ]
     );
 }
+
+#[test]
+fn a_cycle_closed_only_through_a_signature_is_not_reported() {
+    let signed = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl A {\n    fn b(&self) -> crate::b::B {}\n}\n"),
+        Clustered::at("crates/x/src/b.rs", "pub struct B(crate::a::A);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&signed, |view| view.report::<AcyclicQuotients>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}

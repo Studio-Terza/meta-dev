@@ -111,7 +111,7 @@ linked by fields, variants, bounds, trait impls and the signatures of their meth
 `layering` and the transition graph. One engine (`Containment`, with a `ClusterLint` per check) runs every check at the
 crate and the module level: `connected_clusters` (each crate and each directory module is one connected piece),
 `acyclic_quotients` (the crates of the workspace, and the own file and child modules of each crate and module, collapsed
-to single nodes, form no cycle), `interface_by_consumers` and `interface_by_internals` (a cluster's exports, the types and
+to single nodes of the definition graph `layering` reads, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` and `interface_by_internals` (a cluster's exports, the types and
 traits used from outside it, form one group when linked by a shared outside user, or by a shared private item),
 `lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users) and `deep_clusters` (a
 cluster with an interface that exports fewer items than it keeps private). There are no thresholds.
