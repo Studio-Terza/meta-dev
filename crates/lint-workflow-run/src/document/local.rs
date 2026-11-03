@@ -2,6 +2,7 @@ use crate::actions::Actions;
 use crate::document::found::Found;
 use crate::document::node::Node;
 use crate::document::text::Text;
+use crate::excerpt::Excerpt;
 use crate::finding::Finding;
 
 #[derive(Debug)]
@@ -12,10 +13,10 @@ impl Local {
 
     pub(crate) fn finding(used: Node<'_, '_>, actions: Actions<'_>) -> Option<Found> {
         let target = used.text()?;
-        let local = Text::new(target).after(Text::new(Self::PREFIX))?;
+        let local = target.after(Text::new(Self::PREFIX))?;
         match actions.resolving(local.path()) {
             Some(_) => None,
-            None => Some(Found::new(used.line(), Finding::LocalAction { target: target.to_owned() })),
+            None => Some(Found::new(used.line(), Finding::LocalAction { target: Excerpt::from(target) })),
         }
     }
 }
