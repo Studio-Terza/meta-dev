@@ -2,10 +2,10 @@ use std::marker::PhantomData;
 
 use lint_core::{Lint, Report, SourceFile};
 use transition_facts::Transitions;
+use type_facts::Facts;
 
 use crate::Containment;
 use crate::containment::ClusterLint;
-use type_facts::Facts;
 
 pub trait GraphLint {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file>;
