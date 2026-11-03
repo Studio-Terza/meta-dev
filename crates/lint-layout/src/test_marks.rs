@@ -1,10 +1,12 @@
+mod whole;
+
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Macro, PathSegment, Token};
 
 use crate::name::Name;
-use crate::whole::Whole;
 use crate::word::Word;
 use crate::words;
+pub use whole::Whole;
 
 #[derive(Debug)]
 pub struct TestMarks;
