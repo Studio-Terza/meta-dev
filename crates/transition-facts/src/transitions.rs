@@ -15,6 +15,11 @@ impl<'file> Transitions<'file> {
         Transitions(files.iter().filter_map(SourceFile::shipped).flat_map(Collector::collected).collect())
     }
 
+    #[must_use]
+    pub fn contexts(&self) -> &[Context<'file>] {
+        &self.0
+    }
+
     pub fn all(&self) -> impl Iterator<Item = Transition<'_, 'file>> {
         self.0
             .iter()

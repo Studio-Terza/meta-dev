@@ -13,3 +13,9 @@ laws::table!(a_name_is_cased_by_its_letters, |text: &&str| Name::from(*text).cas
     "SHOUTING" => Casing::Shouting,
     "_hidden" => Casing::Other,
 ]);
+
+laws::table!(a_name_splits_into_lowered_humps, |text: &&str| Name::from(*text).humps().map(|hump| hump.to_string()).collect::<Vec<_>>().join(" "), [
+    "PortTrait" => "port trait".to_owned(),
+    "read_all_files" => "read all files".to_owned(),
+    "HTTPServer" => "http server".to_owned(),
+]);

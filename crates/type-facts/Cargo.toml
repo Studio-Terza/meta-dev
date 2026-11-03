@@ -14,6 +14,7 @@ lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
+proc-macro2.workspace = true
 syn.workspace = true
 
 [dev-dependencies]

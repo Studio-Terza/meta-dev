@@ -139,10 +139,32 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
 library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
+
+## Query
+
+Before writing a new trait, port or store, ask what already exists:
+
+    lint query <term>... [--role '<fn signature>']... [--top <n>] [--in <path>]...
+
+It reads the shipped code under each `--in` path (the current directory by default) through the same extraction the
+transition graph uses (`type-facts` and `transition-facts`, no second parser) and lists the traits, generic impls, ports
+and stores that match, best first, each with its crate, site and implementers (or the traits it implements). A term
+matches a camel-case or snake-case word of a name, a trailing plural `s` aside: 3 points in the name itself, 1 in a
+method name or an implementer. A role is a Rust signature whose names are erased: the receiver (none, `self`, `&self`,
+`&mut self`), the arguments that are the type itself, the arity, and the return shape (nothing, `Self`, `Option`,
+`Result`, many, or another value); a method agreeing on all four adds 2 points and on three adds 1, and the line under
+the match shows the method that fits. A port is a type or trait behind the `ports` gate, a store one behind `store`.
+The command blocks nothing and exits non-zero only on malformed arguments.
+
+    $ lint query index --role 'fn f(&self, q: &Query) -> Vec<Hit>' --in crates
+    score 5: trait Index in search at crates/search/src/lib.rs:1; implemented by TextIndex
+        search fn(&self, _) -> many fits fn(&self, _) -> many
+    score 2: generic impl Lookup for T in search at crates/search/src/lib.rs:14
+        find fn(&self, _) -> many fits fn(&self, _) -> many
 
 ## Rust only
 

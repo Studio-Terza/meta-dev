@@ -1,17 +1,22 @@
 mod arity;
 mod facts;
 mod facts_lint;
+mod generic_impl;
 mod implementation;
 mod method;
+mod method_shape;
 mod shape;
+mod spelled;
 mod trait_fact;
 mod type_fact;
 
 pub use arity::Arity;
 pub use facts::Facts;
 pub use facts_lint::FactsLint;
+pub use generic_impl::GenericImpl;
 pub use implementation::Implementation;
 pub use method::Method;
+pub use method_shape::MethodShape;
 pub use shape::Shape;
 pub use trait_fact::TraitFact;
 pub use type_fact::TypeFact;

@@ -67,10 +67,11 @@ impl Name {
 
     #[must_use]
     pub fn camel_word<'word>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
-        self.words()
-            .iter()
-            .flat_map(|chunk| Letters::humps(&chunk.0).into_iter().map(Name))
-            .find_map(|hump| hump.lowered().matches::<Whole>(words))
+        self.humps().find_map(|hump| hump.matches::<Whole>(words))
+    }
+
+    pub fn humps(&self) -> impl Iterator<Item = Name> {
+        self.words().into_iter().flat_map(|chunk| Letters::humps(&chunk.0)).map(|hump| Name(hump).lowered())
     }
 
     #[must_use]
