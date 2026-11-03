@@ -2,8 +2,7 @@ mod finding;
 mod kind;
 
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath, Type};
@@ -11,7 +10,6 @@ use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as Tra
 use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module};
-use lint_placement::Role;
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
@@ -38,15 +36,6 @@ struct Implemented<'file> {
 }
 
 impl<'file> Doubles<'file> {
-    const TESTS: &str = "tests";
-
-    pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
-        let placement = file.placement();
-        (placement.role() == Role::Target
-            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS)))
-        .then_some(file)
-    }
-
     pub fn scan(&mut self, file: &'file SourceFile, imports: &Imports, ports: &PortTraits) {
         let mut reader = Reader {
             file,

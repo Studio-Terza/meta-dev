@@ -5,6 +5,7 @@ use syn::visit::Visit;
 use syn::{Index, ItemMod, ItemStruct, Member, Visibility};
 
 use super::finding::Finding;
+use lint_core::FileLint;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
@@ -17,8 +18,8 @@ pub struct FieldVisibility<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> FieldVisibility<'scan> {
-    pub fn violations(file: &'scan SourceFile) -> Vec<Violation<'scan>> {
+impl FileLint for FieldVisibility<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
         fields.visit_file(file.syntax());
         fields.violations

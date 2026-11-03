@@ -1,4 +1,5 @@
 mod boundary;
+mod test_file;
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -12,6 +13,7 @@ use lint_placement::CrateFile;
 use lint_placement::ManifestFile;
 use lint_placement::Placement;
 use lint_placement::Role;
+pub use test_file::TestFile;
 
 #[derive(Debug)]
 pub struct SourceFile {

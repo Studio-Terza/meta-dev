@@ -4,6 +4,7 @@ use signature_index::SignatureIndex;
 
 use syn::visit::Visit;
 
+use lint_core::FileLint;
 use lint_core::Lint;
 use lint_core::{Headline, Report, SourceFile, Violation};
 
@@ -19,7 +20,7 @@ impl Lint for DistinctSignatures {
     }
 }
 
-impl DistinctSignatures {
+impl FileLint for DistinctSignatures {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut index = SignatureIndex::default();
         index.visit_file(file.syntax());

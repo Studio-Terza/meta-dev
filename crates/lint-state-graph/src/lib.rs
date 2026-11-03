@@ -11,6 +11,7 @@ use declarations::Declarations;
 use declared_graphs::DeclaredGraphs;
 use edge_scan::EdgeScan;
 use field_visibility::FieldVisibility;
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use variant_matches::VariantMatches;
 
