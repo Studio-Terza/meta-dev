@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use file_ports::{Absent, Bytes, FileFailure, Files, Kind};
+use file_ports::{Bytes, Memory};
 use lint_core::{Lint, SourceFile, SourceText};
 use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
@@ -230,7 +230,7 @@ fn a_crate_whose_name_ends_in_ports_may_start_processes() {
     let mut wrong = Vec::new();
     for (name, flagged) in PACKAGES {
         let manifest = format!("[package]\nname = \"{name}\"\n");
-        let files = FakeManifest(file_ports::Text::new(manifest));
+        let files: Memory = [(PathBuf::from("/r/Cargo.toml"), Bytes::from(manifest.as_str()))].into_iter().collect();
         let path = PathBuf::from("/r/src/lib.rs");
         let placement = Placement::locate(&files, &path);
         let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
@@ -250,51 +250,4 @@ fn every_start_is_counted_including_those_behind_ports() {
     let counts: Vec<usize> =
         [ported, inline, other].iter().map(|file| CommandPaths::found(file, Scope::Everywhere).len()).collect();
     assert_eq!(counts, vec![1, 1, 0]);
-}
-
-struct FakeManifest(file_ports::Text);
-
-impl FakeManifest {
-    const AT: &str = "/r/Cargo.toml";
-}
-
-impl Files for FakeManifest {
-    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
-        self.read_text(path).map(|text| Bytes::from(text.as_ref()))
-    }
-
-    fn read_text(&self, path: &Path) -> Result<file_ports::Text, FileFailure> {
-        if path == Path::new(Self::AT) { Ok(self.0.clone()) } else { Absent.read_text(path) }
-    }
-
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        Absent.write(path, bytes)
-    }
-
-    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
-        Absent.append(path, bytes)
-    }
-
-    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        Absent.create_directories(path)
-    }
-
-    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
-        Absent.copy(from, to)
-    }
-
-    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        Absent.entries(directory)
-    }
-
-    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        match self.kind(path) {
-            Kind::Missing => Absent.canonical(path),
-            _ => Ok(path.to_path_buf()),
-        }
-    }
-
-    fn kind(&self, path: &Path) -> Kind {
-        if path == Path::new(Self::AT) { Kind::File } else { Absent.kind(path) }
-    }
 }

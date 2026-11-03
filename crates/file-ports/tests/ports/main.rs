@@ -1,10 +1,7 @@
-mod fake_files;
-
 use std::io;
 use std::path::{Path, PathBuf};
 
-use fake_files::FakeFiles;
-use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Text};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -106,19 +103,22 @@ fn disk_keeps_the_contract() -> Result<(), FileFailure> {
 
 #[test]
 fn fake_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = FakeFiles::default();
+    let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     Checks::on(&memory, Path::new("/scratch"))
 }
 
 #[test]
 fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
-    let memory: FakeFiles = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
+    let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
     assert_eq!(memory.entries(Path::new("/a"))?, [PathBuf::from("/a/b.txt")]);
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
     memory.write(Path::new("top.txt"), &Bytes::from("top"))?;
     assert_eq!(memory.kind(Path::new("top.txt")), Kind::File);
+    let empty = Memory::default();
+    empty.write(Path::new("alone.txt"), &Bytes::from("alone"))?;
+    assert_eq!(empty.kind(Path::new("alone.txt")), Kind::File);
     Ok(())
 }
 
@@ -184,6 +184,17 @@ impl Batches {
         assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
         assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
         assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
+        let mirrored = Memory::default();
+        files.mirror(root, &mirrored)?;
+        assert_eq!(
+            mirrored.entries(root)?,
+            files.entries(root).map(|mut entries| {
+                entries.sort();
+                entries
+            })?
+        );
+        assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
+        assert!(files.mirror(&root.join("none"), &Memory::default()).is_err());
         Ok(())
     }
 }
@@ -192,7 +203,7 @@ impl Batches {
 fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
     let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
     Batches::on(&Disk, scratch.path())?;
-    let fake = FakeFiles::default();
+    let fake = Memory::default();
     fake.create_directories(Path::new("/batch"))?;
     Batches::on(&fake, Path::new("/batch"))
 }

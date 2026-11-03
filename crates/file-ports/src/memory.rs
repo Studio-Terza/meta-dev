@@ -3,16 +3,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, FileFailure, Files, Kind, Text};
 use newtype::Newtype;
 
+use crate::{Bytes, FileFailure, Files, Kind, Text};
+
 #[derive(Debug, Default)]
-pub struct FakeFiles {
+pub struct Memory {
     files: RefCell<BTreeMap<PathBuf, Bytes>>,
     directories: RefCell<BTreeSet<PathBuf>>,
 }
 
-impl FakeFiles {
+impl Memory {
     fn missing() -> FileFailure {
         FileFailure::Missing(io::Error::from(io::ErrorKind::NotFound))
     }
@@ -40,13 +41,13 @@ impl FakeFiles {
     }
 }
 
-impl FromIterator<(PathBuf, Bytes)> for FakeFiles {
-    fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> FakeFiles {
-        FakeFiles { files: RefCell::new(entries.into_iter().collect()), directories: RefCell::default() }
+impl FromIterator<(PathBuf, Bytes)> for Memory {
+    fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Memory {
+        Memory { files: RefCell::new(entries.into_iter().collect()), directories: RefCell::default() }
     }
 }
 
-impl Files for FakeFiles {
+impl Files for Memory {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
         self.stored(path)
     }
