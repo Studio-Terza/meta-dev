@@ -23,8 +23,7 @@ impl From<&[&SourceFile]> for Declarations {
         let seeded = Declarations { homes: TypeHomes::declared_in(files), ..Declarations::default() };
         files
             .iter()
-            .fold(seeded, |declarations, file| {
-                let mut declarations = Declarations { reading: BTreeSet::new(), ..declarations };
+            .fold(seeded, |mut declarations, file| {
                 declarations.visit_file(file.syntax());
                 declarations.filed(Home::containing(file))
             })
