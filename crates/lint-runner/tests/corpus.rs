@@ -30,7 +30,7 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
         .flat_map(|(_, output)| Lines::from(output.as_str()))
         .filter(|line| Corpus::is_violation(line))
         .collect();
-    let unfixed: Vec<&str> = printed.iter().copied().filter(|line| !Corpus::names_a_fix(line)).collect();
+    let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
     assert_ne!(printed, Vec::<&str>::new());
     assert_eq!(unfixed, Vec::<&str>::new());
     Ok(())
@@ -40,23 +40,23 @@ struct Corpus;
 
 impl Corpus {
     fn renamed(path: &Path) -> &OsStr {
-        match path.file_name().unwrap_or_default() {
-            name if name == STORED_MANIFEST => MANIFEST.as_ref(),
-            name => name,
-        }
+        let name = path.file_name().unwrap_or_default();
+        Some(name).filter(|name| *name == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
     fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<(), FileFailure> {
         match corpus.kind(found) {
-            Kind::Directory => {
-                into.create_directories(target)?;
-                corpus
-                    .entries(found)?
-                    .iter()
-                    .try_for_each(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
-            }
+            Kind::Directory => Self::copied_directory(corpus, found, target, into),
             _ => into.write(target, corpus.read(found)?),
         }
+    }
+
+    fn copied_directory(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<(), FileFailure> {
+        into.create_directories(target)?;
+        corpus
+            .entries(found)?
+            .iter()
+            .try_for_each(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
     }
 
     fn output(corpus: &Memory, fixture: &Path) -> Result<String, Box<dyn Error>> {
@@ -67,7 +67,7 @@ impl Corpus {
             .try_for_each(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))?;
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
-        let verdict = if exit == ExitCode::SUCCESS { "passes\n" } else { "fails\n" };
+        let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
 
@@ -86,11 +86,11 @@ impl Corpus {
             .is_some_and(|last| last.is_ascii_digit())
     }
 
-    fn names_a_fix(line: &str) -> bool {
+    fn fix_named(line: &str) -> Option<&str> {
         line.rmatch_indices(FIX_START)
             .next()
             .and_then(|(at, _)| line.get(at + FIX_START.len()..))
-            .is_some_and(|fix| fix.chars().any(|letter| !letter.is_whitespace()))
+            .filter(|fix| fix.chars().filter(|letter| letter.is_whitespace()).count() < fix.chars().count())
     }
 
     fn difference(fixture: &Path, output: &str) -> Option<String> {

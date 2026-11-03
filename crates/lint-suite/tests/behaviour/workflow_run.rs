@@ -110,6 +110,7 @@ laws::table!(
         "run: ${A:+cargo test}\n" => Checked::operator(1, "${"),
         "run: echo ${A#x}\n" => Checked::operator(1, "${"),
         "run: ${TOOLS}/ci reach\n" => Vec::<String>::new(),
+        "run: ${CARGO_HOME}/bin/x\n" => Vec::<String>::new(),
         "run: ci ${{ matrix.index }}\n" => Vec::<String>::new(),
         "run: iffy\n" => Vec::<String>::new(),
         "run: |\n  cargo test\n" => Vec::<String>::new(),
