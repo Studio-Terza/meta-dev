@@ -45,12 +45,13 @@ impl ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
-    pub(crate) fn merged(self, other: ReferencedNames) -> ReferencedNames {
+    pub(crate) fn merged(mut self, other: ReferencedNames) -> ReferencedNames {
+        self.stand_ins.extend(other.stand_ins);
+        self.types.extend(other.types);
         ReferencedNames {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
-            stand_ins: self.stand_ins.into_iter().chain(other.stand_ins).collect(),
-            types: self.types.into_iter().chain(other.types).collect(),
+            ..self
         }
     }
 

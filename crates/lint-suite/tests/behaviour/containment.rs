@@ -505,3 +505,22 @@ fn a_type_named_in_an_interpolated_macro_string_is_used() {
         ]
     );
 }
+
+#[test]
+fn a_const_standing_for_a_variant_stands_for_its_enum() {
+    let constant = [
+        Clustered::at("crates/x/src/lib.rs", "mod fast;\nmod mode;\nmod user;\n"),
+        Clustered::at("crates/x/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at("crates/x/src/mode.rs", "pub enum Mode {\n    Fast,\n}\n"),
+        Clustered::at(
+            "crates/x/src/user.rs",
+            "use crate::mode::Mode;\nconst DEFAULT: Mode = Mode::Fast;\npub struct User;\nimpl User {\n    fn mode(&self) {\n        DEFAULT;\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&constant, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/mode.rs:1: x::mode::Mode is used only within x::user; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
