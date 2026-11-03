@@ -1,4 +1,4 @@
-mod golden_test;
+mod boundary;
 mod rust_files;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,14 +7,16 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 
-use golden_test::GoldenTest;
+use boundary::GoldenTest;
+use newtype::Newtype;
 use rust_files::RustFiles;
 use text_lines::LossyText;
 
 use crate::cli::report::failure::Failure;
+use crate::cli::report::test_name::TestName;
 
 #[derive(Debug, Default)]
-pub struct GoldenTests(BTreeSet<String>);
+pub struct GoldenTests(BTreeSet<TestName>);
 
 impl GoldenTests {
     const CRATES: &'static str = "crates";
@@ -28,7 +30,7 @@ impl GoldenTests {
         })
     }
 
-    pub(crate) fn names(&self) -> &BTreeSet<String> {
+    pub(crate) fn names(&self) -> &BTreeSet<TestName> {
         &self.0
     }
 
@@ -52,7 +54,7 @@ impl FromStr for GoldenTests {
                 .zip(ends)
                 .filter_map(|((start, length), end)| text.get(start + length..end))
                 .filter_map(|chunk| chunk.parse::<GoldenTest>().ok())
-                .map(GoldenTest::into_name)
+                .map(GoldenTest::into_inner)
                 .collect(),
         ))
     }

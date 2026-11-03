@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct GoldenTest(String);
+use newtype::{Arbitrary, Newtype};
+
+use crate::cli::report::test_name::TestName;
+
+#[derive(Newtype, Arbitrary, Debug, PartialEq, Eq)]
+pub struct GoldenTest(TestName);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotGolden;
@@ -14,10 +18,6 @@ impl GoldenTest {
     const METHOD_CALL: &'static str = ".golden(";
     const OPEN: char = '(';
     const UNDERSCORE: char = '_';
-
-    pub(crate) fn into_name(self) -> String {
-        self.0
-    }
 
     fn uses_golden(text: &str) -> Option<&str> {
         let head = text.match_indices(Self::NEXT_ATTRIBUTE).next().and_then(|(at, _)| text.get(..at)).unwrap_or(text);
@@ -36,7 +36,7 @@ impl GoldenTest {
     fn function_name(text: &str) -> Option<GoldenTest> {
         text.match_indices(Self::FUNCTION)
             .find_map(|(at, mark)| Self::after_keyword(text.get(at + mark.len()..)?))
-            .map(GoldenTest)
+            .map(|name| GoldenTest(TestName::new(name)))
     }
 
     fn after_keyword(rest: &str) -> Option<String> {
