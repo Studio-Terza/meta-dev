@@ -31,13 +31,11 @@ impl Scope {
         let value = |key: &str| report.lines().find_map(|line| line.strip_prefix(key)).unwrap_or_default().to_owned();
         let build = value(Self::BUILD);
         Scope {
-            build: if build == Self::WORKSPACE {
-                Build::Workspace
-            } else {
+            build: (build == Self::WORKSPACE).then_some(Build::Workspace).unwrap_or_else(|| {
                 Build::Crates(
                     build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect(),
                 )
-            },
+            }),
             mutated: value(Self::MUTANTS)
                 .split_whitespace()
                 .filter_map(|word| word.strip_prefix(Self::TEST_PACKAGE))
@@ -75,7 +73,7 @@ impl Desk {
             fake,
             &["reach", &self.file("metadata.json"), event, base, &self.file("env"), &self.file("summary")],
         );
-        if answer.exit == ExitCode::SUCCESS { Ok(Scope::read(&answer.out)) } else { Err(answer.out.into()) }
+        (answer.exit == ExitCode::SUCCESS).then(|| Scope::read(&answer.out)).ok_or_else(|| answer.out.clone().into())
     }
 
     pub fn labels_pass(&self, fake: &Fake, base: &str) -> bool {

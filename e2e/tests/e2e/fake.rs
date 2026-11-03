@@ -59,13 +59,19 @@ impl Fake {
     }
 
     fn git(&self, invocation: &Invocation) -> String {
-        let asks = |word: &str| invocation.arguments().iter().any(|argument| argument == word);
-        if asks("merge-base") {
-            Self::FORK.to_owned()
-        } else if asks("--name-status") {
-            self.statuses()
-        } else {
-            self.names()
+        match Asked::of(invocation) {
+            Asked::MergeBase => Self::FORK.to_owned(),
+            Asked::NameStatus => self.statuses(),
+            Asked::Names => self.names(),
+        }
+    }
+
+    fn answered(&self, program: Program, invocation: &Invocation) -> io::Result<String> {
+        match program {
+            Program::Cargo => Ok(self.metadata.clone()),
+            Program::Git => Ok(self.git(invocation)),
+            Program::Gh => Ok(Self::UNLABELLED_CHANGE.to_owned()),
+            Program::Other => Err(Self::refused(invocation)),
         }
     }
 
@@ -86,13 +92,7 @@ impl Ports for Fake {
     }
 
     fn output(&self, invocation: &Invocation) -> io::Result<Text> {
-        match invocation.program().to_str() {
-            Some("cargo") => Ok(self.metadata.clone()),
-            Some("git") => Ok(self.git(invocation)),
-            Some("gh") => Ok(Self::UNLABELLED_CHANGE.to_owned()),
-            _ => Err(Self::refused(invocation)),
-        }
-        .map(Text::new)
+        self.answered(Program::of(invocation), invocation).map(Text::new)
     }
 
     fn logged(&self, invocation: &Invocation, _log: &Path) -> io::Result<Run> {
@@ -105,5 +105,40 @@ impl Ports for Fake {
 
     fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<Text>> {
         invocations.iter().map(|invocation| self.output(invocation)).collect()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Asked {
+    MergeBase,
+    NameStatus,
+    Names,
+}
+
+impl Asked {
+    const NAMED: [(&'static str, Asked); 2] = [("merge-base", Asked::MergeBase), ("--name-status", Asked::NameStatus)];
+
+    fn of(invocation: &Invocation) -> Asked {
+        Self::NAMED
+            .iter()
+            .find(|(word, _)| invocation.arguments().iter().any(|argument| argument == word))
+            .map_or(Asked::Names, |(_, asked)| *asked)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Program {
+    Cargo,
+    Git,
+    Gh,
+    Other,
+}
+
+impl Program {
+    const NAMED: [(&'static str, Program); 3] = [("cargo", Program::Cargo), ("git", Program::Git), ("gh", Program::Gh)];
+
+    fn of(invocation: &Invocation) -> Program {
+        let program = invocation.program().to_str();
+        Self::NAMED.iter().find(|(name, _)| program == Some(*name)).map_or(Program::Other, |(_, named)| *named)
     }
 }

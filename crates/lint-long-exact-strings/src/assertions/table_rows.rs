@@ -1,6 +1,7 @@
 use std::iter;
 
-use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
+use lint_core::Syntax;
+use proc_macro2::{Delimiter, Group, Spacing, TokenStream, TokenTree};
 use syn::Expr;
 
 #[derive(Debug)]
@@ -13,9 +14,8 @@ impl TableRows {
     const ARROW_LENGTH: usize = 2;
 
     pub fn expected(tokens: &TokenStream) -> Vec<Expr> {
-        let rows = tokens.clone().into_iter().filter_map(|tree| match tree {
-            TokenTree::Group(group) if group.delimiter() == Delimiter::Bracket => Some(group.stream()),
-            _ => None,
+        let rows = tokens.clone().into_iter().filter_map(|tree| {
+            Syntax::group(&tree).filter(|group| group.delimiter() == Delimiter::Bracket).map(Group::stream)
         });
         rows.last().map(|rows| Self::split(&rows.into_iter().collect::<Vec<TokenTree>>())).unwrap_or_default()
     }
@@ -38,15 +38,11 @@ impl TableRows {
     }
 
     fn arrow<'end>(start: &TokenTree, end: &'end TokenTree) -> Option<&'end TokenTree> {
-        match (start, end) {
-            (TokenTree::Punct(first), TokenTree::Punct(second))
-                if first.as_char() == Self::ARROW_START
-                    && first.spacing() == Spacing::Joint
-                    && second.as_char() == Self::ARROW_END =>
-            {
-                Some(end)
-            }
-            _ => None,
-        }
+        Syntax::punct(start)
+            .filter(|first| first.as_char() == Self::ARROW_START)
+            .filter(|first| first.spacing() == Spacing::Joint)
+            .and(Syntax::punct(end))
+            .filter(|second| second.as_char() == Self::ARROW_END)
+            .map(|_| end)
     }
 }

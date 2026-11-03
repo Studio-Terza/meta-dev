@@ -54,5 +54,5 @@ fn an_unqualified_name_resolves_to_the_one_other_crate_declaring_it_and_an_ambig
     assert!(resolved.contains("x::A -> y::B (field) at crates/x/src/lib.rs:2, y::B -> x::A (field)"), "{resolved}");
     let ambiguous =
         Layered::of(&[x(), y(), Source::new(Located::new("crates/z/src/lib.rs"), Text::new("struct B;\n"))]);
-    assert!(!ambiguous.contains("tangle"), "{ambiguous}");
+    assert_eq!(ambiguous.matches("tangle").count(), 0, "{ambiguous}");
 }

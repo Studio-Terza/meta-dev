@@ -30,7 +30,8 @@ impl Lint for NamedNumbers {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BOUNDARY.admits(file).is_none() && !support.contains(&file.path().to_owned()))
+                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
+                .filter(|file| support.iter().all(|path| path != file.path()))
                 .flat_map(|file| {
                     Self::flagged::<Numbers>(
                         file,

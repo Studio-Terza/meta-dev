@@ -11,17 +11,17 @@ impl Scored {
     }
 
     fn highest_is(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => Self::of(text).contains(&format!("highest {expected}; ")),
-            _ => false,
-        }
+        Some(pair)
+            .filter(|pair| pair.len() == 2)
+            .and_then(|pair| pair.first().zip(pair.last()))
+            .is_some_and(|(text, expected)| Self::of(text).contains(&format!("highest {expected}; ")))
     }
 
     fn lists(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => Self::of(text).contains(expected),
-            _ => false,
-        }
+        Some(pair)
+            .filter(|pair| pair.len() == 2)
+            .and_then(|pair| pair.first().zip(pair.last()))
+            .is_some_and(|(text, expected)| Self::of(text).contains(expected))
     }
 }
 

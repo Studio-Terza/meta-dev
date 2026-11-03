@@ -107,5 +107,5 @@ fn a_finding_names_the_trait_and_both_fixes() {
         UnconsumedTraits::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(BARE))])).to_string();
     assert!(text.contains("trait Shape has methods but nothing consumes it"), "{text}");
     assert!(text.contains("delete the trait and keep its methods inherent, or give it a consumer"), "{text}");
-    assert!(!text.contains("helper"));
+    assert_eq!(text.matches("helper").count(), 0);
 }
