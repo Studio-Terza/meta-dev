@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use quote::ToTokens;
 use syn::{Attribute, Item};
 
-use lint_core::Walk;
+use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
 
 use crate::ItemGraph;
@@ -23,11 +23,22 @@ pub struct ReferencedNames {
 impl ReferencedNames {
     const UNNAMED: &str = "_";
 
-    pub fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
+    #[must_use]
+    pub fn of_file(file: &SourceFile) -> ReferencedNames {
+        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
+    }
+
+    #[must_use]
+    pub fn into_uses(self) -> BTreeMap<Name, BTreeSet<Name>> {
+        let all = Self::united(self.declared, self.implemented);
+        all.into_iter().map(|(owner, uses)| (owner, uses.into_iter().collect())).collect()
+    }
+
+    pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
-    pub fn merged(self, other: ReferencedNames) -> ReferencedNames {
+    pub(crate) fn merged(self, other: ReferencedNames) -> ReferencedNames {
         ReferencedNames {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
@@ -35,7 +46,7 @@ impl ReferencedNames {
         }
     }
 
-    pub fn into_graph(self) -> ItemGraph {
+    pub(crate) fn into_graph(self) -> ItemGraph {
         let ReferencedNames { declared, implemented, stand_ins } = self;
         let foreign = implemented.into_iter().filter(|(owner, _)| declared.contains_key(owner)).collect();
         ItemGraph::of_references(Self::united(declared, foreign)).standing_in(&stand_ins)

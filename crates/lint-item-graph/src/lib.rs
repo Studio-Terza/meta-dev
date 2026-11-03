@@ -4,6 +4,7 @@ mod scope;
 mod traversal;
 
 pub use node_index::NodeIndex;
+pub use referenced_names::ReferencedNames;
 pub use scope::Scope;
 pub use traversal::Traversal;
 
@@ -11,7 +12,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use referenced_names::ReferencedNames;
 
 #[derive(Clone, Debug, Default)]
 pub struct ItemGraph<Node = Name> {
@@ -25,7 +25,7 @@ impl ItemGraph {
     pub fn of_files(files: &[&SourceFile]) -> ItemGraph {
         let references = files
             .iter()
-            .map(|file| ReferencedNames::of_items(&file.syntax().items, &Scope::of_file(file.syntax())))
+            .map(|file| ReferencedNames::of_file(file))
             .fold(ReferencedNames::default(), ReferencedNames::merged);
         references.into_graph()
     }

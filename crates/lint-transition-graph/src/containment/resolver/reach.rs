@@ -4,49 +4,56 @@ use std::collections::{BTreeMap, BTreeSet};
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Reach<'found> {
-    Local,
-    Crate(&'found CrateName),
-    External,
+use super::place::Place;
+use super::target::Target;
+
+#[derive(Debug)]
+pub(crate) struct Reach<'place, 'found> {
+    place: &'place Place<'found>,
+    modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
 }
 
-impl<'found> Reach<'found> {
+impl<'place, 'found> Reach<'place, 'found> {
     const EXTERNAL: [Word<'static>; 3] = words!["std", "core", "alloc"];
-    const LOCAL: [Word<'static>; 3] = words!["crate", "self", "super"];
+    const ROOT: Word<'static> = Word::new("crate");
+    const ITSELF: Word<'static> = Word::new("self");
+    const PARENT: Word<'static> = Word::new("super");
 
-    pub(crate) fn of_hint(
-        hint: Option<&Name>,
-        from: &CrateName,
-        modules: &BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    ) -> Reach<'found> {
-        hint.map_or(Reach::Local, |named| Self::of_named(named, from, modules))
+    pub(crate) fn new(
+        place: &'place Place<'found>,
+        modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
+    ) -> Reach<'place, 'found> {
+        Reach { place, modules }
     }
 
-    pub(crate) fn krate<'reached>(self, from: &'reached CrateName) -> Option<&'reached CrateName>
-    where
-        'found: 'reached,
-    {
-        match self {
-            Reach::Local => Some(from),
-            Reach::Crate(krate) => Some(krate),
-            Reach::External => None,
+    pub(crate) fn target(&self, name: &Name, written: &[Name], origin: Option<&Name>) -> Option<Target<'found>> {
+        let spelled = self.place.scope().path_to(name, written);
+        match (spelled.first(), origin) {
+            (Some(_), _) => self.pathed(&spelled),
+            (None, Some(origin)) => self.pathed(std::slice::from_ref(origin)).map(Target::unhinted),
+            (None, None) => Some(self.place.target(None)),
         }
     }
 
-    fn of_named(
-        named: &Name,
-        from: &CrateName,
-        modules: &BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    ) -> Reach<'found> {
-        let krate = modules.keys().copied().find(|krate| Borrow::<Name>::borrow(*krate) == named);
-        let external = named.matches::<Whole>(&Self::EXTERNAL);
-        let root = named.matches::<Whole>(&Self::LOCAL);
-        let module = modules.get(from).and_then(|segments| segments.get(named));
-        match (krate, external, root, module) {
-            (Some(krate), _, _, _) => Reach::Crate(krate),
-            (None, None, Some(_), _) | (None, None, None, Some(_)) => Reach::Local,
-            (None, _, _, _) => Reach::External,
+    fn pathed(&self, path: &[Name]) -> Option<Target<'found>> {
+        let (head, rest) = path.split_first()?;
+        let here = self.place.module();
+        let parents = path.iter().take_while(|step| **step == Self::PARENT).count();
+        let within = |base: &[Name], tail: &[Name]| base.iter().chain(tail).cloned().collect::<Vec<Name>>();
+        let krate = self.modules.keys().copied().find(|krate| Borrow::<Name>::borrow(*krate) == head);
+        let own = self.modules.get(self.place.krate()).and_then(|segments| segments.get(head));
+        match (head, krate, self.place.scope().module_root(head)) {
+            (root, _, _) if *root == Self::ROOT => Some(self.place.target(Some(rest.to_vec()))),
+            (itself, _, _) if *itself == Self::ITSELF => Some(self.place.target(Some(within(here, rest)))),
+            (parent, _, _) if *parent == Self::PARENT => {
+                let base = here.get(..here.len().saturating_sub(parents)).unwrap_or_default();
+                Some(self.place.target(Some(within(base, path.get(parents..).unwrap_or_default()))))
+            }
+            (_, _, Some(_)) => Some(self.place.target(Some(within(here, path)))),
+            (_, Some(krate), None) => Some(Target::new(krate, Some(rest.to_vec()), None)),
+            (_, None, None) => {
+                head.matches::<Whole>(&Self::EXTERNAL).map_or(own.map(|_| self.place.target(None)), |_| None)
+            }
         }
     }
 }

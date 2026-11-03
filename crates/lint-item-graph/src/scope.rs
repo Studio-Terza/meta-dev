@@ -48,11 +48,22 @@ impl<'file> Scope<'file> {
     }
 
     #[must_use]
-    pub fn origin(&self, name: &Name, written: Option<&Name>) -> Option<Name> {
-        let root = |spelled: &Name| self.imports.root_of(spelled);
-        let head = written.cloned().or_else(|| root(name))?;
-        let origin = root(&head).unwrap_or(head);
-        Some(origin).filter(|origin| !self.local_roots.contains(origin))
+    pub fn path_to(&self, name: &Name, written: &[Name]) -> Vec<Name> {
+        match written.split_first() {
+            Some((head, rest)) => self.imports.path_of(head).map_or_else(
+                || written.to_vec(),
+                |imported| imported.into_iter().chain(rest.iter().cloned()).collect(),
+            ),
+            None => self.imports.path_of(name).map_or_else(Vec::new, |mut imported| {
+                imported.pop();
+                imported
+            }),
+        }
+    }
+
+    #[must_use]
+    pub fn module_root(&self, head: &Name) -> Option<&Name> {
+        self.local_roots.get(head)
     }
 
     fn kept(&self, token: &TokenTree, root: Option<&TokenTree>, name: Name) -> Option<Name> {
@@ -77,13 +88,13 @@ impl<'file> Scope<'file> {
         (self.local_roots.iter().any(|root| *root == *ident) || imported().is_some()).then_some(ident)
     }
 
-    fn import(&mut self, first: Option<&'file Ident>, last: Option<&'file Ident>, tree: &'file UseTree) {
+    fn import(&mut self, path: Vec<&'file Ident>, tree: &'file UseTree) {
         match tree {
-            UseTree::Path(path) => self.import(first.or(Some(&path.ident)), Some(&path.ident), &path.tree),
-            UseTree::Name(name) if name.ident == Self::SELF_IMPORT => self.imports.add(Import::itself(first, last)),
-            UseTree::Name(name) => self.imports.add(Some(Import::renamed(first, &name.ident, &name.ident))),
-            UseTree::Rename(rename) => self.imports.add(Some(Import::renamed(first, &rename.rename, &rename.ident))),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.import(first, last, item)),
+            UseTree::Path(step) => self.import(path.into_iter().chain([&step.ident]).collect(), &step.tree),
+            UseTree::Name(name) if name.ident == Self::SELF_IMPORT => self.imports.add(Import::itself(path)),
+            UseTree::Name(name) => self.imports.add(Some(Import::renamed(path, &name.ident, &name.ident))),
+            UseTree::Rename(rename) => self.imports.add(Some(Import::renamed(path, &rename.rename, &rename.ident))),
+            UseTree::Group(group) => group.items.iter().for_each(|item| self.import(path.clone(), item)),
             UseTree::Glob(_) => {}
         }
     }
@@ -98,7 +109,7 @@ impl<'file> Visit<'file> for Scope<'file> {
     }
 
     fn visit_item_use(&mut self, item: &'file ItemUse) {
-        Walk::enter(&item.attrs, || self.import(None, None, &item.tree));
+        Walk::enter(&item.attrs, || self.import(Vec::new(), &item.tree));
     }
 
     fn visit_item_fn(&mut self, item: &'file ItemFn) {

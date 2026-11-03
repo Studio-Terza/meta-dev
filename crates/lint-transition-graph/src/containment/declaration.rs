@@ -1,5 +1,4 @@
 use lint_core::Site;
-use lint_placement::CrateName;
 use type_facts::{Dependency, Facts, Implementation, TraitFact, TypeFact};
 
 use super::link::Link;
@@ -8,7 +7,6 @@ use super::resolver::Resolver;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Declaration<'found, 'file> {
-    krate: &'found CrateName,
     named: Member<'found>,
     site: Site<'file>,
     dependencies: &'found [Dependency<'file>],
@@ -23,7 +21,6 @@ impl<'found, 'file> Declaration<'found, 'file> {
 
     fn of_type(facts: &'found Facts<'file>, found: &'found TypeFact<'file>) -> Declaration<'found, 'file> {
         Declaration {
-            krate: found.as_ref(),
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),
             dependencies: AsRef::<[Dependency<'file>]>::as_ref(found),
@@ -33,7 +30,6 @@ impl<'found, 'file> Declaration<'found, 'file> {
 
     fn of_trait(found: &'found TraitFact<'file>) -> Declaration<'found, 'file> {
         Declaration {
-            krate: found.as_ref(),
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),
             dependencies: AsRef::<[Dependency<'file>]>::as_ref(found),
@@ -42,11 +38,10 @@ impl<'found, 'file> Declaration<'found, 'file> {
     }
 
     pub(crate) fn links(&self, placed: Member<'found>, resolver: &Resolver<'found>) -> Vec<Link<'found>> {
-        let held = self.dependencies.iter().flat_map(|dependency| resolver.dependency(self.krate, dependency));
-        let implemented = self
-            .implementations
-            .iter()
-            .flat_map(|implemented| resolver.members(self.krate, implemented.as_ref(), None));
+        let held = self.dependencies.iter().flat_map(|dependency| resolver.dependency(dependency));
+        let file = self.site.path();
+        let implemented =
+            self.implementations.iter().flat_map(|implemented| resolver.members(file, implemented.as_ref(), &[], None));
         held.chain(implemented).map(|used| Link::new(placed, used)).collect()
     }
 }
