@@ -1,5 +1,6 @@
 mod extent;
 mod families;
+mod kind;
 mod node;
 mod occurrence;
 mod scan;
@@ -10,14 +11,14 @@ use families::{Families, Family};
 use scan::Scan;
 
 #[derive(Debug)]
-pub struct RepeatedBodies;
+pub struct RepeatedShapes;
 
-impl Lint for RepeatedBodies {
+impl Lint for RepeatedShapes {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let nodes = files.iter().filter_map(SourceFile::shipped).flat_map(Scan::of_file);
+        let nodes = files.iter().flat_map(Scan::of_file);
         Report::new(
             Headline::new(
-                "report only, a code body is repeated with its names and literals erased; the size of each is listed so any floor can be read",
+                "report only, a body of 40 tokens or more repeats across the workspace with its names and literals erased; each group says whether its copies are tests, shipped code or both",
             ),
             Families::grouped(nodes).maximal().iter().map(Family::violation).collect(),
         )

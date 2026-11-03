@@ -22,6 +22,7 @@ lint-const-shape = { path = "../lint-const-shape" }
 lint-crate-graph = { path = "../lint-crate-graph" }
 lint-distinct-signatures = { path = "../lint-distinct-signatures" }
 lint-effect-sites = { path = "../lint-effect-sites" }
+lint-linear-flow = { path = "../lint-linear-flow" }
 lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
 lint-fakes-at-ports = { path = "../lint-fakes-at-ports" }
@@ -54,8 +55,8 @@ lint-process-starters = { path = "../lint-process-starters" }
 lint-public-api-tests = { path = "../lint-public-api-tests" }
 lint-public-surface = { path = "../lint-public-surface" }
 lint-raw-resources = { path = "../lint-raw-resources" }
-lint-repeated-bodies = { path = "../lint-repeated-bodies" }
 lint-repeated-methods = { path = "../lint-repeated-methods" }
+lint-repeated-shapes = { path = "../lint-repeated-shapes" }
 lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
 lint-test-budget = { path = "../lint-test-budget" }

@@ -1,13 +1,15 @@
 use lint_core::Lint;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
-use lint_repeated_bodies::RepeatedBodies;
+use lint_repeated_shapes::RepeatedShapes;
 
 const BODY: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const RENAMED: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 10;\n    for row in rows {\n        if *row > 7 {\n            sum += row * 5;\n        } else {\n            sum += 9;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const OTHER_CALL: &str = "fn c(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if keeps(*item) {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const SHORT_A: &str = "fn a() {\n    f(1);\n}\n";
 const SHORT_B: &str = "fn b() {\n    f(2);\n}\n";
-const TESTS_A: &str = "#[cfg(test)]\nmod tests {\n    fn a(items: &[u32]) -> u32 {\n        let mut total = 0;\n        for item in items {\n            if *item > 3 {\n                total += item * 2;\n            } else {\n                total += 1;\n            }\n        }\n        total\n    }\n}\n";
+const TESTS_A: &str = "#[cfg(test)]\nmod tests {\n    fn a(items: &[u32]) -> u32 {\n        let mut total = 0;\n        for item in items {\n            if *item > 3 {\n                total += item * 2;\n            } else {\n                total += 1;\n            }\n        }\n        if total > 100 {\n            return 100;\n        }\n        total\n    }\n}\n";
+const TEST_FN: &str = "#[test]\nfn a() {\n    let items = [1, 2];\n    let mut total = 0;\n    for item in items {\n        if item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return;\n    }\n    assert_eq!(total, 2);\n}\n";
+const TEST_FN_AGAIN: &str = "#[test]\nfn b() {\n    let rows = [3, 4];\n    let mut sum = 0;\n    for row in rows {\n        if row > 4 {\n            sum += row * 3;\n        } else {\n            sum += 2;\n        }\n    }\n    if sum > 200 {\n        return;\n    }\n    assert_eq!(sum, 4);\n}\n";
 const CONST_A: &str = "const fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    let mut at = 0;\n    while at < items.len() {\n        if items[at] > 3 {\n            total += items[at] * 2;\n        } else {\n            total += 1;\n        }\n        at += 1;\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const CONST_B: &str = "const fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    let mut at = 0;\n    while at < rows.len() {\n        if rows[at] > 3 {\n            sum += rows[at] * 2;\n        } else {\n            sum += 1;\n        }\n        at += 1;\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 
@@ -29,7 +31,7 @@ const SMALL: &str = "fn s1(items: &[u32]) -> u32 {\n    let mut total = 0; for i
 const SMALL_AGAIN: &str = "fn s2(rows: &[u32]) -> u32 {\n    let mut sum = 0; for row in rows { if *row > 4 { sum += row * 3; } else { sum += 2; } } if sum > 200 { return 200; } sum }\n";
 const SAME_FILE: &str = "fn p1(items: &[u32]) -> u32 {\n    let mut total = 0;\n    let mut at = 0;\n    while at < items.len() {\n        if items[at] > 3 { total += 2; } else { total += 1; }\n        at += 1;\n    }\n    total\n}\nfn p2(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    let mut to = 0;\n    while to < rows.len() {\n        if rows[to] > 4 { sum += 3; } else { sum += 2; }\n        to += 1;\n    }\n    sum\n}\nfn s1(items: &[u32]) -> u32 {\n    let mut total = 0; for item in items { if *item > 3 { total += item * 2; } else { total += 1; } } if total > 100 { return 100; } total }\nfn s2(rows: &[u32]) -> u32 {\n    let mut sum = 0; for row in rows { if *row > 4 { sum += row * 3; } else { sum += 2; } } if sum > 200 { return 200; } sum }\n";
 
-const CASES: [Case; 17] = [
+const CASES: [Case; 18] = [
     Case::new(
         Title::new("renamed with other literals"),
         &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("b.rs"), Text::new(RENAMED))],
@@ -51,14 +53,22 @@ const CASES: [Case; 17] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("test module"),
+        Title::new("a test module copying shipped code"),
         &[Source::new(Located::new("a.rs"), Text::new(TESTS_A)), Source::new(Located::new("b.rs"), Text::new(RENAMED))],
-        Flagged::new(&[]),
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("test functions"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new(TEST_FN)),
+            Source::new(Located::new("b.rs"), Text::new(TEST_FN_AGAIN)),
+        ],
+        Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
         Title::new("const fns"),
         &[Source::new(Located::new("a.rs"), Text::new(CONST_A)), Source::new(Located::new("b.rs"), Text::new(CONST_B))],
-        Flagged::new(&[]),
+        Flagged::new(&["a.rs:1"]),
     ),
     Case::new(
         Title::new("across crates"),
@@ -82,7 +92,7 @@ const CASES: [Case; 17] = [
             Source::new(Located::new("tests/a.rs"), Text::new(BODY)),
             Source::new(Located::new("tests/b.rs"), Text::new(RENAMED)),
         ],
-        Flagged::new(&[]),
+        Flagged::new(&["tests/a.rs:1"]),
     ),
     Case::new(
         Title::new("a repeated match"),
@@ -98,9 +108,9 @@ const CASES: [Case; 17] = [
         Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
-        Title::new("a repeated method chain"),
+        Title::new("a method chain is not a unit"),
         &[Source::new(Located::new("a.rs"), Text::new(CHAIN_A)), Source::new(Located::new("b.rs"), Text::new(CHAIN_B))],
-        Flagged::new(&["a.rs:3"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("provided trait methods"),
@@ -139,17 +149,43 @@ const CASES: [Case; 17] = [
     ),
 ];
 
-#[test]
-fn bodies_repeated_with_names_and_literals_erased_are_listed_once_per_family() {
-    assert_eq!(Sources::mismatches::<RepeatedBodies>(&CASES), Lines::default());
+const SHIPPED: &[Source] =
+    &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("b.rs"), Text::new(RENAMED))];
+const TESTS: &[Source] = &[
+    Source::new(Located::new("tests/a.rs"), Text::new(BODY)),
+    Source::new(Located::new("tests/b.rs"), Text::new(RENAMED)),
+];
+const MIXED: &[Source] =
+    &[Source::new(Located::new("a.rs"), Text::new(BODY)), Source::new(Located::new("tests/b.rs"), Text::new(RENAMED))];
+
+struct Findings;
+
+impl Findings {
+    fn of(sources: &&[Source]) -> String {
+        RepeatedShapes::report(&Sources::parsed(sources)).violations().iter().map(ToString::to_string).collect()
+    }
 }
 
 #[test]
-fn a_finding_lists_its_size_its_copies_and_the_fixes_in_order() {
+fn bodies_repeated_with_names_and_literals_erased_are_listed_once_per_family() {
+    assert_eq!(Sources::mismatches::<RepeatedShapes>(&CASES), Lines::default());
+}
+
+laws::table!(
+    a_finding_names_where_its_copies_live_and_the_fix_for_that_place,
+    Findings::of,
+    [
+        SHIPPED => "a.rs:1: 46 tokens in 2 shipped copies, also at b.rs:1; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
+        TESTS => "tests/a.rs:1: 46 tokens in 2 test copies, also at tests/b.rs:1; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",
+        MIXED => "a.rs:1: 46 tokens in 2 test and shipped copies, also at tests/b.rs:1; the test re-implements shipped logic; test through the shipped code instead of copying it",
+    ]
+);
+
+#[test]
+fn a_finding_lists_its_size_and_its_copies_in_order() {
     let text =
-        RepeatedBodies::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
-    assert!(text.contains("46 tokens in 3 copies, also at a.rs:15, a.rs:29; "), "{text}");
-    assert!(text.contains("a standard trait such as From, TryFrom, FromStr or Display, else a generic over an existing trait, else a derive"), "{text}");
+        RepeatedShapes::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
+    assert!(text.contains("46 tokens in 3 shipped copies, also at a.rs:15, a.rs:29; "), "{text}");
     assert!(!text.contains("helper"));
 }
 
@@ -159,6 +195,6 @@ fn a_nested_family_is_not_listed_beside_its_outer_family() {
         Source::new(Located::new("a.rs"), Text::new(NESTED_A)),
         Source::new(Located::new("b.rs"), Text::new(NESTED_B)),
     ]);
-    let report = RepeatedBodies::report(&files);
+    let report = RepeatedShapes::report(&files);
     assert_eq!(report.violations().len(), 1);
 }
