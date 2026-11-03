@@ -26,6 +26,8 @@ const OTHER_GLOB: Source = Source::new(Located::new("crates/c/src/lib.rs"), Text
 const SELF_GLOB: Source = Source::new(Located::new("crates/a/src/inner.rs"), Text::new("use a::*;\n"));
 
 const TEST_USER: Source = Source::new(Located::new("crates/a/tests/api.rs"), Text::new("use a::Unused;\n"));
+const OTHER_TEST_USER: Source = Source::new(Located::new("crates/c/tests/api.rs"), Text::new("use a::Unused;\n"));
+const EXAMPLE_USER: Source = Source::new(Located::new("crates/a/examples/demo.rs"), Text::new("use a::Unused;\n"));
 const TEST_USER_ALL: Source = Source::new(Located::new("crates/a/tests/api.rs"), Text::new("use a::{Used, Unused};\n"));
 
 const MODULES: Source = Source::new(
@@ -39,7 +41,7 @@ const MODULE_GROUP_USER: Source =
     Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::{used::Thing, inner};\n"));
 const MODULE_BARE_USER: Source = Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::used;\n"));
 
-const CASES: [Case; 16] = [
+const CASES: [Case; 19] = [
     Case::new(Title::new("no dependent"), &[LONELY], Flagged::new(&[])),
     Case::new(Title::new("used by itself"), &[EXPORTER, USER, SELF_USER], Flagged::new(&["crates/a/src/lib.rs:2"])),
     Case::new(Title::new("named by its binary"), &[EXPORTER, USER, BINARY], Flagged::new(&[])),
@@ -53,8 +55,19 @@ const CASES: [Case; 16] = [
         Flagged::new(&["crates/a/src/lib.rs:2"]),
     ),
     Case::new(
-        Title::new("named only by its own tests"),
+        Title::new("named by its own tests, which use the public API"),
         &[EXPORTER, USER, TEST_USER],
+        Flagged::new(&[]),
+    ),
+    Case::new(Title::new("own tests alone make no dependent"), &[EXPORTER, TEST_USER], Flagged::new(&[])),
+    Case::new(
+        Title::new("another crate's tests are not users"),
+        &[EXPORTER, USER, OTHER_TEST_USER],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("its own examples are not users"),
+        &[EXPORTER, USER, EXAMPLE_USER],
         Flagged::new(&["crates/a/src/lib.rs:2"]),
     ),
     Case::new(Title::new("named by tests and another crate"), &[EXPORTER, PATH_USER, TEST_USER_ALL], Flagged::new(&[])),

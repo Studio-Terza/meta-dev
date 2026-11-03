@@ -3,7 +3,7 @@ mod finding;
 use finding::Finding;
 use lint_core::{Headline, Lint};
 use syn::visit::Visit;
-use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, TraitItemFn};
+use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Least;
 use lint_core::Macros;
@@ -97,10 +97,5 @@ impl<'ast> Visit<'ast> for VagueNames {
             self.note(&function.sig.ident);
             syn::visit::visit_impl_item_fn(self, function);
         });
-    }
-
-    fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        self.note(&function.sig.ident);
-        syn::visit::visit_trait_item_fn(self, function);
     }
 }
