@@ -23,25 +23,25 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn state_of(&self, kind: Kind) -> Option<TypeName> {
-        (self.kind == kind).then(|| self.state.clone())
+    pub fn state_of(&self, kind: Kind) -> Option<&TypeName> {
+        (self.kind == kind).then_some(&self.state)
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = Edge> {
-        self.transitions.iter().map(|transition| Edge::new(self.state.clone(), transition.target().clone()))
+    pub fn edges(&self) -> impl Iterator<Item = Edge<'_>> {
+        self.transitions.iter().map(|transition| Edge::new(&self.state, transition.target()))
     }
 
     pub fn violations<'file>(
         &self,
         path: &'file Path,
-        reachable: &BTreeSet<TypeName>,
-        ending: &BTreeSet<TypeName>,
+        reachable: &BTreeSet<&TypeName>,
+        ending: &BTreeSet<&TypeName>,
     ) -> Vec<Violation<'file>> {
-        let state = || self.state.clone();
-        let lost = (!reachable.contains(&self.state)).then(|| Finding::UnreachableState { state: state() });
-        let stuck = (!ending.contains(&self.state)).then(|| Finding::NoTerminalAhead { state: state() });
+        let state = &self.state;
+        let lost = (!reachable.contains(state)).then_some(Finding::UnreachableState { state });
+        let stuck = (!ending.contains(state)).then_some(Finding::NoTerminalAhead { state });
         let open = (self.kind == Kind::Terminal && !self.transitions.is_empty())
-            .then(|| Finding::TerminalHasEdges { state: state() });
+            .then_some(Finding::TerminalHasEdges { state });
         let site = Site::new(path, self.line);
         [lost, stuck, open].into_iter().flatten().map(|finding| Violation::new(site, finding)).collect()
     }
