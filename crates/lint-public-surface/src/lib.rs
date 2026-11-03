@@ -22,8 +22,13 @@ impl Lint for PublicSurface {
         let binaries = BinaryFiles::collect(files);
         let references = files
             .iter()
-            .filter(|file| file.is_shipped())
-            .map(|file| ForeignReferences::in_file(file, &binaries))
+            .filter_map(|file| {
+                if file.is_shipped() {
+                    Some(ForeignReferences::in_file(file, &binaries))
+                } else {
+                    ForeignReferences::in_own_tests(file)
+                }
+            })
             .fold(ForeignReferences::default(), ForeignReferences::absorb);
         Report::new(
             Headline::new("a crate exports exactly what another crate uses"),

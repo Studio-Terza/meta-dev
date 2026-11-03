@@ -19,12 +19,27 @@ pub struct ForeignReferences {
 }
 
 impl ForeignReferences {
+    const TESTS: &'static str = "tests";
+
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
         let own_crate = (!binaries.contains(file.path())).then(|| CrateName::from(file.placement().crate_root()));
         let mut references =
             ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new(), globbed: BTreeSet::new() };
         references.visit_file(file.syntax());
         references
+    }
+
+    pub fn in_own_tests(file: &SourceFile) -> Option<ForeignReferences> {
+        let package = file.placement().package().root();
+        file.placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
+            let tested = CrateName::from(package);
+            let mut references = ForeignReferences::default();
+            references.visit_file(file.syntax());
+            ForeignReferences {
+                names: references.names.remove_entry(&tested).into_iter().collect(),
+                ..ForeignReferences::default()
+            }
+        })
     }
 
     pub fn absorb(mut self, other: ForeignReferences) -> ForeignReferences {
