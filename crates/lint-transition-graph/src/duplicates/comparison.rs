@@ -5,9 +5,9 @@ use lint_core::{Site, Violation};
 use transition_facts::Transitions;
 
 use super::family::Family;
+use crate::class::Class;
 use crate::count::Count;
 use crate::edge::{Edge, Role};
-use crate::end::Class;
 use newtype::Counter;
 
 #[derive(Debug)]

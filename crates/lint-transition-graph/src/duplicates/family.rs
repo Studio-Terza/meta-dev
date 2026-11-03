@@ -8,7 +8,7 @@ use transition_facts::Transition;
 
 use crate::count::Count;
 use crate::edge::{Edge, Role};
-use crate::end::Key;
+use crate::key::Key;
 
 #[derive(Debug)]
 pub(super) struct Family<'found, 'file> {

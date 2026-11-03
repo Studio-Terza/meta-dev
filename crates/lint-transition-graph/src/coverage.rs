@@ -6,9 +6,9 @@ use lint_core::Fix;
 use lint_core::{Site, Violation};
 use newtype::Counter;
 
+use crate::class::Class;
 use crate::count::Count;
 use crate::edge::{Edge, Role};
-use crate::end::Class;
 use share::Share;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
