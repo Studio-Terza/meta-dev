@@ -48,9 +48,10 @@ impl<'file> TypeFact<'file> {
     pub fn derives(&self) -> &[Name] {
         &self.derives
     }
+}
 
-    #[must_use]
-    pub fn dependencies(&self) -> &[Dependency<'file>] {
+impl<'file> AsRef<[Dependency<'file>]> for TypeFact<'file> {
+    fn as_ref(&self) -> &[Dependency<'file>] {
         &self.dependencies
     }
 }

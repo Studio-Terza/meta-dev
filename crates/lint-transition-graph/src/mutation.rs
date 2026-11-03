@@ -1,10 +1,7 @@
 mod crate_mutation;
 mod tally;
 
-use std::collections::BTreeMap;
-
 use lint_core::{Headline, Lint, Report, SourceFile};
-use lint_placement::CrateName;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -22,11 +19,7 @@ impl GraphLint for CoreMutation {
         let types = WorkspaceTypes::declared(facts, transitions);
         let edges: Vec<Edge<'_, 'file>> = transitions.all().map(|found| types.edge(found)).collect();
         let counted: Vec<&Edge<'_, 'file>> = edges.iter().filter_map(Tally::counts).collect();
-        let grouped =
-            counted.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&Edge<'_, 'file>>>, edge| {
-                crates.entry(edge.transition().as_ref()).or_default().push(edge);
-                crates
-            });
+        let grouped = Edge::by_crate(counted.iter().copied());
         Report::new(
             Headline::new(
                 "report only, mutation in the core: edges outside ports, boundary and store modules that take &mut, through &mut self or a &mut parameter, size the store migration; a signature a foreign trait fixes (fmt, next, hash) is counted apart; store operations, &mut self methods in a store module, are listed with the element transition they apply",

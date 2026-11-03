@@ -280,7 +280,7 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
             })
             .collect()
     };
-    let types: Vec<Vec<String>> = facts.types().iter().map(|found| described(found.dependencies())).collect();
+    let types: Vec<Vec<String>> = facts.types().iter().map(|found| described(found.as_ref())).collect();
     assert_eq!(
         types,
         [
@@ -295,6 +295,6 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
             vec!["lint_coreD:variant:Directly:a.rs:2".to_owned()],
         ]
     );
-    let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.dependencies())).collect();
+    let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.as_ref())).collect();
     assert_eq!(traits, [vec!["Sup:bound:Directly:a.rs:3".to_owned()]]);
 }

@@ -9,7 +9,7 @@ use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as Tra
 
 use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
-use lint_paths::{Imports, Module};
+use lint_paths::{Imports, Module, Nested};
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
@@ -107,11 +107,15 @@ impl<'file> Reader<'file, '_> {
     }
 }
 
+impl<'file> Nested<'file> for Reader<'file, '_> {
+    fn module(&mut self) -> &mut Module<'file> {
+        &mut self.module
+    }
+}
+
 impl<'file> Visit<'file> for Reader<'file, '_> {
     fn visit_item_mod(&mut self, module: &'file ItemMod) {
-        self.module.enter(Name::from(&module.ident));
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module.leave();
+        self.nested(module, |reader| visit::visit_item_mod(reader, module));
     }
 
     fn visit_item_impl(&mut self, item: &'file ItemImpl) {

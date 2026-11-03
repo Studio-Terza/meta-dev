@@ -28,9 +28,10 @@ impl<'file> TraitFact<'file> {
         self.methods = methods;
         self
     }
+}
 
-    #[must_use]
-    pub fn dependencies(&self) -> &[Dependency<'file>] {
+impl<'file> AsRef<[Dependency<'file>]> for TraitFact<'file> {
+    fn as_ref(&self) -> &[Dependency<'file>] {
         &self.dependencies
     }
 }
