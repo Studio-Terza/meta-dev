@@ -16,7 +16,7 @@ use tangle::{Tally, Tangle};
 pub struct Tangles;
 
 impl GraphLint for Tangles {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::Unlifted);
         let reach: BTreeMap<&Node, BTreeSet<&Node>> =

@@ -18,7 +18,7 @@ impl HiddenStates {
 }
 
 impl GraphLint for HiddenStates {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let written: Vec<&Transition> =
             graph.edges().iter().filter(|edge| edge.role() == Role::Written).map(Edge::transition).collect();

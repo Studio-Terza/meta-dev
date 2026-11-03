@@ -10,18 +10,18 @@ use crate::cli::workspace::crate_name::CrateName;
 use crate::cli::workspace::share::Share;
 
 #[derive(Debug)]
-pub struct Hub {
+pub struct Hub<'file> {
     crate_name: CrateName,
-    held: Held,
+    held: Held<'file>,
     share: Share,
 }
 
-impl Hub {
-    pub fn new(crate_name: CrateName, held: Held, share: Share) -> Hub {
+impl<'file> Hub<'file> {
+    pub fn new(crate_name: CrateName, held: Held<'file>, share: Share) -> Hub<'file> {
         Hub { crate_name, held, share }
     }
 
-    pub fn ranked(mut hubs: Vec<Hub>) -> Vec<Hub> {
+    pub fn ranked(mut hubs: Vec<Hub<'file>>) -> Vec<Hub<'file>> {
         hubs.sort_by(|one, other| {
             (Reverse(one.weight()), &one.crate_name).cmp(&(Reverse(other.weight()), &other.crate_name))
         });
@@ -40,7 +40,7 @@ impl Hub {
     }
 }
 
-impl fmt::Display for Hub {
+impl<'file> fmt::Display for Hub<'file> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -54,14 +54,14 @@ impl fmt::Display for Hub {
     }
 }
 
-impl Finding for Hub {
+impl<'file> Finding for Hub<'file> {
     fn fix(&self) -> Fix {
         Fix::new("move the logic into leaf crates and keep types, traits and interfaces here")
     }
 }
 
-impl From<&Hub> for Violation {
-    fn from(hub: &Hub) -> Violation {
+impl<'file> From<&Hub<'file>> for Violation<'file> {
+    fn from(hub: &Hub<'file>) -> Violation<'file> {
         Violation::new(hub.held.heaviest().clone(), hub)
     }
 }

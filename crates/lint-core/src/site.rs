@@ -1,32 +1,32 @@
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lint_layout::LineNumber;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Site {
-    path: PathBuf,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Site<'file> {
+    path: &'file Path,
     line: LineNumber,
 }
 
-impl Site {
+impl<'file> Site<'file> {
     #[must_use]
-    pub fn new(path: &Path, line: LineNumber) -> Site {
-        Site { path: path.to_path_buf(), line }
+    pub fn new(path: &'file Path, line: LineNumber) -> Site<'file> {
+        Site { path, line }
     }
 
     #[must_use]
-    pub fn of_file(path: &Path) -> Site {
+    pub fn of_file(path: &'file Path) -> Site<'file> {
         Site::new(path, LineNumber::FIRST)
     }
 
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn path(&self) -> &'file Path {
+        self.path
     }
 }
 
-impl fmt::Display for Site {
+impl fmt::Display for Site<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}:{}", self.path.display(), self.line)
     }

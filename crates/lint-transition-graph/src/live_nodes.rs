@@ -17,7 +17,7 @@ use liveness::{Liveness, Reach, Tally, Usage};
 pub struct LiveNodes;
 
 impl GraphLint for LiveNodes {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let entered: BTreeSet<&Node> = graph
             .edges()

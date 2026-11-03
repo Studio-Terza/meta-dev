@@ -57,7 +57,12 @@ impl SignatureReading {
         }
     }
 
-    pub(super) fn transition(&self, site: Site, signature: &Signature, body: &Block) -> Transition {
+    pub(super) fn transition<'file>(
+        &self,
+        site: Site<'file>,
+        signature: &Signature,
+        body: &Block,
+    ) -> Transition<'file> {
         let scope = self.scope.extended(&signature.generics);
         let takes = signature
             .inputs

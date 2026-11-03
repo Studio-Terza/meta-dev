@@ -9,7 +9,7 @@ pub use crates::{Held, Logic};
 pub struct Complexity;
 
 impl Lint for Complexity {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report<'file>(files: &'file [SourceFile]) -> Report<'file> {
         Report::new(
             Headline::new(
                 "report only, cyclomatic complexity per function, as a distribution per crate; a branchy function is a candidate for a standard trait, a generic over an existing trait, or a derive",
@@ -21,7 +21,7 @@ impl Lint for Complexity {
 
 impl Complexity {
     #[must_use]
-    pub fn held(files: &[SourceFile]) -> Vec<Held> {
+    pub fn held<'file>(files: &'file [SourceFile]) -> Vec<Held<'file>> {
         Crates::grouped(files).held()
     }
 }

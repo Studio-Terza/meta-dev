@@ -18,7 +18,7 @@ use tally::Tally;
 pub struct CoreMutation;
 
 impl GraphLint for CoreMutation {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let types = WorkspaceTypes::declared(facts);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let counted: Vec<&Edge<'_>> = edges.iter().filter_map(Tally::counts).collect();

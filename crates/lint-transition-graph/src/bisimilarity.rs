@@ -18,7 +18,7 @@ use group::{Group, Tally};
 pub struct Bisimilarity;
 
 impl GraphLint for Bisimilarity {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let behaviour = Behaviour::read(&graph);
         let blocks = behaviour.refined();

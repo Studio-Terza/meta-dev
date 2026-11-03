@@ -18,7 +18,7 @@ use family::Family;
 pub struct DuplicateTransitions;
 
 impl GraphLint for DuplicateTransitions {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let types = WorkspaceTypes::declared(facts);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(

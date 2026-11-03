@@ -16,7 +16,7 @@ use motif::{Motif, Occurrence, Tally};
 pub struct RepeatedMotifs;
 
 impl GraphLint for RepeatedMotifs {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::All);
         let pairs: Vec<Occurrence<'_, '_>> = graph

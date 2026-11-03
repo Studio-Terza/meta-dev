@@ -15,11 +15,11 @@ pub(super) struct Collector<'file> {
     file: &'file SourceFile,
     krate: CrateName,
     ground: Ground,
-    transitions: Vec<Transition>,
+    transitions: Vec<Transition<'file>>,
 }
 
 impl<'file> Collector<'file> {
-    pub(super) fn collected(file: &'file SourceFile) -> Vec<Transition> {
+    pub(super) fn collected(file: &'file SourceFile) -> Vec<Transition<'file>> {
         let mut scan = Collector {
             file,
             krate: CrateName::from(file.placement().package().root()),
@@ -30,7 +30,7 @@ impl<'file> Collector<'file> {
         scan.transitions
     }
 
-    fn site(file: &SourceFile, name: &Ident) -> Site {
+    fn site(file: &'file SourceFile, name: &Ident) -> Site<'file> {
         Site::new(file.path(), LineNumber::from(name.span()))
     }
 }

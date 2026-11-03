@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use file_ports::Files;
 use lint_complexity::Complexity;
-use lint_reader::SourceFiles;
+use lint_core::SourceFile;
 
 use crate::cli::failure::Failure;
 use crate_count::CrateCount;
@@ -92,18 +92,17 @@ impl Workspace {
         })
     }
 
-    pub fn hubs(&self, files: &impl Files, repository: &Path) -> Result<Hubs, Failure> {
-        let readout = SourceFiles::read(files, repository)?;
+    pub fn hubs<'file>(&self, sources: &'file [SourceFile], repository: &Path) -> Hubs<'file> {
         let fan_in = self.fan_in();
-        Ok(Hubs::weighed(
-            Complexity::held(readout.files())
+        Hubs::weighed(
+            Complexity::held(sources)
                 .into_iter()
                 .filter_map(|held| {
                     let owner = self.owner_of(repository, held.heaviest().path())?;
                     fan_in.share_of(owner).map(|share| Hub::new(owner.clone(), held, share))
                 })
                 .collect(),
-        ))
+        )
     }
 
     pub fn owner_of(&self, repository: &Path, path: &Path) -> Option<&CrateName> {

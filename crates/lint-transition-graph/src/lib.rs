@@ -42,7 +42,7 @@ pub use triangles::CommutingTriangles;
 pub struct TransitionGraph;
 
 impl GraphLint for TransitionGraph {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let types = WorkspaceTypes::declared(facts);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let grouped = edges.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&Edge<'_>>>, edge| {

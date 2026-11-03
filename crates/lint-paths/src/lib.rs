@@ -28,16 +28,16 @@ pub struct Paths;
 
 impl Paths {
     #[must_use]
-    pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use> {
+    pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use<'file>> {
         Self::walked(&files.into_iter().collect::<Vec<_>>(), |scopes| Wanted::among(scopes, finals))
     }
 
     #[must_use]
-    pub fn every<'file>(files: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use> {
+    pub fn every<'file>(files: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use<'file>> {
         Self::walked(&files.into_iter().collect::<Vec<_>>(), |_| Wanted::EVERY)
     }
 
-    fn walked(files: &[&SourceFile], wanted: impl FnOnce(&Scopes) -> Wanted) -> Vec<Use> {
+    fn walked<'file>(files: &[&'file SourceFile], wanted: impl FnOnce(&Scopes) -> Wanted) -> Vec<Use<'file>> {
         let scopes = Collector::collect(files);
         let resolver = Resolver::over(&scopes);
         let wanted = wanted(&scopes);

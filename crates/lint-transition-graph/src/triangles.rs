@@ -16,7 +16,7 @@ use triangle::{Detour, Tally, Triangle};
 pub struct CommutingTriangles;
 
 impl GraphLint for CommutingTriangles {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::All);
         let triangles: Vec<Triangle<'_, '_>> = graph
