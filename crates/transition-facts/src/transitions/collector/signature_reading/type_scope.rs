@@ -26,7 +26,6 @@ impl TypeScope {
         "bool", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize", "f32", "f64",
         "char", "str", "String"
     ];
-    const ITEM: [Word<'static>; 1] = words!["Item"];
     const SELF: [Word<'static>; 1] = words!["Self"];
     const SIZED: Word<'static> = Word::new("Sized");
     const FN: Word<'static> = Word::new("Fn");
@@ -53,7 +52,6 @@ impl TypeScope {
         match found {
             Type::Reference(reference) => self.endpoint(&reference.elem),
             Type::Paren(paren) => self.endpoint(&paren.elem),
-            Type::Group(group) => self.endpoint(&group.elem),
             Type::Ptr(pointer) => self.endpoint(&pointer.elem),
             Type::Slice(slice) => self.endpoint(&slice.elem),
             Type::Array(array) => self.endpoint(&array.elem),
@@ -99,11 +97,7 @@ impl TypeScope {
     fn generic(&self, argument: &GenericArgument) -> Option<Endpoint> {
         match argument {
             GenericArgument::Type(inner) => Some(self.endpoint(inner)),
-            GenericArgument::AssocType(associated)
-                if Name::from(&associated.ident).matches::<Whole>(&Self::ITEM).is_some() =>
-            {
-                Some(self.endpoint(&associated.ty))
-            }
+            GenericArgument::AssocType(associated) => Some(self.endpoint(&associated.ty)),
             _ => None,
         }
     }
