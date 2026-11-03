@@ -1,3 +1,4 @@
+mod event;
 mod skipped;
 
 use std::ffi::OsString;
@@ -7,33 +8,32 @@ use std::path::Path;
 use text_lines::Lines;
 
 use super::Step;
-use super::changed::Changed;
+use super::branch::Branch;
+use super::changed::{Changed, Question};
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
+use event::Event;
 use skipped::Skipped;
 
 #[derive(Debug)]
 pub struct ReachScope {
     metadata: Journal,
-    event: String,
-    base: String,
+    event: Event,
+    base: Branch,
     environment: Journal,
     summary: Journal,
 }
 
 impl ReachScope {
-    const PULL_REQUEST: &'static str = "pull_request";
-    const AFFECTED: &'static str = "affected";
-    const WIDENED: &'static str = "widened";
     const MAIN: &'static str = "main";
     const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
-    fn recorded(&self, report: &str, out: &mut impl Write) -> Result<(), Failure> {
+    fn recorded(&self, report: &Text, out: &mut impl Write) -> Result<(), Failure> {
         write!(out, "{report}")?;
         self.environment.append(report)?;
         self.summary.append(report)?;
-        Lines::from(report).filter_map(|line| Skipped::try_from(line).ok()).try_for_each(|skipped| {
+        Lines::from(report.as_ref()).filter_map(|line| Skipped::try_from(line).ok()).try_for_each(|skipped| {
             writeln!(out, "{skipped}")?;
             self.summary.append(format_args!("{skipped}\n"))
         })
@@ -45,8 +45,8 @@ impl Step for ReachScope {
         match arguments {
             [metadata, event, base, environment, summary] => Ok(ReachScope {
                 metadata: Journal::file(Path::new(metadata)),
-                event: event.to_str().ok_or(Failure::Usage)?.to_owned(),
-                base: base.to_str().ok_or(Failure::Usage)?.to_owned(),
+                event: Event::from(event.to_str().ok_or(Failure::Usage)?),
+                base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
                 environment: Journal::file(Path::new(environment)),
                 summary: Journal::file(Path::new(summary)),
             }),
@@ -56,10 +56,10 @@ impl Step for ReachScope {
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
         Changed::stored_metadata(ports, &self.metadata)?;
-        let report = match (self.event == Self::PULL_REQUEST, self.base == Self::MAIN) {
-            (true, false) => Changed::answered(Self::AFFECTED, &self.metadata, ports)?,
-            (true, true) => Changed::answered(Self::WIDENED, &self.metadata, ports)?,
-            (false, _) => Self::WHOLE_WORKSPACE.to_owned(),
+        let report = match (self.event, self.base.as_ref() == Self::MAIN) {
+            (Event::PullRequest, false) => Changed::answered(Question::Affected, &self.metadata, ports)?,
+            (Event::PullRequest, true) => Changed::answered(Question::Widened, &self.metadata, ports)?,
+            (Event::Other, _) => Text::new(Self::WHOLE_WORKSPACE.to_owned()),
         };
         self.recorded(&report, out).map(|()| Exit::Success)
     }

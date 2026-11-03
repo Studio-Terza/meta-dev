@@ -51,20 +51,16 @@ impl Change {
             Change::Touched(_) => None,
         }
     }
-
-    fn fields(line: &str) -> Vec<&str> {
-        let tabs: Vec<usize> = line.match_indices(Self::SEPARATOR).map(|(at, _)| at).collect();
-        let starts = [0].into_iter().chain(tabs.iter().map(|at| at + Self::SEPARATOR.len()));
-        let ends = tabs.iter().copied().chain([line.len()]);
-        starts.zip(ends).filter_map(|(start, end)| line.get(start..end)).collect()
-    }
 }
 
 impl FromStr for Change {
     type Err = NotAChange;
 
     fn from_str(line: &str) -> Result<Change, NotAChange> {
-        let fields = Self::fields(line);
+        let tabs: Vec<usize> = line.match_indices(Self::SEPARATOR).map(|(at, _)| at).collect();
+        let starts = [0].into_iter().chain(tabs.iter().map(|at| at + Self::SEPARATOR.len()));
+        let ends = tabs.iter().copied().chain([line.len()]);
+        let fields: Vec<&str> = starts.zip(ends).filter_map(|(start, end)| line.get(start..end)).collect();
         let status = fields.first().and_then(|status| status.chars().next()).ok_or(NotAChange)?;
         match (fields.as_slice(), status) {
             ([_, path], Self::ADDED) => Ok(Change::Added(PathBuf::from(path))),

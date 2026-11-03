@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 use std::time::Instant;
 
-use super::{Exit, Invocation, Ports, Run, Tee};
+use super::{Exit, Invocation, Ports, Run, Tee, Text};
 
 #[derive(Debug)]
 pub struct System;
@@ -39,10 +39,10 @@ impl Ports for System {
         Ok(Run::new(Self::exit_of(status), started.elapsed()))
     }
 
-    fn output(&self, invocation: &Invocation) -> io::Result<String> {
+    fn output(&self, invocation: &Invocation) -> io::Result<Text> {
         let output = Self::command(invocation).output()?;
         if output.status.success() {
-            String::from_utf8(output.stdout).map_err(io::Error::other)
+            String::from_utf8(output.stdout).map(Text::new).map_err(io::Error::other)
         } else {
             Err(io::Error::other(String::from_utf8(output.stderr).unwrap_or_default()))
         }

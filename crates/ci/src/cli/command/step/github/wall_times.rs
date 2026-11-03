@@ -1,3 +1,7 @@
+mod job;
+mod repository;
+mod run_id;
+
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
@@ -5,12 +9,15 @@ use std::io::Write;
 use super::Step;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Invocation, Ports};
+use job::Job;
+use repository::Repository;
+use run_id::RunId;
 
 #[derive(Debug)]
 pub struct WallTimes {
-    repository: String,
-    run: String,
-    job: String,
+    repository: Repository,
+    run: RunId,
+    job: Job,
 }
 
 impl WallTimes {
@@ -40,9 +47,9 @@ impl Step for WallTimes {
     fn from_arguments(arguments: &[OsString]) -> Result<WallTimes, Failure> {
         match arguments {
             [repository, run, job] => Ok(WallTimes {
-                repository: repository.to_str().ok_or(Failure::Usage)?.to_owned(),
-                run: run.to_str().ok_or(Failure::Usage)?.to_owned(),
-                job: job.to_str().ok_or(Failure::Usage)?.to_owned(),
+                repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
+                run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
+                job: Job::new(job.to_str().ok_or(Failure::Usage)?.to_owned()),
             }),
             _ => Err(Failure::Usage),
         }

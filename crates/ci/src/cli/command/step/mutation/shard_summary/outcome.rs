@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -14,8 +15,8 @@ impl Outcome {
 
     const EXTENSION: &'static str = ".txt";
 
-    pub(crate) fn file_name(self) -> String {
-        [self.to_string().as_str(), Self::EXTENSION].concat()
+    pub(crate) fn file_name(self) -> PathBuf {
+        PathBuf::from([self.to_string().as_str(), Self::EXTENSION].concat())
     }
 }
 

@@ -1,3 +1,4 @@
+mod branch;
 mod changed;
 mod compile_times;
 pub mod github;
@@ -10,7 +11,9 @@ mod measured;
 pub mod mutation;
 pub mod ratchet;
 mod reach_scope;
+mod revision;
 mod seconds;
+mod stage;
 mod timed;
 mod tools_key;
 

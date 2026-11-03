@@ -4,6 +4,7 @@ mod ratchet_lower;
 use super::Step;
 use super::journal::Journal;
 use super::measured::Measured;
+use super::revision::Revision;
 
 pub use measured_history::MeasuredHistory;
 pub use ratchet_lower::RatchetLower;
