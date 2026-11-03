@@ -113,14 +113,6 @@ fn the_report_flag_fails_on_an_unreadable_root() {
 }
 
 #[test]
-fn the_process_entry_point_fails_on_a_violation() -> Result<(), Box<dyn Error>> {
-    let root = Disk::package()?;
-    Disk::write(root.path(), "src/lib.rs", DIRTY)?;
-    assert_eq!(Cli::from_args(std::iter::once(OsString::from(root.path()))).run(), ExitCode::FAILURE);
-    Ok(())
-}
-
-#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Disk::package()?;
     Disk::write(root.path(), "src/lib.rs", DIRTY)?;
@@ -145,14 +137,14 @@ impl Trees {
     }
 
     fn crate_graph_lines(root: &Path) -> Result<Lines, Box<dyn Error>> {
-        let readout = SourceFiles::read(root)?;
+        let readout = SourceFiles::read(&file_ports::Disk, root)?;
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
 
     fn flagged(root: &Path, flags: &[&str]) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(&mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(&file_ports::Disk, &mut out, &mut err);
         Printed {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -167,7 +159,7 @@ impl Trees {
     fn reported_all(roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&file_ports::Disk, &mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }

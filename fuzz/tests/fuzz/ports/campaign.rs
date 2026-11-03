@@ -7,6 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use file_ports::Disk;
 use lint_runner::Cli;
 use proptest::prelude::Strategy;
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
@@ -50,7 +51,7 @@ impl Campaign {
         let root = tempfile::tempdir()?;
         Self::planted(input, root.path())?;
         let arguments = [OsString::from(root.path())];
-        let _ = Cli::from_args(arguments.into_iter()).report_to(&mut Vec::new(), &mut Vec::new());
+        let _ = Cli::from_args(arguments.into_iter()).report_to(&Disk, &mut Vec::new(), &mut Vec::new());
         Ok(())
     }
 

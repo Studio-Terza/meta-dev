@@ -1,10 +1,10 @@
 mod members;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use file_ports::Files;
 use newtype::Newtype;
 use toml::Spanned;
 use toml::de::DeTable;
@@ -41,14 +41,12 @@ impl Manifest {
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub fn read(directory: &Path) -> Result<Option<Manifest>, Failure> {
+    pub fn read(files: &impl Files, directory: &Path) -> Result<Option<Manifest>, Failure> {
         let file = directory.join(Self::FILE);
-        match fs::read_to_string(&file) {
+        match files.read_text(&file).map(Newtype::into_inner).map_err(io::Error::from) {
             Ok(text) => text
                 .parse::<Table>()
-                .map(|table| {
-                    Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text.clone()), table })
-                })
+                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
                 .map_err(|source| Failure::Manifest { path: file, source }),
             Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(source) => Err(Failure::Io { path: file, source }),
@@ -98,7 +96,7 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn path_dependencies(&self) -> Vec<PathBuf> {
+    pub fn path_dependencies(&self, files: &impl Files) -> Vec<PathBuf> {
         let workspace = self.table.get(Self::WORKSPACE).and_then(|value| value.get("dependencies"));
         Self::DEPENDENCIES
             .iter()
@@ -107,23 +105,23 @@ impl Manifest {
             .filter_map(Value::as_table)
             .flat_map(Table::values)
             .filter_map(|dependency| dependency.get(Self::PATH)?.as_str())
-            .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
+            .filter_map(|path| files.canonical(&self.directory.join(path)).ok())
             .collect()
     }
 
     #[must_use]
-    pub fn declared_roots(&self) -> BTreeSet<PathBuf> {
+    pub fn declared_roots(&self, files: &impl Files) -> BTreeSet<PathBuf> {
         let library = self.table.get(Self::LIBRARY).into_iter();
         let listed = Self::TARGET_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
         library
             .chain(listed.flatten())
             .filter_map(|target| target.get(Self::PATH)?.as_str())
-            .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
+            .filter_map(|path| files.canonical(&self.directory.join(path)).ok())
             .collect()
     }
 
     #[must_use]
-    pub fn untested_targets(&self) -> Untested {
+    pub fn untested_targets(&self, files: &impl Files) -> Untested {
         let library = self.table.get(Self::LIBRARY).into_iter();
         let listed = Self::TESTED_LISTS.iter().filter_map(|key| self.table.get(*key)).filter_map(Value::as_array);
         Untested::new(
@@ -136,7 +134,7 @@ impl Manifest {
                         Self::default_files(target.get(Self::NAME).and_then(Value::as_str).map(Name::from))
                     })
                 })
-                .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
+                .filter_map(|path| files.canonical(&self.directory.join(path)).ok())
                 .collect(),
         )
     }

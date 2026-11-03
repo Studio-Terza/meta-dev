@@ -1,10 +1,11 @@
 use std::ffi::OsString;
-use std::io::{self, Write};
+use std::io::Write;
 use std::panic::resume_unwind;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
+use file_ports::Files;
 use lint_core::{Lint, Readout};
 use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
@@ -27,16 +28,16 @@ impl Cli {
     }
 
     #[must_use]
-    pub fn run(&self) -> ExitCode {
-        self.report_to(&mut io::stdout(), &mut io::stderr())
-    }
-
-    #[must_use]
-    pub fn report_to(&self, out: &mut (impl Write + Send), err: &mut (impl Write + Send)) -> ExitCode {
+    pub fn report_to(
+        &self,
+        files: &(impl Files + Sync),
+        out: &mut (impl Write + Send),
+        err: &mut (impl Write + Send),
+    ) -> ExitCode {
         let spawned = thread::scope(|scope| {
             thread::Builder::new()
                 .stack_size(StackSize::LINT.into_inner())
-                .spawn_scoped(scope, || self.reported_to(out, err))
+                .spawn_scoped(scope, || self.reported_to(files, out, err))
                 .map(ScopedJoinHandle::join)
         });
         match spawned {
@@ -49,8 +50,8 @@ impl Cli {
         }
     }
 
-    fn reported_to(&self, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match SourceFiles::read_all(&self.roots).map(|readout| self.outcome_of(readout, out)) {
+    fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        match SourceFiles::read_all(files, &self.roots).map(|readout| self.outcome_of(readout, out)) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
                 write!(err, "{violations}").ok();

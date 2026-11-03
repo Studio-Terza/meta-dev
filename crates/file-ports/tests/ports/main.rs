@@ -4,7 +4,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use fake_files::FakeFiles;
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Text};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -142,4 +142,18 @@ fn a_failure_gives_back_its_error() {
         FileFailure::from(io::Error::from(io::ErrorKind::NotFound)).to_string(),
         io::Error::from(io::ErrorKind::NotFound).to_string()
     );
+}
+
+#[test]
+fn absent_holds_nothing_and_takes_nothing() {
+    let path = Path::new("/a.txt");
+    assert!(matches!(Absent.read(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.read_text(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.write(path, &Bytes::from("a")), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.append(path, &Bytes::from("a")), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.create_directories(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.copy(path, path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.entries(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.canonical(path), Err(FileFailure::Missing(_))));
+    assert_eq!(Absent.kind(path), Kind::Missing);
 }

@@ -1,10 +1,12 @@
 use std::path::Path;
 
+use file_ports::Files;
 use lint_layout::Name;
 use lint_layout::Prefix;
 use lint_layout::Word;
 
 use super::Directory;
+use crate::followed::Followed;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Ignored {
@@ -22,7 +24,7 @@ impl Ignored {
     const HIDDEN: Word<'static> = Word::new(".");
     const VERSION_CONTROL: &'static str = ".git";
 
-    pub fn applying_to(self, directory: &Directory) -> Option<Ignored> {
+    pub fn applying_to(self, files: &impl Files, directory: &Directory) -> Option<Ignored> {
         let path: &Path = directory.as_ref();
         let named = path.file_name();
         let applies = match self {
@@ -30,7 +32,10 @@ impl Ignored {
             Ignored::VersionControl => named.is_some_and(|name| name == Self::VERSION_CONTROL),
             Ignored::BuildOutput => {
                 named.is_some_and(|name| name == Self::BUILD_DIRECTORY)
-                    && path.parent().is_some_and(|parent| parent.join(Self::MANIFEST).is_file())
+                    && path
+                        .parent()
+                        .map(|parent| parent.join(Self::MANIFEST))
+                        .is_some_and(|manifest| Followed::file(files, &manifest).is_some())
             }
         };
         applies.then_some(self)

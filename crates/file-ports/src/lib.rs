@@ -1,3 +1,4 @@
+mod absent;
 mod bytes;
 mod disk;
 mod file_failure;
@@ -5,6 +6,7 @@ mod files;
 mod kind;
 mod text;
 
+pub use absent::Absent;
 pub use bytes::Bytes;
 pub use disk::Disk;
 pub use file_failure::FileFailure;

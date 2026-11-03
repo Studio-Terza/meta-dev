@@ -1,6 +1,6 @@
 use newtype::{Arbitrary, Display, Newtype};
 
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Text(String);
 
 impl AsRef<str> for Text {
