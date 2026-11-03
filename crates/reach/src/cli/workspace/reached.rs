@@ -11,6 +11,21 @@ enum Cargo {
     Workspace,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Flag {
+    Cargo,
+    Mutants,
+}
+
+impl fmt::Display for Flag {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Flag::Cargo => "-p ",
+            Flag::Mutants => "--test-package=",
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Reached {
     crates: BTreeSet<CrateName>,
@@ -19,8 +34,6 @@ pub struct Reached {
 }
 
 impl Reached {
-    const CARGO_FLAG: &'static str = "-p ";
-    const MUTANTS_FLAG: &'static str = "--test-package=";
     const WORKSPACE_FLAG: &'static str = "--workspace";
 
     pub fn new(crates: BTreeSet<CrateName>, total: CrateCount) -> Reached {
@@ -40,19 +53,26 @@ impl Reached {
         crates.is_subset(&self.crates).then_some(self)
     }
 
-    fn flags(&self, flag: &str) -> String {
-        self.crates.iter().map(|name| format!("{flag}{name}")).collect::<Vec<String>>().join(" ")
+    fn build_scope(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.cargo {
+            Cargo::Reached => self.flagged(formatter, Flag::Cargo),
+            Cargo::Workspace => formatter.write_str(Self::WORKSPACE_FLAG),
+        }
+    }
+
+    fn flagged(&self, formatter: &mut fmt::Formatter<'_>, flag: Flag) -> fmt::Result {
+        let flags: Vec<String> = self.crates.iter().map(|name| format!("{flag}{name}")).collect();
+        formatter.write_str(&flags.join(" "))
     }
 }
 
 impl fmt::Display for Reached {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "REACH={} of {} crates", self.crates.len(), self.total)?;
-        let scope = match self.cargo {
-            Cargo::Reached => self.flags(Self::CARGO_FLAG),
-            Cargo::Workspace => Self::WORKSPACE_FLAG.to_owned(),
-        };
-        writeln!(formatter, "BUILD_SCOPE={scope}")?;
-        writeln!(formatter, "MUTANTS_SCOPE={}", self.flags(Self::MUTANTS_FLAG))
+        write!(formatter, "BUILD_SCOPE=")?;
+        self.build_scope(formatter)?;
+        write!(formatter, "\nMUTANTS_SCOPE=")?;
+        self.flagged(formatter, Flag::Mutants)?;
+        writeln!(formatter)
     }
 }
