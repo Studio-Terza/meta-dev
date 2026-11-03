@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::cli::command::failure::Failure;
+use crate::cli::ports::Text;
 
 #[derive(Clone, Debug)]
 pub struct Journal(PathBuf);
@@ -21,19 +22,19 @@ impl Journal {
     }
 
     pub(crate) fn emptied(&self) -> Result<Journal, Failure> {
-        self.replace("").map(|()| self.clone())
+        self.replace(&Text::default()).map(|()| self.clone())
     }
 
-    pub(crate) fn replace(&self, text: &str) -> Result<(), Failure> {
-        self.prepared().and_then(|()| fs::write(&self.0, text)).map_err(|source| self.failed(source))
+    pub(crate) fn replace(&self, text: &Text) -> Result<(), Failure> {
+        self.prepared().and_then(|()| fs::write(&self.0, text.as_ref())).map_err(|source| self.failed(source))
     }
 
-    pub(crate) fn read(&self) -> Result<String, Failure> {
-        fs::read_to_string(&self.0).map_err(|source| self.failed(source))
+    pub(crate) fn read(&self) -> Result<Text, Failure> {
+        fs::read_to_string(&self.0).map(Text::new).map_err(|source| self.failed(source))
     }
 
-    pub(crate) fn read_or(&self, absent: &str) -> Result<String, Failure> {
-        self.existing().map_or_else(|| Ok(absent.to_owned()), Journal::read)
+    pub(crate) fn read_or(&self, absent: Text) -> Result<Text, Failure> {
+        self.existing().map_or_else(|| Ok(absent), Journal::read)
     }
 
     pub(crate) fn existing(&self) -> Option<&Journal> {

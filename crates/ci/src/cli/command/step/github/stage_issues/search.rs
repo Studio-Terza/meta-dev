@@ -36,7 +36,7 @@ impl<'stage> Search<'stage> {
             ],
         );
         let text = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        let listed: Vec<Listed> = serde_json::from_str(&text).map_err(Failure::Issues)?;
+        let listed: Vec<Listed> = serde_json::from_str(text.as_ref()).map_err(Failure::Issues)?;
         Ok(listed.iter().find_map(|issue| issue.numbered(self.0)))
     }
 }

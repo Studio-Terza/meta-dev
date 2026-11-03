@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::Path;
 
 use super::Step;
-use super::{Journal, Measured};
+use super::{Journal, Measured, Revision};
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 
@@ -11,7 +11,7 @@ use crate::cli::ports::{Exit, Ports};
 pub struct MeasuredHistory {
     measured: Measured,
     file: Journal,
-    revision: String,
+    revision: Revision,
 }
 
 impl Step for MeasuredHistory {
@@ -20,7 +20,7 @@ impl Step for MeasuredHistory {
             [measured, file, revision] => Ok(MeasuredHistory {
                 measured: Measured::file(Path::new(measured)),
                 file: Journal::file(Path::new(file)),
-                revision: revision.to_str().ok_or(Failure::Usage)?.to_owned(),
+                revision: Revision::new(revision.to_str().ok_or(Failure::Usage)?.to_owned()),
             }),
             _ => Err(Failure::Usage),
         }

@@ -15,7 +15,7 @@ impl CargoMutants {
     const FIXED: [&'static str; 4] = ["--jobs", "2", "--colors", "never"];
     const OUTPUT: &'static str = "--output";
 
-    pub(crate) fn invocation(output: &Path, selection: &[&OsStr], passed_on: &[&str]) -> Invocation {
+    pub(crate) fn invocation(output: &Path, selection: &[&OsStr], passed_on: &[&OsStr]) -> Invocation {
         Invocation::new(
             "cargo",
             [OsStr::new(Self::SUBCOMMAND)]
@@ -23,7 +23,7 @@ impl CargoMutants {
                 .chain(selection.iter().copied())
                 .chain(Self::FIXED.iter().map(OsStr::new))
                 .chain([OsStr::new(Self::OUTPUT), output.as_os_str()])
-                .chain(passed_on.iter().map(OsStr::new)),
+                .chain(passed_on.iter().copied()),
         )
     }
 }
