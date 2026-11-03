@@ -12,7 +12,7 @@ use file_ports::Files;
 use matrix::Matrix;
 use outcomes::Outcomes;
 
-use failure::Failure;
+pub use failure::Failure;
 
 #[derive(Debug)]
 pub struct Shard {
@@ -21,13 +21,15 @@ pub struct Shard {
 }
 
 impl Shard {
+    const ARGUMENTS: usize = 2;
+
     pub fn from_arguments(arguments: &[OsString]) -> Result<Shard, Failure> {
-        match arguments {
-            [directory, destination] => {
-                Ok(Shard { directory: PathBuf::from(directory), destination: PathBuf::from(destination) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        <&[OsString; Self::ARGUMENTS]>::try_from(arguments)
+            .map(|[directory, destination]| Shard {
+                directory: PathBuf::from(directory),
+                destination: PathBuf::from(destination),
+            })
+            .map_err(|_| Failure::Usage)
     }
 
     pub fn write_matrix(&self, files: &impl Files) -> Result<(), Failure> {

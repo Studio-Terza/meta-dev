@@ -3,7 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use mutation_shard::Cli;
 use serde_json::{Value, json};
 
@@ -171,12 +171,14 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
     let mutants = Mutants::new()?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use") && answer.err.contains("outcomes.json"));
+    assert!(answer.err.contains("cannot use"));
+    assert!(answer.err.contains("outcomes.json"));
     mutants.broken_outcomes("not json")?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse") && answer.err.contains("outcomes.json"));
-    assert!(!mutants.destination().exists());
+    assert!(answer.err.contains("cannot parse"));
+    assert!(answer.err.contains("outcomes.json"));
+    assert_eq!(mutants.files.kind(&mutants.destination()), Kind::Missing);
     Ok(())
 }
 
@@ -192,11 +194,16 @@ fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
-    for arguments in [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]] {
-        let answer = Answer::to(&Memory::default(), arguments);
-        assert_eq!(answer.exit, ExitCode::FAILURE);
-        assert_eq!(Text::lines(&answer.err), ["usage: mutation-shard <mutants.out> <out.json>"]);
-    }
+    let answers: Vec<(ExitCode, Vec<String>)> =
+        [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]]
+            .into_iter()
+            .map(|arguments| Answer::to(&Memory::default(), arguments))
+            .map(|answer| (answer.exit, Text::lines(&answer.err).into_iter().map(String::from).collect()))
+            .collect();
+    assert_eq!(
+        answers,
+        vec![(ExitCode::FAILURE, vec![String::from("usage: mutation-shard <mutants.out> <out.json>")]); 3]
+    );
 }
 
 struct Text;
