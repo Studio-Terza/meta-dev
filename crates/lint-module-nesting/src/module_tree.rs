@@ -1,11 +1,9 @@
 mod finding;
 mod module_path;
-mod reexport_count;
 mod users;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
-use super::ModuleNesting;
 use finding::Finding;
 use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
 
@@ -14,14 +12,12 @@ use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::UseEdges;
 use lint_layout::UsePath;
-use reexport_count::ReexportCount;
 use users::Users;
 
 pub struct ModuleTree<'file> {
     modules: ModuleIndex<'file>,
     users: Users<'file>,
     deep_uses: Vec<Violation<'file>>,
-    reexports: BTreeMap<ModulePath<'file>, ReexportCount>,
 }
 
 impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
@@ -30,7 +26,6 @@ impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
             modules: ModuleIndex::from(files.iter().map(|file| ModulePath::of_file(file)).collect::<Vec<_>>()),
             users: Users::default(),
             deep_uses: Vec::new(),
-            reexports: BTreeMap::new(),
         };
         files.iter().fold(empty, |tree, file| tree.absorbed(file))
     }
@@ -38,16 +33,7 @@ impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
 
 impl<'file> ModuleTree<'file> {
     pub fn violations(&self) -> impl Iterator<Item = Violation<'file>> + '_ {
-        let most = ModuleNesting::REEXPORTS;
         let deep_uses = self.deep_uses.iter().cloned();
-        let crowded = self
-            .reexports
-            .iter()
-            .filter(|(module, _)| module.parent().is_some())
-            .filter_map(move |(module, count)| count.beyond(most).map(|count| (module, count)))
-            .map(move |(module, count)| {
-                Violation::new(Site::of_file(module.file()), Finding::CrowdedReexports { count, most })
-            });
         self.modules
             .modules()
             .iter()
@@ -56,12 +42,10 @@ impl<'file> ModuleTree<'file> {
                     .map(|home| Violation::new(Site::of_file(module.file()), Finding::UsedFromOneSibling { home }))
             })
             .chain(deep_uses)
-            .chain(crowded)
     }
 
     fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
         let module = ModulePath::of_file(file);
-        self.reexports.insert(module, ReexportCount::of_file(file.syntax()));
         self.users.add_tests(&self.modules, file.test_modules());
         UseEdges::each(file.syntax(), |path| self.absorb(module, path));
         self

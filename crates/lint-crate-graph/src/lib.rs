@@ -21,7 +21,7 @@ impl Lint for CrateGraph {
             },
         );
         Report::new(
-            Headline::new("a crate whose items form one big cycle or two loosely linked groups is split"),
+            Headline::new("a crate whose items form one big cycle is split"),
             crates
                 .into_iter()
                 .flat_map(|(crate_file, files)| {

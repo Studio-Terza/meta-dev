@@ -23,8 +23,7 @@ const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> V
 const MODULES: &str = "mod one;\nmod two;\n";
 const CHAIN_A: &str =
     "pub struct A0(A1);\npub struct A1(A2);\npub struct A2(A3);\npub struct A3(A4);\npub struct A4;\n";
-const CHAIN_B: &str =
-    "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3(B4);\npub struct B4;\n";
+const RING: usize = 41;
 const SHORT_CHAIN_B: &str = "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
@@ -519,8 +518,9 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    root.write("code/lib.rs", &format!("pub mod a;\n{CHAIN_A}"))?;
-    root.write("code/a.rs", CHAIN_B)?;
+    let ring: String = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
+    root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
+    root.write("code/a.rs", CHAIN_A)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
     assert_eq!(root.crate_graph_lines()?, [named.as_str()]);
     Ok(())
