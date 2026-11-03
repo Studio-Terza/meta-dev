@@ -4,7 +4,7 @@ use std::io::Write;
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Invocation, Ports};
 
 #[derive(Debug)]
 pub struct StageIssues {
@@ -20,12 +20,17 @@ impl Step for StageIssues {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        self.limits.past_warn()?.iter().try_fold(Exit::Success, |exit, finding| {
-            exit.followed_by(|| {
-                let stage = finding.stage();
-                writeln!(out, "{stage} is past its warn level")?;
-                Issue::titled(Title::new(stage.as_ref()), ports)?.filed(finding, ports, out)
+        let findings = self.limits.past_warn()?;
+        let titles: Vec<Title<'_>> = findings.iter().map(|finding| Title::new(finding.stage().as_ref())).collect();
+        let issues = Issue::titled(&titles, ports)?;
+        let filings = findings
+            .iter()
+            .zip(&issues)
+            .map(|(finding, issue)| {
+                writeln!(out, "{} is past its warn level", finding.stage())?;
+                issue.filing(finding, out)
             })
-        })
+            .collect::<Result<Vec<Invocation>, Failure>>()?;
+        Issue::filed(&filings, ports)
     }
 }

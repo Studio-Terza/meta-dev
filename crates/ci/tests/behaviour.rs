@@ -124,6 +124,14 @@ impl Ports for Fake {
         Scratch::placed(log, &self.logged_text)?;
         Ok(Run::new(self.exit, self.elapsed))
     }
+
+    fn runs(&self, invocations: &[Invocation]) -> Vec<io::Result<Run>> {
+        invocations.iter().map(|invocation| self.run(invocation)).collect()
+    }
+
+    fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<ci::ports::Text>> {
+        invocations.iter().map(|invocation| self.output(invocation)).collect()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1003,8 +1011,8 @@ fn a_stage_past_its_warn_line_opens_an_issue_titled_with_its_name() -> Result<()
         *fake.calls.borrow(),
         [
             Gh::search("clippy"),
-            Gh::call(&["issue", "create", "--title", "clippy", "--body", CLIPPY_BODY]),
             Gh::search("test-run"),
+            Gh::call(&["issue", "create", "--title", "clippy", "--body", CLIPPY_BODY]),
             Gh::call(&["issue", "create", "--title", "test-run", "--body", TEST_RUN_BODY]),
         ]
     );
