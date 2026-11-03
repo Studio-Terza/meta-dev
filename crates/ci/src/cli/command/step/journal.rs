@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use std::mem;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, FileFailure, Files, Kind};
@@ -41,6 +42,39 @@ impl Journal {
 
     pub(crate) fn existing(&self, files: &impl Files) -> Option<&Journal> {
         (files.kind(&self.0) == Kind::File).then_some(self)
+    }
+
+    pub(crate) fn read_all(files: &impl Files, journals: &[Journal]) -> Vec<Result<Text, Failure>> {
+        let paths: Vec<PathBuf> = journals.iter().map(|journal| journal.0.clone()).collect();
+        journals
+            .iter()
+            .zip(files.read_text_many(&paths))
+            .map(|(journal, text)| text.map_err(|failure| journal.failed(failure)))
+            .collect()
+    }
+
+    pub(crate) fn read_groups(files: &impl Files, groups: &[Vec<Journal>]) -> Vec<Vec<Result<Text, Failure>>> {
+        let read = Self::read_all(files, &groups.concat());
+        groups
+            .iter()
+            .scan(read, |rest, group| {
+                let later = rest.split_off(group.len());
+                Some(mem::replace(rest, later))
+            })
+            .collect()
+    }
+
+    pub(crate) fn read_present(files: &impl Files, journals: &[Journal]) -> Vec<Option<Result<Text, Failure>>> {
+        let paths: Vec<PathBuf> = journals.iter().map(|journal| journal.0.clone()).collect();
+        let groups: Vec<Vec<Journal>> = journals
+            .iter()
+            .zip(files.kinds(&paths))
+            .map(|(journal, kind)| match kind {
+                Kind::File => vec![journal.clone()],
+                Kind::Directory | Kind::Link | Kind::Missing => Vec::new(),
+            })
+            .collect();
+        Self::read_groups(files, &groups).into_iter().map(|group| group.into_iter().next()).collect()
     }
 
     fn prepared(&self, files: &impl Files) -> Result<(), FileFailure> {

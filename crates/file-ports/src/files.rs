@@ -33,6 +33,10 @@ pub trait Files {
         paths.iter().try_for_each(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default())))
     }
 
+    fn copy_each_into(&self, paths: &[PathBuf], directory: &Path) -> Vec<Result<(), FileFailure>> {
+        paths.iter().map(|path| self.copy(path, &directory.join(path.file_name().unwrap_or_default()))).collect()
+    }
+
     fn entries_many(&self, directories: &[PathBuf]) -> Vec<Result<Vec<PathBuf>, FileFailure>> {
         directories.iter().map(|directory| self.entries(directory)).collect()
     }

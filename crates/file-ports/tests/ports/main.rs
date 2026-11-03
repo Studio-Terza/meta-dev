@@ -179,6 +179,10 @@ impl Batches {
         let listed = files.entries_many(&[root.join("copies"), absent]);
         assert_eq!(listed.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
         assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
+        files.write(&root.join("c.txt"), &Bytes::from("c"))?;
+        let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
+        assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
+        assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
         assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
         Ok(())
     }

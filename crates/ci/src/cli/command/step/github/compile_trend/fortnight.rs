@@ -71,7 +71,7 @@ impl Fortnight {
         let invocations: Vec<Invocation> =
             runs.iter().zip(&directories).map(|(run, directory)| Self::download(*run, directory)).collect();
         Failure::started(ports.outputs(&invocations), &invocations)?;
-        directories.iter().map(|directory| Build::measured_in(ports.files(), directory)).collect()
+        Build::measured_in_all(ports.files(), &directories)
     }
 
     fn download(run: RunId, directory: &Path) -> Invocation {
