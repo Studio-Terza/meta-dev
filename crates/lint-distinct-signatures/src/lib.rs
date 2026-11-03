@@ -1,16 +1,11 @@
-mod finding;
-mod shape;
 mod signature_index;
 
-use finding::Finding;
 use signature_index::SignatureIndex;
 
-use syn::Ident;
 use syn::visit::Visit;
 
 use lint_core::Lint;
-use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name};
+use lint_core::{Headline, Report, SourceFile, Violation};
 
 #[derive(Debug)]
 pub struct DistinctSignatures;
@@ -28,17 +23,6 @@ impl DistinctSignatures {
     fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut index = SignatureIndex::default();
         index.visit_file(file.syntax());
-        index
-            .shared()
-            .into_iter()
-            .map(|(shape, idents)| {
-                let line = idents.first().map_or(LineNumber::FIRST, |ident| LineNumber::from(ident.span()));
-                Violation::new(Site::new(file.path(), line), Finding::new(Self::named(&idents), shape))
-            })
-            .collect()
-    }
-
-    fn named(idents: &[Ident]) -> Vec<Name> {
-        idents.iter().map(Name::from).collect()
+        index.violations(file.path()).collect()
     }
 }
