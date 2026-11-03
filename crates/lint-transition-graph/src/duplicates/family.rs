@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::{Fix, Name, Whole, Word, words};
+use lint_layout::{Name, Whole, Word, words};
 use transition_facts::Transition;
 
 use crate::count::Count;
 use crate::edge::{Edge, Role};
-use crate::end::Key;
+use crate::key::Key;
 
 #[derive(Debug)]
 pub(super) struct Family<'found, 'file> {
@@ -61,7 +62,7 @@ impl fmt::Display for Family<'_, '_> {
     }
 }
 
-impl lint_layout::Finding for Family<'_, '_> {
+impl lint_core::Finding for Family<'_, '_> {
     fn fix(&self) -> Fix {
         match self.canonical() {
             Some(_) => Fix::new(

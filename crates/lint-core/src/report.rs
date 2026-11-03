@@ -1,7 +1,10 @@
+mod headline;
+
+pub use headline::Headline;
+
 use std::fmt;
 
 use crate::boundary::Violation;
-use lint_layout::Headline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Report<'file> {

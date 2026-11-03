@@ -1,7 +1,6 @@
-mod item_count;
 mod tangle;
 
-use lint_core::{Most, Site, Violation};
+use lint_core::{Bound, Site, Violation};
 use lint_placement::CrateFile;
 
 use lint_item_graph::ItemGraph;
@@ -14,7 +13,7 @@ pub struct CrateSummary<'file> {
 }
 
 impl<'file> CrateSummary<'file> {
-    const TANGLE_ITEMS: Most = Most::new(40);
+    const TANGLE_ITEMS: Bound = Bound::Most(40);
 
     pub fn of_graph(crate_file: &'file CrateFile, graph: &ItemGraph) -> CrateSummary<'file> {
         let members = graph.tangles();

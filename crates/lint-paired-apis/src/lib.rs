@@ -1,13 +1,9 @@
 mod declared;
-mod finding;
 mod owner;
-mod pair;
 mod paired_methods;
 mod pairs;
 
-use finding::Finding;
 use lint_core::{Headline, Lint, Report, SourceFile};
-use pair::Pair;
 use paired_methods::PairedMethods;
 use pairs::Pairs;
 

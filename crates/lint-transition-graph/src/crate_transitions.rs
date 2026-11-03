@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
 use lint_placement::CrateName;
 
 use crate::count::Count;
@@ -60,7 +60,7 @@ impl fmt::Display for CrateTransitions<'_, '_> {
     }
 }
 
-impl lint_layout::Finding for CrateTransitions<'_, '_> {
+impl lint_core::Finding for CrateTransitions<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair",

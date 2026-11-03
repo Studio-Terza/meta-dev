@@ -1,7 +1,7 @@
 use lint_core::SourceFile;
 use lint_layout::Failure;
 
-use super::super::located::Opened;
+use super::super::opened::Opened;
 
 #[derive(Debug)]
 pub struct Shelved {

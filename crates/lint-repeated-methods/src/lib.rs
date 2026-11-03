@@ -1,7 +1,7 @@
 mod shape_index;
 
 use lint_core::Lint;
-use lint_core::{Headline, Most, Report, SourceFile};
+use lint_core::{Bound, Headline, Report, SourceFile};
 
 use shape_index::ShapeIndex;
 
@@ -21,5 +21,5 @@ impl Lint for RepeatedMethods {
 }
 
 impl RepeatedMethods {
-    const TYPES_PER_SHAPE: Most = Most::new(2);
+    const TYPES_PER_SHAPE: Bound = Bound::Most(2);
 }

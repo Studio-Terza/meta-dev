@@ -1,7 +1,7 @@
 use serde::Serialize;
 use test_log::FailedTest;
 
-use super::outcomes::Title;
+use super::title::Title;
 use super::verdict::Verdict;
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::io;
 
-use e2e::ports::Measurements;
+use e2e::ports::System;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Fraction {
@@ -35,6 +35,6 @@ impl Report {
     }
 
     pub fn line(&self, name: &str, value: impl fmt::Display) -> io::Result<()> {
-        Measurements::record(&format!("e2e {} {name}={value}\n", self.scenario))
+        System::record(&format!("e2e {} {name}={value}\n", self.scenario))
     }
 }

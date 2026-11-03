@@ -1,5 +1,6 @@
 mod boundary;
 mod located;
+mod manifest_file;
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -10,10 +11,10 @@ use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
 use lint_placement::CrateFile;
-use lint_placement::ManifestFile;
 use lint_placement::Placement;
 use lint_placement::Role;
 use located::Located;
+pub use manifest_file::ManifestFile;
 
 #[derive(Debug)]
 pub struct SourceFile {

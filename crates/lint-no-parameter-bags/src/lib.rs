@@ -1,10 +1,8 @@
 mod bag_candidates;
-mod finding;
 mod name_uses;
 mod root_exports;
 
 use bag_candidates::BagCandidates;
-use finding::Finding;
 use lint_core::{Headline, Lint};
 use name_uses::NameUses;
 use root_exports::RootExports;

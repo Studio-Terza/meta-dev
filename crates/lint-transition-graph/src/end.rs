@@ -4,6 +4,9 @@ use std::fmt;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate::class::Class;
+use crate::key::Key;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Node<'found> {
     krate: &'found CrateName,
@@ -64,25 +67,6 @@ impl fmt::Display for Hop<'_> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Key<'found> {
-    takes: Vec<Node<'found>>,
-    gives: Node<'found>,
-}
-
-impl<'found> Key<'found> {
-    pub(crate) fn algebraic(&self) -> Option<&Key<'found>> {
-        self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
-    }
-}
-
-impl fmt::Display for Key<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let takes: Vec<String> = self.takes.iter().map(ToString::to_string).collect();
-        write!(formatter, "{} -> {}", takes.join(", "), self.gives)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Place {
     Domain,
@@ -121,12 +105,6 @@ impl fmt::Display for End<'_> {
             (None, _) => write!(formatter, "{}", self.name),
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Class {
-    Covered,
-    Primitive,
 }
 
 #[derive(Clone, Debug)]
@@ -176,7 +154,7 @@ impl<'found> Ends<'found> {
             .filter(|implementer| *implementer != gives && !takes.contains(implementer));
         takes.extend(selector);
         takes.sort();
-        (!takes.is_empty()).then_some(Key { takes, gives })
+        (!takes.is_empty()).then_some(Key::new(takes, gives))
     }
 
     pub(crate) fn applied(&self) -> Applied<'_, 'found> {

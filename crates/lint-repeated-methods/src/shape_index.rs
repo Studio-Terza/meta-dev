@@ -9,7 +9,7 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Visibility};
 
-use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
+use lint_core::{Bound, DeclaredType, Home, Site, SourceFile, TypeHomes, Violation, Walk};
 use lint_layout::{Length, LineNumber, Name};
 
 use inners::Inners;
@@ -40,7 +40,7 @@ impl<'file> ShapeIndex<'file> {
     }
 
     #[must_use]
-    pub fn repeated(self, most: Most) -> Vec<Violation<'file>> {
+    pub fn repeated(self, most: Bound) -> Vec<Violation<'file>> {
         let shapes = self
             .owners
             .iter()
