@@ -92,7 +92,14 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
 
     #[must_use]
     pub fn named(&self, terms: &[Term]) -> Score {
-        terms.iter().map(|term| self.hit(term)).fold(Score::default(), |total, each| total + each)
+        terms
+            .iter()
+            .map(|term| {
+                let named = self.names.iter().find_map(|name| term.found_in(name)).map(|_| Self::NAMED);
+                let mentioned = self.mentions().find_map(|name| term.found_in(name)).map(|_| Self::MENTIONED);
+                named.or(mentioned).unwrap_or_default()
+            })
+            .fold(Score::default(), |total, each| total + each)
     }
 
     #[must_use]
@@ -111,12 +118,6 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
         self.fitting(role).map_or_else(Score::default, |method| {
             Score::new(role.agreement(method.shape()).into_inner().saturating_sub(Self::BELOW_CLOSE.into_inner()))
         })
-    }
-
-    fn hit(&self, term: &Term) -> Score {
-        let named = self.names.iter().find_map(|name| term.found_in(name)).map(|_| Self::NAMED);
-        let mentioned = self.mentions().find_map(|name| term.found_in(name)).map(|_| Self::MENTIONED);
-        named.or(mentioned).unwrap_or_default()
     }
 
     fn mentions(&self) -> impl Iterator<Item = &'facts Name> {
