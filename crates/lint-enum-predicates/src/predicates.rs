@@ -1,14 +1,77 @@
+mod declaration;
+mod declarations;
+mod finding;
+mod kind;
+
 use std::borrow::Cow;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type};
+use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type, TypePath};
 
-use lint_core::{Macros, Site, SourceFile, Violation};
+use lint_core::{Headline, Lint, Macros, Report, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 
-use super::{EnumPredicates, Finding, Kind};
+use declaration::Declaration;
+use declarations::Declarations;
+use finding::Finding;
+use kind::Kind;
+
+#[derive(Debug, Default)]
+pub struct EnumPredicates<'file> {
+    declarations: Vec<Declaration<'file>>,
+}
+
+impl Lint for EnumPredicates<'_> {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
+        Report::new(
+            Headline::new(
+                "an enum method returning bool throws away the variant; return an enum or match where the answer is used",
+            ),
+            files.iter().flat_map(|file| predicates.violations(file)).collect(),
+        )
+    }
+}
+
+impl EnumPredicates<'_> {
+    fn violations<'file>(&self, file: &'file SourceFile) -> Vec<Violation<'file>> {
+        let mut scan = Predicates::new(self, file);
+        scan.visit_file(file.syntax());
+        scan.into_violations()
+    }
+
+    fn kind(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> Kind {
+        match implemented {
+            Type::Path(path) => path
+                .path
+                .segments
+                .last()
+                .map_or(Kind::Other, |last| self.kind_named(file, module, path, &Name::from(&last.ident))),
+            _ => Kind::Other,
+        }
+    }
+
+    fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
+        let crate_root = file.placement().crate_root();
+        let local = (path.qself.is_none() && path.path.segments.len() == 1)
+            .then(|| {
+                self.declarations
+                    .iter()
+                    .filter_map(|declaration| declaration.in_module(module))
+                    .find_map(|declaration| declaration.kinds(crate_root, name).next())
+            })
+            .flatten();
+        let candidates: Vec<Kind> =
+            self.declarations.iter().flat_map(|declaration| declaration.kinds(crate_root, name)).collect();
+        match (local, candidates.as_slice()) {
+            (Some(kind), _) => kind,
+            (None, all @ [_, ..]) if all.iter().all(|kind| *kind == Kind::Enum) => Kind::Enum,
+            (None, _) => Kind::Other,
+        }
+    }
+}
 
 pub struct Predicates<'scan, 'file> {
     known: &'scan EnumPredicates<'scan>,

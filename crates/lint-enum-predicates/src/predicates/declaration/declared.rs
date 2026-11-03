@@ -1,6 +1,6 @@
 use lint_layout::Name;
 
-use crate::Kind;
+use crate::predicates::Kind;
 
 #[derive(Debug)]
 pub struct Declared {
