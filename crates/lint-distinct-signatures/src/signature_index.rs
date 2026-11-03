@@ -1,28 +1,41 @@
+mod finding;
+mod members;
+mod shape;
+
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{Ident, ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro};
 
 use lint_core::Macros;
 use lint_core::Walk;
 
-use super::shape::Shape;
+use finding::Finding;
+use lint_core::{Site, Violation};
+use members::Members;
+use shape::Shape;
+use std::path::Path;
 
 #[derive(Default)]
-pub struct SignatureIndex(BTreeMap<Shape, Vec<Ident>>);
+pub struct SignatureIndex(BTreeMap<Shape, Members>);
 
 impl SignatureIndex {
-    pub fn shared(self) -> BTreeMap<Shape, Vec<Ident>> {
-        self.0.into_iter().filter(|(_, names)| names.len() > 1).collect()
+    pub fn violations(self, path: &Path) -> impl Iterator<Item = Violation> {
+        self.0.into_iter().filter(|(_, members)| members.names().len() > 1).map(move |(shape, members)| {
+            Violation::new(Site::new(path, members.first()), Finding::new(members.names(), shape))
+        })
     }
 
     fn indexed(&mut self, item: &ItemImpl) {
         match Walk::inherent_impls(item) {
-            Walk::Entered => Self::functions(item).for_each(|function| {
-                self.0.entry(Shape::describe(item, function)).or_default().push(function.sig.ident.clone());
-            }),
+            Walk::Entered => Self::functions(item).for_each(|function| self.noted(item, function)),
             Walk::Skipped => {}
         }
+    }
+
+    fn noted(&mut self, item: &ItemImpl, function: &ImplItemFn) {
+        let name = &function.sig.ident;
+        self.0.entry(Shape::describe(item, function)).or_insert_with(|| Members::starting(name)).joined(name);
     }
 
     fn functions(item: &ItemImpl) -> impl Iterator<Item = &ImplItemFn> {
