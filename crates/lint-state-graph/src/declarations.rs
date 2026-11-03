@@ -70,7 +70,10 @@ impl<'file> Declarations<'file> {
     }
 
     fn sum_type(item: &ItemEnum) -> Option<&ItemEnum> {
-        item.variants.iter().find(|variant| !matches!(variant.fields, Fields::Unit)).map(|_| item)
+        item.variants
+            .iter()
+            .find(|variant| matches!(variant.fields, Fields::Named(_) | Fields::Unnamed(_)))
+            .map(|_| item)
     }
 }
 
