@@ -21,14 +21,16 @@ impl Pair {
         Pair { opening: Word::new("begin"), closing: Word::new("end") },
     ];
 
-    pub fn violations(&self, methods: &[&Declared]) -> Vec<Violation> {
+    pub fn violations<'file>(&self, methods: &[&Declared<'file>]) -> Vec<Violation<'file>> {
         let names: BTreeSet<&Name> = methods.iter().map(|method| method.method()).collect();
         methods
             .iter()
             .filter_map(|method| {
-                method.method().reprefixed(self.opening, self.closing).filter(|partner| names.contains(partner)).map(
-                    |partner| Violation::new(method.location().clone(), Finding::new(method.method().clone(), partner)),
-                )
+                method
+                    .method()
+                    .reprefixed(self.opening, self.closing)
+                    .filter(|partner| names.contains(partner))
+                    .map(|partner| Violation::new(method.location(), Finding::new(method.method().clone(), partner)))
             })
             .collect()
     }

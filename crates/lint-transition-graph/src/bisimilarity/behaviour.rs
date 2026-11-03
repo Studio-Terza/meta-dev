@@ -69,7 +69,7 @@ struct Labelled<'graph> {
 }
 
 impl<'graph> Labelled<'graph> {
-    fn of_edge(edge: &'graph Edge<'_>) -> Vec<Labelled<'graph>> {
+    fn of_edge(edge: &'graph Edge<'_, '_>) -> Vec<Labelled<'graph>> {
         let label = Label::read(edge.role(), edge.transition());
         let gives: &'graph End = edge.ends().as_ref();
         let destination = gives.node().map_or(Destination::Outside(gives), Destination::Domain);
@@ -99,7 +99,7 @@ pub(super) struct Behaviour<'graph> {
 }
 
 impl<'graph> Behaviour<'graph> {
-    pub(super) fn read(graph: &'graph Graph<'_>) -> Behaviour<'graph> {
+    pub(super) fn read(graph: &'graph Graph<'_, '_>) -> Behaviour<'graph> {
         let start: BTreeMap<&'graph Node, BTreeSet<Move<'graph>>> =
             graph.nodes().keys().map(|node| (node, BTreeSet::new())).collect();
         let labelled: Vec<Labelled<'graph>> = graph.edges().iter().flat_map(Labelled::of_edge).collect();

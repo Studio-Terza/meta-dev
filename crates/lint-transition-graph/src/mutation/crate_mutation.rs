@@ -8,29 +8,32 @@ use super::tally::Tally;
 use crate::edge::{Edge, Role};
 
 #[derive(Debug)]
-pub(super) struct CrateMutation<'found> {
+pub(super) struct CrateMutation<'found, 'file> {
     name: &'found CrateName,
-    first: Option<&'found Site>,
+    first: Option<Site<'file>>,
     tally: Tally,
-    operations: Vec<&'found Edge<'found>>,
+    operations: Vec<&'found Edge<'found, 'file>>,
 }
 
-impl<'found> CrateMutation<'found> {
-    pub(super) fn measured(name: &'found CrateName, edges: &[&'found Edge<'found>]) -> CrateMutation<'found> {
+impl<'found, 'file> CrateMutation<'found, 'file> {
+    pub(super) fn measured(
+        name: &'found CrateName,
+        edges: &[&'found Edge<'found, 'file>],
+    ) -> CrateMutation<'found, 'file> {
         CrateMutation {
             name,
-            first: edges.iter().map(|edge| AsRef::<Site>::as_ref(edge.transition())).min(),
+            first: edges.iter().map(|edge| edge.site()).min(),
             tally: Tally::counted(edges.iter().copied()),
             operations: edges.iter().copied().filter(|edge| edge.role() == Role::Operation).collect(),
         }
     }
 
-    pub(super) fn reported(self) -> Option<Violation> {
-        self.first.map(|site| Violation::new(site.clone(), &self))
+    pub(super) fn reported(self) -> Option<Violation<'file>> {
+        self.first.map(|site| Violation::new(site, &self))
     }
 }
 
-impl fmt::Display for CrateMutation<'_> {
+impl fmt::Display for CrateMutation<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "crate {}: {}", self.name, self.tally)?;
         self.operations.iter().try_for_each(|operation| {
@@ -39,7 +42,7 @@ impl fmt::Display for CrateMutation<'_> {
     }
 }
 
-impl lint_layout::Finding for CrateMutation<'_> {
+impl lint_layout::Finding for CrateMutation<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "move each mutation into a store operation, a &mut self method in a store module, or return a new value",

@@ -8,17 +8,17 @@ use super::Finding;
 
 pub struct Returns<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
-impl Returns<'_> {
-    pub fn of_file(file: &SourceFile) -> Vec<Violation> {
+impl<'file> Returns<'file> {
+    pub fn of_file(file: &'file SourceFile) -> Vec<Violation<'file>> {
         let mut scan = Returns { file, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found
     }
 
-    fn flagged(&self, signature: &Signature) -> Option<Violation> {
+    fn flagged(&self, signature: &Signature) -> Option<Violation<'file>> {
         match &signature.output {
             ReturnType::Type(_, returned) => match returned.as_ref() {
                 Type::Path(path) if path.qself.is_none() && path.path.is_ident("bool") => Some(Violation::new(

@@ -1,22 +1,17 @@
-mod finding;
-mod shape;
 mod signature_index;
 
-use finding::Finding;
 use signature_index::SignatureIndex;
 
-use syn::Ident;
 use syn::visit::Visit;
 
 use lint_core::Lint;
-use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_layout::{LineNumber, Name};
+use lint_core::{Headline, Report, SourceFile, Violation};
 
 #[derive(Debug)]
 pub struct DistinctSignatures;
 
 impl Lint for DistinctSignatures {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("two functions on one type with the same signature hide a missing type or type parameter"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -25,20 +20,9 @@ impl Lint for DistinctSignatures {
 }
 
 impl DistinctSignatures {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut index = SignatureIndex::default();
         index.visit_file(file.syntax());
-        index
-            .shared()
-            .into_iter()
-            .map(|(shape, idents)| {
-                let line = idents.first().map_or(LineNumber::FIRST, |ident| LineNumber::from(ident.span()));
-                Violation::new(Site::new(file.path(), line), Finding::new(Self::named(&idents), shape))
-            })
-            .collect()
-    }
-
-    fn named(idents: &[Ident]) -> Vec<Name> {
-        idents.iter().map(Name::from).collect()
+        index.violations(file.path()).collect()
     }
 }

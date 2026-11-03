@@ -4,7 +4,7 @@ mod placed;
 mod repeated_shape;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::Path;
 
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Type, Visibility};
@@ -17,41 +17,43 @@ use method_shape::{Erasure, MethodShape};
 use placed::Placed;
 use repeated_shape::RepeatedShape;
 
-#[derive(Debug, Default)]
-pub struct ShapeIndex {
-    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType, Site>>,
+#[derive(Debug)]
+pub struct ShapeIndex<'file> {
+    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType, Site<'file>>>,
     inners: Inners,
     homes: TypeHomes,
     home: Home,
-    file: PathBuf,
+    file: &'file Path,
 }
 
-impl ShapeIndex {
+impl<'file> ShapeIndex<'file> {
     #[must_use]
-    pub fn of_files(files: &[&SourceFile]) -> ShapeIndex {
+    pub fn of_files(files: &[&'file SourceFile]) -> ShapeIndex<'file> {
         let index = ShapeIndex {
+            shapes: BTreeMap::new(),
             inners: Inners::gathered_from(files),
             homes: TypeHomes::declared_in(files),
-            ..ShapeIndex::default()
+            home: Home::default(),
+            file: Path::new(""),
         };
         files.iter().fold(index, |index, file| index.reading(file))
     }
 
     #[must_use]
-    pub fn repeated(self, most: Most) -> Vec<Violation> {
+    pub fn repeated(self, most: Most) -> Vec<Violation<'file>> {
         self.shapes
             .into_iter()
             .filter(|(_, types)| most.allows(Length::new(types.len())).is_none())
             .filter_map(|(shape, types)| {
-                let site = types.values().min().cloned()?;
+                let site = types.values().min().copied()?;
                 let repeated = RepeatedShape::new(shape, types.into_keys().collect());
                 Some(Violation::new(site, repeated))
             })
             .collect()
     }
 
-    fn reading(self, file: &SourceFile) -> ShapeIndex {
-        let mut index = ShapeIndex { file: file.path().to_path_buf(), home: Home::containing(file), ..self };
+    fn reading(self, file: &'file SourceFile) -> ShapeIndex<'file> {
+        let mut index = ShapeIndex { file: file.path(), home: Home::containing(file), ..self };
         index.visit_file(file.syntax());
         index
     }
@@ -63,7 +65,7 @@ impl ShapeIndex {
         }
     }
 
-    fn placed(&self, item: &ItemImpl, written: &Name) -> Vec<Placed> {
+    fn placed(&self, item: &ItemImpl, written: &Name) -> Vec<Placed<'file>> {
         let self_type = self.homes.resolve(written, &self.home);
         let erasure = Erasure::around(written, self.inners.inner_of(&self_type));
         item.items
@@ -77,14 +79,14 @@ impl ShapeIndex {
                 _ => None,
             })
             .map(|(function, shape)| {
-                let site = Site::new(&self.file, LineNumber::from(function.sig.ident.span()));
+                let site = Site::new(self.file, LineNumber::from(function.sig.ident.span()));
                 Placed::new(self_type.clone(), shape, site)
             })
             .collect()
     }
 }
 
-impl<'ast> Visit<'ast> for ShapeIndex {
+impl<'ast> Visit<'ast> for ShapeIndex<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
             Walk::Entered => syn::visit::visit_item_mod(self, module),
@@ -94,7 +96,7 @@ impl<'ast> Visit<'ast> for ShapeIndex {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed: Vec<Placed> = self_type.iter().flat_map(|self_type| self.placed(item, self_type)).collect();
+        let placed = self_type.map(|self_type| self.placed(item, &self_type)).unwrap_or_default();
         placed.into_iter().fold(&mut self.shapes, |shapes, placed| {
             placed.recorded_in(shapes);
             shapes

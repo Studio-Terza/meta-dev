@@ -4,29 +4,29 @@ use lint_core::Site;
 use lint_layout::Name;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Declaration {
+pub(crate) struct Declaration<'file> {
     name: Name,
-    site: Site,
+    site: Site<'file>,
 }
 
-impl Declaration {
-    pub(crate) fn new(name: Name, site: Site) -> Declaration {
+impl<'file> Declaration<'file> {
+    pub(crate) fn new(name: Name, site: Site<'file>) -> Declaration<'file> {
         Declaration { name, site }
     }
 
-    pub(crate) fn unconsumed(self, consumers: &BTreeSet<Name>) -> Option<Declaration> {
+    pub(crate) fn unconsumed(self, consumers: &BTreeSet<Name>) -> Option<Declaration<'file>> {
         (!consumers.contains(&self.name)).then_some(self)
     }
 }
 
-impl AsRef<Name> for Declaration {
+impl AsRef<Name> for Declaration<'_> {
     fn as_ref(&self) -> &Name {
         &self.name
     }
 }
 
-impl AsRef<Site> for Declaration {
-    fn as_ref(&self) -> &Site {
+impl<'file> AsRef<Site<'file>> for Declaration<'file> {
+    fn as_ref(&self) -> &Site<'file> {
         &self.site
     }
 }

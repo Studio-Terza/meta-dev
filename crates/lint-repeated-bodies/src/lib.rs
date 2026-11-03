@@ -13,7 +13,7 @@ use scan::Scan;
 pub struct RepeatedBodies;
 
 impl Lint for RepeatedBodies {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let nodes = files.iter().filter_map(SourceFile::shipped).flat_map(Scan::of_file);
         Report::new(
             Headline::new(

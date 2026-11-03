@@ -5,7 +5,7 @@ use lint_layout::Finding;
 pub(crate) struct Summary;
 
 impl Summary {
-    pub(crate) fn placed(first: Option<&Site>, finding: impl Finding) -> Option<Violation> {
-        first.map(|site| Violation::new(site.clone(), finding))
+    pub(crate) fn placed(first: Option<Site<'_>>, finding: impl Finding) -> Option<Violation<'_>> {
+        first.map(|site| Violation::new(site, finding))
     }
 }

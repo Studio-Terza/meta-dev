@@ -29,7 +29,7 @@ use nesting_depth::NestingDepth;
 pub struct FnShape;
 
 impl Lint for FnShape {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -43,7 +43,7 @@ impl FnShape {
     const NESTING: Most = Most::new(2);
     const PARAMETERS: Most = Most::new(4);
 
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut shapes = Shapes { path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
         shapes.visit_file(file.syntax());
         shapes.violations
@@ -90,11 +90,11 @@ impl FnShape {
 struct Shapes<'scan> {
     path: &'scan Path,
     depth: NestingDepth,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
-impl Shapes<'_> {
-    fn found(path: &Path, span: Span, finding: Finding) -> Violation {
+impl<'scan> Shapes<'scan> {
+    fn found(path: &'scan Path, span: Span, finding: Finding) -> Violation<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), finding)
     }
 

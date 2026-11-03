@@ -5,7 +5,10 @@ use super::relation::Relation;
 pub struct InsideSibling;
 
 impl Relation for InsideSibling {
-    fn holds<'module>(this: &ModulePath, module: &'module ModulePath) -> Option<&'module ModulePath> {
+    fn holds<'module, 'file>(
+        this: &ModulePath<'_>,
+        module: &'module ModulePath<'file>,
+    ) -> Option<&'module ModulePath<'file>> {
         let length = module.segments.len();
         module
             .parent()

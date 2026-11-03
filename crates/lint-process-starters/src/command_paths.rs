@@ -17,20 +17,20 @@ impl CommandPaths {
     const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
 
     #[must_use]
-    pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site> {
+    pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site<'_>> {
         Self::among(Paths::read([file], &Self::FINALS), scope)
     }
 
     #[must_use]
-    pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site> {
+    pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site<'_>> {
         Self::among(Paths::read(files, &Self::FINALS), scope)
     }
 
-    fn among(uses: Vec<Use>, scope: Scope) -> Vec<Site> {
+    fn among(uses: Vec<Use<'_>>, scope: Scope) -> Vec<Site<'_>> {
         uses.into_iter()
             .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
             .filter(|used| scope == Scope::Everywhere || used.ground() == Ground::Open)
-            .map(|used| used.place().clone())
+            .map(|used| used.place())
             .collect()
     }
 }

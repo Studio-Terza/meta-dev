@@ -6,7 +6,7 @@ const SOURCES: &[Source] = &[Source::new(Located::new("a.rs"), Text::new("struct
 struct EveryFile;
 
 impl Lint for EveryFile {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let flagged = files.iter().map(|file| {
             Violation::new(Site::of_file(file.path()), Message::new(Problem::new("flagged"), Fix::new("unflag it")))
         });

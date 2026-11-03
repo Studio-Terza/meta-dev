@@ -16,11 +16,11 @@ use crate::finding::Finding;
 #[derive(Debug)]
 pub(crate) struct Offers<'file> {
     path: &'file Path,
-    found: Vec<Candidate>,
+    found: Vec<Candidate<'file>>,
 }
 
 impl<'file> Offers<'file> {
-    pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate> {
+    pub(crate) fn in_file(file: &'file SourceFile) -> Vec<Candidate<'file>> {
         let mut offers = Offers { path: file.path(), found: Vec::new() };
         file.shipped().into_iter().for_each(|file| offers.visit_file(file.syntax()));
         offers.found

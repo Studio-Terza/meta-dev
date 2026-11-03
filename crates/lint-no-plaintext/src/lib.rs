@@ -12,7 +12,7 @@ use wrappers::Wrappers;
 pub struct NoPlaintext;
 
 impl Lint for NoPlaintext {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let wrappers = Wrappers::settled_in(&shipped);
         Report::new(

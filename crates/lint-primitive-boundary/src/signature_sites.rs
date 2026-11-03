@@ -2,7 +2,7 @@ mod scan;
 mod spelling;
 mod use_aliases;
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use scan::Scan;
 use spelling::Spelling;
@@ -23,22 +23,22 @@ use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::{Name, Whole, Word, words};
 
-pub struct SignatureSites<'newtypes> {
-    path: PathBuf,
+pub struct SignatureSites<'newtypes, 'file> {
+    path: &'file Path,
     aliases: UseAliases,
     newtypes: &'newtypes Newtypes,
     owner: Owner,
     context: Name,
     scan: Scan,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
-impl<'newtypes> SignatureSites<'newtypes> {
+impl<'newtypes, 'file> SignatureSites<'newtypes, 'file> {
     const NEWTYPE_EDGES: [Word<'static>; 3] = words!["new", "try_new", "into_inner"];
 
-    pub fn violations(file: &SourceFile, newtypes: &'newtypes Newtypes) -> Vec<Violation> {
+    pub fn violations(file: &'file SourceFile, newtypes: &'newtypes Newtypes) -> Vec<Violation<'file>> {
         let mut sites = SignatureSites {
-            path: file.path().to_owned(),
+            path: file.path(),
             aliases: UseAliases::in_file(file.syntax()),
             newtypes,
             owner: Owner::default(),
@@ -74,7 +74,7 @@ impl<'newtypes> SignatureSites<'newtypes> {
     }
 }
 
-impl<'ast> Visit<'ast> for SignatureSites<'_> {
+impl<'ast> Visit<'ast> for SignatureSites<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
             Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
@@ -130,7 +130,7 @@ impl<'ast> Visit<'ast> for SignatureSites<'_> {
             Scan::Idle => None,
         };
         self.found
-            .extend(found.map(|finding| Violation::new(Site::new(&self.path, LineNumber::from(path.span())), finding)));
+            .extend(found.map(|finding| Violation::new(Site::new(self.path, LineNumber::from(path.span())), finding)));
         syn::visit::visit_type_path(self, path);
     }
 }

@@ -18,15 +18,15 @@ use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
-pub struct VariantMatches<'scan> {
+pub struct VariantMatches<'scan, 'file> {
     declarations: &'scan Declarations,
-    path: &'scan Path,
+    path: &'file Path,
     home: Home,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'file>>,
 }
 
-impl<'scan> VariantMatches<'scan> {
-    pub fn violations(file: &'scan SourceFile, declarations: &'scan Declarations) -> Vec<Violation> {
+impl<'scan, 'file> VariantMatches<'scan, 'file> {
+    pub fn violations(file: &'file SourceFile, declarations: &'scan Declarations) -> Vec<Violation<'file>> {
         let mut matches =
             VariantMatches { declarations, path: file.path(), home: Home::containing(file), violations: Vec::new() };
         matches.visit_file(file.syntax());
@@ -39,14 +39,14 @@ impl<'scan> VariantMatches<'scan> {
             .find_map(|enum_name| self.declarations.foreign_sum_type(&enum_name, &self.home).map(|_| enum_name))
     }
 
-    fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation {
+    fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation<'file> {
         Violation::new(
             Site::new(self.path, LineNumber::from(pat.span())),
             Finding::ForeignMatch { enum_name: enum_name.clone() },
         )
     }
 
-    fn foreign_match(&self, arm: &Arm) -> Option<Violation> {
+    fn foreign_match(&self, arm: &Arm) -> Option<Violation<'file>> {
         match Self::table(&arm.body) {
             Some(_) => None,
             None => self.foreign_variant(&arm.pat).map(|enum_name| self.violation(&arm.pat, &enum_name)),
@@ -65,7 +65,7 @@ impl<'scan> VariantMatches<'scan> {
     }
 }
 
-impl<'ast> Visit<'ast> for VariantMatches<'_> {
+impl<'ast> Visit<'ast> for VariantMatches<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }

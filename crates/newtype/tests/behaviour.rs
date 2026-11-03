@@ -124,8 +124,7 @@ laws::law!(plus_adds_and_stops_at_the_largest, any::<(Rounds, Rounds)>(), pair, 
 });
 
 laws::law!(a_total_is_the_sum_of_the_counts, vec(0usize..4096, 0..8), numbers, {
-    let rounds: Vec<Rounds> = numbers.iter().copied().map(Rounds::new).collect();
-    prop_assert_eq!(Rounds::total(rounds.into_iter()).count(), numbers.iter().sum::<usize>());
+    prop_assert_eq!(Rounds::total(numbers.iter().copied().map(Rounds::new)).count(), numbers.iter().sum::<usize>());
 });
 
 #[test]

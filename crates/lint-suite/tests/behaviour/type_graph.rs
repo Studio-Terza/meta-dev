@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_type_graph::TypeGraph;
 
@@ -5,7 +6,7 @@ struct Graphed;
 
 impl Graphed {
     fn of(sources: &[Source]) -> String {
-        Sources::report::<TypeGraph>(sources).to_string()
+        TypeGraph::report(&Sources::parsed(sources)).to_string()
     }
 
     fn shows(pair: &[&str]) -> bool {

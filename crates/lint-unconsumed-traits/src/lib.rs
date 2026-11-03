@@ -16,7 +16,7 @@ use finding::Finding;
 pub struct UnconsumedTraits;
 
 impl Lint for UnconsumedTraits {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let consumers: BTreeSet<Name> = shipped.iter().flat_map(|file| Bounds::of_file(file)).collect();
         Report::new(
@@ -27,9 +27,7 @@ impl Lint for UnconsumedTraits {
                 .iter()
                 .flat_map(|file| Declared::of_file(file))
                 .filter_map(|declaration| declaration.unconsumed(&consumers))
-                .map(|declaration| {
-                    Violation::new(AsRef::<Site>::as_ref(&declaration).clone(), Finding::from(&declaration))
-                })
+                .map(|declaration| Violation::new(*AsRef::<Site>::as_ref(&declaration), Finding::from(&declaration)))
                 .collect(),
         )
     }

@@ -9,13 +9,16 @@ use crate::end::Hop;
 use crate::graph::Hyperedge;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Detour<'graph, 'found> {
-    first: &'graph Hyperedge<'found>,
-    second: &'graph Hyperedge<'found>,
+pub(super) struct Detour<'graph, 'file> {
+    first: &'graph Hyperedge<'graph, 'file>,
+    second: &'graph Hyperedge<'graph, 'file>,
 }
 
-impl<'graph, 'found> Detour<'graph, 'found> {
-    pub(super) fn new(first: &'graph Hyperedge<'found>, second: &'graph Hyperedge<'found>) -> Detour<'graph, 'found> {
+impl<'graph, 'file> Detour<'graph, 'file> {
+    pub(super) fn new(
+        first: &'graph Hyperedge<'graph, 'file>,
+        second: &'graph Hyperedge<'graph, 'file>,
+    ) -> Detour<'graph, 'file> {
         Detour { first, second }
     }
 }
@@ -35,25 +38,25 @@ impl fmt::Display for Detour<'_, '_> {
 }
 
 #[derive(Debug)]
-pub(super) struct Triangle<'graph, 'found> {
-    direct: &'graph Hyperedge<'found>,
-    paths: Vec<Detour<'graph, 'found>>,
+pub(super) struct Triangle<'graph, 'file> {
+    direct: &'graph Hyperedge<'graph, 'file>,
+    paths: Vec<Detour<'graph, 'file>>,
 }
 
-impl<'graph, 'found> Triangle<'graph, 'found> {
+impl<'graph, 'file> Triangle<'graph, 'file> {
     const SHOWN: usize = 3;
 
     pub(super) fn closing(
-        direct: &'graph Hyperedge<'found>,
-        paths: Vec<Detour<'graph, 'found>>,
-    ) -> Option<Triangle<'graph, 'found>> {
+        direct: &'graph Hyperedge<'graph, 'file>,
+        paths: Vec<Detour<'graph, 'file>>,
+    ) -> Option<Triangle<'graph, 'file>> {
         (!paths.is_empty()).then_some(Triangle { direct, paths })
     }
 }
 
-impl From<&Triangle<'_, '_>> for Violation {
-    fn from(triangle: &Triangle<'_, '_>) -> Violation {
-        Violation::new(AsRef::<Site>::as_ref(triangle.direct).clone(), triangle)
+impl<'file> From<&Triangle<'_, 'file>> for Violation<'file> {
+    fn from(triangle: &Triangle<'_, 'file>) -> Violation<'file> {
+        Violation::new(*AsRef::<Site<'file>>::as_ref(triangle.direct), triangle)
     }
 }
 

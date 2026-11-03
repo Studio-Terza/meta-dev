@@ -1,4 +1,5 @@
 use body_lifts::Body;
+use lint_core::Site;
 use lint_layout::Name;
 use transition_facts::{Ground, Mutation, Transition};
 
@@ -12,14 +13,18 @@ pub(crate) enum Role {
 }
 
 #[derive(Debug)]
-pub(crate) struct Edge<'found> {
-    transition: &'found Transition,
+pub(crate) struct Edge<'found, 'file> {
+    transition: &'found Transition<'file>,
     ends: Ends,
     fixed_by: Option<&'found Name>,
 }
 
-impl<'found> Edge<'found> {
-    pub(crate) fn new(transition: &'found Transition, ends: Ends, fixed_by: Option<&'found Name>) -> Edge<'found> {
+impl<'found, 'file> Edge<'found, 'file> {
+    pub(crate) fn new(
+        transition: &'found Transition<'file>,
+        ends: Ends,
+        fixed_by: Option<&'found Name>,
+    ) -> Edge<'found, 'file> {
         Edge { transition, ends, fixed_by }
     }
 
@@ -35,8 +40,12 @@ impl<'found> Edge<'found> {
         &self.ends
     }
 
-    pub(crate) fn transition(&self) -> &'found Transition {
+    pub(crate) fn transition(&self) -> &'found Transition<'file> {
         self.transition
+    }
+
+    pub(crate) fn site(&self) -> Site<'file> {
+        *AsRef::<Site<'file>>::as_ref(self.transition)
     }
 
     pub(crate) fn fixed_by(&self) -> Option<&'found Name> {

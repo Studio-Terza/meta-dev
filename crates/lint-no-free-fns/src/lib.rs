@@ -2,7 +2,9 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
+use std::path::Path as StdPath;
 use syn::visit::Visit;
+
 use syn::{Ident, ItemFn, Path};
 
 use lint_core::Report;
@@ -10,26 +12,15 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::LineNumber;
-use lint_layout::Name;
 
 #[derive(Debug)]
 pub struct NoFreeFns;
 
 impl Lint for NoFreeFns {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("free functions are not allowed; make them associated functions or methods"),
-            files
-                .iter()
-                .flat_map(|file| {
-                    Self::free_fns(file.syntax()).into_iter().map(move |name| {
-                        Violation::new(
-                            Site::new(file.path(), LineNumber::from(name.span())),
-                            Finding::FreeFn { name: Name::from(&name) },
-                        )
-                    })
-                })
-                .collect(),
+            files.iter().flat_map(|file| Self::free_fns(file.path(), file.syntax())).collect(),
         )
     }
 }
@@ -37,8 +28,8 @@ impl Lint for NoFreeFns {
 impl NoFreeFns {
     const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
 
-    fn free_fns(file: &syn::File) -> Vec<Ident> {
-        let mut visitor = FreeFns { found: Vec::new() };
+    fn free_fns<'file>(path: &'file StdPath, file: &syn::File) -> Vec<Violation<'file>> {
+        let mut visitor = FreeFns { path, found: Vec::new() };
         visitor.visit_file(file);
         visitor.found
     }
@@ -58,13 +49,18 @@ impl NoFreeFns {
     }
 }
 
-struct FreeFns {
-    found: Vec<Ident>,
+struct FreeFns<'file> {
+    path: &'file StdPath,
+    found: Vec<Violation<'file>>,
 }
 
-impl<'ast> Visit<'ast> for FreeFns {
+impl<'ast> Visit<'ast> for FreeFns<'_> {
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        self.found.extend(NoFreeFns::exemption(function).map_or_else(|| Some(function.sig.ident.clone()), |_| None));
+        let name = &function.sig.ident;
+        self.found.extend(NoFreeFns::exemption(function).map_or_else(
+            || Some(Violation::new(Site::new(self.path, LineNumber::from(name.span())), Finding::FreeFn { name })),
+            |_| None,
+        ));
         syn::visit::visit_item_fn(self, function);
     }
 
