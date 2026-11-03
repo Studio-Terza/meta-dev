@@ -1,7 +1,7 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::Fix;
 use lint_paths::Ground;
 
 use super::called::Called;
@@ -43,7 +43,7 @@ impl fmt::Display for EffectSite<'_> {
     }
 }
 
-impl lint_layout::Finding for EffectSite<'_> {
+impl lint_core::Finding for EffectSite<'_> {
     fn fix(&self) -> Fix {
         Fix::new("move the effect behind a port in a ports module and call the port from here")
     }

@@ -14,7 +14,7 @@ use syn::{Field, Fields, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Signature, T
 
 use crate::finding::Finding;
 use crate::newtypes::Newtypes;
-use crate::text_sites::Owner;
+use crate::owner::Owner;
 use lint_core::Gate;
 use lint_core::Site;
 use lint_core::SourceFile;

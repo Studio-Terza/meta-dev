@@ -6,10 +6,10 @@ use newtype::Newtype;
 use type_facts::{Method, MethodShape};
 
 use crate::query::candidate::Candidate;
+use crate::query::term::Term;
 use crate::query::top::Top;
 use crate::role::Role;
 use crate::score::Score;
-use crate::term::Term;
 
 #[derive(Clone, Copy, Debug)]
 struct Fit<'facts> {

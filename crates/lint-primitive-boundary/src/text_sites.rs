@@ -1,5 +1,3 @@
-mod owner;
-pub use owner::Owner;
 mod sighting;
 
 use std::path::Path;
@@ -13,6 +11,7 @@ use lint_core::Violation;
 use lint_file::FileLint;
 use lint_layout::{Name, Whole, Word, words};
 
+use crate::owner::Owner;
 use sighting::Sighting;
 
 #[derive(Default)]

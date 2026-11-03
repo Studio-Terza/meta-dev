@@ -2,8 +2,8 @@ use std::path::Path;
 
 use syn::Ident;
 
-use super::owner::Owner;
 use crate::finding::Finding;
+use crate::owner::Owner;
 use lint_core::Site;
 use lint_core::Violation;
 use lint_layout::LineNumber;

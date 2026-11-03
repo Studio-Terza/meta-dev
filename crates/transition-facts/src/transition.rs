@@ -1,3 +1,6 @@
+mod inputs;
+mod output;
+
 use std::fmt;
 
 use lint_core::Site;
@@ -8,8 +11,8 @@ use crate::context::Context;
 use crate::function::Function;
 use crate::ground::Ground;
 use crate::implementer::Implementer;
-use crate::inputs::Inputs;
-use crate::output::Output;
+pub use inputs::Inputs;
+pub use output::Output;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Transition<'found, 'file> {

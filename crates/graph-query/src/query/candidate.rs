@@ -8,9 +8,9 @@ use newtype::Newtype;
 use type_facts::{Facts, GenericImpl, Implementation, Method, TraitFact, TypeFact};
 
 use crate::query::kind::Kind;
+use crate::query::term::Term;
 use crate::role::Role;
 use crate::score::Score;
-use crate::term::Term;
 
 #[derive(Clone, Copy, Debug)]
 enum Label<'facts, 'file> {

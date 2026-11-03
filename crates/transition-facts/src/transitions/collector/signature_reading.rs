@@ -6,13 +6,13 @@ use body_lifts::{BodyReading, Branches, Propagation};
 use lint_core::Site;
 use lint_layout::Name;
 
+use super::origins::Origins;
 use crate::context::Context;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::filler::Filler;
 use crate::function::Function;
 use crate::ground::Ground;
 use crate::mutation::Mutation;
-use crate::origins::Origins;
 use crate::resolved::Resolved;
 use type_scope::TypeScope;
 

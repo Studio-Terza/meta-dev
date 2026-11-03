@@ -2,13 +2,13 @@ use std::fmt;
 
 use super::module_path::{ModulePath, Target};
 use super::reexport_count::ReexportCount;
+use lint_core::Bound;
 use lint_core::Fix;
-use lint_core::Most;
 
 pub enum Finding<'file, 'path> {
     UsedFromOneSibling { home: ModulePath<'file> },
     ReachesPastModRs { target: &'path Target<'path> },
-    CrowdedReexports { count: ReexportCount, most: Most },
+    CrowdedReexports { count: ReexportCount, most: Bound },
 }
 
 impl fmt::Display for Finding<'_, '_> {
