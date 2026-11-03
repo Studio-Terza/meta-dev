@@ -2,7 +2,6 @@ use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
-use lint_repeated_shapes::RepeatedShapes;
 use lint_transition_graph::{CoreMutation, DuplicateTransitions, GraphLint, TransitionGraph};
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -16,7 +15,6 @@ impl Elegance {
         let facts = Facts::of_files(files);
         let transitions = Transitions::of_files(files);
         vec![
-            RepeatedShapes::report(files),
             Complexity::report(files),
             TransitionGraph::report_graph(&facts, &transitions),
             DuplicateTransitions::report_graph(&facts, &transitions),

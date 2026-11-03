@@ -4,10 +4,10 @@ mod shape;
 use std::collections::BTreeSet;
 
 use syn::visit::Visit;
-use syn::{Field, ItemImpl, ItemMod, ItemStruct, Type};
+use syn::{Field, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::{SourceFile, Walk};
-use lint_layout::Name;
+use lint_layout::{Name, Word};
 
 use crate::attributes::Attributes;
 use crate::wrappers::Wrappers;
@@ -55,16 +55,7 @@ impl<'file> Definitions<'file> {
     }
 
     fn validated_owner(item: &ItemImpl) -> Option<Name> {
-        let deserializing = item
-            .trait_
-            .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
-            .filter(|last| last.ident == Self::DESERIALIZE);
-        let owner = match &*item.self_ty {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
-        deserializing.and(Conversions::called_in(item)).and(owner)
+        Conversions::called_in(item).and(Name::implementing(item, Word::new(Self::DESERIALIZE)))
     }
 }
 

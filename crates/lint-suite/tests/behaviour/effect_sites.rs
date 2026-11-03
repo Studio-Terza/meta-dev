@@ -2,6 +2,8 @@ use lint_core::Lint;
 use lint_effect_sites::{EffectSites, EffectsInPorts};
 use lint_fixtures::{Located, Source, Sources, Text};
 
+use crate::shown::Shown;
+
 struct Effects;
 
 impl Effects {
@@ -11,13 +13,6 @@ impl Effects {
 
     fn at(path: &'static str, text: &str) -> Source {
         Source::new(Located::new(path), Text::new(Box::leak(text.to_owned().into_boxed_str())))
-    }
-
-    fn shows(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => Self::of(&[Self::at("crates/x/src/lib.rs", text)]).contains(expected),
-            _ => false,
-        }
     }
 }
 
@@ -30,7 +25,7 @@ const FOREIGN: &str =
 
 laws::table!(
     effect_sites_are_counted_per_crate_and_listed_outside_ports,
-    Effects::shows,
+    Shown::of::<EffectSites>,
     [
         [EVERY_KIND, "crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2)"] => true,
         [EVERY_KIND, "crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string"] => true,

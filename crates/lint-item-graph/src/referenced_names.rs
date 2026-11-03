@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use quote::ToTokens;
-use syn::{Attribute, Item, Type};
+use syn::{Attribute, Item};
 
 use lint_core::Walk;
 use lint_layout::Name;
@@ -68,7 +68,7 @@ impl ReferencedNames {
             Walk::Entered => {
                 let own = match item {
                     Item::Impl(item) => ReferencedNames {
-                        implemented: Self::named(Self::self_type(&item.self_ty), scope, item),
+                        implemented: Self::named(Name::of_type(&item.self_ty), scope, item),
                         ..ReferencedNames::default()
                     },
                     _ => ReferencedNames { declared: Self::named(owner, scope, item), ..ReferencedNames::default() },
@@ -84,12 +84,5 @@ impl ReferencedNames {
             .map(|owner| (owner, scope.referenced(item.to_token_stream())))
             .into_iter()
             .collect()
-    }
-
-    fn self_type(self_type: &Type) -> Option<Name> {
-        match self_type {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
     }
 }

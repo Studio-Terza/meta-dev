@@ -10,7 +10,6 @@ use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 use lint_core::Gate;
 use lint_core::SourceFile;
 use lint_core::Violation;
-use lint_core::Walk;
 use lint_file::FileLint;
 use lint_layout::{Name, Whole, Word, words};
 
@@ -80,10 +79,7 @@ impl FileLint for TextSites {
 
 impl<'ast> Visit<'ast> for TextSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
-            Walk::Entered | Walk::Skipped => {}
-        }
+        Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
