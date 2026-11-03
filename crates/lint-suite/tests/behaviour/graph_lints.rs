@@ -1,25 +1,17 @@
-use lint_core::Lint;
-use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{Bisimilarity, CommutingTriangles, LiveNodes, RepeatedMotifs, Tangles};
+
+use crate::shown::Shown;
 
 struct Graphs;
 
 impl Graphs {
-    fn of<Report: Lint>(text: &str) -> String {
-        Report::report(&Sources::parsed(&[Source::new(
-            Located::new("crates/x/src/lib.rs"),
-            Text::new(Box::leak(text.to_owned().into_boxed_str())),
-        )]))
-        .to_string()
-    }
-
     fn shows(case: &[&str]) -> bool {
         match case {
-            ["live", text, expected] => Self::of::<LiveNodes>(text).contains(expected),
-            ["bisimilar", text, expected] => Self::of::<Bisimilarity>(text).contains(expected),
-            ["triangle", text, expected] => Self::of::<CommutingTriangles>(text).contains(expected),
-            ["motif", text, expected] => Self::of::<RepeatedMotifs>(text).contains(expected),
-            ["tangle", text, expected] => Self::of::<Tangles>(text).contains(expected),
+            ["live", pair @ ..] => Shown::of::<LiveNodes>(pair),
+            ["bisimilar", pair @ ..] => Shown::of::<Bisimilarity>(pair),
+            ["triangle", pair @ ..] => Shown::of::<CommutingTriangles>(pair),
+            ["motif", pair @ ..] => Shown::of::<RepeatedMotifs>(pair),
+            ["tangle", pair @ ..] => Shown::of::<Tangles>(pair),
             _ => false,
         }
     }

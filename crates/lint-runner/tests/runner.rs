@@ -21,6 +21,11 @@ const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> 
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
 const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\n";
 const MODULES: &str = "mod one;\nmod two;\n";
+const CHAIN_A: &str =
+    "pub struct A0(A1);\npub struct A1(A2);\npub struct A2(A3);\npub struct A3(A4);\npub struct A4;\n";
+const CHAIN_B: &str =
+    "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3(B4);\npub struct B4;\n";
+const SHORT_CHAIN_B: &str = "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
@@ -155,19 +160,6 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 struct Trees;
 
 impl Trees {
-    fn chain(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> = (0..size)
-            .map(|index| {
-                if index + 1 < size {
-                    format!("pub struct {prefix}{index}({prefix}{});\n", index + 1)
-                } else {
-                    format!("pub struct {prefix}{index};\n")
-                }
-            })
-            .collect();
-        lines.concat()
-    }
-
     fn occurrences(files: &impl Files, path: &Path, needle: &str) -> Result<usize, FileFailure> {
         match files.kind(path) {
             Kind::Directory => files
@@ -503,8 +495,8 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
 #[test]
 fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", &Trees::chain("A", 5))?;
-    let main = format!("use r::A0;\n{}fn main() {{\n    let _ = (B0, A0);\n}}\n", Trees::chain("B", 4));
+    root.write("src/lib.rs", CHAIN_A)?;
+    let main = format!("use r::A0;\n{SHORT_CHAIN_B}fn main() {{\n    let _ = (B0, A0);\n}}\n");
     root.write("src/main.rs", &main)?;
     assert_eq!(root.crate_graph_lines()?, Lines::default());
     Ok(())
@@ -514,8 +506,8 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    root.write("code/lib.rs", &format!("pub mod a;\n{}", Trees::chain("A", 5)))?;
-    root.write("code/a.rs", &Trees::chain("B", 5))?;
+    root.write("code/lib.rs", &format!("pub mod a;\n{CHAIN_A}"))?;
+    root.write("code/a.rs", CHAIN_B)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
     assert_eq!(root.crate_graph_lines()?, [named.as_str()]);
     Ok(())
