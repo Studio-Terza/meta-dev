@@ -3,22 +3,17 @@ mod referenced;
 
 use proc_macro2::Span;
 use syn::visit::{self, Visit};
-use syn::{
-    Attribute, Fields, Ident, ImplItem, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, ReturnType,
-    Signature, TraitItem, punctuated::Punctuated,
-};
+use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, punctuated::Punctuated};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
-use crate::arity::Arity;
 use crate::dependency::Dependency;
 use crate::facts::Facts;
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
 use crate::method::Method;
-use crate::method_shape::MethodShape;
 use crate::shape::Shape;
 use crate::spelled::Spelled;
 use crate::trait_fact::TraitFact;
@@ -56,15 +51,6 @@ impl<'file> Collector<'file> {
             .collect()
     }
 
-    fn method(signature: &Signature, selfish: Option<&Name>) -> Method {
-        let returns = match &signature.output {
-            ReturnType::Type(_, returned) => Spelled::last_of(returned),
-            ReturnType::Default => None,
-        };
-        let shape = MethodShape::of_signature(signature, selfish);
-        Method::new(Name::from(&signature.ident), Arity::new(signature.inputs.len()), returns, shape)
-    }
-
     fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape, dependencies: Vec<Dependency<'file>>) {
         let found = (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
             TypeFact::declared(self.krate, Name::from(name), self.site_at(name.span()), Self::derives(attributes))
@@ -81,10 +67,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_struct(&mut self, found: &'ast ItemStruct) {
-        let shape = match &found.fields {
-            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Shape::OneField,
-            _ => Shape::Other,
-        };
+        let shape = Shape::from(&found.fields);
         let dependencies = Referenced::started(self.file.path(), &found.ident, &found.generics).of_fields(
             Via::Field,
             found.fields.iter(),
@@ -104,16 +87,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
-        let methods = found
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                TraitItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => {
-                    Some(Self::method(&function.sig, None))
-                }
-                _ => None,
-            })
-            .collect();
+        let methods = found.items.iter().filter_map(Method::of_trait_item).collect();
         let fact = (Walk::outside_tests(&found.attrs) == Walk::Entered).then(|| {
             TraitFact::new(
                 self.krate,
@@ -128,22 +102,12 @@ impl<'ast> Visit<'ast> for Collector<'_> {
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
         let target = Spelled::last_of(&found.self_ty);
-        let methods: Vec<Method> = found
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) => Some(Self::method(&function.sig, target.as_ref())),
-                _ => None,
-            })
-            .collect();
+        let methods = found.items.iter().filter_map(|item| Method::of_impl_item(item, target.as_ref()));
         let implemented = found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
-        let (implementation, inherent) = match implemented {
-            Some(segment) => (
-                Some(Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), methods)),
-                Vec::new(),
-            ),
-            None => (None, methods),
-        };
+        let (implemented_methods, inherent): (Vec<Method>, Vec<Method>) = methods.partition(|_| implemented.is_some());
+        let implementation = implemented.map(|segment| {
+            Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), implemented_methods)
+        });
         let walk = Walk::outside_tests(&found.attrs);
         let generic =
             found.generics.type_params().next().and(target.clone()).filter(|_| walk == Walk::Entered).map(|spelled| {

@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt;
 use std::io::Write;
 use std::panic::resume_unwind;
 use std::path::PathBuf;
@@ -23,7 +24,8 @@ impl Cli {
         let given: Vec<OsString> = arguments.collect();
         let mode = Mode::of_arguments(&given);
         let roots = mode.roots(&given);
-        Cli { roots: if roots.is_empty() { vec![PathBuf::from(".")] } else { roots }, mode }
+        let roots = roots.first().map(|_| ()).map_or_else(|| vec![PathBuf::from(".")], |()| roots);
+        Cli { roots, mode }
     }
 
     #[must_use]
@@ -39,37 +41,33 @@ impl Cli {
                 .spawn_scoped(scope, || self.reported_to(files, out, err))
                 .map(ScopedJoinHandle::join)
         });
-        match spawned {
-            Ok(Ok(exit)) => exit,
-            Ok(Err(payload)) => resume_unwind(payload),
-            Err(failure) => {
-                writeln!(err, "{failure}").ok();
-                ExitCode::FAILURE
-            }
-        }
+        spawned.map_or_else(
+            |failure| Self::refused(&failure, err),
+            |joined| joined.unwrap_or_else(|payload| resume_unwind(payload)),
+        )
     }
 
     fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match self.mode.refusal() {
-            Some(refused) => {
-                writeln!(err, "{refused}").ok();
-                ExitCode::FAILURE
-            }
+            Some(refused) => Self::refused(refused, err),
             None => self.ended(SourceFiles::read_all(files, &self.roots).as_ref(), out, err),
         }
     }
 
     fn ended(&self, read: Result<&Readout, &Failure>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match read.map(|readout| self.mode.outcome_of(readout, out)) {
-            Ok(Outcome::Clean) => ExitCode::SUCCESS,
-            Ok(violations) => {
-                write!(err, "{violations}").ok();
-                ExitCode::FAILURE
-            }
-            Err(failure) => {
-                writeln!(err, "{failure}").ok();
-                ExitCode::FAILURE
-            }
+            Ok(outcome) => outcome.violations().map_or(ExitCode::SUCCESS, |violations| Self::written(violations, err)),
+            Err(failure) => Self::refused(failure, err),
         }
+    }
+
+    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {
+        writeln!(err, "{failure}").ok();
+        ExitCode::FAILURE
+    }
+
+    fn written(violations: &Outcome<'_>, err: &mut impl Write) -> ExitCode {
+        write!(err, "{violations}").ok();
+        ExitCode::FAILURE
     }
 }

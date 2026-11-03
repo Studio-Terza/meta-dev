@@ -1,4 +1,4 @@
-use syn::{Block, Expr, Stmt};
+use syn::{Block, Expr, ExprField, ExprPath, Stmt};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Body {
@@ -10,11 +10,27 @@ impl Body {
     const RECEIVER: &'static str = "self";
 
     pub fn classify(block: &Block) -> Body {
-        match block.stmts.as_slice() {
-            [Stmt::Expr(Expr::Field(field), None)] if matches!(&*field.base, Expr::Path(base) if base.path.is_ident(Self::RECEIVER)) => {
-                Body::FieldProjection
-            }
-            _ => Body::Other,
+        block
+            .stmts
+            .first()
+            .filter(|_| block.stmts.len() == 1)
+            .and_then(Self::field_of)
+            .and_then(|field| Self::path_of(&field.base))
+            .filter(|base| base.path.is_ident(Self::RECEIVER))
+            .map_or(Body::Other, |_| Body::FieldProjection)
+    }
+
+    fn field_of(statement: &Stmt) -> Option<&ExprField> {
+        match statement {
+            Stmt::Expr(Expr::Field(field), None) => Some(field),
+            _ => None,
+        }
+    }
+
+    fn path_of(base: &Expr) -> Option<&ExprPath> {
+        match base {
+            Expr::Path(path) => Some(path),
+            _ => None,
         }
     }
 }

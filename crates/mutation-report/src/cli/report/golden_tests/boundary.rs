@@ -10,6 +10,19 @@ pub struct GoldenTest(TestName);
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotGolden;
 
+#[derive(Debug)]
+struct NameLetter;
+
+impl NameLetter {
+    const UNDERSCORE: char = '_';
+
+    fn within_name(letter: char) -> Option<char> {
+        Some(letter)
+            .filter(|letter| letter.is_alphanumeric())
+            .or_else(|| Some(letter).filter(|letter| *letter == Self::UNDERSCORE))
+    }
+}
+
 impl GoldenTest {
     const NEXT_ATTRIBUTE: &'static str = "\n#[";
     const FUNCTION: &'static str = "fn";
@@ -17,7 +30,6 @@ impl GoldenTest {
     const TYPE_CALL: &'static str = "Golden::";
     const METHOD_CALL: &'static str = ".golden(";
     const OPEN: char = '(';
-    const UNDERSCORE: char = '_';
 
     fn uses_golden(text: &str) -> Option<&str> {
         let head = text.match_indices(Self::NEXT_ATTRIBUTE).next().and_then(|(at, _)| text.get(..at)).unwrap_or(text);
@@ -30,7 +42,7 @@ impl GoldenTest {
     }
 
     fn opens(rest: Option<&str>) -> Option<&str> {
-        rest.filter(|rest| rest.chars().find(|letter| !letter.is_whitespace()) == Some(Self::OPEN))
+        rest.filter(|rest| rest.chars().skip_while(|letter| letter.is_whitespace()).take(1).eq([Self::OPEN]))
     }
 
     fn function_name(text: &str) -> Option<GoldenTest> {
@@ -40,12 +52,9 @@ impl GoldenTest {
     }
 
     fn after_keyword(rest: &str) -> Option<String> {
-        let name: String = rest
-            .chars()
-            .skip_while(|letter| letter.is_whitespace())
-            .take_while(|letter| letter.is_alphanumeric() || *letter == Self::UNDERSCORE)
-            .collect();
-        (rest.chars().next().is_some_and(char::is_whitespace) && !name.is_empty()).then_some(name)
+        let name: String =
+            rest.chars().skip_while(|letter| letter.is_whitespace()).map_while(NameLetter::within_name).collect();
+        rest.chars().next().filter(|letter| letter.is_whitespace()).and(name.chars().next()).map(|_| name)
     }
 }
 

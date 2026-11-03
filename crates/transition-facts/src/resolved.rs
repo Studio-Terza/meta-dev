@@ -13,10 +13,17 @@ impl Resolved {
         Resolved::Found(Endpoint::new(Nature::Interface, Name::from(name)))
     }
 
-    pub(crate) fn tupled(mut elements: impl Iterator<Item = Resolved>, selfish: Nature) -> Resolved {
-        elements
-            .find(|element| element.nature(selfish) == Nature::Primitive)
-            .unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))
+    pub(crate) fn tupled(elements: Vec<Resolved>, selfish: Nature) -> Resolved {
+        let unit = elements.first().map(|_| ());
+        unit.map_or_else(
+            || Resolved::Found(Endpoint::from(Unnamed::Unit)),
+            |()| {
+                elements
+                    .into_iter()
+                    .find(|element| element.nature(selfish) == Nature::Primitive)
+                    .unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))
+            },
+        )
     }
 
     pub(crate) fn resolved_with<'found>(&'found self, selfish: &'found Endpoint) -> &'found Endpoint {

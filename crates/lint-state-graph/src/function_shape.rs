@@ -7,7 +7,7 @@ pub use returns::Returns;
 use crate::declarations::Vertex;
 use std::path::Path;
 
-use syn::{FnArg, ImplItemFn, Type};
+use syn::{FnArg, ImplItem, ImplItemFn, PatType, Type};
 
 use super::declarations::Declarations;
 use super::impl_context::ImplContext;
@@ -40,12 +40,24 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
                 .sig
                 .inputs
                 .iter()
-                .filter_map(|argument| match argument {
-                    FnArg::Typed(typed) => vertex(&typed.ty),
-                    FnArg::Receiver(_) => None,
-                })
+                .filter_map(Self::typed)
+                .filter_map(|typed| vertex(&typed.ty))
                 .collect(),
             body: Body::classify(&function.block),
+        }
+    }
+
+    pub fn function(item: &ImplItem) -> Option<&ImplItemFn> {
+        match item {
+            ImplItem::Fn(function) => Some(function),
+            _ => None,
+        }
+    }
+
+    fn typed(argument: &FnArg) -> Option<&PatType> {
+        match argument {
+            FnArg::Typed(typed) => Some(typed),
+            FnArg::Receiver(_) => None,
         }
     }
 

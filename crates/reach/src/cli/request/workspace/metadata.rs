@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::cli::failure::Failure;
-use crate::cli::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::crate_name::CrateName;
 use package::Package;
 
 #[derive(Debug, Deserialize)]
@@ -20,10 +20,9 @@ impl Metadata {
         let Metadata { workspace_root, packages } = self;
         let (inside, outside): (Vec<Package>, Vec<Package>) =
             packages.into_iter().partition(|package| package.directory_under(&workspace_root).is_some());
-        match outside.into_iter().next() {
-            Some(package) => Err(Failure::Outside { manifest: package.into_manifest() }),
-            None => Ok(Metadata { workspace_root, packages: inside }),
-        }
+        outside.into_iter().next().map_or(Ok(Metadata { workspace_root, packages: inside }), |package| {
+            Err(Failure::Outside { manifest: package.into_manifest() })
+        })
     }
 
     pub fn directories(&self) -> BTreeMap<&CrateName, &Path> {
@@ -36,8 +35,7 @@ impl Metadata {
     pub fn readers(&self) -> BTreeMap<&CrateName, &[PathBuf]> {
         self.packages
             .iter()
-            .filter(|package| !package.readings().is_empty())
-            .map(|package| (package.name(), package.readings()))
+            .filter_map(|package| package.readings().first().map(|_| (package.name(), package.readings())))
             .collect()
     }
 

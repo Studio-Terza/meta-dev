@@ -26,16 +26,17 @@ pub struct Report<'arguments> {
 }
 
 impl<'arguments> Report<'arguments> {
+    const ARGUMENTS: usize = 4;
+
     pub fn from_arguments(arguments: &'arguments [impl AsRef<OsStr>]) -> Result<Report<'arguments>, Failure<'static>> {
-        match arguments {
-            [shards, sources, markdown, json] => Ok(Report {
+        TryInto::<&[_; Report::<'static>::ARGUMENTS]>::try_into(arguments)
+            .map(|[shards, sources, markdown, json]| Report {
                 shards: Path::new(shards),
                 sources: Path::new(sources),
                 markdown: Path::new(markdown),
                 json: Path::new(json),
-            }),
-            _ => Err(Failure::Usage),
-        }
+            })
+            .map_err(|_| Failure::Usage)
     }
 
     pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure<'arguments>> {

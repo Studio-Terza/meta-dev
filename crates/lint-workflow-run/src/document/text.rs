@@ -40,7 +40,8 @@ impl<'text> Text<'text> {
         let end = start.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.len(), |(at, _)| at);
         start
             .get(..end)
-            .filter(|word| !word.is_empty() && !known.iter().any(|shell| shell.into_inner() == *word))
+            .filter(|word| word.chars().next().is_some())
+            .and_then(|word| known.iter().find(|shell| shell.into_inner() == word).map_or(Some(word), |_| None))
             .map(Text)
     }
 
@@ -49,18 +50,11 @@ impl<'text> Text<'text> {
     }
 
     pub(crate) fn trimmed(self) -> Text<'text> {
-        let blanks_gone = self
-            .0
-            .char_indices()
-            .find(|(_, letter)| !letter.is_whitespace())
-            .and_then(|(at, _)| self.0.get(at..))
-            .unwrap_or_default();
-        let end = blanks_gone
-            .char_indices()
-            .rev()
-            .find(|(_, letter)| !letter.is_whitespace())
-            .map_or(0, |(at, letter)| at + letter.len_utf8());
-        Text(blanks_gone.get(..end).unwrap_or_default())
+        let leading: usize = self.0.chars().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+        let blanks_gone = self.0.get(leading..).unwrap_or_default();
+        let trailing: usize =
+            blanks_gone.chars().rev().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+        Text(blanks_gone.get(..blanks_gone.len() - trailing).unwrap_or_default())
     }
 
     pub(crate) fn path(self) -> &'text Path {

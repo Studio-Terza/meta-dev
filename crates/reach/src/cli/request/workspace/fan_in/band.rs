@@ -2,7 +2,7 @@ use std::fmt;
 
 use newtype::Newtype;
 
-use crate::cli::workspace::percent::Percent;
+use crate::cli::request::workspace::percent::Percent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Band(usize);

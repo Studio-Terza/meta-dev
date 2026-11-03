@@ -1,4 +1,4 @@
-use syn::{TraitBoundModifier, TypeParamBound};
+use syn::{PathSegment, TraitBoundModifier, TypeParamBound};
 
 use lint_layout::{Name, Whole, Word, words};
 
@@ -18,18 +18,21 @@ impl<'bound> Bound<'bound> {
     }
 
     pub(super) fn endpoint(&self, scope: &TypeScope<'_>) -> Option<Resolved> {
-        let traited = match self.0 {
-            TypeParamBound::Trait(found) if matches!(found.modifier, TraitBoundModifier::None) => {
-                found.path.segments.last()
-            }
-            _ => None,
-        };
+        let traited = self.traited();
         let iterated = traited.filter(|last| Name::from(&last.ident).matches::<Whole>(&Self::ITERATORS).is_some());
-        match iterated {
-            Some(last) => Some(
-                scope.argument(&last.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque))),
-            ),
-            None => traited.map(|last| Resolved::Found(Endpoint::new(Nature::Interface, Name::from(&last.ident)))),
+        iterated
+            .map(|last| {
+                scope.argument(&last.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))
+            })
+            .or_else(|| traited.map(|last| Resolved::Found(Endpoint::new(Nature::Interface, Name::from(&last.ident)))))
+    }
+
+    fn traited(&self) -> Option<&'bound PathSegment> {
+        match self.0 {
+            TypeParamBound::Trait(found) => Some(found)
+                .filter(|found| matches!(found.modifier, TraitBoundModifier::None))
+                .and_then(|found| found.path.segments.last()),
+            _ => None,
         }
     }
 }

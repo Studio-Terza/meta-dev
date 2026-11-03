@@ -1,4 +1,4 @@
-use syn::{GenericArgument, PathArguments, PathSegment, Type};
+use syn::{FnArg, GenericArgument, PatType, PathArguments, PathSegment, ReturnType, Type};
 
 use lint_layout::Name;
 
@@ -19,6 +19,20 @@ impl Spelled {
         match &segment.arguments {
             PathArguments::AngleBracketed(arguments) => arguments.args.iter().find_map(Self::of_argument),
             _ => None,
+        }
+    }
+
+    pub(crate) fn returned_by(output: &ReturnType) -> Option<&Type> {
+        match output {
+            ReturnType::Type(_, found) => Some(found),
+            ReturnType::Default => None,
+        }
+    }
+
+    pub(crate) fn typed(input: &FnArg) -> Option<&PatType> {
+        match input {
+            FnArg::Typed(typed) => Some(typed),
+            FnArg::Receiver(_) => None,
         }
     }
 

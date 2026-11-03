@@ -23,12 +23,11 @@ impl<'found> ImplContext<'found> {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| Name::from(&segment.ident));
-        let kind = match (trait_name, declarations.vertex_named(&self_type).map(Vertex::name)) {
-            (Some(name), Some(vertex)) => ImplKind::TraitOnVertex(name, vertex),
-            (Some(name), None) => ImplKind::TraitOnValue(name),
-            (None, Some(vertex)) => ImplKind::InherentOnVertex(vertex),
-            (None, None) => ImplKind::InherentOnValue,
-        };
+        let vertex = declarations.vertex_named(&self_type).map(Vertex::name);
+        let kind = trait_name.map_or_else(
+            || vertex.map_or(ImplKind::InherentOnValue, ImplKind::InherentOnVertex),
+            |name| ImplKind::of_trait(name, vertex),
+        );
         ImplContext { self_type, kind }
     }
 

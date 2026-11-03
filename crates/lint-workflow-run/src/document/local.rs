@@ -13,9 +13,6 @@ impl Local {
     pub(crate) fn finding(used: Node<'_, '_>, actions: Actions<'_>) -> Option<Finding> {
         let target = used.text()?;
         let local = target.after(Text::new(Self::PREFIX))?;
-        match actions.resolving(local.path()) {
-            Some(_) => None,
-            None => Some(Finding::LocalAction { target: Excerpt::from(target) }),
-        }
+        actions.resolving(local.path()).map_or(Some(Finding::LocalAction { target: Excerpt::from(target) }), |_| None)
     }
 }

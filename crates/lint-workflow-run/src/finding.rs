@@ -49,7 +49,7 @@ impl fmt::Display for Finding {
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
+        match self {
             Finding::Block
             | Finding::TooLong { .. }
             | Finding::Operator { .. }
@@ -57,10 +57,10 @@ impl lint_core::Finding for Finding {
             | Finding::Inline { .. }
             | Finding::Environment
             | Finding::LocalAction { .. }
-            | Finding::Script => Self::RUST_COMMAND,
-            Finding::Interpreter { .. } => "use a shell and put the logic in a Rust command",
-            Finding::Unparsable { .. } => "correct the YAML so it parses",
-            Finding::Unreadable { .. } => "make the file readable as UTF-8 text",
-        })
+            | Finding::Script => Fix::new(Self::RUST_COMMAND),
+            Finding::Interpreter { .. } => Fix::new("use a shell and put the logic in a Rust command"),
+            Finding::Unparsable { .. } => Fix::new("correct the YAML so it parses"),
+            Finding::Unreadable { .. } => Fix::new("make the file readable as UTF-8 text"),
+        }
     }
 }
