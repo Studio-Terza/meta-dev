@@ -28,13 +28,6 @@ impl Endpoint {
         Endpoint { nature, name }
     }
 
-    pub(crate) fn tupled(elements: impl Iterator<Item = Endpoint>) -> Endpoint {
-        elements
-            .into_iter()
-            .find(|element| element.nature == Nature::Primitive)
-            .unwrap_or_else(|| Endpoint::from(Unnamed::Opaque))
-    }
-
     #[must_use]
     pub fn nature(&self) -> Nature {
         self.nature

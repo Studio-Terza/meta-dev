@@ -2,15 +2,15 @@ use syn::{ReturnType, Type, TypeTuple};
 
 use lint_core::TypeName;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Returns {
-    Vertex(TypeName),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Returns<'found> {
+    Vertex(&'found TypeName),
     TupleHoldingVertex,
     Other,
 }
 
-impl Returns {
-    pub fn classify(output: &ReturnType, vertex: impl Fn(&Type) -> Option<TypeName>) -> Returns {
+impl<'found> Returns<'found> {
+    pub fn classify(output: &ReturnType, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
         match output {
             ReturnType::Default => Returns::Other,
             ReturnType::Type(_, ty) => match &**ty {
@@ -21,14 +21,14 @@ impl Returns {
         }
     }
 
-    pub fn vertex(&self) -> Option<&TypeName> {
+    pub fn vertex(&self) -> Option<&'found TypeName> {
         match self {
             Returns::Vertex(name) => Some(name),
             Returns::TupleHoldingVertex | Returns::Other => None,
         }
     }
 
-    fn of_tuple(tuple: &TypeTuple, vertex: impl Fn(&Type) -> Option<TypeName>) -> Returns {
+    fn of_tuple(tuple: &TypeTuple, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
         if tuple.elems.iter().any(|element| vertex(element).is_some()) {
             Returns::TupleHoldingVertex
         } else {

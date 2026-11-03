@@ -20,7 +20,14 @@ impl Cli {
         out: &mut impl Write,
         err: &mut impl Write,
     ) -> ExitCode {
-        match Command::parse(arguments).and_then(|command| command.carry_out(ports, out)) {
+        match Command::parse(arguments) {
+            Ok(command) => Self::exited(command.carry_out(ports, out), err),
+            Err(failure) => Self::exited(Err(failure), err),
+        }
+    }
+
+    fn exited(carried_out: Result<ports::Exit, command::Failure<'_>>, err: &mut impl Write) -> ExitCode {
+        match carried_out {
             Ok(exit) => ExitCode::from(exit),
             Err(failure) => {
                 writeln!(err, "{failure}").ok();

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use quote::ToTokens;
-use syn::{Member, Visibility};
+use syn::{Field, Index};
 
 use super::edge_scan::{Edge, EdgeCount};
 use lint_core::Fix;
@@ -11,21 +11,21 @@ use lint_core::Site;
 use lint_core::TypeName;
 use lint_layout::Name;
 
-pub enum Finding<'file> {
+pub enum Finding<'found> {
     TupleHoldsVertex,
-    FreeTransition { target: TypeName },
-    EdgeFromNonVertex { target: TypeName, owner: TypeName },
-    HiddenEdge { edge: Edge },
-    MutatesVertex { vertex: TypeName },
-    ViewReturnsVertex { target: TypeName },
-    DuplicateEdge { edge: Edge, sites: BTreeMap<Name, Site<'file>> },
-    CrowdedVertex { source: TypeName, edges: EdgeCount, most: Most },
-    ExposedField { field: Member, owner: Name, visibility: Visibility },
-    ForeignMatch { enum_name: Name },
+    FreeTransition { target: &'found TypeName },
+    EdgeFromNonVertex { target: &'found TypeName, owner: &'found TypeName },
+    HiddenEdge { edge: Edge<'found> },
+    MutatesVertex { vertex: &'found TypeName },
+    ViewReturnsVertex { target: &'found TypeName },
+    DuplicateEdge { edge: &'found Edge<'found>, sites: &'found BTreeMap<Name, Site<'found>> },
+    CrowdedVertex { source: &'found TypeName, edges: EdgeCount, most: Most },
+    ExposedField { field: &'found Field, index: Index, owner: Name },
+    ForeignMatch { enum_name: &'found Name },
     UnreadableGraph,
-    UnreachableState { state: TypeName },
-    NoTerminalAhead { state: TypeName },
-    TerminalHasEdges { state: TypeName },
+    UnreachableState { state: &'found TypeName },
+    NoTerminalAhead { state: &'found TypeName },
+    TerminalHasEdges { state: &'found TypeName },
 }
 
 impl fmt::Display for Finding<'_> {
@@ -48,11 +48,11 @@ impl fmt::Display for Finding<'_> {
             Finding::CrowdedVertex { source, edges, most } => {
                 write!(formatter, "{source} has {edges} edges leaving it, at most {most} allowed")
             }
-            Finding::ExposedField { field, owner, visibility } => write!(
+            Finding::ExposedField { field, index, owner } => write!(
                 formatter,
                 "field {} of {owner} is {}",
-                field.to_token_stream(),
-                visibility.to_token_stream().to_string().chars().filter(|letter| *letter != ' ').collect::<String>()
+                field.ident.as_ref().map_or_else(|| index.to_token_stream(), ToTokens::to_token_stream),
+                field.vis.to_token_stream().to_string().chars().filter(|letter| *letter != ' ').collect::<String>()
             ),
             Finding::ForeignMatch { enum_name } => write!(formatter, "match on {enum_name} outside its file"),
             Finding::UnreadableGraph => formatter.write_str("states! graph cannot be read, so it cannot be checked"),

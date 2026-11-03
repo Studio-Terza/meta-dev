@@ -20,12 +20,16 @@ impl HiddenStates {
 impl GraphLint for HiddenStates {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
-        let written: Vec<&Transition<'file>> =
+        let written: Vec<&Transition<'_, 'file>> =
             graph.edges().iter().filter(|edge| edge.role() == Role::Written).map(Edge::transition).collect();
-        let mut above: Vec<&Transition<'file>> =
-            written.iter().copied().filter(|found| Self::FLOOR.allows(found.branches()).is_some()).collect();
+        let mut above: Vec<&Transition<'_, 'file>> =
+            written.iter().copied().filter(|found| Self::FLOOR.allows(found.function().branches()).is_some()).collect();
         above.sort_by(|left, right| {
-            right.branches().cmp(&left.branches()).then_with(|| AsRef::<Site>::as_ref(*left).cmp(right.as_ref()))
+            right
+                .function()
+                .branches()
+                .cmp(&left.function().branches())
+                .then_with(|| AsRef::<Site>::as_ref(*left).cmp(right.as_ref()))
         });
         Report::new(
             Headline::new(

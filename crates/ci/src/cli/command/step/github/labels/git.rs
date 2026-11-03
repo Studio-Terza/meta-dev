@@ -20,7 +20,7 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         Git { ports }
     }
 
-    pub(crate) fn changes_since_fork(&self, base: &Branch) -> Result<Vec<Change>, Failure> {
+    pub(crate) fn changes_since_fork(&self, base: &Branch) -> Result<Vec<Change>, Failure<'static>> {
         let fork = self.fork_point(base)?;
         let listed = self.asked(&Invocation::new(
             "git",
@@ -38,13 +38,13 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         Ok(Lines::from(listed.as_ref()).filter_map(|line| line.parse::<Change>().ok()).collect())
     }
 
-    fn fork_point(&self, base: &Branch) -> Result<Revision, Failure> {
+    fn fork_point(&self, base: &Branch) -> Result<Revision, Failure<'static>> {
         let remote = [Self::REMOTE, base.as_ref()].concat();
         let found = self.asked(&Invocation::new("git", ["merge-base", remote.as_str(), Self::HEAD]))?;
         Ok(Revision::new(Lines::from(found.as_ref()).next().unwrap_or_default().to_owned()))
     }
 
-    fn asked(&self, invocation: &Invocation) -> Result<Text, Failure> {
+    fn asked(&self, invocation: &Invocation) -> Result<Text, Failure<'static>> {
         self.ports.output(invocation).map_err(Failure::starting(invocation))
     }
 }

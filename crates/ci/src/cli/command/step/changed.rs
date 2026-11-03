@@ -1,6 +1,6 @@
 mod question;
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 
 use text_lines::Lines;
 
@@ -13,11 +13,14 @@ pub(crate) use question::Question;
 pub(crate) struct Changed;
 
 impl Changed {
-    pub(crate) fn asked(ports: &impl Ports, invocation: &Invocation) -> Result<Text, Failure> {
+    pub(crate) fn asked(ports: &impl Ports, invocation: &Invocation) -> Result<Text, Failure<'static>> {
         ports.output(invocation).map_err(|source| Failure::Program { program: invocation.program().to_owned(), source })
     }
 
-    pub(crate) fn stored_metadata(ports: &impl Ports, metadata: &Journal) -> Result<(), Failure> {
+    pub(crate) fn stored_metadata<'journal>(
+        ports: &impl Ports,
+        metadata: &'journal Journal,
+    ) -> Result<(), Failure<'journal>> {
         let text = Self::asked(
             ports,
             &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
@@ -25,19 +28,26 @@ impl Changed {
         metadata.replace(ports.files(), &text)
     }
 
-    pub(crate) fn reach(ports: &impl Ports, arguments: impl Iterator<Item = OsString>) -> Result<Text, Failure> {
+    pub(crate) fn reach(
+        ports: &impl Ports,
+        arguments: impl Iterator<Item = OsString>,
+    ) -> Result<Text, Failure<'static>> {
         ports.reached(&arguments.collect::<Vec<_>>()).map_err(Self::refused)
     }
 
-    pub(crate) fn reaches(ports: &impl Ports, questions: &[Vec<OsString>]) -> Vec<Result<Text, Failure>> {
+    pub(crate) fn reaches(ports: &impl Ports, questions: &[Vec<&OsStr>]) -> Vec<Result<Text, Failure<'static>>> {
         ports.reaches(questions).into_iter().map(|answer| answer.map_err(Self::refused)).collect()
     }
 
-    fn refused(refusal: Text) -> Failure {
+    fn refused(refusal: Text) -> Failure<'static> {
         Failure::Reach(Refusal::from(refusal))
     }
 
-    pub(crate) fn answered(question: Question, metadata: &Journal, ports: &impl Ports) -> Result<Text, Failure> {
+    pub(crate) fn answered(
+        question: Question,
+        metadata: &Journal,
+        ports: &impl Ports,
+    ) -> Result<Text, Failure<'static>> {
         let changed = Self::asked(
             ports,
             &Invocation::new(

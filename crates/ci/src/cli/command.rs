@@ -10,7 +10,7 @@ use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
 
 use super::ports::{Exit, Ports};
-use failure::Failure;
+pub(crate) use failure::Failure;
 
 #[derive(Debug)]
 pub enum Command {
@@ -60,36 +60,36 @@ impl Command {
     const SHARD_SUMMARY: &'static str = "shard-summary";
     const MATRIX: &'static str = "matrix";
 
-    pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure> {
+    pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         let name = arguments.next().and_then(|name| name.into_string().ok());
         let rest: Vec<OsString> = arguments.collect();
         match name.as_deref() {
-            Some(Self::TIMED) => Timed::from_arguments(&rest).map(Command::Timed),
-            Some(Self::LIBTEST_SECONDS) => LibtestSeconds::from_arguments(&rest).map(Command::LibtestSeconds),
-            Some(Self::REACH) => ReachScope::from_arguments(&rest).map(Command::Reach),
-            Some(Self::HISTORY) => History::from_arguments(&rest).map(Command::History),
-            Some(Self::MEASURED_HISTORY) => MeasuredHistory::from_arguments(&rest).map(Command::MeasuredHistory),
-            Some(Self::RATCHET_LOWER) => RatchetLower::from_arguments(&rest).map(Command::RatchetLower),
-            Some(Self::COMPILE_TIMES) => CompileTimes::from_arguments(&rest).map(Command::CompileTimes),
-            Some(Self::LOGGED) => Logged::from_arguments(&rest).map(Command::Logged),
-            Some(Self::TOOLS) => InstallTools::from_arguments(&rest).map(Command::Tools),
-            Some(Self::TOOLS_KEY) => ToolsKey::from_arguments(&rest).map(Command::ToolsKey),
-            Some(Self::MUTANTS_SHARD) => MutantsShard::from_arguments(&rest).map(Command::MutantsShard),
-            Some(Self::MUTANTS_CHANGED) => MutantsChanged::from_arguments(&rest).map(Command::MutantsChanged),
-            Some(Self::WALL_TIMES) => WallTimes::from_arguments(&rest).map(Command::WallTimes),
-            Some(Self::SHOW) => Show::from_arguments(&rest).map(Command::Show),
-            Some(Self::SUMMARIZE) => Summarize::from_arguments(&rest).map(Command::Summarize),
-            Some(Self::LABELS) => Labels::from_arguments(&rest).map(Command::Labels),
-            Some(Self::SPEC_LINE) => SpecLine::from_arguments(&rest).map(Command::SpecLine),
-            Some(Self::STAGE_ISSUES) => StageIssues::from_arguments(&rest).map(Command::StageIssues),
-            Some(Self::COMPILE_TREND) => CompileTrend::from_arguments(&rest).map(Command::CompileTrend),
-            Some(Self::SHARD_SUMMARY) => ShardSummary::from_arguments(&rest).map(Command::ShardSummary),
-            Some(Self::MATRIX) => Matrix::from_arguments(&rest).map(Command::Matrix),
+            Some(Self::TIMED) => Timed::from_arguments(rest).map(Command::Timed),
+            Some(Self::LIBTEST_SECONDS) => LibtestSeconds::from_arguments(rest).map(Command::LibtestSeconds),
+            Some(Self::REACH) => ReachScope::from_arguments(rest).map(Command::Reach),
+            Some(Self::HISTORY) => History::from_arguments(rest).map(Command::History),
+            Some(Self::MEASURED_HISTORY) => MeasuredHistory::from_arguments(rest).map(Command::MeasuredHistory),
+            Some(Self::RATCHET_LOWER) => RatchetLower::from_arguments(rest).map(Command::RatchetLower),
+            Some(Self::COMPILE_TIMES) => CompileTimes::from_arguments(rest).map(Command::CompileTimes),
+            Some(Self::LOGGED) => Logged::from_arguments(rest).map(Command::Logged),
+            Some(Self::TOOLS) => InstallTools::from_arguments(rest).map(Command::Tools),
+            Some(Self::TOOLS_KEY) => ToolsKey::from_arguments(rest).map(Command::ToolsKey),
+            Some(Self::MUTANTS_SHARD) => MutantsShard::from_arguments(rest).map(Command::MutantsShard),
+            Some(Self::MUTANTS_CHANGED) => MutantsChanged::from_arguments(rest).map(Command::MutantsChanged),
+            Some(Self::WALL_TIMES) => WallTimes::from_arguments(rest).map(Command::WallTimes),
+            Some(Self::SHOW) => Show::from_arguments(rest).map(Command::Show),
+            Some(Self::SUMMARIZE) => Summarize::from_arguments(rest).map(Command::Summarize),
+            Some(Self::LABELS) => Labels::from_arguments(rest).map(Command::Labels),
+            Some(Self::SPEC_LINE) => SpecLine::from_arguments(rest).map(Command::SpecLine),
+            Some(Self::STAGE_ISSUES) => StageIssues::from_arguments(rest).map(Command::StageIssues),
+            Some(Self::COMPILE_TREND) => CompileTrend::from_arguments(rest).map(Command::CompileTrend),
+            Some(Self::SHARD_SUMMARY) => ShardSummary::from_arguments(rest).map(Command::ShardSummary),
+            Some(Self::MATRIX) => Matrix::from_arguments(rest).map(Command::Matrix),
             _ => Err(Failure::Usage),
         }
     }
 
-    pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         match self {
             Command::Timed(step) => step.carry_out(ports, out),
             Command::LibtestSeconds(step) => step.carry_out(ports, out),

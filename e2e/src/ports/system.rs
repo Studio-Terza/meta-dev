@@ -22,11 +22,12 @@ impl Checkout {
         let below = Self::directories(&tops)?;
         let candidates: Vec<PathBuf> =
             [root].into_iter().chain(tops).chain(below).map(|directory| directory.join(Self::MANIFEST)).collect();
+        let kinds = Disk.kinds(&candidates);
         let manifests: Vec<PathBuf> = candidates
-            .iter()
-            .zip(Disk.kinds(&candidates))
+            .into_iter()
+            .zip(kinds)
             .filter(|(_, kind)| *kind == Kind::File)
-            .map(|(manifest, _)| manifest.clone())
+            .map(|(manifest, _)| manifest)
             .collect();
         let mirrored = Memory::default();
         manifests.iter().zip(Disk.read_many(&manifests)).try_for_each(|(manifest, read)| {
@@ -37,13 +38,19 @@ impl Checkout {
     }
 
     fn directories(parents: &[PathBuf]) -> Result<Vec<PathBuf>, FileFailure> {
-        let children: Vec<PathBuf> =
-            Disk.entries_many(parents).into_iter().collect::<Result<Vec<Vec<PathBuf>>, FileFailure>>()?.concat();
+        let children: Vec<PathBuf> = Disk
+            .entries_many(parents)
+            .into_iter()
+            .collect::<Result<Vec<Vec<PathBuf>>, FileFailure>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        let kinds = Disk.kinds(&children);
         Ok(children
-            .iter()
-            .zip(Disk.kinds(&children))
+            .into_iter()
+            .zip(kinds)
             .filter(|(_, kind)| *kind == Kind::Directory)
-            .map(|(child, _)| child.clone())
+            .map(|(child, _)| child)
             .collect())
     }
 }

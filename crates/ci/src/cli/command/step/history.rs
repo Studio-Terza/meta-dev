@@ -17,8 +17,8 @@ pub struct History {
 }
 
 impl Step for History {
-    fn from_arguments(arguments: &[OsString]) -> Result<History, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<History, Failure<'static>> {
+        match arguments.as_slice() {
             [metadata, file, revision] => Ok(History {
                 metadata: Journal::file(Path::new(metadata)),
                 file: Journal::file(Path::new(file)),
@@ -28,7 +28,7 @@ impl Step for History {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let record = Changed::answered(Question::History, &self.metadata, ports)?;
         write!(out, "{}\t{record}", self.revision)?;
         self.file.append(ports.files(), format_args!("{}\t{record}", self.revision)).map(|()| Exit::Success)

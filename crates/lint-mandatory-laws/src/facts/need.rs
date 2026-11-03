@@ -4,13 +4,13 @@ use lint_core::Fix;
 
 use super::pair::Pair;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Need {
-    Roundtrip(Pair),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Need<'facts> {
+    Roundtrip(Pair<'facts>),
     Law,
 }
 
-impl fmt::Display for Need {
+impl fmt::Display for Need<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Need::Roundtrip(pair) => write!(
@@ -22,7 +22,7 @@ impl fmt::Display for Need {
     }
 }
 
-impl lint_core::Finding for Need {
+impl lint_core::Finding for Need<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Need::Roundtrip(_) => {

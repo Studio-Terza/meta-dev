@@ -4,9 +4,9 @@ use super::mark::Mark;
 use super::slot::Slot;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum ShapeToken {
+pub(crate) enum ShapeToken<'raw> {
     Literal,
     Local(Slot),
-    Word(Name),
+    Word(&'raw Name),
     Mark(Mark),
 }

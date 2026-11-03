@@ -25,21 +25,25 @@ impl Outcomes {
 
     pub fn read(files: &impl Files, directory: &Path) -> Result<Outcomes, Failure> {
         let path = directory.join(Self::FILE);
-        let text = files
-            .read_text(&path)
-            .map_err(|failure| Failure::Io { path: path.clone(), source: io::Error::from(failure) })?;
-        serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path, source })
+        match files.read_text(&path) {
+            Ok(text) => serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path, source }),
+            Err(failure) => Err(Failure::Io { path, source: io::Error::from(failure) }),
+        }
     }
 
     pub(crate) fn logs(&self, files: &impl Files, directory: &Path) -> Vec<TestLog> {
         let candidates: Vec<Vec<PathBuf>> = self.outcomes.iter().map(|outcome| outcome.logs(directory)).collect();
-        let every: Vec<PathBuf> = candidates.iter().flatten().cloned().collect();
-        let kinds: BTreeMap<&PathBuf, Kind> = every.iter().zip(files.kinds(&every)).collect();
+        let every: Vec<&PathBuf> = candidates.iter().flatten().collect();
+        let kinds: BTreeMap<&PathBuf, Kind> = every.iter().copied().zip(files.kinds(&every)).collect();
         let chosen: Vec<Option<&PathBuf>> =
             candidates.iter().map(|paths| paths.iter().find(|path| kinds.get(path) == Some(&Kind::File))).collect();
-        let wanted: Vec<PathBuf> = chosen.iter().flatten().map(|path| (*path).clone()).collect();
-        let read: BTreeMap<&PathBuf, Bytes> =
-            wanted.iter().zip(files.read_many(&wanted)).filter_map(|(path, bytes)| Some((path, bytes.ok()?))).collect();
+        let wanted: Vec<&PathBuf> = chosen.iter().flatten().copied().collect();
+        let read: BTreeMap<&PathBuf, Bytes> = wanted
+            .iter()
+            .copied()
+            .zip(files.read_many(&wanted))
+            .filter_map(|(path, bytes)| Some((path, bytes.ok()?)))
+            .collect();
         chosen
             .into_iter()
             .map(|path| {
@@ -50,11 +54,11 @@ impl Outcomes {
             .collect()
     }
 
-    pub(crate) fn baseline(&self, logs: &[TestLog]) -> Vec<TestName> {
+    pub(crate) fn baseline<'log>(&self, logs: &'log [TestLog]) -> Vec<&'log TestName> {
         self.outcomes.iter().zip(logs).filter_map(|(outcome, log)| outcome.baseline(log)).flatten().collect()
     }
 
-    pub fn mutants(&self, logs: &[TestLog]) -> Vec<MutantResult> {
+    pub fn mutants<'log>(&self, logs: &'log [TestLog]) -> Vec<MutantResult<'log>> {
         self.outcomes.iter().zip(logs).filter_map(|(outcome, log)| outcome.mutant(log)).collect()
     }
 }

@@ -13,6 +13,7 @@ use crate::cli::ports::{Exit, Invocation, Ports, Text};
 #[derive(Debug)]
 pub struct MutantsChanged {
     diff: Journal,
+    missed: Journal,
     output: PathBuf,
     scope: Vec<OsString>,
 }
@@ -22,18 +23,24 @@ impl MutantsChanged {
     const DIFF: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
     const MISSED_LIST: [&'static str; 2] = ["mutants.out", "missed.txt"];
 
-    fn changed_lines(ports: &impl Ports) -> Result<Text, Failure> {
+    fn changed_lines(ports: &impl Ports) -> Result<Text, Failure<'static>> {
         let invocation = Invocation::new("git", Self::DIFF);
         ports.output(&invocation).map_err(Failure::starting(&invocation))
     }
 
-    fn missed_list(&self) -> Journal {
-        Journal::file(&Self::MISSED_LIST.iter().fold(self.output.clone(), |path, part| path.join(part)))
+    fn new(diff: PathBuf, output: PathBuf, scope: Vec<OsString>) -> MutantsChanged {
+        MutantsChanged {
+            missed: Journal::from(
+                [output.as_path()].into_iter().chain(Self::MISSED_LIST.map(Path::new)).collect::<PathBuf>(),
+            ),
+            diff: Journal::from(diff),
+            output,
+            scope,
+        }
     }
 
-    fn judged(&self, files: &impl Files, out: &mut impl Write) -> Result<Exit, Failure> {
-        let list = self.missed_list();
-        let missed = list.read_or(files, Text::default())?;
+    fn judged(&self, files: &impl Files, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
+        let missed = self.missed.read_or(files, Text::default())?;
         if missed.as_ref().is_empty() {
             writeln!(out, "mutants: none missed")?;
             Ok(Exit::Success)
@@ -43,7 +50,7 @@ impl MutantsChanged {
         }
     }
 
-    fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let changed = Self::changed_lines(ports)?;
         self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
@@ -58,18 +65,16 @@ impl MutantsChanged {
 }
 
 impl Step for MutantsChanged {
-    fn from_arguments(arguments: &[OsString]) -> Result<MutantsChanged, Failure> {
-        match arguments {
-            [diff, output, scope @ ..] => Ok(MutantsChanged {
-                diff: Journal::file(Path::new(diff)),
-                output: PathBuf::from(output),
-                scope: scope.to_vec(),
-            }),
+    fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
+        match arguments.as_slice() {
+            [diff, output, scope @ ..] => {
+                Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), scope.to_vec()))
+            }
             _ => Err(Failure::Usage),
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         if self.scope.is_empty() {
             writeln!(out, "mutants: skipped, no crate is reached by this change, so nothing was tested")?;
             Ok(Exit::Success)

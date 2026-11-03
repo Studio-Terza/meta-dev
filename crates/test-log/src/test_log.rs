@@ -4,7 +4,7 @@ mod reading;
 mod test_name;
 mod verdict;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use line::Line;
 use reading::Reading;
@@ -16,14 +16,13 @@ use verdict::Verdict;
 pub struct TestLog(BTreeMap<TestName, Verdict>);
 
 impl TestLog {
-    #[must_use]
-    pub fn names(&self) -> BTreeSet<TestName> {
-        self.0.keys().cloned().collect()
+    pub fn names(&self) -> impl Iterator<Item = &TestName> {
+        self.0.keys()
     }
 
     #[must_use]
-    pub fn failed(&self) -> Vec<TestName> {
-        self.0.iter().filter(|(_, verdict)| **verdict == Verdict::Failed).map(|(name, _)| name.clone()).collect()
+    pub fn failed(&self) -> Vec<&TestName> {
+        self.0.iter().filter(|(_, verdict)| **verdict == Verdict::Failed).map(|(name, _)| name).collect()
     }
 }
 

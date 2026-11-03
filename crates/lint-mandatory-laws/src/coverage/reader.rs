@@ -9,25 +9,26 @@ use crate::package::Package;
 use lint_core::SourceFile;
 use mentions::Mentions;
 
-pub(crate) struct Reader {
-    package: Package,
-    laws: Vec<Law>,
+pub(crate) struct Reader<'file> {
+    package: Package<'file>,
+    laws: Vec<Law<'file>>,
 }
 
-impl Reader {
-    pub(crate) fn read(file: &SourceFile) -> Vec<Law> {
+impl<'file> Reader<'file> {
+    pub(crate) fn read(file: &'file SourceFile) -> Vec<Law<'file>> {
         let mut reader = Reader { package: Package::containing(file), laws: Vec::new() };
         reader.visit_file(file.syntax());
         reader.laws
     }
 }
 
-impl<'ast> Visit<'ast> for Reader {
+impl<'ast> Visit<'ast> for Reader<'_> {
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         let kind = Kind::of_macro(invocation);
-        let mentions = Mentions::beyond_title(invocation.tokens.clone(), kind);
-        let law = Law::new(self.package.clone(), kind, mentions);
-        self.laws.extend((kind != Kind::Other).then_some(law));
+        let package = self.package;
+        let law = (kind != Kind::Other)
+            .then(|| Law::new(package, kind, Mentions::beyond_title(invocation.tokens.clone(), kind)));
+        self.laws.extend(law);
         visit::visit_macro(self, invocation);
     }
 }

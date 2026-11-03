@@ -18,7 +18,7 @@ pub(super) struct Tally {
 
 impl Tally {
     pub(super) fn counts<'edge, 'found, 'file>(edge: &'edge Edge<'found, 'file>) -> Option<&'edge Edge<'found, 'file>> {
-        match (edge.role(), *AsRef::<Ground>::as_ref(edge.transition()), edge.transition().mutation()) {
+        match (edge.role(), *AsRef::<Ground>::as_ref(edge.transition()), edge.transition().function().mutation()) {
             (Role::Operation, _, _) | (_, Ground::Core, Mutation::ThroughSelf | Mutation::ThroughParameter) => {
                 Some(edge)
             }
@@ -30,7 +30,7 @@ impl Tally {
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Tally {
         edges.fold(Tally::default(), |tally, edge| {
-            let counted = match (edge.role(), edge.transition().mutation()) {
+            let counted = match (edge.role(), edge.transition().function().mutation()) {
                 (Role::Operation, _) => Tally { operations: tally.operations.incremented(), ..tally },
                 (_, Mutation::ThroughSelf) => Tally { through_self: tally.through_self.incremented(), ..tally },
                 (_, Mutation::ThroughParameter | Mutation::Absent) => {

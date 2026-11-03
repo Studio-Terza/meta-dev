@@ -18,8 +18,8 @@ pub struct Summarize {
 }
 
 impl Step for Summarize {
-    fn from_arguments(arguments: &[OsString]) -> Result<Summarize, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Summarize, Failure<'static>> {
+        match arguments.as_slice() {
             [report, summary] => {
                 Ok(Summarize { report: Journal::file(Path::new(report)), summary: Journal::file(Path::new(summary)) })
             }
@@ -27,7 +27,7 @@ impl Step for Summarize {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let mut shown = Vec::new();
         Show::shown(ports.files(), slice::from_ref(&self.report), &mut shown)?;
         self.summary.append(ports.files(), LossyText::from(shown.as_slice())).map(|()| Exit::Success)

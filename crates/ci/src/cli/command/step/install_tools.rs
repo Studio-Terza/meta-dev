@@ -1,7 +1,6 @@
 mod tool;
 
 use std::ffi::{OsStr, OsString};
-use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -31,24 +30,21 @@ impl InstallTools {
         )
     }
 
-    fn installed(&self, files: &impl Files) -> Result<Exit, Failure> {
-        files
-            .create_directories(&self.destination)
-            .map_err(|failure| Failure::Io { path: self.destination.clone(), source: io::Error::from(failure) })?;
+    fn installed(&self, files: &impl Files) -> Result<Exit, Failure<'_>> {
+        files.create_directories(&self.destination).map_err(|failure| Failure::unusable(&self.destination, failure))?;
         let built: Vec<PathBuf> = Self::PROGRAMS.iter().map(|tool| self.built.join(tool.as_ref())).collect();
+        let copied = files.copy_each_into(&built, &self.destination);
         built
-            .iter()
-            .zip(files.copy_each_into(&built, &self.destination))
-            .try_for_each(|(from, copied)| {
-                copied.map_err(|failure| Failure::Io { path: from.clone(), source: io::Error::from(failure) })
-            })
+            .into_iter()
+            .zip(copied)
+            .try_for_each(|(from, copied)| copied.map_err(|failure| Failure::unusable(from, failure)))
             .map(|()| Exit::Success)
     }
 }
 
 impl Step for InstallTools {
-    fn from_arguments(arguments: &[OsString]) -> Result<InstallTools, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
+        match arguments.as_slice() {
             [built, destination] => {
                 Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
             }
@@ -56,7 +52,7 @@ impl Step for InstallTools {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let build = Self::build_invocation();
         let run = ports.run(&build).map_err(Failure::starting(&build))?;
         run.exit().followed_by(|| self.installed(ports.files()))

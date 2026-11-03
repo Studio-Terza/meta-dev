@@ -3,21 +3,21 @@ use std::fmt;
 use lint_core::Fix;
 use lint_layout::Name;
 
-pub struct Finding(Name);
+pub struct Finding<'guard>(&'guard Name);
 
-impl From<&Name> for Finding {
-    fn from(guard: &Name) -> Finding {
-        Finding(guard.clone())
+impl<'guard> From<&'guard Name> for Finding<'guard> {
+    fn from(guard: &'guard Name) -> Finding<'guard> {
+        Finding(guard)
     }
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} implements Drop", self.0)
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new("mark it #[must_use]")
     }

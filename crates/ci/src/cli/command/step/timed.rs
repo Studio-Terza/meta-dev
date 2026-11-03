@@ -17,8 +17,8 @@ pub struct Timed {
 }
 
 impl Step for Timed {
-    fn from_arguments(arguments: &[OsString]) -> Result<Timed, Failure> {
-        match arguments {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Timed, Failure<'static>> {
+        match arguments.as_slice() {
             [measured, stage, program, rest @ ..] => Ok(Timed {
                 measured: Measured::file(Path::new(measured)),
                 stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
@@ -28,7 +28,7 @@ impl Step for Timed {
         }
     }
 
-    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let run = ports
             .run(&self.invocation)
             .map_err(|source| Failure::Program { program: self.invocation.program().to_owned(), source })?;

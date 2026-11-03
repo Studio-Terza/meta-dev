@@ -1,19 +1,26 @@
 use lint_layout::Name;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Filler {
+pub(crate) enum Filler {
     Free,
     Inherent,
     Implemented(Name),
-    Provided(Name),
+    Provided,
 }
 
 impl Filler {
-    #[must_use]
-    pub fn trait_name(&self) -> Option<&Name> {
+    pub(crate) fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
         match self {
-            Filler::Implemented(name) | Filler::Provided(name) => Some(name),
+            Filler::Implemented(name) => Some(name),
+            Filler::Provided => Some(selfish),
             Filler::Free | Filler::Inherent => None,
+        }
+    }
+
+    pub(crate) fn owned(&self) -> Option<&Filler> {
+        match self {
+            Filler::Free => None,
+            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Some(self),
         }
     }
 }

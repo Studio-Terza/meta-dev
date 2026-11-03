@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 
 use crate::cli::command::step::seconds::Seconds;
@@ -10,11 +12,9 @@ pub struct Unit {
 }
 
 impl Unit {
-    pub(super) fn label(&self) -> &OneLine {
-        &self.name
-    }
-
-    pub(super) fn took(&self) -> Seconds {
-        self.duration
+    pub(super) fn tallied(self, mut totals: BTreeMap<OneLine, Seconds>) -> BTreeMap<OneLine, Seconds> {
+        let total = totals.entry(self.name).or_default();
+        *total = [*total, self.duration].into_iter().sum();
+        totals
     }
 }
