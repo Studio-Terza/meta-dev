@@ -37,18 +37,42 @@ impl fmt::Display for Key {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum End {
-    Domain(Node),
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Place {
+    Domain,
+    Shared,
+    Interface,
+    External,
     Primitive,
-    Foreign,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct End {
+    place: Place,
+    name: Name,
+    node: Option<Node>,
 }
 
 impl End {
-    fn domain(&self) -> Option<&Node> {
-        match self {
-            End::Domain(node) => Some(node),
-            End::Primitive | End::Foreign => None,
+    pub(crate) fn placed(place: Place, name: &Name) -> End {
+        End { place, name: name.clone(), node: None }
+    }
+
+    pub(crate) fn domain(node: Node) -> End {
+        End { place: Place::Domain, name: node.name.clone(), node: Some(node) }
+    }
+
+    pub(crate) fn place(&self) -> Place {
+        self.place
+    }
+}
+
+impl fmt::Display for End {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (&self.node, self.place) {
+            (Some(node), _) => write!(formatter, "{node}"),
+            (None, Place::Interface) => write!(formatter, "impl {}", self.name),
+            (None, _) => write!(formatter, "{}", self.name),
         }
     }
 }
@@ -57,7 +81,6 @@ impl End {
 pub(crate) enum Class {
     Covered,
     Primitive,
-    Foreign,
 }
 
 #[derive(Clone, Debug)]
@@ -71,32 +94,45 @@ impl Ends {
         Ends { takes, gives }
     }
 
+    pub(crate) fn all(&self) -> impl Iterator<Item = &End> {
+        self.takes.iter().chain([&self.gives])
+    }
+
     pub(crate) fn edges(&self) -> Vec<Key> {
-        self.gives.domain().map_or_else(Vec::new, |to| {
+        self.gives.node.as_ref().map_or_else(Vec::new, |to| {
             self.takes
                 .iter()
-                .filter_map(End::domain)
+                .filter_map(|taken| taken.node.as_ref())
                 .map(|from| Key { takes: vec![from.clone()], gives: to.clone() })
                 .collect()
         })
     }
 
     pub(crate) fn class(&self) -> Class {
-        let ends: Vec<&End> = self.takes.iter().chain([&self.gives]).collect();
-        if ends.contains(&&End::Primitive) {
-            Class::Primitive
-        } else if ends.contains(&&End::Foreign) {
-            Class::Foreign
-        } else {
-            Class::Covered
+        match self.all().find(|end| end.place == Place::Primitive) {
+            Some(_) => Class::Primitive,
+            None => Class::Covered,
         }
     }
 
     pub(crate) fn key(&self) -> Option<Key> {
-        let mut takes: Vec<Node> =
-            self.takes.iter().map(|taken| taken.domain().cloned()).collect::<Option<Vec<Node>>>()?;
+        let mut takes: Vec<Node> = self.takes.iter().map(|taken| taken.node.clone()).collect::<Option<Vec<Node>>>()?;
         takes.sort();
-        let gives = self.gives.domain()?.clone();
+        let gives = self.gives.node.clone()?;
         (!takes.is_empty()).then_some(Key { takes, gives })
+    }
+
+    pub(crate) fn applied(&self) -> Applied<'_> {
+        Applied(self)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Applied<'ends>(&'ends Ends);
+
+impl fmt::Display for Applied<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let takes: Vec<String> = self.0.takes.iter().skip(1).map(ToString::to_string).collect();
+        write!(formatter, "{} -> {}", takes.join(", "), self.0.gives)
     }
 }

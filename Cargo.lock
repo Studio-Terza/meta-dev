@@ -21,6 +21,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "body-lifts"
+version = "0.1.0"
+dependencies = [
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "body-shape"
 version = "0.1.0"
 dependencies = [
@@ -751,6 +759,8 @@ dependencies = [
  "lint-workflow-run",
  "tempfile",
  "text-lines",
+ "transition-facts",
+ "type-facts",
 ]
 
 [[package]]
@@ -832,6 +842,7 @@ dependencies = [
  "lint-walk-similarity",
  "lint-workflow-run",
  "tempfile",
+ "transition-facts",
 ]
 
 [[package]]
@@ -862,10 +873,12 @@ dependencies = [
 name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
+ "body-lifts",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "newtype",
+ "transition-facts",
  "type-facts",
 ]
 
@@ -1319,6 +1332,17 @@ name = "toml_writer"
 version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
+
+[[package]]
+name = "transition-facts"
+version = "0.1.0"
+dependencies = [
+ "body-lifts",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "type-facts"
