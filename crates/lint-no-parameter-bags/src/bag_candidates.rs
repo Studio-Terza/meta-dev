@@ -53,10 +53,7 @@ impl BagCandidates {
 
 impl<'ast> Visit<'ast> for BagCandidates {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {

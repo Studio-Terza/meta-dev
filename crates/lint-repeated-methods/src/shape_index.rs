@@ -94,10 +94,7 @@ impl<'file> ShapeIndex<'file> {
 
 impl<'ast> Visit<'ast> for ShapeIndex<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

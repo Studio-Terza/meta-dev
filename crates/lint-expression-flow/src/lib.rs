@@ -33,9 +33,9 @@ pub struct ExpressionFlow;
 
 impl Lint for ExpressionFlow {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
+        Self::shipped(
+            files,
             Headline::new("control flow is an expression; every branch yields the value the function returns"),
-            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
         )
     }
 }
