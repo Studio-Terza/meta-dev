@@ -42,7 +42,7 @@ impl Content {
 
     fn read_from(contents: &Bytes) -> Option<Content> {
         Some(Self::WINDOW.bytes(contents))
-            .filter(|bytes| !bytes.contains(&b'\0'))
+            .filter(|bytes| bytes.iter().all(|byte| *byte != b'\0'))
             .and_then(|bytes| {
                 String::from_utf8(bytes)
                     .or_else(|failure| {

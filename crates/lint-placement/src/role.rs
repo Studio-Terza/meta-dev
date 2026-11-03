@@ -16,16 +16,18 @@ impl Role {
 
     #[must_use]
     pub fn in_source(inside: &Path) -> Role {
-        if inside == Path::new(Self::MAIN)
-            || inside.parent() == Some(Path::new(Self::BINARIES))
-            || (inside.file_name() == Some(OsStr::new(Self::MAIN))
-                && inside.parent().and_then(Path::parent) == Some(Path::new(Self::BINARIES)))
-        {
-            Role::BinaryRoot
-        } else if inside == Path::new(Self::LIBRARY) {
-            Role::LibraryRoot
-        } else {
-            Role::Other
-        }
+        Self::binary(inside)
+            .or_else(|| Some(inside).filter(|inside| *inside == Path::new(Self::LIBRARY)).map(|_| Role::LibraryRoot))
+            .unwrap_or(Role::Other)
+    }
+
+    fn binary(inside: &Path) -> Option<Role> {
+        let main = Some(inside).filter(|inside| *inside == Path::new(Self::MAIN));
+        let listed = inside.parent().filter(|parent| *parent == Path::new(Self::BINARIES));
+        let nested = Some(inside)
+            .filter(|inside| inside.file_name() == Some(OsStr::new(Self::MAIN)))
+            .and_then(|inside| inside.parent().and_then(Path::parent))
+            .filter(|grandparent| *grandparent == Path::new(Self::BINARIES));
+        main.or(listed).or(nested).map(|_| Role::BinaryRoot)
     }
 }

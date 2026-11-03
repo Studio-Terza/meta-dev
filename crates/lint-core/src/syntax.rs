@@ -1,6 +1,7 @@
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprLit, FnArg, GenericArgument, ImplItem, ImplItemFn, Item, ItemImpl,
-    ItemMod, ItemUse, Lit, LitStr, PatType, PathArguments, ReturnType, TraitItem, TraitItemFn, Type, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, ImplItem, ImplItemFn, Item,
+    ItemImpl, ItemMod, ItemUse, Lit, LitStr, PatType, PathArguments, ReturnType, TraitItem, TraitItemFn, Type,
+    TypePath,
 };
 
 use lint_layout::Name;
@@ -82,6 +83,14 @@ impl Syntax {
     pub fn item_mod(item: &Item) -> Option<&ItemMod> {
         match item {
             Item::Mod(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn expr_path(expr: &Expr) -> Option<&ExprPath> {
+        match expr {
+            Expr::Path(path) => Some(path),
             _ => None,
         }
     }

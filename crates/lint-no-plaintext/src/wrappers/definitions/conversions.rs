@@ -1,5 +1,7 @@
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMethodCall, Ident, ItemImpl};
+use syn::{ExprCall, ExprMethodCall, Ident, ItemImpl};
+
+use lint_core::Syntax;
 
 pub struct Conversions<'item> {
     called: Vec<&'item Ident>,
@@ -17,10 +19,9 @@ impl<'item> Conversions<'item> {
 
 impl<'item> Visit<'item> for Conversions<'item> {
     fn visit_expr_call(&mut self, call: &'item ExprCall) {
-        self.called.extend(match &*call.func {
-            Expr::Path(path) => path.path.segments.last().map(|segment| &segment.ident),
-            _ => None,
-        });
+        self.called.extend(
+            Syntax::expr_path(&call.func).and_then(|path| path.path.segments.last()).map(|segment| &segment.ident),
+        );
         syn::visit::visit_expr_call(self, call);
     }
 

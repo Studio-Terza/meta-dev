@@ -21,11 +21,11 @@ impl fmt::Display for Finding<'_> {
 
 impl lint_layout::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::Unported(_) => "implement a trait declared in a ports crate or module, or rename it",
-            Finding::Beside(..) => {
-                "a test double implements only traits declared in a ports crate or module, besides derives and std traits"
-            }
-        })
+        match self {
+            Finding::Unported(_) => Fix::new("implement a trait declared in a ports crate or module, or rename it"),
+            Finding::Beside(..) => Fix::new(
+                "a test double implements only traits declared in a ports crate or module, besides derives and std traits",
+            ),
+        }
     }
 }
