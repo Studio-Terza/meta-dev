@@ -1,4 +1,5 @@
 mod impl_block;
+mod referenced;
 mod spelled;
 
 use syn::visit::{self, Visit};
@@ -12,13 +13,16 @@ use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
 use crate::arity::Arity;
+use crate::dependency::Dependency;
 use crate::facts::Facts;
 use crate::implementation::Implementation;
 use crate::method::Method;
 use crate::shape::Shape;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
+use crate::via::Via;
 pub(crate) use impl_block::ImplBlock;
+use referenced::Referenced;
 use spelled::Spelled;
 
 pub(crate) struct Collector<'file> {
@@ -58,9 +62,11 @@ impl<'file> Collector<'file> {
         Method::new(Name::from(&signature.ident), Arity::new(signature.inputs.len()), returns)
     }
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape) {
+    fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape, dependencies: Vec<Dependency<'file>>) {
         let found = (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
-            TypeFact::declared(self.krate, Name::from(name), self.site(name), Self::derives(attributes)).shaped(shape)
+            TypeFact::declared(self.krate, Name::from(name), self.site(name), Self::derives(attributes))
+                .shaped(shape)
+                .depending_on(dependencies)
         });
         self.facts.add_type(found);
     }
@@ -76,16 +82,33 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Shape::OneField,
             _ => Shape::Other,
         };
-        self.declared(&found.attrs, &found.ident, shape);
+        let dependencies = Referenced::started(self.file.path(), &found.ident, &found.generics).of_fields(
+            Via::Field,
+            found.fields.iter(),
+            &found.generics,
+        );
+        self.declared(&found.attrs, &found.ident, shape, dependencies);
     }
 
     fn visit_item_enum(&mut self, found: &'ast ItemEnum) {
-        self.declared(&found.attrs, &found.ident, Shape::Other);
+        let fields = found.variants.iter().flat_map(|variant| variant.fields.iter());
+        let dependencies = Referenced::started(self.file.path(), &found.ident, &found.generics).of_fields(
+            Via::Variant,
+            fields,
+            &found.generics,
+        );
+        self.declared(&found.attrs, &found.ident, Shape::Other, dependencies);
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
-        let fact = (Walk::outside_tests(&found.attrs) == Walk::Entered)
-            .then(|| TraitFact::new(self.krate, Name::from(&found.ident), self.site(&found.ident)));
+        let fact = (Walk::outside_tests(&found.attrs) == Walk::Entered).then(|| {
+            TraitFact::new(
+                self.krate,
+                Name::from(&found.ident),
+                self.site(&found.ident),
+                Referenced::started(self.file.path(), &found.ident, &found.generics).of_trait(found),
+            )
+        });
         self.facts.add_trait(fact);
     }
 

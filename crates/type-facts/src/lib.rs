@@ -1,17 +1,23 @@
 mod arity;
+mod dependency;
 mod facts;
 mod facts_lint;
+mod held;
 mod implementation;
 mod method;
 mod shape;
 mod trait_fact;
 mod type_fact;
+mod via;
 
 pub use arity::Arity;
+pub use dependency::Dependency;
 pub use facts::Facts;
 pub use facts_lint::FactsLint;
+pub use held::Held;
 pub use implementation::Implementation;
 pub use method::Method;
 pub use shape::Shape;
 pub use trait_fact::TraitFact;
 pub use type_fact::TypeFact;
+pub use via::Via;

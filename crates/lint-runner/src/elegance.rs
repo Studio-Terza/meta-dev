@@ -1,6 +1,7 @@
 use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
+use lint_layering::Layering;
 use lint_repeated_bodies::RepeatedBodies;
 use lint_transition_graph::{
     Bisimilarity, CommutingTriangles, CoreMutation, DuplicateTransitions, GraphLint, HiddenStates, LiveNodes,
@@ -25,6 +26,7 @@ impl Elegance {
             UnconsumedTraits::report(files),
             Complexity::report(files),
             TypeGraph::report_facts(&facts),
+            Layering::report_facts(&facts),
             TransitionGraph::report_graph(&facts, &transitions),
             DuplicateTransitions::report_graph(&facts, &transitions),
             CoreMutation::report_graph(&facts, &transitions),

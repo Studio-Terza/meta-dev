@@ -2,6 +2,7 @@ use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate::dependency::Dependency;
 use crate::shape::Shape;
 
 #[derive(Clone, Debug)]
@@ -11,6 +12,7 @@ pub struct TypeFact<'file> {
     site: Site<'file>,
     derives: Vec<Name>,
     shape: Shape,
+    dependencies: Vec<Dependency<'file>>,
 }
 
 impl<'file> TypeFact<'file> {
@@ -20,7 +22,12 @@ impl<'file> TypeFact<'file> {
         site: Site<'file>,
         derives: Vec<Name>,
     ) -> TypeFact<'file> {
-        TypeFact { krate, name, site, derives, shape: Shape::Other }
+        TypeFact { krate, name, site, derives, shape: Shape::Other, dependencies: Vec::new() }
+    }
+
+    pub(crate) fn depending_on(mut self, dependencies: Vec<Dependency<'file>>) -> TypeFact<'file> {
+        self.dependencies = dependencies;
+        self
     }
 
     pub(crate) fn shaped(mut self, shape: Shape) -> TypeFact<'file> {
@@ -40,6 +47,11 @@ impl<'file> TypeFact<'file> {
     #[must_use]
     pub fn derives(&self) -> &[Name] {
         &self.derives
+    }
+
+    #[must_use]
+    pub fn dependencies(&self) -> &[Dependency<'file>] {
+        &self.dependencies
     }
 }
 

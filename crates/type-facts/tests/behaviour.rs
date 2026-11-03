@@ -2,7 +2,7 @@ use lint_core::Site;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use type_facts::{Facts, Shape, TypeFact};
+use type_facts::{Dependency, Facts, Shape, TypeFact, Via};
 
 struct Described;
 
@@ -173,4 +173,45 @@ fn types_and_traits_inside_inline_modules_are_found() {
     let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A"]);
     assert_eq!(facts.traits().len(), 1);
+}
+
+#[test]
+fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer() {
+    let files = Sources::parsed(&[Described::file(
+        "a.rs",
+        "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup {}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let described = |dependencies: &[Dependency<'_>]| -> Vec<String> {
+        dependencies
+            .iter()
+            .map(|dependency| {
+                let qualifier = dependency.qualifier().map(ToString::to_string).unwrap_or_default();
+                format!(
+                    "{qualifier}{}:{}:{:?}:{}",
+                    AsRef::<Name>::as_ref(dependency),
+                    AsRef::<Via>::as_ref(dependency),
+                    dependency.held(),
+                    AsRef::<Site>::as_ref(dependency)
+                )
+            })
+            .collect()
+    };
+    let types: Vec<Vec<String>> = facts.types().iter().map(|found| described(found.dependencies())).collect();
+    assert_eq!(
+        types,
+        [
+            vec![
+                "B:field:Directly:a.rs:1".to_owned(),
+                "Box:field:Directly:a.rs:1".to_owned(),
+                "A:field:Indirectly:a.rs:1".to_owned(),
+                "C:field:Indirectly:a.rs:1".to_owned(),
+                "Into:bound:Directly:a.rs:1".to_owned(),
+                "B:bound:Directly:a.rs:1".to_owned(),
+            ],
+            vec!["lint_coreD:variant:Directly:a.rs:2".to_owned()],
+        ]
+    );
+    let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.dependencies())).collect();
+    assert_eq!(traits, [vec!["Sup:bound:Directly:a.rs:3".to_owned()]]);
 }
