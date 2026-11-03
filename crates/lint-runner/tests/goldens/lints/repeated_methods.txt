@@ -1,7 +1,7 @@
 test budget, report only:
 corpus: 0 tests in 3 files, 0 of 22 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/three.rs:5: bare u8 in show; name what it counts with a newtype
 src/three.rs:8: bare u8 in show; name what it counts with a newtype
 src/three.rs:11: bare u8 in show; name what it counts with a newtype

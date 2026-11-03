@@ -7,7 +7,7 @@ src/associated.rs:7: fn make names nothing; say what it does
 methods do their own work, they do not forward to another type of ours:
 src/associated.rs:7: fn make only forwards to Maker::make; expose the part or call that directly
 src/method.rs:7: fn work only forwards to work; expose the part or call that directly
-primitives appear only at a type's boundary:
+primitives appear only at a type's boundary or in a boundary module:
 src/associated.rs:3: bare u8 in make; name what it counts with a newtype
 src/associated.rs:7: bare u8 in make; name what it counts with a newtype
 src/foreign.rs:1: bare u8 in inner; name what it counts with a newtype
