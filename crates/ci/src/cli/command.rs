@@ -4,7 +4,7 @@ mod step;
 use std::ffi::OsString;
 use std::io::Write;
 
-use step::github::{Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
+use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
 use step::{CompileTimes, History, InstallTools, LibtestSeconds, Logged, ReachScope, Step, Timed, ToolsKey};
@@ -32,6 +32,7 @@ pub enum Command {
     Labels(Labels),
     SpecLine(SpecLine),
     StageIssues(StageIssues),
+    CompileTrend(CompileTrend),
     ShardSummary(ShardSummary),
     Matrix(Matrix),
 }
@@ -55,6 +56,7 @@ impl Command {
     const LABELS: &'static str = "labels";
     const SPEC_LINE: &'static str = "spec-line";
     const STAGE_ISSUES: &'static str = "stage-issues";
+    const COMPILE_TREND: &'static str = "compile-trend";
     const SHARD_SUMMARY: &'static str = "shard-summary";
     const MATRIX: &'static str = "matrix";
 
@@ -80,6 +82,7 @@ impl Command {
             Some(Self::LABELS) => Labels::from_arguments(&rest).map(Command::Labels),
             Some(Self::SPEC_LINE) => SpecLine::from_arguments(&rest).map(Command::SpecLine),
             Some(Self::STAGE_ISSUES) => StageIssues::from_arguments(&rest).map(Command::StageIssues),
+            Some(Self::COMPILE_TREND) => CompileTrend::from_arguments(&rest).map(Command::CompileTrend),
             Some(Self::SHARD_SUMMARY) => ShardSummary::from_arguments(&rest).map(Command::ShardSummary),
             Some(Self::MATRIX) => Matrix::from_arguments(&rest).map(Command::Matrix),
             _ => Err(Failure::Usage),
@@ -106,6 +109,7 @@ impl Command {
             Command::Labels(step) => step.carry_out(ports, out),
             Command::SpecLine(step) => step.carry_out(ports, out),
             Command::StageIssues(step) => step.carry_out(ports, out),
+            Command::CompileTrend(step) => step.carry_out(ports, out),
             Command::ShardSummary(step) => step.carry_out(ports, out),
             Command::Matrix(step) => step.carry_out(ports, out),
         }
