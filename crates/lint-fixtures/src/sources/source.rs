@@ -1,9 +1,11 @@
+mod located;
+
 use std::path::Path;
 
 use newtype::Newtype;
 
-use crate::located::Located;
-use crate::text::Text;
+use super::Text;
+pub use located::Located;
 
 #[derive(Debug)]
 pub struct Source {

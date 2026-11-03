@@ -2,7 +2,7 @@ use std::fmt;
 
 use newtype::{Arbitrary, Newtype};
 
-use crate::flagged::Flagged;
+use super::Flagged;
 
 #[derive(Newtype, Arbitrary, Debug, Default, PartialEq, Eq)]
 pub struct Lines(Vec<String>);

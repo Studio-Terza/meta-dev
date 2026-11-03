@@ -1,6 +1,7 @@
-use crate::flagged::Flagged;
-use crate::source::Source;
-use crate::title::Title;
+mod title;
+
+use super::{Flagged, Source};
+pub use title::Title;
 
 #[derive(Debug)]
 pub struct Case {
