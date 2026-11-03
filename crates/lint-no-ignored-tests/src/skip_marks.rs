@@ -1,8 +1,8 @@
 mod gate;
 
-use proc_macro2::TokenTree;
+use proc_macro2::{Ident, TokenTree};
 use syn::visit::{self, Visit};
-use syn::{Attribute, ItemFn, ItemMod, Macro, Meta, MetaList};
+use syn::{Attribute, ItemFn, ItemMod, Macro, MetaList};
 
 use gate::Gate;
 use lint_core::Macros;
@@ -31,19 +31,32 @@ impl SkipMarks {
     }
 
     fn skip_named(list: &MetaList) -> Option<Word<'static>> {
-        list.tokens.clone().into_iter().find_map(|tree| match tree {
-            TokenTree::Ident(ident) => Name::from(&ident).matches::<Whole>(&Self::SKIPPING),
+        list.tokens
+            .clone()
+            .into_iter()
+            .filter_map(Self::ident)
+            .find_map(|ident| Name::from(&ident).matches::<Whole>(&Self::SKIPPING))
+    }
+
+    fn ident(tree: TokenTree) -> Option<Ident> {
+        match tree {
+            TokenTree::Ident(ident) => Some(ident),
             _ => None,
-        })
+        }
     }
 
     fn skip(attribute: &Attribute) -> Option<Word<'static>> {
-        match &attribute.meta {
-            Meta::List(list) if list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE) => Self::skip_named(list),
-            meta => {
-                meta.path().segments.last().and_then(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING))
-            }
-        }
+        attribute.meta.require_list().ok().filter(|list| list.path.is_ident(Self::CONDITIONAL_ATTRIBUTE)).map_or_else(
+            || {
+                attribute
+                    .meta
+                    .path()
+                    .segments
+                    .last()
+                    .and_then(|last| Name::from(&last.ident).matches::<Whole>(&Self::SKIPPING))
+            },
+            Self::skip_named,
+        )
     }
 
     fn record_skips(&mut self, attributes: &[Attribute], marked: Marked) {

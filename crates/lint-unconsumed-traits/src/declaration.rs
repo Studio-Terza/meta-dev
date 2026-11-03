@@ -15,7 +15,7 @@ impl<'file> Declaration<'file> {
     }
 
     pub(crate) fn unconsumed(self, consumers: &BTreeSet<Name>) -> Option<Declaration<'file>> {
-        (!consumers.contains(&self.name)).then_some(self)
+        Some(self).filter(|declaration| consumers.get(&declaration.name).is_none())
     }
 }
 

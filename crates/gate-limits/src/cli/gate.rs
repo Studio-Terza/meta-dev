@@ -37,7 +37,11 @@ impl Gate {
             .into_iter()
             .map(|(stage, pairing)| pairing.finding(stage))
             .collect::<Result<Vec<Finding>, Failure<'_>>>()
-            .and_then(|findings| if findings.is_empty() { Err(Failure::Empty) } else { Ok(Gate { findings }) })
+            .and_then(Self::found)
+    }
+
+    fn found(findings: Vec<Finding>) -> Result<Gate, Failure<'static>> {
+        findings.first().map(|_| ()).ok_or(Failure::Empty).map(|()| Gate { findings })
     }
 
     pub fn lowered(self) -> Result<Record, Failure<'static>> {
@@ -52,10 +56,7 @@ impl Gate {
     }
 
     fn asked<'stage>(only: &[OsString], stage: &'stage Stage) -> Option<&'stage Stage> {
-        match only {
-            [] => Some(stage),
-            named => named.iter().find_map(|name| Self::names(name, stage)),
-        }
+        only.first().map_or(Some(stage), |_| only.iter().find_map(|name| Self::names(name, stage)))
     }
 
     fn names<'stage>(name: &OsStr, stage: &'stage Stage) -> Option<&'stage Stage> {

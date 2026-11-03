@@ -17,6 +17,15 @@ enum TestShare {
     WholeFile,
 }
 
+impl TestShare {
+    fn test_lines(self, inline: Count, whole: Count) -> Count {
+        match self {
+            TestShare::InlineModules => inline,
+            TestShare::WholeFile => whole,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CrateBudget {
     tests: Count,
@@ -36,10 +45,7 @@ impl CrateBudget {
             files: Count::new(1),
             lines,
             starts: Count::new(CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len()),
-            test_lines: match share {
-                TestShare::InlineModules => scan.test_lines,
-                TestShare::WholeFile => lines,
-            },
+            test_lines: share.test_lines(scan.test_lines, lines),
             ..scan
         }
     }

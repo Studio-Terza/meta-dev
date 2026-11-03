@@ -53,7 +53,7 @@ impl Summary {
             golden_tests: Count::new(golden.len()),
             surviving: Entry::named_with(&mutants, Verdict::MissedMutant),
             timed_out: Entry::named_with(&mutants, Verdict::Timeout),
-            tests_that_kill_nothing: baseline.iter().filter(|test| !killers.contains(*test)).cloned().collect(),
+            tests_that_kill_nothing: baseline.difference(&killers).cloned().collect(),
             killed_with_no_golden_failing: Self::killed_without_golden(&mutants, golden),
         }
     }
@@ -71,9 +71,9 @@ impl Summary {
         ordered.sort_by(|left, right| left.name().cmp(right.name()));
         ordered
             .into_iter()
-            .filter(|mutant| {
-                !mutant.failed().is_empty()
-                    && mutant.failed().iter().find_map(|test| Self::golden(test, golden)).is_none()
+            .filter_map(|mutant| mutant.failed().first().map(|_| mutant))
+            .filter_map(|mutant| {
+                mutant.failed().iter().find_map(|test| Self::golden(test, golden)).map_or(Some(mutant), |_| None)
             })
             .map(ToString::to_string)
             .map(Entry::new)

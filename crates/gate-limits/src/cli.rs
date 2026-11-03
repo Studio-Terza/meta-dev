@@ -42,16 +42,17 @@ impl Cli {
 
     #[must_use]
     pub fn report_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match self.gate(files) {
-            Ok(gate) => {
-                write!(out, "{gate}").ok();
-                gate.blocking(&self.report_only).map_or(ExitCode::SUCCESS, |_| ExitCode::FAILURE)
-            }
-            Err(failure) => {
-                writeln!(err, "{failure}").ok();
-                ExitCode::FAILURE
-            }
-        }
+        self.gate(files).map_or_else(|failure| Self::refused(&failure, err), |gate| self.reported(&gate, out))
+    }
+
+    fn reported(&self, gate: &Gate, out: &mut impl Write) -> ExitCode {
+        write!(out, "{gate}").ok();
+        gate.blocking(&self.report_only).map_or(ExitCode::SUCCESS, |_| ExitCode::FAILURE)
+    }
+
+    fn refused(failure: &Failure<'_>, err: &mut impl Write) -> ExitCode {
+        writeln!(err, "{failure}").ok();
+        ExitCode::FAILURE
     }
 
     pub fn past_warn(&self, files: &impl Files) -> Result<Vec<Finding>, Failure<'_>> {

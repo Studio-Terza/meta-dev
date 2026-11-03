@@ -13,14 +13,14 @@ pub(super) enum Effect {
 
 impl fmt::Display for Effect {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Effect::Files => "files",
-            Effect::Environment => "environment",
-            Effect::Clock => "clock",
-            Effect::Network => "network",
-            Effect::Processes => "processes",
-            Effect::Randomness => "randomness",
-            Effect::Stdio => "stdio",
-        })
+        match self {
+            Effect::Files => formatter.write_str("files"),
+            Effect::Environment => formatter.write_str("environment"),
+            Effect::Clock => formatter.write_str("clock"),
+            Effect::Network => formatter.write_str("network"),
+            Effect::Processes => formatter.write_str("processes"),
+            Effect::Randomness => formatter.write_str("randomness"),
+            Effect::Stdio => formatter.write_str("stdio"),
+        }
     }
 }
