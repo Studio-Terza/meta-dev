@@ -65,10 +65,8 @@ impl Admission {
             .into_iter()
             .filter(|manifest| manifest.package().is_some())
             .try_fold(Admission { loaded, admitted: Vec::new() }, |admission, package| {
-                match Self::enclosing(&workspaces, package.directory()) {
-                    Some(root) if package.workspace().is_none() => admission.within(&root, package),
-                    _ => Ok(admission.admitting(Some(package))),
-                }
+                let root = Self::enclosing(&workspaces, package.directory()).filter(|_| package.workspace().is_none());
+                admission.placed(root, package)
             })
             .map(|admission| admission.admitted)
     }
@@ -80,10 +78,13 @@ impl Admission {
             workspace.as_ref().and_then(|workspace| workspace.admits(candidate.directory())).is_some()
         });
         loaded.extend(workspace.map(|workspace| (root.to_path_buf(), Ok(workspace))));
-        Ok(Admission { loaded, admitted: self.admitted }.admitting(member))
+        Ok(Admission { loaded, admitted: self.admitted.into_iter().chain(member).collect() })
     }
 
-    fn admitting(self, package: Option<Manifest>) -> Admission {
-        Admission { admitted: self.admitted.into_iter().chain(package).collect(), ..self }
+    fn placed(self, root: Option<PathBuf>, package: Manifest) -> Result<Admission, Failure> {
+        match root {
+            Some(root) => self.within(&root, package),
+            None => Ok(Admission { admitted: self.admitted.into_iter().chain(Some(package)).collect(), ..self }),
+        }
     }
 }

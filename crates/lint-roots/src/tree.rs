@@ -10,6 +10,8 @@ pub struct Tree<'given> {
 }
 
 impl<'given> Tree<'given> {
+    const CURRENT: &'static str = ".";
+
     pub fn open_many(files: &impl Files, given: &'given [PathBuf]) -> Vec<Result<Tree<'given>, Failure>> {
         given
             .iter()
@@ -34,10 +36,10 @@ impl<'given> Tree<'given> {
 
     #[must_use]
     pub fn display(&self, file: &Path) -> PathBuf {
-        match file.strip_prefix(&self.canonical) {
-            Ok(inside) if self.given == Path::new(".") => inside.to_path_buf(),
-            Ok(inside) => self.given.join(inside),
-            Err(_) => file.to_path_buf(),
-        }
+        let shown = Some(self.given).filter(|given| *given != Path::new(Self::CURRENT));
+        file.strip_prefix(&self.canonical).map_or_else(
+            |_| file.to_path_buf(),
+            |inside| shown.map_or_else(|| inside.to_path_buf(), |given| given.join(inside)),
+        )
     }
 }
