@@ -1,8 +1,10 @@
-use std::fmt;
+use std::fmt::{self, Write};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use text_lines::OneLine;
+
+use crate::cli::shard::title::Title;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Named {
@@ -13,6 +15,12 @@ pub struct Named {
 
 impl Named {
     const UNKNOWN_FILE: &'static str = "?";
+
+    pub fn title(&self) -> Title {
+        let mut title = String::new();
+        write!(title, "{self}").ok();
+        Title::from(title)
+    }
 }
 
 impl fmt::Display for Named {
