@@ -1,14 +1,14 @@
 use lint_layout::Name;
 use lint_paths::Module;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Owner {
-    root: Module,
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Owner<'file> {
+    root: Module<'file>,
     name: Name,
 }
 
-impl Owner {
-    pub fn new(module: &Module, name: Name) -> Owner {
+impl<'file> Owner<'file> {
+    pub fn new(module: &Module<'file>, name: Name) -> Owner<'file> {
         Owner { root: module.root(), name }
     }
 }

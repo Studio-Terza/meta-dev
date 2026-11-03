@@ -11,11 +11,7 @@ impl Spelled {
         Spelled { path, started_on }
     }
 
-    pub(crate) fn path(&self) -> &UsePath {
-        &self.path
-    }
-
-    pub(crate) fn started_on(&self) -> LineNumber {
-        self.started_on
+    pub(crate) fn handed<Made>(self, to: impl FnOnce(UsePath, LineNumber) -> Made) -> Made {
+        to(self.path, self.started_on)
     }
 }

@@ -7,6 +7,7 @@ use lint_layout::Name;
 pub struct ModulePath(Vec<Name>);
 
 impl ModulePath {
+    pub const ROOT: ModulePath = ModulePath(Vec::new());
     const MODULE_FILE: &'static str = "mod";
 
     #[must_use]
@@ -33,7 +34,7 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub fn child(&self, name: &Name) -> ModulePath {
-        ModulePath(self.0.iter().cloned().chain(Some(name.clone())).collect())
+    pub fn child(&self, name: Name) -> ModulePath {
+        ModulePath(self.0.iter().cloned().chain(Some(name)).collect())
     }
 }

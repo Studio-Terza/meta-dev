@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::module_path::{ModuleIndex, ModulePath};
+use super::module_path::{ModuleIndex, ModulePath, Target};
 use lint_core::SourceFile;
 use lint_layout::UseEdges;
 
@@ -8,34 +8,29 @@ use lint_layout::UseEdges;
 pub struct Users<'file>(BTreeMap<ModulePath<'file>, BTreeSet<ModulePath<'file>>>);
 
 impl<'file> Users<'file> {
-    #[must_use]
-    pub fn recorded(self, home: Option<ModulePath<'file>>, caller: &ModulePath<'file>) -> Users<'file> {
-        match home {
-            Some(home) => self.with_caller(home, caller),
-            None => self,
-        }
+    pub fn record(&mut self, home: Option<ModulePath<'file>>, caller: ModulePath<'file>) {
+        home.into_iter().fold(&mut self.0, |users, home| {
+            users.entry(home).or_default().insert(caller);
+            users
+        });
     }
 
-    fn with_caller(mut self, home: ModulePath<'file>, caller: &ModulePath<'file>) -> Users<'file> {
-        self.0.entry(home).or_default().insert(caller.clone());
-        self
-    }
-
-    #[must_use]
-    pub fn with_tests(self, modules: &ModuleIndex<'file>, files: &'file [SourceFile]) -> Users<'file> {
-        files.iter().fold(self, |users, file| users.with_test(modules, file))
+    pub fn add_tests(&mut self, modules: &ModuleIndex<'file>, files: &'file [SourceFile]) {
+        files.iter().fold(self, |users, file| {
+            users.add_test(modules, file);
+            users
+        });
     }
 
     pub fn callers_of(&self, module: &ModulePath<'file>) -> Option<&BTreeSet<ModulePath<'file>>> {
         self.0.get(module)
     }
 
-    fn with_test(self, modules: &ModuleIndex<'file>, file: &'file SourceFile) -> Users<'file> {
+    fn add_test(&mut self, modules: &ModuleIndex<'file>, file: &'file SourceFile) {
         let caller = ModulePath::of_file(file);
-        UseEdges::in_file(file.syntax()).iter().fold(self, |users, path| {
-            let home =
-                ModulePath::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules).cloned());
-            users.recorded(home, &caller)
-        })
+        UseEdges::each(file.syntax(), |path| {
+            let home = Target::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules));
+            self.record(home, caller);
+        });
     }
 }

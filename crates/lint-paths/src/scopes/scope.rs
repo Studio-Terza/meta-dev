@@ -17,12 +17,11 @@ impl Scope {
         self.globs.push(prefix);
     }
 
-    pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> Vec<Name> {
+    pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> impl Iterator<Item = &Name> {
         self.imports
             .iter()
             .filter(|(_, target)| target.segments().last().and_then(|last| last.matches::<Whole>(finals)).is_some())
-            .map(|(local, _)| local.clone())
-            .collect()
+            .map(|(local, _)| local)
     }
 
     pub(crate) fn imported(&self, name: &Name) -> Option<&UsePath> {

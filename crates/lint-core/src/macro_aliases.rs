@@ -15,15 +15,14 @@ pub struct MacroAliases {
 impl MacroAliases {
     #[must_use]
     pub fn in_file(file: &File, original: Word<'_>) -> MacroAliases {
-        let original = Name::from(original);
-        let mut aliases = MacroAliases { names: BTreeSet::from([original.clone()]), original };
+        let mut aliases = MacroAliases { names: BTreeSet::new(), original: Name::from(original) };
         aliases.visit_file(file);
         aliases
     }
 
     #[must_use]
     pub fn call(&self, name: &Name) -> Option<&Name> {
-        self.names.get(name)
+        Some(&self.original).filter(|original| *original == name).or_else(|| self.names.get(name))
     }
 
     fn renamed(&self, tree: &UseTree) -> Vec<Name> {

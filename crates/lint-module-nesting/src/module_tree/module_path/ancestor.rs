@@ -8,8 +8,7 @@ impl Relation for Ancestor {
         this: &ModulePath<'_>,
         other: &'other ModulePath<'file>,
     ) -> Option<&'other ModulePath<'file>> {
-        (this.crate_root == other.crate_root
-            && other.segments.get(..this.segments.len()) == Some(this.segments.as_slice()))
-        .then_some(other)
+        (this.crate_root == other.crate_root && other.segments.get(..this.segments.len()) == Some(this.segments))
+            .then_some(other)
     }
 }

@@ -8,7 +8,7 @@ use route::Route;
 use trail::Trail;
 
 pub(crate) struct Resolver<'scopes> {
-    scopes: &'scopes Scopes,
+    scopes: &'scopes Scopes<'scopes>,
 }
 
 impl<'scopes> Resolver<'scopes> {
@@ -16,27 +16,29 @@ impl<'scopes> Resolver<'scopes> {
     const SELF: &'static str = "self";
     const SUPER: &'static str = "super";
 
-    pub(crate) fn over(scopes: &'scopes Scopes) -> Resolver<'scopes> {
+    pub(crate) fn over(scopes: &'scopes Scopes<'scopes>) -> Resolver<'scopes> {
         Resolver { scopes }
     }
 
-    pub(crate) fn candidates(&self, module: &Module, path: &UsePath) -> Vec<UsePath> {
+    pub(crate) fn candidates(&self, module: &Module<'scopes>, path: UsePath) -> Vec<UsePath> {
         self.resolved(module, path, &Trail::default())
     }
 
-    fn resolved(&self, module: &Module, path: &UsePath, trail: &Trail) -> Vec<UsePath> {
-        let rest = path.rest();
+    fn resolved(&self, module: &Module<'scopes>, path: UsePath, trail: &Trail<'_>) -> Vec<UsePath> {
         match path.first() {
-            Some(head) if *head == Self::CRATE => self.resolved(&module.root(), &rest, trail),
-            Some(head) if *head == Self::SELF => self.resolved(module, &rest, trail),
+            Some(head) if *head == Self::CRATE => self.resolved(&module.root(), path.rest(), trail),
+            Some(head) if *head == Self::SELF => self.resolved(module, path.rest(), trail),
             Some(head) if *head == Self::SUPER => {
-                module.parent().map_or_else(Vec::new, |parent| self.resolved(&parent, &rest, trail))
+                module.parent().map_or_else(Vec::new, |parent| self.resolved(&parent, path.rest(), trail))
             }
-            Some(head) => Route::leading(self.scopes, module, head, trail)
-                .iter()
-                .flat_map(|route| route.follow(self, module, path, trail))
-                .chain(Some(path.clone()))
-                .collect(),
+            Some(head) => {
+                let mut found: Vec<UsePath> = Route::leading(self.scopes, module, head, trail)
+                    .iter()
+                    .flat_map(|route| route.follow(self, module, &path, trail))
+                    .collect();
+                found.push(path);
+                found
+            }
             None => Vec::new(),
         }
     }

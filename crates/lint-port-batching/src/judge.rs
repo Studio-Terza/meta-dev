@@ -10,12 +10,12 @@ use crate::spelling::Spelling;
 
 #[derive(Debug)]
 pub struct Judge<'run> {
-    imports: &'run Imports,
+    imports: &'run Imports<'run>,
     ports: &'run PortTraits,
 }
 
 impl<'run> Judge<'run> {
-    pub fn new(imports: &'run Imports, ports: &'run PortTraits) -> Judge<'run> {
+    pub fn new(imports: &'run Imports<'run>, ports: &'run PortTraits) -> Judge<'run> {
         Judge { imports, ports }
     }
 
@@ -23,7 +23,7 @@ impl<'run> Judge<'run> {
         self.ports
     }
 
-    pub fn generics(&self, module: &Module, generics: &Generics) -> BTreeSet<Name> {
+    pub fn generics(&self, module: &Module<'_>, generics: &Generics) -> BTreeSet<Name> {
         let params = generics.params.iter().filter_map(|param| self.param(module, param));
         let predicates = generics
             .where_clause
@@ -33,14 +33,14 @@ impl<'run> Judge<'run> {
         params.chain(predicates).collect()
     }
 
-    pub fn port_type(&self, module: &Module, generics: &BTreeSet<Name>, ty: &Type) -> Option<Name> {
+    pub fn port_type(&self, module: &Module<'_>, generics: &BTreeSet<Name>, ty: &Type) -> Option<Name> {
         match Spelling::inner(ty) {
             Some(inner) => self.port_type(module, generics, inner),
             None => self.bounded(module, ty).or_else(|| Spelling::generic(ty, generics)),
         }
     }
 
-    fn bounded(&self, module: &Module, ty: &Type) -> Option<Name> {
+    fn bounded(&self, module: &Module<'_>, ty: &Type) -> Option<Name> {
         let bounds = match ty {
             Type::ImplTrait(bounded) => Some(&bounded.bounds),
             Type::TraitObject(bounded) => Some(&bounded.bounds),
@@ -49,7 +49,7 @@ impl<'run> Judge<'run> {
         bounds.into_iter().flatten().find_map(|bound| self.bound(module, bound))
     }
 
-    fn param(&self, module: &Module, param: &GenericParam) -> Option<Name> {
+    fn param(&self, module: &Module<'_>, param: &GenericParam) -> Option<Name> {
         match param {
             GenericParam::Type(param) => {
                 param.bounds.iter().find_map(|bound| self.bound(module, bound)).map(|_| Name::from(&param.ident))
@@ -58,7 +58,7 @@ impl<'run> Judge<'run> {
         }
     }
 
-    fn predicate(&self, module: &Module, predicate: &WherePredicate) -> Option<Name> {
+    fn predicate(&self, module: &Module<'_>, predicate: &WherePredicate) -> Option<Name> {
         match predicate {
             WherePredicate::Type(predicate) => predicate
                 .bounds
@@ -70,7 +70,7 @@ impl<'run> Judge<'run> {
         }
     }
 
-    fn bound(&self, module: &Module, bound: &TypeParamBound) -> Option<Name> {
+    fn bound(&self, module: &Module<'_>, bound: &TypeParamBound) -> Option<Name> {
         let traited = match bound {
             TypeParamBound::Trait(traited) => Some(traited),
             _ => None,

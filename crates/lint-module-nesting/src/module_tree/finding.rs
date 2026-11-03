@@ -1,17 +1,17 @@
 use std::fmt;
 
-use super::module_path::ModulePath;
+use super::module_path::{ModulePath, Target};
 use super::reexport_count::ReexportCount;
 use lint_core::Fix;
 use lint_core::Most;
 
-pub enum Finding<'file> {
+pub enum Finding<'file, 'path> {
     UsedFromOneSibling { home: ModulePath<'file> },
-    ReachesPastModRs { target: ModulePath<'file> },
+    ReachesPastModRs { target: &'path Target<'path> },
     CrowdedReexports { count: ReexportCount, most: Most },
 }
 
-impl fmt::Display for Finding<'_> {
+impl fmt::Display for Finding<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finding::UsedFromOneSibling { home } => write!(formatter, "used only from {home}"),
@@ -23,7 +23,7 @@ impl fmt::Display for Finding<'_> {
     }
 }
 
-impl lint_core::Finding for Finding<'_> {
+impl lint_core::Finding for Finding<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::UsedFromOneSibling { .. } => "move it inside that module",

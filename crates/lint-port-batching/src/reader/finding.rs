@@ -2,7 +2,7 @@ use std::fmt;
 use std::path::Path;
 
 use lint_core::{Site, Violation};
-use lint_layout::{Fix, LineNumber, Name};
+use lint_layout::{Fix, LineNumber, Name, Word};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Port {
@@ -10,9 +10,9 @@ pub enum Port {
     Field(Name),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Within {
-    Closure(Name),
+    Closure(Word<'static>),
     Loop(Looping),
 }
 

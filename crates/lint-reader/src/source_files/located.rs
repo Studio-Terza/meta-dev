@@ -35,8 +35,8 @@ impl<'tree> Located<'tree> {
     }
 
     pub fn open_many(files: &impl Files, fresh: &[Located<'tree>]) -> Vec<Result<Opened, Failure>> {
-        let paths: Vec<PathBuf> = fresh.iter().map(|located| located.file.clone()).collect();
-        let packages: Vec<PathBuf> = fresh.iter().map(|located| located.package.clone()).collect();
+        let paths: Vec<&Path> = fresh.iter().map(|located| located.file.as_path()).collect();
+        let packages: Vec<&Path> = fresh.iter().map(|located| located.package.as_path()).collect();
         fresh
             .iter()
             .zip(files.read_text_many(&paths))

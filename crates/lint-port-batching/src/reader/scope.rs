@@ -6,18 +6,18 @@ use lint_layout::Name;
 
 use super::finding::{Port, Within};
 
-#[derive(Clone, Debug, Default)]
-pub struct Scope {
+#[derive(Debug, Default)]
+pub struct Scope<'run> {
     generics: BTreeSet<Name>,
-    held: BTreeSet<Name>,
+    held: Option<&'run BTreeSet<Name>>,
     bindings: BTreeSet<Name>,
     within: Option<Within>,
 }
 
-impl Scope {
+impl<'run> Scope<'run> {
     const SELF: &str = "self";
 
-    pub fn declared(generics: BTreeSet<Name>, held: BTreeSet<Name>) -> Scope {
+    pub fn declared(generics: BTreeSet<Name>, held: Option<&'run BTreeSet<Name>>) -> Scope<'run> {
         Scope { generics, held, ..Scope::default() }
     }
 
@@ -25,25 +25,26 @@ impl Scope {
         &self.generics
     }
 
-    pub fn within(&self) -> Option<&Within> {
-        self.within.as_ref()
+    pub fn within(&self) -> Option<Within> {
+        self.within
     }
 
-    pub fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Scope {
-        Scope { generics, held: self.held.clone(), bindings, within: None }
+    pub fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Scope<'run> {
+        Scope { generics, held: self.held, bindings, within: None }
     }
 
-    pub fn entered(&self, within: Option<Within>) -> Scope {
-        Scope { within: self.within.clone().or(within), ..self.clone() }
+    pub fn replace_within(&mut self, within: Option<Within>) -> Option<Within> {
+        std::mem::replace(&mut self.within, within)
     }
 
-    pub fn paced(&self, paced: Option<&Name>) -> Scope {
-        Scope { within: self.within.clone().filter(|_| paced.is_none()), ..self.clone() }
-    }
-
-    pub fn shadowed(&self, closure: &ExprClosure) -> Scope {
+    pub fn shadowed(&mut self, closure: &ExprClosure) -> BTreeSet<Name> {
         let shadowed: BTreeSet<Name> = closure.inputs.iter().filter_map(Self::bound).collect();
-        Scope { bindings: self.bindings.difference(&shadowed).cloned().collect(), ..self.clone() }
+        let kept = self.bindings.iter().filter(|binding| !shadowed.contains(*binding)).cloned().collect();
+        std::mem::replace(&mut self.bindings, kept)
+    }
+
+    pub fn unshadowed(&mut self, bindings: BTreeSet<Name>) {
+        self.bindings = bindings;
     }
 
     pub fn bound(pattern: &Pat) -> Option<Name> {
@@ -65,7 +66,7 @@ impl Scope {
         };
         member
             .filter(|_| matches!(field.base.as_ref(), syn::Expr::Path(base) if base.path.is_ident(Self::SELF)))
-            .filter(|member| self.held.contains(member))
+            .filter(|member| self.held.is_some_and(|held| held.contains(member)))
             .map(Port::Field)
     }
 }

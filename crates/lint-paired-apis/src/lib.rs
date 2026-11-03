@@ -16,7 +16,7 @@ pub struct PairedApis;
 
 impl Lint for PairedApis {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let declared: Vec<_> = files.iter().filter_map(SourceFile::shipped).flat_map(PairedMethods::of_file).collect();
+        let declared = PairedMethods::of_files(files);
         Report::new(
             Headline::new(
                 "report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending",

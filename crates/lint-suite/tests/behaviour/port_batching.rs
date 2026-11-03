@@ -50,6 +50,9 @@ const OTHER: &str = ported!(
 const SHADOWED: &str = ported!(
     "fn f(store: &impl Store, stores: Vec<u8>) -> Vec<u8> {\n    stores.iter().map(|store: &u8| store + 1).collect()\n}\n"
 );
+const UNSHADOWED: &str = ported!(
+    "fn f(store: &impl Store, ids: Vec<u8>) -> u8 {\n    let total: u8 = ids.iter().map(|store: &u8| store + 1).sum();\n    for id in ids {\n        store.fetch(id);\n    }\n    total\n}\n"
+);
 const TEST_MODULE: &str = ported!(
     "#[cfg(test)]\nmod tests {\n    fn f(store: &impl super::Store, ids: Vec<u8>) {\n        for id in ids {\n            store.fetch(id);\n        }\n    }\n}\n"
 );
@@ -76,7 +79,7 @@ const BOXED: &str = ported!(
     "fn f(store: Box<dyn Store>, ids: Vec<u8>) -> Vec<u8> {\n    ids.iter().map(|id| store.fetch(*id)).collect()\n}\n"
 );
 
-const CASES: [Case; 24] = [
+const CASES: [Case; 25] = [
     Case::new(
         Title::new("closure passed to map over an iterator"),
         &[Source::new(Located::new("a.rs"), Text::new(MAPPED))],
@@ -147,6 +150,11 @@ const CASES: [Case; 24] = [
         Title::new("shadowed by a closure parameter"),
         &[Source::new(Located::new("a.rs"), Text::new(SHADOWED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("binding restored after the shadowing closure"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNSHADOWED))],
+        Flagged::new(&["a.rs:11"]),
     ),
     Case::new(
         Title::new("test module"),

@@ -6,16 +6,16 @@ use crate::scopes::Scopes;
 use lint_core::SourceFile;
 use lint_layout::{Name, UsePath};
 
-pub(crate) struct Collector {
-    scopes: Scopes,
-    module: Module,
+pub(crate) struct Collector<'file> {
+    scopes: Scopes<'file>,
+    module: Module<'file>,
 }
 
-impl Collector {
+impl<'file> Collector<'file> {
     const SELF: &'static str = "self";
     const DROP: &'static str = "Drop";
 
-    pub(crate) fn collect(files: &[&SourceFile]) -> Scopes {
+    pub(crate) fn collect(files: &[&'file SourceFile]) -> Scopes<'file> {
         files.iter().fold(Scopes::default(), |scopes, file| {
             let module = Module::of_file(file);
             let mut collector = Collector { scopes, module };
@@ -25,20 +25,20 @@ impl Collector {
         })
     }
 
-    fn imported(&mut self, prefix: &UsePath, tree: &UseTree) {
+    fn imported(&mut self, prefix: UsePath, tree: &UseTree) {
         match tree {
-            UseTree::Path(path) => self.imported(&prefix.extended(Name::from(&path.ident)), &path.tree),
+            UseTree::Path(path) => self.imported(prefix.then(Name::from(&path.ident)), &path.tree),
             UseTree::Name(name) => self.bound(prefix, &name.ident, None),
             UseTree::Rename(name) => self.bound(prefix, &name.ident, Some(&name.rename)),
-            UseTree::Glob(_) => self.scopes.scope_of(&self.module).glob(prefix.clone()),
-            UseTree::Group(group) => group.items.iter().for_each(|item| self.imported(prefix, item)),
+            UseTree::Glob(_) => self.scopes.glob(&self.module, prefix),
+            UseTree::Group(group) => group.items.iter().for_each(|item| self.imported(prefix.clone(), item)),
         }
     }
 
-    fn bound(&mut self, prefix: &UsePath, ident: &Ident, rename: Option<&Ident>) {
-        let target = if ident == Self::SELF { prefix.clone() } else { prefix.extended(Name::from(ident)) };
+    fn bound(&mut self, prefix: UsePath, ident: &Ident, rename: Option<&Ident>) {
+        let target = if ident == Self::SELF { prefix } else { prefix.then(Name::from(ident)) };
         let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
-        self.scopes.scope_of(&self.module).import(local, target);
+        self.scopes.import(&self.module, local, target);
     }
 
     fn dropped(item: &ItemImpl) -> Option<Name> {
@@ -50,17 +50,16 @@ impl Collector {
     }
 }
 
-impl<'ast> Visit<'ast> for Collector {
+impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let outer = self.module.clone();
-        self.module = outer.within(&Name::from(&module.ident));
+        self.module.enter(Name::from(&module.ident));
         self.scopes.declare(&self.module);
         visit::visit_item_mod(self, module);
-        self.module = outer;
+        self.module.leave();
     }
 
     fn visit_item_use(&mut self, item: &'ast ItemUse) {
-        self.imported(&UsePath::default(), &item.tree);
+        self.imported(UsePath::default(), &item.tree);
     }
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
@@ -68,7 +67,7 @@ impl<'ast> Visit<'ast> for Collector {
             Type::Path(path) => UsePath::from(&path.path),
             _ => UsePath::default(),
         };
-        self.scopes.scope_of(&self.module).import(Some(Name::from(&item.ident)), target);
+        self.scopes.import(&self.module, Some(Name::from(&item.ident)), target);
         visit::visit_item_type(self, item);
     }
 

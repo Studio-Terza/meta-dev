@@ -16,10 +16,10 @@ use token_paths::TokenPaths;
 
 pub(crate) struct Walker<'file, 'run> {
     file: &'file SourceFile,
-    scopes: &'run Scopes,
-    wanted: &'run Wanted,
+    scopes: &'run Scopes<'run>,
+    wanted: &'run Wanted<'run>,
     resolver: &'run Resolver<'run>,
-    module: Module,
+    module: Module<'file>,
     ground: Ground,
     cover: Cover,
     found: Vec<Use<'file>>,
@@ -28,8 +28,8 @@ pub(crate) struct Walker<'file, 'run> {
 impl<'file, 'run> Walker<'file, 'run> {
     pub(crate) fn walk(
         file: &'file SourceFile,
-        scopes: &'run Scopes,
-        wanted: &'run Wanted,
+        scopes: &'run Scopes<'run>,
+        wanted: &'run Wanted<'run>,
         resolver: &'run Resolver<'run>,
     ) -> Vec<Use<'file>> {
         let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
@@ -47,8 +47,8 @@ impl<'file, 'run> Walker<'file, 'run> {
         walker.found
     }
 
-    fn made(&self, path: &UsePath, line: LineNumber) -> Option<Use<'file>> {
-        self.wanted(path).map(|_| {
+    fn made(&self, path: UsePath, line: LineNumber) -> Option<Use<'file>> {
+        self.wanted(&path).map(|_| ()).map(|()| {
             let candidates = self.resolver.candidates(&self.module, path);
             Use::new(Site::new(self.file.path(), line), candidates, self.ground, self.cover)
         })
@@ -64,14 +64,15 @@ impl<'file, 'run> Walker<'file, 'run> {
 
     fn written(expression: &ExprPath) -> UsePath {
         let path = UsePath::from(&expression.path);
-        expression.qself.as_ref().map_or(path.clone(), |qself| Self::qualified(qself, &path))
+        match &expression.qself {
+            Some(qself) => Self::qualified(qself, &path),
+            None => path,
+        }
     }
 
     fn qualified(qself: &QSelf, path: &UsePath) -> UsePath {
         match qself.ty.as_ref() {
-            Type::Path(inner) if qself.position == 0 => {
-                path.segments().iter().fold(UsePath::from(&inner.path), |full, segment| full.extended(segment.clone()))
-            }
+            Type::Path(inner) if qself.position == 0 => UsePath::from(&inner.path).joined(path.segments()),
             _ => UsePath::default(),
         }
     }
@@ -79,12 +80,11 @@ impl<'file, 'run> Walker<'file, 'run> {
 
 impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let outer = self.module.clone();
         let ground = self.ground;
-        self.module = outer.within(&Name::from(&module.ident));
+        self.module.enter(Name::from(&module.ident));
         self.ground = Gate::PORTS.names(module).map_or(ground, |_| Ground::Ports);
         visit::visit_item_mod(self, module);
-        self.module = outer;
+        self.module.leave();
         self.ground = ground;
     }
 
@@ -104,19 +104,15 @@ impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
     fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
         let path = Self::written(expression);
         let line = expression.path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let made: Vec<Use<'file>> = line
-            .filter(|_| !path.segments().is_empty())
-            .into_iter()
-            .filter_map(|line| self.made(&path, line))
-            .collect();
+        let made = line.filter(|_| !path.segments().is_empty()).and_then(|line| self.made(path, line));
         self.found.extend(made);
         visit::visit_expr_path(self, expression);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         let made: Vec<Use<'file>> = TokenPaths::within(invocation.tokens.clone())
-            .iter()
-            .filter_map(|spelled| self.made(spelled.path(), spelled.started_on()))
+            .into_iter()
+            .filter_map(|spelled| spelled.handed(|path, line| self.made(path, line)))
             .collect();
         self.found.extend(made);
     }
