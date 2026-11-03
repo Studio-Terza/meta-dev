@@ -52,10 +52,7 @@ impl CommutingTriangles {
             .filter_map(Hyperedge::written)
             .filter_map(|first| first.other(direct))
             .filter(|first| AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*first)).within(&start).is_some())
-            .filter(|first| {
-                let middle = AsRef::<Hop>::as_ref(*first).reached();
-                middle != end && !start.contains(middle)
-            })
+            .filter(|first| !start.contains(AsRef::<Hop>::as_ref(*first).reached()))
             .flat_map(|first| {
                 let middle = AsRef::<Hop>::as_ref(first).reached();
                 let available: BTreeSet<&Node> = start.iter().copied().chain([middle]).collect();

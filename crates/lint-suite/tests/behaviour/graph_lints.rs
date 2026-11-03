@@ -36,6 +36,7 @@ const PROPAGATING: &str = "struct A;\nstruct B;\nimpl A {\n    fn b(&self) -> B 
 const PAIRED: &str = "struct S;\nstruct N;\nstruct W;\nstruct C;\nimpl W {\n    fn new(s: S, n: N) -> W {}\n    fn s(&self) -> S {}\n    fn c(&self) -> C {}\n}\nimpl S {\n    fn c(&self) -> C {}\n}\n";
 const JOINED: &str = "struct S;\nstruct N;\nstruct W;\nstruct C;\nimpl W {\n    fn new(s: S, n: N) -> W {}\n    fn c(&self) -> C {}\n}\nimpl C {\n    fn joined(s: S, n: N) -> C {}\n}\n";
 const UNCHAINED: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nstruct G;\nstruct H;\nimpl B {\n    fn read(a: A, g: G) -> B {}\n}\nimpl C {\n    fn parse(b: B, g: G) -> C {}\n}\nimpl E {\n    fn read(d: D, h: H) -> E {}\n}\nimpl F {\n    fn parse(e: E, a: A) -> F {}\n}\n";
+const INNER: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn b(&self) -> B {}\n}\nimpl B {\n    fn c(&self) -> C {}\n}\nimpl C {\n    fn joined(a: A, b: B) -> C {}\n}\n";
 const CHAINED: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nstruct G;\nstruct H;\nimpl B {\n    fn read(a: A, g: G) -> B {}\n}\nimpl C {\n    fn parse(b: B, g: G) -> C {}\n}\nimpl E {\n    fn read(d: D, h: H) -> E {}\n}\nimpl F {\n    fn parse(e: E, h: H) -> F {}\n}\n";
 const STARVED: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn new(raw: String) -> A {}\n}\nimpl B {\n    fn shown(&self) -> String {}\n}\nimpl C {\n    fn joined(a: A, b: B) -> C {}\n    fn shown(&self) -> String {}\n}\n";
 const SHOWN: &str = "use std::fmt;\nstruct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {}\n}\nimpl fmt::Display for B {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {}\n}\nimpl From<A> for String {\n    fn from(a: A) -> String {}\n}\nimpl From<B> for String {\n    fn from(b: B) -> String {}\n}\n";
@@ -73,6 +74,7 @@ laws::table!(
         ["triangle", MOTIF, "also goes"] => false,
         ["triangle", PAIRED, "crates/x/src/lib.rs:1: workspace: 1 written edges close a triangle, over 1 paths of two edges"] => true,
         ["triangle", PAIRED, "x::S -> x::C"] => false,
+        ["triangle", INNER, "crates/x/src/lib.rs:1: workspace: 0 written edges close a triangle, over 0 paths of two edges"] => true,
         ["triangle", JOINED, "crates/x/src/lib.rs:10: (x::N, x::S) -> x::C by x::C::joined also goes 1 path(s): through x::W by x::W::new at crates/x/src/lib.rs:6 and x::W::c at crates/x/src/lib.rs:7"] => true,
         ["motif", MOTIF, "crates/x/src/lib.rs:8: chain read then parse repeats over 2 disjoint type sets: x::A -> x::B -> x::C at crates/x/src/lib.rs:8, crates/x/src/lib.rs:11; x::D -> x::E -> x::F at crates/x/src/lib.rs:14, crates/x/src/lib.rs:17"] => true,
         ["motif", MOTIF, "crates/x/src/lib.rs:1: workspace: 1 repeated motifs over 2 disjoint type sets"] => true,
