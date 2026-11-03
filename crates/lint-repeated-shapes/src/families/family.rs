@@ -2,6 +2,7 @@ mod finding;
 
 use lint_core::{Site, Violation};
 
+use crate::kind::Kind;
 use crate::occurrence::Occurrence;
 use body_shape::TokenCount;
 use finding::Finding;
@@ -28,9 +29,10 @@ impl<'file> Family<'file> {
     pub(crate) fn violation(&self) -> Violation<'file> {
         let mut sites: Vec<&Site<'file>> = self.copies.iter().map(Occurrence::as_ref).collect();
         sites.sort();
+        let kind = self.copies.iter().map(Occurrence::kind).reduce(Kind::joined).unwrap_or(Kind::Mixed);
         sites.first().map_or_else(
             || unreachable!("a family has copies"),
-            |site| Violation::new(**site, Finding::new(self.size, sites.get(1..).unwrap_or_default())),
+            |site| Violation::new(**site, Finding::new(self.size, kind, sites.get(1..).unwrap_or_default())),
         )
     }
 }
