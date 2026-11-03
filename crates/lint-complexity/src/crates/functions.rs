@@ -1,13 +1,11 @@
-mod branches;
-
 use syn::visit::{self, Visit};
 use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
+use body_lifts::Branches;
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
 
 use super::function::Function;
-use branches::Branches;
 
 pub(crate) struct Functions<'file> {
     file: &'file SourceFile,

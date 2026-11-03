@@ -37,7 +37,7 @@ impl WorkspaceTypes {
     }
 
     pub(crate) fn edge<'found>(&self, transition: &'found Transition) -> Edge<'found> {
-        let fixed_by = transition.filler().implemented().filter(|name| !self.traits.contains(*name));
+        let fixed_by = transition.filler().trait_name().filter(|name| !self.traits.contains(*name));
         let from: &CrateName = transition.as_ref();
         let end = |endpoint: &Endpoint| self.end(from, endpoint, fixed_by);
         let takes = transition.takes().iter().map(end).collect();

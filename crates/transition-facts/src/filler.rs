@@ -10,10 +10,10 @@ pub enum Filler {
 
 impl Filler {
     #[must_use]
-    pub fn implemented(&self) -> Option<&Name> {
+    pub fn trait_name(&self) -> Option<&Name> {
         match self {
-            Filler::Implemented(name) => Some(name),
-            Filler::Free | Filler::Inherent | Filler::Provided(_) => None,
+            Filler::Implemented(name) | Filler::Provided(name) => Some(name),
+            Filler::Free | Filler::Inherent => None,
         }
     }
 }

@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+body-lifts = { path = "../body-lifts" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
