@@ -259,7 +259,7 @@ fn implementers_of_a_trait_are_found_across_crates() {
 }
 
 #[test]
-fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer() {
+fn fields_variants_and_bounds_are_dependencies() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup {\n    type Out: Shown;\n    fn made(&self);\n}\n",
@@ -271,10 +271,9 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
             .map(|dependency| {
                 let qualifier = dependency.qualifier().map(ToString::to_string).unwrap_or_default();
                 format!(
-                    "{qualifier}{}:{}:{:?}:{}",
+                    "{qualifier}{}:{}:{}",
                     AsRef::<Name>::as_ref(dependency),
                     AsRef::<Via>::as_ref(dependency),
-                    dependency.held(),
                     AsRef::<Site>::as_ref(dependency)
                 )
             })
@@ -285,16 +284,16 @@ fn fields_variants_and_bounds_are_dependencies_marked_when_held_behind_a_pointer
         types,
         [
             vec![
-                "B:field:Directly:a.rs:1".to_owned(),
-                "Box:field:Directly:a.rs:1".to_owned(),
-                "A:field:Indirectly:a.rs:1".to_owned(),
-                "C:field:Indirectly:a.rs:1".to_owned(),
-                "Into:bound:Directly:a.rs:1".to_owned(),
-                "B:bound:Directly:a.rs:1".to_owned(),
+                "B:field:a.rs:1".to_owned(),
+                "Box:field:a.rs:1".to_owned(),
+                "A:field:a.rs:1".to_owned(),
+                "C:field:a.rs:1".to_owned(),
+                "Into:bound:a.rs:1".to_owned(),
+                "B:bound:a.rs:1".to_owned(),
             ],
-            vec!["lint_coreD:variant:Directly:a.rs:2".to_owned()],
+            vec!["lint_coreD:variant:a.rs:2".to_owned()],
         ]
     );
     let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.as_ref())).collect();
-    assert_eq!(traits, [vec!["Sup:bound:Directly:a.rs:3".to_owned(), "Shown:bound:Directly:a.rs:4".to_owned()]]);
+    assert_eq!(traits, [vec!["Sup:bound:a.rs:3".to_owned(), "Shown:bound:a.rs:4".to_owned()]]);
 }

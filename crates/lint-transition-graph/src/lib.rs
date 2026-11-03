@@ -1,3 +1,4 @@
+mod containment;
 mod count;
 mod coverage;
 mod crate_transitions;
@@ -17,6 +18,10 @@ use crate_transitions::CrateTransitions;
 use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
+pub use containment::{
+    AcyclicQuotients, ConnectedClusters, Containment, DeepClusters, InterfaceByConsumers, InterfaceByInternals,
+    LowestCluster,
+};
 pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::{GraphLint, OnGraph};
 pub use mutation::CoreMutation;

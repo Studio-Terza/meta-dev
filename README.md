@@ -31,7 +31,7 @@ manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_bi
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, no_early_exits, one_edge, unconsumed_traits, layering, rust_only, workflow_run.
+effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
@@ -63,10 +63,6 @@ boundary. The message names the fix: take and return a domain type, or move the 
 `unconsumed_traits` refuses a local trait with methods that nothing in shipped code consumes: no bound (generic, where
 clause or supertrait), no `impl Trait` or `dyn Trait`, and no call to one of its provided methods. Delete the trait and
 keep its methods inherent, or give it a consumer.
-
-`layering` keeps type definitions layered. A type depends on another through a field, an enum variant or a bound, and
-the only cycle allowed is a type's explicit recursion into itself through a reference, `Box`, `Rc`, `Arc`, `Weak`, `Vec` or
-`VecDeque`. Pull the shared part of a tangle into its own type, or make the recursion explicit.
 
 `one_edge` keeps one transition per pair. In shipped code, a set of domain input types reaches one domain output type
 by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
@@ -112,6 +108,17 @@ fixes: combinators on `Option`, `Result` and iterators; extract an arm's logic i
 condition as an enum or a predicate type. Shared routers over syn and token shapes live in `lint_core::Syntax`. The
 `--report` run keeps `flow_shapes`, which counts per crate the functions that are a pipeline, a pure router, or
 neither.
+
+The `--report` run also prints the containment reports of `lint-transition-graph`, report only until the owner has
+reviewed them. The crates, modules and files are a nested clustering of the type and trait graph: types and traits are
+linked by fields, variants, bounds, trait impls and the signatures of their methods, read through the same facts as
+the transition graph. One engine (`Containment`, with a `ClusterLint` per check) runs every check at the
+crate and the module level: `connected_clusters` (each crate and each directory module is one connected piece),
+`acyclic_quotients` (the crates of the workspace, and the own file and child modules of each crate and module, collapsed
+to single nodes of the definition graph of fields, variants and bounds, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` and `interface_by_internals` (a cluster's exports, the types and
+traits used from outside it, form one group when linked by a shared outside user, or by a shared private item),
+`lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users) and `deep_clusters` (a
+cluster with an interface that exports fewer items than it keeps private). There are no thresholds.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not

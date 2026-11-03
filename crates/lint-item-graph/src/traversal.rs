@@ -31,19 +31,13 @@ where
 
     fn step(&mut self) -> Option<option::IntoIter<Index>> {
         let next = self.path.last_mut()?.next_neighbour();
-        Some(self.stepped(next))
-    }
-
-    fn stepped(&mut self, next: Option<Index>) -> option::IntoIter<Index> {
-        match next {
-            Some(child) => self.descended(child),
+        Some(match next {
+            Some(child) => {
+                Some(child).filter(|child| self.seen.insert(*child)).into_iter().for_each(|child| self.enter(child));
+                None.into_iter()
+            }
             None => self.path.pop().map(|frame| frame.node()).into_iter(),
-        }
-    }
-
-    fn descended(&mut self, child: Index) -> option::IntoIter<Index> {
-        Some(child).filter(|child| self.seen.insert(*child)).into_iter().for_each(|child| self.enter(child));
-        None.into_iter()
+        })
     }
 }
 
