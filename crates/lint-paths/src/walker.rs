@@ -1,7 +1,7 @@
 mod token_paths;
 
 use syn::visit::{self, Visit};
-use syn::{ExprPath, ItemImpl, ItemMod, Macro, QSelf, Type};
+use syn::{ExprPath, ItemImpl, ItemMod, Macro, Path, QSelf, Type};
 
 use crate::cover::Cover;
 use crate::ground::Ground;
@@ -64,16 +64,19 @@ impl<'file, 'run> Walker<'file, 'run> {
 
     fn written(expression: &ExprPath) -> UsePath {
         let path = UsePath::from(&expression.path);
-        match &expression.qself {
-            Some(qself) => Self::qualified(qself, &path),
-            None => path,
-        }
+        expression.qself.as_ref().map(|qself| Self::qualified(qself, &path)).unwrap_or(path)
     }
 
     fn qualified(qself: &QSelf, path: &UsePath) -> UsePath {
-        match qself.ty.as_ref() {
-            Type::Path(inner) if qself.position == 0 => UsePath::from(&inner.path).joined(path.segments()),
-            _ => UsePath::default(),
+        Self::type_path(&qself.ty)
+            .filter(|_| qself.position == 0)
+            .map_or_else(UsePath::default, |inner| UsePath::from(inner).joined(path.segments()))
+    }
+
+    pub(crate) fn type_path(ty: &Type) -> Option<&Path> {
+        match ty {
+            Type::Path(inner) => Some(&inner.path),
+            _ => None,
         }
     }
 }
@@ -90,12 +93,9 @@ impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let outer = self.cover;
-        let guarded = match item.self_ty.as_ref() {
-            Type::Path(path) => {
-                path.path.segments.last().and_then(|last| self.scopes.guarded(&self.module, &Name::from(&last.ident)))
-            }
-            _ => None,
-        };
+        let guarded = Self::type_path(&item.self_ty)
+            .and_then(|path| path.segments.last())
+            .and_then(|last| self.scopes.guarded(&self.module, &Name::from(&last.ident)));
         self.cover = guarded.map_or(outer, |_| Cover::Guarded);
         visit::visit_item_impl(self, item);
         self.cover = outer;
@@ -104,7 +104,7 @@ impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
     fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
         let path = Self::written(expression);
         let line = expression.path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let made = line.filter(|_| !path.segments().is_empty()).and_then(|line| self.made(path, line));
+        let made = path.segments().first().and(line).and_then(|line| self.made(path, line));
         self.found.extend(made);
         visit::visit_expr_path(self, expression);
     }

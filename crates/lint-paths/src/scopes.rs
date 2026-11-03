@@ -43,7 +43,7 @@ impl<'file> Scopes<'file> {
 
     pub(crate) fn renames_head(&self, module: &Module<'file>, path: &UsePath) -> Option<&Scope> {
         let head = path.segments().first()?;
-        self.scope(module).filter(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
+        self.scope(module).filter(|scope| scope.imported(head).or_else(|| scope.globs().first()).is_some())
     }
 
     pub(crate) fn renamed_to<'scopes>(&'scopes self, finals: &[Word<'_>]) -> impl Iterator<Item = &'scopes Name> {

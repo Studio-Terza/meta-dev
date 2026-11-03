@@ -28,10 +28,10 @@ impl<'file> Use<'file> {
 
     #[must_use]
     pub fn under(&self, root: &[Word<'_>]) -> Option<&UsePath> {
-        self.candidates.iter().find(|candidate| {
-            let segments = candidate.segments();
-            segments.len() > root.len() && segments.iter().zip(root).all(|(segment, spelled)| segment == spelled)
-        })
+        self.candidates
+            .iter()
+            .filter(|candidate| candidate.segments().len() > root.len())
+            .find(|candidate| candidate.segments().iter().zip(root).all(|(segment, spelled)| segment == spelled))
     }
 
     #[must_use]

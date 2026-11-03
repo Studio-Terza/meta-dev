@@ -26,7 +26,8 @@ impl<'scope> Route<'scope> {
         let entered =
             Some(module.within(head.clone())).filter(|child| scopes.scope(child).is_some()).map(Route::Entered);
         let globbed = scope
-            .filter(|_| imported.is_none() && trail.globbing() == Globbing::Open)
+            .filter(|_| imported.is_none())
+            .filter(|_| trail.globbing() == Globbing::Open)
             .into_iter()
             .flat_map(|scope| scope.globs().iter());
         imported.into_iter().chain(entered).chain(globbed.map(Route::Globbed)).collect()
@@ -43,9 +44,9 @@ impl<'scope> Route<'scope> {
             Route::Imported { head, target } => {
                 resolver.resolved(module, path.rerooted(target), &trail.following(module, head))
             }
-            Route::Entered(child) => Some(path.rest())
-                .filter(|rest| !rest.segments().is_empty())
-                .map_or_else(Vec::new, |rest| resolver.resolved(child, rest, trail)),
+            Route::Entered(child) => {
+                path.segments().get(1).map_or_else(Vec::new, |_| resolver.resolved(child, path.rest(), trail))
+            }
             Route::Globbed(glob) => resolver.resolved(module, glob.joined(path.segments()), &trail.spent()),
         }
     }
