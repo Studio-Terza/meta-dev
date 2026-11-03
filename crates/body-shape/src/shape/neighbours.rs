@@ -11,6 +11,8 @@ pub(crate) struct Neighbours<'tokens> {
 }
 
 impl<'tokens> Neighbours<'tokens> {
+    const CALLED: [RawToken; 2] = [RawToken::Mark(Mark::OPEN_PAREN), RawToken::Mark(Mark::BANG)];
+
     pub(crate) fn all(tokens: &'tokens [RawToken]) -> impl Iterator<Item = Neighbours<'tokens>> {
         (0..tokens.len()).map(|index| {
             let before = index.checked_sub(1);
@@ -24,13 +26,22 @@ impl<'tokens> Neighbours<'tokens> {
     }
 
     pub(crate) fn position(self) -> Position {
-        match (self.earlier, self.before, self.after, self.then) {
-            (_, Some(RawToken::Mark(Mark::DOT)), _, _)
-            | (Some(RawToken::Mark(Mark::COLON)), Some(RawToken::Mark(Mark::COLON)), _, _)
-            | (_, _, Some(RawToken::Mark(Mark::OPEN_PAREN | Mark::BANG)), _)
-            | (_, _, Some(RawToken::Mark(Mark::COLON)), Some(RawToken::Mark(Mark::COLON))) => Position::Named,
-            (_, _, Some(RawToken::Literal), _) => Position::BeforeLiteral,
-            _ => Position::Plain,
-        }
+        self.named()
+            .or_else(|| self.after.filter(|after| **after == RawToken::Literal).map(|_| Position::BeforeLiteral))
+            .unwrap_or(Position::Plain)
+    }
+
+    fn named(self) -> Option<Position> {
+        self.before
+            .filter(|before| **before == RawToken::Mark(Mark::DOT))
+            .or_else(|| Self::paired(self.earlier, self.before))
+            .or_else(|| self.after.filter(|after| Self::CALLED.contains(after)))
+            .or_else(|| Self::paired(self.after, self.then))
+            .map(|_| Position::Named)
+    }
+
+    fn paired(first: Option<&'tokens RawToken>, second: Option<&'tokens RawToken>) -> Option<&'tokens RawToken> {
+        let colon = RawToken::Mark(Mark::COLON);
+        first.filter(|first| **first == colon).and(second).filter(|second| **second == colon)
     }
 }

@@ -22,8 +22,7 @@ impl RawToken {
     pub(crate) fn shaped<'raw>(&'raw self, position: Position, slots: &mut Slots<'raw>) -> Option<ShapeToken<'raw>> {
         match self {
             RawToken::Literal => Some(ShapeToken::Literal),
-            RawToken::Mark(Mark::MINUS) if position == Position::BeforeLiteral => None,
-            RawToken::Mark(mark) => Some(ShapeToken::Mark(*mark)),
+            RawToken::Mark(mark) => Self::marked(*mark, position),
             RawToken::Word(name) => Some(slots.classified(name, position)),
         }
     }
@@ -33,16 +32,24 @@ impl RawToken {
             TokenTree::Literal(_) => vec![RawToken::Literal],
             TokenTree::Punct(punct) => vec![RawToken::Mark(Mark::new(punct.as_char()))],
             TokenTree::Ident(ident) => vec![RawToken::Word(Name::from(&ident))],
-            TokenTree::Group(group) => {
-                let inner = Self::flattened(group.stream());
-                match group.delimiter() {
-                    Delimiter::Parenthesis => Self::between(Mark::OPEN_PAREN, inner, Mark::CLOSE_PAREN),
-                    Delimiter::Brace => Self::between(Mark::OPEN_BRACE, inner, Mark::CLOSE_BRACE),
-                    Delimiter::Bracket => Self::between(Mark::OPEN_BRACKET, inner, Mark::CLOSE_BRACKET),
-                    Delimiter::None => inner,
-                }
-            }
+            TokenTree::Group(group) => Self::delimited(group.delimiter(), Self::flattened(group.stream())),
         }
+    }
+
+    fn delimited(delimiter: Delimiter, inner: Vec<RawToken>) -> Vec<RawToken> {
+        match delimiter {
+            Delimiter::Parenthesis => Self::between(Mark::OPEN_PAREN, inner, Mark::CLOSE_PAREN),
+            Delimiter::Brace => Self::between(Mark::OPEN_BRACE, inner, Mark::CLOSE_BRACE),
+            Delimiter::Bracket => Self::between(Mark::OPEN_BRACKET, inner, Mark::CLOSE_BRACKET),
+            Delimiter::None => inner,
+        }
+    }
+
+    fn marked<'raw>(mark: Mark, position: Position) -> Option<ShapeToken<'raw>> {
+        Some(mark)
+            .filter(|mark| *mark == Mark::MINUS)
+            .filter(|_| position == Position::BeforeLiteral)
+            .map_or(Some(ShapeToken::Mark(mark)), |_| None)
     }
 
     fn between(open: Mark, inner: Vec<RawToken>, close: Mark) -> Vec<RawToken> {

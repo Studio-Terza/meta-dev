@@ -16,18 +16,25 @@ pub struct BodyReading;
 impl BodyReading {
     #[must_use]
     pub fn classified(block: &Block) -> Body {
-        match block.stmts.as_slice() {
-            [Stmt::Expr(only, None)] => Self::shaped(only),
-            _ => Body::Written,
-        }
+        Self::only(block).map_or(Body::Written, Self::shaped)
     }
 
     fn shaped(found: &Expr) -> Body {
-        match found {
-            _ if Focus::reached(found).is_some() => Body::Focused,
-            Expr::Match(routed) if routed.arms.iter().all(|arm| Route::taken(arm).is_some()) => Body::Routed,
-            _ if Chain::unwound(found).lifted().is_some() => Body::Mapped,
-            _ => Body::Written,
+        Focus::reached(found)
+            .map(|_| Body::Focused)
+            .or_else(|| Route::routed(found).map(|_| Body::Routed))
+            .or_else(|| Chain::unwound(found).lifted().map(|_| Body::Mapped))
+            .unwrap_or(Body::Written)
+    }
+
+    fn only(block: &Block) -> Option<&Expr> {
+        block.stmts.first().filter(|_| block.stmts.len() == 1).and_then(Self::expression)
+    }
+
+    fn expression(statement: &Stmt) -> Option<&Expr> {
+        match statement {
+            Stmt::Expr(only, None) => Some(only),
+            _ => None,
         }
     }
 }
