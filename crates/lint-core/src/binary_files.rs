@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use syn::{Item, ItemMod};
+use syn::ItemMod;
+
+use crate::syntax::Syntax;
 
 use crate::source_file::SourceFile;
 use lint_layout::Name;
@@ -34,37 +36,39 @@ impl BinaryFiles {
     fn gather(
         file: &SourceFile,
         by_path: &BTreeMap<&Path, &SourceFile>,
+        members: BTreeSet<PathBuf>,
+    ) -> BTreeSet<PathBuf> {
+        match members.get(file.path()).map(|_| ()) {
+            Some(()) => members,
+            None => Self::entered(file, by_path, members),
+        }
+    }
+
+    fn entered(
+        file: &SourceFile,
+        by_path: &BTreeMap<&Path, &SourceFile>,
         mut members: BTreeSet<PathBuf>,
     ) -> BTreeSet<PathBuf> {
-        if members.insert(file.path().to_owned()) {
-            Self::children(file, by_path)
-                .into_iter()
-                .fold(members, |members, child| Self::gather(child, by_path, members))
-        } else {
-            members
-        }
+        members.insert(file.path().to_owned());
+        Self::children(file, by_path).into_iter().fold(members, |members, child| Self::gather(child, by_path, members))
     }
 
     fn children<'files>(file: &SourceFile, by_path: &BTreeMap<&Path, &'files SourceFile>) -> Vec<&'files SourceFile> {
         file.syntax()
             .items
             .iter()
-            .filter_map(|item| match item {
-                Item::Mod(module) => Some(module),
-                _ => None,
-            })
+            .filter_map(Syntax::item_mod)
             .flat_map(|module| Self::declared_files(file.path(), module))
             .filter_map(|candidate| by_path.get(candidate.as_path()).copied())
             .collect()
     }
 
     fn declared_files(parent: &Path, module: &ItemMod) -> Vec<PathBuf> {
-        let directory = if parent.ends_with(Self::MAIN_FILE) || parent.ends_with(Self::MODULE_FILE) {
-            parent.parent().map(Path::to_path_buf)
-        } else {
-            Some(parent.with_extension(""))
-        }
-        .unwrap_or_default();
+        let directory = [Self::MAIN_FILE, Self::MODULE_FILE]
+            .iter()
+            .find(|root| parent.ends_with(root))
+            .map_or_else(|| Some(parent.with_extension("")), |_| parent.parent().map(Path::to_path_buf))
+            .unwrap_or_default();
         let name = Name::from(&module.ident);
         vec![
             directory.join(&name).with_extension(Self::SOURCE_EXTENSION),

@@ -22,7 +22,7 @@ impl<'file> Report<'file> {
 
     #[must_use]
     pub fn dirty(self) -> Option<Report<'file>> {
-        (!self.violations.is_empty()).then_some(self)
+        self.violations.first().map(|_| ()).map(|()| self)
     }
 }
 

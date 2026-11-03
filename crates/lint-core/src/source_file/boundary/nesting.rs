@@ -13,14 +13,49 @@ impl Depth {
         Depth(self.0.saturating_sub(1))
     }
 
-    fn angled(self, window: &[char]) -> Depth {
-        match window {
-            ['=', '>'] | [_, '(' | '[' | '{' | ')' | ']' | '}' | ';'] => Depth::zero(),
-            ['-', '>'] => self,
-            [_, '<'] => self.incremented(),
-            [_, '>'] => self.receded(),
-            _ => self,
+    fn angled(self, step: Step) -> Depth {
+        match step {
+            Step::FatArrow | Step::Open | Step::Close | Step::End => Depth::zero(),
+            Step::ThinArrow | Step::Plain => self,
+            Step::Less => self.incremented(),
+            Step::Greater => self.receded(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Step {
+    Open,
+    Close,
+    End,
+    Less,
+    Greater,
+    FatArrow,
+    ThinArrow,
+    Plain,
+}
+
+impl Step {
+    const ARROWS: [([char; 2], Step); 2] = [(['=', '>'], Step::FatArrow), (['-', '>'], Step::ThinArrow)];
+    const MARKS: [(char, Step); 9] = [
+        ('(', Step::Open),
+        ('[', Step::Open),
+        ('{', Step::Open),
+        (')', Step::Close),
+        (']', Step::Close),
+        ('}', Step::Close),
+        (';', Step::End),
+        ('<', Step::Less),
+        ('>', Step::Greater),
+    ];
+
+    fn between(before: char, current: char) -> Step {
+        Self::ARROWS
+            .into_iter()
+            .find(|(arrow, _)| *arrow == [before, current])
+            .map(|(_, step)| step)
+            .or_else(|| Self::MARKS.into_iter().find(|(mark, _)| *mark == current).map(|(_, step)| step))
+            .unwrap_or(Step::Plain)
     }
 }
 
@@ -36,11 +71,11 @@ impl Nesting {
         Self::LIMIT.allows(deepest).map(|_| text)
     }
 
-    fn peak(chars: &[char], step: impl Fn(Depth, &[char]) -> Depth) -> Depth {
+    fn peak(chars: &[char], step: impl Fn(Depth, Step) -> Depth) -> Depth {
         chars
             .iter()
             .scan((Depth::zero(), ' '), |(depth, before), current| {
-                *depth = step(*depth, &[*before, *current]);
+                *depth = step(*depth, Step::between(*before, *current));
                 *before = *current;
                 Some(*depth)
             })
@@ -48,11 +83,11 @@ impl Nesting {
             .unwrap_or_default()
     }
 
-    fn delimited(depth: Depth, window: &[char]) -> Depth {
-        match window {
-            [_, '(' | '[' | '{'] => depth.incremented(),
-            [_, ')' | ']' | '}'] => depth.receded(),
-            _ => depth,
+    fn delimited(depth: Depth, step: Step) -> Depth {
+        match step {
+            Step::Open => depth.incremented(),
+            Step::Close => depth.receded(),
+            Step::End | Step::Less | Step::Greater | Step::FatArrow | Step::ThinArrow | Step::Plain => depth,
         }
     }
 }

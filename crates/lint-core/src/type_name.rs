@@ -1,7 +1,9 @@
 use std::fmt;
 
 use quote::ToTokens;
-use syn::{GenericArgument, Ident, PathArguments, Type};
+use syn::{Ident, Type};
+
+use crate::syntax::Syntax;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TypeName(String);
@@ -22,23 +24,16 @@ impl TypeName {
 
     #[must_use]
     pub fn or_self<'name>(&'name self, self_type: &'name TypeName) -> &'name TypeName {
-        if self.0 == Self::SELF { self_type } else { self }
+        Some(self).filter(|name| name.0 == Self::SELF).map_or(self, |_| self_type)
     }
 
     fn unwrapped(ty: &Type) -> &Type {
-        let last = match ty {
-            Type::Path(path) => path.path.segments.last(),
-            _ => None,
-        };
-        last.filter(|segment| Self::WRAPPERS.iter().any(|wrapper| segment.ident == wrapper))
-            .and_then(|segment| match &segment.arguments {
-                PathArguments::AngleBracketed(arguments) => arguments.args.first(),
-                _ => None,
-            })
-            .and_then(|argument| match argument {
-                GenericArgument::Type(inner) => Some(inner),
-                _ => None,
-            })
+        Syntax::type_path(ty)
+            .and_then(|path| path.path.segments.last())
+            .filter(|segment| Self::WRAPPERS.iter().any(|wrapper| segment.ident == wrapper))
+            .and_then(|segment| Syntax::angled(&segment.arguments))
+            .and_then(|arguments| arguments.args.first())
+            .and_then(Syntax::type_argument)
             .unwrap_or(ty)
     }
 }

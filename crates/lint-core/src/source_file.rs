@@ -41,10 +41,10 @@ impl SourceFile {
     }
 
     fn parsed(path: PathBuf, located: Located, placement: Placement, text: SourceText) -> Result<Self, Failure> {
-        let parsed = Nesting::within_limit(&text)
+        match Nesting::within_limit(&text)
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
-            .and_then(|text| syn::parse_file(text.as_ref()));
-        match parsed {
+            .and_then(|text| syn::parse_file(text.as_ref()))
+        {
             Ok(syntax) => Ok(Self {
                 crate_file: placement.crate_file(&path),
                 path,
