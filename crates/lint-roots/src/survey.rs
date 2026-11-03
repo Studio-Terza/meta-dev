@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Kind};
@@ -24,20 +25,19 @@ impl Survey {
     #[must_use]
     pub fn learn(self, files: &impl Files, fact: Fact, paths: &[PathBuf]) -> Survey {
         match fact {
-            Fact::Kind => {
-                let found = files.kinds(paths).into_iter().map(Some).collect();
-                Survey { kinds: Self::extended(self.kinds, paths, found), ..self }
-            }
-            Fact::Canonical => {
-                let found = files.canonical_many(paths).into_iter().map(Result::ok).collect();
-                Survey { canonical: Self::extended(self.canonical, paths, found), ..self }
-            }
-            Fact::Followed => {
-                let survey = self.learn(files, Fact::Canonical, paths);
-                let reals: Vec<PathBuf> =
-                    paths.iter().filter_map(|path| survey.canonical(path)).map(Path::to_path_buf).collect();
-                survey.learn(files, Fact::Kind, &reals)
-            }
+            Fact::Kind => Survey {
+                kinds: Self::extended(self.kinds, paths, files.kinds(paths).into_iter().map(Some).collect()),
+                ..self
+            },
+            Fact::Canonical => Survey {
+                canonical: Self::extended(
+                    self.canonical,
+                    paths,
+                    files.canonical_many(paths).into_iter().map(Result::ok).collect(),
+                ),
+                ..self
+            },
+            Fact::Followed => self.learn(files, Fact::Canonical, paths).followed(files, paths),
             Fact::Listed => paths
                 .iter()
                 .cloned()
@@ -82,17 +82,28 @@ impl Survey {
         found
     }
 
-    fn listing(mut self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
+    fn followed(self, files: &impl Files, paths: &[PathBuf]) -> Survey {
+        let reals: Vec<PathBuf> = paths.iter().filter_map(|path| self.canonical(path)).map(Path::to_path_buf).collect();
+        self.learn(files, Fact::Kind, &reals)
+    }
+
+    fn listing(self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
         match listing {
-            Ok(mut entries) => {
-                entries.sort();
-                self.listed.insert(directory, entries);
-                self
-            }
-            Err(failure) => {
-                self.failed.push(Failure::Io { path: directory, source: failure.into() });
-                self
-            }
+            Ok(entries) => self.sorted_into(directory, entries),
+            Err(failure) => Survey {
+                failed: self
+                    .failed
+                    .into_iter()
+                    .chain(iter::once(Failure::Io { path: directory, source: failure.into() }))
+                    .collect(),
+                ..self
+            },
         }
+    }
+
+    fn sorted_into(mut self, directory: PathBuf, mut entries: Vec<PathBuf>) -> Survey {
+        entries.sort();
+        self.listed.insert(directory, entries);
+        self
     }
 }

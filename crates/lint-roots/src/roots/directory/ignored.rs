@@ -27,18 +27,20 @@ impl Ignored {
     }
 
     pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {
-        let named = path.file_name();
-        let applies = match self {
-            Ignored::Hidden => named.is_some_and(|name| Name::from(name).matches::<Prefix>(&[Self::HIDDEN]).is_some()),
-            Ignored::VersionControl => named.is_some_and(|name| name == Self::VERSION_CONTROL),
-            Ignored::BuildOutput => {
-                named.is_some_and(|name| name == Self::BUILD_DIRECTORY)
-                    && path
-                        .parent()
-                        .map(|parent| parent.join(Self::MANIFEST))
-                        .is_some_and(|manifest| survey.file(&manifest).is_some())
-            }
-        };
-        applies.then_some(self)
+        match self {
+            Ignored::Hidden => path
+                .file_name()
+                .map(Name::from)
+                .filter(|name| name.matches::<Prefix>(&[Self::HIDDEN]).is_some())
+                .map(|_| self),
+            Ignored::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL).map(|_| self),
+            Ignored::BuildOutput => path
+                .file_name()
+                .filter(|name| *name == Self::BUILD_DIRECTORY)
+                .and_then(|_| path.parent())
+                .map(|parent| parent.join(Self::MANIFEST))
+                .filter(|manifest| survey.file(manifest).is_some())
+                .map(|_| self),
+        }
     }
 }

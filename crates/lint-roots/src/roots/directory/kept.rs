@@ -24,7 +24,8 @@ impl<'survey> Kept<'survey> {
         self.survey
             .entries(directory)
             .iter()
-            .filter(|entry| self.survey.kind(entry) == Kind::Directory && self.skipped(entry).is_none())
+            .filter(|entry| self.survey.kind(entry) == Kind::Directory)
+            .filter(|entry| self.skipped(entry).is_none())
             .cloned()
             .map(Directory)
             .collect()
@@ -46,12 +47,15 @@ impl<'survey> Kept<'survey> {
         self.survey
             .entries(directory)
             .iter()
-            .flat_map(|entry| match (self.survey.kind(entry), self.skipped(entry)) {
-                (Kind::Directory, Some(_)) => Vec::new(),
-                (Kind::Directory, None) => self.files(entry),
-                (Kind::File | Kind::Link | Kind::Missing, _) => vec![entry.clone()],
-            })
+            .flat_map(|entry| self.entry_files(entry, self.survey.kind(entry)))
             .collect()
+    }
+
+    fn entry_files(&self, entry: &Path, kind: Kind) -> Vec<PathBuf> {
+        match kind {
+            Kind::Directory => self.skipped(entry).map_or_else(|| self.files(entry), |_| Vec::new()),
+            Kind::File | Kind::Link | Kind::Missing => vec![entry.to_path_buf()],
+        }
     }
 
     fn skipped(&self, entry: &Path) -> Option<&Ignored> {

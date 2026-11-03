@@ -17,9 +17,11 @@ impl<'run> Wanted<'run> {
     pub(crate) fn holds<'name>(&self, name: &'name Name) -> Option<&'name Name> {
         match self {
             Wanted::Every => Some(name),
-            Wanted::Among { finals, renamed } => {
-                (finals.iter().any(|word| name == word) || renamed.contains(name)).then_some(name)
-            }
+            Wanted::Among { finals, renamed } => Self::among_named(finals, renamed, name),
         }
+    }
+
+    fn among_named<'name>(finals: &[Word<'_>], renamed: &BTreeSet<&Name>, name: &'name Name) -> Option<&'name Name> {
+        finals.iter().find(|word| name == *word).map(|_| name).or_else(|| renamed.get(name).map(|_| name))
     }
 }

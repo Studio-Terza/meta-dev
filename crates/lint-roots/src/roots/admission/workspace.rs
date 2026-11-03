@@ -93,20 +93,21 @@ impl Workspace {
         dependencies: &BTreeMap<&Path, Vec<PathBuf>>,
         root: &Path,
     ) -> BTreeSet<&'manifests Path> {
-        let reached: BTreeSet<&'manifests Path> = members
-            .iter()
-            .copied()
-            .chain([root])
-            .filter_map(|directory| dependencies.get(directory))
-            .flatten()
-            .filter_map(|path| manifests.get_key_value(path))
-            .filter(|(path, manifest)| manifest.package().is_some() && !members.contains(path.as_path()))
-            .map(|(path, _)| path.as_path())
-            .collect();
-        if reached.is_empty() {
-            members
-        } else {
-            Self::with_path_dependencies(members.into_iter().chain(reached).collect(), manifests, dependencies, root)
-        }
+        iter::successors(Some(members), |members| {
+            let packaged: BTreeSet<&'manifests Path> = members
+                .iter()
+                .copied()
+                .chain([root])
+                .filter_map(|directory| dependencies.get(directory))
+                .flatten()
+                .filter_map(|path| manifests.get_key_value(path))
+                .filter(|(_, manifest)| manifest.package().is_some())
+                .map(|(path, _)| path.as_path())
+                .collect();
+            let reached: Vec<&'manifests Path> = packaged.difference(members).copied().collect();
+            reached.first().map(|_| members.iter().copied().chain(reached.iter().copied()).collect())
+        })
+        .last()
+        .unwrap_or_default()
     }
 }
