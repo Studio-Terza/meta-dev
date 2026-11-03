@@ -30,7 +30,6 @@ impl Cli {
     const DEFAULT_MEASURED: &'static str = "ci/measured.toml";
     const REPORT_ONLY: &'static str = "--report-only";
     const WHOLE_REACH: &'static str = "--whole-reach";
-    const REACH_END: &'static str = "crates";
 
     pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Cli {
         let limits = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_LIMITS), PathBuf::from);
@@ -45,10 +44,12 @@ impl Cli {
         Cli { limits, measured, only, report_only }
     }
 
-    fn relaxed<'argument>(reach: &[&'argument OsString]) -> impl Iterator<Item = &'argument OsString> {
-        let end = reach.iter().position(|word| *word == Self::REACH_END);
-        let whole = matches!(reach, [reached, _, total, ..] if reached == total && *reached != "0");
-        end.filter(|_| whole).into_iter().flat_map(|end| reach.iter().skip(end).skip(1).copied())
+    fn relaxed<'argument>(reach: &[&'argument OsString]) -> Vec<&'argument OsString> {
+        let names: &[&OsString] = match reach {
+            [reached, _, total, _, names @ ..] if reached == total && *reached != "0" => names,
+            _ => &[],
+        };
+        names.to_vec()
     }
 
     #[must_use]
