@@ -1,5 +1,6 @@
 use crate::characters::Characters;
 use crate::document::key::Key;
+use crate::document::lines::Lines;
 use crate::document::text::Text;
 use crate::excerpt::Excerpt;
 use crate::finding::Finding;
@@ -36,12 +37,11 @@ impl<'text> Command<'text> {
     }
 
     pub(crate) fn finding(self, setting: Key) -> Option<Finding> {
-        self.0
-            .multiline()
-            .map(|_| Finding::Block)
+        (self.0.lines() > Lines::ONE)
+            .then_some(Finding::Block)
             .or_else(|| self.excess().map(|characters| Finding::TooLong { characters, limit: Self::LIMIT }))
             .or_else(|| Self::operator_in(self, setting).map(|symbol| Finding::Operator { symbol }))
-            .or_else(|| Self::keyword_in(self.0).map(|word| Finding::Control { word }))
+            .or_else(|| self.keyword().map(|word| Finding::Control { word }))
             .or_else(|| {
                 (setting == Key::Run)
                     .then(|| Unquoted::new(self.0, Hidden::Quoted).parsed::<Inline>().ok())
@@ -77,11 +77,11 @@ impl<'text> Command<'text> {
             .or_else(|| command.0.modified_expansion())
     }
 
-    fn keyword_in(text: Text<'_>) -> Option<Word> {
+    fn keyword(self) -> Option<Word> {
         Self::OPENERS
             .iter()
             .copied()
-            .find(|word| text.after(Text::from(*word)).is_some())
-            .or_else(|| Self::KEYWORDS.iter().copied().find(|word| text.after_word(*word).is_some()))
+            .find(|word| self.0.after(Text::from(*word)).is_some())
+            .or_else(|| Self::KEYWORDS.iter().find_map(|word| self.0.leading(*word)))
     }
 }
