@@ -1,8 +1,11 @@
 test budget, report only:
-corpus: 6 tests in 7 files, 29 of 29 lines, 1 process starts
+corpus: 8 tests in 9 files, 41 of 41 lines, 1 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 unit tests do no I/O and start no process:
-tests/behaviour/main.rs:4: calls std::env::var in test code; use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports
-tests/disk.rs:4: calls std::fs::read_to_string in test code; use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports
-tests/scratch.rs:3: calls tempfile::tempdir in test code; use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports
+tests/behaviour/main.rs:4: calls std::env::var in test code; use a fake of the port or a library API such as golden!
+tests/behaviour/ports.rs:4: calls std::process::Command::new in test code; use a fake of the port or a library API such as golden!
+tests/disk.rs:4: calls std::fs::read_to_string in test code; use a fake of the port or a library API such as golden!
+tests/ports.rs:4: calls std::fs::write in test code; use a fake of the port or a library API such as golden!
+tests/real_port.rs:5: calls file_ports::Disk in test code; use a fake of the port or a library API such as golden!
+tests/scratch.rs:3: calls tempfile::tempdir in test code; use a fake of the port or a library API such as golden!
 fails
