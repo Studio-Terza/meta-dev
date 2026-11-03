@@ -7,7 +7,7 @@ use lint_complexity::Logic;
 use lint_core::{Headline, Report, Violation};
 use newtype::{Counter, Newtype};
 
-use crate::cli::workspace::percent::Percent;
+use crate::cli::request::workspace::percent::Percent;
 use among::Among;
 pub use hub::Hub;
 

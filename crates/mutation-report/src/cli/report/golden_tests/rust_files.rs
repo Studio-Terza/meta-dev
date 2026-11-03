@@ -69,7 +69,7 @@ impl RustFiles {
             .scan(kinds.into_iter(), |kinds, (directory, listing)| Some(Entry::listed(directory, listing, kinds)))
             .collect();
         let deeper: Vec<&Path> = entries.iter().flatten().flatten().filter_map(Entry::directory).collect();
-        let below = if deeper.is_empty() { Vec::new() } else { Self::listed(files, &deeper) };
+        let below = deeper.first().map_or_else(Vec::new, |_| Self::listed(files, &deeper));
         entries
             .into_iter()
             .scan(below.into_iter(), |below, entries| Some(entries.and_then(|entries| Self::flattened(entries, below))))

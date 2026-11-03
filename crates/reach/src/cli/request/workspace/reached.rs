@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use crate::cli::workspace::crate_count::CrateCount;
-use crate::cli::workspace::crate_name::CrateName;
-use crate::cli::workspace::share::Share;
+use crate::cli::request::workspace::crate_count::CrateCount;
+use crate::cli::request::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::share::Share;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cargo {
@@ -19,10 +19,10 @@ enum Flag {
 
 impl fmt::Display for Flag {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Flag::Cargo => "-p ",
-            Flag::Mutants => "--test-package=",
-        })
+        match self {
+            Flag::Cargo => formatter.write_str("-p "),
+            Flag::Mutants => formatter.write_str("--test-package="),
+        }
     }
 }
 

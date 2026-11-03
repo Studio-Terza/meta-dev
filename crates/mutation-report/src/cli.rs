@@ -14,19 +14,13 @@ pub struct Cli;
 impl Cli {
     #[must_use]
     pub fn answer(arguments: &[impl AsRef<OsStr>], files: &impl Files, err: &mut impl Write) -> ExitCode {
-        match Report::from_arguments(arguments) {
-            Ok(report) => Self::exited(report.write_summary(files), err),
-            Err(failure) => Self::exited(Err(failure), err),
-        }
+        Report::from_arguments(arguments)
+            .and_then(|report| report.write_summary(files))
+            .map_or_else(|failure| Self::refused(&failure, err), |()| ExitCode::SUCCESS)
     }
 
-    fn exited(written: Result<(), Failure<'_>>, err: &mut impl Write) -> ExitCode {
-        match written {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(failure) => {
-                writeln!(err, "{failure}").ok();
-                ExitCode::FAILURE
-            }
-        }
+    fn refused(failure: &Failure<'_>, err: &mut impl Write) -> ExitCode {
+        writeln!(err, "{failure}").ok();
+        ExitCode::FAILURE
     }
 }
