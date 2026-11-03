@@ -20,7 +20,9 @@ impl Sighting {
     }
 
     pub fn outside(self, doors: &[Owner]) -> Option<Sighting> {
-        Some(self).filter(|sighting| sighting.owner == Owner::Free || !doors.contains(&sighting.owner))
+        let free = (self.owner == Owner::Free).then_some(());
+        let undoored = doors.iter().all(|door| *door != self.owner).then_some(());
+        free.or(undoored).map(|()| self)
     }
 
     pub fn into_violation(self, path: &Path) -> Violation<'_> {

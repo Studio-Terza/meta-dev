@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use syn::punctuated::Punctuated;
 use syn::{Expr, Macro, Token};
 
+use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word, words};
 
 use super::bindings::Bindings;
@@ -38,14 +39,14 @@ impl<'run> Compared<'run> {
             Expr::Lit(literal) => Literal::pinning(&literal.lit, Reading::Plain),
             Expr::Reference(reference) => self.traced(&reference.expr, seen),
             Expr::Paren(inner) => self.traced(&inner.expr, seen),
-            Expr::MethodCall(call) if Name::from(&call.method).matches::<Whole>(&Self::PEELED).is_some() => {
-                self.traced(&call.receiver, seen)
-            }
-            Expr::Call(call)
-                if Literal::called(&call.func).and_then(|last| last.matches::<Whole>(&Self::WRAPPERS)).is_some() =>
-            {
-                call.args.iter().find_map(|argument| self.traced(argument, seen))
-            }
+            Expr::MethodCall(call) => Some(call)
+                .filter(|call| Name::from(&call.method).matches::<Whole>(&Self::PEELED).is_some())
+                .and_then(|call| self.traced(&call.receiver, seen)),
+            Expr::Call(call) => Literal::called(&call.func)
+                .filter(|last| last.matches::<Whole>(&Self::WRAPPERS).is_some())
+                .into_iter()
+                .flat_map(|_| call.args.iter())
+                .find_map(|argument| self.traced(argument, seen)),
             Expr::Array(array) => array.elems.iter().find_map(|element| self.traced(element, seen)),
             Expr::Tuple(tuple) => tuple.elems.iter().find_map(|element| self.traced(element, seen)),
             Expr::Struct(built) => built.fields.iter().find_map(|field| self.traced(&field.expr, seen)),
@@ -67,14 +68,12 @@ impl<'run> Compared<'run> {
             .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
             .map(|arguments| arguments.into_iter().collect())
             .unwrap_or_default();
-        match arguments.first() {
-            Some(Expr::Lit(literal)) if name.matches::<Whole>(&Self::FORMATS).is_some() => {
-                Literal::pinning(&literal.lit, Reading::Format)
-            }
-            _ if name.matches::<Whole>(&Self::LISTS).is_some() => {
-                arguments.iter().find_map(|argument| self.traced(argument, seen))
-            }
-            _ => None,
-        }
+        let formatted = name.matches::<Whole>(&Self::FORMATS).map(|_| arguments.first().and_then(Syntax::literal));
+        let listed = name
+            .matches::<Whole>(&Self::LISTS)
+            .into_iter()
+            .flat_map(|_| arguments.iter())
+            .find_map(|argument| self.traced(argument, seen));
+        formatted.map_or(listed, |literal| literal.and_then(|literal| Literal::pinning(literal, Reading::Format)))
     }
 }

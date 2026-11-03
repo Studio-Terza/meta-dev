@@ -9,6 +9,7 @@ use crate::subject::Subject;
 use derives::Derives;
 use lint_core::Site;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_layout::Name;
 use lint_layout::Whole;
 use lint_layout::{LineNumber, Word, words};
@@ -59,10 +60,7 @@ impl Shape {
     }
 
     fn conversion(member: &ImplItem) -> Option<Name> {
-        let method = match member {
-            ImplItem::Fn(function) => Some(Name::from(&function.sig.ident)),
-            _ => None,
-        }?;
+        let method = Syntax::impl_fn(member).map(|function| Name::from(&function.sig.ident))?;
         method
             .matches::<Whole>(&Self::METHODS)
             .or_else(|| method.words().first().and_then(|first| first.matches::<Whole>(&Self::LEADS)))

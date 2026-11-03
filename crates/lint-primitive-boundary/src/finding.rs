@@ -22,12 +22,12 @@ impl fmt::Display for Finding {
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::BarePrimitive { .. } => {
-                "take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary"
-            }
-            Finding::WireForm { .. } => "parse it into a type at the door",
-            Finding::TextOutsideDoor { .. } => "parse in FromStr or render in Display",
-        })
+        match self {
+            Finding::BarePrimitive { .. } => Fix::new(
+                "take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary",
+            ),
+            Finding::WireForm { .. } => Fix::new("parse it into a type at the door"),
+            Finding::TextOutsideDoor { .. } => Fix::new("parse in FromStr or render in Display"),
+        }
     }
 }

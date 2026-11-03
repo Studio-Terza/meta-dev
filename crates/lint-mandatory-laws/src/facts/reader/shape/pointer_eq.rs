@@ -1,4 +1,5 @@
-use syn::{Expr, ExprCall, Ident, ImplItem, ImplItemFn, ItemImpl, Stmt};
+use lint_core::Syntax;
+use syn::{Expr, ExprCall, Ident, ImplItemFn, ItemImpl, Stmt};
 
 #[derive(Debug)]
 pub(super) struct PointerEq;
@@ -9,17 +10,16 @@ impl PointerEq {
     const POINTER_METHODS: [&'static str; 2] = ["ptr_eq", "addr_eq"];
 
     pub(super) fn whole_impl(item: &ItemImpl) -> Option<&ImplItemFn> {
-        item.items.iter().find_map(|member| match member {
-            ImplItem::Fn(function) => Self::whole_body(function),
-            _ => None,
-        })
+        item.items.iter().filter_map(Syntax::impl_fn).find_map(Self::whole_body)
     }
 
     fn whole_body(function: &ImplItemFn) -> Option<&ImplItemFn> {
-        match function.block.stmts.as_slice() {
-            [Stmt::Expr(expr, None)] => Self::address_comparison(expr).map(|_| function),
-            _ => None,
-        }
+        Some(function.block.stmts.as_slice())
+            .filter(|statements| statements.len() == 1)
+            .and_then(<[Stmt]>::first)
+            .and_then(Syntax::tail)
+            .and_then(Self::address_comparison)
+            .map(|_| function)
     }
 
     fn address_comparison(expr: &Expr) -> Option<&Expr> {
@@ -32,20 +32,20 @@ impl PointerEq {
     }
 
     fn pointer_call(call: &ExprCall) -> Option<&ExprCall> {
-        match &*call.func {
-            Expr::Path(path) => {
+        Syntax::expr_path(&call.func)
+            .and_then(|path| {
                 Self::pointer_compare(&path.path.segments.iter().map(|segment| &segment.ident).collect::<Vec<_>>())
-                    .map(|_| call)
-            }
-            _ => None,
-        }
+            })
+            .map(|_| call)
     }
 
     fn pointer_compare<'name>(names: &[&'name Ident]) -> Option<&'name Ident> {
-        match names {
-            [.., module, last] if **module == Self::POINTER_MODULE && **last == Self::COMPARING => Some(last),
-            [.., last] => Self::POINTER_METHODS.iter().find(|name| **last == **name).map(|_| *last),
-            [] => None,
-        }
+        let (last, leading) = names.split_last()?;
+        leading
+            .last()
+            .filter(|module| ***module == Self::POINTER_MODULE)
+            .and(Some(*last))
+            .filter(|last| **last == Self::COMPARING)
+            .or_else(|| Self::POINTER_METHODS.iter().find(|name| **last == **name).map(|_| *last))
     }
 }

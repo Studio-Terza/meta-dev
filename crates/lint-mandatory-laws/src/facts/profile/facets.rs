@@ -31,6 +31,13 @@ impl<'file> Facets<'file> {
         self.exposure
     }
 
+    pub(crate) fn after(self, earlier: Option<Facets<'file>>) -> Facets<'file> {
+        match earlier {
+            Some(earlier) => earlier.merged(self),
+            None => self,
+        }
+    }
+
     pub(crate) fn merged(mut self, other: Facets<'file>) -> Facets<'file> {
         self.facts.extend(other.facts);
         self.exposure = self.exposure.max(other.exposure);

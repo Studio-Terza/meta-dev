@@ -28,7 +28,8 @@ impl Lint for PrimitiveBoundary {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| !support.contains(&file.path().to_owned()) && Gate::BOUNDARY.admits(file).is_none())
+                .filter(|file| support.iter().all(|path| path != file.path()))
+                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
                 .flat_map(|file| {
                     SignatureSites::violations(file, &newtypes).into_iter().chain(TextSites::violations(file))
                 })

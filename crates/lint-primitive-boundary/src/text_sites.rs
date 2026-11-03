@@ -5,10 +5,11 @@ mod sighting;
 use std::path::Path;
 
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
+use syn::{ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 
 use lint_core::Gate;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_file::FileLint;
@@ -59,14 +60,13 @@ impl TextSites {
     }
 
     fn text_constructor(call: &ExprCall) -> Option<Ident> {
-        let segments = match &*call.func {
-            Expr::Path(path) => path.path.segments.iter().collect::<Vec<_>>(),
-            _ => Vec::new(),
-        };
-        match segments.as_slice() {
-            [first, second] if first.ident == "String" && second.ident == "from" => Some(second.ident.clone()),
-            _ => None,
-        }
+        Syntax::expr_path(&call.func)
+            .map(|path| &path.path.segments)
+            .filter(|segments| segments.len() == 2)
+            .filter(|segments| segments.first().is_some_and(|first| first.ident == "String"))
+            .and_then(|segments| segments.last())
+            .filter(|second| second.ident == "from")
+            .map(|second| second.ident.clone())
     }
 }
 
@@ -80,9 +80,9 @@ impl FileLint for TextSites {
 
 impl<'ast> Visit<'ast> for TextSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
-            Walk::Entered | Walk::Skipped => {}
+        match Gate::BOUNDARY.names(module) {
+            Some(_) => {}
+            None => Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module)),
         }
     }
 
