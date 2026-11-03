@@ -435,6 +435,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-layering"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-item-graph",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "type-facts",
+]
+
+[[package]]
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
@@ -811,6 +823,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-layering",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -900,6 +913,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-layering",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",

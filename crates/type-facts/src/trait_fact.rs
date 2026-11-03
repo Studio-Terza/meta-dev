@@ -2,16 +2,29 @@ use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate::dependency::Dependency;
+
 #[derive(Clone, Debug)]
 pub struct TraitFact<'file> {
     krate: &'file CrateName,
     name: Name,
     site: Site<'file>,
+    dependencies: Vec<Dependency<'file>>,
 }
 
 impl<'file> TraitFact<'file> {
-    pub(crate) fn new(krate: &'file CrateName, name: Name, site: Site<'file>) -> TraitFact<'file> {
-        TraitFact { krate, name, site }
+    pub(crate) fn new(
+        krate: &'file CrateName,
+        name: Name,
+        site: Site<'file>,
+        dependencies: Vec<Dependency<'file>>,
+    ) -> TraitFact<'file> {
+        TraitFact { krate, name, site, dependencies }
+    }
+
+    #[must_use]
+    pub fn dependencies(&self) -> &[Dependency<'file>] {
+        &self.dependencies
     }
 }
 
