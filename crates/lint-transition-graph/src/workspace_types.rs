@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::{Endpoint, Nature, Transition};
+use transition_facts::{Endpoint, Nature, Transition, Transitions};
 use type_facts::Facts;
 
 use crate::count::Count;
@@ -13,11 +13,19 @@ use crate::end::{End, Ends, Node, Place};
 pub(crate) struct WorkspaceTypes {
     types: BTreeMap<Name, BTreeSet<CrateName>>,
     traits: BTreeSet<Name>,
+    crates: BTreeSet<CrateName>,
 }
 
 impl WorkspaceTypes {
-    pub(crate) fn declared(facts: &Facts) -> WorkspaceTypes {
+    pub(crate) fn declared(facts: &Facts, transitions: &Transitions) -> WorkspaceTypes {
         WorkspaceTypes {
+            crates: transitions
+                .all()
+                .iter()
+                .map(AsRef::<CrateName>::as_ref)
+                .chain(facts.types().iter().map(AsRef::<CrateName>::as_ref))
+                .cloned()
+                .collect(),
             types: facts.types().iter().fold(
                 BTreeMap::new(),
                 |mut names: BTreeMap<Name, BTreeSet<CrateName>>, found| {
@@ -47,7 +55,7 @@ impl WorkspaceTypes {
     fn end(&self, from: &CrateName, endpoint: &Endpoint, fixed_by: Option<&Name>) -> End {
         let name: &Name = endpoint.as_ref();
         match (endpoint.nature(), fixed_by) {
-            (Nature::Named, _) => self.named(from, name),
+            (Nature::Named, _) => self.named(endpoint.origin().unwrap_or(from), name),
             (Nature::Interface, _) => End::placed(Place::Interface, name),
             (Nature::Primitive, Some(fixing)) => End::placed(Place::Interface, fixing),
             (Nature::Primitive, None) => End::placed(Place::Primitive, name),
@@ -56,7 +64,7 @@ impl WorkspaceTypes {
     }
 
     fn named(&self, from: &CrateName, name: &Name) -> End {
-        let declaring = self.types.get(name);
+        let declaring = self.types.get(name).filter(|_| self.crates.contains(from));
         let resolved = declaring.map(|crates| Node::resolved(crates, from, name));
         match resolved {
             None => End::placed(Place::External, name),

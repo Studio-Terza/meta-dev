@@ -1,3 +1,4 @@
+mod origins;
 mod signature_reading;
 
 use syn::visit::{self, Visit};
@@ -9,11 +10,12 @@ use lint_placement::CrateName;
 
 use crate::ground::Ground;
 use crate::transition::Transition;
+use origins::Origins;
 use signature_reading::SignatureReading;
 
 pub(super) struct Collector<'file> {
     file: &'file SourceFile,
-    krate: CrateName,
+    origins: Origins,
     ground: Ground,
     transitions: Vec<Transition>,
 }
@@ -22,7 +24,7 @@ impl<'file> Collector<'file> {
     pub(super) fn collected(file: &'file SourceFile) -> Vec<Transition> {
         let mut scan = Collector {
             file,
-            krate: CrateName::from(file.placement().package().root()),
+            origins: Origins::of_file(CrateName::from(file.placement().package().root()), file.syntax()),
             ground: Ground::gated(file),
             transitions: Vec::new(),
         };
@@ -44,7 +46,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
-        let reading = SignatureReading::of_trait(self.krate.clone(), found, self.ground);
+        let reading = SignatureReading::of_trait(&self.origins, found, self.ground);
         let provided: Vec<Transition> = found
             .items
             .iter()
@@ -63,7 +65,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
-        let reading = SignatureReading::of_impl(self.krate.clone(), found, self.ground);
+        let reading = SignatureReading::of_impl(&self.origins, found, self.ground);
         let transitions: Vec<Transition> = found
             .items
             .iter()
@@ -78,7 +80,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let found = SignatureReading::free(self.krate.clone(), self.ground).transition(
+        let found = SignatureReading::free(&self.origins, self.ground).transition(
             self.site(&function.sig.ident),
             &function.sig,
             &function.block,
