@@ -27,21 +27,21 @@ impl fmt::Display for Flag {
 }
 
 #[derive(Debug)]
-pub struct Reached {
-    crates: BTreeSet<CrateName>,
+pub struct Reached<'meta> {
+    crates: BTreeSet<&'meta CrateName>,
     total: CrateCount,
     cargo: Cargo,
 }
 
-impl Reached {
+impl<'meta> Reached<'meta> {
     const WORKSPACE_FLAG: &'static str = "--workspace";
 
-    pub fn new(crates: BTreeSet<CrateName>, total: CrateCount) -> Reached {
+    pub fn new(crates: BTreeSet<&'meta CrateName>, total: CrateCount) -> Reached<'meta> {
         Reached { crates, total, cargo: Cargo::Reached }
     }
 
     #[must_use]
-    pub fn widened(self) -> Reached {
+    pub fn widened(self) -> Reached<'meta> {
         Reached { cargo: Cargo::Workspace, ..self }
     }
 
@@ -49,7 +49,7 @@ impl Reached {
         Share::new(CrateCount::new(self.crates.len()), self.total)
     }
 
-    pub fn covering(&self, crates: &BTreeSet<CrateName>) -> Option<&Reached> {
+    pub fn covering(&self, crates: &BTreeSet<&CrateName>) -> Option<&Reached<'meta>> {
         crates.is_subset(&self.crates).then_some(self)
     }
 
@@ -66,7 +66,7 @@ impl Reached {
     }
 }
 
-impl fmt::Display for Reached {
+impl fmt::Display for Reached<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "REACH={} of {} crates", self.crates.len(), self.total)?;
         write!(formatter, "BUILD_SCOPE=")?;
