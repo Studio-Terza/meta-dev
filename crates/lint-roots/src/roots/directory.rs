@@ -1,6 +1,7 @@
 mod ignored;
 mod kept;
 
+use std::iter;
 use std::path::{Path, PathBuf};
 
 use file_ports::Files;
@@ -33,8 +34,10 @@ impl Directory {
         roots
             .iter()
             .map(|root| {
-                let order = Kept::new(&survey, ignored).preorder(Directory(root.clone()));
-                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, order)), Err)
+                let kept = Kept::new(&survey, ignored);
+                let below = kept.preorder(kept.below(root));
+                let order: Vec<&Path> = iter::once(root.as_path()).chain(below.iter().map(AsRef::as_ref)).collect();
+                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, below)), Err)
             })
             .collect()
     }

@@ -16,7 +16,7 @@ pub struct Packages;
 impl Packages {
     pub fn targets_of(
         files: &impl Files,
-        trees: &[&Tree],
+        trees: &[&Tree<'_>],
         admitted: Vec<Result<Vec<Manifest>, Failure>>,
     ) -> Vec<Result<Vec<Target>, Failure>> {
         let named: Vec<PathBuf> = admitted.iter().flatten().flatten().flat_map(Manifest::named_paths).collect();
@@ -28,7 +28,7 @@ impl Packages {
         trees
             .iter()
             .zip(groups)
-            .map(|(tree, group)| group.and_then(|packages| Self::targets_in(&mut survey, tree, &packages)))
+            .map(|(tree, group)| group.and_then(|packages| Self::targets_in(&mut survey, tree, packages)))
             .collect()
     }
 
@@ -59,14 +59,15 @@ impl Packages {
         survey.learn(files, Fact::Followed, &mains)
     }
 
-    fn targets_in(survey: &mut Survey, tree: &Tree, packages: &[Package]) -> Result<Vec<Target>, Failure> {
+    fn targets_in(survey: &mut Survey, tree: &Tree<'_>, packages: Vec<Package>) -> Result<Vec<Target>, Failure> {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)
             .filter(|directory| survey.kind(directory) == Kind::Directory)
             .collect();
-        survey
-            .failure(&real)
-            .map_or_else(|| Ok(packages.iter().flat_map(|package| package.targets(survey, tree)).collect()), Err)
+        survey.failure(&real).map_or_else(
+            || Ok(packages.into_iter().filter_map(|package| package.into_target(survey, tree)).collect()),
+            Err,
+        )
     }
 }

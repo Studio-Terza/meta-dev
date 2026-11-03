@@ -9,7 +9,7 @@ use newtype::Newtype;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Located<'tree> {
-    tree: &'tree Tree,
+    tree: &'tree Tree<'tree>,
     package: PathBuf,
     file: PathBuf,
 }
@@ -30,7 +30,7 @@ pub struct Opened {
 
 impl<'tree> Located<'tree> {
     #[must_use]
-    pub fn new(tree: &'tree Tree, package: &Path, file: &Path) -> Located<'tree> {
+    pub fn new(tree: &'tree Tree<'tree>, package: &Path, file: &Path) -> Located<'tree> {
         Located { tree, package: package.to_path_buf(), file: file.to_path_buf() }
     }
 

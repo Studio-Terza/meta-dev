@@ -17,7 +17,7 @@ pub struct Survey {
     kinds: BTreeMap<PathBuf, Kind>,
     canonical: BTreeMap<PathBuf, PathBuf>,
     listed: BTreeMap<PathBuf, Vec<PathBuf>>,
-    failed: BTreeMap<PathBuf, Vec<Failure>>,
+    failed: Vec<Failure>,
 }
 
 impl Survey {
@@ -67,11 +67,10 @@ impl Survey {
     }
 
     pub fn failure(&mut self, order: &[impl AsRef<Path>]) -> Option<Failure> {
-        let first = order
-            .iter()
-            .map(AsRef::as_ref)
-            .find(|directory| self.failed.get(*directory).is_some_and(|failures| !failures.is_empty()))?;
-        self.failed.get_mut(first).and_then(Vec::pop)
+        let latest = order.iter().map(AsRef::as_ref).find_map(|directory| {
+            self.failed.iter().rposition(|failure| matches!(failure, Failure::Io { path, .. } if path == directory))
+        })?;
+        Some(self.failed.remove(latest))
     }
 
     fn extended<Value>(
@@ -91,8 +90,7 @@ impl Survey {
                 self
             }
             Err(failure) => {
-                let failure = Failure::Io { path: directory.clone(), source: failure.into() };
-                self.failed.entry(directory).or_default().push(failure);
+                self.failed.push(Failure::Io { path: directory, source: failure.into() });
                 self
             }
         }

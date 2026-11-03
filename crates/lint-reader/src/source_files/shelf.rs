@@ -6,15 +6,17 @@ use lint_core::SourceFile;
 use lint_layout::Failure;
 use lint_roots::{Fact, Survey};
 
-use super::located::{Located, Node, Opened};
+mod shelved;
+
+use super::located::{Located, Node};
 use super::modules::{Child, Modules};
 use super::scope::Scope;
+use shelved::Shelved;
 
 #[derive(Debug, Default)]
 pub struct Shelf<'tree> {
     survey: Survey,
-    opened: BTreeMap<Located<'tree>, Opened>,
-    parsed: BTreeMap<Located<'tree>, Result<SourceFile, Failure>>,
+    shelved: BTreeMap<Located<'tree>, Shelved>,
 }
 
 impl<'tree> Shelf<'tree> {
@@ -29,18 +31,18 @@ impl<'tree> Shelf<'tree> {
     }
 
     pub fn source(&mut self, scope: &Scope<'tree>, file: &Path) -> Option<Result<SourceFile, Failure>> {
-        self.parsed.remove(&Located::new(scope.tree(), scope.package(), file))
+        self.shelved.get_mut(&Located::new(scope.tree(), scope.package(), file)).and_then(Shelved::take_parsed)
     }
 
     #[must_use]
     pub fn test_source(&self, scope: &Scope<'tree>, file: &Path) -> Option<SourceFile> {
         let located = Located::new(scope.tree(), scope.package(), file);
-        self.opened.get(&located).and_then(|opened| opened.parsed().ok())
+        self.shelved.get(&located).and_then(Shelved::reparsed)
     }
 
     fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: &BTreeSet<Node<'tree>>) -> Shelf<'tree> {
         let fresh: BTreeSet<Located<'tree>> =
-            level.iter().map(Node::located).filter(|located| !self.parsed.contains_key(*located)).cloned().collect();
+            level.iter().map(Node::located).filter(|located| !self.shelved.contains_key(*located)).cloned().collect();
         let stocked = self.read(files, fresh.into_iter().collect());
         let candidates: Vec<PathBuf> = level.iter().flat_map(|node| stocked.candidates(node)).collect();
         let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Followed, &candidates), ..stocked };
@@ -60,33 +62,26 @@ impl<'tree> Shelf<'tree> {
 
     fn read(self, files: &impl Files, fresh: Vec<Located<'tree>>) -> Shelf<'tree> {
         let opened = Located::open_many(files, &fresh);
-        fresh.into_iter().zip(opened).fold(self, |mut shelf, (located, opened)| match opened {
-            Ok(opened) => {
-                shelf.parsed.insert(located.clone(), opened.parsed());
-                shelf.opened.insert(located, opened);
-                shelf
-            }
-            Err(failure) => {
-                shelf.parsed.insert(located, Err(failure));
-                shelf
-            }
+        fresh.into_iter().zip(opened).fold(self, |mut shelf, (located, opened)| {
+            shelf.shelved.insert(located, Shelved::from(opened));
+            shelf
         })
     }
 
     fn candidates(&self, node: &Node<'tree>) -> Vec<PathBuf> {
-        self.parsed
+        self.shelved
             .get(node.located())
+            .and_then(Shelved::parsed)
             .into_iter()
-            .flatten()
             .flat_map(|parsed| Modules::candidates(node.located().file(), node.children(), &parsed.syntax().items))
             .collect()
     }
 
     fn declared(&self, node: &Node<'tree>) -> Vec<Child> {
-        self.parsed
+        self.shelved
             .get(node.located())
+            .and_then(Shelved::parsed)
             .into_iter()
-            .flatten()
             .flat_map(|parsed| {
                 Modules::declared_in(&self.survey, node.located().file(), node.children(), &parsed.syntax().items)
                     .nested()
