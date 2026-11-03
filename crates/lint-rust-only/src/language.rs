@@ -1,10 +1,13 @@
 mod content;
+mod extensions;
 mod fix;
 
 use std::ffi::OsStr;
+use std::fmt;
 use std::path::Path;
 
 use content::Content;
+use extensions::Extensions;
 pub(crate) use fix::Fix;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,72 +147,7 @@ impl Language {
     }
 
     fn by_extension(extension: &OsStr) -> Option<Language> {
-        let lowered = extension.to_ascii_lowercase();
-        let known = lowered.to_str()?;
-        Self::ALL.iter().copied().find(|language| language.extensions().contains(&known))
-    }
-
-    #[must_use]
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Language::Python => "Python",
-            Language::Shell => "shell",
-            Language::Batch => "batch",
-            Language::PowerShell => "PowerShell",
-            Language::Perl => "Perl",
-            Language::Ruby => "Ruby",
-            Language::Php => "PHP",
-            Language::Lua => "Lua",
-            Language::Go => "Go",
-            Language::Java => "Java",
-            Language::Kotlin => "Kotlin",
-            Language::Scala => "Scala",
-            Language::Swift => "Swift",
-            Language::ObjectiveC => "Objective-C",
-            Language::C => "C",
-            Language::Cpp => "C++",
-            Language::CSharp => "C#",
-            Language::Dart => "Dart",
-            Language::Haskell => "Haskell",
-            Language::Elixir => "Elixir",
-            Language::Erlang => "Erlang",
-            Language::Clojure => "Clojure",
-            Language::OCaml => "OCaml",
-            Language::FSharp => "F#",
-            Language::R => "R",
-            Language::Julia => "Julia",
-            Language::Groovy => "Groovy",
-            Language::Zig => "Zig",
-            Language::JavaScript => "JavaScript",
-            Language::TypeScript => "TypeScript",
-            Language::Html => "HTML",
-            Language::Css => "CSS",
-            Language::Vue => "Vue",
-            Language::Svelte => "Svelte",
-            Language::Awk => "awk",
-            Language::Sed => "sed",
-            Language::Tcl => "Tcl",
-            Language::Nix => "Nix",
-            Language::Make => "make",
-            Language::Notebook => "notebook",
-            Language::Vim => "Vim script",
-            Language::Lisp => "Lisp",
-            Language::Scheme => "Scheme",
-            Language::Racket => "Racket",
-            Language::Nim => "Nim",
-            Language::VisualBasic => "Visual Basic",
-            Language::Solidity => "Solidity",
-            Language::Assembly => "assembly",
-            Language::D => "D",
-            Language::Pascal => "Pascal",
-            Language::Fortran => "Fortran",
-            Language::Crystal => "Crystal",
-            Language::V => "V",
-            Language::Arduino => "Arduino",
-            Language::Starlark => "Starlark",
-            Language::Astro => "Astro",
-            Language::Script => "interpreted script",
-        }
+        Self::ALL.iter().copied().find(|language| language.extensions().holding(extension).is_some())
     }
 
     #[must_use]
@@ -226,8 +164,8 @@ impl Language {
         }
     }
 
-    fn extensions(self) -> &'static [&'static str] {
-        match self {
+    fn extensions(self) -> Extensions {
+        Extensions::new(match self {
             Language::Python => &["py", "pyw", "pyi", "pyx"],
             Language::Shell => &["sh", "bash", "zsh", "fish", "ksh", "csh", "dash"],
             Language::Batch => &["bat", "cmd"],
@@ -285,6 +223,70 @@ impl Language {
             Language::Starlark => &["bzl"],
             Language::Astro => &["astro"],
             Language::Script => &[],
-        }
+        })
+    }
+}
+
+impl fmt::Display for Language {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Language::Python => "Python",
+            Language::Shell => "shell",
+            Language::Batch => "batch",
+            Language::PowerShell => "PowerShell",
+            Language::Perl => "Perl",
+            Language::Ruby => "Ruby",
+            Language::Php => "PHP",
+            Language::Lua => "Lua",
+            Language::Go => "Go",
+            Language::Java => "Java",
+            Language::Kotlin => "Kotlin",
+            Language::Scala => "Scala",
+            Language::Swift => "Swift",
+            Language::ObjectiveC => "Objective-C",
+            Language::C => "C",
+            Language::Cpp => "C++",
+            Language::CSharp => "C#",
+            Language::Dart => "Dart",
+            Language::Haskell => "Haskell",
+            Language::Elixir => "Elixir",
+            Language::Erlang => "Erlang",
+            Language::Clojure => "Clojure",
+            Language::OCaml => "OCaml",
+            Language::FSharp => "F#",
+            Language::R => "R",
+            Language::Julia => "Julia",
+            Language::Groovy => "Groovy",
+            Language::Zig => "Zig",
+            Language::JavaScript => "JavaScript",
+            Language::TypeScript => "TypeScript",
+            Language::Html => "HTML",
+            Language::Css => "CSS",
+            Language::Vue => "Vue",
+            Language::Svelte => "Svelte",
+            Language::Awk => "awk",
+            Language::Sed => "sed",
+            Language::Tcl => "Tcl",
+            Language::Nix => "Nix",
+            Language::Make => "make",
+            Language::Notebook => "notebook",
+            Language::Vim => "Vim script",
+            Language::Lisp => "Lisp",
+            Language::Scheme => "Scheme",
+            Language::Racket => "Racket",
+            Language::Nim => "Nim",
+            Language::VisualBasic => "Visual Basic",
+            Language::Solidity => "Solidity",
+            Language::Assembly => "assembly",
+            Language::D => "D",
+            Language::Pascal => "Pascal",
+            Language::Fortran => "Fortran",
+            Language::Crystal => "Crystal",
+            Language::V => "V",
+            Language::Arduino => "Arduino",
+            Language::Starlark => "Starlark",
+            Language::Astro => "Astro",
+            Language::Script => "interpreted script",
+        })
     }
 }

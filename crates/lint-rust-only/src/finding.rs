@@ -17,7 +17,7 @@ impl Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {}", self.language.name(), self.place)
+        write!(formatter, "{} {}", self.language, self.place)
     }
 }
 

@@ -1,33 +1,33 @@
 use std::convert::Infallible;
 use std::str::FromStr;
 
-pub(super) struct Part {
-    name: String,
-    lowered: String,
-}
+pub(super) struct Part(String);
+
+#[derive(Clone, Copy)]
+struct Marker(&'static str);
 
 impl Part {
-    const WHOLE: [&'static str; 2] = ["test", "tests"];
+    const WHOLE: [Marker; 2] = [Marker("test"), Marker("tests")];
 
-    const ENDINGS: [&'static str; 2] = ["Test", "Tests"];
+    const ENDINGS: [Marker; 2] = [Marker("Test"), Marker("Tests")];
 
     const EXTENSION: char = '.';
 
     pub(super) fn naming_tests(self) -> Option<Part> {
+        let lowered: String = self.0.chars().flat_map(char::to_lowercase).collect();
         Self::WHOLE
-            .iter()
-            .copied()
-            .find(|whole| self.lowered == *whole)
-            .or_else(|| Self::ENDINGS.iter().find_map(|ending| self.ending(ending)))
+            .into_iter()
+            .find(|whole| lowered == whole.0)
+            .or_else(|| Self::ENDINGS.into_iter().find_map(|ending| self.ending(ending)))
             .map(|_| self)
     }
 
-    fn ending(&self, ending: &'static str) -> Option<&'static str> {
-        self.name
+    fn ending(&self, ending: Marker) -> Option<Marker> {
+        self.0
             .len()
-            .checked_sub(ending.len())
-            .and_then(|from| self.name.get(from..))
-            .filter(|tail| *tail == ending)
+            .checked_sub(ending.0.len())
+            .and_then(|from| self.0.get(from..))
+            .filter(|tail| *tail == ending.0)
             .map(|_| ending)
     }
 }
@@ -36,8 +36,6 @@ impl FromStr for Part {
     type Err = Infallible;
 
     fn from_str(text: &str) -> Result<Part, Infallible> {
-        let name: String = text.chars().take_while(|letter| *letter != Self::EXTENSION).collect();
-        let lowered = name.chars().flat_map(char::to_lowercase).collect();
-        Ok(Part { name, lowered })
+        Ok(Part(text.chars().take_while(|letter| *letter != Self::EXTENSION).collect()))
     }
 }
