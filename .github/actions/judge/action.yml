@@ -13,13 +13,8 @@ runs:
       if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/project/') || github.base_ref == 'main' || startsWith(github.base_ref, 'project/')
       shell: bash
       env:
-        ARGS: ${{ inputs.stages }} ${{ startsWith(github.base_ref, 'project/') && '--report-only clippy test-run lint' || '--report-only test-compile' }}
-      run: |
-        set -- $REACH
-        if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ "${1:-0}" != 0 ] && [ "${1:-}" = "${3:-}" ]; then
-          ARGS="$ARGS test-compile"
-        fi
-        "$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS
+        ARGS: ${{ inputs.stages }} ${{ startsWith(github.base_ref, 'project/') && format('--report-only clippy test-run lint --whole-reach {0} test-compile', env.REACH) || '--report-only test-compile' }}
+      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS'
     - name: step times
       if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
       shell: bash

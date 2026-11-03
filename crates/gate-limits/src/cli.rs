@@ -29,15 +29,26 @@ impl Cli {
     const DEFAULT_LIMITS: &'static str = "ci/limits.toml";
     const DEFAULT_MEASURED: &'static str = "ci/measured.toml";
     const REPORT_ONLY: &'static str = "--report-only";
+    const WHOLE_REACH: &'static str = "--whole-reach";
+    const REACH_END: &'static str = "crates";
 
     pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Cli {
         let limits = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_LIMITS), PathBuf::from);
         let measured = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_MEASURED), PathBuf::from);
-        let rest: Vec<OsString> = arguments.collect();
+        let all: Vec<OsString> = arguments.collect();
+        let split = all.iter().position(|argument| argument == Self::WHOLE_REACH).unwrap_or(all.len());
+        let rest: Vec<OsString> = all.iter().take(split).cloned().collect();
+        let reach: Vec<&OsString> = all.iter().skip(split).skip(1).collect();
         let flag = rest.iter().position(|argument| argument == Self::REPORT_ONLY).unwrap_or(rest.len());
         let only = rest.iter().take(flag).cloned().collect();
-        let report_only = rest.iter().skip(flag).skip(1).cloned().collect();
+        let report_only = rest.iter().skip(flag).skip(1).chain(Self::relaxed(&reach)).cloned().collect();
         Cli { limits, measured, only, report_only }
+    }
+
+    fn relaxed<'argument>(reach: &[&'argument OsString]) -> impl Iterator<Item = &'argument OsString> {
+        let end = reach.iter().position(|word| *word == Self::REACH_END);
+        let whole = matches!(reach, [reached, _, total, ..] if reached == total && *reached != "0");
+        end.filter(|_| whole).into_iter().flat_map(|end| reach.iter().skip(end).skip(1).copied())
     }
 
     #[must_use]
