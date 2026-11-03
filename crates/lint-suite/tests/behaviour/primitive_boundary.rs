@@ -26,6 +26,9 @@ const TUPLE: &str = "fn f(x: (u8, char)) {}\n";
 const CLOSURE: &str = "fn f(x: impl Fn(&str) -> bool) {}\n";
 const BOUND: &str = "fn m<T>(a: T)\nwhere\n    T: AsRef<str>,\n{\n}\n";
 const ALIASED: &str = "type Label = String;\nfn f(x: Label) {}\n";
+const ALIASED_QUALIFIED: &str = "type Label = <A>::String;\nfn f(x: Label) {}\n";
+const TWO_FIELD_CONSTRUCTOR: &str =
+    "struct Pair(A, B);\nimpl Pair {\n    fn new(x: u32) -> Pair {\n        g(x)\n    }\n}\n";
 const QUALIFIED: &str = "fn m(a: std::string::String, b: alloc::string::String) {}\n";
 const RENAMED: &str = "use std::string::String as S;\nfn m(a: S) {}\n";
 const FOREIGN_PATHS: &str = "fn f(x: other::String, y: &other::str, z: <A>::String) {}\n";
@@ -44,7 +47,7 @@ const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &
 const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 
-const CASES: [Case; 44] = [
+const CASES: [Case; 46] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -165,6 +168,16 @@ const CASES: [Case; 44] = [
         Title::new("an alias of a primitive is read through"),
         &[Source::new(Located::new("a.rs"), Text::new(ALIASED))],
         Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("an alias of a qualified path is not read through"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("new on a tuple struct of two fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_FIELD_CONSTRUCTOR))],
+        Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
         Title::new("qualified String"),
