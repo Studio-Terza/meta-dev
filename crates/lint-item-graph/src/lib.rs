@@ -57,20 +57,20 @@ impl ItemGraph {
 
     #[must_use]
     pub fn name_at(&self, node: NodeIndex) -> Option<&Name> {
-        self.names.get(node.index())
+        self.names.get(node.into_inner())
     }
 
     #[must_use]
     pub fn tangles(&self) -> Vec<Vec<NodeIndex>> {
         let everyone: Vec<NodeIndex> = (0..self.names.len()).map(NodeIndex::from).collect();
         let finished: Vec<NodeIndex> =
-            Traversal::trees(everyone, |node| self.links.get(node.index()).cloned().unwrap_or_default())
+            Traversal::trees(everyone, |node| self.links.get(node.into_inner()).cloned().unwrap_or_default())
                 .into_iter()
                 .flatten()
                 .collect();
         let backward = Self::reversed(&self.links);
         let tangles: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished.into_iter().rev().collect(), |node| {
-            backward.get(node.index()).cloned().unwrap_or_default()
+            backward.get(node.into_inner()).cloned().unwrap_or_default()
         })
         .into_iter()
         .map(|component| component.into_iter().collect::<BTreeSet<NodeIndex>>().into_iter().collect())
@@ -84,7 +84,7 @@ impl ItemGraph {
         let edges =
             links.iter().enumerate().flat_map(|(from, to)| to.iter().map(move |to| (NodeIndex::from(from), *to)));
         edges.fold(vec![Vec::new(); links.len()], |mut backward, (from, to)| {
-            backward.get_mut(to.index()).into_iter().for_each(|reaching| reaching.push(from));
+            backward.get_mut(to.into_inner()).into_iter().for_each(|reaching| reaching.push(from));
             backward
         })
     }

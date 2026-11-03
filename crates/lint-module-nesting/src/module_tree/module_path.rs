@@ -64,10 +64,6 @@ impl ModulePath {
         &self.file
     }
 
-    pub fn segment_length(&self) -> usize {
-        self.segments.len()
-    }
-
     pub fn parent(&self) -> Option<ModulePath> {
         let (_, parents) = self.segments.split_last()?;
         Some(ModulePath { crate_root: self.crate_root.clone(), segments: parents.to_vec(), file: PathBuf::new() })
@@ -78,24 +74,25 @@ impl ModulePath {
     }
 
     pub fn crossed_directory(&self, user: &ModulePath, modules: &ModuleIndex) -> Option<ModulePath> {
-        (1..self.segments.len()).map(|cut| self.truncated_to_length(cut)).find(|boundary| {
+        self.prefixes().take(self.segments.len()).skip(1).find(|boundary| {
             modules.directory_same_as(boundary).is_some() && boundary.relates::<Ancestor>(user).is_none()
         })
     }
 
     pub fn deepest_in<'index>(&self, modules: &'index ModuleIndex) -> Option<&'index ModulePath> {
-        (0..=self.segments.len())
-            .rev()
-            .map(|length| self.truncated_to_length(length))
-            .find_map(|probe| modules.same_as(&probe))
+        self.prefixes().rev().find_map(|probe| modules.same_as(&probe))
     }
 
-    pub fn truncated_to_length(&self, length: usize) -> ModulePath {
-        ModulePath {
-            crate_root: self.crate_root.clone(),
-            segments: self.segments.iter().take(length).cloned().collect(),
-            file: PathBuf::new(),
-        }
+    pub fn truncated_like(&self, other: &ModulePath) -> ModulePath {
+        self.with_segments(self.segments.iter().take(other.segments.len()).cloned().collect())
+    }
+
+    fn prefixes(&self) -> impl DoubleEndedIterator<Item = ModulePath> + '_ {
+        (0..=self.segments.len()).map(|length| self.with_segments(self.segments.iter().take(length).cloned().collect()))
+    }
+
+    fn with_segments(&self, segments: Vec<Name>) -> ModulePath {
+        ModulePath { crate_root: self.crate_root.clone(), segments, file: PathBuf::new() }
     }
 
     fn child(&self, name: &Name) -> ModulePath {

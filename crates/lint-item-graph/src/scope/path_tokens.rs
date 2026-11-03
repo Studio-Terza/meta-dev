@@ -16,25 +16,28 @@ impl PathTokens {
         &self.0
     }
 
-    pub fn root_index(&self, index: usize) -> Option<usize> {
-        self.separator_before(index).map_or(Some(index), |_| {
-            index
-                .checked_sub(Self::SEGMENT_LENGTH)
-                .filter(|before| matches!(self.0.get(*before), Some(TokenTree::Ident(_))))
-                .and_then(|before| self.root_index(before))
+    pub fn roots(&self) -> Vec<Option<&TokenTree>> {
+        self.0.iter().fold(Vec::new(), |mut found, _| {
+            let root = self.next_root(&found);
+            found.push(root);
+            found
         })
     }
 
-    fn separator_before(&self, index: usize) -> Option<&TokenTree> {
+    fn next_root<'tokens>(&'tokens self, found: &[Option<&'tokens TokenTree>]) -> Option<&'tokens TokenTree> {
+        let index = found.len();
         (1..=Self::SEPARATOR_LENGTH)
-            .map(|back| {
+            .map(|back| index.checked_sub(back).and_then(|at| self.0.get(at)).and_then(Self::separator))
+            .collect::<Option<Vec<&TokenTree>>>()
+            .map_or(self.0.get(index), |_| {
                 index
-                    .checked_sub(back)
-                    .and_then(|at| self.0.get(at))
-                    .filter(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
+                    .checked_sub(Self::SEGMENT_LENGTH)
+                    .filter(|before| matches!(self.0.get(*before), Some(TokenTree::Ident(_))))
+                    .and_then(|before| found.get(before).copied().flatten())
             })
-            .collect::<Option<Vec<&TokenTree>>>()?
-            .into_iter()
-            .next()
+    }
+
+    fn separator(token: &TokenTree) -> Option<&TokenTree> {
+        Some(token).filter(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
     }
 }
