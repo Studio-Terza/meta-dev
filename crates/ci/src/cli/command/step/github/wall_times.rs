@@ -8,6 +8,7 @@ use std::io::Write;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use job::Job;
 use repository::Repository;
@@ -45,14 +46,16 @@ impl fmt::Display for WallTimes {
 
 impl Step for WallTimes {
     fn from_arguments(arguments: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
-        match arguments.as_slice() {
-            [repository, run, job] => Ok(WallTimes {
-                repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
-                run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
-                job: Job::new(job.to_str().ok_or(Failure::Usage)?.to_owned()),
-            }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let repository = &arguments.taken()?;
+        let run = &arguments.taken()?;
+        let job = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(WallTimes {
+            repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
+            run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
+            job: Job::new(job.to_str().ok_or(Failure::Usage)?.to_owned()),
+        })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+mod boundary;
+
 use super::place::Place;
+use boundary::Status;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NotAChange;
@@ -16,9 +19,6 @@ pub enum Change {
 
 impl Change {
     const SEPARATOR: &'static str = "\t";
-    const ADDED: char = 'A';
-    const COPIED: char = 'C';
-    const RENAMED: char = 'R';
 
     pub(crate) fn now_at(&self) -> &Path {
         match self {
@@ -35,11 +35,7 @@ impl Change {
     }
 
     pub(crate) fn touching(&self, place: Place) -> Option<&Change> {
-        let touched = match self {
-            Change::Renamed { from, to } => [from, to].iter().any(|path| place.containing(path).is_some()),
-            Change::Added(path) | Change::Copied(path) | Change::Touched(path) => place.containing(path).is_some(),
-        };
-        touched.then_some(self)
+        self.paths().into_iter().find_map(|path| place.containing(path)).map(|_| self)
     }
 
     pub(crate) fn bringing_in(&self, place: Place) -> Option<&Path> {
@@ -61,13 +57,8 @@ impl FromStr for Change {
         let starts = [0].into_iter().chain(tabs.iter().map(|at| at + Self::SEPARATOR.len()));
         let ends = tabs.iter().copied().chain([line.len()]);
         let fields: Vec<&str> = starts.zip(ends).filter_map(|(start, end)| line.get(start..end)).collect();
-        let status = fields.first().and_then(|status| status.chars().next()).ok_or(NotAChange)?;
-        match (fields.as_slice(), status) {
-            ([_, path], Self::ADDED) => Ok(Change::Added(PathBuf::from(path))),
-            ([_, _, path], Self::COPIED) => Ok(Change::Copied(PathBuf::from(path))),
-            ([_, from, to], Self::RENAMED) => Ok(Change::Renamed { from: PathBuf::from(from), to: PathBuf::from(to) }),
-            ([_, path], _) => Ok(Change::Touched(PathBuf::from(path))),
-            _ => Err(NotAChange),
-        }
+        let (status, paths) = fields.split_first().ok_or(NotAChange)?;
+        let status = status.chars().next().map(Status::from).ok_or(NotAChange)?;
+        status.change(paths).ok_or(NotAChange)
     }
 }

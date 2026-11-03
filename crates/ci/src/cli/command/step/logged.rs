@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 
 #[derive(Debug)]
@@ -14,12 +15,11 @@ pub struct Logged {
 
 impl Step for Logged {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Logged, Failure<'static>> {
-        match arguments.as_slice() {
-            [log, program, rest @ ..] => {
-                Ok(Logged { log: PathBuf::from(log), invocation: Invocation::new(program, rest) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let log = &arguments.taken()?;
+        let program = &arguments.taken()?;
+        let rest = arguments.rest();
+        Ok(Logged { log: PathBuf::from(log), invocation: Invocation::new(program, rest) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

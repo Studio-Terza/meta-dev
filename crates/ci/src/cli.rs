@@ -27,12 +27,11 @@ impl Cli {
     }
 
     fn exited(carried_out: Result<ports::Exit, command::Failure<'_>>, err: &mut impl Write) -> ExitCode {
-        match carried_out {
-            Ok(exit) => ExitCode::from(exit),
-            Err(failure) => {
-                writeln!(err, "{failure}").ok();
-                ExitCode::FAILURE
-            }
-        }
+        carried_out.map_or_else(|failure| Self::refused(&failure, err), ExitCode::from)
+    }
+
+    fn refused(failure: &command::Failure<'_>, err: &mut impl Write) -> ExitCode {
+        writeln!(err, "{failure}").ok();
+        ExitCode::FAILURE
     }
 }

@@ -4,6 +4,7 @@ use std::io::Write;
 use super::Step;
 use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 
 #[derive(Debug)]
@@ -13,10 +14,10 @@ pub struct StageIssues {
 
 impl Step for StageIssues {
     fn from_arguments(arguments: Vec<OsString>) -> Result<StageIssues, Failure<'static>> {
-        match arguments.as_slice() {
-            [_, _, ..] => Ok(StageIssues { limits: gate_limits::Cli::from_args(arguments.into_iter()) }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let limits = arguments.taken()?;
+        let measured = arguments.taken()?;
+        Ok(StageIssues { limits: gate_limits::Cli::from_args([limits, measured].into_iter().chain(arguments.rest())) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

@@ -8,6 +8,7 @@ use file_ports::Files;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports};
 use tool::Tool;
 
@@ -44,12 +45,11 @@ impl InstallTools {
 
 impl Step for InstallTools {
     fn from_arguments(arguments: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
-        match arguments.as_slice() {
-            [built, destination] => {
-                Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let built = &arguments.taken()?;
+        let destination = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

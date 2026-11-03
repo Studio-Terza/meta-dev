@@ -18,6 +18,7 @@ use super::super::changed::Changed;
 use super::super::journal::Journal;
 use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 use check::Check;
 use fault::Owed;
@@ -40,14 +41,16 @@ impl fmt::Display for Labels {
 
 impl Step for Labels {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Labels, Failure<'static>> {
-        match arguments.as_slice() {
-            [base, pull_request, metadata] => Ok(Labels {
-                base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
-                pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
-                metadata: Journal::file(Path::new(metadata)),
-            }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let base = &arguments.taken()?;
+        let pull_request = &arguments.taken()?;
+        let metadata = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(Labels {
+            base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
+            pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
+            metadata: Journal::file(Path::new(metadata)),
+        })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
@@ -61,6 +64,6 @@ impl Step for Labels {
         let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.refactor(), &changes)?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
         faults.iter().try_for_each(|owed| owed.complained(out))?;
-        Ok(if faults.is_empty() { Exit::Success } else { Exit::Failure(NonZeroU8::MIN) })
+        Ok(faults.first().map_or(Exit::Success, |_| Exit::Failure(NonZeroU8::MIN)))
     }
 }

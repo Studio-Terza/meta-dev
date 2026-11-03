@@ -13,11 +13,15 @@ impl<'body> Line<'body> {
 
     pub(crate) fn read(text: &'body str) -> Line<'body> {
         let line = Self::trimmed(text);
-        match line.split_at_checked(Self::SPEC.len()) {
-            _ if line == Self::REPAIR => Line::Repair,
-            Some((head, value)) if head == Self::SPEC => Line::Spec(value),
-            _ => Line::Other,
-        }
+        Some(line)
+            .filter(|line| *line == Self::REPAIR)
+            .map(|_| Line::Repair)
+            .or_else(|| {
+                line.split_at_checked(Self::SPEC.len())
+                    .filter(|(head, _)| *head == Self::SPEC)
+                    .map(|(_, value)| Line::Spec(value))
+            })
+            .unwrap_or(Line::Other)
     }
 
     pub(crate) fn spec(self) -> Option<&'body str> {
@@ -28,12 +32,8 @@ impl<'body> Line<'body> {
     }
 
     fn trimmed(text: &str) -> &str {
-        let end = text
-            .char_indices()
-            .rev()
-            .find(|(_, letter)| !letter.is_whitespace())
-            .map_or(0, |(at, letter)| at + letter.len_utf8());
-        text.get(..end).unwrap_or_default()
+        let trailing: usize = text.chars().rev().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+        text.get(..text.len() - trailing).unwrap_or_default()
     }
 }
 

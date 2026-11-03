@@ -9,10 +9,10 @@ pub enum Question {
 
 impl From<Question> for OsString {
     fn from(question: Question) -> OsString {
-        OsString::from(match question {
-            Question::History => "history",
-            Question::Affected => "affected",
-            Question::Widened => "widened",
-        })
+        match question {
+            Question::History => OsString::from("history"),
+            Question::Affected => OsString::from("affected"),
+            Question::Widened => OsString::from("widened"),
+        }
     }
 }

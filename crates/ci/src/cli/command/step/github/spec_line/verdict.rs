@@ -24,12 +24,12 @@ impl<'body> Verdict<'body> {
         let lines: Vec<Line> = Lines::from(body.as_ref()).map(Line::read).collect();
         let specs: Vec<Line> = lines.iter().copied().filter(|line| line.spec().is_some()).collect();
         let attached = specs.iter().filter_map(|line| line.spec()).find_map(|value| Attachment::try_from(value).ok());
-        match (lines.contains(&Line::Repair), attached, specs.is_empty()) {
-            (true, _, _) => Verdict::Repair,
-            (false, Some(attachment), _) => Verdict::Attached(attachment),
-            (false, None, true) => Verdict::Missing,
-            (false, None, false) => Verdict::Malformed(specs),
-        }
+        lines
+            .iter()
+            .find(|line| **line == Line::Repair)
+            .map(|_| Verdict::Repair)
+            .or_else(|| attached.map(Verdict::Attached))
+            .unwrap_or_else(|| specs.first().map(|_| ()).map_or(Verdict::Missing, |()| Verdict::Malformed(specs)))
     }
 
     pub(crate) fn reported(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {
@@ -40,15 +40,19 @@ impl<'body> Verdict<'body> {
                 Line::Repair
             )?),
             Verdict::Attached(attachment) => Ok(writeln!(out, "spec line well formed: spec: {attachment}")?),
-            Verdict::Malformed(specs) => {
-                specs.iter().try_for_each(|line| writeln!(out, "spec line malformed: {line}"))?;
-                Ok(writeln!(out, "::error::no spec line of the body is well formed; {}", Self::FORMS)?)
-            }
-            Verdict::Missing => {
-                writeln!(out, "spec line missing")?;
-                Ok(writeln!(out, "::error::the body has no line starting \"spec: \"; {}", Self::FORMS)?)
-            }
+            Verdict::Malformed(specs) => Self::malformed(specs, out),
+            Verdict::Missing => Self::missing(out),
         }
+    }
+
+    fn malformed(specs: &[Line<'_>], out: &mut impl Write) -> Result<(), Failure<'static>> {
+        specs.iter().try_for_each(|line| writeln!(out, "spec line malformed: {line}"))?;
+        Ok(writeln!(out, "::error::no spec line of the body is well formed; {}", Self::FORMS)?)
+    }
+
+    fn missing(out: &mut impl Write) -> Result<(), Failure<'static>> {
+        writeln!(out, "spec line missing")?;
+        Ok(writeln!(out, "::error::the body has no line starting \"spec: \"; {}", Self::FORMS)?)
     }
 
     pub(crate) fn exit(&self) -> Exit {

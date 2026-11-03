@@ -1,3 +1,5 @@
+mod verdict;
+
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -8,7 +10,9 @@ use super::super::journal::Journal;
 use super::Step;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Invocation, Ports, Text};
+use verdict::Verdict;
 
 #[derive(Debug)]
 pub struct MutantsChanged {
@@ -41,13 +45,7 @@ impl MutantsChanged {
 
     fn judged(&self, files: &impl Files, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let missed = self.missed.read_or(files, Text::default())?;
-        if missed.as_ref().is_empty() {
-            writeln!(out, "mutants: none missed")?;
-            Ok(Exit::Success)
-        } else {
-            write!(out, "mutants missed:\n{missed}")?;
-            Ok(Exit::Failure(CargoMutants::MISSED))
-        }
+        Verdict::from(&missed).reported(out)
     }
 
     fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
@@ -66,20 +64,17 @@ impl MutantsChanged {
 
 impl Step for MutantsChanged {
     fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
-        match arguments.as_slice() {
-            [diff, output, scope @ ..] => {
-                Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), scope.to_vec()))
-            }
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let diff = &arguments.taken()?;
+        let output = &arguments.taken()?;
+        let scope = arguments.rest();
+        Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), scope))
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        if self.scope.is_empty() {
-            writeln!(out, "mutants: skipped, no crate is reached by this change, so nothing was tested")?;
-            Ok(Exit::Success)
-        } else {
-            self.tested(ports, out)
+        match self.scope.first() {
+            None => Verdict::Skipped.reported(out),
+            Some(_) => self.tested(ports, out),
         }
     }
 }
