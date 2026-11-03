@@ -30,8 +30,8 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods, rust_only,
-workflow_run.
+no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods,
+effects_in_ports, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -49,6 +49,15 @@ declaration is read instead. A unit return is not flagged, nor are consts, stati
 as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
+
+`effects_in_ports` keeps effects in ports. In shipped code, a call into files, the environment, the clock, the network,
+processes, randomness or stdio (`std::fs`, `std::env`, `SystemTime::now`, `Instant::now`, `thread::sleep`, `std::net`,
+`process::Command::new`, `process::exit`, `rand`, `io::stdout` and the like, and `println!`, `eprintln!` and `dbg!`) is
+allowed only in a crate whose name ends in the word `ports` or a module named `ports`, read through imports as
+`process_starters` reads them. The shared ports are `file-ports` (`Files`, with `Disk`) and `console-ports`
+(`Process` for a binary's arguments and streams, `Environment` for variables); code takes the port as a parameter, and
+its tests pass a fake of the port or real fixture files. The `--report` run still counts effect sites per crate, in
+ports and outside.
 
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the

@@ -37,6 +37,10 @@ impl CrateEffects {
     pub(crate) fn violations(&self, name: &CrateName) -> Vec<Violation> {
         let summary =
             self.0.first().map(|first| Violation::new(first.place().clone(), Summary::counted(name, &self.0)));
-        summary.into_iter().chain(self.0.iter().filter_map(EffectSite::outside_ports)).collect()
+        summary.into_iter().chain(self.outside_ports()).collect()
+    }
+
+    pub(crate) fn outside_ports(&self) -> Vec<Violation> {
+        self.0.iter().filter_map(EffectSite::outside_ports).collect()
     }
 }

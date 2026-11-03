@@ -10,6 +10,20 @@ use crate_effects::CrateEffects;
 #[derive(Debug)]
 pub struct EffectSites;
 
+#[derive(Debug)]
+pub struct EffectsInPorts;
+
+impl Lint for EffectsInPorts {
+    fn report(files: &[SourceFile]) -> Report {
+        Report::new(
+            Headline::new(
+                "effects on files, environment, clock, network, processes, randomness and stdio happen only in ports",
+            ),
+            EffectSites::crates(files).values().flat_map(|found| CrateEffects::found(found).outside_ports()).collect(),
+        )
+    }
+}
+
 impl EffectSites {
     fn crates(files: &[SourceFile]) -> BTreeMap<CrateName, Vec<&SourceFile>> {
         files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {

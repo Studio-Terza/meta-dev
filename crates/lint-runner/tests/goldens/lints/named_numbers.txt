@@ -19,4 +19,6 @@ primitives appear in signatures and fields only inside a boundary:
 src/float.rs:1: bare f64 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/literal.rs:1: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/units.rs:1: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+effects on files, environment, clock, network, processes, randomness and stdio happen only in ports:
+src/in_macro.rs:2: stdio effect outside ports: calls println!; move the effect behind a port in a ports module and call the port from here
 fails

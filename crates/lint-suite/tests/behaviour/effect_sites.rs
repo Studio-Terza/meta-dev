@@ -1,4 +1,4 @@
-use lint_effect_sites::EffectSites;
+use lint_effect_sites::{EffectSites, EffectsInPorts};
 use lint_fixtures::{Located, Source, Sources, Text};
 
 struct Effects;
@@ -57,5 +57,13 @@ fn tests_and_examples_are_not_read() {
         Effects::at("crates/x/tests/run.rs", "fn f() {\n    std::env::var(\"A\");\n}\n"),
         Effects::at("crates/x/examples/e.rs", "fn f() {\n    println!(\"a\");\n}\n"),
     ]);
+    assert!(!text.contains("crate x"), "{text}");
+}
+
+#[test]
+fn the_gate_fails_only_the_effects_outside_ports() {
+    let text = Sources::report::<EffectsInPorts>(&[Effects::at("crates/x/src/lib.rs", IN_PORTS)]).to_string();
+    assert!(text.contains("lib.rs:7: files effect outside ports: calls std::fs::write"), "{text}");
+    assert_eq!(text.matches("effect outside ports").count(), 1, "{text}");
     assert!(!text.contains("crate x"), "{text}");
 }
