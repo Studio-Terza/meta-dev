@@ -21,7 +21,7 @@ impl Files for Absent {
         Err(Self::missing())
     }
 
-    fn write(&self, _path: &Path, _bytes: &Bytes) -> Result<(), FileFailure> {
+    fn write(&self, _path: &Path, _bytes: Bytes) -> Result<(), FileFailure> {
         Err(Self::missing())
     }
 

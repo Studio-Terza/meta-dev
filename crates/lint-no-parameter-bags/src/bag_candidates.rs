@@ -27,11 +27,11 @@ impl BagCandidates {
         candidates
     }
 
-    pub fn candidates(&self) -> impl Iterator<Item = Candidate> {
+    pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
             .filter(|(name, _)| !self.disqualified.contains(*name))
-            .map(|(name, line)| Candidate::new(name.clone(), *line))
+            .map(|(name, line)| Candidate::new(name, *line))
     }
 
     fn self_name(item: &ItemImpl) -> Option<Name> {

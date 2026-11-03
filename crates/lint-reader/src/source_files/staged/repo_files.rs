@@ -11,7 +11,7 @@ use lint_roots::Tree;
 pub struct RepoFiles;
 
 impl RepoFiles {
-    pub fn under(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Vec<RepoFile>, Failure>> {
+    pub fn under(files: &impl Files, trees: &[&Tree<'_>]) -> Vec<Result<Vec<RepoFile>, Failure>> {
         let listed = Roots::files(files, trees);
         let paths: Vec<Vec<PathBuf>> =
             listed.iter().map(|found| found.as_ref().map_or_else(|_| Vec::new(), Clone::clone)).collect();
@@ -24,7 +24,7 @@ impl RepoFiles {
             .collect()
     }
 
-    fn found(tree: &Tree, listed: &[PathBuf], contents: Vec<Result<Bytes, FileFailure>>) -> Vec<RepoFile> {
+    fn found(tree: &Tree<'_>, listed: &[PathBuf], contents: Vec<Result<Bytes, FileFailure>>) -> Vec<RepoFile> {
         listed
             .iter()
             .zip(contents)

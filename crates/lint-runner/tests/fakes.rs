@@ -23,7 +23,7 @@ impl Files for FakeUnlistable<'_> {
         self.memory.read_text(path)
     }
 
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
         self.memory.write(path, bytes)
     }
 
@@ -81,7 +81,7 @@ impl Files for FakeLinked<'_> {
         self.memory.read_text(self.followed(path))
     }
 
-    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
         self.memory.write(path, bytes)
     }
 

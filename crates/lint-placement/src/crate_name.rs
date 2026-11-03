@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt;
 
 use syn::Ident;
@@ -14,12 +15,6 @@ impl From<&Ident> for CrateName {
     }
 }
 
-impl From<&Name> for CrateName {
-    fn from(name: &Name) -> CrateName {
-        CrateName(name.clone())
-    }
-}
-
 impl From<&CrateRoot> for CrateName {
     fn from(root: &CrateRoot) -> CrateName {
         let spelled = root.package().map_or_else(
@@ -28,6 +23,12 @@ impl From<&CrateRoot> for CrateName {
         );
         let underscored: String = spelled.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect();
         CrateName(Name::from(underscored.as_str()))
+    }
+}
+
+impl Borrow<Name> for CrateName {
+    fn borrow(&self) -> &Name {
+        &self.0
     }
 }
 

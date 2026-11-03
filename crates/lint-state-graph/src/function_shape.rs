@@ -26,10 +26,11 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
         path: &'file Path,
         function: &ImplItemFn,
         context: &ImplContext<'_>,
-        declarations: &'found Declarations,
+        declarations: &'found Declarations<'_>,
     ) -> FunctionShape<'found, 'file> {
         let vertex = |ty: &Type| {
-            declarations.vertex_named(&declarations.resolve(TypeName::from_type(ty).or_self(context.self_type())))
+            let written = TypeName::from_type(ty);
+            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type())))
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),

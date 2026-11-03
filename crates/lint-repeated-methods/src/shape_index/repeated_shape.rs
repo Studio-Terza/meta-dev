@@ -8,11 +8,11 @@ use super::method_shape::MethodShape;
 #[derive(Debug)]
 pub struct RepeatedShape<'index> {
     shape: &'index MethodShape,
-    types: Vec<&'index DeclaredType>,
+    types: Vec<&'index DeclaredType<'index>>,
 }
 
 impl<'index> RepeatedShape<'index> {
-    pub fn new(shape: &'index MethodShape, types: Vec<&'index DeclaredType>) -> RepeatedShape<'index> {
+    pub fn new(shape: &'index MethodShape, types: Vec<&'index DeclaredType<'index>>) -> RepeatedShape<'index> {
         RepeatedShape { shape, types }
     }
 }

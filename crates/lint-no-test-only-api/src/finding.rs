@@ -1,17 +1,33 @@
+use std::borrow::Cow;
 use std::fmt;
 
 use lint_core::Fix;
 use lint_layout::Name;
 
-#[derive(Clone, Debug)]
-pub(crate) enum Finding {
+#[derive(Debug)]
+pub(crate) enum Finding<'name> {
     GatedOnTest,
     DocHidden,
     OnlyTests,
-    Feature(Name),
+    Feature(Cow<'name, Name>),
 }
 
-impl fmt::Display for Finding {
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Gate {
+    GatedOnTest,
+    DocHidden,
+}
+
+impl From<Gate> for Finding<'_> {
+    fn from(gate: Gate) -> Self {
+        match gate {
+            Gate::GatedOnTest => Finding::GatedOnTest,
+            Gate::DocHidden => Finding::DocHidden,
+        }
+    }
+}
+
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finding::GatedOnTest => formatter.write_str("visible item gated on test"),
@@ -22,7 +38,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::GatedOnTest => "remove the gate and test through the real public API",

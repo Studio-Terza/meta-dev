@@ -3,6 +3,10 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CrateFile(PathBuf);
 
+impl CrateFile {
+    pub const UNPLACED: CrateFile = CrateFile(PathBuf::new());
+}
+
 impl From<PathBuf> for CrateFile {
     fn from(path: PathBuf) -> CrateFile {
         CrateFile(path)

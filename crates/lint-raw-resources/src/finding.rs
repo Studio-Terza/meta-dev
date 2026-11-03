@@ -3,12 +3,12 @@ use std::fmt;
 use lint_core::Fix;
 use lint_layout::UsePath;
 
-pub enum Finding {
-    OutsidePorts(UsePath),
-    OutsideGuard(UsePath),
+pub enum Finding<'path> {
+    OutsidePorts(&'path UsePath),
+    OutsideGuard(&'path UsePath),
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finding::OutsidePorts(path) => write!(formatter, "calls {path}"),
@@ -17,7 +17,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::OutsidePorts(_) => {

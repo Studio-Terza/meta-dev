@@ -3,26 +3,22 @@ use syn::{Item, ItemMod, ItemUse, UseTree, Visibility};
 use lint_core::SourceFile;
 use lint_layout::LineNumber;
 use lint_layout::Name;
-use lint_placement::CrateName;
 use lint_placement::Role;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Export {
-    crate_name: CrateName,
     name: Name,
     line: LineNumber,
 }
 
 impl Export {
     pub fn in_root(file: &SourceFile) -> Vec<Export> {
-        (file.placement().role() == Role::LibraryRoot)
-            .then(|| CrateName::from(file.placement().crate_root()))
-            .map_or_else(Vec::new, |crate_name| {
-                Self::reexports(file)
-                    .flat_map(|used| Self::leaves(&crate_name, &used.tree))
-                    .chain(Self::modules(file).map(|module| Self::of_module(&crate_name, module)))
-                    .collect()
-            })
+        (file.placement().role() == Role::LibraryRoot).then_some(file).map_or_else(Vec::new, |file| {
+            Self::reexports(file)
+                .flat_map(|used| Self::leaves(&used.tree))
+                .chain(Self::modules(file).map(Self::of_module))
+                .collect()
+        })
     }
 
     fn reexports(file: &SourceFile) -> impl Iterator<Item = &ItemUse> {
@@ -39,16 +35,8 @@ impl Export {
         })
     }
 
-    fn of_module(crate_name: &CrateName, module: &ItemMod) -> Export {
-        Export {
-            crate_name: crate_name.clone(),
-            name: Name::from(&module.ident),
-            line: LineNumber::from(module.ident.span()),
-        }
-    }
-
-    pub fn crate_name(&self) -> &CrateName {
-        &self.crate_name
+    fn of_module(module: &ItemMod) -> Export {
+        Export { name: Name::from(&module.ident), line: LineNumber::from(module.ident.span()) }
     }
 
     pub fn name(&self) -> &Name {
@@ -59,20 +47,16 @@ impl Export {
         self.line
     }
 
-    fn leaves(crate_name: &CrateName, tree: &UseTree) -> Vec<Export> {
+    fn leaves(tree: &UseTree) -> Vec<Export> {
         match tree {
-            UseTree::Path(path) => Self::leaves(crate_name, &path.tree),
-            UseTree::Group(group) => group.items.iter().flat_map(|item| Self::leaves(crate_name, item)).collect(),
-            UseTree::Name(name) => vec![Export {
-                crate_name: crate_name.clone(),
-                name: Name::from(&name.ident),
-                line: LineNumber::from(name.ident.span()),
-            }],
-            UseTree::Rename(rename) => vec![Export {
-                crate_name: crate_name.clone(),
-                name: Name::from(&rename.rename),
-                line: LineNumber::from(rename.rename.span()),
-            }],
+            UseTree::Path(path) => Self::leaves(&path.tree),
+            UseTree::Group(group) => group.items.iter().flat_map(Self::leaves).collect(),
+            UseTree::Name(name) => {
+                vec![Export { name: Name::from(&name.ident), line: LineNumber::from(name.ident.span()) }]
+            }
+            UseTree::Rename(rename) => {
+                vec![Export { name: Name::from(&rename.rename), line: LineNumber::from(rename.rename.span()) }]
+            }
             UseTree::Glob(_) => Vec::new(),
         }
     }

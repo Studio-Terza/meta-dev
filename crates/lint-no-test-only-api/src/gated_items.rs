@@ -33,8 +33,7 @@ impl<'ast> Visit<'ast> for GatedItems {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let gated = ItemHead::gate_of(&item.attrs);
-        self.found
-            .extend(item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated.clone())));
+        self.found.extend(item.items.iter().filter_map(ItemHead::of_member).filter_map(|head| head.flagged(gated)));
         visit::visit_item_impl(self, item);
     }
 

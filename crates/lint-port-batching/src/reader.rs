@@ -3,7 +3,7 @@ mod finding;
 mod per_element;
 mod scope;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::mem;
 
 use syn::spanned::Spanned;
@@ -25,15 +25,15 @@ use finding::{Looping, Port, Spot, Within};
 use per_element::PerElement;
 use scope::Scope;
 
-pub struct Reader<'run> {
-    module: Module,
+pub struct Reader<'run, 'file> {
+    module: Module<'file>,
     context: Context<'run>,
-    scope: Scope,
+    scope: Scope<'run>,
     found: BTreeMap<Spot, Within>,
 }
 
-impl<'run> Reader<'run> {
-    pub fn violations<'file>(
+impl<'run, 'file> Reader<'run, 'file> {
+    pub fn violations(
         file: &'file SourceFile,
         judge: &'run Judge<'run>,
         holders: &'run Holders,
@@ -49,10 +49,17 @@ impl<'run> Reader<'run> {
         reader.found.into_iter().map(|(spot, within)| spot.violation(file.path(), within)).collect()
     }
 
-    fn scoped(&mut self, scope: Scope, visit: impl FnOnce(&mut Self)) {
+    fn scoped(&mut self, scope: Scope<'run>, visit: impl FnOnce(&mut Self)) {
         let outer = mem::replace(&mut self.scope, scope);
         visit(self);
         self.scope = outer;
+    }
+
+    fn within(&mut self, within: impl FnOnce(Option<Within>) -> Option<Within>, visit: impl FnOnce(&mut Self)) {
+        let inner = within(self.scope.within());
+        let outer = self.scope.replace_within(inner);
+        visit(self);
+        self.scope.replace_within(outer);
     }
 
     fn function(&mut self, attributes: &[Attribute], signature: &Signature, body: &Block) {
@@ -66,22 +73,16 @@ impl<'run> Reader<'run> {
     }
 
     fn found(&mut self, port: Option<Port>, line: LineNumber) {
-        let within = self.scope.within().cloned();
+        let within = self.scope.within();
         self.found.extend(within.zip(port).map(|(within, port)| (Spot::new(line, port), within)));
-    }
-
-    fn entered(&mut self, within: Option<Within>, visit: impl FnOnce(&mut Self)) {
-        let scope = self.scope.entered(within);
-        self.scoped(scope, visit);
     }
 }
 
-impl<'ast> Visit<'ast> for Reader<'_> {
+impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let outer = self.module.clone();
-        self.module = outer.within(&Name::from(&module.ident));
+        self.module.enter(Name::from(&module.ident));
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module = outer;
+        self.module.leave();
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
@@ -95,7 +96,7 @@ impl<'ast> Visit<'ast> for Reader<'_> {
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
         Walk::enter(&item.attrs, || {
             let generics = self.context.judge().generics(&self.module, &item.generics);
-            let scope = Scope::declared(generics, BTreeSet::default());
+            let scope = Scope::declared(generics, None);
             self.scoped(scope, |reader| visit::visit_item_trait(reader, item));
         });
     }
@@ -122,33 +123,33 @@ impl<'ast> Visit<'ast> for Reader<'_> {
             Expr::Field(field) => self.scope.reached_field(field),
             _ => None,
         };
-        let paced = receiver.and_then(|_| self.context.judge().ports().paces(&Name::from(&call.method)));
-        let scope = self.scope.paced(paced);
-        self.scoped(scope, |reader| reader.visit_expr(&call.receiver));
+        let paced = receiver.and_then(|_| self.context.judge().ports().paces(&Name::from(&call.method))).map(|_| ());
+        self.within(|outer| outer.filter(|_| paced.is_none()), |reader| reader.visit_expr(&call.receiver));
         let within = PerElement::adaptor(call).map(Within::Closure);
         call.args.iter().for_each(|argument| {
-            let closure = within.clone().filter(|_| matches!(argument, Expr::Closure(_)));
-            self.entered(closure, |reader| reader.visit_expr(argument));
+            let closure = within.filter(|_| matches!(argument, Expr::Closure(_)));
+            self.within(|outer| outer.or(closure), |reader| reader.visit_expr(argument));
         });
     }
 
     fn visit_expr_closure(&mut self, closure: &'ast ExprClosure) {
-        let scope = self.scope.shadowed(closure);
-        self.scoped(scope, |reader| reader.visit_expr(&closure.body));
+        let outer = self.scope.shadowed(closure);
+        self.visit_expr(&closure.body);
+        self.scope.unshadowed(outer);
     }
 
     fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
         self.visit_expr(&expr.expr);
-        self.entered(Some(Within::Loop(Looping::For)), |reader| reader.visit_block(&expr.body));
+        self.within(|outer| outer.or(Some(Within::Loop(Looping::For))), |reader| reader.visit_block(&expr.body));
     }
 
     fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
         self.visit_expr(&expr.cond);
-        self.entered(Some(Within::Loop(Looping::While)), |reader| reader.visit_block(&expr.body));
+        self.within(|outer| outer.or(Some(Within::Loop(Looping::While))), |reader| reader.visit_block(&expr.body));
     }
 
     fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
-        self.entered(Some(Within::Loop(Looping::Bare)), |reader| reader.visit_block(&expr.body));
+        self.within(|outer| outer.or(Some(Within::Loop(Looping::Bare))), |reader| reader.visit_block(&expr.body));
     }
 
     fn visit_expr_path(&mut self, path: &'ast ExprPath) {

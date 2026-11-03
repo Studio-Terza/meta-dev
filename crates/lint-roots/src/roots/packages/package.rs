@@ -35,22 +35,19 @@ impl Package {
     }
 
     #[must_use]
-    pub fn targets(&self, survey: &Survey, tree: &Tree) -> Vec<Target> {
-        let declared = self.declared.iter().filter(|file| survey.file(file).is_some()).cloned();
-        let roots =
-            Self::ROOT_FILES.iter().map(|file| self.directory.join(file)).filter(|file| survey.file(file).is_some());
+    pub fn into_target(self, survey: &Survey, tree: &Tree<'_>) -> Option<Target> {
         let crates: Vec<PathBuf> = self
             .target_directories()
             .iter()
             .flat_map(|directory| survey.entries(directory))
             .filter_map(|entry| Self::crate_root(survey, entry))
             .collect();
-        declared
-            .chain(roots)
-            .chain(crates)
-            .filter(|file| file.starts_with(tree.canonical()))
-            .map(|file| Target::new(self.directory.clone(), file))
-            .collect()
+        let Package { directory, declared } = self;
+        let declared = declared.into_iter().filter(|file| survey.file(file).is_some());
+        let roots = Self::ROOT_FILES.iter().map(|file| directory.join(file)).filter(|file| survey.file(file).is_some());
+        let files: Vec<PathBuf> =
+            declared.chain(roots).chain(crates).filter(|file| file.starts_with(tree.canonical())).collect();
+        Some(files).filter(|files| !files.is_empty()).map(|files| Target::new(directory, files))
     }
 
     fn crate_root(survey: &Survey, entry: &Path) -> Option<PathBuf> {

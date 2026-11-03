@@ -19,7 +19,7 @@ pub use modules::Modules;
 #[derive(Debug)]
 pub struct Guards<'file> {
     path: &'file Path,
-    module: Module,
+    module: Module<'file>,
     members: Members<'file>,
     modules: Modules<'file>,
 }
@@ -77,7 +77,7 @@ impl<'file> Guards<'file> {
 
 impl<'ast> Visit<'ast> for Guards<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let inner = self.module.within(&Name::from(&module.ident));
+        let inner = self.module.within(Name::from(&module.ident));
         let outer = mem::replace(&mut self.module, inner);
         let around = mem::take(&mut self.members);
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));

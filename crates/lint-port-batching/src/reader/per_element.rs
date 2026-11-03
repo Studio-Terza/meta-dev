@@ -92,11 +92,11 @@ impl PerElement {
         "fuse",
     ];
 
-    pub fn adaptor(call: &ExprMethodCall) -> Option<Name> {
+    pub fn adaptor(call: &ExprMethodCall) -> Option<Word<'static>> {
         let method = Name::from(&call.method);
         let always = method.matches::<Whole>(&Self::ALWAYS);
         let shared = || method.matches::<Whole>(&Self::SHARED).filter(|_| Self::iterated(&call.receiver).is_some());
-        always.or_else(shared).map(|_| method.clone())
+        always.or_else(shared)
     }
 
     fn iterated(receiver: &Expr) -> Option<Iterated> {

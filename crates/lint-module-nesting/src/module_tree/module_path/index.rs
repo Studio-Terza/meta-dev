@@ -8,23 +8,23 @@ use super::ModulePath;
 #[derive(Debug)]
 pub struct ModuleIndex<'file> {
     modules: Vec<ModulePath<'file>>,
-    latest: HashMap<CrateRoot, HashMap<Vec<Name>, ModulePath<'file>>>,
-    directories: HashMap<CrateRoot, HashSet<Vec<Name>>>,
+    latest: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>,
+    directories: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>,
 }
 
 impl<'file> From<Vec<ModulePath<'file>>> for ModuleIndex<'file> {
     fn from(modules: Vec<ModulePath<'file>>) -> ModuleIndex<'file> {
         let latest = modules.iter().fold(
             HashMap::new(),
-            |mut found: HashMap<CrateRoot, HashMap<Vec<Name>, ModulePath<'file>>>, module| {
-                found.entry(module.crate_root.clone()).or_default().insert(module.segments.clone(), module.clone());
+            |mut found: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>, module| {
+                found.entry(module.crate_root).or_default().insert(module.segments.iter().collect(), *module);
                 found
             },
         );
         let directories = modules.iter().filter_map(ModulePath::directory_module).fold(
             HashMap::new(),
-            |mut found: HashMap<CrateRoot, HashSet<Vec<Name>>>, module| {
-                found.entry(module.crate_root.clone()).or_default().insert(module.segments.clone());
+            |mut found: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>, module| {
+                found.entry(module.crate_root).or_default().insert(module.segments.iter().collect());
                 found
             },
         );
@@ -37,11 +37,17 @@ impl<'file> ModuleIndex<'file> {
         &self.modules
     }
 
-    pub fn same_as(&self, probe: &ModulePath<'file>) -> Option<&ModulePath<'file>> {
-        self.latest.get(&probe.crate_root).and_then(|found| found.get(probe.segments.as_slice()))
+    pub fn same_as(&self, crate_root: &CrateRoot, segments: &[&Name]) -> Option<ModulePath<'file>> {
+        let found: &HashMap<Vec<&Name>, ModulePath<'file>> = self.latest.get(crate_root)?;
+        found.get(segments).copied()
     }
 
-    pub fn directory_same_as<'probe>(&self, probe: &'probe ModulePath<'file>) -> Option<&'probe ModulePath<'file>> {
-        self.directories.get(&probe.crate_root).filter(|found| found.contains(probe.segments.as_slice())).map(|_| probe)
+    pub fn directory_same_as<'probe>(
+        &self,
+        crate_root: &CrateRoot,
+        segments: &'probe [&'probe Name],
+    ) -> Option<&'probe [&'probe Name]> {
+        let found: &HashSet<Vec<&Name>> = self.directories.get(crate_root)?;
+        found.contains(segments).then_some(segments)
     }
 }

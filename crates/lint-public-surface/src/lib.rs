@@ -13,6 +13,7 @@ use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
+use lint_placement::CrateName;
 
 #[derive(Debug)]
 pub struct PublicSurface;
@@ -29,19 +30,22 @@ impl Lint for PublicSurface {
                 )
             })
             .fold(ForeignReferences::default(), ForeignReferences::absorb);
+        let references = &references;
         Report::new(
             Headline::new("a crate exports exactly what another crate uses"),
             files
                 .iter()
                 .flat_map(|file| {
-                    Export::in_root(file).into_iter().filter(|export| references.unnamed(export).is_some()).map(
-                        move |export| {
+                    let crate_name = CrateName::from(file.placement().crate_root());
+                    Export::in_root(file)
+                        .into_iter()
+                        .filter(move |export| references.unnamed(&crate_name, export).is_some())
+                        .map(move |export| {
                             Violation::new(
                                 Site::new(file.path(), export.line()),
-                                Finding::UnnamedExport { name: export.name().clone() },
+                                Finding::UnnamedExport { name: export.name() },
                             )
-                        },
-                    )
+                        })
                 })
                 .collect(),
         )

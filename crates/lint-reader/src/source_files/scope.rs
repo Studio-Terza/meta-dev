@@ -5,19 +5,19 @@ use lint_roots::Tree;
 
 #[derive(Debug)]
 pub struct Scope<'tree> {
-    tree: &'tree Tree,
+    tree: &'tree Tree<'tree>,
     package: PathBuf,
     crate_file: CrateFile,
 }
 
 impl<'tree> Scope<'tree> {
     #[must_use]
-    pub fn new(tree: &'tree Tree, package: &Path, crate_file: CrateFile) -> Scope<'tree> {
+    pub fn new(tree: &'tree Tree<'tree>, package: &Path, crate_file: CrateFile) -> Scope<'tree> {
         Scope { tree, package: package.to_path_buf(), crate_file }
     }
 
     #[must_use]
-    pub fn tree(&self) -> &'tree Tree {
+    pub fn tree(&self) -> &'tree Tree<'tree> {
         self.tree
     }
 

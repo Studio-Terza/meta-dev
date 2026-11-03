@@ -1,16 +1,22 @@
 use std::collections::HashMap;
 
-use syn::{Field, GenericArgument, GenericParam, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
+use syn::{Field, GenericArgument, GenericParam, Ident, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
 
 use lint_layout::Name;
 
-pub struct StructFields {
+pub struct StructFields<'file> {
     generics: Vec<Name>,
-    fields: HashMap<Member, Name>,
+    fields: HashMap<FieldKey<'file>, Name>,
 }
 
-impl StructFields {
-    pub fn describe(item: &ItemStruct) -> StructFields {
+#[derive(PartialEq, Eq, Hash)]
+enum FieldKey<'file> {
+    Named(&'file Ident),
+    Unnamed(Index),
+}
+
+impl<'file> StructFields<'file> {
+    pub fn describe(item: &'file ItemStruct) -> StructFields<'file> {
         StructFields {
             generics: item
                 .generics
@@ -33,11 +39,15 @@ impl StructFields {
         }
     }
 
-    pub fn field_type(&self, member: &Member, concrete: &[Name]) -> Option<Name> {
-        let declared = self.fields.get(member)?;
+    pub fn field_type<'name>(&'name self, member: &'file Member, concrete: &'name [Name]) -> Option<&'name Name> {
+        let key = match member {
+            Member::Named(ident) => FieldKey::Named(ident),
+            Member::Unnamed(index) => FieldKey::Unnamed(Index { index: index.index, span: index.span }),
+        };
+        let declared = self.fields.get(&key)?;
         match self.generics.iter().position(|generic| generic == declared) {
-            Some(position) => concrete.get(position).cloned(),
-            None => Some(declared.clone()),
+            Some(position) => concrete.get(position),
+            None => Some(declared),
         }
     }
 
@@ -63,7 +73,7 @@ impl StructFields {
         }
     }
 
-    fn key_at(index: Index, field: &Field) -> Member {
-        field.ident.clone().map_or_else(|| Member::Unnamed(index), Member::Named)
+    fn key_at(index: Index, field: &'file Field) -> FieldKey<'file> {
+        field.ident.as_ref().map_or(FieldKey::Unnamed(index), FieldKey::Named)
     }
 }

@@ -60,9 +60,8 @@ impl<'ast> Visit<'ast> for PathReach {
                 .filter(|target| Self::lexical(&self.directory.join(target)).starts_with(&self.source))
                 .map(|_| LineNumber::from(module.ident.span())),
         );
-        let outer = self.directory.clone();
-        self.directory = outer.join(Name::from(&module.ident));
+        self.directory.push(Name::from(&module.ident));
         visit::visit_item_mod(self, module);
-        self.directory = outer;
+        self.directory.pop();
     }
 }

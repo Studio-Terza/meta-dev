@@ -19,7 +19,7 @@ pub struct PackageRoot {
 
 impl PackageRoot {
     #[must_use]
-    pub fn read_many(files: &impl Files, directories: &[PathBuf]) -> Vec<PackageRoot> {
+    pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<PackageRoot> {
         let manifests: Vec<Option<Manifest>> =
             Manifest::read_many(files, directories).into_iter().map(|read| read.ok().flatten()).collect();
         let named: Vec<PathBuf> = manifests.iter().flatten().flat_map(Manifest::named_paths).collect();
@@ -34,7 +34,7 @@ impl PackageRoot {
             .iter()
             .zip(&manifests)
             .map(|(directory, manifest)| {
-                let root = CrateRoot::of_manifest(directory, manifest.as_ref());
+                let root = CrateRoot::of_manifest(directory.as_ref(), manifest.as_ref());
                 PackageRoot {
                     name: CrateName::from(&root),
                     root,

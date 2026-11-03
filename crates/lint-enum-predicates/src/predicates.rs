@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type};
@@ -9,15 +11,15 @@ use lint_placement::ModulePath;
 use super::{EnumPredicates, Finding, Kind};
 
 pub struct Predicates<'scan, 'file> {
-    known: &'scan EnumPredicates,
+    known: &'scan EnumPredicates<'scan>,
     file: &'file SourceFile,
-    module: ModulePath,
+    module: Cow<'file, ModulePath>,
     violations: Vec<Violation<'file>>,
 }
 
 impl<'scan, 'file> Predicates<'scan, 'file> {
-    pub fn new(known: &'scan EnumPredicates, file: &'file SourceFile) -> Predicates<'scan, 'file> {
-        Predicates { known, file, module: file.placement().module().clone(), violations: Vec::new() }
+    pub fn new(known: &'scan EnumPredicates<'scan>, file: &'file SourceFile) -> Predicates<'scan, 'file> {
+        Predicates { known, file, module: Cow::Borrowed(file.placement().module()), violations: Vec::new() }
     }
 
     pub fn into_violations(self) -> Vec<Violation<'file>> {
@@ -50,7 +52,7 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
 
 impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let inner = self.module.child(&Name::from(&module.ident));
+        let inner = Cow::Owned(self.module.child(Name::from(&module.ident)));
         let outer = std::mem::replace(&mut self.module, inner);
         syn::visit::visit_item_mod(self, module);
         self.module = outer;

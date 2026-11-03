@@ -3,24 +3,24 @@ use std::fmt;
 use lint_core::Fix;
 use lint_layout::Name;
 
-pub struct Finding {
-    opening: Name,
+pub struct Finding<'method> {
+    opening: &'method Name,
     closing: Name,
 }
 
-impl Finding {
-    pub fn new(opening: Name, closing: Name) -> Finding {
+impl<'method> Finding<'method> {
+    pub fn new(opening: &'method Name, closing: Name) -> Finding<'method> {
         Finding { opening, closing }
     }
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "fn {} pairs with fn {}", self.opening, self.closing)
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new("write a guard whose Drop does the ending")
     }

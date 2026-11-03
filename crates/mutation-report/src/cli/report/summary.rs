@@ -62,7 +62,7 @@ impl Summary {
         let json = serde_json::to_string_pretty(self)
             .map_err(|source| Failure::Parse { path: Cow::Borrowed(path), source })?;
         files
-            .write(path, &Bytes::from(json.as_str()))
+            .write(path, Bytes::from(json.as_str()))
             .map_err(|failure| Failure::Io { path: Cow::Borrowed(path), source: io::Error::from(failure) })
     }
 

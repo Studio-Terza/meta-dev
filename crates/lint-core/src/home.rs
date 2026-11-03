@@ -3,20 +3,28 @@ use lint_placement::ModulePath;
 
 use crate::source_file::SourceFile;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Home {
-    crate_file: CrateFile,
-    module: ModulePath,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Home<'file> {
+    crate_file: &'file CrateFile,
+    module: &'file ModulePath,
 }
 
-impl Home {
+static NOWHERE: Home<'static> = Home { crate_file: &CrateFile::UNPLACED, module: &ModulePath::ROOT };
+
+impl<'file> Home<'file> {
     #[must_use]
-    pub fn containing(file: &SourceFile) -> Home {
-        Home { crate_file: file.crate_file().clone(), module: file.placement().module().clone() }
+    pub fn containing(file: &'file SourceFile) -> Home<'file> {
+        Home { crate_file: file.crate_file(), module: file.placement().module() }
     }
 
     #[must_use]
-    pub fn in_crate_with<'other>(&self, other: &'other Home) -> Option<&'other Home> {
+    pub fn in_crate_with(self, other: Home<'_>) -> Option<Home<'_>> {
         (self.crate_file == other.crate_file).then_some(other)
+    }
+}
+
+impl Default for Home<'_> {
+    fn default() -> Self {
+        NOWHERE
     }
 }

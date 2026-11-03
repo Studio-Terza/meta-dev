@@ -9,7 +9,7 @@ use newtype::Newtype;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Located<'tree> {
-    tree: &'tree Tree,
+    tree: &'tree Tree<'tree>,
     package: PathBuf,
     file: PathBuf,
 }
@@ -30,13 +30,13 @@ pub struct Opened {
 
 impl<'tree> Located<'tree> {
     #[must_use]
-    pub fn new(tree: &'tree Tree, package: &Path, file: &Path) -> Located<'tree> {
+    pub fn new(tree: &'tree Tree<'tree>, package: &Path, file: &Path) -> Located<'tree> {
         Located { tree, package: package.to_path_buf(), file: file.to_path_buf() }
     }
 
     pub fn open_many(files: &impl Files, fresh: &[Located<'tree>]) -> Vec<Result<Opened, Failure>> {
-        let paths: Vec<PathBuf> = fresh.iter().map(|located| located.file.clone()).collect();
-        let packages: Vec<PathBuf> = fresh.iter().map(|located| located.package.clone()).collect();
+        let paths: Vec<&Path> = fresh.iter().map(|located| located.file.as_path()).collect();
+        let packages: Vec<&Path> = fresh.iter().map(|located| located.package.as_path()).collect();
         fresh
             .iter()
             .zip(files.read_text_many(&paths))

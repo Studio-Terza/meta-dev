@@ -2,22 +2,22 @@ use syn::Ident;
 
 use super::callee::Callee;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Forwarder {
-    name: Ident,
-    callee: Callee,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Forwarder<'file> {
+    name: &'file Ident,
+    callee: Callee<'file>,
 }
 
-impl Forwarder {
-    pub fn new(name: Ident, callee: Callee) -> Forwarder {
+impl<'file> Forwarder<'file> {
+    pub fn new(name: &'file Ident, callee: Callee<'file>) -> Forwarder<'file> {
         Forwarder { name, callee }
     }
 
-    pub fn name(&self) -> &Ident {
-        &self.name
+    pub fn name(&self) -> &'file Ident {
+        self.name
     }
 
-    pub fn callee(&self) -> &Callee {
-        &self.callee
+    pub fn callee(&self) -> Callee<'file> {
+        self.callee
     }
 }

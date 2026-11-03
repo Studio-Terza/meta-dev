@@ -29,8 +29,8 @@ impl<'file> FileScan<'file> {
         scan
     }
 
-    pub(super) fn printed(&self) -> &[EffectSite<'file>] {
-        &self.printed
+    pub(super) fn into_printed(self) -> Vec<EffectSite<'file>> {
+        self.printed
     }
 
     pub(super) fn tested(&self) -> &BTreeSet<Site<'file>> {
