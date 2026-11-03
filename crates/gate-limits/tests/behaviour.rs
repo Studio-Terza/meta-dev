@@ -172,6 +172,15 @@ fn a_report_only_stage_is_judged_and_printed_but_never_blocks() -> io::Result<()
     assert_eq!(run.exit, ExitCode::SUCCESS);
     let other = Run::reported_only("report-only-other", LIMITS, "test-run = 6\nclippy = 30", &only)?;
     assert_eq!(other.exit, ExitCode::FAILURE);
+    let measured = "test-run = 6\nclippy = 30";
+    let whole = ["--report-only", "clippy", "--whole-reach", "5", "of", "5", "crates", "test-run"];
+    assert_eq!(Run::reported_only("whole-reach", LIMITS, measured, &whole)?.exit, ExitCode::SUCCESS);
+    for (name, reach) in [("part", ["3", "of", "5"]), ("none", ["0", "of", "0"])] {
+        let words = ["--report-only", "clippy", "--whole-reach", reach[0], reach[1], reach[2], "crates", "test-run"];
+        assert_eq!(Run::reported_only(name, LIMITS, measured, &words)?.exit, ExitCode::FAILURE);
+    }
+    let unset = ["--report-only", "clippy", "--whole-reach", "test-run"];
+    assert_eq!(Run::reported_only("unset", LIMITS, measured, &unset)?.exit, ExitCode::FAILURE);
     Ok(())
 }
 
