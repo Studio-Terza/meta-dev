@@ -151,7 +151,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -317,8 +317,6 @@ A pull request pays only for what it can affect. `ci reach` lists the files the 
 gives them to `reach`, with the output of `cargo metadata --no-deps`:
 
     reach affected <metadata> [<changed file>...]
-    reach fan-in <metadata>
-    reach hubs <metadata> <repository>
 
 A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
 normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
@@ -333,16 +331,6 @@ reached. A skip is not silent: for each scope that is empty, `ci reach` prints `
 steps that use it do not run` in the step and in the run summary, and `ci mutants-changed` prints that mutants were
 skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
 cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
-
-`fan-in` lists how many crates depend on each crate, directly or not, most first, as a count and a share of the
-workspace, then the distribution: crates per tenth of the share, the median and the largest. It reads only the graph
-as it stands, never its history. How far a change reaches is the measure of tangle, so the lint job on main prints it.
-
-`hubs` weighs how thick each crate is against how many depend on it: the logic a crate holds, its shipped
-functions' cyclomatic complexity above one summed as `lint-complexity` counts it, times the crates that depend on it.
-Each crate is listed at its heaviest function, heaviest weighted first, then the share of all logic held by crates that
-more than half the workspace depends on. A crate many depend on should be thin: types, traits and interfaces, with the
-logic in the leaves.
 
 ## Newtypes
 

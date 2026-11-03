@@ -1,4 +1,3 @@
-mod arity;
 mod dependency;
 mod facts;
 mod facts_lint;
@@ -13,7 +12,6 @@ mod trait_fact;
 mod type_fact;
 mod via;
 
-pub use arity::Arity;
 pub use dependency::Dependency;
 pub use facts::Facts;
 pub use facts_lint::FactsLint;
