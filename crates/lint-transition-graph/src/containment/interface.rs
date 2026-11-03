@@ -7,7 +7,7 @@ use super::cluster::{Cluster, Level};
 use super::groups::Groups;
 use super::link::Link;
 use super::member::Member;
-use super::{ClusterLint, Containment};
+use super::{ClusterLint, Containment, Split};
 
 #[derive(Debug)]
 struct Interface<'found> {
@@ -16,22 +16,17 @@ struct Interface<'found> {
     groups: Groups<'found>,
 }
 
-impl<'found> Interface<'found> {
-    fn violations<'file>(view: &Containment<'found, 'file>, level: Level) -> Vec<Violation<'file>> {
-        view.clusters()
-            .into_iter()
-            .filter(|cluster| cluster.level() == level)
-            .filter_map(|cluster| Interface::split_in(view, cluster))
-            .filter_map(|split| view.first_site(&split.exports).map(|site| Violation::new(site, &split)))
-            .collect()
-    }
-
-    fn split_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'found>> {
+impl<'found> Split<'found> for Interface<'found> {
+    fn found_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'found>> {
         let exports = view.exports(cluster, &view.members(cluster));
         let sharing = Containment::adjacency(exports.iter().flat_map(|export| view.outside_users(cluster, *export)));
         let links = sharing.values().flat_map(Link::star);
         let groups = Groups::linked(&exports, links).split()?;
         Some(Interface { cluster, exports, groups })
+    }
+
+    fn sited(&self) -> &BTreeSet<Member<'found>> {
+        &self.exports
     }
 }
 
@@ -56,7 +51,7 @@ impl ClusterLint for InterfaceByConsumers {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        Interface::violations(view, Level::Module)
+        view.splits::<Interface<'_>>(Level::Module)
     }
 }
 
@@ -69,6 +64,6 @@ impl ClusterLint for CrateInterfaces {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        Interface::violations(view, Level::Crate)
+        view.splits::<Interface<'_>>(Level::Crate)
     }
 }

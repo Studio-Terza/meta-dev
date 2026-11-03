@@ -40,6 +40,6 @@ impl<'file> ModuleTree<'file> {
         let target = Target::from_use(&module, path, &self.modules);
         let crossed = target.as_ref().and_then(|target| target.crossed_directory(&module, &self.modules));
         self.deep_uses
-            .extend(crossed.map(|target| Violation::new(Site::of_file(module.file()), ReachesPastModRs { target })));
+            .extend(crossed.map(|target| Violation::new(Site::of_file(module.file()), ReachesPastModRs::from(target))));
     }
 }

@@ -21,8 +21,8 @@ use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
 pub use containment::{
-    AcyclicQuotients, ClusterLint, ConnectedClusters, ConnectedDirectories, Containment, CrateInterfaces,
-    InterfaceByConsumers, LowestCluster,
+    AcyclicQuotients, ConnectedClusters, ConnectedDirectories, Containment, CrateInterfaces, InterfaceByConsumers,
+    LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::{GraphLint, OnContainment, OnGraph};

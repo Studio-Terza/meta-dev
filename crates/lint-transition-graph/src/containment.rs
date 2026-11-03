@@ -19,7 +19,7 @@ use lint_placement::CrateName;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
-use cluster::Cluster;
+use cluster::{Cluster, Level};
 use declaration::Declaration;
 use link::Link;
 use member::Member;
@@ -34,6 +34,12 @@ pub trait ClusterLint {
     const HEADLINE: Headline;
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>>;
+}
+
+pub(crate) trait Split<'found>: lint_core::Finding + Sized {
+    fn found_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Self>;
+
+    fn sited(&self) -> &BTreeSet<Member<'found>>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -151,6 +157,15 @@ impl<'found, 'file> Containment<'found, 'file> {
         self.adjacent(export, Toward::Users)
             .filter(|user| cluster.holding(user.cluster()).is_none())
             .map(|user| Link::new(user, export))
+            .collect()
+    }
+
+    pub(crate) fn splits<Found: Split<'found>>(&self, level: Level) -> Vec<Violation<'file>> {
+        self.clusters()
+            .into_iter()
+            .filter(|cluster| cluster.level() == level)
+            .filter_map(|cluster| Found::found_in(self, cluster))
+            .filter_map(|found| self.first_site(found.sited()).map(|site| Violation::new(site, &found)))
             .collect()
     }
 

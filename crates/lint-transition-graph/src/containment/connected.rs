@@ -6,7 +6,7 @@ use lint_core::{Fix, Headline, Violation};
 use super::cluster::{Cluster, Level, Part};
 use super::groups::Groups;
 use super::member::Member;
-use super::{ClusterLint, Containment, Toward};
+use super::{ClusterLint, Containment, Split, Toward};
 
 #[derive(Debug)]
 pub struct ConnectedClusters;
@@ -17,7 +17,7 @@ impl ClusterLint for ConnectedClusters {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        Divided::violations(view, Level::Crate)
+        view.splits::<Divided<'_>>(Level::Crate)
     }
 }
 
@@ -30,7 +30,7 @@ impl ClusterLint for ConnectedDirectories {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        Divided::violations(view, Level::Module)
+        view.splits::<Divided<'_>>(Level::Module)
     }
 }
 
@@ -41,16 +41,7 @@ struct Divided<'found> {
     groups: Groups<'found>,
 }
 
-impl<'found> Divided<'found> {
-    fn violations<'file>(view: &Containment<'found, 'file>, level: Level) -> Vec<Violation<'file>> {
-        view.clusters()
-            .into_iter()
-            .filter(|cluster| cluster.level() == level)
-            .filter_map(|cluster| Divided::found_in(view, cluster))
-            .filter_map(|divided| view.first_site(&divided.members).map(|site| Violation::new(site, &divided)))
-            .collect()
-    }
-
+impl<'found> Split<'found> for Divided<'found> {
     fn found_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Divided<'found>> {
         let members = view.members(cluster);
         let nested = members.iter().find_map(|member| Part::toward(cluster, member.cluster()).nested());
@@ -62,6 +53,10 @@ impl<'found> Divided<'found> {
         let links = view.links_within(&members, Toward::Used);
         let groups = judged.and_then(|_| Groups::linked(&members, links.into_iter()).split())?;
         Some(Divided { cluster, members, groups })
+    }
+
+    fn sited(&self) -> &BTreeSet<Member<'found>> {
+        &self.members
     }
 }
 
