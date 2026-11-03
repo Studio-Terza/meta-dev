@@ -8,8 +8,11 @@ use lint_runner::Cli;
 use ports::Disk;
 
 use std::ffi::OsString;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+
+use file_ports::{Bytes, FileFailure, Files, Kind, Text};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -157,9 +160,13 @@ impl Trees {
     }
 
     fn reported_all(roots: &[PathBuf]) -> Reported {
+        Self::reported_through(&file_ports::Disk, roots)
+    }
+
+    fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&file_ports::Disk, &mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }
@@ -251,6 +258,7 @@ fn a_declared_module_with_no_file_is_a_failure() -> Result<(), Box<dyn Error>> {
     let run = Trees::reported(root.path());
     assert_eq!(run.failures(), 1);
     assert!(run.err.contains("cannot read"));
+    assert!(run.err.contains("src/absent.rs"), "{}", run.err);
     Ok(())
 }
 
@@ -539,6 +547,44 @@ fn a_manifest_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_manifest_beside_the_linted_member_that_cannot_be_read_fails_closed() -> Result<(), Box<dyn Error>> {
+    let root = Disk::temporary()?;
+    Disk::write(root.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
+    Disk::write(root.path(), "one/Cargo.toml", MANIFEST)?;
+    Disk::write(root.path(), "one/src/lib.rs", CLEAN)?;
+    Disk::write(root.path(), "two/src/lib.rs", CLEAN)?;
+    assert!(Trees::reported(&root.path().join("one")).is_clean());
+    Disk::directory(&root.path().join("two/Cargo.toml"))?;
+    assert!(Trees::reported(&root.path().join("one")).err.contains("two/Cargo.toml"));
+    Ok(())
+}
+
+#[test]
+fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Result<(), Box<dyn Error>> {
+    let workspace = Disk::temporary()?;
+    Disk::write(workspace.path(), "Cargo.toml", "[workspace]\nmembers = [\"one\"]\n")?;
+    Disk::write(workspace.path(), "one/Cargo.toml", MANIFEST)?;
+    Disk::write(workspace.path(), "one/src/lib.rs", CLEAN)?;
+    let package = Disk::package()?;
+    Disk::write(package.path(), "src/lib.rs", CLEAN)?;
+    let cases = [
+        (workspace.path(), "one/src/inner", "one"),
+        (workspace.path(), "one/.hidden", "one"),
+        (workspace.path(), "two", "one"),
+        (package.path(), "tests", "src"),
+    ];
+    cases.iter().try_for_each(|(root, directory, given)| {
+        Disk::write(root, &format!("{directory}/kept.txt"), "x")?;
+        let unlistable = file_ports::Disk.canonical(&root.join(directory))?;
+        assert!(Trees::reported(&root.join(given)).is_clean(), "{directory}");
+        let run = Trees::reported_through(&FakeUnlistable(unlistable.clone()), &[root.join(given)]);
+        assert_eq!(run.exit, ExitCode::FAILURE, "{directory}");
+        assert!(run.err.contains(&format!("cannot read {}", unlistable.display())), "{directory}: {}", run.err);
+        Ok(())
+    })
+}
+
+#[test]
 fn a_twenty_thousand_link_method_chain_is_linted_without_overflowing_the_stack() -> Result<(), Box<dyn Error>> {
     let root = Disk::package()?;
     Disk::write(root.path(), "src/lib.rs", &format!("fn long(x: u8) {{ x{} }}\n", ".m()".repeat(LONG_CHAIN_LINKS)))?;
@@ -612,6 +658,50 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
         );
         Ok(())
     })
+}
+
+struct FakeUnlistable(PathBuf);
+
+impl Files for FakeUnlistable {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        file_ports::Disk.read(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        file_ports::Disk.read_text(path)
+    }
+
+    fn write(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        file_ports::Disk.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        file_ports::Disk.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        file_ports::Disk.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        file_ports::Disk.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        if directory == self.0 {
+            Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied)))
+        } else {
+            file_ports::Disk.entries(directory)
+        }
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        file_ports::Disk.canonical(path)
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        file_ports::Disk.kind(path)
+    }
 }
 
 mod ports {

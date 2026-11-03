@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -32,33 +33,48 @@ impl<'journal> Scope<'journal> {
     pub(crate) fn judged<'change>(
         &self,
         ports: &impl Ports,
-        check: Check,
+        checks: &[Check],
         refactor: Option<&PullRequest>,
         changes: &'change [Change],
-    ) -> Result<Owed<'change>, Failure> {
-        let flagged = check.flagged(changes);
+    ) -> Result<Vec<Owed<'change>>, Failure> {
+        let asked: Vec<(Check, Vec<&'change Change>)> =
+            checks.iter().map(|check| (*check, check.flagged(changes))).collect();
+        let produced: BTreeSet<&Path> = asked
+            .iter()
+            .filter(|(check, _)| !matches!((check, refactor), (Check::Goldens, Some(_))))
+            .flat_map(|(_, flagged)| flagged)
+            .flat_map(|change| change.paths())
+            .collect();
+        let questions: Vec<Vec<OsString>> = produced.iter().map(|path| self.arguments(path).collect()).collect();
+        let answers: BTreeMap<&Path, Text> = produced
+            .into_iter()
+            .zip(Changed::reaches(ports, &questions))
+            .map(|(path, answer)| answer.map(|text| (path, text)))
+            .collect::<Result<_, Failure>>()?;
+        Ok(asked.into_iter().map(|(check, flagged)| Self::owed(&answers, check, refactor, flagged)).collect())
+    }
+
+    fn owed<'change>(
+        answers: &BTreeMap<&Path, Text>,
+        check: Check,
+        refactor: Option<&PullRequest>,
+        flagged: Vec<&'change Change>,
+    ) -> Owed<'change> {
         match (check, refactor) {
-            (Check::Goldens, Some(_)) => Ok(Owed::new(Fault::Refactor, flagged)),
-            _ => flagged
-                .into_iter()
-                .map(|change| Ok(self.reaching(ports, change)?.is_none().then_some(change)))
-                .filter_map(Result::transpose)
-                .collect::<Result<_, Failure>>()
-                .map(|failing| Owed::new(Fault::Beyond(check), failing)),
+            (Check::Goldens, Some(_)) => Owed::new(Fault::Refactor, flagged),
+            _ => Owed::new(
+                Fault::Beyond(check),
+                flagged.into_iter().filter(|change| Self::reaching(answers, change).is_none()).collect(),
+            ),
         }
     }
 
-    fn reaching<'change>(
-        &self,
-        ports: &impl Ports,
-        change: &'change Change,
-    ) -> Result<Option<&'change Change>, Failure> {
-        let beyond: Vec<Text> = change
+    fn reaching<'change>(answers: &BTreeMap<&Path, Text>, change: &'change Change) -> Option<&'change Change> {
+        change
             .paths()
-            .into_iter()
-            .map(|produced| Changed::reach(ports, self.arguments(produced)))
-            .collect::<Result<_, _>>()?;
-        Ok(beyond.iter().all(|listed| listed.as_ref().is_empty()).then_some(change))
+            .iter()
+            .all(|produced| answers.get(produced).is_some_and(|listed| listed.as_ref().is_empty()))
+            .then_some(change)
     }
 
     fn arguments(&self, produced: &Path) -> impl Iterator<Item = OsString> {

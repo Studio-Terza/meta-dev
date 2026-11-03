@@ -3,14 +3,14 @@ mod declaration;
 mod redirects;
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use file_ports::Files;
 use syn::Item;
 
 use lint_core::Walk;
 use lint_layout::Failure;
 use lint_layout::Name;
+use lint_roots::Survey;
 
 pub use child::Child;
 use declaration::Declaration;
@@ -24,21 +24,34 @@ pub struct Modules {
 }
 
 impl Modules {
-    const SOURCE_EXTENSION: &'static str = "rs";
-    const MODULE_FILE: &'static str = "mod.rs";
+    #[must_use]
+    pub fn candidates(file: &Path, children_directory: &Path, items: &[Item]) -> Vec<PathBuf> {
+        let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
+        [Walk::Entered, Walk::Skipped]
+            .into_iter()
+            .flat_map(|wanted| Self::declarations(items, children_directory, wanted))
+            .flat_map(|declaration| {
+                declaration
+                    .choices(&file_directory)
+                    .into_iter()
+                    .chain(Redirects::conditional(&file_directory, declaration.module()))
+            })
+            .map(|child| child.as_ref().to_path_buf())
+            .collect()
+    }
 
     #[must_use]
-    pub fn declared_in(files: &impl Files, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
+    pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
         let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
         let entered = Self::declarations(items, children_directory, Walk::Entered);
         let skipped = Self::declarations(items, children_directory, Walk::Skipped);
         let tests = skipped
             .iter()
-            .flat_map(|declaration| Self::resolve(files, &file_directory, declaration).unwrap_or_default())
+            .flat_map(|declaration| Self::resolve(survey, &file_directory, declaration).unwrap_or_default())
             .collect();
         entered.into_iter().fold(
             Modules { children: Vec::new(), tests, failures: Vec::new() },
-            |modules, declaration| match Self::resolve(files, &file_directory, &declaration) {
+            |modules, declaration| match Self::resolve(survey, &file_directory, &declaration) {
                 Ok(found) => Modules { children: modules.children.into_iter().chain(found).collect(), ..modules },
                 Err(failure) => {
                     Modules { failures: modules.failures.into_iter().chain([failure]).collect(), ..modules }
@@ -49,6 +62,11 @@ impl Modules {
 
     pub fn take_children(&mut self) -> Vec<Child> {
         std::mem::take(&mut self.children)
+    }
+
+    #[must_use]
+    pub fn nested(self) -> Vec<Child> {
+        self.children.into_iter().chain(self.tests).collect()
     }
 
     #[must_use]
@@ -77,32 +95,23 @@ impl Modules {
             .collect()
     }
 
-    fn resolve(
-        files: &impl Files,
-        file_directory: &Path,
-        declaration: &Declaration<'_>,
-    ) -> Result<Vec<Child>, Failure> {
-        let own = declaration.directory().join(Name::from(&declaration.module().ident));
-        let explicit = Redirects::explicit(declaration.module()).map(|path| file_directory.join(path));
-        let expected = explicit.clone().unwrap_or_else(|| own.with_extension(Self::SOURCE_EXTENSION));
-        let choices = match explicit {
-            Some(file) => {
-                let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
-                vec![Child::new(file, children)]
-            }
-            None => vec![
-                Child::new(own.with_extension(Self::SOURCE_EXTENSION), own.clone()),
-                Child::new(own.join(Self::MODULE_FILE), own),
-            ],
-        };
-        let primary = choices.into_iter().find_map(|choice| choice.existing(files));
+    fn resolve(survey: &Survey, file_directory: &Path, declaration: &Declaration<'_>) -> Result<Vec<Child>, Failure> {
+        let primary = declaration.choices(file_directory).into_iter().find_map(|choice| choice.existing(survey));
         let found: Vec<Child> = primary.iter().cloned().collect();
-        let conditional = Redirects::conditional(file_directory, declaration.module());
-        let found = conditional.into_iter().filter_map(|child| child.existing(files)).fold(found, |found, child| {
-            if found.contains(&child) { found } else { found.into_iter().chain([child]).collect() }
-        });
+        let found = Redirects::conditional(file_directory, declaration.module())
+            .into_iter()
+            .filter_map(|child| child.existing(survey))
+            .fold(
+                found,
+                |found, child| {
+                    if found.contains(&child) { found } else { found.into_iter().chain([child]).collect() }
+                },
+            );
         if found.is_empty() {
-            Err(Failure::Io { path: expected, source: io::Error::from(io::ErrorKind::NotFound) })
+            Err(Failure::Io {
+                path: declaration.expected(file_directory),
+                source: io::Error::from(io::ErrorKind::NotFound),
+            })
         } else {
             Ok(found)
         }

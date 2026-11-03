@@ -66,4 +66,12 @@ impl Ports for System {
         copied?;
         Ok(Run::new(Self::exit_of(status), started.elapsed()))
     }
+
+    fn runs(&self, invocations: &[Invocation]) -> Vec<io::Result<Run>> {
+        invocations.iter().map(|invocation| self.run(invocation)).collect()
+    }
+
+    fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<Text>> {
+        invocations.iter().map(|invocation| self.output(invocation)).collect()
+    }
 }

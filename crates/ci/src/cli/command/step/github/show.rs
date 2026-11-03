@@ -17,9 +17,12 @@ pub struct Show {
 impl Show {
     const ABSENT: &'static str = "not produced\n";
 
-    pub(super) fn shown(files: &impl Files, file: &Journal, out: &mut impl Write) -> Result<(), Failure> {
-        writeln!(out, "{file}:")?;
-        Ok(write!(out, "{}", file.read_or(files, Text::new(Self::ABSENT.to_owned()))?)?)
+    pub(super) fn shown(files: &impl Files, journals: &[Journal], out: &mut impl Write) -> Result<(), Failure> {
+        journals.iter().zip(Journal::read_present(files, journals)).try_for_each(|(journal, text)| {
+            writeln!(out, "{journal}:")?;
+            let text = text.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
+            Ok(write!(out, "{text}")?)
+        })
     }
 }
 
@@ -32,9 +35,7 @@ impl Step for Show {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        self.files
-            .iter()
-            .try_for_each(|file| Self::shown(ports.files(), &Journal::file(file), out))
-            .map(|()| Exit::Success)
+        let journals: Vec<Journal> = self.files.iter().map(|file| Journal::file(file)).collect();
+        Self::shown(ports.files(), &journals, out).map(|()| Exit::Success)
     }
 }

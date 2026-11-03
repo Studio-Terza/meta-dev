@@ -31,18 +31,18 @@ impl InstallTools {
         )
     }
 
-    fn copied(&self, files: &impl Files, tool: Tool) -> Result<(), Failure> {
-        let from = self.built.join(tool.as_ref());
-        files
-            .copy(&from, &self.destination.join(tool.as_ref()))
-            .map_err(|failure| Failure::Io { path: from, source: io::Error::from(failure) })
-    }
-
     fn installed(&self, files: &impl Files) -> Result<Exit, Failure> {
         files
             .create_directories(&self.destination)
             .map_err(|failure| Failure::Io { path: self.destination.clone(), source: io::Error::from(failure) })?;
-        Self::PROGRAMS.into_iter().try_for_each(|tool| self.copied(files, tool)).map(|()| Exit::Success)
+        let built: Vec<PathBuf> = Self::PROGRAMS.iter().map(|tool| self.built.join(tool.as_ref())).collect();
+        built
+            .iter()
+            .zip(files.copy_each_into(&built, &self.destination))
+            .try_for_each(|(from, copied)| {
+                copied.map_err(|failure| Failure::Io { path: from.clone(), source: io::Error::from(failure) })
+            })
+            .map(|()| Exit::Success)
     }
 }
 

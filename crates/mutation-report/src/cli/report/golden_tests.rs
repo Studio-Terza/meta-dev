@@ -25,11 +25,11 @@ impl GoldenTests {
     const ASYNC_TEST: &'static str = "#[tokio::test]";
 
     pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure> {
-        RustFiles::below(files, &sources.join(Self::CRATES))?.iter().try_fold(GoldenTests::default(), |found, file| {
-            let bytes = files
-                .read(file)
-                .map_err(|failure| Failure::Io { path: file.clone(), source: io::Error::from(failure) })?;
-            Ok(found.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
+        let found = RustFiles::below(files, &sources.join(Self::CRATES))?;
+        found.iter().zip(files.read_many(&found)).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
+            let bytes =
+                bytes.map_err(|failure| Failure::Io { path: file.clone(), source: io::Error::from(failure) })?;
+            Ok(tests.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
         })
     }
 

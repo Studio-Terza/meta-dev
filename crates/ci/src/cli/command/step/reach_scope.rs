@@ -6,7 +6,6 @@ use std::io::Write;
 use std::path::Path;
 
 use file_ports::Files;
-use text_lines::Lines;
 
 use super::Step;
 use super::branch::Branch;
@@ -15,7 +14,7 @@ use super::journal::Journal;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports, Text};
 use event::Event;
-use skipped::Skipped;
+use skipped::Skips;
 
 #[derive(Debug)]
 pub struct ReachScope {
@@ -31,13 +30,11 @@ impl ReachScope {
     const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
     fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure> {
+        let skipped = Skips::from(report.as_ref());
         write!(out, "{report}")?;
         self.environment.append(files, report)?;
-        self.summary.append(files, report)?;
-        Lines::from(report.as_ref()).filter_map(|line| Skipped::try_from(line).ok()).try_for_each(|skipped| {
-            writeln!(out, "{skipped}")?;
-            self.summary.append(files, format_args!("{skipped}\n"))
-        })
+        self.summary.append(files, format_args!("{report}{skipped}"))?;
+        Ok(write!(out, "{skipped}")?)
     }
 }
 

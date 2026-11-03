@@ -36,25 +36,38 @@ impl ShardSummary {
         Ok(found)
     }
 
-    fn text_of(&self, files: &impl Files, outcome: Outcome) -> Result<Text, Failure> {
-        self.directories(files)?
-            .iter()
-            .map(|directory| Journal::file(&directory.join(outcome.file_name())))
-            .filter(|journal| journal.existing(files).is_some())
-            .try_fold(String::new(), |text, file| Ok(text + file.read(files)?.as_ref()))
-            .map(Text::new)
+    fn texts(&self, files: &impl Files) -> Result<Vec<Text>, Failure> {
+        let directories = self.directories(files)?;
+        let tagged: Vec<(Outcome, Journal)> = Outcome::ALL
+            .into_iter()
+            .flat_map(|outcome| directories.iter().map(move |directory| (outcome, directory.join(outcome.file_name()))))
+            .map(|(outcome, path)| (outcome, Journal::file(&path)))
+            .collect();
+        let journals: Vec<Journal> = tagged.iter().map(|(_, journal)| journal.clone()).collect();
+        let read: Vec<Option<Text>> =
+            Journal::read_present(files, &journals).into_iter().map(Option::transpose).collect::<Result<_, _>>()?;
+        Ok(Outcome::ALL
+            .into_iter()
+            .map(|outcome| {
+                let texts = tagged.iter().zip(&read).filter(|((tag, _), _)| *tag == outcome).flat_map(|(_, text)| text);
+                Text::new(texts.map(AsRef::as_ref).collect())
+            })
+            .collect())
     }
 
     fn report(&self, files: &impl Files) -> Result<Report, Failure> {
+        let texts = self.texts(files)?;
         let tallies = Outcome::ALL
             .into_iter()
-            .map(|outcome| {
-                Ok(Tally::new(outcome, Count::new(Lines::from(self.text_of(files, outcome)?.as_ref()).count())))
-            })
-            .collect::<Result<_, Failure>>()?;
-        let listed = Outcome::LISTED.into_iter().try_fold(String::new(), |text, outcome| {
-            Ok::<String, Failure>(text + self.text_of(files, outcome)?.as_ref())
-        })?;
+            .zip(&texts)
+            .map(|(outcome, text)| Tally::new(outcome, Count::new(Lines::from(text.as_ref()).count())))
+            .collect();
+        let listed: String = Outcome::ALL
+            .iter()
+            .zip(&texts)
+            .filter(|(outcome, _)| Outcome::LISTED.contains(outcome))
+            .map(|(_, text)| text.as_ref())
+            .collect();
         let mut names: Vec<Mutant> = Lines::from(listed.as_str()).map(|name| Mutant::new(name.to_owned())).collect();
         names.sort();
         Ok(Report::new(tallies, names))

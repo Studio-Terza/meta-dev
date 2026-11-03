@@ -32,7 +32,7 @@ impl Shard {
 
     pub fn write_matrix(&self, files: &impl Files) -> Result<(), Failure> {
         let outcomes = Outcomes::read(files, &self.directory)?;
-        Matrix::new(outcomes.baseline(files, &self.directory), outcomes.mutants(files, &self.directory))
-            .write(files, &self.destination)
+        let logs = outcomes.logs(files, &self.directory);
+        Matrix::new(outcomes.baseline(&logs), outcomes.mutants(&logs)).write(files, &self.destination)
     }
 }

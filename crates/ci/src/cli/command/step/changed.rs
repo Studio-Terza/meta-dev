@@ -1,7 +1,6 @@
 mod question;
 
 use std::ffi::OsString;
-use std::process::ExitCode;
 
 use text_lines::Lines;
 
@@ -27,13 +26,15 @@ impl Changed {
     }
 
     pub(crate) fn reach(ports: &impl Ports, arguments: impl Iterator<Item = OsString>) -> Result<Text, Failure> {
-        let mut report = Vec::new();
-        let mut refusal = Vec::new();
-        if reach::Cli::answer(arguments, ports.files(), &mut report, &mut refusal) == ExitCode::SUCCESS {
-            Ok(Text::new(String::from_utf8(report).unwrap_or_default()))
-        } else {
-            Err(Failure::Reach(Refusal::from(refusal)))
-        }
+        ports.reached(&arguments.collect::<Vec<_>>()).map_err(Self::refused)
+    }
+
+    pub(crate) fn reaches(ports: &impl Ports, questions: &[Vec<OsString>]) -> Vec<Result<Text, Failure>> {
+        ports.reaches(questions).into_iter().map(|answer| answer.map_err(Self::refused)).collect()
+    }
+
+    fn refused(refusal: Text) -> Failure {
+        Failure::Reach(Refusal::from(refusal))
     }
 
     pub(crate) fn answered(question: Question, metadata: &Journal, ports: &impl Ports) -> Result<Text, Failure> {

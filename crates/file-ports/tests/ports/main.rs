@@ -157,3 +157,42 @@ fn absent_holds_nothing_and_takes_nothing() {
     assert!(matches!(Absent.canonical(path), Err(FileFailure::Missing(_))));
     assert_eq!(Absent.kind(path), Kind::Missing);
 }
+
+struct Batches;
+
+impl Batches {
+    fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
+        let [a, b, absent] = ["a.txt", "copies/a.txt", "absent.txt"].map(|name| root.join(name));
+        files.write(&a, &Bytes::from("a"))?;
+        files.create_directories(&root.join("copies"))?;
+        files.copy_into(std::slice::from_ref(&a), &root.join("copies"))?;
+        let both = [a.clone(), b.clone()];
+        assert_eq!(
+            files.read_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?,
+            [Bytes::from("a"), Bytes::from("a")]
+        );
+        let texts = files.read_text_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
+        assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
+        let canonical = files.canonical_many(&[a.clone(), absent.clone()]);
+        assert_eq!(canonical.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        let listed = files.entries_many(&[root.join("copies"), absent]);
+        assert_eq!(listed.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
+        assert_eq!(listed.into_iter().next().unwrap_or_else(|| Ok(Vec::new()))?, [b]);
+        files.write(&root.join("c.txt"), &Bytes::from("c"))?;
+        let copied = files.copy_each_into(&[root.join("none"), root.join("c.txt")], &root.join("copies"));
+        assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
+        assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
+        assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
+        Ok(())
+    }
+}
+
+#[test]
+fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
+    let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
+    Batches::on(&Disk, scratch.path())?;
+    let fake = FakeFiles::default();
+    fake.create_directories(Path::new("/batch"))?;
+    Batches::on(&fake, Path::new("/batch"))
+}

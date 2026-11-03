@@ -3,18 +3,23 @@ use std::path::{Path, PathBuf};
 use file_ports::Files;
 use lint_layout::Failure;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tree {
     canonical: PathBuf,
     given: PathBuf,
 }
 
 impl Tree {
-    pub fn open(files: &impl Files, given: &Path) -> Result<Tree, Failure> {
-        let canonical = files
-            .canonical(given)
-            .map_err(|failure| Failure::Io { path: given.to_path_buf(), source: failure.into() })?;
-        Ok(Tree { canonical, given: given.to_path_buf() })
+    pub fn open_many(files: &impl Files, given: &[PathBuf]) -> Vec<Result<Tree, Failure>> {
+        given
+            .iter()
+            .zip(files.canonical_many(given))
+            .map(|(given, canonical)| {
+                canonical
+                    .map(|canonical| Tree { canonical, given: given.clone() })
+                    .map_err(|failure| Failure::Io { path: given.clone(), source: failure.into() })
+            })
+            .collect()
     }
 
     #[must_use]

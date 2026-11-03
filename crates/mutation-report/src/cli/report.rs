@@ -51,12 +51,14 @@ impl Report {
             .entries(&self.shards)
             .map_err(|failure| Failure::Io { path: self.shards.clone(), source: io::Error::from(failure) })?;
         directories.sort();
-        directories
+        let shard_files: Vec<PathBuf> = directories.iter().map(|directory| Self::shard_file(directory)).collect();
+        let present: Vec<PathBuf> = shard_files
             .iter()
-            .map(|directory| Self::shard_file(directory))
-            .filter(|file| files.kind(file) == Kind::File)
-            .map(|file| ShardMatrix::read(files, &file))
-            .collect()
+            .zip(files.kinds(&shard_files))
+            .filter(|(_, kind)| *kind == Kind::File)
+            .map(|(file, _)| file.clone())
+            .collect();
+        present.iter().zip(files.read_text_many(&present)).map(|(file, text)| ShardMatrix::parsed(file, text)).collect()
     }
 
     fn shard_file(directory: &Path) -> PathBuf {
