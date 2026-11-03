@@ -1,6 +1,7 @@
 mod boundary;
 mod rust_files;
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
 use std::io;
@@ -24,11 +25,12 @@ impl GoldenTests {
     const TEST: &'static str = "#[test]";
     const ASYNC_TEST: &'static str = "#[tokio::test]";
 
-    pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure> {
-        let found = RustFiles::below(files, &sources.join(Self::CRATES))?;
-        found.iter().zip(files.read_many(&found)).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
+    pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure<'static>> {
+        let found = RustFiles::below(files, sources.join(Self::CRATES))?;
+        let read = files.read_many(&found);
+        found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
             let bytes =
-                bytes.map_err(|failure| Failure::Io { path: file.clone(), source: io::Error::from(failure) })?;
+                bytes.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
             Ok(tests.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
         })
     }

@@ -3,6 +3,7 @@ mod entry;
 mod heading;
 mod section;
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::io;
@@ -57,12 +58,12 @@ impl Summary {
         }
     }
 
-    pub(crate) fn written_as_json(&self, files: &impl Files, path: &Path) -> Result<(), Failure> {
-        let json =
-            serde_json::to_string_pretty(self).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })?;
+    pub(crate) fn written_as_json<'path>(&self, files: &impl Files, path: &'path Path) -> Result<(), Failure<'path>> {
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|source| Failure::Parse { path: Cow::Borrowed(path), source })?;
         files
             .write(path, &Bytes::from(json.as_str()))
-            .map_err(|failure| Failure::Io { path: path.to_path_buf(), source: io::Error::from(failure) })
+            .map_err(|failure| Failure::Io { path: Cow::Borrowed(path), source: io::Error::from(failure) })
     }
 
     fn killed_without_golden(mutants: &[RecordedMutant], golden: &BTreeSet<TestName>) -> Vec<Entry> {

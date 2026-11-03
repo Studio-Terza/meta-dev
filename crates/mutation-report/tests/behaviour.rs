@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -79,7 +79,7 @@ struct Answer {
 impl Answer {
     fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
         let mut err = Vec::new();
-        let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
+        let exit = Cli::answer(arguments, files, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 }
