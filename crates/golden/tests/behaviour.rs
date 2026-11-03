@@ -2,7 +2,7 @@ mod differences;
 
 use std::ffi::OsStr;
 
-use golden::{Difference, Failure, Golden, Mode, Output, golden};
+use golden::{Difference, Disk, Failure, Golden, Mode, Output, Process, golden};
 use laws::proptest;
 use laws::{roundtrip, table};
 use ports::Fixture;
@@ -10,22 +10,22 @@ use proptest::prelude::any;
 
 #[test]
 fn checking_matching_output_passes() -> Result<(), Box<dyn std::error::Error>> {
-    Fixture::with_recorded("same\n")?.golden().verify(Output::new("same\n"))?;
+    Fixture::with_recorded("same\n")?.golden().verify(&Process, &Disk, Output::new("same\n"))?;
     Ok(())
 }
 
 #[test]
 fn a_check_fails_on_changed_output_and_leaves_the_golden_alone() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    assert!(matches!(fixture.golden().verify(Output::new("new\n")), Err(Failure::Differs { .. })));
-    assert!(fixture.golden().verify(Output::new("old\n")).is_ok());
+    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("new\n")), Err(Failure::Differs { .. })));
+    assert!(fixture.golden().verify(&Process, &Disk, Output::new("old\n")).is_ok());
     Ok(())
 }
 
 #[test]
 fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    assert!(matches!(fixture.golden().verify(Output::new("new\n")), Err(Failure::Missing { .. })));
+    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("new\n")), Err(Failure::Missing { .. })));
     assert!(!fixture.path().exists());
     Ok(())
 }
@@ -34,7 +34,7 @@ fn a_check_never_creates_a_missing_golden() -> Result<(), Box<dyn std::error::Er
 fn a_golden_that_is_not_text_is_reported_as_unreadable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("")?;
     fixture.overwrite(&[0xff, 0xfe])?;
-    assert!(matches!(fixture.golden().verify(Output::new("")), Err(Failure::Unreadable { .. })));
+    assert!(matches!(fixture.golden().verify(&Process, &Disk, Output::new("")), Err(Failure::Unreadable { .. })));
     Ok(())
 }
 
@@ -62,7 +62,8 @@ roundtrip!(
 #[test]
 fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
-    let printed = fixture.golden().verify(Output::new("new\n")).err().map(|failure| format!("{failure:?}"));
+    let printed =
+        fixture.golden().verify(&Process, &Disk, Output::new("new\n")).err().map(|failure| format!("{failure:?}"));
     let heading = format!("{}: output differs from the golden", fixture.path().display());
     let lines = printed.as_deref().map(|text| text_lines::Lines::from(text).collect::<Vec<&str>>());
     let wanted = [
@@ -81,8 +82,8 @@ fn a_returned_failure_prints_the_readable_message() -> Result<(), Box<dyn std::e
 fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::with_recorded("old\n")?;
     fixture.mark_package()?;
-    let recorded = fixture.golden().verify_in(Mode::Record, Output::new("new\n"));
-    let chosen = Mode::current().ok() == Some(Mode::Record);
+    let recorded = fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new("new\n"));
+    let chosen = Mode::current(&Process).ok() == Some(Mode::Record);
     assert_eq!(matches!(recorded, Err(Failure::NotChosen { .. })), !chosen);
     assert_eq!(fixture.text()? == "old\n", !chosen);
     Ok(())
@@ -91,8 +92,8 @@ fn a_test_cannot_choose_to_record_a_package_golden() -> Result<(), Box<dyn std::
 #[test]
 fn a_golden_in_a_package_lives_under_its_goldens_directory() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    fixture.golden().verify_in(Mode::Record, Output::new("placed\n"))?;
-    assert!(fixture.golden().verify(Output::new("placed\n")).is_ok());
+    fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new("placed\n"))?;
+    assert!(fixture.golden().verify(&Process, &Disk, Output::new("placed\n")).is_ok());
     Ok(())
 }
 
@@ -122,7 +123,7 @@ mod ports {
     use std::fs;
     use std::path::PathBuf;
 
-    use golden::{Golden, Mode, Output};
+    use golden::{Disk, Golden, Mode, Output, Process};
     use tempfile::TempDir;
 
     pub struct Fixture {
@@ -169,7 +170,7 @@ mod ports {
 
         pub fn recorded_through_the_api(text: &str) -> Option<Self> {
             let fixture = Self::new().ok()?;
-            fixture.golden().verify_in(Mode::Record, Output::new(text)).ok()?;
+            fixture.golden().verify_in(&Process, &Disk, Mode::Record, Output::new(text)).ok()?;
             Some(fixture)
         }
     }

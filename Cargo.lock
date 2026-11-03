@@ -51,6 +51,8 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "gate-limits",
  "laws",
  "mutation-report",
@@ -152,6 +154,8 @@ dependencies = [
 name = "gate-limits"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "newtype",
  "serde",
  "text-lines",
@@ -175,6 +179,8 @@ dependencies = [
 name = "golden"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "laws",
  "newtype",
  "tempfile",
@@ -970,6 +976,8 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "golden",
  "laws",
  "newtype",
@@ -984,6 +992,8 @@ dependencies = [
 name = "mutation-shard"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "laws",
  "serde",
  "serde_json",
@@ -1115,6 +1125,7 @@ dependencies = [
 name = "reach"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "file-ports",
  "laws",
  "lint-complexity",

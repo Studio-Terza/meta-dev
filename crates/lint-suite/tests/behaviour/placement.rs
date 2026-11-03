@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use file_ports::Memory;
+use file_ports::Absent;
 use lint_placement::Placement;
 
 struct Placed {
@@ -12,7 +12,7 @@ impl Placed {
     fn of(pair: &[&str]) -> Option<Placed> {
         match pair {
             [package, file] => Some(Placed {
-                placement: Placement::within(&Memory::default(), Path::new(package), Path::new(file)),
+                placement: Placement::within(&Absent, Path::new(package), Path::new(file)),
                 file: PathBuf::from(file),
             }),
             _ => None,

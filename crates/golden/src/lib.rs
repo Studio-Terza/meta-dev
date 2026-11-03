@@ -10,9 +10,13 @@ pub use golden::Golden;
 pub use mode::Mode;
 pub use output::Output;
 
+pub use console_ports::Process;
+pub use file_ports::Disk;
+
 #[macro_export]
 macro_rules! golden {
     ($name:expr, $actual:expr $(,)?) => {
-        $crate::Golden::in_running_package($name).and_then(|golden| golden.verify($crate::Output::new($actual)))
+        $crate::Golden::in_package(env!("CARGO_MANIFEST_DIR"), $name)
+            .and_then(|golden| golden.verify(&$crate::Process, &$crate::Disk, $crate::Output::new($actual)))
     };
 }

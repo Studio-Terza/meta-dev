@@ -1,3 +1,6 @@
+use std::fmt;
+use std::io::Write;
+
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -9,8 +12,9 @@ impl AsRef<[u8]> for Bytes {
     }
 }
 
-impl From<&str> for Bytes {
-    fn from(text: &str) -> Bytes {
-        Bytes(text.as_bytes().to_vec())
+impl<Shown: fmt::Display + ?Sized> From<&Shown> for Bytes {
+    fn from(shown: &Shown) -> Bytes {
+        let mut bytes = Vec::new();
+        write!(bytes, "{shown}").map_or_else(|_| Bytes::default(), |()| Bytes(bytes))
     }
 }

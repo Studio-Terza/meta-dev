@@ -15,6 +15,8 @@ name = "behaviour"
 path = "tests/behaviour.rs"
 
 [dependencies]
+console-ports = { path = "../console-ports" }
+file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 thiserror.workspace = true
 

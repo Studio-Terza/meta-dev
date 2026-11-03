@@ -1,5 +1,7 @@
-use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
+
+use file_ports::{Files, Kind};
 
 use crate::cli::report::failure::Failure;
 
@@ -9,16 +11,20 @@ pub struct RustFiles;
 impl RustFiles {
     const RUST: &'static str = "rs";
 
-    pub fn below(directory: &Path) -> Result<Vec<PathBuf>, Failure> {
-        let failed = |source| Failure::Io { path: directory.to_path_buf(), source };
-        fs::read_dir(directory).map_err(failed)?.try_fold(Vec::new(), |found, entry| {
-            let path = entry.map_err(failed)?.path();
-            Ok(found.into_iter().chain(Self::descend(path)?).collect())
-        })
+    pub fn below(files: &impl Files, directory: &Path) -> Result<Vec<PathBuf>, Failure> {
+        let entries = files
+            .entries(directory)
+            .map_err(|failure| Failure::Io { path: directory.to_path_buf(), source: io::Error::from(failure) })?;
+        entries
+            .into_iter()
+            .try_fold(Vec::new(), |found, path| Ok(found.into_iter().chain(Self::descend(files, path)?).collect()))
     }
 
-    fn descend(path: PathBuf) -> Result<Vec<PathBuf>, Failure> {
-        if path.is_dir() { Self::below(&path) } else { Ok(Self::rust(path).into_iter().collect()) }
+    fn descend(files: &impl Files, path: PathBuf) -> Result<Vec<PathBuf>, Failure> {
+        match files.kind(&path) {
+            Kind::Directory => Self::below(files, &path),
+            _ => Ok(Self::rust(path).into_iter().collect()),
+        }
     }
 
     fn rust(file: PathBuf) -> Option<PathBuf> {

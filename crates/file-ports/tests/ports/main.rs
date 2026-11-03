@@ -1,7 +1,10 @@
+mod fake_files;
+
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory, Text};
+use fake_files::FakeFiles;
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -84,7 +87,7 @@ struct Checks;
 impl Checks {
     fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
         let contract = Contract { files, root: root.to_path_buf() };
-        assert_eq!(contract.written_then_read()?, Text::new("written".to_owned()));
+        assert_eq!(contract.written_then_read()?.as_ref(), "written");
         assert_eq!(contract.appended()?, Text::new("one two".to_owned()));
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
@@ -102,15 +105,15 @@ fn disk_keeps_the_contract() -> Result<(), FileFailure> {
 }
 
 #[test]
-fn memory_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = Memory::default();
+fn fake_keeps_the_contract() -> Result<(), FileFailure> {
+    let memory = FakeFiles::default();
     memory.create_directories(Path::new("/scratch"))?;
     Checks::on(&memory, Path::new("/scratch"))
 }
 
 #[test]
-fn memory_starts_from_its_entries() -> Result<(), FileFailure> {
-    let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
+fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
+    let memory: FakeFiles = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
     assert_eq!(memory.entries(Path::new("/a"))?, [PathBuf::from("/a/b.txt")]);
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
@@ -139,4 +142,18 @@ fn a_failure_gives_back_its_error() {
         FileFailure::from(io::Error::from(io::ErrorKind::NotFound)).to_string(),
         io::Error::from(io::ErrorKind::NotFound).to_string()
     );
+}
+
+#[test]
+fn absent_holds_nothing_and_takes_nothing() {
+    let path = Path::new("/a.txt");
+    assert!(matches!(Absent.read(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.read_text(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.write(path, &Bytes::from("a")), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.append(path, &Bytes::from("a")), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.create_directories(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.copy(path, path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.entries(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.canonical(path), Err(FileFailure::Missing(_))));
+    assert_eq!(Absent.kind(path), Kind::Missing);
 }

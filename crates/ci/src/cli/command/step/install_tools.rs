@@ -1,9 +1,11 @@
 mod tool;
 
 use std::ffi::{OsStr, OsString};
-use std::fs;
+use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+
+use file_ports::Files;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
@@ -29,17 +31,18 @@ impl InstallTools {
         )
     }
 
-    fn copied(&self, tool: Tool) -> Result<(), Failure> {
+    fn copied(&self, files: &impl Files, tool: Tool) -> Result<(), Failure> {
         let from = self.built.join(tool.as_ref());
-        fs::copy(&from, self.destination.join(tool.as_ref()))
-            .map(drop)
-            .map_err(|source| Failure::Io { path: from, source })
+        files
+            .copy(&from, &self.destination.join(tool.as_ref()))
+            .map_err(|failure| Failure::Io { path: from, source: io::Error::from(failure) })
     }
 
-    fn installed(&self) -> Result<Exit, Failure> {
-        fs::create_dir_all(&self.destination)
-            .map_err(|source| Failure::Io { path: self.destination.clone(), source })?;
-        Self::PROGRAMS.into_iter().try_for_each(|tool| self.copied(tool)).map(|()| Exit::Success)
+    fn installed(&self, files: &impl Files) -> Result<Exit, Failure> {
+        files
+            .create_directories(&self.destination)
+            .map_err(|failure| Failure::Io { path: self.destination.clone(), source: io::Error::from(failure) })?;
+        Self::PROGRAMS.into_iter().try_for_each(|tool| self.copied(files, tool)).map(|()| Exit::Success)
     }
 }
 
@@ -56,6 +59,6 @@ impl Step for InstallTools {
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
         let build = Self::build_invocation();
         let run = ports.run(&build).map_err(Failure::starting(&build))?;
-        run.exit().followed_by(|| self.installed())
+        run.exit().followed_by(|| self.installed(ports.files()))
     }
 }

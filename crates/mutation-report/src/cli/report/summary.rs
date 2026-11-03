@@ -5,11 +5,12 @@ mod section;
 
 use std::collections::BTreeSet;
 use std::fmt;
-use std::fs;
+use std::io;
 use std::path::Path;
 
 use boundary::Count;
 use entry::Entry;
+use file_ports::{Bytes, Files};
 use heading::Heading;
 use section::Section;
 use serde::Serialize;
@@ -56,10 +57,12 @@ impl Summary {
         }
     }
 
-    pub(crate) fn written_as_json(&self, path: &Path) -> Result<(), Failure> {
+    pub(crate) fn written_as_json(&self, files: &impl Files, path: &Path) -> Result<(), Failure> {
         let json =
             serde_json::to_string_pretty(self).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })?;
-        fs::write(path, json).map_err(|source| Failure::Io { path: path.to_path_buf(), source })
+        files
+            .write(path, &Bytes::from(json.as_str()))
+            .map_err(|failure| Failure::Io { path: path.to_path_buf(), source: io::Error::from(failure) })
     }
 
     fn killed_without_golden(mutants: &[RecordedMutant], golden: &BTreeSet<TestName>) -> Vec<Entry> {

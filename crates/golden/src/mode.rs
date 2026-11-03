@@ -1,5 +1,6 @@
-use std::env;
 use std::ffi::OsStr;
+
+use console_ports::Environment;
 
 use crate::Failure;
 
@@ -14,8 +15,11 @@ impl Mode {
     pub const ON: &'static str = "1";
     const CI: &'static str = "CI";
 
-    pub fn current() -> Result<Self, Failure> {
-        Self::chosen(env::var_os(Self::VARIABLE).as_deref(), env::var_os(Self::CI).as_deref())
+    pub fn current(environment: &impl Environment) -> Result<Self, Failure> {
+        Self::chosen(
+            environment.variable(OsStr::new(Self::VARIABLE)).as_deref(),
+            environment.variable(OsStr::new(Self::CI)).as_deref(),
+        )
     }
 
     pub fn chosen(record: Option<&OsStr>, ci: Option<&OsStr>) -> Result<Self, Failure> {

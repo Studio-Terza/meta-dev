@@ -85,7 +85,7 @@ impl Fortnight {
             ],
         );
         ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        Build::try_from(directory.as_path())
+        Build::measured_in(ports.files(), &directory)
     }
 
     pub(super) fn merged(ports: &impl Ports) -> Result<Text, Failure> {

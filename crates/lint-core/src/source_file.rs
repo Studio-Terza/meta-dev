@@ -3,7 +3,7 @@ mod boundary;
 use std::path::{Path, PathBuf};
 
 use boundary::Nesting;
-use file_ports::Memory;
+use file_ports::Absent;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
@@ -27,7 +27,7 @@ impl SourceFile {
 
     pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
         let path = path.into();
-        let placement = Placement::locate(&Memory::default(), &path);
+        let placement = Placement::locate(&Absent, &path);
         let located = path.clone();
         Self::parse_at(path, located, placement, text)
     }

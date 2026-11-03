@@ -32,7 +32,7 @@ impl Step for Timed {
         let run = ports
             .run(&self.invocation)
             .map_err(|source| Failure::Program { program: self.invocation.program().to_owned(), source })?;
-        self.measured.append(&self.stage, Seconds::from(run.elapsed()))?;
+        self.measured.append(ports.files(), &self.stage, Seconds::from(run.elapsed()))?;
         Ok(run.exit())
     }
 }
