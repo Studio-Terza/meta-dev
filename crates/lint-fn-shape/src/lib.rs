@@ -31,9 +31,9 @@ pub struct FnShape;
 
 impl Lint for FnShape {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
+        Self::shipped(
+            files,
             Headline::new("hairy control flow; booleans and tuples become types, nesting becomes methods"),
-            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
         )
     }
 }
