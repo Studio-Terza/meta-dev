@@ -1,5 +1,6 @@
 mod macro_items;
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use quote::ToTokens;
@@ -45,20 +46,22 @@ impl ReferencedNames {
     }
 
     fn with_item(self, item: &Item, scope: &Scope) -> ReferencedNames {
-        let (attributes, owner, nested): (&[Attribute], Option<Name>, Vec<Item>) = match item {
-            Item::Struct(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Enum(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Trait(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Fn(item) => (&item.attrs, Some(Name::from(&item.sig.ident)), Vec::new()),
-            Item::Type(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Const(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Static(item) => (&item.attrs, Some(Name::from(&item.ident)), Vec::new()),
-            Item::Impl(item) => (&item.attrs, None, Vec::new()),
-            Item::Mod(module) => {
-                (&module.attrs, None, module.content.iter().flat_map(|(_, items)| items.clone()).collect())
-            }
-            Item::Macro(call) => (&call.attrs, None, MacroItems::declared_by(call)),
-            _ => (&[], None, Vec::new()),
+        let (attributes, owner, nested): (&[Attribute], Option<Name>, Cow<'_, [Item]>) = match item {
+            Item::Struct(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Enum(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Trait(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Fn(item) => (&item.attrs, Some(Name::from(&item.sig.ident)), Cow::Borrowed(&[])),
+            Item::Type(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Const(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Static(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
+            Item::Impl(item) => (&item.attrs, None, Cow::Borrowed(&[])),
+            Item::Mod(module) => (
+                &module.attrs,
+                None,
+                module.content.as_ref().map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
+            ),
+            Item::Macro(call) => (&call.attrs, None, Cow::Owned(MacroItems::declared_by(call))),
+            _ => (&[], None, Cow::Borrowed(&[])),
         };
         match Walk::outside_tests(attributes) {
             Walk::Skipped => self,
