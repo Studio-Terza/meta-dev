@@ -36,7 +36,7 @@ impl Cli {
         let rest: Vec<OsString> = arguments.collect();
         let flag = rest.iter().position(|argument| argument == Self::REPORT_ONLY).unwrap_or(rest.len());
         let only = rest.iter().take(flag).cloned().collect();
-        let report_only = rest.iter().skip(flag + 1).cloned().collect();
+        let report_only = rest.iter().skip(flag).skip(1).cloned().collect();
         Cli { limits, measured, only, report_only }
     }
 
