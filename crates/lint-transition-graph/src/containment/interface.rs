@@ -3,7 +3,7 @@ use std::fmt;
 
 use lint_core::{Fix, Headline, Violation};
 
-use super::cluster::{Cluster, Level};
+use super::cluster::Cluster;
 use super::groups::Groups;
 use super::link::Link;
 use super::member::Member;
@@ -42,11 +42,23 @@ impl Linking {
         exports: &BTreeSet<Member<'found>>,
     ) -> Vec<Link<'found>> {
         let members = view.members(cluster);
-        let sharing = Containment::adjacency(exports.iter().flat_map(|export| match self {
-            Linking::Consumers => view.outside_users(cluster, *export),
-            Linking::Internals => view.private_reached(&members, exports, *export),
-        }));
+        let sharing = Containment::adjacency(self.shared(view, cluster, &members, exports).into_iter());
         sharing.values().flat_map(Link::star).collect()
+    }
+
+    fn shared<'found>(
+        self,
+        view: &Containment<'found, '_>,
+        cluster: Cluster<'found>,
+        members: &BTreeSet<Member<'found>>,
+        exports: &BTreeSet<Member<'found>>,
+    ) -> Vec<Link<'found>> {
+        match self {
+            Linking::Consumers => exports.iter().flat_map(|export| view.outside_users(cluster, *export)).collect(),
+            Linking::Internals => {
+                exports.iter().flat_map(|export| view.private_reached(members, exports, *export)).collect()
+            }
+        }
     }
 }
 
@@ -64,10 +76,7 @@ impl<'found> Interface<'found> {
         cluster: Cluster<'found>,
         linking: Linking,
     ) -> Option<Interface<'found>> {
-        let judged = match cluster.level() {
-            Level::Crate | Level::Module => Some(cluster),
-            Level::Workspace => None,
-        }?;
+        let judged = cluster.bounded()?;
         let exports = view.exports(judged, &view.members(judged));
         let groups = Groups::linked(&exports, linking.links(view, judged, &exports).into_iter()).split()?;
         Some(Interface { cluster: judged, linking, exports, groups })
@@ -76,20 +85,31 @@ impl<'found> Interface<'found> {
 
 impl fmt::Display for Interface<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let by = match self.linking {
-            Linking::Consumers => "no outside user joins",
-            Linking::Internals => "no private item joins",
-        };
-        write!(formatter, "the exports of {} fall into {} that {by}", self.cluster, self.groups)
+        match self.linking {
+            Linking::Consumers => {
+                write!(
+                    formatter,
+                    "the exports of {} fall into {} that no outside user joins",
+                    self.cluster, self.groups
+                )
+            }
+            Linking::Internals => {
+                write!(
+                    formatter,
+                    "the exports of {} fall into {} that no private item joins",
+                    self.cluster, self.groups
+                )
+            }
+        }
     }
 }
 
 impl lint_core::Finding for Interface<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self.linking {
-            Linking::Consumers => "split it along the groups, one part for each kind of user",
-            Linking::Internals => "split it along the groups, since they share no implementation",
-        })
+        match self.linking {
+            Linking::Consumers => Fix::new("split it along the groups, one part for each kind of user"),
+            Linking::Internals => Fix::new("split it along the groups, since they share no implementation"),
+        }
     }
 }
 
