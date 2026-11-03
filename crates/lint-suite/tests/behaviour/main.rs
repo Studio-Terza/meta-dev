@@ -46,6 +46,7 @@ mod raw_resources;
 mod repeated_methods;
 mod repeated_shapes;
 mod rust_only;
+mod shown;
 mod state_graph;
 mod test_budget;
 mod thin_main;

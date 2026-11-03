@@ -1,13 +1,18 @@
-use lint_core::Lint;
+use lint_core::{Lint, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{DuplicateTransitions, OneEdge};
+
+use crate::shown::Shown;
 
 struct Duplicates;
 
 impl Duplicates {
     fn of(sources: &[Source]) -> String {
-        let files = Sources::parsed(sources);
-        format!("{}{}", OneEdge::report(&files), DuplicateTransitions::report(&files))
+        Self::reported(&Sources::parsed(sources))
+    }
+
+    fn reported(files: &[SourceFile]) -> String {
+        format!("{}{}", OneEdge::report(files), DuplicateTransitions::report(files))
     }
 
     fn at(path: &'static str, text: &str) -> Source {
@@ -15,10 +20,7 @@ impl Duplicates {
     }
 
     fn shows(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => Self::of(&[Self::at("crates/x/src/lib.rs", text)]).contains(expected),
-            _ => false,
-        }
+        Shown::by(pair, Self::reported)
     }
 }
 

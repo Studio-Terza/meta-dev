@@ -2,21 +2,13 @@ use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_type_graph::TypeGraph;
 
+use crate::shown::Shown;
+
 struct Graphed;
 
 impl Graphed {
     fn of(sources: &[Source]) -> String {
         TypeGraph::report(&Sources::parsed(sources)).to_string()
-    }
-
-    fn shows(pair: &[&str]) -> bool {
-        match pair {
-            [text, expected] => {
-                let leaked: &'static str = Box::leak((*text).to_owned().into_boxed_str());
-                Self::of(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(leaked))]).contains(expected)
-            }
-            _ => false,
-        }
     }
 }
 
@@ -26,7 +18,7 @@ const IGNORED: &str = "struct A;\nstruct B;\nimpl std::fmt::Display for A {}\nim
 
 laws::table!(
     the_graph_of_a_crate_is_measured_by_nodes_edges_density_and_its_largest_component,
-    Graphed::shows,
+    Shown::of::<TypeGraph>,
     [
         ["struct A;\nstruct B;\nimpl From<B> for A {}\nimpl From<A> for B {}\n", "crates/x/src/lib.rs:1: crate x: 2 nodes, 2 edges, density 1.000, largest strongly connected component 2;"] => true,
         ["struct A;\nstruct B;\nimpl From<A> for B {}\n", "2 nodes, 1 edges, density 0.500, largest strongly connected component 1"] => true,
