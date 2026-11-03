@@ -56,7 +56,8 @@ processes, randomness or stdio (`std::fs`, `std::env`, `SystemTime::now`, `Insta
 allowed only in a crate whose name ends in the word `ports` or a module named `ports`, read through imports as
 `process_starters` reads them. The shared ports are `file-ports` (`Files`, with `Disk`) and `console-ports`
 (`Process` for a binary's arguments and streams, `Environment` for variables); code takes the port as a parameter, and
-its tests pass a fake of the port or real fixture files. The `--report` run still counts effect sites per crate, in
+its tests pass the port's in-memory fake, `Memory` for files and `Variables` for the environment. Fixture trees on disk
+load into a `Memory` through `golden::fixtures!`, as recorded output is checked through `golden!`. The `--report` run still counts effect sites per crate, in
 ports and outside.
 
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
@@ -85,11 +86,13 @@ about shipped code; code under `#[cfg(test)]` is skipped as before.
 
 `no_test_io` keeps effects out of tests. In a file under a package's `tests` directory it fails a path in an expression
 or a macro body that resolves, through imports as `process_starters` reads them, into `std::fs`, `std::net`, `std::env`,
-`std::process`, `std::os::unix::fs`, `std::os::unix::net`, `std::os::windows::fs` or the `tempfile` crate. `std::process::ExitCode`
-is a value and passes; so do types in signatures and `env!`, which is read at compile time. Raw I/O in test code is allowed
-only in a test target named `ports` (`tests/ports.rs` or `tests/ports/`) or a module named `ports`, where the tests of a port
-exercise the real effect; everywhere else a test goes through a fake of the port or a library API such as `golden!`, and
-the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
+`std::process`, `std::os::unix::fs`, `std::os::unix::net`, `std::os::windows::fs` or the `tempfile` crate, or that names
+`std::io::stdin`, `stdout` or `stderr` or a real filler of the shared ports: `file_ports::Disk` and `console_ports::Process`,
+also through `golden`. `std::process::ExitCode` is a value and passes; so do types in signatures and `env!`, which is read
+at compile time. Real I/O in test code is allowed only in the tests of a crate whose name ends in the word `ports`, where a
+port's tests exercise its real filler; a module or test target named `ports` in any other crate no longer exempts it.
+Everywhere else a test goes through the port's in-memory fake or a library API such as `golden!` or `golden::fixtures!`,
+and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
 `fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union

@@ -1,4 +1,9 @@
+use std::path::PathBuf;
+
+use file_ports::{Bytes, Memory};
+use lint_core::{Lint, SourceFile, SourceText};
 use lint_no_test_io::NoTestIo;
+use lint_placement::Placement;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
@@ -18,8 +23,14 @@ const TYPED: &str = "fn f(_file: std::fs::File) -> std::io::Result<()> {\n    Ok
 const OTHER_MODULE: &str = "fn f() {\n    std::path::Path::new(\"a\");\n}\n";
 const LOCAL_FS: &str = "mod fs {\n    pub fn read() {}\n}\nfn f() {\n    fs::read();\n}\n";
 const INLINE_PORTS: &str = "mod ports {\n    pub fn f() {\n        std::fs::read(\"a\");\n    }\n}\n";
+const DISK: &str = "use file_ports::{Disk, Files};\nfn f() {\n    Disk.read(std::path::Path::new(\"a\"));\n}\n";
+const PROCESS: &str = "fn f() {\n    console_ports::Process.variable(\"A\".as_ref());\n}\n";
+const GOLDEN_PORTS: &str = "use golden::{Disk, Process};\nfn f() {\n    Golden::verify(&Process, &Disk);\n}\n";
+const PRINTED: &str = "use std::io::{self, Write};\nfn f() {\n    writeln!(io::stdout(), \"a\");\n}\n";
+const FAKES: &str =
+    "use file_ports::{Files, Memory};\nfn f() {\n    Memory::default().read(std::path::Path::new(\"a\"));\n}\n";
 
-const CASES: [Case; 22] = [
+const CASES: [Case; 28] = [
     Case::new(
         Title::new("qualified read"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(READ))],
@@ -103,12 +114,37 @@ const CASES: [Case; 22] = [
     Case::new(Title::new("shipped code"), &[Source::new(Located::new("src/a.rs"), Text::new(READ))], Flagged::new(&[])),
     Case::new(Title::new("example"), &[Source::new(Located::new("examples/a.rs"), Text::new(READ))], Flagged::new(&[])),
     Case::new(
+        Title::new("the real file port"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(DISK))],
+        Flagged::new(&["tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("the real console port"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(PROCESS))],
+        Flagged::new(&["tests/a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("the real ports through golden"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(GOLDEN_PORTS))],
+        Flagged::new(&["tests/a.rs:3", "tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("standard output"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(PRINTED))],
+        Flagged::new(&["tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("the in-memory fakes"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(FAKES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
         Title::new("test target named ports"),
         &[
             Source::new(Located::new("tests/ports.rs"), Text::new(READ)),
             Source::new(Located::new("tests/ports/b.rs"), Text::new(READ)),
         ],
-        Flagged::new(&[]),
+        Flagged::new(&["tests/ports.rs:2", "tests/ports/b.rs:2"]),
     ),
     Case::new(
         Title::new("test target whose name only contains ports"),
@@ -124,16 +160,38 @@ const CASES: [Case; 22] = [
             Source::new(Located::new("tests/behaviour/ports.rs"), Text::new(READ)),
             Source::new(Located::new("tests/behaviour/ports/b.rs"), Text::new(READ)),
         ],
-        Flagged::new(&[]),
+        Flagged::new(&["tests/behaviour/ports.rs:2", "tests/behaviour/ports/b.rs:2"]),
     ),
     Case::new(
         Title::new("inline module named ports"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(INLINE_PORTS))],
-        Flagged::new(&[]),
+        Flagged::new(&["tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a crate whose name only contains ports"),
+        &[Source::new(Located::new("crates/reports/tests/a.rs"), Text::new(READ))],
+        Flagged::new(&["crates/reports/tests/a.rs:2"]),
     ),
 ];
 
 #[test]
-fn effects_in_test_code_are_flagged_outside_ports() {
+fn effects_and_real_ports_in_test_code_are_flagged_outside_ports_crates() {
     assert_eq!(Sources::mismatches::<NoTestIo>(&CASES), Lines::default());
+}
+
+#[test]
+fn tests_of_a_crate_whose_name_ends_in_ports_check_its_real_fillers() {
+    let flagged: Vec<usize> = ["disk-ports", "reports"]
+        .iter()
+        .map(|name| {
+            let manifest = format!("[package]\nname = \"{name}\"\n");
+            let files: Memory =
+                [(PathBuf::from("/r/Cargo.toml"), Bytes::from(manifest.as_str()))].into_iter().collect();
+            let path = PathBuf::from("/r/tests/a.rs");
+            let placement = Placement::locate(&files, &path);
+            SourceFile::parse_at(path.clone(), path, placement, SourceText::new(DISK.to_owned()))
+                .map_or(usize::MAX, |file| NoTestIo::report(&[file]).violations().len())
+        })
+        .collect();
+    assert_eq!(flagged, [0, 1]);
 }

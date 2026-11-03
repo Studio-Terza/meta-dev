@@ -1,10 +1,12 @@
 use std::error::Error;
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use lint_runner::Cli;
-use ports::Checkout;
+
+use crate::fakes::FakeLinked;
 
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const CLEAN: &str = "struct A;\n";
@@ -29,15 +31,43 @@ impl Run {
     }
 }
 
+struct Checkout {
+    files: Memory,
+    root: PathBuf,
+}
+
 impl Checkout {
-    fn run(roots: &[PathBuf]) -> Run {
+    const ROOT: &'static str = "/checkout";
+
+    fn new() -> Result<Checkout, FileFailure> {
+        let checkout = Checkout { files: Memory::default(), root: PathBuf::from(Self::ROOT) };
+        checkout.write("Cargo.toml", MANIFEST)?;
+        checkout.write("src/lib.rs", CLEAN)?;
+        Ok(checkout)
+    }
+
+    fn below(self, directory: &str) -> Checkout {
+        Checkout { root: self.root.join(directory), files: self.files }
+    }
+
+    fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
+        let file = self.root.join(path);
+        file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
+        self.files.write(&file, &Bytes::from(text))
+    }
+
+    fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&file_ports::Disk, &mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 
     fn checked(&self) -> Run {
-        Self::run(&[self.path().to_path_buf()])
+        Self::run(&self.files, std::slice::from_ref(&self.root))
+    }
+
+    fn path(&self) -> &Path {
+        &self.root
     }
 
     fn shown(&self, path: &str) -> String {
@@ -123,9 +153,7 @@ fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Result<(), Box<dyn Error>> {
-    let outer = Checkout::new()?;
-    let inner = Checkout::inside(outer.path())?;
-    let nested = Checkout::inside(&inner.path().join("assets"))?;
+    let nested = Checkout::new()?.below("inner/assets/nested");
     nested.write("Cargo.toml", MANIFEST)?;
     nested.write("src/lib.rs", CLEAN)?;
     nested.write("run.sh", "x\n")?;
@@ -140,7 +168,7 @@ fn a_path_given_twice_is_reported_once() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("run.sh", "x\n")?;
     let roots = [checkout.path().to_path_buf(), checkout.path().to_path_buf()];
-    assert_eq!(Checkout::run(&roots).findings(), 1);
+    assert_eq!(Checkout::run(&checkout.files, &roots).findings(), 1);
     Ok(())
 }
 
@@ -148,48 +176,7 @@ fn a_path_given_twice_is_reported_once() -> Result<(), Box<dyn Error>> {
 fn a_symlink_loop_does_not_repeat_findings() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("run.sh", "x\n")?;
-    checkout.linked("src/loop")?;
-    assert_eq!(checkout.checked().findings(), 1);
+    let linked = FakeLinked::new(&checkout.files, checkout.path().join("src/loop"), checkout.path().to_path_buf());
+    assert_eq!(Checkout::run(&linked, std::slice::from_ref(&checkout.root)).findings(), 1);
     Ok(())
-}
-
-mod ports {
-    use std::error::Error;
-    use std::fs;
-    use std::io;
-    use std::path::Path;
-
-    use super::{CLEAN, MANIFEST};
-
-    pub struct Checkout(tempfile::TempDir);
-
-    impl Checkout {
-        pub fn new() -> Result<Checkout, Box<dyn Error>> {
-            let checkout = Checkout(tempfile::tempdir()?);
-            checkout.write("Cargo.toml", MANIFEST)?;
-            checkout.write("src/lib.rs", CLEAN)?;
-            Ok(checkout)
-        }
-
-        pub fn inside(directory: &Path) -> io::Result<Checkout> {
-            fs::create_dir_all(directory)?;
-            Ok(Checkout(tempfile::tempdir_in(directory)?))
-        }
-
-        pub fn write(&self, path: &str, text: &str) -> Result<(), Box<dyn Error>> {
-            let file = self.0.path().join(path);
-            if let Some(parent) = file.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            Ok(fs::write(file, text)?)
-        }
-
-        pub fn linked(&self, link: &str) -> io::Result<()> {
-            std::os::unix::fs::symlink(self.0.path(), self.0.path().join(link))
-        }
-
-        pub fn path(&self) -> &Path {
-            self.0.path()
-        }
-    }
 }
