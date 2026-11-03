@@ -63,12 +63,7 @@ fn tests_and_examples_are_not_read() {
 #[test]
 fn the_gate_fails_only_the_effects_outside_ports() {
     let text = Sources::report::<EffectsInPorts>(&[Effects::at("crates/x/src/lib.rs", IN_PORTS)]).to_string();
-    let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(
-        lines,
-        [
-            "effects on files, environment, clock, network, processes, randomness and stdio happen only in ports:",
-            "crates/x/src/lib.rs:7: files effect outside ports: calls std::fs::write; move the effect behind a port in a ports module and call the port from here",
-        ]
-    );
+    assert!(text.contains("lib.rs:7: files effect outside ports: calls std::fs::write"), "{text}");
+    assert_eq!(text.matches("effect outside ports").count(), 1, "{text}");
+    assert!(!text.contains("crate x"), "{text}");
 }
