@@ -14,7 +14,6 @@ mod expression_flow;
 mod fakes_at_ports;
 mod fn_shape;
 mod guard_must_use;
-mod layering;
 mod linear_flow;
 mod literal_names;
 mod long_exact_strings;

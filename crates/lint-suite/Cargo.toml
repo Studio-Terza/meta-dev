@@ -60,7 +60,6 @@ lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 transition-facts = { path = "../transition-facts" }
 type-facts = { path = "../type-facts" }
-lint-layering = { path = "../lint-layering" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
