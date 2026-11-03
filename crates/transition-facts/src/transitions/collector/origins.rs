@@ -1,29 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
-use syn::{File, ItemMod, ItemUse, Path, UseTree};
+use syn::{File, ItemMod, ItemUse, UseTree};
 
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 
 use crate::endpoint::Endpoint;
 use crate::resolved::Resolved;
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum Spelling {
-    Bare(Name),
-    Pathed(Name),
-}
-
-impl Spelling {
-    pub(crate) fn of_path(path: &Path) -> Option<Spelling> {
-        let first = Name::from(&path.segments.first()?.ident);
-        match path.segments.len() {
-            1 => Some(Spelling::Bare(first)),
-            _ => Some(Spelling::Pathed(first)),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct Origins<'file> {
@@ -50,11 +34,8 @@ impl<'file> Origins<'file> {
     }
 
     pub(crate) fn endpoint(&self, endpoint: Endpoint) -> Endpoint {
-        let origin = match endpoint.spelling() {
-            Some(Spelling::Bare(head)) => self.imported.get(head).map(|imported| self.crate_of(imported)),
-            Some(Spelling::Pathed(head)) => Some(self.crate_of(head)),
-            None => None,
-        };
+        let origin =
+            endpoint.spelling().and_then(|spelling| spelling.head(&self.imported)).map(|head| self.crate_of(head));
         endpoint.originating(origin)
     }
 

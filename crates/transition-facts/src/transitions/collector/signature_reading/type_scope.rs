@@ -8,8 +8,8 @@ use syn::{GenericArgument, Generics, Path, PathArguments, PathSegment, Type, Typ
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::endpoint::{Endpoint, Nature, Unnamed};
-use crate::origins::Spelling;
 use crate::resolved::Resolved;
+use crate::spelling::Spelling;
 use bound::Bound;
 use constraint::Constraint;
 
