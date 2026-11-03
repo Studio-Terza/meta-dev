@@ -3,7 +3,6 @@ mod function;
 mod functions;
 mod held;
 mod logic;
-mod score;
 
 use std::collections::BTreeMap;
 
