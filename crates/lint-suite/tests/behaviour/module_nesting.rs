@@ -30,12 +30,13 @@ const FIRST: Source =
 const SECOND: Source =
     Source::new(Located::new("crates/a/src/outer/second.rs"), Text::new("use crate::outer::inner::Thing;\n"));
 
-const CASES: [Case; 5] = [
+const CASES: [Case; 6] = [
     Case::new(Title::new("used by two siblings"), &[ROOT, PARENT, SECOND_PARENT, HELPER], Flagged::new(&[])),
     Case::new(Title::new("through the parent"), &[OUTER, INNER, THROUGH, OTHER_THROUGH], Flagged::new(&[])),
     Case::new(Title::new("crate-only re-exports"), &[HIDDEN_WIDE], Flagged::new(&[])),
     Case::new(Title::new("a parent without mod.rs"), &[OUTER_FILE, INNER, REACHING], Flagged::new(&[])),
     Case::new(Title::new("users inside the boundary"), &[FAMILY, INNER, FIRST, SECOND], Flagged::new(&[])),
+    Case::new(Title::new("used by one sibling"), &[ROOT, PARENT, HELPER], Flagged::new(&["crates/a/src/helper.rs:1"])),
 ];
 
 #[test]
