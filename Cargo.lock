@@ -435,6 +435,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-linear-flow"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-literal-names"
 version = "0.1.0"
 dependencies = [
@@ -781,6 +793,7 @@ dependencies = [
  "lint-fn-shape",
  "lint-guard-must-use",
  "lint-layout",
+ "lint-linear-flow",
  "lint-literal-names",
  "lint-long-exact-strings",
  "lint-mandatory-laws",
@@ -868,6 +881,7 @@ dependencies = [
  "lint-fn-shape",
  "lint-guard-must-use",
  "lint-layout",
+ "lint-linear-flow",
  "lint-literal-names",
  "lint-long-exact-strings",
  "lint-mandatory-laws",
