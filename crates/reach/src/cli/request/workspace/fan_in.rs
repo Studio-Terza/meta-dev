@@ -4,9 +4,9 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use crate::cli::workspace::crate_count::CrateCount;
-use crate::cli::workspace::crate_name::CrateName;
-use crate::cli::workspace::share::Share;
+use crate::cli::request::workspace::crate_count::CrateCount;
+use crate::cli::request::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::share::Share;
 use band::Band;
 
 #[derive(Debug)]
@@ -53,20 +53,25 @@ impl<'meta> FanIn<'meta> {
         let shares: Vec<Share> = self.shares().collect();
         let median = shares.get(shares.len() >> 1);
         let largest = self.by_count.iter().next();
-        match (median, largest) {
-            (Some(median), Some((Reverse(count), names))) => {
-                let share = Share::new(*count, self.total);
-                let names: Vec<String> = names.iter().map(ToString::to_string).collect();
-                writeln!(
-                    formatter,
-                    "median {median}, {}%; largest {share}, {}%: {}",
-                    median.percent(),
-                    share.percent(),
-                    names.join(" ")
-                )
-            }
-            _ => Ok(()),
-        }
+        median.zip(largest).map_or(Ok(()), |(median, (Reverse(count), names))| {
+            Self::extremes(formatter, median, Share::new(*count, self.total), names)
+        })
+    }
+
+    fn extremes(
+        formatter: &mut fmt::Formatter<'_>,
+        median: &Share,
+        share: Share,
+        names: &BTreeSet<&CrateName>,
+    ) -> fmt::Result {
+        let names: Vec<String> = names.iter().map(ToString::to_string).collect();
+        writeln!(
+            formatter,
+            "median {median}, {}%; largest {share}, {}%: {}",
+            median.percent(),
+            share.percent(),
+            names.join(" ")
+        )
     }
 }
 

@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::cli::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::crate_name::CrateName;
 
 #[derive(Debug, Deserialize)]
 pub struct Dependency {

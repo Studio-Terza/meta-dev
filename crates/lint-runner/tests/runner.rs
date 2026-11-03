@@ -97,7 +97,8 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
     let run = root.flagged(&["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
     assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
-    assert!(run.out.contains("2 shipped copies, also at ") && run.out.contains("/src/two.rs:3; "), "{}", run.out);
+    assert!(run.out.contains("2 shipped copies, also at "), "{}", run.out);
+    assert!(run.out.contains("/src/two.rs:3; "), "{}", run.out);
     assert_eq!(run.err, "");
     Ok(())
 }
@@ -109,7 +110,7 @@ fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Err
     root.write("src/one.rs", REPEATED)?;
     root.write("src/two.rs", REPEATED_AGAIN)?;
     let run = root.flagged(&[]);
-    assert!(!run.out.contains("copies"), "{}", run.out);
+    assert_eq!(run.out.matches("copies").count(), 0, "{}", run.out);
     Ok(())
 }
 
@@ -156,14 +157,9 @@ struct Trees;
 
 impl Trees {
     fn chain(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> = (0..size)
-            .map(|index| {
-                if index + 1 < size {
-                    format!("pub struct {prefix}{index}({prefix}{});\n", index + 1)
-                } else {
-                    format!("pub struct {prefix}{index};\n")
-                }
-            })
+        let lines: Vec<String> = (1..size)
+            .map(|next| format!("pub struct {prefix}{}({prefix}{next});\n", next - 1))
+            .chain(size.checked_sub(1).map(|last| format!("pub struct {prefix}{last};\n")))
             .collect();
         lines.concat()
     }
@@ -270,7 +266,7 @@ impl Reported {
     const SITE: &'static str = ".rs:";
 
     fn is_clean(&self) -> bool {
-        self.exit == ExitCode::SUCCESS && self.err == "\n"
+        (self.exit, self.err.as_str()) == (ExitCode::SUCCESS, "\n")
     }
 
     fn headlines(&self) -> usize {
@@ -329,7 +325,7 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
     root.write("src/tests.rs", "struct S { on: bool }\n")?;
     let run = root.reported();
     assert_eq!(run.violations(), 1);
-    assert!(!run.err.contains("src/tests.rs"));
+    assert_eq!(run.err.matches("src/tests.rs").count(), 0);
     Ok(())
 }
 

@@ -94,11 +94,13 @@ const REFUSALS: [[&str; 4]; 6] = [
 
 #[test]
 fn every_unusable_input_fails_closed_and_says_why() -> io::Result<()> {
-    for [name, limits, measured, reason] in REFUSALS {
-        let run = Run::reported(name, limits, measured)?;
-        assert_eq!(run.exit, ExitCode::FAILURE, "{name}");
-        assert!(run.err.contains(reason), "{name}: {}", run.err);
-    }
+    let refused: Vec<(&str, ExitCode, bool)> = REFUSALS
+        .into_iter()
+        .map(|[name, limits, measured, reason]| {
+            Run::reported(name, limits, measured).map(|run| (name, run.exit, run.err.contains(reason)))
+        })
+        .collect::<io::Result<_>>()?;
+    assert_eq!(refused, REFUSALS.map(|[name, ..]| (name, ExitCode::FAILURE, true)));
     Ok(())
 }
 

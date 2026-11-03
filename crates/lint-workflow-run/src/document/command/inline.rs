@@ -54,7 +54,7 @@ impl FromStr for Inline {
         Ok(Inline(
             letters
                 .chunk_by(|first, second| first.is_whitespace() == second.is_whitespace())
-                .filter(|run| run.iter().all(|letter| !letter.is_whitespace()))
+                .filter_map(|run| run.first().filter(|letter| letter.is_whitespace()).map_or(Some(run), |_| None))
                 .map(|run| run.iter().collect())
                 .collect(),
         ))

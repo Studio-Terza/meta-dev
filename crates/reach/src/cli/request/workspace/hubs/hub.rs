@@ -6,8 +6,8 @@ use lint_core::{Finding, Fix, Violation};
 use newtype::Newtype;
 
 use super::among::Among;
-use crate::cli::workspace::crate_name::CrateName;
-use crate::cli::workspace::share::Share;
+use crate::cli::request::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::share::Share;
 
 #[derive(Debug)]
 pub struct Hub<'meta, 'file> {

@@ -2,8 +2,8 @@ use std::fmt;
 
 use newtype::Newtype;
 
-use crate::cli::workspace::crate_count::CrateCount;
-use crate::cli::workspace::percent::Percent;
+use crate::cli::request::workspace::crate_count::CrateCount;
+use crate::cli::request::workspace::percent::Percent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Share {

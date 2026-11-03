@@ -38,15 +38,17 @@ impl<'ast> Visit<'ast> for FieldVisibility<'_> {
 
 impl FieldVisibility<'_> {
     fn exposed(&mut self, item: &ItemStruct) {
-        let exposed =
-            item.fields.iter().enumerate().filter(|(_, field)| !matches!(field.vis, Visibility::Inherited)).map(
-                |(index, field)| {
-                    Violation::new(
-                        Site::new(self.path, LineNumber::from(field.span())),
-                        Finding::ExposedField { field, index: Index::from(index), owner: Name::from(&item.ident) },
-                    )
-                },
-            );
+        let exposed = item
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| matches!(field.vis, Visibility::Public(_) | Visibility::Restricted(_)))
+            .map(|(index, field)| {
+                Violation::new(
+                    Site::new(self.path, LineNumber::from(field.span())),
+                    Finding::ExposedField { field, index: Index::from(index), owner: Name::from(&item.ident) },
+                )
+            });
         self.violations.extend(exposed);
     }
 }
