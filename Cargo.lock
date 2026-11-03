@@ -447,6 +447,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-linear-flow"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-literal-names"
 version = "0.1.0"
 dependencies = [
@@ -737,10 +749,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-repeated-bodies"
+name = "lint-repeated-methods"
 version = "0.1.0"
 dependencies = [
- "body-shape",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -750,11 +761,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-repeated-methods"
+name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
+ "body-shape",
  "lint-core",
  "lint-layout",
+ "lint-placement",
  "newtype",
  "proc-macro2",
  "quote",
@@ -793,6 +806,7 @@ dependencies = [
  "lint-guard-must-use",
  "lint-layering",
  "lint-layout",
+ "lint-linear-flow",
  "lint-literal-names",
  "lint-long-exact-strings",
  "lint-mandatory-laws",
@@ -820,8 +834,8 @@ dependencies = [
  "lint-public-surface",
  "lint-raw-resources",
  "lint-reader",
- "lint-repeated-bodies",
  "lint-repeated-methods",
+ "lint-repeated-shapes",
  "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",
@@ -881,6 +895,7 @@ dependencies = [
  "lint-guard-must-use",
  "lint-layering",
  "lint-layout",
+ "lint-linear-flow",
  "lint-literal-names",
  "lint-long-exact-strings",
  "lint-mandatory-laws",
@@ -909,8 +924,8 @@ dependencies = [
  "lint-public-surface",
  "lint-raw-resources",
  "lint-reader",
- "lint-repeated-bodies",
  "lint-repeated-methods",
+ "lint-repeated-shapes",
  "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",

@@ -1,5 +1,5 @@
 [package]
-name = "lint-repeated-bodies"
+name = "lint-repeated-shapes"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,6 +13,7 @@ doctest = false
 body-shape = { path = "../body-shape" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
+lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 proc-macro2.workspace = true
 quote.workspace = true
