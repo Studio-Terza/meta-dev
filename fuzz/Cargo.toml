@@ -17,11 +17,12 @@ name = "fuzz"
 path = "tests/fuzz/main.rs"
 required-features = ["campaign"]
 
-[dev-dependencies]
+[dependencies]
 file-ports = { path = "../crates/file-ports" }
+
+[dev-dependencies]
 lint-runner = { path = "../crates/lint-runner" }
 proptest.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true

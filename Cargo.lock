@@ -158,7 +158,6 @@ dependencies = [
  "file-ports",
  "lint-runner",
  "proptest",
- "tempfile",
 ]
 
 [[package]]
@@ -812,7 +811,6 @@ dependencies = [
  "lint-vec-out-params",
  "lint-walk-similarity",
  "lint-workflow-run",
- "tempfile",
  "text-lines",
  "transition-facts",
  "type-facts",
