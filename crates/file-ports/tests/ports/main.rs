@@ -87,7 +87,7 @@ struct Checks;
 impl Checks {
     fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
         let contract = Contract { files, root: root.to_path_buf() };
-        assert_eq!(contract.written_then_read()?, Text::new("written".to_owned()));
+        assert_eq!(contract.written_then_read()?.as_ref(), "written");
         assert_eq!(contract.appended()?, Text::new("one two".to_owned()));
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
