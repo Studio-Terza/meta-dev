@@ -25,10 +25,10 @@ impl fmt::Display for Finding<'_, '_> {
 
 impl lint_core::Finding for Finding<'_, '_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::UsedFromOneSibling { .. } => "move it inside that module",
-            Finding::ReachesPastModRs { .. } => "import the parent's re-export instead",
-            Finding::CrowdedReexports { .. } => "split the module",
-        })
+        match self {
+            Finding::UsedFromOneSibling { .. } => Fix::new("move it inside that module"),
+            Finding::ReachesPastModRs { .. } => Fix::new("import the parent's re-export instead"),
+            Finding::CrowdedReexports { .. } => Fix::new("split the module"),
+        }
     }
 }

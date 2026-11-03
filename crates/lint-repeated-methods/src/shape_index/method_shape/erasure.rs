@@ -1,6 +1,6 @@
 use proc_macro2::{Group, Ident, Span, TokenStream, TokenTree};
 use quote::ToTokens;
-use syn::Type;
+use syn::{FnArg, Type};
 
 use lint_layout::Name;
 
@@ -19,16 +19,27 @@ impl<'found> Erasure<'found> {
     }
 
     pub fn tokens(&self, tokens: TokenStream) -> TokenStream {
-        tokens
-            .into_iter()
-            .map(|token| match token {
-                TokenTree::Ident(ident) if *self.self_type == ident => {
-                    TokenTree::Ident(Ident::new(Self::OWN_TYPE, ident.span()))
-                }
-                TokenTree::Group(group) => TokenTree::Group(Group::new(group.delimiter(), self.tokens(group.stream()))),
-                TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => token,
-            })
-            .collect()
+        tokens.into_iter().map(|token| self.token(token)).collect()
+    }
+
+    pub fn spelled_argument(&self, argument: &FnArg) -> TokenStream {
+        match argument {
+            FnArg::Receiver(receiver) => self.spelled(receiver),
+            FnArg::Typed(typed) => self.spelled_input(&typed.ty),
+        }
+    }
+
+    fn token(&self, token: TokenTree) -> TokenTree {
+        match token {
+            TokenTree::Ident(ident) => TokenTree::Ident(self.renamed(ident)),
+            TokenTree::Group(group) => TokenTree::Group(Group::new(group.delimiter(), self.tokens(group.stream()))),
+            TokenTree::Punct(_) | TokenTree::Literal(_) => token,
+        }
+    }
+
+    fn renamed(&self, ident: Ident) -> Ident {
+        let span = ident.span();
+        Some(ident).filter(|ident| *self.self_type != *ident).unwrap_or_else(|| Ident::new(Self::OWN_TYPE, span))
     }
 
     pub fn spelled(&self, ty: &impl ToTokens) -> TokenStream {
@@ -36,10 +47,9 @@ impl<'found> Erasure<'found> {
     }
 
     pub fn spelled_input(&self, ty: &Type) -> TokenStream {
-        if self.inner == Some(ty) {
-            TokenStream::from(TokenTree::Ident(Ident::new(Self::INNER, Span::call_site())))
-        } else {
-            self.spelled(ty)
-        }
+        self.inner.filter(|inner| *inner == ty).map_or_else(
+            || self.spelled(ty),
+            |_| TokenStream::from(TokenTree::Ident(Ident::new(Self::INNER, Span::call_site()))),
+        )
     }
 }
