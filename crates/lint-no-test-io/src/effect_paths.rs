@@ -40,7 +40,7 @@ impl EffectPaths {
         .then_some(file)
     }
 
-    pub fn effect(used: &Use) -> Option<&UsePath> {
+    pub fn effect<'used>(used: &'used Use<'_>) -> Option<&'used UsePath> {
         Self::EFFECTS
             .iter()
             .find_map(|root| used.under(root))

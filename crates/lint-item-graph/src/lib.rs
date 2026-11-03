@@ -62,15 +62,12 @@ impl ItemGraph {
 
     #[must_use]
     pub fn tangles(&self) -> Vec<Vec<NodeIndex>> {
-        let everyone: Vec<NodeIndex> = (0..self.names.len()).map(NodeIndex::from).collect();
-        let finished: Vec<NodeIndex> =
-            Traversal::trees(everyone, |node| self.links.get(node.into_inner()).cloned().unwrap_or_default())
-                .into_iter()
-                .flatten()
-                .collect();
+        let everyone = (0..self.names.len()).map(NodeIndex::from);
+        let forward = |node: NodeIndex| self.links.get(node.into_inner()).into_iter().flatten().copied();
+        let finished = Traversal::trees(everyone, forward).into_iter().flatten().rev();
         let backward = Self::reversed(&self.links);
-        let tangles: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished.into_iter().rev().collect(), |node| {
-            backward.get(node.into_inner()).cloned().unwrap_or_default()
+        let tangles: BTreeSet<Vec<NodeIndex>> = Traversal::trees(finished, |node: NodeIndex| {
+            backward.get(node.into_inner()).into_iter().flatten().copied()
         })
         .into_iter()
         .map(|component| component.into_iter().collect::<BTreeSet<NodeIndex>>().into_iter().collect())

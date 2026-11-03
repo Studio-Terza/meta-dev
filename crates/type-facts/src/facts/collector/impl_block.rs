@@ -23,7 +23,7 @@ impl ImplBlock {
         ImplBlock { krate, target, implementation, methods }
     }
 
-    pub(crate) fn applied_to(&self, found: TypeFact) -> TypeFact {
+    pub(crate) fn applied_to<'file>(&self, found: TypeFact<'file>) -> TypeFact<'file> {
         let krate: &CrateName = found.as_ref();
         let name: &Name = found.as_ref();
         if *krate == self.krate && *name == self.target {

@@ -8,35 +8,35 @@ use crate::count::Count;
 use crate::end::Key;
 
 #[derive(Debug)]
-pub(super) struct Family<'found> {
+pub(super) struct Family<'found, 'file> {
     key: Key,
-    members: Vec<&'found Transition>,
+    members: Vec<&'found Transition<'file>>,
 }
 
-impl<'found> Family<'found> {
+impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
-    pub(super) fn repeated(key: Key, members: Vec<&'found Transition>) -> Option<Family<'found>> {
+    pub(super) fn repeated(key: Key, members: Vec<&'found Transition<'file>>) -> Option<Family<'found, 'file>> {
         (members.len() > 1).then_some(Family { key, members })
     }
 
-    pub(super) fn violation(&self) -> Option<Violation> {
-        let first = self.members.iter().map(|member| AsRef::<Site>::as_ref(*member)).min();
-        first.map(|site| Violation::new(site.clone(), self))
+    pub(super) fn violation(&self) -> Option<Violation<'file>> {
+        let first = self.members.iter().map(|member| *AsRef::<Site<'file>>::as_ref(*member)).min();
+        first.map(|site| Violation::new(site, self))
     }
 
     pub(super) fn size(&self) -> Count {
         Count::new(self.members.len())
     }
 
-    fn canonical(&self) -> Option<&&'found Transition> {
+    fn canonical(&self) -> Option<&&'found Transition<'file>> {
         self.members
             .iter()
             .find(|member| AsRef::<Name>::as_ref(**member).matches::<Whole>(&Self::CONVERSIONS).is_some())
     }
 }
 
-impl fmt::Display for Family<'_> {
+impl fmt::Display for Family<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let paths: Vec<String> =
             self.members.iter().map(|member| format!("{member} at {}", AsRef::<Site>::as_ref(*member))).collect();
@@ -48,7 +48,7 @@ impl fmt::Display for Family<'_> {
     }
 }
 
-impl lint_layout::Finding for Family<'_> {
+impl lint_layout::Finding for Family<'_, '_> {
     fn fix(&self) -> Fix {
         match self.canonical() {
             Some(_) => Fix::new("keep the standard conversion and route the other transitions through it"),

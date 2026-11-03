@@ -16,21 +16,21 @@ use crate::transition::Transition;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
-pub(super) struct SignatureReading<'file> {
+pub(super) struct SignatureReading<'origins> {
     krate: CrateName,
     owner: Option<Name>,
-    scope: TypeScope<'file>,
+    scope: TypeScope<'origins>,
     ground: Ground,
     filler: Filler,
 }
 
-impl<'file> SignatureReading<'file> {
-    pub(super) fn free(origins: &'file Origins, ground: Ground) -> SignatureReading<'file> {
+impl<'origins> SignatureReading<'origins> {
+    pub(super) fn free(origins: &'origins Origins, ground: Ground) -> SignatureReading<'origins> {
         let scope = TypeScope::new(Endpoint::from(Unnamed::Opaque), origins);
         SignatureReading { krate: origins.own().clone(), owner: None, scope, ground, filler: Filler::Free }
     }
 
-    pub(super) fn of_impl(origins: &'file Origins, found: &ItemImpl, ground: Ground) -> SignatureReading<'file> {
+    pub(super) fn of_impl(origins: &'origins Origins, found: &ItemImpl, ground: Ground) -> SignatureReading<'origins> {
         let selfish =
             TypeScope::new(Endpoint::from(Unnamed::Opaque), origins).extended(&found.generics).endpoint(&found.self_ty);
         let filler = found
@@ -47,7 +47,11 @@ impl<'file> SignatureReading<'file> {
         }
     }
 
-    pub(super) fn of_trait(origins: &'file Origins, found: &ItemTrait, ground: Ground) -> SignatureReading<'file> {
+    pub(super) fn of_trait(
+        origins: &'origins Origins,
+        found: &ItemTrait,
+        ground: Ground,
+    ) -> SignatureReading<'origins> {
         let name = Name::from(&found.ident);
         SignatureReading {
             krate: origins.own().clone(),
@@ -58,7 +62,12 @@ impl<'file> SignatureReading<'file> {
         }
     }
 
-    pub(super) fn transition(&self, site: Site, signature: &Signature, body: &Block) -> Transition {
+    pub(super) fn transition<'file>(
+        &self,
+        site: Site<'file>,
+        signature: &Signature,
+        body: &Block,
+    ) -> Transition<'file> {
         let scope = self.scope.extended(&signature.generics);
         let takes = signature
             .inputs

@@ -18,7 +18,7 @@ use lint_core::Violation;
 pub struct PublicSurface;
 
 impl Lint for PublicSurface {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let binaries = BinaryFiles::collect(files);
         let references = files
             .iter()

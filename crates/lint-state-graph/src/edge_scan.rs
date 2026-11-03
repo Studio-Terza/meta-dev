@@ -5,7 +5,7 @@ pub use edge::Edge;
 pub use edge_count::EdgeCount;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::Path;
 
 use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
@@ -22,31 +22,31 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::{Length, Name};
 
-pub struct EdgeScan<'scan> {
+pub struct EdgeScan<'scan, 'file> {
     declarations: &'scan Declarations,
-    path: PathBuf,
-    edges: BTreeMap<Edge, BTreeMap<Name, Site>>,
-    violations: Vec<Violation>,
+    path: &'file Path,
+    edges: BTreeMap<Edge, BTreeMap<Name, Site<'file>>>,
+    violations: Vec<Violation<'file>>,
 }
 
-impl<'scan> EdgeScan<'scan> {
+impl<'scan, 'file> EdgeScan<'scan, 'file> {
     pub fn new(declarations: &'scan Declarations) -> Self {
-        EdgeScan { declarations, path: PathBuf::new(), edges: BTreeMap::new(), violations: Vec::new() }
+        EdgeScan { declarations, path: Path::new(""), edges: BTreeMap::new(), violations: Vec::new() }
     }
 
-    pub fn scan(&mut self, file: &SourceFile) {
-        file.path().clone_into(&mut self.path);
+    pub fn scan(&mut self, file: &'file SourceFile) {
+        self.path = file.path();
         self.visit_file(file.syntax());
     }
 
-    pub fn violations(mut self) -> Vec<Violation> {
+    pub fn violations(mut self) -> Vec<Violation<'file>> {
         let most = StateGraph::EDGES_PER_VERTEX;
         let duplicates = self.edges.iter().filter(|(_, names)| names.len() > 1).filter_map(|(edge, names)| {
-            let site = names.values().min()?.clone();
+            let site = *names.values().min()?;
             Some(Violation::new(site, Finding::DuplicateEdge { edge: edge.clone(), sites: names.clone() }))
         });
         let fan_out = self.edges.iter().fold(
-            BTreeMap::<&TypeName, BTreeMap<&Name, &Site>>::new(),
+            BTreeMap::<&TypeName, BTreeMap<&Name, &Site<'file>>>::new(),
             |mut fan_out, (edge, names)| {
                 fan_out.entry(edge.source()).or_default().extend(names.iter());
                 fan_out
@@ -56,22 +56,22 @@ impl<'scan> EdgeScan<'scan> {
             .into_iter()
             .filter(|(_, names)| most.allows(Length::new(names.len())).is_none())
             .filter_map(|(source, names)| {
-                let site = (*names.values().min()?).clone();
+                let site = **names.values().min()?;
                 Some(Violation::new(
                     site,
                     Finding::CrowdedVertex { source: source.clone(), edges: EdgeCount::new(names.len()), most },
                 ))
             });
-        let structural: Vec<Violation> = duplicates.chain(crowded).collect();
+        let structural: Vec<Violation<'file>> = duplicates.chain(crowded).collect();
         self.violations.extend(structural);
         self.violations
     }
 
     fn check_function(&mut self, context: &ImplContext, function: &ImplItemFn) {
-        let shape = FunctionShape::describe(&self.path, function, context, self.declarations);
+        let shape = FunctionShape::describe(self.path, function, context, self.declarations);
         self.violations.extend(
             matches!(shape.returns(), Returns::TupleHoldingVertex)
-                .then(|| Violation::new(shape.site().clone(), Finding::TupleHoldsVertex)),
+                .then(|| Violation::new(shape.site(), Finding::TupleHoldsVertex)),
         );
         let receiver = function.sig.receiver();
         let source = shape.vertex_parameters().first();
@@ -81,8 +81,7 @@ impl<'scan> EdgeScan<'scan> {
                 self.record_edge(context, function, &shape, edge);
             }
             (None, Some(target), Some(_)) => {
-                self.violations
-                    .push(Violation::new(shape.site().clone(), Finding::FreeTransition { target: target.clone() }));
+                self.violations.push(Violation::new(shape.site(), Finding::FreeTransition { target: target.clone() }));
             }
             (Some(receiver), _, _) if receiver.reference.is_some() => {
                 self.violations.extend(Self::view_fault(context, receiver, &shape));
@@ -91,7 +90,7 @@ impl<'scan> EdgeScan<'scan> {
                 let edge = context.edge_source(&shape).map(|source| Edge::new(source, target.clone()));
                 match edge {
                     None => self.violations.push(Violation::new(
-                        shape.site().clone(),
+                        shape.site(),
                         Finding::EdgeFromNonVertex { target: target.clone(), owner: context.self_type().clone() },
                     )),
                     Some(edge) => self.record_edge(context, function, &shape, edge),
@@ -101,33 +100,34 @@ impl<'scan> EdgeScan<'scan> {
         }
     }
 
-    fn record_edge(&mut self, context: &ImplContext, function: &ImplItemFn, shape: &FunctionShape, edge: Edge) {
+    fn record_edge(&mut self, context: &ImplContext, function: &ImplItemFn, shape: &FunctionShape<'file>, edge: Edge) {
         match context.public(function) {
             Some(function) => {
-                self.edges
-                    .entry(edge)
-                    .or_default()
-                    .entry(context.edge_name(function))
-                    .or_insert_with(|| shape.site().clone());
+                self.edges.entry(edge).or_default().entry(context.edge_name(function)).or_insert_with(|| shape.site());
             }
-            None => self.violations.push(Violation::new(shape.site().clone(), Finding::HiddenEdge { edge })),
+            None => self.violations.push(Violation::new(shape.site(), Finding::HiddenEdge { edge })),
         }
     }
 
-    fn view_fault(context: &ImplContext, receiver: &Receiver, shape: &FunctionShape) -> Option<Violation> {
+    fn view_fault(
+        context: &ImplContext,
+        receiver: &Receiver,
+        shape: &FunctionShape<'file>,
+    ) -> Option<Violation<'file>> {
         if receiver.mutability.is_some() {
-            matches!(context.kind(), ImplKind::InherentOnVertex).then(|| {
-                Violation::new(shape.site().clone(), Finding::MutatesVertex { vertex: context.self_type().clone() })
-            })
+            matches!(context.kind(), ImplKind::InherentOnVertex)
+                .then(|| Violation::new(shape.site(), Finding::MutatesVertex { vertex: context.self_type().clone() }))
         } else {
-            shape.returns().vertex().filter(|_| shape.body() != Body::FieldProjection).map(|target| {
-                Violation::new(shape.site().clone(), Finding::ViewReturnsVertex { target: target.clone() })
-            })
+            shape
+                .returns()
+                .vertex()
+                .filter(|_| shape.body() != Body::FieldProjection)
+                .map(|target| Violation::new(shape.site(), Finding::ViewReturnsVertex { target: target.clone() }))
         }
     }
 }
 
-impl<'ast> Visit<'ast> for EdgeScan<'_> {
+impl<'ast> Visit<'ast> for EdgeScan<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
@@ -137,7 +137,7 @@ impl<'ast> Visit<'ast> for EdgeScan<'_> {
     }
 }
 
-impl EdgeScan<'_> {
+impl EdgeScan<'_, '_> {
     fn scanned(&mut self, item: &ItemImpl) {
         let context = ImplContext::describe(item, self.declarations);
         item.items

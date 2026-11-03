@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
+use lint_clones::Clones;
 use lint_core::{Lint, Readout};
 use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
@@ -51,7 +52,7 @@ impl Cli {
     }
 
     fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match SourceFiles::read_all(files, &self.roots).map(|readout| self.outcome_of(readout, out)) {
+        match SourceFiles::read_all(files, &self.roots).as_ref().map(|readout| self.outcome_of(readout, out)) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
                 write!(err, "{violations}").ok();
@@ -64,11 +65,12 @@ impl Cli {
         }
     }
 
-    fn outcome_of(&self, readout: Readout, out: &mut impl Write) -> Outcome {
+    fn outcome_of<'file>(&self, readout: &'file Readout, out: &mut impl Write) -> Outcome<'file> {
         let files = readout.files();
         match self.mode {
             Mode::Gate => {
-                write!(out, "{}{}", TestBudget::measured(files), PairedApis::report(files)).ok();
+                write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))
+                    .ok();
                 Lints::checked(readout)
             }
             Mode::Report => {

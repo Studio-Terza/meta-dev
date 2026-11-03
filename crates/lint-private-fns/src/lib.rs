@@ -21,7 +21,7 @@ use lint_layout::{Length, Name};
 pub struct PrivateFns;
 
 impl Lint for PrivateFns {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("too many private fns; a type's logic belongs in its interface or in more types"),
             files

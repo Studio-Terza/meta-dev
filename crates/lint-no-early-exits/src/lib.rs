@@ -9,7 +9,7 @@ use lint_core::{Headline, Lint, Report, SourceFile};
 pub struct NoEarlyExits;
 
 impl Lint for NoEarlyExits {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("a body leaves through its tail value or ?, never through return, break or continue"),
             files.iter().flat_map(Exits::of_file).collect(),

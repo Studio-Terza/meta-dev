@@ -4,15 +4,15 @@ use lint_core::Report;
 use lint_layout::Failure;
 
 #[derive(Debug)]
-pub enum Outcome {
+pub enum Outcome<'file> {
     Clean,
-    Violations { reports: Vec<Report>, failures: Vec<Failure> },
+    Violations { reports: Vec<Report<'file>>, failures: &'file [Failure] },
 }
 
-impl Outcome {
+impl<'file> Outcome<'file> {
     #[must_use]
-    pub fn from_reports(reports: Vec<Report>, failures: Vec<Failure>) -> Outcome {
-        let dirty: Vec<Report> = reports.into_iter().filter_map(Report::dirty).collect();
+    pub fn from_reports(reports: Vec<Report<'file>>, failures: &'file [Failure]) -> Outcome<'file> {
+        let dirty: Vec<Report<'file>> = reports.into_iter().filter_map(Report::dirty).collect();
         if dirty.is_empty() && failures.is_empty() {
             Outcome::Clean
         } else {
@@ -21,7 +21,7 @@ impl Outcome {
     }
 }
 
-impl fmt::Display for Outcome {
+impl fmt::Display for Outcome<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Outcome::Clean => formatter.write_str("all lints pass"),

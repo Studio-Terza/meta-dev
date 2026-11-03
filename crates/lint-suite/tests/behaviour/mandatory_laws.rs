@@ -365,17 +365,17 @@ fn missing_laws_are_flagged() {
 
 #[test]
 fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
-    let report = MandatoryLaws::report(&[
-        Sources::file("src/a.rs", Text::new(ENCODING)),
-        Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR)),
-    ]);
+    let files = [Sources::file("src/a.rs", Text::new(ENCODING)), Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR))];
+    let report = MandatoryLaws::report(&files);
     assert!(report.dirty().is_some());
 }
 
 #[test]
 fn the_message_names_the_fix() {
-    let pair = MandatoryLaws::report(&[Sources::file("src/a.rs", Text::new(ENCODING))]);
-    let order = MandatoryLaws::report(&[Sources::file("src/a.rs", Text::new(ORDER))]);
+    let encoding = [Sources::file("src/a.rs", Text::new(ENCODING))];
+    let ordering = [Sources::file("src/a.rs", Text::new(ORDER))];
+    let pair = MandatoryLaws::report(&encoding);
+    let order = MandatoryLaws::report(&ordering);
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(order.violations().iter().all(|violation| violation.to_string().contains("laws::law!")));

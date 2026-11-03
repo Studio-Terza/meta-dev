@@ -16,11 +16,11 @@ use lint_layout::{LineNumber, Name};
 #[derive(Debug)]
 pub struct Ungenerated<'file> {
     path: &'file Path,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl<'file> Ungenerated<'file> {
-    pub fn in_file(file: &'file SourceFile) -> Vec<Violation> {
+    pub fn in_file(file: &'file SourceFile) -> Vec<Violation<'file>> {
         let mut ungenerated = Ungenerated { path: file.path(), found: Vec::new() };
         ungenerated.visit_file(file.syntax());
         ungenerated.found

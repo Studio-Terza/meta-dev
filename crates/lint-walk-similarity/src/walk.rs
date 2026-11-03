@@ -9,16 +9,16 @@ use type_facts::{Shape, TypeFact};
 use step::Step;
 
 #[derive(Debug)]
-pub(crate) struct Walk<'facts> {
-    found: &'facts TypeFact,
+pub(crate) struct Walk<'facts, 'file> {
+    found: &'facts TypeFact<'file>,
     steps: BTreeSet<Step>,
 }
 
-impl<'facts> Walk<'facts> {
+impl<'facts, 'file> Walk<'facts, 'file> {
     const EXCLUDED_DERIVE: [Word<'static>; 1] = words!["Newtype"];
     const SMALLEST: Least = Least::new(4);
 
-    pub(crate) fn walked(found: &'facts TypeFact, local: &BTreeSet<Name>) -> Option<Walk<'facts>> {
+    pub(crate) fn walked(found: &'facts TypeFact<'file>, local: &BTreeSet<Name>) -> Option<Walk<'facts, 'file>> {
         let steps: BTreeSet<Step> = Step::walked_by(found, local).into_iter().collect();
         Self::SMALLEST
             .allows(Length::new(steps.len()))
@@ -32,13 +32,13 @@ impl<'facts> Walk<'facts> {
     }
 }
 
-impl AsRef<Site> for Walk<'_> {
-    fn as_ref(&self) -> &Site {
+impl<'file> AsRef<Site<'file>> for Walk<'_, 'file> {
+    fn as_ref(&self) -> &Site<'file> {
         self.found.as_ref()
     }
 }
 
-impl AsRef<Name> for Walk<'_> {
+impl AsRef<Name> for Walk<'_, '_> {
     fn as_ref(&self) -> &Name {
         self.found.as_ref()
     }

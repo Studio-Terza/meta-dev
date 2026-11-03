@@ -37,7 +37,10 @@ Every run also prints the test budget: tests, files, lines, test lines and proce
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
 It is report only, no number blocks. The run also lists public methods that form a pair such as
 `start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. That list is report only too,
-so it is outside the lints above and never changes the exit code.
+so it is outside the lints above and never changes the exit code. It also lists each `.clone()` call in shipped code outside a module named
+`boundary` or a crate whose name ends in `boundary` (`clones`), with the fix: borrow, take a slice or `&str`, name a
+lifetime, or move the value; report only as well. Clippy's `redundant_clone`, `implicit_clone`, `unnecessary_to_owned`,
+`clone_on_ref_ptr`, `needless_collect` and `needless_pass_by_value` warn across the workspace, and CI denies warnings.
 
 `primitive_boundary` keeps primitives at the boundary, by convention as `ports` keeps effects. In shipped code, `bool`, the
 integers, the floats, `char`, `String` and `str`, and tuples of them, may appear in a function signature (parameters, return

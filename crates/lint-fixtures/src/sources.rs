@@ -22,19 +22,18 @@ impl Sources {
     }
 
     #[must_use]
-    pub fn lines(report: &Report) -> Lines {
+    pub fn lines(report: &Report<'_>) -> Lines {
         Lines::new(report.violations().iter().map(|violation| violation.site().to_string()).collect())
     }
 
     #[must_use]
-    pub fn report<Checked: Lint>(sources: &[Source]) -> Report {
-        let files: Vec<SourceFile> = sources.iter().map(|source| Self::file(source.path(), source.text())).collect();
-        Checked::report(&files)
+    pub fn parsed(sources: &[Source]) -> Vec<SourceFile> {
+        sources.iter().map(|source| Self::file(source.path(), source.text())).collect()
     }
 
     #[must_use]
     pub fn flagged<Checked: Lint>(sources: &[Source]) -> Lines {
-        Self::lines(&Self::report::<Checked>(sources))
+        Self::lines(&Checked::report(&Self::parsed(sources)))
     }
 
     #[must_use]

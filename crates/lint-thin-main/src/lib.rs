@@ -17,7 +17,7 @@ use lint_placement::Role;
 pub struct ThinMain;
 
 impl Lint for ThinMain {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("a binary is a thin main over its library"),
             files

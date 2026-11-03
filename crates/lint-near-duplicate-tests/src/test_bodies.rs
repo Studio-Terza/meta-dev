@@ -13,11 +13,11 @@ use crate::test_body::TestBody;
 #[derive(Debug)]
 pub(crate) struct TestBodies<'file> {
     file: &'file SourceFile,
-    bodies: Vec<TestBody>,
+    bodies: Vec<TestBody<'file>>,
 }
 
-impl TestBodies<'_> {
-    pub(crate) fn found(file: &SourceFile) -> Vec<TestBody> {
+impl<'file> TestBodies<'file> {
+    pub(crate) fn found(file: &'file SourceFile) -> Vec<TestBody<'file>> {
         let mut scan = TestBodies { file, bodies: Vec::new() };
         scan.visit_file(file.syntax());
         scan.bodies

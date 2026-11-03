@@ -44,11 +44,10 @@ impl<'tree> Shelf<'tree> {
         let stocked = self.read(files, fresh.into_iter().collect());
         let candidates: Vec<PathBuf> = level.iter().flat_map(|node| stocked.candidates(node)).collect();
         let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Followed, &candidates), ..stocked };
-        let found: Vec<(&Node<'tree>, Child)> =
-            level.iter().flat_map(|node| stocked.declared(node).into_iter().map(move |child| (node, child))).collect();
         let visited: BTreeSet<Node<'tree>> = visited.iter().chain(level).cloned().collect();
-        let next: BTreeSet<Node<'tree>> = found
-            .into_iter()
+        let next: BTreeSet<Node<'tree>> = level
+            .iter()
+            .flat_map(|node| stocked.declared(node).into_iter().map(move |child| (node, child)))
             .map(|(node, child)| child.canonical(&stocked.survey).visit(|file, children| node.child(file, children)))
             .filter(|node| !visited.contains(node))
             .collect();

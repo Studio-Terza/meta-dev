@@ -1,5 +1,6 @@
 mod arbitrary_newtypes;
 mod bool_methods;
+mod clones;
 mod complexity;
 mod const_shape;
 mod core_mutation;
