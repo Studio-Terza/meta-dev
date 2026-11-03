@@ -10,7 +10,7 @@ runs:
   using: composite
   steps:
     - name: limits
-      if: github.ref == 'refs/heads/main' || github.base_ref == 'main' || startsWith(github.base_ref, 'project/')
+      if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/project/') || github.base_ref == 'main' || startsWith(github.base_ref, 'project/')
       shell: bash
       env:
         ARGS: ${{ inputs.stages }} ${{ startsWith(github.base_ref, 'project/') && '--report-only clippy test-run lint' || '--report-only test-compile' }}
