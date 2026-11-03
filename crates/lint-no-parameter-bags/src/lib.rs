@@ -10,7 +10,6 @@ use name_uses::NameUses;
 use root_exports::RootExports;
 
 use lint_core::Report;
-use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::Name;
@@ -34,12 +33,7 @@ impl Lint for NoParameterBags {
                         .candidates()
                         .filter(|candidate| exports.exported(file, candidate.name()).is_none())
                         .filter(|candidate| Self::one_consumer_besides(&uses, own, candidate.name()).is_some())
-                        .map(|candidate| {
-                            Violation::new(
-                                Site::new(file.path(), candidate.line()),
-                                Finding::ParameterBag { name: candidate.name().clone() },
-                            )
-                        })
+                        .map(|candidate| candidate.violation(file.path()))
                         .collect::<Vec<Violation>>()
                 })
                 .collect(),

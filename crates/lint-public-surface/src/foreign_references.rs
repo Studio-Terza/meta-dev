@@ -1,4 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
+mod crate_reach;
+
+use std::collections::BTreeMap;
 
 use syn::visit::Visit;
 use syn::{Ident, ItemUse, Macro, Path, UseTree};
@@ -10,12 +12,12 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate_reach::CrateReach;
+
 #[derive(Default)]
 pub struct ForeignReferences {
     own_crate: Option<CrateName>,
-    names: BTreeMap<CrateName, BTreeSet<Name>>,
-    crates: BTreeSet<CrateName>,
-    globbed: BTreeSet<CrateName>,
+    crates: BTreeMap<CrateName, CrateReach>,
 }
 
 impl ForeignReferences {
@@ -26,8 +28,7 @@ impl ForeignReferences {
             Some(_) => None,
             None => Some(CrateName::from(file.placement().crate_root())),
         };
-        let mut references =
-            ForeignReferences { own_crate, names: BTreeMap::new(), crates: BTreeSet::new(), globbed: BTreeSet::new() };
+        let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
         references.visit_file(file.syntax());
         references
     }
@@ -39,28 +40,26 @@ impl ForeignReferences {
             let mut references = ForeignReferences::default();
             references.visit_file(file.syntax());
             ForeignReferences {
-                names: references.names.remove_entry(&tested).into_iter().collect(),
+                crates: references
+                    .crates
+                    .remove_entry(&tested)
+                    .map(|(name, reach)| (name, reach.names_only()))
+                    .into_iter()
+                    .collect(),
                 ..ForeignReferences::default()
             }
         })
     }
 
     pub fn absorb(mut self, other: ForeignReferences) -> ForeignReferences {
-        other.names.into_iter().for_each(|(crate_name, names)| {
-            self.names.entry(crate_name).or_default().extend(names);
+        other.crates.into_iter().for_each(|(crate_name, reach)| {
+            self.crates.entry(crate_name).or_default().absorb(reach);
         });
-        self.crates.extend(other.crates);
-        self.globbed.extend(other.globbed);
         self
     }
 
-    pub fn unnamed<'export>(&self, export: &'export Export) -> Option<&'export Export> {
-        let crate_name = export.crate_name();
-        self.crates
-            .get(crate_name)
-            .filter(|_| !self.globbed.contains(crate_name))
-            .filter(|_| !self.names.get(crate_name).is_some_and(|names| names.contains(export.name())))
-            .map(|_| export)
+    pub fn unnamed<'export>(&self, crate_name: &CrateName, export: &'export Export) -> Option<&'export Export> {
+        self.crates.get(crate_name).and_then(|reach| reach.unnamed(export.name())).map(|_| export)
     }
 
     fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {
@@ -93,10 +92,7 @@ impl ForeignReferences {
             .map(CrateName::from)
             .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
             .into_iter()
-            .for_each(|crate_name| {
-                self.crates.insert(crate_name.clone());
-                self.globbed.insert(crate_name);
-            });
+            .for_each(|crate_name| self.crates.entry(crate_name).or_default().globbed());
     }
 
     fn record(&mut self, first: Option<&Ident>, name: &Ident) {
@@ -104,10 +100,7 @@ impl ForeignReferences {
             .map(CrateName::from)
             .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
             .into_iter()
-            .for_each(|crate_name| {
-                self.names.entry(crate_name.clone()).or_default().insert(Name::from(name));
-                self.crates.insert(crate_name);
-            });
+            .for_each(|crate_name| self.crates.entry(crate_name).or_default().named(Name::from(name)));
     }
 }
 

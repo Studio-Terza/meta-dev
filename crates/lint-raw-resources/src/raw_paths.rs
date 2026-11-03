@@ -25,10 +25,10 @@ impl RawPaths {
         Self::RAW.iter().find_map(|tail| used.spelling(PathTail::new(tail)))
     }
 
-    fn finding(used: &Use<'_>, path: &UsePath) -> Option<Finding> {
+    fn finding<'path>(used: &Use<'_>, path: &'path UsePath) -> Option<Finding<'path>> {
         match (used.ground(), used.cover()) {
-            (Ground::Open, _) => Some(Finding::OutsidePorts(path.clone())),
-            (Ground::Ports, Cover::Bare) => Some(Finding::OutsideGuard(path.clone())),
+            (Ground::Open, _) => Some(Finding::OutsidePorts(path)),
+            (Ground::Ports, Cover::Bare) => Some(Finding::OutsideGuard(path)),
             (Ground::Ports, Cover::Guarded) => None,
         }
     }

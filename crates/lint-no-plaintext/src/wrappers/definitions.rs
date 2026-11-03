@@ -15,16 +15,16 @@ use conversions::Conversions;
 use shape::Shape;
 
 #[derive(Default)]
-pub struct Definitions {
-    shapes: Vec<Shape>,
+pub struct Definitions<'file> {
+    shapes: Vec<Shape<'file>>,
     names: BTreeSet<Name>,
     validated: BTreeSet<Name>,
 }
 
-impl Definitions {
+impl<'file> Definitions<'file> {
     const DESERIALIZE: &'static str = "Deserialize";
 
-    pub fn collected_from(files: &[&SourceFile]) -> Definitions {
+    pub fn collected_from(files: &[&'file SourceFile]) -> Definitions<'file> {
         files.iter().fold(Definitions::default(), |mut definitions, file| {
             definitions.visit_file(file.syntax());
             definitions
@@ -68,25 +68,24 @@ impl Definitions {
     }
 }
 
-impl<'ast> Visit<'ast> for Definitions {
-    fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+impl<'file> Visit<'file> for Definitions<'file> {
+    fn visit_item_mod(&mut self, module: &'file ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
-    fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+    fn visit_item_struct(&mut self, item: &'file ItemStruct) {
         Walk::enter(&item.attrs, || {
-            let name = Name::from(&item.ident);
             self.shapes.push(Shape::new(
-                name.clone(),
+                &item.ident,
                 Self::only_field(item)
                     .filter(|_| Attributes::flattened_from(&item.attrs).validation().is_none())
-                    .map(|field| field.ty.clone()),
+                    .map(|field| &field.ty),
             ));
-            self.names.insert(name);
+            self.names.insert(Name::from(&item.ident));
         });
     }
 
-    fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
+    fn visit_item_impl(&mut self, item: &'file ItemImpl) {
         self.validated.extend(Self::validated_owner(item));
         syn::visit::visit_item_impl(self, item);
     }

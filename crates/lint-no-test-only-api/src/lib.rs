@@ -7,6 +7,7 @@ mod mentions;
 mod offers;
 mod test_features;
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
@@ -46,7 +47,7 @@ impl NoTestOnlyApi {
             .iter()
             .filter_map(|(name, line)| {
                 FeatureWord::test_word(name)
-                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(name.clone())))
+                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(Cow::Borrowed(name))))
             })
             .collect()
     }

@@ -26,7 +26,7 @@ impl Wrappers {
         self.plain.get(name)
     }
 
-    fn widened(&self, definitions: &Definitions) -> Wrappers {
+    fn widened(&self, definitions: &Definitions<'_>) -> Wrappers {
         Wrappers { plain: definitions.plain_among(self) }
     }
 }
