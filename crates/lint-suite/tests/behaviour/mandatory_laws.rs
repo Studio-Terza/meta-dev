@@ -369,7 +369,7 @@ fn a_plain_law_does_not_stand_in_for_a_roundtrip() {
         Sources::file("src/a.rs", Text::new(ENCODING)),
         Sources::file("tests/a.rs", Text::new(LAW_FOR_PAIR)),
     ]);
-    assert!(report.dirty().is_some());
+    assert!(!report.is_clean());
 }
 
 #[test]
@@ -379,5 +379,5 @@ fn the_message_names_the_fix() {
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(order.violations().iter().all(|violation| violation.to_string().contains("laws::law!")));
-    assert!(pair.dirty().is_some() && order.dirty().is_some());
+    assert!(!pair.is_clean() && !order.is_clean());
 }

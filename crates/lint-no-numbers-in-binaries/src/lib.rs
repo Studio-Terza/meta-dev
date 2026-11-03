@@ -21,7 +21,7 @@ impl Lint for NoNumbersInBinaries {
             Headline::new("a binary is wiring: a number it needs is a setting in its config file"),
             files
                 .iter()
-                .filter(|file| binaries.holding(file.path()).is_some())
+                .filter(|file| binaries.contains(file.path()))
                 .flat_map(|file| {
                     let mut numbers = Numbers::default();
                     numbers.visit_file(file.syntax());
@@ -49,10 +49,14 @@ impl<'ast> Visit<'ast> for Numbers {
     }
 
     fn visit_lit_int(&mut self, literal: &'ast LitInt) {
-        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+        self.0.extend(
+            (!NamedNumbers::is_unit(Word::new(literal.base10_digits()))).then(|| LineNumber::from(literal.span())),
+        );
     }
 
     fn visit_lit_float(&mut self, literal: &'ast LitFloat) {
-        self.0.extend(NamedNumbers::unnamed(Word::new(literal.base10_digits()), LineNumber::from(literal.span())));
+        self.0.extend(
+            (!NamedNumbers::is_unit(Word::new(literal.base10_digits()))).then(|| LineNumber::from(literal.span())),
+        );
     }
 }

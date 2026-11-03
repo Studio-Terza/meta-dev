@@ -28,7 +28,7 @@ impl Wrapped {
         let inner = self.field.inner();
         match self.settings.checking() {
             None => {
-                let zero = self.field.counts().map(|_| {
+                let zero = self.field.counts().then(|| {
                     quote! {
                         #[must_use]
                         pub const fn zero() -> Self {

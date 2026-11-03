@@ -12,7 +12,7 @@ impl Wanted {
         Wanted(finals.iter().map(|name| Name::from(*name)).chain(renamed).collect())
     }
 
-    pub(crate) fn holds(&self, name: &Name) -> Option<&Name> {
-        self.0.get(name)
+    pub(crate) fn holds(&self, name: &Name) -> bool {
+        self.0.contains(name)
     }
 }

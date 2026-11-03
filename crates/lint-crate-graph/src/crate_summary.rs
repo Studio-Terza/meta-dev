@@ -39,12 +39,12 @@ impl CrateSummary {
         let tangles = self
             .tangles
             .iter()
-            .filter(|tangle| Self::TANGLE_ITEMS.allows(tangle.items().count()).is_none())
+            .filter(|tangle| !Self::TANGLE_ITEMS.allows(tangle.items().count()))
             .map(|tangle| Violation::new(self.site.clone(), tangle));
         let cut = self
             .cut
             .iter()
-            .filter(|cut| cut.conductance().loose().is_some())
+            .filter(|cut| cut.conductance().is_loose())
             .map(|cut| Violation::new(self.site.clone(), cut));
         tangles.chain(cut).collect()
     }

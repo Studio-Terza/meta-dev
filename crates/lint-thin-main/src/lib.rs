@@ -26,7 +26,7 @@ impl Lint for ThinMain {
                 .flat_map(|file| {
                     let items = &file.syntax().items;
                     let inside_main = Self::mains(items).flat_map(BodyItems::declared_in);
-                    items.iter().filter(|item| Self::thin(item).is_none()).chain(inside_main).map(|item| {
+                    items.iter().filter(|item| !Self::is_thin(item)).chain(inside_main).map(|item| {
                         Violation::new(Site::new(file.path(), LineNumber::from(Self::keyword(item))), Finding::Logic)
                     })
                 })
@@ -38,7 +38,7 @@ impl Lint for ThinMain {
 impl ThinMain {
     fn mains(items: &[Item]) -> impl Iterator<Item = &ItemFn> {
         items.iter().filter_map(|item| match item {
-            Item::Fn(main) if Self::thin(item).is_some() => Some(main),
+            Item::Fn(main) if Self::is_thin(item) => Some(main),
             _ => None,
         })
     }
@@ -59,11 +59,11 @@ impl ThinMain {
         }
     }
 
-    fn thin(item: &Item) -> Option<&Item> {
+    fn is_thin(item: &Item) -> bool {
         match item {
-            Item::Use(_) => Some(item),
-            Item::Fn(ItemFn { sig, .. }) if sig.ident == "main" => Some(item),
-            _ => None,
+            Item::Use(_) => true,
+            Item::Fn(ItemFn { sig, .. }) => sig.ident == "main",
+            _ => false,
         }
     }
 }

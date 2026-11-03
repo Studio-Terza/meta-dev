@@ -194,7 +194,7 @@ fn a_workflow_that_cannot_be_read_is_reported_not_passed() {
 
 #[test]
 fn a_report_with_no_findings_is_clean() {
-    assert!(WorkflowRun::report(&[]).dirty().is_none());
+    assert!(WorkflowRun::report(&[]).is_clean());
 }
 
 laws::table!(

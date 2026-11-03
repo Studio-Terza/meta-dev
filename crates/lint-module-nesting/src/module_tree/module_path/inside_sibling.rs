@@ -1,15 +1,15 @@
 use super::ModulePath;
 use super::ancestor::Ancestor;
 use super::relation::Relation;
+use super::same::Same;
 
 pub struct InsideSibling;
 
 impl Relation for InsideSibling {
-    fn holds<'module>(this: &ModulePath, module: &'module ModulePath) -> Option<&'module ModulePath> {
+    fn holds(this: &ModulePath, module: &ModulePath) -> bool {
         let length = module.segments.len();
-        module
-            .parent()
-            .and_then(|parent| parent.relates::<Ancestor>(this).map(|_| module))
-            .filter(|_| this.segments.len() >= length)
+        module.parent().is_some_and(|parent| parent.relates::<Ancestor>(this))
+            && this.segments.len() >= length
+            && !this.truncated_to_length(length).relates::<Same>(module)
     }
 }

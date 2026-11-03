@@ -28,10 +28,11 @@ impl Lint for PublicApiTests {
             files
                 .iter()
                 .flat_map(|file| {
-                    let (lines, message) = file.shipped().map_or_else(
-                        || (PathReach::lines_in(file), Self::REACH),
-                        |shipped| (TestCode::lines_in(shipped.syntax(), &emitters), Self::FIX),
-                    );
+                    let (lines, message) = if file.is_shipped() {
+                        (TestCode::lines_in(file.syntax(), &emitters), Self::FIX)
+                    } else {
+                        (PathReach::lines_in(file), Self::REACH)
+                    };
                     lines.into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
                 })
                 .collect(),

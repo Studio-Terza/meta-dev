@@ -30,10 +30,10 @@ pub struct Nesting;
 impl Nesting {
     const LIMIT: Most = Most::new(256);
 
-    pub fn within_limit(text: &SourceText) -> Option<&SourceText> {
+    pub fn within_limit(text: &SourceText) -> bool {
         let chars: Vec<char> = text.as_ref().chars().collect();
         let deepest = Self::peak(&chars, Self::delimited).max(Self::peak(&chars, Depth::angled));
-        Self::LIMIT.allows(deepest.count()).map(|_| text)
+        Self::LIMIT.allows(deepest.count())
     }
 
     fn peak(chars: &[char], step: impl Fn(Depth, &[char]) -> Depth) -> Depth {

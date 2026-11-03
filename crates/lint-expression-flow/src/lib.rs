@@ -32,7 +32,7 @@ impl Lint for ExpressionFlow {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("control flow is an expression; every branch yields the value the function returns"),
-            files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
+            files.iter().filter(|file| file.is_shipped()).flat_map(Self::violations).collect(),
         )
     }
 }
@@ -44,10 +44,10 @@ impl ExpressionFlow {
         flows.violations
     }
 
-    fn dropped(statement: &Stmt, last: bool) -> Option<&Stmt> {
+    fn is_dropped(statement: &Stmt, last: bool) -> bool {
         match statement {
-            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) if semicolon.is_some() || !last => Some(statement),
-            _ => None,
+            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) => semicolon.is_some() || !last,
+            _ => false,
         }
     }
 
@@ -61,22 +61,20 @@ impl ExpressionFlow {
         }
     }
 
-    fn compound(op: BinOp) -> Option<BinOp> {
-        Some(op).filter(|op| {
-            matches!(
-                op,
-                BinOp::AddAssign(_)
-                    | BinOp::SubAssign(_)
-                    | BinOp::MulAssign(_)
-                    | BinOp::DivAssign(_)
-                    | BinOp::RemAssign(_)
-                    | BinOp::BitXorAssign(_)
-                    | BinOp::BitAndAssign(_)
-                    | BinOp::BitOrAssign(_)
-                    | BinOp::ShlAssign(_)
-                    | BinOp::ShrAssign(_)
-            )
-        })
+    fn is_compound(op: BinOp) -> bool {
+        matches!(
+            op,
+            BinOp::AddAssign(_)
+                | BinOp::SubAssign(_)
+                | BinOp::MulAssign(_)
+                | BinOp::DivAssign(_)
+                | BinOp::RemAssign(_)
+                | BinOp::BitXorAssign(_)
+                | BinOp::BitAndAssign(_)
+                | BinOp::BitOrAssign(_)
+                | BinOp::ShlAssign(_)
+                | BinOp::ShrAssign(_)
+        )
     }
 }
 
@@ -159,8 +157,8 @@ impl<'ast> Visit<'ast> for Flows<'_> {
                 .stmts
                 .iter()
                 .enumerate()
-                .filter_map(|(index, statement)| ExpressionFlow::dropped(statement, index == last))
-                .map(|statement| {
+                .filter(|(index, statement)| ExpressionFlow::is_dropped(statement, *index == last))
+                .map(|(_, statement)| {
                     Self::found(
                         self.path,
                         statement.span(),
@@ -226,14 +224,17 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     }
 
     fn visit_expr_binary(&mut self, expr: &'ast ExprBinary) {
-        self.violations
-            .extend(ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| {
-            Self::found(
-                self.path,
-                expr.op.span(),
-                "compound assignment to a local; build the value in one expression or give its type an updater method",
-            )
-        }));
+        self.violations.extend(
+            ExpressionFlow::assigned_local(&expr.left)
+                .filter(|_| ExpressionFlow::is_compound(expr.op))
+                .map(|_| {
+                    Self::found(
+                        self.path,
+                        expr.op.span(),
+                        "compound assignment to a local; build the value in one expression or give its type an updater method",
+                    )
+                }),
+        );
         syn::visit::visit_expr_binary(self, expr);
     }
 }

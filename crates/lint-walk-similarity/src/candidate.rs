@@ -23,7 +23,7 @@ impl Candidate {
             first.steps().intersection(second.steps()).count(),
             first.steps().union(second.steps()).count(),
         );
-        agreement.near_identical().map(|_| Candidate {
+        agreement.is_near_identical().then(|| Candidate {
             first: AsRef::<Name>::as_ref(first).clone(),
             second: AsRef::<Name>::as_ref(second).clone(),
             site: AsRef::<Site>::as_ref(first).clone(),

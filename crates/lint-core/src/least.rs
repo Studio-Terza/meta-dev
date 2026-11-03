@@ -5,7 +5,7 @@ pub struct Least(usize);
 
 impl Least {
     #[must_use]
-    pub const fn allows(self, count: usize) -> Option<usize> {
-        if count >= self.0 { Some(count) } else { None }
+    pub const fn allows(self, count: usize) -> bool {
+        count >= self.0
     }
 }
