@@ -16,9 +16,9 @@ pub(crate) struct CrateTransitions<'found, 'file> {
     name: &'found CrateName,
     first: Option<Site<'file>>,
     domain: Count,
-    interfaces: BTreeSet<&'found End>,
-    boxes: BTreeSet<&'found End>,
-    pairs: BTreeSet<Hop>,
+    interfaces: BTreeSet<&'found End<'found>>,
+    boxes: BTreeSet<&'found End<'found>>,
+    pairs: BTreeSet<Hop<'found>>,
     coverage: Coverage,
 }
 

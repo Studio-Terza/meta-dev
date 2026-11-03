@@ -11,7 +11,7 @@ use crate::graph::Graph;
 
 #[derive(Debug)]
 struct Member<'graph, 'file> {
-    node: &'graph Node,
+    node: &'graph Node<'graph>,
     site: Site<'file>,
 }
 
@@ -23,7 +23,7 @@ pub(super) struct Group<'graph, 'file> {
 
 impl<'graph, 'file> Group<'graph, 'file> {
     fn alike(
-        members: Vec<&'graph Node>,
+        members: Vec<&'graph Node<'graph>>,
         graph: &'graph Graph<'_, 'file>,
         behaviour: &'graph Behaviour<'graph>,
     ) -> Option<Group<'graph, 'file>> {
@@ -37,7 +37,7 @@ impl<'graph, 'file> Group<'graph, 'file> {
     }
 
     pub(super) fn ranked(
-        grouped: impl IntoIterator<Item = Vec<&'graph Node>>,
+        grouped: impl IntoIterator<Item = Vec<&'graph Node<'graph>>>,
         graph: &'graph Graph<'_, 'file>,
         behaviour: &'graph Behaviour<'graph>,
     ) -> Vec<Group<'graph, 'file>> {

@@ -17,7 +17,7 @@ enum Kind {
 
 #[derive(Debug)]
 pub(super) struct Tangle<'graph, 'file> {
-    members: Vec<&'graph Node>,
+    members: Vec<&'graph Node<'graph>>,
     sites: Vec<Site<'file>>,
     closing: Vec<&'graph Hyperedge<'graph, 'file>>,
     kind: Kind,
@@ -29,7 +29,7 @@ impl<'graph, 'file> Tangle<'graph, 'file> {
     const CONVERSIONS: [Word<'static>; 4] = words!["from", "try_from", "from_str", "into"];
 
     pub(super) fn closed(
-        members: BTreeSet<&'graph Node>,
+        members: BTreeSet<&'graph Node<'graph>>,
         consuming: &Consuming<'graph, 'file>,
         graph: &'graph Graph<'_, 'file>,
     ) -> Tangle<'graph, 'file> {
@@ -38,9 +38,9 @@ impl<'graph, 'file> Tangle<'graph, 'file> {
             .flat_map(|node| consuming.led_within(node, &members))
             .filter(|edge| members.contains(AsRef::<Hop>::as_ref(*edge).reached()))
             .collect();
-        let converting = closing
-            .iter()
-            .find(|edge| AsRef::<Name>::as_ref(edge.transition()).matches::<Whole>(&Self::CONVERSIONS).is_none());
+        let converting = closing.iter().find(|edge| {
+            AsRef::<Name>::as_ref(edge.transition().function()).matches::<Whole>(&Self::CONVERSIONS).is_none()
+        });
         let kind = match (members.len() == Self::PAIR, converting) {
             (true, None) => Kind::RoundTrip,
             _ => Kind::Tangle,
