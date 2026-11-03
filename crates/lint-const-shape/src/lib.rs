@@ -26,7 +26,7 @@ pub struct ConstShape;
 impl Lint for ConstShape {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
-            Headline::new("casts live in const fns or bits modules, and const loops walk slices"),
+            Headline::new("casts live in const fns or boundary modules, and const loops walk slices"),
             files.iter().flat_map(Self::violations).collect(),
         )
     }
@@ -59,17 +59,17 @@ impl Context {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Zone {
-    Bits,
+    Boundary,
     Elsewhere,
 }
 
 impl Zone {
     fn of_file(file: &SourceFile) -> Zone {
-        Gate::BITS.admits(file).map_or(Zone::Elsewhere, |_| Zone::Bits)
+        Gate::BOUNDARY.admits(file).map_or(Zone::Elsewhere, |_| Zone::Boundary)
     }
 
     fn entering(self, module: &ItemMod) -> Zone {
-        Gate::BITS.names(module).map_or(self, |_| Zone::Bits)
+        Gate::BOUNDARY.names(module).map_or(self, |_| Zone::Boundary)
     }
 }
 
