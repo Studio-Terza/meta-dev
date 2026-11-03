@@ -21,4 +21,9 @@ src/imported.rs:3: calls std::mem::forget; put it in a guard behind a port: a cr
 src/ports.rs:2: calls std::mem::forget outside a guard; in a port, put it in an impl of a type that implements Drop
 src/qualified.rs:2: calls std::fs::remove_dir_all; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
 src/renamed.rs:3: calls std::env::temp_dir; put it in a guard behind a port: a crate whose name ends in ports, or a module named ports
+effects on files, environment, clock, network, processes, randomness and stdio happen only in ports:
+src/other_calls.rs:3: files effect outside ports: calls std::fs::remove_dir; move the effect behind a port in a ports module and call the port from here
+src/other_calls.rs:4: files effect outside ports: calls std::fs::read; move the effect behind a port in a ports module and call the port from here
+src/qualified.rs:2: files effect outside ports: calls std::fs::remove_dir_all; move the effect behind a port in a ports module and call the port from here
+src/renamed.rs:3: environment effect outside ports: calls std::env::temp_dir; move the effect behind a port in a ports module and call the port from here
 fails
