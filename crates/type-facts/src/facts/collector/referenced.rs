@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem, TypeReference};
+use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem, TraitItemType, TypeReference};
 
 use lint_core::Site;
 use lint_layout::{LineNumber, Name, Whole, Word, words};
@@ -47,10 +47,7 @@ impl<'item, 'file> Referenced<'item, 'file> {
 
     pub(crate) fn of_trait(mut self, found: &ItemTrait) -> Vec<Dependency<'file>> {
         found.supertraits.iter().for_each(|bound| self.visit_type_param_bound(bound));
-        let associated = found.items.iter().filter_map(|item| match item {
-            TraitItem::Type(associated) => Some(associated),
-            _ => None,
-        });
+        let associated = found.items.iter().filter_map(Self::associated_type);
         associated.for_each(|associated| {
             associated.bounds.iter().for_each(|bound| self.visit_type_param_bound(bound));
             self.visit_generics(&associated.generics);
@@ -67,21 +64,24 @@ impl<'item, 'file> Referenced<'item, 'file> {
     fn dependency(&self, path: &syn::Path, segment: &PathSegment) -> Option<Dependency<'file>> {
         let qualifier = path.segments.first().filter(|_| path.segments.len() > 1).map(|first| Name::from(&first.ident));
         let named = Name::from(&segment.ident);
-        let resolved = match named.matches::<Whole>(&Self::ITSELF) {
-            Some(_) => Name::from(self.own),
-            None => named,
-        };
+        let resolved = named.matches::<Whole>(&Self::ITSELF).map(|_| Name::from(self.own)).unwrap_or(named);
         let site = Site::new(self.file, LineNumber::from(segment.ident.span()));
-        (!self.parameters.contains(&&segment.ident))
-            .then(|| Dependency::new(resolved, site, self.via, self.held).qualified(qualifier))
+        self.parameters
+            .iter()
+            .find(|parameter| **parameter == &segment.ident)
+            .map_or_else(|| Some(Dependency::new(resolved, site, self.via, self.held).qualified(qualifier)), |_| None)
+    }
+
+    fn associated_type(item: &TraitItem) -> Option<&TraitItemType> {
+        match item {
+            TraitItem::Type(associated) => Some(associated),
+            _ => None,
+        }
     }
 
     fn visit_arguments(&mut self, segment: &PathSegment) {
         let outer = self.held;
-        self.held = match Name::from(&segment.ident).matches::<Whole>(&Self::POINTERS) {
-            Some(_) => Held::Indirectly,
-            None => outer,
-        };
+        self.held = Name::from(&segment.ident).matches::<Whole>(&Self::POINTERS).map_or(outer, |_| Held::Indirectly);
         visit::visit_path_arguments(self, &segment.arguments);
         self.held = outer;
     }
