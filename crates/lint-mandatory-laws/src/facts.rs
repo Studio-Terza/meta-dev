@@ -12,12 +12,12 @@ use crate::subject::Subject;
 use exposure::Exposure;
 use lint_core::SourceFile;
 use obligation::Obligation;
-use profile::Profile;
+use profile::{Facets, Profile};
 use reader::Reader;
 
 #[derive(Debug, Default)]
 pub(crate) struct Facts<'file> {
-    profiles: BTreeMap<Subject, Profile<'file>>,
+    profiles: BTreeMap<Subject<'file>, Facets<'file>>,
 }
 
 impl<'file> Facts<'file> {
@@ -25,11 +25,11 @@ impl<'file> Facts<'file> {
         files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Facts::read)
     }
 
-    pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation<'file>> {
+    pub(crate) fn unmet(&self, coverage: &Coverage<'_>) -> Vec<Obligation<'_, 'file>> {
         self.profiles
-            .values()
-            .filter(|profile| profile.exposure() == Exposure::Public)
-            .flat_map(|profile| profile.unmet(coverage))
+            .iter()
+            .filter(|(_, facets)| facets.exposure() == Exposure::Public)
+            .flat_map(|(subject, facets)| facets.unmet(subject, coverage))
             .collect()
     }
 
@@ -38,12 +38,7 @@ impl<'file> Facts<'file> {
     }
 
     fn added(mut self, profile: Profile<'file>) -> Facts<'file> {
-        let subject = profile.subject().clone();
-        let merged = match self.profiles.remove(&subject) {
-            Some(earlier) => earlier.merged(profile),
-            None => profile,
-        };
-        self.profiles.insert(subject, merged);
+        profile.filed_in(&mut self.profiles);
         self
     }
 }

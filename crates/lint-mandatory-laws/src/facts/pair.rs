@@ -3,14 +3,14 @@ use std::fmt;
 
 use lint_layout::Name;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Pair {
-    left: Name,
-    right: Name,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Pair<'facts> {
+    left: &'facts Name,
+    right: &'facts Name,
 }
 
-impl Pair {
-    pub(crate) fn new(left: Name, right: Name) -> Pair {
+impl<'facts> Pair<'facts> {
+    pub(crate) fn new(left: &'facts Name, right: &'facts Name) -> Pair<'facts> {
         Pair { left, right }
     }
 
@@ -18,11 +18,11 @@ impl Pair {
         &self,
         mentions: &'mentions BTreeSet<Name>,
     ) -> Option<&'mentions BTreeSet<Name>> {
-        (mentions.contains(&self.left) && mentions.contains(&self.right)).then_some(mentions)
+        (mentions.contains(self.left) && mentions.contains(self.right)).then_some(mentions)
     }
 }
 
-impl fmt::Display for Pair {
+impl fmt::Display for Pair<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "`{}` and `{}`", self.left, self.right)
     }
