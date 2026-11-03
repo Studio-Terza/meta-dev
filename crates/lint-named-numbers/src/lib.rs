@@ -30,20 +30,15 @@ impl Lint for NamedNumbers {
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .filter(|file| Gate::BOUNDARY.admits(file).is_none())
-                .filter(|file| support.iter().all(|path| path != file.path()))
+                .filter(|file| Gate::BOUNDARY.admits(file).is_none() && !support.contains(&file.path().to_owned()))
                 .flat_map(|file| {
-                    let mut numbers = Numbers::default();
-                    numbers.visit_file(file.syntax());
-                    numbers.0.into_iter().map(move |line| {
-                        Violation::new(
-                            Site::new(file.path(), line),
-                            Message::new(
-                                Problem::new("numeric literal outside a const item"),
-                                Fix::new("name it as a const so it can be found and tuned"),
-                            ),
-                        )
-                    })
+                    Self::flagged::<Numbers>(
+                        file,
+                        Message::new(
+                            Problem::new("numeric literal outside a const item"),
+                            Fix::new("name it as a const so it can be found and tuned"),
+                        ),
+                    )
                 })
                 .collect(),
         )
@@ -60,26 +55,30 @@ impl NamedNumbers {
             None => Some(line),
         }
     }
+
+    pub fn flagged<Found: Literals>(file: &SourceFile, message: Message) -> impl Iterator<Item = Violation<'_>> {
+        let mut found = Found::default();
+        found.visit_file(file.syntax());
+        found.lines().into_iter().map(move |line| Violation::new(Site::new(file.path(), line), message))
+    }
+}
+
+pub trait Literals: for<'ast> Visit<'ast> + Default {
+    fn lines(self) -> Vec<LineNumber>;
+}
+
+impl Literals for Numbers {
+    fn lines(self) -> Vec<LineNumber> {
+        self.0
+    }
 }
 
 #[derive(Default)]
 struct Numbers(Vec<LineNumber>);
 
-impl Numbers {
-    fn outside_boundary(&mut self, module: &ItemMod) {
-        match Gate::BOUNDARY.names(module) {
-            Some(_) => {}
-            None => syn::visit::visit_item_mod(self, module),
-        }
-    }
-}
-
 impl<'ast> Visit<'ast> for Numbers {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => self.outside_boundary(module),
-            Walk::Skipped => {}
-        }
+        Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

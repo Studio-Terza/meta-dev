@@ -1,5 +1,7 @@
 # crate-graph-shape
 
+Status: dropped by the owner on 2026-11-03; `reach fan-in`, `reach hubs` and the fan-in column of the history file are deleted, and this spec is kept as a record. The item graph inside one crate (`crate_graph`) still blocks.
+
 Problem: the crate dependency graph can turn into spaghetti, with logic sitting in crates that most of the workspace depends on, so one edit rebuilds and retests nearly everything. This is the first of two compile-time concerns, judged only by the shape of the graph as it stands.
 
 L1 Everything here reports and blocks nothing, until the owner decides otherwise from the data.
@@ -16,3 +18,5 @@ Out: gates, git history, churn and volatility, compile timings (the second conce
 ## History
 
 Owner's messages 42dad9d0, 772f1172, 871be1b4.
+
+Dropped (owner faca6011): crate reach and hub thickness scored below chance.

@@ -7,10 +7,10 @@ use std::path::Path;
 
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
+use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, Token};
 
-use lint_core::{Site, SourceFile, Syntax, Walk};
-use lint_layout::{LineNumber, Name};
+use lint_core::{Site, SourceFile, Walk};
+use lint_layout::{LineNumber, Name, Word};
 use lint_paths::Module;
 
 use members::Members;
@@ -26,6 +26,8 @@ pub struct Guards<'file> {
 
 impl<'file> Guards<'file> {
     const DROP: &str = "Drop";
+    const MUST_USE: &str = "must_use";
+    const CONDITIONAL: &str = "cfg_attr";
 
     pub fn scanned(files: &[&'file SourceFile]) -> Modules<'file> {
         let empty = Guards {
@@ -45,42 +47,23 @@ impl<'file> Guards<'file> {
             .modules
     }
 
-    fn dropped_type(item: &ItemImpl) -> Option<Name> {
-        item.trait_
-            .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
-            .filter(|last| last.ident == Self::DROP)
-            .and_then(|_| Syntax::last_name(&item.self_ty))
-    }
-
     fn declared(&mut self, attributes: &[Attribute], name: &Ident) {
         let site = Site::new(self.path, LineNumber::from(name.span()));
-        self.members.declare(Name::from(name), attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None));
+        self.members.declare(Name::from(name), attributes.iter().find_map(Self::mark).map_or(Some(site), |_| None));
     }
-}
-
-struct MustUse;
-
-impl MustUse {
-    const MUST_USE: &str = "must_use";
-    const CONDITIONAL: &str = "cfg_attr";
 
     fn mark(attribute: &Attribute) -> Option<&Attribute> {
-        Some(attribute).filter(|attribute| attribute.path().is_ident(Self::MUST_USE)).or_else(|| {
-            attribute
-                .meta
-                .require_list()
-                .ok()
-                .filter(|list| list.path.is_ident(Self::CONDITIONAL))
-                .and_then(Self::conditional)
-                .map(|_| attribute)
-        })
-    }
-
-    fn conditional(list: &MetaList) -> Option<Meta> {
-        list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-            .ok()
-            .and_then(|nested| nested.into_iter().skip(1).find(|meta| meta.path().is_ident(Self::MUST_USE)))
+        match attribute.path() {
+            path if path.is_ident(Self::MUST_USE) => Some(attribute),
+            path if path.is_ident(Self::CONDITIONAL) => attribute
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .ok()?
+                .into_iter()
+                .skip(1)
+                .find(|meta| meta.path().is_ident(Self::MUST_USE))
+                .map(|_| attribute),
+            _ => None,
+        }
     }
 }
 
@@ -96,7 +79,7 @@ impl<'ast> Visit<'ast> for Guards<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || self.members.drop_implemented(Self::dropped_type(item)));
+        Walk::enter(&item.attrs, || self.members.drop_implemented(Name::implementing(item, Word::new(Self::DROP))));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
@@ -112,7 +95,7 @@ impl<'ast> Visit<'ast> for Guards<'_> {
     }
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
-        let target = Syntax::last_name(&item.ty);
+        let target = Name::of_type(&item.ty);
         Walk::enter(&item.attrs, || self.members.alias(Name::from(&item.ident), target));
     }
 }

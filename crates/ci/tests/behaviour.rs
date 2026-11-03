@@ -30,7 +30,7 @@ const EMPTY_REPORT_AND_NOTES: [&str; 5] = [
     "skipped: BUILD_SCOPE is empty, so the steps that use it do not run",
     "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run",
 ];
-const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0";
+const HISTORY_LINE: &str = "abc123\treach 1 of 5";
 const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
@@ -208,16 +208,10 @@ impl Sample {
         Text::owned(&scratch.read("m.toml"))
     }
 
-    fn reach_report(changed: &&str) -> Vec<String> {
+    fn reach_report(&[base, changed]: &[&str; 2]) -> Vec<String> {
         let scratch = Scratch::fresh();
-        let fake = Script { changed: (*changed).to_owned(), ..Script::new() };
-        Text::owned(&scratch.answer(&fake, &Reach::into(&scratch, "pull_request", "feature")).out)
-    }
-
-    fn reach_into_main(changed: &&str) -> Vec<String> {
-        let scratch = Scratch::fresh();
-        let fake = Script { changed: (*changed).to_owned(), ..Script::new() };
-        Text::owned(&scratch.answer(&fake, &Reach::into(&scratch, "pull_request", "main")).out)
+        let fake = Script { changed: changed.to_owned(), ..Script::new() };
+        Text::owned(&scratch.answer(&fake, &Reach::into(&scratch, "pull_request", base)).out)
     }
 }
 
@@ -264,20 +258,20 @@ laws::table!(
     the_scope_is_what_the_changed_files_reach,
     Sample::reach_report,
     [
-        "crates/leaf/src/lib.rs\n" => LEAF_REPORT.to_vec(),
-        "crates/middle/src/lib.rs\n" => TWO_REPORT.to_vec(),
-        "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n" => TWO_REPORT.to_vec(),
-        "README.md\n" => EMPTY_REPORT_AND_NOTES.to_vec(),
-        "" => EMPTY_REPORT_AND_NOTES.to_vec(),
+        ["feature", "crates/leaf/src/lib.rs\n"] => LEAF_REPORT.to_vec(),
+        ["feature", "crates/middle/src/lib.rs\n"] => TWO_REPORT.to_vec(),
+        ["feature", "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n"] => TWO_REPORT.to_vec(),
+        ["feature", "README.md\n"] => EMPTY_REPORT_AND_NOTES.to_vec(),
+        ["feature", ""] => EMPTY_REPORT_AND_NOTES.to_vec(),
     ]
 );
 
 laws::table!(
     a_pull_request_into_main_runs_the_whole_workspace_but_reports_the_reach_for_mutants,
-    Sample::reach_into_main,
+    Sample::reach_report,
     [
-        "crates/leaf/src/lib.rs\n" => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
-        "README.md\n" => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
+        ["main", "crates/leaf/src/lib.rs\n"] => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
+        ["main", "README.md\n"] => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
 
@@ -416,7 +410,7 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn a_history_line_names_the_revision_the_reach_and_every_fan_in_and_is_appended() -> Result<(), Box<dyn Error>> {
+fn a_history_line_names_the_revision_and_the_reach_and_is_appended() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.write("metadata.json", METADATA)?;
     scratch.write("history.tsv", "older\n")?;

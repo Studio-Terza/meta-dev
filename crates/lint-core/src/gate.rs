@@ -6,6 +6,7 @@ use lint_layout::{Name, Word};
 use lint_placement::Placement;
 
 use crate::source_file::SourceFile;
+use crate::walk::Walk;
 use suffix::Suffix;
 
 #[derive(Debug)]
@@ -33,6 +34,10 @@ impl Gate {
         self.package_suffix
             .and_then(|suffix| placement.package().root().package()?.matches::<Suffix>(&[suffix]))
             .map(|_| placement)
+    }
+
+    pub fn enter_outside(&self, module: &ItemMod, visit: impl FnOnce()) {
+        Walk::enter(&module.attrs, || self.names(module).map_or_else(visit, |_| ()));
     }
 
     #[must_use]

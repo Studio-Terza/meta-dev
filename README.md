@@ -30,8 +30,15 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, no_early_exits, one_edge, rust_only, workflow_run.
+no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
+effects_in_ports, no_early_exits, one_edge, unconsumed_traits, layering, rust_only, workflow_run.
+
+`repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
+tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
+literals are erased; a group nested inside a larger group is not listed again. The message names the fix by where the
+copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,
+extract the shape once, write it generic over an existing trait, or derive it; in both, the test re-implements shipped
+logic and should test through it.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -52,6 +59,14 @@ declaration is read instead. A unit return is not flagged, nor are consts, stati
 as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
+
+`unconsumed_traits` refuses a local trait with methods that nothing in shipped code consumes: no bound (generic, where
+clause or supertrait), no `impl Trait` or `dyn Trait`, and no call to one of its provided methods. Delete the trait and
+keep its methods inherent, or give it a consumer.
+
+`layering` keeps type definitions layered. A type depends on another through a field, an enum variant or a bound, and
+the only cycle allowed is a type's explicit recursion into itself through a reference, `Box`, `Rc`, `Arc`, `Weak`, `Vec` or
+`VecDeque`. Pull the shared part of a tangle into its own type, or make the recursion explicit.
 
 `one_edge` keeps one transition per pair. In shipped code, a set of domain input types reaches one domain output type
 by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
@@ -151,7 +166,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -317,8 +332,6 @@ A pull request pays only for what it can affect. `ci reach` lists the files the 
 gives them to `reach`, with the output of `cargo metadata --no-deps`:
 
     reach affected <metadata> [<changed file>...]
-    reach fan-in <metadata>
-    reach hubs <metadata> <repository>
 
 A file inside a crate reaches that crate and every crate that depends on it, directly or not, through
 normal, dev or build dependencies. `README.md` and `specs/` reach nothing. Any other file reaches every crate:
@@ -334,16 +347,6 @@ steps that use it do not run` in the step and in the run summary, and `ci mutant
 skipped when it gets no scope. The lint step and `cargo fmt` stay whole-repo: lints such as `crate_graph` and `repeated_methods`
 cannot judge a slice. Main, and every pull request into main, ignore all this and run everything, with `--workspace`; mutants still test only the changed lines, in the reach. A pull request into any other branch keeps the reach.
 
-`fan-in` lists how many crates depend on each crate, directly or not, most first, as a count and a share of the
-workspace, then the distribution: crates per tenth of the share, the median and the largest. It reads only the graph
-as it stands, never its history. How far a change reaches is the measure of tangle, so the lint job on main prints it.
-
-`hubs` weighs how thick each crate is against how many depend on it: the logic a crate holds, its shipped
-functions' cyclomatic complexity above one summed as `lint-complexity` counts it, times the crates that depend on it.
-Each crate is listed at its heaviest function, heaviest weighted first, then the share of all logic held by crates that
-more than half the workspace depends on. A crate many depend on should be thin: types, traits and interfaces, with the
-logic in the leaves.
-
 ## Newtypes
 
 `#[derive(Newtype)]` implements `Newtype` (`type Inner`, `new`, `into_inner`) for a struct with one field,
@@ -353,7 +356,7 @@ tuple or named, generic or not.
     pub struct Rounds(usize);
 
 A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` the same derive implements
-`Validated` instead, and `try_new` is the only way in. The check is a function from `&Inner` to
+inherent `try_new` and `into_inner` instead, and `try_new` is the only way in. The check is a function from `&Inner` to
 `Result<(), Error>`.
 
     #[derive(Newtype, Arbitrary, Debug)]

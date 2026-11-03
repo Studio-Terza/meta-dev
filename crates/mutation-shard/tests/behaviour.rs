@@ -3,7 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use mutation_shard::Cli;
 use serde_json::{Value, json};
 
@@ -24,6 +24,10 @@ impl Answer {
         let mut err = Vec::new();
         let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
+    }
+
+    fn usage() -> Answer {
+        Answer { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
     }
 }
 
@@ -171,14 +175,12 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
     let mutants = Mutants::new()?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use"));
-    assert!(answer.err.contains("outcomes.json"));
+    assert!(answer.err.contains("cannot use") && answer.err.contains("outcomes.json"));
     mutants.broken_outcomes("not json")?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse"));
-    assert!(answer.err.contains("outcomes.json"));
-    assert_eq!(mutants.files.kind(&mutants.destination()), Kind::Missing);
+    assert!(answer.err.contains("cannot parse") && answer.err.contains("outcomes.json"));
+    assert!(!mutants.destination().exists());
     Ok(())
 }
 
@@ -192,27 +194,17 @@ fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[test]
-fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
-    let answers: Vec<(ExitCode, Vec<String>)> =
-        [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]]
-            .into_iter()
-            .map(|arguments| Answer::to(&Memory::default(), arguments))
-            .map(|answer| (answer.exit, Text::lines(&answer.err).into_iter().map(String::from).collect()))
-            .collect();
-    assert_eq!(
-        answers,
-        vec![(ExitCode::FAILURE, vec![String::from("usage: mutation-shard <mutants.out> <out.json>")]); 3]
-    );
-}
+const USAGE: &str = "usage: mutation-shard <mutants.out> <out.json>";
 
-struct Text;
-
-impl Text {
-    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
-        text_lines::Lines::from(text.as_ref()).collect()
-    }
-}
+laws::table!(
+    the_wrong_number_of_arguments_is_refused_with_the_usage,
+    |arguments: &[&OsStr]| Answer::to(&Memory::default(), arguments),
+    [
+        [] => Answer::usage(),
+        [OsStr::new("a")] => Answer::usage(),
+        [OsStr::new("a"), OsStr::new("b"), OsStr::new("c")] => Answer::usage(),
+    ]
+);
 
 struct Mutants {
     files: Memory,

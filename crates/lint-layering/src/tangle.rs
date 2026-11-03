@@ -4,7 +4,6 @@ use std::fmt;
 use lint_core::{Site, Violation};
 use lint_layout::Fix;
 
-use crate::count::Count;
 use crate::definition::{Declared, Definition};
 use crate::link::Link;
 
@@ -31,10 +30,6 @@ impl<'facts, 'file> Tangle<'facts, 'file> {
             right.members.len().cmp(&left.members.len()).then_with(|| left.first().cmp(&right.first()))
         });
         tangles
-    }
-
-    pub(crate) fn size(&self) -> Count {
-        Count::new(self.members.len())
     }
 
     fn first(&self) -> Option<Site<'file>> {
@@ -67,7 +62,7 @@ impl fmt::Display for Tangle<'_, '_> {
 impl lint_layout::Finding for Tangle<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "layer the definitions: move the shared part into a lower type, or hold the upper type behind a trait the lower one declares",
+            "pull the shared part into its own type, or make the recursion explicit: a type holding itself through Box, Rc or Arc",
         )
     }
 }

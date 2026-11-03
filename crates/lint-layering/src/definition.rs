@@ -9,7 +9,6 @@ use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 use type_facts::{Dependency, Facts};
 
-use crate::count::Count;
 use crate::link::Link;
 use declaration::Declaration;
 
@@ -49,14 +48,6 @@ impl<'facts, 'file> Declared<'facts, 'file> {
             declaring
         });
         Declared { declaring, sites }
-    }
-
-    pub(crate) fn count(&self) -> Count {
-        Count::new(self.sites.len())
-    }
-
-    pub(crate) fn first(&self) -> Option<Site<'file>> {
-        self.sites.values().copied().min()
     }
 
     pub(crate) fn site_of(&self, definition: &Definition<'facts>) -> Option<Site<'file>> {

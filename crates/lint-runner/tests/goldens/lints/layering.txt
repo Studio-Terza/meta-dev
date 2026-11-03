@@ -1,0 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 7 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+type definitions are layered: over the definition graph, where A depends on B when A has a field of type B, an enum variant carrying B, or a bound on B, resolved by name within the workspace (same crate first, then a crate-qualified path, then the one crate declaring it), the only cycle is a type's explicit recursion into itself through a reference, Box, Rc, Arc, Weak, Vec or VecDeque:
+src/lib.rs:1: tangle of 2 definitions: corpus::Customer at src/lib.rs:5, corpus::Order at src/lib.rs:1; closed by 2 edges: corpus::Order -> corpus::Customer (field) at src/lib.rs:2, corpus::Customer -> corpus::Order (field) at src/lib.rs:6; pull the shared part into its own type, or make the recursion explicit: a type holding itself through Box, Rc or Arc
+fails
