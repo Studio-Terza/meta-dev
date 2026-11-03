@@ -14,8 +14,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_item_graph::Traversal;
+use lint_item_graph::{ItemGraph, Traversal};
 use lint_layout::Name;
+use lint_placement::CrateName;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -79,7 +80,15 @@ impl<'found, 'file> Containment<'found, 'file> {
         let resolver = &Resolver::of_members(placed.keys().copied());
         let defined = placed.iter().flat_map(|(member, declaration)| declaration.links(*member, resolver));
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
-        let links: BTreeSet<Link<'found>> = defined.chain(signed).filter_map(Link::apart).collect();
+        let crates = files.iter().filter_map(SourceFile::shipped).fold(
+            BTreeMap::new(),
+            |mut crates: BTreeMap<&CrateName, Vec<&SourceFile>>, file| {
+                crates.entry(file.placement().package().crate_name()).or_default().push(file);
+                crates
+            },
+        );
+        let bodies = crates.iter().flat_map(|(krate, files)| resolver.bodies(krate, &ItemGraph::of_files(files)));
+        let links: BTreeSet<Link<'found>> = defined.chain(signed).chain(bodies).filter_map(Link::apart).collect();
         Containment {
             sites: placed
                 .iter()

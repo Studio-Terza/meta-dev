@@ -148,3 +148,48 @@ fn a_cluster_with_fewer_exports_than_private_items_is_deep() {
         ]
     );
 }
+
+#[test]
+fn a_type_named_only_in_a_method_body_is_linked_within_its_crate() {
+    let bodies = [
+        Clustered::at(
+            "crates/x/src/lib.rs",
+            "pub struct A;\npub struct B;\nimpl A {\n    fn f(&self) {\n        B::new();\n        Far::new();\n    }\n}\n",
+        ),
+        Clustered::at("crates/y/src/lib.rs", "pub struct Far;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&bodies, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        Clustered::lines(&bodies, |view| view.report::<LowestCluster>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_name_declared_twice_in_one_crate_is_left_out() {
+    let twins = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct T;\npub struct U(T);\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct T;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&twins, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn an_unqualified_name_resolves_to_the_one_crate_declaring_it() {
+    let apart = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct W;\n"),
+        Clustered::at("crates/y/src/lib.rs", "pub struct V(W);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&apart, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::W is used only within crate y; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
