@@ -38,10 +38,13 @@ impl Block {
         ending: &BTreeSet<&TypeName>,
     ) -> Vec<Violation<'file>> {
         let state = &self.state;
-        let lost = (!reachable.contains(state)).then_some(Finding::UnreachableState { state });
-        let stuck = (!ending.contains(state)).then_some(Finding::NoTerminalAhead { state });
-        let open = (self.kind == Kind::Terminal && !self.transitions.is_empty())
-            .then_some(Finding::TerminalHasEdges { state });
+        let lost = reachable.get(state).map_or_else(|| Some(Finding::UnreachableState { state }), |_| None);
+        let stuck = ending.get(state).map_or_else(|| Some(Finding::NoTerminalAhead { state }), |_| None);
+        let open = self
+            .transitions
+            .first()
+            .filter(|_| self.kind == Kind::Terminal)
+            .map(|_| Finding::TerminalHasEdges { state });
         let site = Site::new(path, self.line);
         [lost, stuck, open].into_iter().flatten().map(|finding| Violation::new(site, finding)).collect()
     }
