@@ -51,10 +51,6 @@ impl CommutingTriangles {
             .flatten()
             .copied()
             .filter_map(Arc::written)
-            .filter(|first| {
-                let middle = AsRef::<Step>::as_ref(*first).reached();
-                middle != start && middle != end
-            })
             .flat_map(|first| {
                 let middle = AsRef::<Step>::as_ref(first).reached();
                 leaving

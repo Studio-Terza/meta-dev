@@ -73,7 +73,7 @@ impl<'graph> Behaviour<'graph> {
         let start: BTreeMap<&'graph Node, Block> = self.moves.keys().map(|node| (*node, Block::default())).collect();
         iter::successors(Some(start), |blocks| {
             let next = self.split(blocks);
-            (Self::distinct(&next) > Self::distinct(blocks)).then_some(next)
+            (Self::distinct(&next) != Self::distinct(blocks)).then_some(next)
         })
         .last()
         .unwrap_or_default()
