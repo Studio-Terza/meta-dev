@@ -47,4 +47,10 @@ src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum o
 src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/deep.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/deep.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/deep.rs:4: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/shallow.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/shallow.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
 fails

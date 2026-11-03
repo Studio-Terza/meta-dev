@@ -16,4 +16,6 @@ src/lib.rs:12: break; yield the value from an if or match expression, drive the 
 src/lib.rs:17: continue; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 src/lib.rs:25: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 tests/leaves.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/lib.rs:16: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 fails

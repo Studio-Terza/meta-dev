@@ -7,4 +7,6 @@ src/per_element.rs:11: for loop; drive the iterator with combinators, const fns 
 ports are called once per batch, not once per element:
 src/per_element.rs:7: port store is called inside the closure passed to map, once per element; add a batch method to the port, such as fetch_many or write_all, and call it once outside the per-element code; consuming a stream from a port is fine, and deliberate pacing is a Pacing parameter on the port method
 src/per_element.rs:12: port store is called inside a for loop body, once per iteration; add a batch method to the port, such as fetch_many or write_all, and call it once outside the per-element code; consuming a stream from a port is fine, and deliberate pacing is a Pacing parameter on the port method
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/per_element.rs:11: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 fails

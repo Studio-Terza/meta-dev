@@ -1,7 +1,7 @@
 use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
-use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
+use lint_linear_flow::FlowShapes;
 use lint_transition_graph::{CoreMutation, DuplicateTransitions, GraphLint, TransitionGraph};
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -21,9 +21,6 @@ impl Elegance {
             CoreMutation::report_graph(&facts, &transitions),
             EffectSites::report(files),
             FlowShapes::report(files),
-            LinearBodies::report(files),
-            PureRouters::report(files),
-            PlainConditions::report(files),
         ]
     }
 }

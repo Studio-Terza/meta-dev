@@ -46,4 +46,6 @@ state graph violated:
 src/contexts.rs:4: field b of A is pub; struct fields are private
 a body leaves through its tail value or ?, never through return, break or continue:
 src/loops.rs:4: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/walks.rs:5: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 fails
