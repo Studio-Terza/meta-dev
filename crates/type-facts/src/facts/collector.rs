@@ -12,45 +12,26 @@ use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
 use crate::arity::Arity;
+use crate::facts::Facts;
 use crate::implementation::Implementation;
 use crate::method::Method;
 use crate::shape::Shape;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
-use impl_block::ImplBlock;
+pub(crate) use impl_block::ImplBlock;
 use spelled::Spelled;
 
 pub(crate) struct Collector<'file> {
     file: &'file SourceFile,
-    krate: CrateName,
-    types: Vec<TypeFact<'file>>,
-    traits: Vec<TraitFact<'file>>,
-    blocks: Vec<ImplBlock>,
+    krate: &'file CrateName,
+    facts: Facts<'file>,
 }
 
 impl<'file> Collector<'file> {
-    pub(crate) fn of_file(file: &'file SourceFile) -> Collector<'file> {
-        let mut scan = Collector {
-            file,
-            krate: CrateName::from(file.placement().package().root()),
-            types: Vec::new(),
-            traits: Vec::new(),
-            blocks: Vec::new(),
-        };
+    pub(crate) fn collected(facts: Facts<'file>, file: &'file SourceFile) -> Facts<'file> {
+        let mut scan = Collector { file, krate: file.placement().package().crate_name(), facts };
         scan.visit_file(file.syntax());
-        scan
-    }
-
-    pub(super) fn types(&self) -> &[TypeFact<'file>] {
-        &self.types
-    }
-
-    pub(super) fn traits(&self) -> &[TraitFact<'file>] {
-        &self.traits
-    }
-
-    pub(super) fn blocks(&self) -> &[ImplBlock] {
-        &self.blocks
+        scan.facts
     }
 
     fn site(&self, name: &Ident) -> Site<'file> {
@@ -78,10 +59,10 @@ impl<'file> Collector<'file> {
     }
 
     fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape) {
-        let found =
-            TypeFact::declared(self.krate.clone(), Name::from(name), self.site(name), Self::derives(attributes))
-                .shaped(shape);
-        self.types.extend((Walk::outside_tests(attributes) == Walk::Entered).then_some(found));
+        let found = (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
+            TypeFact::declared(self.krate, Name::from(name), self.site(name), Self::derives(attributes)).shaped(shape)
+        });
+        self.facts.add_type(found);
     }
 }
 
@@ -103,8 +84,9 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
-        let fact = TraitFact::new(self.krate.clone(), Name::from(&found.ident), self.site(&found.ident));
-        self.traits.extend((Walk::outside_tests(&found.attrs) == Walk::Entered).then_some(fact));
+        let fact = (Walk::outside_tests(&found.attrs) == Walk::Entered)
+            .then(|| TraitFact::new(self.krate, Name::from(&found.ident), self.site(&found.ident)));
+        self.facts.add_trait(fact);
     }
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
@@ -116,15 +98,18 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 _ => None,
             })
             .collect();
-        let implementation = found.trait_.as_ref().and_then(|(_, path, _)| {
-            path.segments.last().map(|segment| {
-                Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), methods.clone())
-            })
-        });
-        let inherent = implementation.as_ref().map_or(methods, |_| Vec::new());
-        let target = Spelled::last_of(&found.self_ty);
+        let implemented = found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
+        let (implementation, inherent) = match implemented {
+            Some(segment) => (
+                Some(Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), methods)),
+                Vec::new(),
+            ),
+            None => (None, methods),
+        };
         let walk = Walk::outside_tests(&found.attrs);
-        let block = target.map(|target| ImplBlock::new(self.krate.clone(), target, implementation, inherent));
-        self.blocks.extend(block.filter(|_| walk == Walk::Entered));
+        let block = Spelled::last_of(&found.self_ty)
+            .map(|target| ImplBlock::new(self.krate, target, implementation, inherent))
+            .filter(|_| walk == Walk::Entered);
+        self.facts.add_block(block);
     }
 }

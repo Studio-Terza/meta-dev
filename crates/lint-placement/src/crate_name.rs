@@ -5,7 +5,7 @@ use syn::Ident;
 use crate::crate_root::CrateRoot;
 use lint_layout::Name;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CrateName(Name);
 
 impl From<&Ident> for CrateName {

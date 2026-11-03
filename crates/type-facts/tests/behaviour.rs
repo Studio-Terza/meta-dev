@@ -19,9 +19,9 @@ impl Described {
         facts.types().first().unwrap_or_else(|| unreachable!("a type was declared"))
     }
 
-    fn methods(found: &TypeFact<'_>) -> Vec<String> {
-        found
-            .methods()
+    fn methods(facts: &Facts<'_>, found: &TypeFact<'_>) -> Vec<String> {
+        facts
+            .methods(found)
             .iter()
             .map(|method| {
                 let returns = method.returns().map(ToString::to_string).unwrap_or_default();
@@ -30,9 +30,9 @@ impl Described {
             .collect()
     }
 
-    fn implemented(found: &TypeFact<'_>) -> Vec<String> {
-        found
-            .implementations()
+    fn implemented(facts: &Facts<'_>, found: &TypeFact<'_>) -> Vec<String> {
+        facts
+            .implementations(found)
             .iter()
             .map(|each| {
                 let argument = each.argument().map(ToString::to_string).unwrap_or_default();
@@ -72,7 +72,10 @@ fn inherent_methods_are_kept_with_arity_and_returned_type() {
         "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
     let facts = Facts::of_files(&files);
-    assert_eq!(Described::methods(Described::only(&facts)), ["one/1->", "two/2->Vec", "three/1->B", "four/0->"]);
+    assert_eq!(
+        Described::methods(&facts, Described::only(&facts)),
+        ["one/1->", "two/2->Vec", "three/1->B", "four/0->"]
+    );
 }
 
 #[test]
@@ -83,10 +86,10 @@ fn trait_impls_keep_the_trait_and_its_first_type_argument() {
     )]);
     let facts = Facts::of_files(&files);
     let found = Described::only(&facts);
-    assert_eq!(Described::implemented(found), ["From<B>", "Display<>", "AsRef<C>", "Tr<D>", "Plain<>"]);
-    assert_eq!(Described::methods(found), Vec::<String>::new());
-    let provided: Vec<String> = found
-        .implementations()
+    assert_eq!(Described::implemented(&facts, found), ["From<B>", "Display<>", "AsRef<C>", "Tr<D>", "Plain<>"]);
+    assert_eq!(Described::methods(&facts, found), Vec::<String>::new());
+    let provided: Vec<String> = facts
+        .implementations(found)
         .iter()
         .flat_map(|each| each.methods().iter().map(|method| AsRef::<Name>::as_ref(method).to_string()))
         .collect();
@@ -104,7 +107,7 @@ fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_ty
         ),
     ]);
     let facts = Facts::of_files(&files);
-    let methods: Vec<Vec<String>> = facts.types().iter().map(Described::methods).collect();
+    let methods: Vec<Vec<String>> = facts.types().iter().map(|found| Described::methods(&facts, found)).collect();
     assert_eq!(methods, [vec!["here/1->"], vec!["there/1->", "by_ref/1->", "bare/1->"]]);
     let crates: Vec<String> = facts.types().iter().map(|found| AsRef::<CrateName>::as_ref(found).to_string()).collect();
     assert_eq!(crates, ["x", "y"]);
@@ -131,7 +134,7 @@ fn test_code_and_target_files_are_left_out() {
     ]);
     let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A"]);
-    assert_eq!(Described::methods(Described::only(&facts)), Vec::<String>::new());
+    assert_eq!(Described::methods(&facts, Described::only(&facts)), Vec::<String>::new());
     assert_eq!(facts.traits().len(), 0);
 }
 
