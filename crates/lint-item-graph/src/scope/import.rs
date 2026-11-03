@@ -11,8 +11,17 @@ pub struct Import<'file> {
 }
 
 impl<'file> Import<'file> {
+    const SELF_IMPORT: &'static str = "self";
+
     pub fn renamed(path: Vec<&'file Ident>, leaf: &'file Ident, original: &'file Ident) -> Import<'file> {
         Import { leaf, path, original }
+    }
+
+    pub fn named(path: Vec<&'file Ident>, ident: &'file Ident) -> Option<Import<'file>> {
+        match (*ident == Self::SELF_IMPORT).then_some(()) {
+            Some(()) => Import::itself(path),
+            None => Some(Import::renamed(path, ident, ident)),
+        }
     }
 
     pub fn itself(mut path: Vec<&'file Ident>) -> Option<Import<'file>> {
