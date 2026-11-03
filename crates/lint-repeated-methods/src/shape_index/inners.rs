@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::mem;
 
 use syn::visit::Visit;
-use syn::{Fields, ItemStruct, Type};
+use syn::{ItemStruct, Type};
 
 use lint_core::{Home, SourceFile};
 use lint_layout::Name;
@@ -29,11 +29,7 @@ impl<'file> Inners<'file> {
 
 impl<'file> Visit<'file> for Inners<'file> {
     fn visit_item_struct(&mut self, item: &'file ItemStruct) {
-        let only = match &item.fields {
-            Fields::Named(fields) if fields.named.len() == 1 => fields.named.first(),
-            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => fields.unnamed.first(),
-            Fields::Named(_) | Fields::Unnamed(_) | Fields::Unit => None,
-        };
+        let only = Some(&item.fields).filter(|fields| fields.len() == 1).and_then(|fields| fields.iter().next());
         self.reading.extend(only.map(|field| (Name::from(&item.ident), &field.ty)));
     }
 }

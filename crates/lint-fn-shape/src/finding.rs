@@ -25,12 +25,12 @@ impl fmt::Display for Finding {
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::DeepNesting { .. } => "lift the inner part into a method",
-            Finding::WideSignature { .. } => "group the ones that travel together into a struct",
-            Finding::BooleanLocal => "inline a one-use condition or make a mode a type",
-            Finding::TupleLocal => "name it as a struct",
-            Finding::TupleAccumulator => "give the accumulator a type",
-        })
+        match self {
+            Finding::DeepNesting { .. } => Fix::new("lift the inner part into a method"),
+            Finding::WideSignature { .. } => Fix::new("group the ones that travel together into a struct"),
+            Finding::BooleanLocal => Fix::new("inline a one-use condition or make a mode a type"),
+            Finding::TupleLocal => Fix::new("name it as a struct"),
+            Finding::TupleAccumulator => Fix::new("give the accumulator a type"),
+        }
     }
 }

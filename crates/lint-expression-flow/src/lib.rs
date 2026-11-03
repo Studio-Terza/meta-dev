@@ -2,7 +2,7 @@ mod fn_body;
 
 use lint_core::{Headline, Lint};
 use lint_file::FileLint;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use fn_body::FnBody;
 use proc_macro2::Span;
@@ -43,10 +43,12 @@ impl Lint for ExpressionFlow {
 impl ExpressionFlow {
     fn dropped<'block>(statement: &'block Stmt, last: Option<&Stmt>) -> Option<&'block Stmt> {
         let inner = last.filter(|tail| std::ptr::eq(*tail, statement)).map_or(Some(statement), |_| None);
+        Self::branching(statement).and_then(|semicolon| semicolon.as_ref().map(|_| statement).or(inner))
+    }
+
+    fn branching(statement: &Stmt) -> Option<&Option<Token![;]>> {
         match statement {
-            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) if semicolon.is_some() || inner.is_some() => {
-                Some(statement)
-            }
+            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) => Some(semicolon),
             _ => None,
         }
     }
@@ -262,7 +264,7 @@ impl MutableLocals {
 
     fn declared_mutable(local: &Local) -> Option<&PatIdent> {
         match &local.pat {
-            Pat::Ident(binding) if binding.mutability.is_some() => Some(binding),
+            Pat::Ident(binding) => Some(binding).filter(|binding| binding.mutability.is_some()),
             _ => None,
         }
     }
@@ -271,9 +273,9 @@ impl MutableLocals {
         match expr {
             Expr::MethodCall(call) => ExpressionFlow::assigned_local(&call.receiver),
             Expr::Call(call) => ExpressionFlow::assigned_local(&call.func),
-            Expr::Reference(reference) if reference.mutability.is_some() => {
-                ExpressionFlow::assigned_local(&reference.expr)
-            }
+            Expr::Reference(reference) => Some(reference)
+                .filter(|reference| reference.mutability.is_some())
+                .and_then(|reference| ExpressionFlow::assigned_local(&reference.expr)),
             _ => None,
         }
     }
@@ -290,7 +292,9 @@ impl MutableLocals {
     }
 
     fn only_reassigned(&self) -> Vec<Span> {
-        self.declared.iter().filter(|(name, _)| !self.touched.contains(*name)).map(|(_, span)| *span).collect()
+        let touched: BTreeSet<&Name> = self.touched.iter().collect();
+        let declared: BTreeSet<&Name> = self.declared.keys().collect();
+        declared.difference(&touched).filter_map(|name| self.declared.get(*name)).copied().collect()
     }
 }
 

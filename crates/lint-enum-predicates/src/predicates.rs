@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type};
+use syn::{ItemImpl, ItemMod, Macro};
 
-use lint_core::{Macros, Site, SourceFile, Violation};
+use lint_core::{Macros, Site, SourceFile, Syntax, Violation};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 
@@ -30,15 +30,12 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
         block
             .items
             .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) => Some(&function.sig),
-                _ => None,
-            })
-            .filter(|signature| match &signature.output {
-                ReturnType::Type(_, returned) => {
-                    matches!(returned.as_ref(), Type::Path(path) if path.path.is_ident("bool"))
-                }
-                ReturnType::Default => false,
+            .filter_map(Syntax::impl_fn)
+            .map(|function| &function.sig)
+            .filter(|signature| {
+                Syntax::returned(&signature.output)
+                    .and_then(Syntax::type_path)
+                    .is_some_and(|path| path.path.is_ident("bool"))
             })
             .map(|signature| {
                 Violation::new(
@@ -59,10 +56,10 @@ impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let found = match (&block.trait_, self.known.kind(self.file, &self.module, &block.self_ty)) {
-            (None, Kind::Enum) => self.predicates(block),
-            _ => Vec::new(),
-        };
+        let found = Syntax::inherent(block)
+            .filter(|block| self.known.kind(self.file, &self.module, &block.self_ty) == Kind::Enum)
+            .map(|block| self.predicates(block))
+            .unwrap_or_default();
         self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);
     }

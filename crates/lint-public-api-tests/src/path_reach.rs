@@ -1,9 +1,9 @@
 use std::path::{Component, Path, PathBuf};
 
+use syn::ItemMod;
 use syn::visit::{self, Visit};
-use syn::{Expr, ExprLit, ItemMod, Lit};
 
-use lint_core::SourceFile;
+use lint_core::{SourceFile, Syntax};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
@@ -34,22 +34,28 @@ impl PathReach {
     }
 
     fn lexical(path: &Path) -> PathBuf {
-        path.components().fold(PathBuf::new(), |folded, component| match component {
-            Component::ParentDir if folded.file_name().is_some() => {
-                folded.parent().map(Path::to_path_buf).unwrap_or_default()
-            }
+        path.components().fold(PathBuf::new(), Self::stepped)
+    }
+
+    fn stepped(folded: PathBuf, component: Component) -> PathBuf {
+        match component {
+            Component::ParentDir => folded.file_name().map_or_else(
+                || folded.join(Component::ParentDir),
+                |_| folded.parent().map(Path::to_path_buf).unwrap_or_default(),
+            ),
             Component::CurDir => folded,
             other => folded.join(other),
-        })
+        }
     }
 
     fn target(module: &ItemMod) -> Option<PathBuf> {
-        module.attrs.iter().filter(|attribute| attribute.path().is_ident(Self::PATH_ATTRIBUTE)).find_map(|attribute| {
-            match &attribute.meta.require_name_value().ok()?.value {
-                Expr::Lit(ExprLit { lit: Lit::Str(path), .. }) => Some(PathBuf::from(path.value())),
-                _ => None,
-            }
-        })
+        module
+            .attrs
+            .iter()
+            .filter(|attribute| attribute.path().is_ident(Self::PATH_ATTRIBUTE))
+            .filter_map(|attribute| attribute.meta.require_name_value().ok())
+            .find_map(|pair| Syntax::string_literal(&pair.value))
+            .map(|path| PathBuf::from(path.value()))
     }
 }
 

@@ -1,6 +1,6 @@
 use syn::{
-    AngleBracketedGenericArguments, FnArg, GenericArgument, ImplItem, ImplItemFn, ItemImpl, PatType, PathArguments,
-    ReturnType, TraitItem, TraitItemFn, Type, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, FnArg, GenericArgument, ImplItem, ImplItemFn, Item, ItemImpl,
+    ItemMod, ItemUse, Lit, LitStr, PatType, PathArguments, ReturnType, TraitItem, TraitItemFn, Type, TypePath,
 };
 
 use lint_layout::Name;
@@ -68,6 +68,30 @@ impl Syntax {
     #[must_use]
     pub fn last_name(ty: &Type) -> Option<Name> {
         Self::type_path(ty).and_then(|path| path.path.segments.last()).map(|last| Name::from(&last.ident))
+    }
+
+    #[must_use]
+    pub fn item_use(item: &Item) -> Option<&ItemUse> {
+        match item {
+            Item::Use(used) => Some(used),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn item_mod(item: &Item) -> Option<&ItemMod> {
+        match item {
+            Item::Mod(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn string_literal(value: &Expr) -> Option<&LitStr> {
+        match value {
+            Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
+            _ => None,
+        }
     }
 
     #[must_use]

@@ -1,6 +1,6 @@
-use syn::{Item, ItemMod, ItemUse, UseTree, Visibility};
+use syn::{ItemMod, ItemUse, UseTree, Visibility};
 
-use lint_core::SourceFile;
+use lint_core::{SourceFile, Syntax};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 use lint_placement::Role;
@@ -22,17 +22,15 @@ impl Export {
     }
 
     fn reexports(file: &SourceFile) -> impl Iterator<Item = &ItemUse> {
-        file.syntax().items.iter().filter_map(|item| match item {
-            Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Some(used),
-            _ => None,
-        })
+        file.syntax().items.iter().filter_map(Syntax::item_use).filter(|used| matches!(used.vis, Visibility::Public(_)))
     }
 
     fn modules(file: &SourceFile) -> impl Iterator<Item = &ItemMod> {
-        file.syntax().items.iter().filter_map(|item| match item {
-            Item::Mod(module) if matches!(module.vis, Visibility::Public(_)) => Some(module),
-            _ => None,
-        })
+        file.syntax()
+            .items
+            .iter()
+            .filter_map(Syntax::item_mod)
+            .filter(|module| matches!(module.vis, Visibility::Public(_)))
     }
 
     fn of_module(module: &ItemMod) -> Export {

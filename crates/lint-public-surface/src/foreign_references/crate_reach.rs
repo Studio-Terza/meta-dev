@@ -36,6 +36,6 @@ impl CrateReach {
     }
 
     pub fn unnamed<'name>(&self, name: &'name Name) -> Option<&'name Name> {
-        (self.used == Used::Named && !self.names.contains(name)).then_some(name)
+        (self.used == Used::Named).then_some(name).filter(|name| self.names.iter().all(|known| known != *name))
     }
 }
