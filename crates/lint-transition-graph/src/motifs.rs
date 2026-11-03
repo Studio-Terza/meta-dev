@@ -53,7 +53,8 @@ impl RepeatedMotifs {
         path: &Occurrence<'graph, 'file>,
         consuming: &Consuming<'graph, 'file>,
     ) -> Vec<Occurrence<'graph, 'file>> {
-        path.last()
+        path.nodes()
+            .last()
             .into_iter()
             .flat_map(|node| consuming.taking(node))
             .filter_map(Hyperedge::written)

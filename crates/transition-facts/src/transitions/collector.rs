@@ -5,15 +5,15 @@ use syn::{Ident, ImplItem, ItemFn, ItemImpl, ItemMod, ItemTrait, TraitItem};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::LineNumber;
-use lint_placement::CrateName;
 
 use crate::context::Context;
 use crate::ground::Ground;
+use crate::origins::Origins;
 use signature_reading::SignatureReading;
 
 pub(super) struct Collector<'file> {
     file: &'file SourceFile,
-    krate: &'file CrateName,
+    origins: Origins<'file>,
     ground: Ground,
     contexts: Vec<Context<'file>>,
 }
@@ -22,7 +22,7 @@ impl<'file> Collector<'file> {
     pub(super) fn collected(file: &'file SourceFile) -> Vec<Context<'file>> {
         let mut scan = Collector {
             file,
-            krate: file.placement().package().crate_name(),
+            origins: Origins::of_file(file.placement().package().crate_name(), file.syntax()),
             ground: Ground::gated(file),
             contexts: Vec::new(),
         };
@@ -44,7 +44,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
-        let reading = SignatureReading::of_trait(self.krate, found, self.ground);
+        let reading = SignatureReading::of_trait(&self.origins, found, self.ground);
         let file = self.file;
         let provided: Vec<_> = found
             .items
@@ -67,7 +67,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
-        let reading = SignatureReading::of_impl(self.krate, found, self.ground);
+        let reading = SignatureReading::of_impl(&self.origins, found, self.ground);
         let file = self.file;
         let functions: Vec<_> = found
             .items
@@ -86,7 +86,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let reading = SignatureReading::free(self.krate, self.ground);
+        let reading = SignatureReading::free(&self.origins, self.ground);
         let found = reading.function(Self::site(self.file, &function.sig.ident), &function.sig, &function.block);
         self.contexts.extend(
             (Walk::outside_tests(&function.attrs) == Walk::Entered)

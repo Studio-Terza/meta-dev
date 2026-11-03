@@ -1,5 +1,6 @@
 use lint_layout::Name;
 use lint_paths::Module;
+use lint_placement::CrateFile;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Owner<'file> {
@@ -9,6 +10,6 @@ pub struct Owner<'file> {
 
 impl<'file> Owner<'file> {
     pub fn new(module: &Module<'file>, name: Name) -> Owner<'file> {
-        Owner { root: module.root(), name }
+        Owner { root: Module::from(<&CrateFile>::from(module)), name }
     }
 }

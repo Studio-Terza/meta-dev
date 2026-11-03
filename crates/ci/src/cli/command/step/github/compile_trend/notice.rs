@@ -32,7 +32,7 @@ impl<'builds> Notice<'builds> {
         earlier: &'builds [Build],
         fortnight: &'builds Fortnight,
     ) -> Notice<'builds> {
-        let range = earlier.iter().map(Build::total).fold(None, |range, total| Some(Range::around(range, total)));
+        let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::spanning);
         Notice { today, earlier, fortnight, range }
     }
 

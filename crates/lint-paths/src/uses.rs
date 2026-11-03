@@ -27,11 +27,6 @@ impl<'file> Use<'file> {
     }
 
     #[must_use]
-    pub fn into_spelling(self, tail: PathTail<'_>) -> Option<UsePath> {
-        self.candidates.into_iter().find(|candidate| candidate.ends_with(tail).is_some())
-    }
-
-    #[must_use]
     pub fn under(&self, root: &[Word<'_>]) -> Option<&UsePath> {
         self.candidates.iter().find(|candidate| {
             let segments = candidate.segments();

@@ -1,23 +1,19 @@
 mod finding;
 mod kind;
-mod words;
 
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
 use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath, Type};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
-use lint_layout::{LineNumber, Name, UsePath};
+use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module};
-use lint_placement::Role;
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
 pub use kind::Kind;
-use words::DoubleWords;
 
 #[derive(Debug, Default)]
 pub struct Doubles<'file> {
@@ -40,15 +36,6 @@ struct Implemented<'file> {
 }
 
 impl<'file> Doubles<'file> {
-    const TESTS: &str = "tests";
-
-    pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
-        let placement = file.placement();
-        (placement.role() == Role::Target
-            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS)))
-        .then_some(file)
-    }
-
     pub fn scan(&mut self, file: &'file SourceFile, imports: &Imports<'_>, ports: &PortTraits) {
         let mut reader = Reader {
             file,
@@ -92,10 +79,12 @@ struct Reader<'file, 'run> {
 }
 
 impl<'file> Reader<'file, '_> {
+    const DOUBLES: [Word<'static>; 5] = words!["fake", "stub", "mock", "spy", "dummy"];
+
     fn declared(&mut self, name: &Ident) {
         let double = DoubleKey { target: self.target, name: Name::from(name) };
         let site = Site::new(self.file.path(), LineNumber::from(name.span()));
-        self.doubles.declared.extend(DoubleWords::name(&double.name).map(|_| (double, site)));
+        self.doubles.declared.extend(double.name.matches::<CamelWord>(&Self::DOUBLES).map(|_| (double, site)));
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey<'file>> {
@@ -103,7 +92,8 @@ impl<'file> Reader<'file, '_> {
             Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
             _ => None,
         };
-        name.filter(|name| DoubleWords::name(name).is_some()).map(|name| DoubleKey { target: self.target, name })
+        name.filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
+            .map(|name| DoubleKey { target: self.target, name })
     }
 
     fn implementation(&self, double: DoubleKey<'file>, path: &'file TraitPath) -> Implemented<'file> {

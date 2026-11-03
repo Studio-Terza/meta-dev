@@ -1,5 +1,5 @@
 use file_ports::{Bytes, Text};
-use lint_core::{Contents, RepoFile};
+use lint_core::{Contents, Lint, RepoFile};
 use lint_rust_only::RustOnly;
 
 const EXTENSIONS: [(&str, &str); 83] = [

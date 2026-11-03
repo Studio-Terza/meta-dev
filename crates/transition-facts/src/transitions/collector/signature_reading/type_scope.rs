@@ -3,11 +3,12 @@ mod constraint;
 
 use std::collections::BTreeMap;
 
-use syn::{GenericArgument, Generics, PathArguments, PathSegment, Type, TypeParamBound};
+use syn::{GenericArgument, Generics, Path, PathArguments, PathSegment, Type, TypeParamBound};
 
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::endpoint::{Endpoint, Nature, Unnamed};
+use crate::origins::Spelling;
 use crate::resolved::Resolved;
 use bound::Bound;
 use constraint::Constraint;
@@ -72,7 +73,7 @@ impl<'outer> TypeScope<'outer> {
                 .path
                 .segments
                 .last()
-                .map_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)), |last| self.named(last)),
+                .map_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)), |last| self.named(&path.path, last)),
             Type::ImplTrait(found) => self.bounded(found.bounds.iter()),
             Type::TraitObject(found) => self.bounded(found.bounds.iter()),
             Type::BareFn(_) => Resolved::interface(Self::FN),
@@ -93,7 +94,7 @@ impl<'outer> TypeScope<'outer> {
         bounds.find_map(|bound| Bound::new(bound).endpoint(self)).unwrap_or_else(|| Resolved::interface(Self::SIZED))
     }
 
-    fn named(&self, segment: &PathSegment) -> Resolved {
+    fn named(&self, path: &Path, segment: &PathSegment) -> Resolved {
         let name = Name::from(&segment.ident);
         match name {
             _ if name.matches::<Whole>(&Self::WRAPPERS).is_some() => {
@@ -103,7 +104,9 @@ impl<'outer> TypeScope<'outer> {
                 Resolved::Found(Endpoint::new(Nature::Primitive, name))
             }
             _ if name.matches::<Whole>(&Self::SELF).is_some() => Resolved::Itself,
-            _ => self.declared(&name).unwrap_or_else(|| Resolved::Found(Endpoint::new(Nature::Named, name))),
+            _ => self.declared(&name).unwrap_or_else(|| {
+                Resolved::Found(Endpoint::new(Nature::Named, name).spelled(Spelling::of_path(path)))
+            }),
         }
     }
 

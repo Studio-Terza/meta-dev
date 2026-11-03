@@ -1,3 +1,5 @@
+mod vertex;
+
 use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
@@ -8,6 +10,7 @@ use lint_core::TypeHomes;
 use lint_core::TypeName;
 use lint_core::Walk;
 use lint_layout::Name;
+pub use vertex::Vertex;
 
 #[derive(Default)]
 pub struct Declarations<'file> {
@@ -32,16 +35,12 @@ impl<'file> From<&[&'file SourceFile]> for Declarations<'file> {
 }
 
 impl<'file> Declarations<'file> {
-    pub fn resolve(&self, name: TypeName) -> TypeName {
-        self.aliases.get(&name).cloned().unwrap_or(name)
-    }
-
     pub fn resolved<'name>(&'name self, name: &'name TypeName) -> &'name TypeName {
         self.aliases.get(name).unwrap_or(name)
     }
 
-    pub fn vertex_named(&self, name: &TypeName) -> Option<&TypeName> {
-        self.vertices.get(name)
+    pub fn vertex_named(&self, name: &TypeName) -> Option<Vertex<'_>> {
+        self.vertices.get(name).map(Vertex::new)
     }
 
     pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home<'file>) -> Option<&Name> {
@@ -57,7 +56,8 @@ impl<'file> Declarations<'file> {
 
     fn with_resolved_vertices(mut self) -> Declarations<'file> {
         let vertices = std::mem::take(&mut self.vertices);
-        self.vertices = vertices.into_iter().map(|vertex| self.resolve(vertex)).collect();
+        self.vertices =
+            vertices.into_iter().map(|vertex| self.aliases.get(&vertex).cloned().unwrap_or(vertex)).collect();
         self
     }
 

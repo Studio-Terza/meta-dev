@@ -25,7 +25,7 @@ impl<'file> CrateEffects<'file> {
         let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
         let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();
         let mut sites: Vec<EffectSite<'file>> = called
-            .into_iter()
+            .iter()
             .filter_map(Vocabulary::site_of)
             .filter(|site| !tested.contains(&site.place()))
             .chain(scans.into_iter().flat_map(FileScan::into_printed))

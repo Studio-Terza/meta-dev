@@ -13,23 +13,12 @@ pub struct UsePath(Vec<Name>);
 impl UsePath {
     const SEPARATOR: &'static str = "::";
 
-    #[must_use]
-    pub fn extended(&self, segment: Name) -> UsePath {
-        UsePath(self.0.iter().cloned().chain(Some(segment)).collect())
-    }
-
     pub(crate) fn push(&mut self, segment: Name) {
         self.0.push(segment);
     }
 
     pub(crate) fn pop(&mut self) {
         self.0.pop();
-    }
-
-    #[must_use]
-    pub fn then(mut self, segment: Name) -> UsePath {
-        self.0.push(segment);
-        self
     }
 
     #[must_use]
@@ -53,11 +42,6 @@ impl UsePath {
         (self.0.len() >= words.len()
             && self.0.iter().rev().zip(words.iter().rev()).all(|(segment, spelled)| segment == spelled))
         .then_some(self)
-    }
-
-    #[must_use]
-    pub fn first(&self) -> Option<&Name> {
-        self.0.first()
     }
 
     #[must_use]

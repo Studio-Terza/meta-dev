@@ -5,7 +5,6 @@ use syn::{Block, FnArg, ItemImpl, ItemTrait, ReturnType, Signature, Type};
 use body_lifts::{BodyReading, Branches, Propagation};
 use lint_core::Site;
 use lint_layout::Name;
-use lint_placement::CrateName;
 
 use crate::context::Context;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
@@ -13,38 +12,49 @@ use crate::filler::Filler;
 use crate::function::Function;
 use crate::ground::Ground;
 use crate::mutation::Mutation;
+use crate::origins::Origins;
 use crate::resolved::Resolved;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
-pub(super) struct SignatureReading<'file> {
+pub(super) struct SignatureReading<'origins, 'file> {
     context: Context<'file>,
     scope: TypeScope<'static>,
+    origins: &'origins Origins<'file>,
 }
 
-impl<'file> SignatureReading<'file> {
-    pub(super) fn free(krate: &'file CrateName, ground: Ground) -> SignatureReading<'file> {
+impl<'origins, 'file> SignatureReading<'origins, 'file> {
+    pub(super) fn free(origins: &'origins Origins<'file>, ground: Ground) -> SignatureReading<'origins, 'file> {
         let selfish = Endpoint::from(Unnamed::Opaque);
         let scope = TypeScope::root(selfish.nature());
-        SignatureReading { context: Context::new(krate, selfish, ground, Filler::Free), scope }
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Free), scope, origins }
     }
 
-    pub(super) fn of_impl(krate: &'file CrateName, found: &ItemImpl, ground: Ground) -> SignatureReading<'file> {
+    pub(super) fn of_impl(
+        origins: &'origins Origins<'file>,
+        found: &ItemImpl,
+        ground: Ground,
+    ) -> SignatureReading<'origins, 'file> {
         let outer = Endpoint::from(Unnamed::Opaque).nature();
-        let selfish = TypeScope::declaring(outer, None, &found.generics).endpoint(&found.self_ty).or_opaque();
+        let selfish =
+            origins.endpoint(TypeScope::declaring(outer, None, &found.generics).endpoint(&found.self_ty).or_opaque());
         let filler = found
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map_or(Filler::Inherent, |segment| Filler::Implemented(Name::from(&segment.ident)));
         let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
-        SignatureReading { context: Context::new(krate, selfish, ground, filler), scope }
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins }
     }
 
-    pub(super) fn of_trait(krate: &'file CrateName, found: &ItemTrait, ground: Ground) -> SignatureReading<'file> {
+    pub(super) fn of_trait(
+        origins: &'origins Origins<'file>,
+        found: &ItemTrait,
+        ground: Ground,
+    ) -> SignatureReading<'origins, 'file> {
         let selfish = Endpoint::new(Nature::Interface, Name::from(&found.ident));
         let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
-        SignatureReading { context: Context::new(krate, selfish, ground, Filler::Provided), scope }
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Provided), scope, origins }
     }
 
     pub(super) fn function(&self, site: Site<'file>, signature: &Signature, body: &Block) -> Function<'file> {
@@ -54,12 +64,12 @@ impl<'file> SignatureReading<'file> {
             .iter()
             .map(|input| match input {
                 FnArg::Receiver(receiver) => scope.endpoint(&receiver.ty),
-                FnArg::Typed(typed) => scope.endpoint(&typed.ty),
+                FnArg::Typed(typed) => self.origins.located(scope.endpoint(&typed.ty)),
             })
             .collect();
         let gives = match &signature.output {
             ReturnType::Default => Resolved::Found(Endpoint::from(Unnamed::Unit)),
-            ReturnType::Type(_, returned) => scope.endpoint(returned),
+            ReturnType::Type(_, returned) => self.origins.located(scope.endpoint(returned)),
         };
         Function::new(site, Name::from(&signature.ident), takes, gives).shaped(
             Self::mutation(signature),

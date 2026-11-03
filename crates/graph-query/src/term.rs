@@ -17,7 +17,7 @@ impl Term {
 
 impl From<&Name> for Term {
     fn from(name: &Name) -> Term {
-        let letters: Vec<char> = name.lowered().to_string().chars().collect();
+        let letters: Vec<char> = name.to_string().chars().flat_map(char::to_lowercase).collect();
         let stem = match letters.split_last() {
             Some(('s', rest)) if rest.len() >= Self::SHORTEST_STEM => rest,
             _ => letters.as_slice(),

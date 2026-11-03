@@ -41,13 +41,6 @@ impl<'graph, 'file> Consuming<'graph, 'file> {
         self.by.get(node).into_iter().flatten().copied()
     }
 
-    pub(crate) fn led<'query>(
-        &'query self,
-        node: &'query Node<'graph>,
-    ) -> impl Iterator<Item = &'graph Hyperedge<'graph, 'file>> + 'query {
-        self.taking(node).filter(move |edge| AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*edge)).first() == Some(node))
-    }
-
     pub(crate) fn led_within<'query>(
         &'query self,
         node: &'query Node<'graph>,
