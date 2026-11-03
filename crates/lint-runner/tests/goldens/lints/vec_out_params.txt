@@ -15,12 +15,12 @@ src/out.rs:1: fn fill; give the collection a type that owns its rules
 src/out.rs:4: fn push; give the collection a type that owns its rules
 function names say what the function does:
 src/optional.rs:1: fn g names nothing; say what it does
-primitives appear only at a type's boundary or in a boundary module:
-src/fine.rs:1: bare u8 in read; name what it counts with a newtype
-src/fine.rs:2: bare u8 in take; name what it counts with a newtype
-src/optional.rs:1: bare u8 in g; name what it counts with a newtype
-src/out.rs:1: bare u8 in fill; name what it counts with a newtype
-src/out.rs:4: bare u8 in push; name what it counts with a newtype
+primitives appear in signatures and fields only inside a boundary:
+src/fine.rs:1: bare u8 in read; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/fine.rs:2: bare u8 in take; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/optional.rs:1: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/out.rs:1: bare u8 in fill; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/out.rs:4: bare u8 in push; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 tests go through public APIs:
 src/fine.rs:4: test code in src; move it to the package's tests directory and call the public API from there
 fails

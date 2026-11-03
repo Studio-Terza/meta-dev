@@ -6,4 +6,6 @@ src/checked.rs:8: Entry only carries values into one other file; give it the log
 src/free.rs:4: Entry only carries values into one other file; give it the logic that consumes it
 data that enters from a file holds no free text; split it into typed parts, or give it a newtype that validates:
 src/free.rs:5: free text in title; split it into typed parts, or use a newtype that validates (serde try_from, or a Deserialize that calls FromStr)
+primitives appear in signatures and fields only inside a boundary:
+src/free.rs:5: bare String in title; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 fails
