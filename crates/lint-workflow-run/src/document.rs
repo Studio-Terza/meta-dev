@@ -2,6 +2,7 @@ mod command;
 mod environment;
 mod found;
 mod key;
+mod lines;
 mod local;
 mod node;
 mod script;
@@ -10,6 +11,7 @@ mod text;
 use saphyr::{LoadableYamlNode, MarkedYaml, ScanError, YamlData};
 
 use crate::actions::Actions;
+use crate::finding::Finding;
 use command::Command;
 use environment::Environment;
 use found::Found;
@@ -41,9 +43,15 @@ impl Document<'_> {
     fn entry(key: Node<'_, '_>, value: Node<'_, '_>, step: Node<'_, '_>, actions: Actions<'_>) -> Vec<Found> {
         match key.text().and_then(Key::named) {
             Some(setting @ (Key::Run | Key::Shell)) => Self::command(key, value, setting, actions),
-            Some(Key::Uses) => Local::finding(value, actions).into_iter().collect(),
+            Some(Key::Uses) => {
+                Local::finding(value, actions).map(|finding| Found::new(value.line(), finding)).into_iter().collect()
+            }
             Some(Key::Env) => Environment::findings(value).into_iter().chain(Self::judged(value, actions)).collect(),
-            Some(Key::With) => Script::finding(step, value).into_iter().chain(Self::judged(value, actions)).collect(),
+            Some(Key::With) => Script::script(step, value)
+                .map(|script| Found::new(script.line(), Finding::Script))
+                .into_iter()
+                .chain(Self::judged(value, actions))
+                .collect(),
             _ => Self::judged(value, actions),
         }
     }

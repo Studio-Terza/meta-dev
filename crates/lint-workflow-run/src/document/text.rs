@@ -1,43 +1,38 @@
+mod expansion;
+
 use std::fmt;
 use std::path::Path;
 
 use newtype::Newtype;
 
 use crate::characters::Characters;
+use crate::document::lines::Lines;
 use crate::excerpt::Excerpt;
 use crate::word::Word;
+use expansion::Expansion;
 
 #[derive(Newtype, Clone, Copy, Debug, Default)]
 pub struct Text<'text>(&'text str);
 
 impl<'text> Text<'text> {
     pub(crate) const EXPANSION: Word = Word::new("${");
-    const OPEN: char = '{';
-    const CLOSE: char = '}';
 
     pub(crate) fn after(self, prefix: Text<'_>) -> Option<Text<'text>> {
         self.0.get(..prefix.0.len()).filter(|start| *start == prefix.0).and(self.0.get(prefix.0.len()..)).map(Text)
     }
 
-    pub(crate) fn after_word(self, word: Word) -> Option<Text<'text>> {
-        self.after(Text::from(word)).filter(|rest| rest.0.chars().next().is_none_or(char::is_whitespace))
+    pub(crate) fn leading(self, word: Word) -> Option<Word> {
+        self.after(Text::from(word)).filter(|rest| rest.0.chars().next().is_none_or(char::is_whitespace)).map(|_| word)
     }
 
     pub(crate) fn modified_expansion(self) -> Option<Word> {
         let expansion = Self::EXPANSION.into_inner();
         self.0
             .match_indices(expansion)
-            .find_map(|(at, found)| self.0.get(at + found.len()..).map(Text).and_then(Text::modifier))
+            .find_map(|(at, found)| {
+                self.0.get(at + found.len()..).map(Text).and_then(|rest| Expansion::try_from(rest).ok())
+            })
             .map(|_| Self::EXPANSION)
-    }
-
-    fn modifier(rest: Text<'text>) -> Option<Text<'text>> {
-        let rest = rest.0;
-        let end = rest.match_indices(Self::CLOSE).next().map_or(rest.len(), |(at, _)| at);
-        rest.get(..end)
-            .filter(|_| rest.chars().next().is_none_or(|letter| letter != Self::OPEN))
-            .filter(|name| name.chars().any(|letter| !letter.is_alphanumeric() && letter != '_'))
-            .map(Text)
     }
 
     pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Text<'text>> {
@@ -72,8 +67,8 @@ impl<'text> Text<'text> {
         Path::new(self.0)
     }
 
-    pub(crate) fn multiline(self) -> Option<Text<'text>> {
-        self.0.contains('\n').then_some(self)
+    pub(crate) fn lines(self) -> Lines {
+        Lines::new(self.0.chars().filter(|letter| *letter == '\n').count() + 1)
     }
 }
 

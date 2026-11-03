@@ -96,11 +96,12 @@ impl Modules {
     }
 
     fn resolve(survey: &Survey, file_directory: &Path, declaration: &Declaration<'_>) -> Result<Vec<Child>, Failure> {
-        let primary = declaration.choices(file_directory).into_iter().find_map(|choice| choice.existing(survey));
+        let primary =
+            declaration.choices(file_directory).into_iter().find(|choice| survey.file(choice.as_ref()).is_some());
         let found: Vec<Child> = primary.iter().cloned().collect();
         let found = Redirects::conditional(file_directory, declaration.module())
             .into_iter()
-            .filter_map(|child| child.existing(survey))
+            .filter(|child| survey.file(child.as_ref()).is_some())
             .fold(
                 found,
                 |found, child| {

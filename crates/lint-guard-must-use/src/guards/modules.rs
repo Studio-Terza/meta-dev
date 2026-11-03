@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lint_core::{Site, Violation};
 use lint_layout::Name;
 use lint_paths::Module;
+use lint_placement::CrateFile;
 
 use super::members::Members;
 use super::type_key::TypeKey;
@@ -41,10 +42,10 @@ impl<'file> Modules<'file> {
         name: &'modules Name,
     ) -> Vec<TypeKey<'modules>> {
         let shared = || {
-            let root = module.root();
+            let root: &CrateFile = module.as_ref();
             self.0
                 .iter()
-                .filter(|(other, others)| others.declares(name).is_some() && other.root() == root)
+                .filter(|(other, others)| others.declares(name).is_some() && AsRef::<CrateFile>::as_ref(*other) == root)
                 .map(|(other, _)| TypeKey::new(other, name))
                 .collect()
         };

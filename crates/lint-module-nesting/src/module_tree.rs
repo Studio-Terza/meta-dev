@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath};
+use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Relation};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -62,16 +62,19 @@ impl<'file> ModuleTree<'file> {
     fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
         let module = ModulePath::of_file(file);
         self.reexports.insert(module.clone(), ReexportCount::of_file(file.syntax()));
-        self.users = std::mem::take(&mut self.users).with_tests(&self.modules, file.test_modules());
+        self.users = file
+            .test_modules()
+            .iter()
+            .fold(std::mem::take(&mut self.users), |users, test| users.with_test(&self.modules, test));
         UseEdges::in_file(file.syntax()).iter().fold(self, |tree, path| tree.absorbing(&module, path))
     }
 
     fn absorbing(mut self, module: &ModulePath<'file>, path: &UsePath) -> ModuleTree<'file> {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
-                let used = target.deepest_in(&self.modules);
+                let used = self.modules.deepest(&target);
                 self.users = std::mem::take(&mut self.users).recorded(used.cloned(), module);
-                self.deep_uses.extend(target.crossed_directory(module, &self.modules).map(|_| {
+                self.deep_uses.extend(self.modules.crossed(&target, module).map(|_| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })
                 }));
                 self
@@ -82,10 +85,10 @@ impl<'file> ModuleTree<'file> {
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
         let outsiders: Vec<&ModulePath<'file>> =
-            self.users.callers_of(module)?.iter().filter(|user| module.relates::<Ancestor>(user).is_none()).collect();
+            self.users.callers_of(module)?.iter().filter(|user| Ancestor::holds(module, user).is_none()).collect();
         outsiders
             .iter()
-            .all(|user| user.relates::<InsideSibling>(module).is_some())
+            .all(|user| InsideSibling::holds(user, module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath<'file>> =
                     outsiders.iter().map(|user| user.truncated_like(module)).collect();

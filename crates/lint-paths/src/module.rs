@@ -26,18 +26,16 @@ impl Module {
         let outer = self.path.len().checked_sub(1)?;
         Some(Module { crate_file: self.crate_file.clone(), path: self.path.iter().take(outer).cloned().collect() })
     }
+}
 
-    #[must_use]
-    pub fn root(&self) -> Module {
-        Module { crate_file: self.crate_file.clone(), path: Vec::new() }
+impl AsRef<CrateFile> for Module {
+    fn as_ref(&self) -> &CrateFile {
+        &self.crate_file
     }
+}
 
-    pub(crate) fn ancestry(&self) -> Vec<Module> {
-        (0..=self.path.len())
-            .map(|length| Module {
-                crate_file: self.crate_file.clone(),
-                path: self.path.iter().take(length).cloned().collect(),
-            })
-            .collect()
+impl From<&CrateFile> for Module {
+    fn from(crate_file: &CrateFile) -> Module {
+        Module { crate_file: crate_file.clone(), path: Vec::new() }
     }
 }

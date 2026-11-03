@@ -30,7 +30,7 @@ impl Collector {
             UseTree::Path(path) => self.imported(&prefix.extended(Name::from(&path.ident)), &path.tree),
             UseTree::Name(name) => self.bound(prefix, &name.ident, None),
             UseTree::Rename(name) => self.bound(prefix, &name.ident, Some(&name.rename)),
-            UseTree::Glob(_) => self.scopes.scope_of(&self.module).glob(prefix.clone()),
+            UseTree::Glob(_) => self.scopes.glob(&self.module, prefix.clone()),
             UseTree::Group(group) => group.items.iter().for_each(|item| self.imported(prefix, item)),
         }
     }
@@ -38,7 +38,7 @@ impl Collector {
     fn bound(&mut self, prefix: &UsePath, ident: &Ident, rename: Option<&Ident>) {
         let target = if ident == Self::SELF { prefix.clone() } else { prefix.extended(Name::from(ident)) };
         let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
-        self.scopes.scope_of(&self.module).import(local, target);
+        self.scopes.import(&self.module, local, target);
     }
 
     fn dropped(item: &ItemImpl) -> Option<Name> {
@@ -68,7 +68,7 @@ impl<'ast> Visit<'ast> for Collector {
             Type::Path(path) => UsePath::from(&path.path),
             _ => UsePath::default(),
         };
-        self.scopes.scope_of(&self.module).import(Some(Name::from(&item.ident)), target);
+        self.scopes.import(&self.module, Some(Name::from(&item.ident)), target);
         visit::visit_item_type(self, item);
     }
 
