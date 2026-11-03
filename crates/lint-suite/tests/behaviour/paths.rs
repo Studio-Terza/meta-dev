@@ -1,6 +1,6 @@
 use lint_core::SourceFile;
 use lint_fixtures::{Sources, Text};
-use lint_layout::{Word, words};
+use lint_layout::{PathTail, Word, words};
 use lint_paths::{Cover, Ground, Paths};
 
 const TARGET: [Word<'static>; 2] = words!["fs", "remove_dir_all"];
@@ -11,7 +11,7 @@ impl Reads {
     fn spelled(files: &[SourceFile]) -> Vec<String> {
         Paths::read(files, &words!["remove_dir_all"])
             .iter()
-            .filter(|used| used.spelling(&TARGET).is_some())
+            .filter(|used| used.spelling(PathTail::new(&TARGET)).is_some())
             .map(|used| used.place().to_string())
             .collect()
     }
@@ -76,7 +76,7 @@ fn a_use_remembers_where_it_stands_and_whether_a_guard_holds_it() {
     let file = Sources::file("a.rs", Text::new(text));
     let seen: Vec<(Ground, Cover)> = Paths::read(&[file], &words!["remove_dir_all"])
         .iter()
-        .filter(|used| used.spelling(&TARGET).is_some())
+        .filter(|used| used.spelling(PathTail::new(&TARGET)).is_some())
         .map(|used| (used.ground(), used.cover()))
         .collect();
     assert_eq!(seen, vec![(Ground::Ports, Cover::Guarded), (Ground::Ports, Cover::Bare), (Ground::Open, Cover::Bare)]);

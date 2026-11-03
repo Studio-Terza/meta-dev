@@ -3,6 +3,7 @@ use std::iter::Sum;
 use syn::{Item, UseTree, Visibility};
 
 use lint_core::Most;
+use lint_layout::Length;
 use newtype::Display;
 
 #[derive(Display, Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,7 +21,7 @@ impl ReexportCount {
     }
 
     pub fn beyond(self, most: Most) -> Option<ReexportCount> {
-        match most.allows(self.0) {
+        match most.allows(Length::new(self.0)) {
             Some(_) => None,
             None => Some(self),
         }

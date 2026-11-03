@@ -2,7 +2,6 @@ mod build_script;
 mod source_directory;
 mod target_directory;
 
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
@@ -11,6 +10,7 @@ use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
 use crate::role::Role;
 use build_script::BuildScript;
+use lint_layout::{Name, Whole, Word};
 use source_directory::SourceDirectory;
 use target_directory::TargetDirectory;
 
@@ -70,15 +70,15 @@ impl Placement {
         })
     }
 
-    fn named_ancestor<'path>(path: &'path Path, accepted: &[&str]) -> Option<&'path Path> {
-        path.ancestors()
-            .skip(1)
-            .find(|ancestor| ancestor.file_name().and_then(OsStr::to_str).is_some_and(|name| accepted.contains(&name)))
+    fn named_ancestor<'path>(path: &'path Path, accepted: &[Word<'_>]) -> Option<&'path Path> {
+        path.ancestors().skip(1).find(|ancestor| {
+            ancestor.file_name().map(Name::from).and_then(|name| name.matches::<Whole>(accepted)).is_some()
+        })
     }
 
     fn guessed_package(path: &Path) -> PathBuf {
-        Self::named_ancestor(path, &[Self::SOURCE_DIRECTORY])
-            .or_else(|| Self::named_ancestor(path, &Self::TARGET_DIRECTORIES))
+        Self::named_ancestor(path, &[Word::new(Self::SOURCE_DIRECTORY)])
+            .or_else(|| Self::named_ancestor(path, &Self::TARGET_DIRECTORIES.map(Word::new)))
             .and_then(Path::parent)
             .or_else(|| path.parent())
             .map(Path::to_path_buf)

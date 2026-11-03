@@ -1,10 +1,10 @@
-mod wildcard;
+mod boundary;
 
 use std::path::{Component, Path};
 
 use crate::name::Name;
 use crate::word::Word;
-use wildcard::Wildcard;
+use boundary::Wildcard;
 
 #[derive(Debug, Default)]
 pub struct Members {

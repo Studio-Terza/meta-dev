@@ -1,4 +1,5 @@
 mod binary_files;
+mod boundary;
 mod declared_type;
 mod gate;
 mod home;
@@ -16,10 +17,10 @@ mod source_file;
 mod support_modules;
 mod type_homes;
 mod type_name;
-mod violation;
 mod walk;
 
 pub use binary_files::BinaryFiles;
+pub use boundary::Violation;
 pub use declared_type::DeclaredType;
 pub use gate::Gate;
 pub use home::Home;
@@ -37,7 +38,6 @@ pub use source_file::SourceFile;
 pub use support_modules::SupportModules;
 pub use type_homes::TypeHomes;
 pub use type_name::TypeName;
-pub use violation::Violation;
 pub use walk::Walk;
 
 pub use lint_layout::{Finding, Fix, Headline, Message, Problem, SourceText};

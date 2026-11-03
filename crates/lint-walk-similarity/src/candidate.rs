@@ -20,10 +20,7 @@ pub(crate) struct Candidate {
 
 impl Candidate {
     pub(crate) fn between(first: &Walk<'_>, second: &Walk<'_>) -> Option<Candidate> {
-        let agreement = Agreement::counted(
-            first.steps().intersection(second.steps()).count(),
-            first.steps().union(second.steps()).count(),
-        );
+        let agreement = Agreement::between(first, second);
         agreement.near_identical().map(|_| Candidate {
             first: AsRef::<Name>::as_ref(first).clone(),
             second: AsRef::<Name>::as_ref(second).clone(),

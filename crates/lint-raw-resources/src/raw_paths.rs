@@ -1,5 +1,5 @@
 use lint_core::Violation;
-use lint_layout::{UsePath, Word, words};
+use lint_layout::{PathTail, UsePath, Word, words};
 use lint_paths::{Cover, Ground, Use};
 
 use super::Finding;
@@ -22,7 +22,7 @@ impl RawPaths {
     }
 
     fn raw(used: &Use) -> Option<&UsePath> {
-        Self::RAW.iter().find_map(|tail| used.spelling(tail))
+        Self::RAW.iter().find_map(|tail| used.spelling(PathTail::new(tail)))
     }
 
     fn finding(used: &Use, path: &UsePath) -> Option<Finding> {

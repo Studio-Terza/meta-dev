@@ -353,6 +353,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-layout",
+ "newtype",
  "proc-macro2",
  "syn 2.0.119",
 ]
@@ -466,6 +467,7 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-placement",
+ "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -674,6 +676,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-layout",
+ "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

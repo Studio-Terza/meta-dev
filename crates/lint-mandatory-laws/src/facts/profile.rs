@@ -7,7 +7,7 @@ use crate::obligation::Obligation;
 use crate::pair::Pair;
 use crate::subject::Subject;
 use lint_core::Site;
-use lint_layout::Name;
+use lint_layout::{Name, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct Profile {
@@ -18,11 +18,11 @@ pub(crate) struct Profile {
 }
 
 impl Profile {
-    const TRAIT_PAIRS: [(&'static str, &'static str); 2] = [("Display", "FromStr"), ("Serialize", "Deserialize")];
-    const METHOD_PAIR: (&'static str, &'static str) = ("encode", "decode");
-    const ORDERS: [&'static str; 2] = ["Ord", "PartialEq"];
-    const TO: &'static str = "to";
-    const FROM: &'static str = "from";
+    const TRAIT_PAIRS: [[Word<'static>; 2]; 2] = [words!["Display", "FromStr"], words!["Serialize", "Deserialize"]];
+    const METHOD_PAIR: [Word<'static>; 2] = words!["encode", "decode"];
+    const ORDERS: [Word<'static>; 2] = words!["Ord", "PartialEq"];
+    const TO: Word<'static> = Word::new("to");
+    const FROM: Word<'static> = Word::new("from");
 
     pub(crate) fn declared(subject: Subject, site: Site, exposure: Exposure, facts: Vec<Name>) -> Profile {
         Profile { subject, site, exposure, facts: facts.into_iter().collect() }
@@ -52,7 +52,7 @@ impl Profile {
         let unwitnessed =
             methods.iter().filter(|pair| roundtrips.iter().find_map(|mentions| pair.witnessed_by(mentions)).is_none());
         let unspared = self.trait_pairs().into_iter().skip(spare);
-        let law = Self::ORDERS.iter().find_map(|order| self.known(order)).map(|_| Need::Law);
+        let law = Self::ORDERS.iter().find_map(|order| self.known(*order)).map(|_| Need::Law);
         let unlawed = law.filter(|_| coverage.law_naming(&self.subject).is_none());
         unwitnessed
             .cloned()
@@ -63,19 +63,19 @@ impl Profile {
             .collect()
     }
 
-    fn known(&self, fact: &str) -> Option<&Name> {
+    fn known(&self, fact: Word<'_>) -> Option<&Name> {
         self.facts.get(&Name::from(fact))
     }
 
     fn trait_pairs(&self) -> Vec<Pair> {
         Self::TRAIT_PAIRS
             .iter()
-            .filter_map(|(left, right)| Some(Pair::new(self.known(left)?.clone(), self.known(right)?.clone())))
+            .filter_map(|[left, right]| Some(Pair::new(self.known(*left)?.clone(), self.known(*right)?.clone())))
             .collect()
     }
 
     fn method_pairs(&self) -> BTreeSet<Pair> {
-        let (encode, decode) = Self::METHOD_PAIR;
+        let [encode, decode] = Self::METHOD_PAIR;
         let coded =
             self.known(encode).zip(self.known(decode)).map(|(left, right)| Pair::new(left.clone(), right.clone()));
         let from = self.forms(Self::FROM);
@@ -86,7 +86,7 @@ impl Profile {
         coded.into_iter().chain(formed).collect()
     }
 
-    fn forms(&self, lead: &str) -> BTreeMap<Vec<Name>, Name> {
+    fn forms(&self, lead: Word<'_>) -> BTreeMap<Vec<Name>, Name> {
         self.facts
             .iter()
             .filter_map(|fact| {

@@ -21,7 +21,7 @@ use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
-use lint_layout::{Name, Prefix, Whole, Word, words};
+use lint_layout::{Length, Name, Prefix, Whole, Word, words};
 
 use nesting_depth::NestingDepth;
 
@@ -135,9 +135,8 @@ impl<'ast> Visit<'ast> for Shapes<'_> {
     }
 
     fn visit_signature(&mut self, signature: &'ast Signature) {
-        let wide = (signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count()
-            > FnShape::PARAMETERS.count())
-        .then_some(signature.ident.span());
+        let typed = signature.inputs.iter().filter(|argument| matches!(argument, FnArg::Typed(_))).count();
+        let wide = FnShape::PARAMETERS.allows(Length::new(typed)).map_or(Some(signature.ident.span()), |_| None);
         self.violations.extend(
             wide.map(|span| Self::found(self.path, span, Finding::WideSignature { most: FnShape::PARAMETERS })),
         );

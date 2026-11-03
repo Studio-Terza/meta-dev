@@ -9,6 +9,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::LineNumber;
+use lint_layout::SourceText;
 
 #[derive(Debug)]
 pub struct NoComments;
@@ -20,7 +21,7 @@ impl Lint for NoComments {
             files
                 .iter()
                 .flat_map(|file| {
-                    Self::comment_lines(file.text().as_ref())
+                    Self::comment_lines(file.text())
                         .into_iter()
                         .map(move |line| Violation::new(Site::new(file.path(), line), Self::COMMENT))
                 })
@@ -33,7 +34,8 @@ impl NoComments {
     const COMMENT: Message =
         Message::new(Problem::new("comment"), Fix::new("delete it and say the same in the names of the code"));
 
-    fn comment_lines(source: &str) -> Vec<LineNumber> {
+    fn comment_lines(text: &SourceText) -> Vec<LineNumber> {
+        let source = text.as_ref();
         let shebang = strip_shebang(source).unwrap_or(0);
         tokenize(source.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes)
             .scan(shebang, |offset, token| {

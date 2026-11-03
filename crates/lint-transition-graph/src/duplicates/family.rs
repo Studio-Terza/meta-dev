@@ -4,6 +4,7 @@ use lint_core::{Site, Violation};
 use lint_layout::{Fix, Name, Whole, Word, words};
 use type_facts::Transition;
 
+use crate::count::Count;
 use crate::end::Key;
 
 #[derive(Debug)]
@@ -24,8 +25,8 @@ impl<'found> Family<'found> {
         first.map(|site| Violation::new(site.clone(), self))
     }
 
-    pub(super) fn size(&self) -> usize {
-        self.members.len()
+    pub(super) fn size(&self) -> Count {
+        Count::new(self.members.len())
     }
 
     fn canonical(&self) -> Option<&&'found Transition> {
