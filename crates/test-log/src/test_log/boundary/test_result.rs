@@ -42,13 +42,11 @@ impl FromStr for TestResult {
         let parsed = || {
             let body =
                 line.get(..Self::TEST.len()).filter(|start| *start == Self::TEST).and(line.get(Self::TEST.len()..))?;
-            let end = body
-                .char_indices()
-                .rfind(|(_, letter)| !letter.is_whitespace())
-                .map(|(at, letter)| at + letter.len_utf8())?;
-            let body = body.get(..end)?;
+            let trailing: usize =
+                body.chars().rev().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
+            let body = body.get(..body.len() - trailing)?;
             let (at, separator) = body.match_indices(Self::SEPARATOR).last()?;
-            let name = body.get(..at).filter(|name| !name.is_empty())?;
+            let name = body.get(..at).filter(|_| at > 0)?;
             let verdict = Self::verdict_of(body.get(at + separator.len()..)?)?;
             Some(TestResult { name: name.to_owned(), verdict })
         };

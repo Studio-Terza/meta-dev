@@ -46,6 +46,7 @@ laws::table!(
         "Running a (target/debug/deps/one)\nRunning b\ntest t ... ok\n" => "<one :: t>",
         "Running a (target/debug/deps/one)\nRunningb (target/debug/deps/two)\ntest t ... ok\n" => "<one :: t>",
         "Running a (target/debug/deps/one)\nDoc-tests\ntest t ... ok\n" => "<one :: t>",
+        "Running a (target/debug/deps/one)\nDoc-tests   \ntest t ... ok\n" => "<one :: t>",
         "Running a (target/debug/deps/one)\nnote: Doc-tests z\ntest t ... ok\n" => "<one :: t>",
         "Running a (target/debug/deps/one)\nDoc-testsz\ntest t ... ok\n" => "<one :: t>",
     ]
