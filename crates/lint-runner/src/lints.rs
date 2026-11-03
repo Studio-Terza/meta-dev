@@ -18,7 +18,6 @@ use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
 use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
-use lint_near_duplicate_tests::NearDuplicateTests;
 use lint_no_comments::NoComments;
 use lint_no_early_exits::NoEarlyExits;
 use lint_no_forwarders::NoForwarders;
@@ -37,6 +36,7 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
+use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
@@ -90,7 +90,7 @@ impl Lints {
             FakesAtPorts::report(files),
             PortBatching::report(files),
             LongExactStrings::report(files),
-            NearDuplicateTests::report(files),
+            RepeatedShapes::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),
             BoolMethods::report(files),

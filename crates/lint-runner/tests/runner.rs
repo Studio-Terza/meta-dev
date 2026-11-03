@@ -96,13 +96,10 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
-    root.write("src/lib.rs", &format!("{DIRTY}{MODULES}"))?;
-    root.write("src/one.rs", REPEATED)?;
-    root.write("src/two.rs", REPEATED_AGAIN)?;
+    root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
     let run = root.flagged(&["--report"]);
     assert_eq!(run.exit, ExitCode::SUCCESS);
-    assert!(run.out.contains("/src/one.rs:3: "), "{}", run.out);
-    assert!(run.out.contains("2 shipped copies, also at ") && run.out.contains("/src/two.rs:3; "), "{}", run.out);
+    assert!(run.out.contains("/src/lib.rs:3: trait Index has no generic consumer"), "{}", run.out);
     assert_eq!(run.err, "");
     Ok(())
 }
@@ -110,11 +107,22 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
 #[test]
 fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
+    root.write("src/lib.rs", INDEX)?;
+    let run = root.flagged(&[]);
+    assert!(!run.out.contains("no generic consumer"), "{}", run.out);
+    Ok(())
+}
+
+#[test]
+fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
     root.write("src/lib.rs", MODULES)?;
     root.write("src/one.rs", REPEATED)?;
     root.write("src/two.rs", REPEATED_AGAIN)?;
     let run = root.flagged(&[]);
-    assert!(!run.out.contains("copies"), "{}", run.out);
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("/src/one.rs:3: "), "{}", run.err);
+    assert!(run.err.contains("2 shipped copies, also at ") && run.err.contains("/src/two.rs:3; "), "{}", run.err);
     Ok(())
 }
 
