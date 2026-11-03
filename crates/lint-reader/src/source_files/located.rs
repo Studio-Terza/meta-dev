@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
-use lint_core::{SourceFile, SourceText};
+use lint_core::SourceText;
 use lint_layout::Failure;
 use lint_placement::Placement;
 use lint_roots::Tree;
 use newtype::Newtype;
+
+use super::opened::Opened;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Located<'tree> {
@@ -18,14 +20,6 @@ pub struct Located<'tree> {
 pub struct Node<'tree> {
     located: Located<'tree>,
     children: PathBuf,
-}
-
-#[derive(Debug)]
-pub struct Opened {
-    shown: PathBuf,
-    file: PathBuf,
-    text: SourceText,
-    placement: Placement,
 }
 
 impl<'tree> Located<'tree> {
@@ -58,17 +52,9 @@ impl<'tree> Located<'tree> {
     fn opened(&self, text: Result<Text, FileFailure>, placement: Placement) -> Result<Opened, Failure> {
         let shown = self.tree.display(&self.file);
         match text {
-            Ok(text) => {
-                Ok(Opened { shown, file: self.file.clone(), text: SourceText::new(text.into_inner()), placement })
-            }
+            Ok(text) => Ok(Opened::new(shown, self.file.clone(), SourceText::new(text.into_inner()), placement)),
             Err(failure) => Err(Failure::Io { path: shown, source: failure.into() }),
         }
-    }
-}
-
-impl Opened {
-    pub fn parsed(&self) -> Result<SourceFile, Failure> {
-        SourceFile::parse_at(self.shown.clone(), self.file.clone(), self.placement.clone(), self.text.clone())
     }
 }
 
