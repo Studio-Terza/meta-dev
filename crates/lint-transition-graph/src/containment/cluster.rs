@@ -25,19 +25,23 @@ impl<'found> Cluster<'found> {
     }
 
     pub(crate) fn level(&self) -> Level {
-        match (self.krate, self.segments.first()) {
-            (None, _) => Level::Workspace,
-            (Some(_), None) => Level::Crate,
-            (Some(_), Some(_)) => Level::Module,
+        match self.krate {
+            None => Level::Workspace,
+            Some(_) => self.segments.first().map_or(Level::Crate, |_| Level::Module),
+        }
+    }
+
+    pub(crate) fn bounded(self) -> Option<Cluster<'found>> {
+        match self.level() {
+            Level::Crate | Level::Module => Some(self),
+            Level::Workspace => None,
         }
     }
 
     pub(crate) fn parent(&self) -> Option<Cluster<'found>> {
-        match (self.krate, self.segments.split_last()) {
-            (Some(krate), Some((_, outer))) => Some(Cluster::module(krate, outer)),
-            (Some(_), None) => Some(Cluster::WORKSPACE),
-            (None, _) => None,
-        }
+        self.krate.map(|krate| {
+            self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(krate, outer))
+        })
     }
 
     pub(crate) fn lineage(self) -> impl Iterator<Item = Cluster<'found>> {
@@ -63,10 +67,9 @@ impl<'found> Cluster<'found> {
 
 impl fmt::Display for Cluster<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.krate, self.segments.first()) {
-            (None, _) => write!(formatter, "the workspace"),
-            (Some(krate), None) => write!(formatter, "crate {krate}"),
-            (Some(krate), Some(_)) => write!(formatter, "{krate}::{}", Segments(self.segments)),
+        match self.krate {
+            None => write!(formatter, "the workspace"),
+            Some(krate) => Segments(self.segments).named_in(krate, formatter),
         }
     }
 }
@@ -98,6 +101,15 @@ impl fmt::Display for Part<'_> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Segments<'found>(&'found [Name]);
+
+impl Segments<'_> {
+    fn named_in(self, krate: &CrateName, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0.first() {
+            None => write!(formatter, "crate {krate}"),
+            Some(_) => write!(formatter, "{krate}::{self}"),
+        }
+    }
+}
 
 impl fmt::Display for Segments<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

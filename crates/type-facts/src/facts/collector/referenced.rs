@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem};
+use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem, TraitItemType};
 
 use lint_core::Site;
 use lint_layout::{LineNumber, Name, Whole, Word, words};
@@ -43,10 +43,7 @@ impl<'item, 'file> Referenced<'item, 'file> {
 
     pub(crate) fn of_trait(mut self, found: &ItemTrait) -> Vec<Dependency<'file>> {
         found.supertraits.iter().for_each(|bound| self.visit_type_param_bound(bound));
-        let associated = found.items.iter().filter_map(|item| match item {
-            TraitItem::Type(associated) => Some(associated),
-            _ => None,
-        });
+        let associated = found.items.iter().filter_map(Self::associated_type);
         associated.for_each(|associated| {
             associated.bounds.iter().for_each(|bound| self.visit_type_param_bound(bound));
             self.visit_generics(&associated.generics);
@@ -63,13 +60,19 @@ impl<'item, 'file> Referenced<'item, 'file> {
     fn dependency(&self, path: &syn::Path, segment: &PathSegment) -> Option<Dependency<'file>> {
         let written = path.segments.iter().rev().skip(1).rev().map(|step| Name::from(&step.ident)).collect();
         let named = Name::from(&segment.ident);
-        let resolved = match named.matches::<Whole>(&Self::ITSELF) {
-            Some(_) => Name::from(self.own),
-            None => named,
-        };
+        let resolved = named.matches::<Whole>(&Self::ITSELF).map(|_| Name::from(self.own)).unwrap_or(named);
         let site = Site::new(self.file, LineNumber::from(segment.ident.span()));
-        (!self.parameters.contains(&&segment.ident))
+        self.parameters
+            .iter()
+            .all(|parameter| **parameter != segment.ident)
             .then(|| Dependency::new(resolved, site, self.via).qualified(written))
+    }
+
+    fn associated_type(item: &TraitItem) -> Option<&TraitItemType> {
+        match item {
+            TraitItem::Type(associated) => Some(associated),
+            _ => None,
+        }
     }
 
     fn visit_arguments(&mut self, segment: &PathSegment) {
