@@ -2,7 +2,7 @@ use std::fmt;
 
 use lint_core::{Site, Violation};
 use lint_layout::{Fix, Name, Whole, Word, words};
-use type_facts::Transition;
+use transition_facts::Transition;
 
 use crate::count::Count;
 use crate::end::Key;

@@ -22,23 +22,23 @@ impl Graphed {
 
 const CONVERSIONS: &str = "struct Raw;\nstruct Policy;\nimpl From<Raw> for Policy {\n    fn from(raw: Raw) -> Self {}\n}\nimpl Policy {\n    fn parsed(raw: &Raw) -> Result<Policy, Error> {}\n}\n";
 const PRIMITIVES: &str = "struct A;\nimpl A {\n    fn is_ready(&self) -> bool {}\n    fn label(&self) -> String {}\n    fn run(&mut self) {}\n    fn count(&self) -> Option<Vec<usize>> {}\n}\n";
-const FOREIGN: &str = "struct A;\nimpl A {\n    fn path(&self) -> PathBuf {}\n    fn each<T>(&self, item: T) -> A {}\n    fn pair(&self) -> (A, A) {}\n}\n";
-const WRAPPED: &str = "struct A;\nstruct B;\nimpl A {\n    fn all(&self) -> impl Iterator<Item = &B> {}\n    fn many(items: &[B]) -> Box<Self> {}\n    fn shared(&self) -> Rc<RefCell<B>> {}\n}\n";
-const READ_THROUGH: &str = "struct A;\nstruct B;\nimpl A {\n    fn p(&self) -> (B) {}\n    fn q(&self) -> [B; 2] {}\n    fn r(&self) -> () {}\n    fn s(&self) -> impl Tr<Other = B> {}\n    fn t<B>(&self, item: B) -> A {}\n}\nimpl<B> Wrap<B> for A {\n    fn u(&self, item: B) -> A {}\n}\n";
+const TRAIT_FIXED: &str = "struct A;\nimpl PartialEq for A {\n    fn eq(&self, other: &Self) -> bool {}\n}\nimpl fmt::Display for A {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {}\n}\ntrait Local {\n    fn size(&self) -> usize;\n}\nimpl Local for A {\n    fn size(&self) -> usize {}\n}\n";
+const GENERIC: &str = "struct A;\nstruct B;\nimpl A {\n    fn each<T: Clone>(&self, item: T) -> A {}\n    fn with(&self, f: impl Fn(&B) -> B) -> B {}\n    fn dynamic(&self) -> Box<dyn Render> {}\n    fn pair(&self) -> (A, B) {}\n    fn mixed(&self) -> (A, usize) {}\n}\n";
+const LIFTS: &str = "struct A;\nstruct Name;\nimpl A {\n    fn name(&self) -> &Name { &self.name }\n    fn names(&self) -> Vec<Name> { self.items.iter().map(Name::from).collect() }\n    fn count(&self) -> usize { self.items.len() }\n}\nmod store {\n    impl Records {\n        fn insert(&mut self, name: Name) {}\n        fn find(&self, name: &Name) -> Option<A> {}\n    }\n}\n";
 const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n        fn f(&self) -> bool {}\n    }\n}\nimpl A {\n    #[cfg(test)]\n    fn g(&self) -> bool {}\n}\n";
-const FREE_AND_GENERIC: &str = "struct A;\nfn make() -> A {}\nimpl<T> Wrap for T {\n    fn wrapped(self) -> A {}\n}\n";
 
 laws::table!(
     the_transition_graph_of_a_crate_is_measured_with_its_coverage,
     Graphed::shows,
     [
-        [CONVERSIONS, "crates/x/src/lib.rs:4: crate x: 2 nodes, 1 edges, 2 transitions, coverage 2 of 2, share 1.000, 0 touch a primitive or unit, 0 touch a foreign or generic type"] => true,
-        [PRIMITIVES, "1 nodes, 0 edges, 4 transitions, coverage 0 of 4, share 0.000, 4 touch a primitive or unit, 0 touch"] => true,
-        [FOREIGN, "1 nodes, 1 edges, 3 transitions, coverage 0 of 3, share 0.000, 0 touch a primitive or unit, 3 touch a foreign or generic type"] => true,
-        [WRAPPED, "2 nodes, 2 edges, 3 transitions, coverage 3 of 3, share 1.000"] => true,
-        [READ_THROUGH, "2 nodes, 2 edges, 6 transitions, coverage 2 of 6, share 0.333, 1 touch a primitive or unit, 3 touch a foreign or generic type"] => true,
+        [CONVERSIONS, "crates/x/src/lib.rs:4: crate x: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"] => true,
+        [PRIMITIVES, "crate x: 1 domain types, 0 interface nodes, 1 black boxes, 0 domain pairs, 4 written edges, coverage 1 of 4, share 0.250, 3 touch a bare primitive; not written: 0 derived lifts, 0 store operations"] => true,
+        [TRAIT_FIXED, "crate x: 1 domain types, 1 interface nodes, 2 black boxes, 0 domain pairs, 3 written edges, coverage 2 of 3, share 0.667, 1 touch a bare primitive"] => true,
+        [GENERIC, "crate x: 2 domain types, 3 interface nodes, 1 black boxes, 2 domain pairs, 5 written edges, coverage 4 of 5, share 0.800, 1 touch a bare primitive"] => true,
+        [LIFTS, "crate x: 2 domain types, 0 interface nodes, 2 black boxes, 2 domain pairs, 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; not written: 2 derived lifts, 1 store operations"] => true,
+        [LIFTS, "crates/x/src/lib.rs:4: workspace: 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; not written: 2 derived lifts, 1 store operations; give each bare primitive a newtype, an enum or a standard trait, so every written edge joins nodes the graph can see"] => true,
         [TESTED, "crate x"] => false,
-        [FREE_AND_GENERIC, "1 nodes, 0 edges, 2 transitions, coverage 1 of 2, share 0.500, 0 touch a primitive or unit, 1 touch a foreign or generic type"] => true,
+        [TESTED, "workspace:"] => false,
         ["struct A;\n", "crate x"] => false,
     ]
 );
@@ -51,8 +51,17 @@ fn a_type_resolves_to_its_own_crate_first_and_else_to_the_one_crate_declaring_it
             "struct A;\nimpl A {\n    fn b(&self) -> B {}\n    fn c(&self) -> C {}\n}\n",
         ),
         Graphed::at("crates/y/src/lib.rs", "struct B;\nstruct C;\n"),
-        Graphed::at("crates/z/src/lib.rs", "struct C;\nstruct A;\nimpl A {\n    fn b(&self) -> B {}\n}\n"),
+        Graphed::at(
+            "crates/z/src/lib.rs",
+            "struct C;\nstruct A;\nimpl A {\n    fn b(&self) -> B {}\n    fn is(&self) -> bool {}\n}\n",
+        ),
     ]);
-    assert!(text.contains("crate x: 1 nodes, 1 edges, 2 transitions, coverage 1 of 2, share 0.500, 0 touch a primitive or unit, 1 touch a foreign"), "{text}");
-    assert!(text.contains("crate z: 2 nodes, 1 edges, 1 transitions, coverage 1 of 1, share 1.000"), "{text}");
+    assert!(text.contains("crate x: 1 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000"), "{text}");
+    assert!(text.contains("crate z: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 1 of 2, share 0.500"), "{text}");
+    assert!(
+        text.contains(
+            "crates/x/src/lib.rs:3: workspace: 4 written edges, coverage 3 of 4, share 0.750, 1 touch a bare primitive"
+        ),
+        "{text}"
+    );
 }
