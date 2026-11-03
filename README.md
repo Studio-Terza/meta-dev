@@ -57,7 +57,8 @@ boundary. The message names the fix: take and return a domain type, or move the 
 by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
 `Result` and collections to the type inside. A trait impl also takes its implementing type when no input or output carries
 it, so impls of one trait on different types are different edges, while a `From`, `TryFrom` or `FromStr` impl meets a
-function between the same pair. Type names resolve through their path or `use` import; a name declared in several crates
+function between the same pair. An operation whose inputs and output are all one type (`A, A -> A`) belongs to that
+type's algebra and is judged by its laws, not compared. Type names resolve through their path or `use` import; a name declared in several crates
 and not imported, or twice in one crate, is a leaf. Edges touching a bare primitive, an interface or a foreign type are not
 compared, nor are derived lifts (a map, field focus or match routing) and store operations. The message names the fix:
 keep the standard conversion, or one transition, and route the others through it; delete a hand-written copy of a map,

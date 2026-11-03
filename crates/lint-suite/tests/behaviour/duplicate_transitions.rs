@@ -26,6 +26,9 @@ const TWO_PARSERS: &str = "struct Raw;\nstruct Policy;\nimpl From<&Raw> for Poli
 const NO_CONVERSION: &str = "struct Raw;\nstruct Policy;\nimpl Raw {\n    fn policy(&self) -> Policy {}\n    fn parsed(&self) -> Result<Policy, Error> {}\n}\n";
 const DIFFERENT_INPUTS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn c(&self) -> C {}\n    fn c_with(&self, b: &B) -> C {}\n    fn b_and_a(b: B, a: A) -> C {}\n}\n";
 const PRIMITIVE_PAIRS: &str = "struct A;\nimpl A {\n    fn ready(&self) -> bool {}\n    fn done(&self) -> bool {}\n    fn label(&self) -> PathBuf {}\n}\n";
+const ALGEBRA: &str = "struct Weight;\nimpl Weight {\n    fn plus(self, other: Weight) -> Weight {}\n    fn least(self, other: Weight) -> Weight {}\n}\n";
+const SELF_LOOP: &str =
+    "struct A;\nstruct B;\nimpl A {\n    fn with(&self, b: &B) -> A {}\n    fn without(&self, b: &B) -> A {}\n}\n";
 const LIFTED: &str = "struct A;\nstruct B;\nimpl A {\n    fn b(&self) -> &B { &self.b }\n    fn made(&self) -> B {}\n}\nmod store {\n    impl A {\n        fn b_mut(&mut self) -> B {}\n    }\n}\n";
 
 laws::table!(
@@ -41,6 +44,8 @@ laws::table!(
         [LIFTED, "has 2 transitions"] => false,
         [LIFTED, "workspace: 1 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 2 derived lifts and store operations"] => true,
         ["struct A;\n", "workspace:"] => false,
+        [ALGEBRA, "has 2 transitions"] => false,
+        [SELF_LOOP, "x::A, x::B -> x::A has 2 transitions"] => true,
     ]
 );
 

@@ -72,7 +72,7 @@ impl Gate {
 
     #[must_use]
     pub fn past_warn(self) -> Vec<Finding> {
-        self.findings.into_iter().filter(|finding| finding.verdict() != Verdict::Within).collect()
+        self.findings.into_iter().filter(|finding| *AsRef::<Verdict>::as_ref(finding) != Verdict::Within).collect()
     }
 }
 

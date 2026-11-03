@@ -1,10 +1,11 @@
 test budget, report only:
 corpus: 0 tests in 1 files, 0 of 19 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 two functions on one type with the same signature hide a missing type or type parameter:
 src/lib.rs:12: policy, read share the signature Raw::(&self) -> Policy; distinguish the types they take or return
 methods do their own work, they do not forward to another type of ours:
 src/lib.rs:12: fn policy only forwards to Policy::from; expose the part or call that directly
-one edge per pair: in shipped code, a set of input types reaches one output type by one written edge (function, method or trait impl), read through references, Option, Result and collections, compared where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it; derived lifts and store operations are not written edges:
+one edge per pair: in shipped code, a set of input types reaches one output type by one written edge (function, method or trait impl), read through references, Option, Result and collections, compared where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it; operations whose inputs and output are all one type (A, A -> A) are that type's algebra, judged by its laws, not edges; derived lifts and store operations are not written edges:
 src/lib.rs:6: corpus::Raw -> corpus::Policy has 3 transitions: corpus::Policy::from at src/lib.rs:6, corpus::Raw::policy at src/lib.rs:12, corpus::Raw::read at src/lib.rs:16; corpus::Policy::from is the standard conversion; keep the standard conversion and route the other transitions through it; where they mean different things, give each its own output type
 fails

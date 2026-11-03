@@ -18,12 +18,23 @@ impl Add for Weight {
 }
 
 impl Sub for Weight {
-    type Output = Weight;
+    type Output = WeightChange;
 
-    fn sub(self, other: Weight) -> Weight {
-        Weight(self.0 - other.0)
+    fn sub(self, other: Weight) -> WeightChange {
+        WeightChange(self.0 - other.0)
     }
 }
+
+impl Add<WeightChange> for Weight {
+    type Output = Weight;
+
+    fn add(self, change: WeightChange) -> Weight {
+        Weight(self.0 + change.0)
+    }
+}
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+pub struct WeightChange(f64);
 
 impl Sum for Weight {
     fn sum<Weights: Iterator<Item = Weight>>(weights: Weights) -> Weight {

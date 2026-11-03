@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::{Endpoint, Implementer, Nature, Transition, Transitions};
+use transition_facts::{Endpoint, Implementer, Inputs, Nature, Output, Transition, Transitions};
 use type_facts::Facts;
 
 use crate::count::Count;
@@ -60,8 +60,9 @@ impl<'found> WorkspaceTypes<'found> {
         let from: &CrateName = transition.as_ref();
         let end = |endpoint: &'found Endpoint| self.end(from, endpoint, fixed_by);
         let implementer = transition.implementer().map(Implementer::endpoint).map(end);
-        let ends = Ends::new(transition.takes().iter().map(end).collect(), end(transition.gives().endpoint()))
-            .implemented_by(implementer);
+        let ends =
+            Ends::new(Inputs::iter(transition.takes()).map(end).collect(), end(Output::endpoint(transition.gives())))
+                .implemented_by(implementer);
         Edge::new(transition, ends, fixed_by)
     }
 

@@ -26,10 +26,6 @@ impl Finding {
         (self.verdict == Verdict::Block).then_some(self)
     }
 
-    pub(super) fn verdict(&self) -> Verdict {
-        self.verdict
-    }
-
     #[must_use]
     pub fn stage(&self) -> &Stage {
         &self.stage
@@ -46,5 +42,11 @@ impl Finding {
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}: {} took {}, {}", self.verdict, self.stage, self.measured, self.limit)
+    }
+}
+
+impl AsRef<Verdict> for Finding {
+    fn as_ref(&self) -> &Verdict {
+        &self.verdict
     }
 }
