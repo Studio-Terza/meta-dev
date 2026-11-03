@@ -44,6 +44,7 @@ impl Kind {
         "Unpin",
     ];
 
+    #[must_use]
     pub fn judged(written: &UsePath, candidates: &[UsePath], ports: &PortTraits) -> Kind {
         candidates
             .iter()

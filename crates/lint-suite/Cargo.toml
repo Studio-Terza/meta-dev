@@ -39,6 +39,7 @@ lint-no-plaintext = { path = "../lint-no-plaintext" }
 lint-no-test-io = { path = "../lint-no-test-io" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-paired-apis = { path = "../lint-paired-apis" }
+lint-port-batching = { path = "../lint-port-batching" }
 lint-paths = { path = "../lint-paths" }
 lint-placement = { path = "../lint-placement" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }

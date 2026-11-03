@@ -1,5 +1,5 @@
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use newtype::{Arbitrary, Display, Newtype};
 use serde::Deserialize;
@@ -67,12 +67,15 @@ impl Fortnight {
         );
         let listed = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         let runs: Vec<RunId> = serde_json::from_str(listed.as_ref()).map_err(Failure::Runs)?;
-        runs.into_iter().map(|run| self.download(run, ports)).collect()
+        let directories: Vec<PathBuf> = runs.iter().map(|run| self.downloads.join(run.to_string())).collect();
+        let invocations: Vec<Invocation> =
+            runs.iter().zip(&directories).map(|(run, directory)| Self::download(*run, directory)).collect();
+        Failure::started(ports.outputs(&invocations), &invocations)?;
+        directories.iter().map(|directory| Build::measured_in(ports.files(), directory)).collect()
     }
 
-    fn download(&self, run: RunId, ports: &impl Ports) -> Result<Build, Failure> {
-        let directory = self.downloads.join(run.to_string());
-        let invocation = Invocation::new(
+    fn download(run: RunId, directory: &Path) -> Invocation {
+        Invocation::new(
             "gh",
             [
                 "run".into(),
@@ -81,11 +84,9 @@ impl Fortnight {
                 "--name".into(),
                 Self::ARTIFACT.into(),
                 "--dir".into(),
-                directory.clone().into_os_string(),
+                directory.as_os_str().to_owned(),
             ],
-        );
-        ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        Build::measured_in(ports.files(), &directory)
+        )
     }
 
     pub(super) fn merged(ports: &impl Ports) -> Result<Text, Failure> {

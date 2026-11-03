@@ -86,14 +86,23 @@ impl Ports for Fake {
 
     fn output(&self, invocation: &Invocation) -> io::Result<Text> {
         match invocation.program().to_str() {
-            Some("cargo") => Ok(Text::new(self.metadata.clone())),
-            Some("git") => Ok(Text::new(self.git(invocation))),
-            Some("gh") => Ok(Text::new(Self::UNLABELLED_CHANGE.to_owned())),
+            Some("cargo") => Ok(self.metadata.clone()),
+            Some("git") => Ok(self.git(invocation)),
+            Some("gh") => Ok(Self::UNLABELLED_CHANGE.to_owned()),
             _ => Err(Self::refused(invocation)),
         }
+        .map(Text::new)
     }
 
     fn logged(&self, invocation: &Invocation, _log: &Path) -> io::Result<Run> {
         Err(Self::refused(invocation))
+    }
+
+    fn runs(&self, invocations: &[Invocation]) -> Vec<io::Result<Run>> {
+        invocations.iter().map(|invocation| self.run(invocation)).collect()
+    }
+
+    fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<Text>> {
+        invocations.iter().map(|invocation| self.output(invocation)).collect()
     }
 }

@@ -26,4 +26,8 @@ pub trait Ports {
     fn output(&self, invocation: &Invocation) -> io::Result<Text>;
 
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run>;
+
+    fn runs(&self, invocations: &[Invocation]) -> Vec<io::Result<Run>>;
+
+    fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<Text>>;
 }

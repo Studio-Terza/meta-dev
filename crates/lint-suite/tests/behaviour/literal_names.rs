@@ -10,8 +10,9 @@ const TEST_FN: &str = "#[cfg(test)]\nfn get() {}\n";
 
 const INLINE: &str = "mod inner {\n    pub fn get() {}\n}\n";
 const REQUIRED_METHOD: &str = "trait T {\n    fn get(&self);\n}\n";
+const PROVIDED_METHOD: &str = "trait T {\n    fn update(&self) {\n        fn get() {}\n    }\n}\n";
 
-const CASES: [Case; 6] = [
+const CASES: [Case; 7] = [
     Case::new(Title::new("trait impl"), &[Source::new(Located::new("a.rs"), Text::new(TRAIT_IMPL))], Flagged::new(&[])),
     Case::new(
         Title::new("test module"),
@@ -30,9 +31,14 @@ const CASES: [Case; 6] = [
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
-        Title::new("trait method"),
+        Title::new("a trait method's name belongs to the trait"),
         &[Source::new(Located::new("a.rs"), Text::new(REQUIRED_METHOD))],
-        Flagged::new(&["a.rs:2"]),
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a provided trait method, with a vague fn inside"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_METHOD))],
+        Flagged::new(&["a.rs:3"]),
     ),
 ];
 

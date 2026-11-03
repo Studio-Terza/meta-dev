@@ -28,6 +28,7 @@ use lint_no_parameter_bags::NoParameterBags;
 use lint_no_plaintext::NoPlaintext;
 use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
+use lint_port_batching::PortBatching;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
 use lint_process_starters::ProcessStarters;
@@ -84,6 +85,7 @@ impl Lints {
             NoIgnoredTests::report(files),
             NoTestIo::report(files),
             FakesAtPorts::report(files),
+            PortBatching::report(files),
             LongExactStrings::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
