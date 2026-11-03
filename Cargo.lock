@@ -970,6 +970,7 @@ dependencies = [
  "lint-vec-out-params",
  "lint-workflow-run",
  "transition-facts",
+ "type-facts",
 ]
 
 [[package]]

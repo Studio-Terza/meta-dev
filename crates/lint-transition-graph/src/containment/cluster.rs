@@ -52,8 +52,12 @@ impl<'found> Cluster<'found> {
         self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Cluster::WORKSPACE)
     }
 
-    pub(crate) fn part_holding(self, inner: Cluster<'found>) -> Cluster<'found> {
-        inner.lineage().find(|outer| outer.parent() == Some(self)).unwrap_or(self)
+    pub(crate) fn krate(&self) -> Option<&'found CrateName> {
+        self.krate
+    }
+
+    pub(crate) fn segments(&self) -> &'found [Name] {
+        self.segments
     }
 }
 
@@ -74,8 +78,8 @@ pub(crate) struct Part<'found> {
 }
 
 impl<'found> Part<'found> {
-    pub(crate) fn of(whole: Cluster<'found>, inner: Cluster<'found>) -> Part<'found> {
-        Part { whole, part: whole.part_holding(inner) }
+    pub(crate) fn toward(whole: Cluster<'found>, inner: Cluster<'found>) -> Part<'found> {
+        Part { whole, part: inner.lineage().find(|outer| outer.parent() == Some(whole)).unwrap_or(whole) }
     }
 
     pub(crate) fn nested(&self) -> Option<Cluster<'found>> {
@@ -93,7 +97,7 @@ impl fmt::Display for Part<'_> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Segments<'found>(pub(crate) &'found [Name]);
+pub(crate) struct Segments<'found>(&'found [Name]);
 
 impl fmt::Display for Segments<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

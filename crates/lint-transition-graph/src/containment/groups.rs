@@ -5,6 +5,7 @@ use lint_item_graph::Traversal;
 
 use crate::count::Count;
 
+use super::link::Link;
 use super::member::Member;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -13,11 +14,12 @@ pub(crate) struct Groups<'found>(Vec<Vec<Member<'found>>>);
 impl<'found> Groups<'found> {
     pub(crate) fn linked(
         members: &BTreeSet<Member<'found>>,
-        pairs: impl Iterator<Item = (Member<'found>, Member<'found>)>,
+        links: impl Iterator<Item = Link<'found>>,
     ) -> Groups<'found> {
-        let links = pairs.flat_map(|(one, other)| [(one, other), (other, one)]).fold(
+        let links = links.flat_map(|link| [link, link.reversed()]).fold(
             BTreeMap::new(),
-            |mut links: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>, (from, to)| {
+            |mut links: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>, link| {
+                let [from, to] = link.ends();
                 links.entry(from).or_default().insert(to);
                 links
             },

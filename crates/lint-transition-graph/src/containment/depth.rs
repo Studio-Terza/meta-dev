@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lint_core::{Fix, Headline, Report, Violation};
+use lint_core::{Fix, Headline, Violation};
 
 use crate::count::Count;
 
@@ -11,19 +11,18 @@ use super::{ClusterLint, Containment};
 pub struct DeepClusters;
 
 impl ClusterLint for DeepClusters {
-    fn report_clusters<'file>(view: &Containment<'_, 'file>) -> Report<'file> {
-        Report::new(
-            Headline::new(
-                "report only, the deep crates and modules: a cluster with an interface is deep when it exports fewer types and traits than it keeps private, its exports being those used from outside it",
-            ),
-            view.clusters()
-                .into_iter()
-                .filter_map(|cluster| Deep::of(view, cluster).map(|deep| (cluster, deep)))
-                .filter_map(|(cluster, deep)| {
-                    view.first_site(&view.members(cluster)).map(|site| Violation::new(site, &deep))
-                })
-                .collect(),
-        )
+    const HEADLINE: Headline = Headline::new(
+        "report only, the deep crates and modules: a cluster with an interface is deep when it exports fewer types and traits than it keeps private, its exports being those used from outside it",
+    );
+
+    fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
+        view.clusters()
+            .into_iter()
+            .filter_map(|cluster| Deep::measured(view, cluster).map(|deep| (cluster, deep)))
+            .filter_map(|(cluster, deep)| {
+                view.first_site(&view.members(cluster)).map(|site| Violation::new(site, &deep))
+            })
+            .collect()
     }
 }
 
@@ -35,7 +34,7 @@ struct Deep<'found> {
 }
 
 impl<'found> Deep<'found> {
-    fn of(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Deep<'found>> {
+    fn measured(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Deep<'found>> {
         let judged = match cluster.level() {
             Level::Crate | Level::Module => Some(cluster),
             Level::Workspace => None,

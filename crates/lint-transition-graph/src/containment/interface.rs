@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use lint_core::{Fix, Headline, Report, Violation};
-use lint_item_graph::Traversal;
+use lint_core::{Fix, Headline, Violation};
 
 use super::cluster::{Cluster, Level};
 use super::groups::Groups;
+use super::link::Link;
 use super::member::Member;
 use super::{ClusterLint, Containment};
 
@@ -16,7 +16,7 @@ enum Linking {
 }
 
 impl Linking {
-    fn headline(self) -> Headline {
+    const fn headline(self) -> Headline {
         Headline::new(match self {
             Linking::Consumers => {
                 "report only, each crate and module has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, and the linked exports form one group"
@@ -27,63 +27,33 @@ impl Linking {
         })
     }
 
-    fn report<'file>(self, view: &Containment<'_, 'file>) -> Report<'file> {
-        Report::new(
-            self.headline(),
-            view.clusters()
-                .into_iter()
-                .filter_map(|cluster| Interface::of(view, cluster, self))
-                .filter_map(|split| view.first_site(&split.exports).map(|site| Violation::new(site, &split)))
-                .collect(),
-        )
+    fn violations<'file>(self, view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
+        view.clusters()
+            .into_iter()
+            .filter_map(|cluster| Interface::split_in(view, cluster, self))
+            .filter_map(|split| view.first_site(&split.exports).map(|site| Violation::new(site, &split)))
+            .collect()
     }
 
-    fn pairs<'found>(
+    fn links<'found>(
         self,
         view: &Containment<'found, '_>,
         cluster: Cluster<'found>,
         exports: &BTreeSet<Member<'found>>,
-    ) -> Vec<(Member<'found>, Member<'found>)> {
+    ) -> Vec<Link<'found>> {
         let members = view.members(cluster);
-        let sharing: BTreeMap<Member<'found>, BTreeSet<Member<'found>>> = match self {
-            Linking::Consumers => exports
-                .iter()
-                .flat_map(|export| {
-                    view.users_of(*export)
-                        .filter(|user| cluster.holding(user.cluster()).is_none())
-                        .map(|user| (user, *export))
-                        .collect::<Vec<_>>()
-                })
-                .fold(BTreeMap::new(), Self::gathered),
-            Linking::Internals => exports
-                .iter()
-                .flat_map(|export| {
-                    Traversal::trees([*export], |member: Member<'found>| {
-                        view.uses_of(member).filter(|used| members.contains(used)).collect::<Vec<_>>().into_iter()
-                    })
-                    .into_iter()
-                    .flatten()
-                    .filter(|reached| !exports.contains(reached))
-                    .map(|reached| (reached, *export))
-                    .collect::<Vec<_>>()
-                })
-                .fold(BTreeMap::new(), Self::gathered),
-        };
-        sharing
-            .into_values()
-            .flat_map(|linked| {
-                let first = linked.first().copied();
-                linked.into_iter().filter_map(move |other| first.map(|first| (first, other)))
+        let sharing = exports
+            .iter()
+            .flat_map(|export| match self {
+                Linking::Consumers => view.outside_users(cluster, *export),
+                Linking::Internals => view.private_reached(&members, exports, *export),
             })
-            .collect()
-    }
-
-    fn gathered<'found>(
-        mut sharing: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
-        (shared, export): (Member<'found>, Member<'found>),
-    ) -> BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
-        sharing.entry(shared).or_default().insert(export);
-        sharing
+            .fold(BTreeMap::new(), |mut sharing: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>, link| {
+                let [shared, export] = link.ends();
+                sharing.entry(shared).or_default().insert(export);
+                sharing
+            });
+        sharing.values().flat_map(Link::star).collect()
     }
 }
 
@@ -96,13 +66,17 @@ struct Interface<'found> {
 }
 
 impl<'found> Interface<'found> {
-    fn of(view: &Containment<'found, '_>, cluster: Cluster<'found>, linking: Linking) -> Option<Interface<'found>> {
+    fn split_in(
+        view: &Containment<'found, '_>,
+        cluster: Cluster<'found>,
+        linking: Linking,
+    ) -> Option<Interface<'found>> {
         let judged = match cluster.level() {
             Level::Crate | Level::Module => Some(cluster),
             Level::Workspace => None,
         }?;
         let exports = view.exports(judged, &view.members(judged));
-        let groups = Groups::linked(&exports, linking.pairs(view, judged, &exports).into_iter()).split()?;
+        let groups = Groups::linked(&exports, linking.links(view, judged, &exports).into_iter()).split()?;
         Some(Interface { cluster: judged, linking, exports, groups })
     }
 }
@@ -130,8 +104,10 @@ impl lint_core::Finding for Interface<'_> {
 pub struct InterfaceByConsumers;
 
 impl ClusterLint for InterfaceByConsumers {
-    fn report_clusters<'file>(view: &Containment<'_, 'file>) -> Report<'file> {
-        Linking::Consumers.report(view)
+    const HEADLINE: Headline = Linking::Consumers.headline();
+
+    fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
+        Linking::Consumers.violations(view)
     }
 }
 
@@ -139,7 +115,9 @@ impl ClusterLint for InterfaceByConsumers {
 pub struct InterfaceByInternals;
 
 impl ClusterLint for InterfaceByInternals {
-    fn report_clusters<'file>(view: &Containment<'_, 'file>) -> Report<'file> {
-        Linking::Internals.report(view)
+    const HEADLINE: Headline = Linking::Internals.headline();
+
+    fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
+        Linking::Internals.violations(view)
     }
 }
