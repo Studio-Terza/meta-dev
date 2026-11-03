@@ -5,17 +5,17 @@ use super::function::Function;
 use super::logic::Logic;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Held {
+pub struct Held<'file> {
     logic: Logic,
-    heaviest: Site,
+    heaviest: Site<'file>,
 }
 
-impl Held {
-    pub(crate) fn summed(functions: &[Function]) -> Option<Held> {
+impl<'file> Held<'file> {
+    pub(crate) fn summed(functions: &[Function<'file>]) -> Option<Held<'file>> {
         let heaviest = functions.iter().max_by_key(|function| function.score())?;
         let logic =
             Logic::total(functions.iter().map(|function| Logic::new(function.score().into_inner().saturating_sub(1))));
-        Some(Held { logic, heaviest: AsRef::<Site>::as_ref(heaviest).clone() })
+        Some(Held { logic, heaviest: *AsRef::<Site<'file>>::as_ref(heaviest) })
     }
 
     #[must_use]
@@ -24,7 +24,7 @@ impl Held {
     }
 
     #[must_use]
-    pub fn heaviest(&self) -> &Site {
-        &self.heaviest
+    pub fn heaviest(&self) -> Site<'file> {
+        self.heaviest
     }
 }

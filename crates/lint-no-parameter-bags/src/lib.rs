@@ -19,7 +19,7 @@ use lint_layout::Name;
 pub struct NoParameterBags;
 
 impl Lint for NoParameterBags {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let uses: Vec<NameUses> = shipped.iter().map(|file| NameUses::in_file(file)).collect();
         let exports = RootExports::in_files(&shipped);

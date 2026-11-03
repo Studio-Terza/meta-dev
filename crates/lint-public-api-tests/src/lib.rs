@@ -29,7 +29,7 @@ impl PublicApiTests {
 }
 
 impl Lint for PublicApiTests {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let syntax: Vec<&syn::File> = files.iter().map(SourceFile::syntax).collect();
         let emitters = Emitters::defined_in(&syntax);
         Report::new(

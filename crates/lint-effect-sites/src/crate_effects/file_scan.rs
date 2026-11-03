@@ -17,8 +17,8 @@ use super::vocabulary::Vocabulary;
 pub(super) struct FileScan<'file> {
     file: &'file SourceFile,
     ground: Ground,
-    printed: Vec<EffectSite>,
-    tested: BTreeSet<Site>,
+    printed: Vec<EffectSite<'file>>,
+    tested: BTreeSet<Site<'file>>,
 }
 
 impl<'file> FileScan<'file> {
@@ -29,11 +29,11 @@ impl<'file> FileScan<'file> {
         scan
     }
 
-    pub(super) fn printed(&self) -> &[EffectSite] {
+    pub(super) fn printed(&self) -> &[EffectSite<'file>] {
         &self.printed
     }
 
-    pub(super) fn tested(&self) -> &BTreeSet<Site> {
+    pub(super) fn tested(&self) -> &BTreeSet<Site<'file>> {
         &self.tested
     }
 

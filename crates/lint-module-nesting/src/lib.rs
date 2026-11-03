@@ -10,7 +10,7 @@ use lint_core::{Headline, Most, Report};
 pub struct ModuleNesting;
 
 impl Lint for ModuleNesting {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let tree = ModuleTree::from(shipped.as_slice());
         Report::new(

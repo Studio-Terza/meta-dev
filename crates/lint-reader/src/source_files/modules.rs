@@ -60,8 +60,8 @@ impl Modules {
         )
     }
 
-    pub fn take_children(&mut self) -> Vec<Child> {
-        std::mem::take(&mut self.children)
+    pub fn take_children(&mut self, survey: &Survey) -> Vec<Child> {
+        std::mem::take(&mut self.children).into_iter().map(|child| child.canonical(survey)).collect()
     }
 
     #[must_use]

@@ -7,9 +7,11 @@ const NESTED: &str = "pub struct A;\nconst _: () = {\n    impl A {\n        pub 
 
 #[test]
 fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
-    let report = ConstShape::report(&[Sources::file("a.rs", Text::new(NOT_TEST))]);
+    let files = [Sources::file("a.rs", Text::new(NOT_TEST))];
+    let report = ConstShape::report(&files);
     assert_eq!(Sources::lines(&report), ["a.rs:3"]);
-    let report = ConstShape::report(&[Sources::file("a.rs", Text::new(NESTED))]);
+    let files = [Sources::file("a.rs", Text::new(NESTED))];
+    let report = ConstShape::report(&files);
     assert_eq!(Sources::lines(&report), ["a.rs:4"]);
 }
 

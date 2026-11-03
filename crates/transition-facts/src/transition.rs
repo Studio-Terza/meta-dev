@@ -11,9 +11,9 @@ use crate::ground::Ground;
 use crate::mutation::Mutation;
 
 #[derive(Clone, Debug)]
-pub struct Transition {
+pub struct Transition<'file> {
     krate: CrateName,
-    site: Site,
+    site: Site<'file>,
     owner: Option<Name>,
     name: Name,
     takes: Vec<Endpoint>,
@@ -25,8 +25,8 @@ pub struct Transition {
     filler: Filler,
 }
 
-impl Transition {
-    pub(crate) fn new(krate: CrateName, site: Site, owner: Option<Name>, name: Name) -> Transition {
+impl<'file> Transition<'file> {
+    pub(crate) fn new(krate: CrateName, site: Site<'file>, owner: Option<Name>, name: Name) -> Transition<'file> {
         Transition {
             krate,
             site,
@@ -42,21 +42,21 @@ impl Transition {
         }
     }
 
-    pub(crate) fn taking(mut self, takes: Vec<Endpoint>, gives: Endpoint, mutation: Mutation) -> Transition {
+    pub(crate) fn taking(mut self, takes: Vec<Endpoint>, gives: Endpoint, mutation: Mutation) -> Transition<'file> {
         self.takes = takes;
         self.gives = gives;
         self.mutation = mutation;
         self
     }
 
-    pub(crate) fn placed(mut self, ground: Ground, filler: Filler, body: Body) -> Transition {
+    pub(crate) fn placed(mut self, ground: Ground, filler: Filler, body: Body) -> Transition<'file> {
         self.ground = ground;
         self.filler = filler;
         self.body = body;
         self
     }
 
-    pub(crate) fn branching(mut self, branching: Branching) -> Transition {
+    pub(crate) fn branching(mut self, branching: Branching) -> Transition<'file> {
         self.branching = branching;
         self
     }
@@ -92,31 +92,31 @@ impl Transition {
     }
 }
 
-impl AsRef<Ground> for Transition {
+impl AsRef<Ground> for Transition<'_> {
     fn as_ref(&self) -> &Ground {
         &self.ground
     }
 }
 
-impl AsRef<CrateName> for Transition {
+impl AsRef<CrateName> for Transition<'_> {
     fn as_ref(&self) -> &CrateName {
         &self.krate
     }
 }
 
-impl AsRef<Name> for Transition {
+impl AsRef<Name> for Transition<'_> {
     fn as_ref(&self) -> &Name {
         &self.name
     }
 }
 
-impl AsRef<Site> for Transition {
-    fn as_ref(&self) -> &Site {
+impl<'file> AsRef<Site<'file>> for Transition<'file> {
+    fn as_ref(&self) -> &Site<'file> {
         &self.site
     }
 }
 
-impl fmt::Display for Transition {
+impl fmt::Display for Transition<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.owner {
             Some(owner) => write!(formatter, "{}::{owner}::{}", self.krate, self.name),

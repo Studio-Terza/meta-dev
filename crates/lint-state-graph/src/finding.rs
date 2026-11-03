@@ -11,14 +11,14 @@ use lint_core::Site;
 use lint_core::TypeName;
 use lint_layout::Name;
 
-pub enum Finding {
+pub enum Finding<'file> {
     TupleHoldsVertex,
     FreeTransition { target: TypeName },
     EdgeFromNonVertex { target: TypeName, owner: TypeName },
     HiddenEdge { edge: Edge },
     MutatesVertex { vertex: TypeName },
     ViewReturnsVertex { target: TypeName },
-    DuplicateEdge { edge: Edge, sites: BTreeMap<Name, Site> },
+    DuplicateEdge { edge: Edge, sites: BTreeMap<Name, Site<'file>> },
     CrowdedVertex { source: TypeName, edges: EdgeCount, most: Most },
     ExposedField { field: Member, owner: Name, visibility: Visibility },
     ForeignMatch { enum_name: Name },
@@ -28,7 +28,7 @@ pub enum Finding {
     TerminalHasEdges { state: TypeName },
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finding::TupleHoldsVertex => formatter.write_str("returns a tuple holding a vertex"),
@@ -65,7 +65,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::TupleHoldsVertex => "return the vertex",

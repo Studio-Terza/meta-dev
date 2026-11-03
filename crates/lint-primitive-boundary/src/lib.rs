@@ -19,7 +19,7 @@ use lint_core::SupportModules;
 pub struct PrimitiveBoundary;
 
 impl Lint for PrimitiveBoundary {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         let newtypes = Newtypes::in_files(files);
         Report::new(

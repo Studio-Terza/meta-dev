@@ -9,11 +9,11 @@ use super::function::Function;
 
 pub(crate) struct Functions<'file> {
     file: &'file SourceFile,
-    found: Vec<Function>,
+    found: Vec<Function<'file>>,
 }
 
-impl Functions<'_> {
-    pub(crate) fn of_file(file: &SourceFile) -> Vec<Function> {
+impl<'file> Functions<'file> {
+    pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Function<'file>> {
         let mut scan = Functions { file, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found

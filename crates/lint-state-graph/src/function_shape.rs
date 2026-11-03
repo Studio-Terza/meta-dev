@@ -14,20 +14,20 @@ use lint_core::Site;
 use lint_core::TypeName;
 use lint_layout::LineNumber;
 
-pub struct FunctionShape {
-    site: Site,
+pub struct FunctionShape<'file> {
+    site: Site<'file>,
     returns: Returns,
     vertex_parameters: Vec<TypeName>,
     body: Body,
 }
 
-impl FunctionShape {
+impl<'file> FunctionShape<'file> {
     pub fn describe(
-        path: &Path,
+        path: &'file Path,
         function: &ImplItemFn,
         context: &ImplContext,
         declarations: &Declarations,
-    ) -> FunctionShape {
+    ) -> FunctionShape<'file> {
         let vertex = |ty: &Type| {
             let name = declarations.resolve(TypeName::from_type(ty).or_self(context.self_type()));
             declarations.vertex_named(&name).map(|_| name)
@@ -48,8 +48,8 @@ impl FunctionShape {
         }
     }
 
-    pub fn site(&self) -> &Site {
-        &self.site
+    pub fn site(&self) -> Site<'file> {
+        self.site
     }
 
     pub fn returns(&self) -> &Returns {

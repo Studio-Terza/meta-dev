@@ -4,24 +4,24 @@ use crate::site::Site;
 use lint_layout::{Finding, Fix};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Violation {
-    site: Site,
+pub struct Violation<'file> {
+    site: Site<'file>,
     problem: String,
     fix: Fix,
 }
 
-impl Violation {
-    pub fn new(site: Site, finding: impl Finding) -> Violation {
+impl<'file> Violation<'file> {
+    pub fn new(site: Site<'file>, finding: impl Finding) -> Violation<'file> {
         Violation { site, problem: finding.to_string(), fix: finding.fix() }
     }
 
     #[must_use]
-    pub fn site(&self) -> &Site {
+    pub fn site(&self) -> &Site<'file> {
         &self.site
     }
 }
 
-impl fmt::Display for Violation {
+impl fmt::Display for Violation<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}: {}; {}", self.site, self.problem, self.fix)
     }

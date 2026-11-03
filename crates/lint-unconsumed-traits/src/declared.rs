@@ -8,13 +8,13 @@ use crate::declaration::Declaration;
 
 pub(crate) struct Declared<'file> {
     file: &'file SourceFile,
-    found: Vec<Declaration>,
+    found: Vec<Declaration<'file>>,
 }
 
-impl Declared<'_> {
+impl<'file> Declared<'file> {
     const DISPATCHING: &'static str = "enum_dispatch";
 
-    pub(crate) fn of_file(file: &SourceFile) -> Vec<Declaration> {
+    pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Declaration<'file>> {
         let mut scan = Declared { file, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found

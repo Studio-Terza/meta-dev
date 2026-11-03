@@ -17,7 +17,7 @@ pub struct Elegance;
 
 impl Elegance {
     #[must_use]
-    pub fn reports(files: &[SourceFile]) -> Vec<Report> {
+    pub fn reports(files: &[SourceFile]) -> Vec<Report<'_>> {
         let facts = Facts::of_files(files);
         let transitions = Transitions::of_files(files);
         vec![

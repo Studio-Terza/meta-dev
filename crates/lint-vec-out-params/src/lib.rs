@@ -14,11 +14,11 @@ use lint_layout::{LineNumber, Name, Word};
 #[derive(Debug)]
 pub struct VecOutParams<'file> {
     file: &'file SourceFile,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'file>>,
 }
 
 impl Lint for VecOutParams<'_> {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
                 "a &mut Vec parameter lets any caller push without the checks; give the collection a type that owns its rules",

@@ -20,8 +20,9 @@ impl Readout {
         &self.repo_files
     }
 
-    pub fn take_failures(&mut self) -> Vec<Failure> {
-        std::mem::take(&mut self.failures)
+    #[must_use]
+    pub fn failures(&self) -> &[Failure] {
+        &self.failures
     }
 
     #[must_use]

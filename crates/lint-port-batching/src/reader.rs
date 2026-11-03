@@ -33,7 +33,11 @@ pub struct Reader<'run> {
 }
 
 impl<'run> Reader<'run> {
-    pub fn violations(file: &'run SourceFile, judge: &'run Judge<'run>, holders: &'run Holders) -> Vec<Violation> {
+    pub fn violations<'file>(
+        file: &'file SourceFile,
+        judge: &'run Judge<'run>,
+        holders: &'run Holders,
+    ) -> Vec<Violation<'file>> {
         let crate_name = CrateName::from(file.placement().crate_root());
         let mut reader = Reader {
             module: Module::of_file(file),

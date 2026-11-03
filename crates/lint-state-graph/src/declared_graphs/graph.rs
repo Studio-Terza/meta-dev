@@ -19,7 +19,7 @@ use kind::Kind;
 pub struct Graph(Vec<Block>);
 
 impl Graph {
-    pub fn checked(invocation: &Macro, path: &Path) -> Vec<Violation> {
+    pub fn checked<'file>(invocation: &Macro, path: &'file Path) -> Vec<Violation<'file>> {
         invocation.parse_body::<Graph>().map_or_else(
             |_| {
                 let site = Site::new(path, LineNumber::from(invocation.bang_token.span));
@@ -29,7 +29,7 @@ impl Graph {
         )
     }
 
-    pub fn violations(&self, path: &Path) -> Vec<Violation> {
+    pub fn violations<'file>(&self, path: &'file Path) -> Vec<Violation<'file>> {
         let edges: Vec<Edge> = self.0.iter().flat_map(Block::edges).collect();
         let reversed: Vec<Edge> = edges.iter().map(Edge::reversed).collect();
         let reachable = Self::closed(&self.states(Kind::Start), &edges);

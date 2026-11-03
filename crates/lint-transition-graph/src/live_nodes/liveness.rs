@@ -19,20 +19,20 @@ pub(super) enum Usage {
 }
 
 #[derive(Debug)]
-pub(super) struct Liveness<'found> {
+pub(super) struct Liveness<'found, 'file> {
     node: &'found Node,
-    site: &'found Site,
+    site: Site<'file>,
     reach: Reach,
     usage: Usage,
 }
 
-impl<'found> Liveness<'found> {
+impl<'found, 'file> Liveness<'found, 'file> {
     pub(super) fn judged(
         node: &'found Node,
-        site: &'found Site,
+        site: Site<'file>,
         reach: Reach,
         usage: Usage,
-    ) -> Option<Liveness<'found>> {
+    ) -> Option<Liveness<'found, 'file>> {
         match (reach, usage) {
             (Reach::Reached, Usage::Consumed) => None,
             _ => Some(Liveness { node, site, reach, usage }),
@@ -40,13 +40,13 @@ impl<'found> Liveness<'found> {
     }
 }
 
-impl From<&Liveness<'_>> for Violation {
-    fn from(live: &Liveness<'_>) -> Violation {
-        Violation::new(live.site.clone(), live)
+impl<'file> From<&Liveness<'_, 'file>> for Violation<'file> {
+    fn from(live: &Liveness<'_, 'file>) -> Violation<'file> {
+        Violation::new(live.site, live)
     }
 }
 
-impl fmt::Display for Liveness<'_> {
+impl fmt::Display for Liveness<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let said = match (self.reach, self.usage) {
             (Reach::Unreached, Usage::Unconsumed) => "no edge reaches it from a boundary entry and no edge takes it",
@@ -57,7 +57,7 @@ impl fmt::Display for Liveness<'_> {
     }
 }
 
-impl lint_layout::Finding for Liveness<'_> {
+impl lint_layout::Finding for Liveness<'_, '_> {
     fn fix(&self) -> Fix {
         match (self.reach, self.usage) {
             (Reach::Unreached, _) => Fix::new(
@@ -76,7 +76,7 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counted(nodes: Count, found: &[Liveness<'_>]) -> Tally {
+    pub(super) fn counted(nodes: Count, found: &[Liveness<'_, '_>]) -> Tally {
         Tally {
             nodes,
             unreached: Count::new(found.iter().filter(|live| live.reach == Reach::Unreached).count()),

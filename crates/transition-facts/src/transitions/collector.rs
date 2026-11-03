@@ -15,11 +15,11 @@ pub(super) struct Collector<'file> {
     file: &'file SourceFile,
     krate: CrateName,
     ground: Ground,
-    transitions: Vec<Transition>,
+    transitions: Vec<Transition<'file>>,
 }
 
 impl<'file> Collector<'file> {
-    pub(super) fn collected(file: &'file SourceFile) -> Vec<Transition> {
+    pub(super) fn collected(file: &'file SourceFile) -> Vec<Transition<'file>> {
         let mut scan = Collector {
             file,
             krate: CrateName::from(file.placement().package().root()),
@@ -30,8 +30,8 @@ impl<'file> Collector<'file> {
         scan.transitions
     }
 
-    fn site(&self, name: &Ident) -> Site {
-        Site::new(self.file.path(), LineNumber::from(name.span()))
+    fn site(file: &'file SourceFile, name: &Ident) -> Site<'file> {
+        Site::new(file.path(), LineNumber::from(name.span()))
     }
 }
 
@@ -45,7 +45,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
         let reading = SignatureReading::of_trait(self.krate.clone(), found, self.ground);
-        let provided: Vec<Transition> = found
+        let file = self.file;
+        let provided = found
             .items
             .iter()
             .filter_map(|item| match item {
@@ -56,30 +57,26 @@ impl<'ast> Visit<'ast> for Collector<'_> {
                 function
                     .default
                     .as_ref()
-                    .map(|body| reading.transition(self.site(&function.sig.ident), &function.sig, body))
-            })
-            .collect();
-        self.transitions.extend(provided.into_iter().filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered));
+                    .map(|body| reading.transition(Self::site(file, &function.sig.ident), &function.sig, body))
+            });
+        self.transitions.extend(provided.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered));
     }
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
         let reading = SignatureReading::of_impl(self.krate.clone(), found, self.ground);
-        let transitions: Vec<Transition> = found
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => {
-                    Some(reading.transition(self.site(&function.sig.ident), &function.sig, &function.block))
-                }
-                _ => None,
-            })
-            .collect();
-        self.transitions.extend(transitions.into_iter().filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered));
+        let file = self.file;
+        let transitions = found.items.iter().filter_map(|item| match item {
+            ImplItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => {
+                Some(reading.transition(Self::site(file, &function.sig.ident), &function.sig, &function.block))
+            }
+            _ => None,
+        });
+        self.transitions.extend(transitions.filter(|_| Walk::outside_tests(&found.attrs) == Walk::Entered));
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         let found = SignatureReading::free(self.krate.clone(), self.ground).transition(
-            self.site(&function.sig.ident),
+            Self::site(self.file, &function.sig.ident),
             &function.sig,
             &function.block,
         );

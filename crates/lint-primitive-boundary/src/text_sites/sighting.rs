@@ -23,7 +23,7 @@ impl Sighting {
         Some(self).filter(|sighting| sighting.owner == Owner::Free || !doors.contains(&sighting.owner))
     }
 
-    pub fn into_violation(self, path: &Path) -> Violation {
+    pub fn into_violation(self, path: &Path) -> Violation<'_> {
         Violation::new(
             Site::new(path, LineNumber::from(self.handler.span())),
             Finding::TextOutsideDoor { handler: Name::from(&self.handler) },

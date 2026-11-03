@@ -2,6 +2,8 @@ mod finding;
 
 use finding::Finding;
 use lint_core::{Headline, Lint};
+use std::path::Path;
+
 use syn::visit::Visit;
 use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
@@ -19,20 +21,13 @@ use lint_layout::{Name, Whole, Word, words};
 pub struct LiteralNames;
 
 impl Lint for LiteralNames {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("function names say what the function does"),
             files
                 .iter()
                 .filter_map(SourceFile::shipped)
-                .flat_map(|file| {
-                    Self::vague_names(file.syntax()).into_iter().map(move |name| {
-                        Violation::new(
-                            Site::new(file.path(), LineNumber::from(name.span())),
-                            Finding::VagueName { name: Name::from(&name) },
-                        )
-                    })
-                })
+                .flat_map(|file| Self::vague_names(file.path(), file.syntax()))
                 .collect(),
         )
     }
@@ -52,24 +47,28 @@ impl LiteralNames {
         }
     }
 
-    fn vague_names(file: &syn::File) -> Vec<Ident> {
-        let mut names = VagueNames { found: Vec::new() };
+    fn vague_names<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
+        let mut names = VagueNames { path, found: Vec::new() };
         names.visit_file(file);
         names.found
     }
 }
 
-struct VagueNames {
-    found: Vec<Ident>,
+struct VagueNames<'file> {
+    path: &'file Path,
+    found: Vec<Violation<'file>>,
 }
 
-impl VagueNames {
-    fn note(&mut self, name: &Ident) {
-        self.found.extend(LiteralNames::vague(&Name::from(name)).map(|_| name.clone()));
+impl VagueNames<'_> {
+    fn note(&mut self, ident: &Ident) {
+        let site = Site::new(self.path, LineNumber::from(ident.span()));
+        self.found.extend(
+            LiteralNames::vague(&Name::from(ident)).map(|name| Violation::new(site, Finding::VagueName { name })),
+        );
     }
 }
 
-impl<'ast> Visit<'ast> for VagueNames {
+impl<'ast> Visit<'ast> for VagueNames<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
