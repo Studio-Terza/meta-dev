@@ -557,19 +557,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lint-near-duplicate-tests"
-version = "0.1.0"
-dependencies = [
- "lint-core",
- "lint-layout",
- "lint-placement",
- "newtype",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -849,7 +836,6 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
- "lint-near-duplicate-tests",
  "lint-no-comments",
  "lint-no-early-exits",
  "lint-no-forwarders",
@@ -937,7 +923,6 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
- "lint-near-duplicate-tests",
  "lint-no-early-exits",
  "lint-no-forwarders",
  "lint-no-free-fns",

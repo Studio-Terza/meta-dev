@@ -45,15 +45,20 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
 }
 
 #[test]
-fn a_linked_crate_is_not_reported() {
+fn a_linked_crate_is_not_reported_and_a_name_declared_twice_in_it_is_left_out() {
     let linked = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A(a::B);\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct B;\n"),
     ];
-    assert_eq!(
-        Clustered::lines(&linked, |view| view.report::<ConnectedClusters>().violations().to_vec()),
-        Vec::<String>::new()
-    );
+    let twins = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct T;\npub struct U(T);\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct T;\n"),
+    ];
+    let reported: Vec<Vec<String>> = [linked, twins]
+        .iter()
+        .map(|sources| Clustered::lines(sources, |view| view.report::<ConnectedClusters>().violations().to_vec()))
+        .collect();
+    assert_eq!(reported, [Vec::<String>::new(), Vec::new()]);
 }
 
 #[test]
@@ -164,18 +169,6 @@ fn a_type_named_only_in_a_method_body_is_linked_within_its_crate() {
     );
     assert_eq!(
         Clustered::lines(&bodies, |view| view.report::<LowestCluster>().violations().to_vec()),
-        Vec::<String>::new()
-    );
-}
-
-#[test]
-fn a_name_declared_twice_in_one_crate_is_left_out() {
-    let twins = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct T;\npub struct U(T);\n"),
-        Clustered::at("crates/x/src/a.rs", "pub struct T;\n"),
-    ];
-    assert_eq!(
-        Clustered::lines(&twins, |view| view.report::<ConnectedClusters>().violations().to_vec()),
         Vec::<String>::new()
     );
 }

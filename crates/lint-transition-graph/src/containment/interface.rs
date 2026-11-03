@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::{Fix, Headline, Violation};
@@ -42,17 +42,10 @@ impl Linking {
         exports: &BTreeSet<Member<'found>>,
     ) -> Vec<Link<'found>> {
         let members = view.members(cluster);
-        let sharing = exports
-            .iter()
-            .flat_map(|export| match self {
-                Linking::Consumers => view.outside_users(cluster, *export),
-                Linking::Internals => view.private_reached(&members, exports, *export),
-            })
-            .fold(BTreeMap::new(), |mut sharing: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>, link| {
-                let [shared, export] = link.ends();
-                sharing.entry(shared).or_default().insert(export);
-                sharing
-            });
+        let sharing = Containment::adjacency(exports.iter().flat_map(|export| match self {
+            Linking::Consumers => view.outside_users(cluster, *export),
+            Linking::Internals => view.private_reached(&members, exports, *export),
+        }));
         sharing.values().flat_map(Link::star).collect()
     }
 }

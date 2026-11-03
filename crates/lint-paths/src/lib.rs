@@ -3,6 +3,7 @@ mod cover;
 mod ground;
 mod imports;
 mod module;
+mod nested;
 mod resolver;
 mod scopes;
 mod test_file;
@@ -21,6 +22,7 @@ pub use cover::Cover;
 pub use ground::Ground;
 pub use imports::Imports;
 pub use module::Module;
+pub use nested::Nested;
 pub use test_file::TestFile;
 pub use uses::Use;
 

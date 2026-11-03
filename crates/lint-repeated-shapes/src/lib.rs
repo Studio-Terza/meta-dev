@@ -18,7 +18,7 @@ impl Lint for RepeatedShapes {
         let nodes = files.iter().flat_map(Scan::of_file);
         Report::new(
             Headline::new(
-                "report only, a body of 40 tokens or more repeats across the workspace with its names and literals erased; each group says whether its copies are tests, shipped code or both",
+                "a body of 40 tokens or more repeats across the workspace with its names and literals erased; each group says whether its copies are tests, shipped code or both",
             ),
             Families::grouped(nodes).maximal().iter().map(Family::violation).collect(),
         )

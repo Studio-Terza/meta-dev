@@ -30,8 +30,15 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods,
+no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, layering, rust_only, workflow_run.
+
+`repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
+tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
+literals are erased; a group nested inside a larger group is not listed again. The message names the fix by where the
+copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,
+extract the shape once, write it generic over an existing trait, or derive it; in both, the test re-implements shipped
+logic and should test through it.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.

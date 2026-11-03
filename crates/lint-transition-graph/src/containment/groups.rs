@@ -1,10 +1,11 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_item_graph::Traversal;
 
 use crate::count::Count;
 
+use super::Containment;
 use super::link::Link;
 use super::member::Member;
 
@@ -16,14 +17,7 @@ impl<'found> Groups<'found> {
         members: &BTreeSet<Member<'found>>,
         links: impl Iterator<Item = Link<'found>>,
     ) -> Groups<'found> {
-        let links = links.flat_map(|link| [link, link.reversed()]).fold(
-            BTreeMap::new(),
-            |mut links: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>, link| {
-                let [from, to] = link.ends();
-                links.entry(from).or_default().insert(to);
-                links
-            },
-        );
+        let links = Containment::adjacency(links.flat_map(|link| [link, link.reversed()]));
         let mut groups: Vec<Vec<Member<'found>>> =
             Traversal::trees(members.iter().copied(), |member: Member<'found>| {
                 links.get(&member).into_iter().flatten().copied()

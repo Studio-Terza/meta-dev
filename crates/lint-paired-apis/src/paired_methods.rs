@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use syn::visit::{self, Visit};
-use syn::{Ident, ImplItem, ItemImpl, ItemMod, ItemTrait, TraitItem, Type, Visibility};
+use syn::{Ident, ImplItem, ItemImpl, ItemMod, ItemTrait, TraitItem, Visibility};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
@@ -68,11 +68,7 @@ impl<'ast> Visit<'ast> for PairedMethods<'_> {
             (Walk::Entered, Walk::Entered) => Self::public_methods(block),
             _ => Vec::new(),
         };
-        let owner = match block.self_ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
-        self.owned_by(owner, &methods);
+        self.owned_by(Name::of_type(&block.self_ty), &methods);
     }
 
     fn visit_item_trait(&mut self, block: &'ast ItemTrait) {

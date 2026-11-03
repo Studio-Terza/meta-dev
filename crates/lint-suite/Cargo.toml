@@ -30,7 +30,6 @@ lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-module-nesting = { path = "../lint-module-nesting" }
 lint-named-lifetimes = { path = "../lint-named-lifetimes" }
 lint-named-numbers = { path = "../lint-named-numbers" }
-lint-near-duplicate-tests = { path = "../lint-near-duplicate-tests" }
 lint-no-early-exits = { path = "../lint-no-early-exits" }
 lint-no-forwarders = { path = "../lint-no-forwarders" }
 lint-no-free-fns = { path = "../lint-no-free-fns" }

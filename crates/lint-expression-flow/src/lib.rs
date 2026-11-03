@@ -12,8 +12,9 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
-    BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident, ImplItemConst,
-    ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, PatIdent, Stmt, Token, TraitItemFn,
+    Attribute, BinOp, Block, Expr, ExprAssign, ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprWhile, Ident,
+    ImplItemConst, ImplItemFn, ItemConst, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, PatIdent, Signature,
+    Stmt, Token, TraitItemFn,
 };
 
 use lint_core::Fix;
@@ -93,13 +94,15 @@ struct Flows<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> Flows<'scan> {
-    fn found(path: &'scan Path, span: Span, message: Message) -> Violation<'scan> {
-        Violation::new(Site::new(path, LineNumber::from(span)), message)
+impl Flows<'_> {
+    fn report(&mut self, spans: impl IntoIterator<Item = Span>, message: Message) {
+        let path = self.path;
+        self.violations
+            .extend(spans.into_iter().map(|span| Violation::new(Site::new(path, LineNumber::from(span)), message)));
     }
 
-    fn report(&mut self, span: Span, message: Message) {
-        self.violations.push(Self::found(self.path, span, message));
+    fn function(&mut self, attributes: &[Attribute], signature: &Signature, body: Option<&Block>) {
+        Walk::enter(attributes, || FnBody::scanned_unless_const(signature, body).walked_by(self));
     }
 
     fn lonely_if(expr: &ExprIf) -> Option<Span> {
@@ -109,16 +112,13 @@ impl<'scan> Flows<'scan> {
     fn visit_body(&mut self, body: &Block) {
         let mut locals = MutableLocals::default();
         locals.visit_block(body);
-        self.violations.extend(locals.only_reassigned().into_iter().map(|span| {
-            Self::found(
-                self.path,
-                span,
-                Message::new(
-                    Problem::new("mutable local that is only reassigned"),
-                    Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
-                ),
-            )
-        }));
+        self.report(
+            locals.only_reassigned(),
+            Message::new(
+                Problem::new("mutable local that is only reassigned"),
+                Fix::new("a mutable binding is borrowed as &mut or has methods called on it"),
+            ),
+        );
         self.visit_block(body);
     }
 }
@@ -145,57 +145,43 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     fn visit_impl_item_const(&mut self, _: &'ast ImplItemConst) {}
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        Walk::enter(&function.attrs, || {
-            FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
-        });
+        self.function(&function.attrs, &function.sig, Some(&function.block));
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
-        Walk::enter(&function.attrs, || {
-            FnBody::scanned_unless_const(&function.sig, Some(&function.block)).walked_by(self);
-        });
+        self.function(&function.attrs, &function.sig, Some(&function.block));
     }
 
     fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {
-        Walk::enter(&function.attrs, || {
-            FnBody::scanned_unless_const(&function.sig, function.default.as_ref()).walked_by(self);
-        });
+        self.function(&function.attrs, &function.sig, function.default.as_ref());
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
         let last = block.stmts.last();
-        self.violations.extend(
-            block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(|statement| {
-                Self::found(
-                    self.path,
-                    statement.span(),
-                    Message::new(
-                        Problem::new("if or match whose value is dropped"),
-                        Fix::new("let it produce the value the function returns"),
-                    ),
-                )
-            }),
+        self.report(
+            block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(Spanned::span),
+            Message::new(
+                Problem::new("if or match whose value is dropped"),
+                Fix::new("let it produce the value the function returns"),
+            ),
         );
         syn::visit::visit_block(self, block);
     }
 
     fn visit_expr_if(&mut self, expr: &'ast ExprIf) {
-        self.violations.extend(Self::lonely_if(expr).map(|span| {
-            Self::found(
-                self.path,
-                span,
-                Message::new(
-                    Problem::new("if without else yields nothing"),
-                    Fix::new("use then_some, filter, or an else branch that produces the value"),
-                ),
-            )
-        }));
+        self.report(
+            Self::lonely_if(expr),
+            Message::new(
+                Problem::new("if without else yields nothing"),
+                Fix::new("use then_some, filter, or an else branch that produces the value"),
+            ),
+        );
         syn::visit::visit_expr_if(self, expr);
     }
 
     fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
         self.report(
-            expr.loop_token.span,
+            [expr.loop_token.span],
             Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
         );
         syn::visit::visit_expr_loop(self, expr);
@@ -203,7 +189,7 @@ impl<'ast> Visit<'ast> for Flows<'_> {
 
     fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
         self.report(
-            expr.for_token.span,
+            [expr.for_token.span],
             Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
         );
         syn::visit::visit_expr_for_loop(self, expr);
@@ -211,7 +197,7 @@ impl<'ast> Visit<'ast> for Flows<'_> {
 
     fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
         self.report(
-            expr.while_token.span,
+            [expr.while_token.span],
             Message::new(
                 Problem::new("while loop"),
                 Fix::new("drive an iterator with combinators, const fns excepted"),
@@ -221,32 +207,24 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     }
 
     fn visit_expr_assign(&mut self, expr: &'ast ExprAssign) {
-        self.violations.extend(ExpressionFlow::assigned_local(&expr.left).map(|_| {
-            Self::found(
-                self.path,
-                expr.eq_token.span,
-                Message::new(
-                    Problem::new("assignment to a local"),
-                    Fix::new("build the value in one expression or give its type an updater method"),
-                ),
-            )
-        }));
+        self.report(
+            ExpressionFlow::assigned_local(&expr.left).map(|_| expr.eq_token.span),
+            Message::new(
+                Problem::new("assignment to a local"),
+                Fix::new("build the value in one expression or give its type an updater method"),
+            ),
+        );
         syn::visit::visit_expr_assign(self, expr);
     }
 
     fn visit_expr_binary(&mut self, expr: &'ast ExprBinary) {
-        self.violations.extend(ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(
-            |_| {
-                Self::found(
-                    self.path,
-                    expr.op.span(),
-                    Message::new(
-                        Problem::new("compound assignment to a local"),
-                        Fix::new("build the value in one expression or give its type an updater method"),
-                    ),
-                )
-            },
-        ));
+        self.report(
+            ExpressionFlow::assigned_local(&expr.left).and(ExpressionFlow::compound(expr.op)).map(|_| expr.op.span()),
+            Message::new(
+                Problem::new("compound assignment to a local"),
+                Fix::new("build the value in one expression or give its type an updater method"),
+            ),
+        );
         syn::visit::visit_expr_binary(self, expr);
     }
 }

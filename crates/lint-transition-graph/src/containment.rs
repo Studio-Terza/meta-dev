@@ -112,7 +112,9 @@ impl<'found, 'file> Containment<'found, 'file> {
         Report::new(Check::HEADLINE, Check::violations(self))
     }
 
-    fn adjacency(links: impl Iterator<Item = Link<'found>>) -> BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
+    pub(crate) fn adjacency(
+        links: impl Iterator<Item = Link<'found>>,
+    ) -> BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
         links.fold(BTreeMap::new(), |mut adjacency: BTreeMap<_, BTreeSet<_>>, link| {
             let [from, to] = link.ends();
             adjacency.entry(from).or_default().insert(to);

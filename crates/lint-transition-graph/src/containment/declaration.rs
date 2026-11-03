@@ -26,7 +26,7 @@ impl<'found, 'file> Declaration<'found, 'file> {
             krate: found.as_ref(),
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),
-            dependencies: found.dependencies(),
+            dependencies: AsRef::<[Dependency<'file>]>::as_ref(found),
             implementations: facts.implementations(found),
         }
     }
@@ -36,7 +36,7 @@ impl<'found, 'file> Declaration<'found, 'file> {
             krate: found.as_ref(),
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),
-            dependencies: found.dependencies(),
+            dependencies: AsRef::<[Dependency<'file>]>::as_ref(found),
             implementations: &[],
         }
     }

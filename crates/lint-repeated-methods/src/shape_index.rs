@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Type, Visibility};
+use syn::{ImplItem, ItemImpl, ItemMod, Visibility};
 
 use lint_core::{DeclaredType, Home, Most, Site, SourceFile, TypeHomes, Violation, Walk};
 use lint_layout::{Length, LineNumber, Name};
@@ -69,13 +69,6 @@ impl<'file> ShapeIndex<'file> {
         index
     }
 
-    fn self_type(self_type: &Type) -> Option<Name> {
-        match self_type {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
-    }
-
     fn placed(&self, item: &ItemImpl, written: Name) -> Placed<'file> {
         let self_type = self.homes.resolve(written, self.home);
         let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type.home(), self_type.as_ref()));
@@ -101,14 +94,11 @@ impl<'file> ShapeIndex<'file> {
 
 impl<'ast> Visit<'ast> for ShapeIndex<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
+        let self_type = Name::of_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
         let placed = self_type.map(|self_type| self.placed(item, self_type));
         placed.into_iter().fold(&mut self.owners, |owners, placed| {
             placed.recorded_in(owners);

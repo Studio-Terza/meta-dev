@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use method_shape::MethodShape;
 use syn::visit::Visit;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Type};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::SourceFile;
 use lint_core::Walk;
@@ -34,13 +34,6 @@ impl BagCandidates {
             .map(|(name, line)| Candidate::new(name, *line))
     }
 
-    fn self_name(item: &ItemImpl) -> Option<Name> {
-        match &*item.self_ty {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
-    }
-
     fn logic_carrier(item: &ItemImpl, self_name: Name) -> Option<Name> {
         match &item.trait_ {
             Some(_) => Some(self_name),
@@ -60,10 +53,7 @@ impl BagCandidates {
 
 impl<'ast> Visit<'ast> for BagCandidates {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
-        }
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
@@ -71,6 +61,6 @@ impl<'ast> Visit<'ast> for BagCandidates {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        self.disqualified.extend(Self::self_name(item).and_then(|name| Self::logic_carrier(item, name)));
+        self.disqualified.extend(Name::of_type(&item.self_ty).and_then(|name| Self::logic_carrier(item, name)));
     }
 }
