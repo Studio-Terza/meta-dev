@@ -51,11 +51,17 @@ impl Input {
     }
 
     pub fn manifest(&self) -> &[u8] {
-        if self.role == Role::Manifest { &self.bytes } else { Role::MANIFEST_TEXT.as_bytes() }
+        match self.role {
+            Role::Manifest => &self.bytes,
+            Role::Library | Role::Binary | Role::Test => Role::MANIFEST_TEXT.as_bytes(),
+        }
     }
 
     pub fn source(&self) -> &[u8] {
-        if self.role == Role::Manifest { &[] } else { &self.bytes }
+        match self.role {
+            Role::Manifest => &[],
+            Role::Library | Role::Binary | Role::Test => &self.bytes,
+        }
     }
 }
 

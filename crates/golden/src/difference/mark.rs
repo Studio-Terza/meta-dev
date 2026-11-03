@@ -9,10 +9,10 @@ pub enum Mark {
 
 impl fmt::Display for Mark {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Mark::Context => " ",
-            Mark::Recorded => "-",
-            Mark::Actual => "+",
-        })
+        match self {
+            Mark::Context => formatter.write_str(" "),
+            Mark::Recorded => formatter.write_str("-"),
+            Mark::Actual => formatter.write_str("+"),
+        }
     }
 }

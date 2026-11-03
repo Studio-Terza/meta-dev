@@ -12,7 +12,7 @@ impl From<&[u8]> for LossyText {
         LossyText(
             bytes
                 .utf8_chunks()
-                .flat_map(|chunk| [chunk.valid(), if chunk.invalid().is_empty() { "" } else { Self::REPLACEMENT }])
+                .flat_map(|chunk| [chunk.valid(), chunk.invalid().first().map_or("", |_| Self::REPLACEMENT)])
                 .collect(),
         )
     }
