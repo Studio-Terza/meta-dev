@@ -19,7 +19,7 @@ use tangle::Tangle;
 pub struct Layering;
 
 impl Layering {
-    fn groups<'facts>(links: &[Link<'facts, '_>]) -> Vec<BTreeSet<Definition<'facts>>> {
+    fn violations<'file>(declared: &Declared<'_, 'file>, links: &[Link<'_, 'file>]) -> Vec<Violation<'file>> {
         let graph =
             ItemGraph::of_references(links.iter().fold(BTreeMap::new(), |references, link| link.added_to(references)));
         let cycles = graph
@@ -27,14 +27,11 @@ impl Layering {
             .into_iter()
             .filter(|component| component.len() > 1)
             .map(|component| component.into_iter().filter_map(|index| graph.name_at(index).copied()).collect());
-        let loops: BTreeSet<Definition<'facts>> = links.iter().filter_map(Link::direct_loop).collect();
-        cycles.chain(loops.into_iter().map(|node| BTreeSet::from([node]))).collect()
-    }
-
-    fn violations<'file>(declared: &Declared<'_, 'file>, links: &[Link<'_, 'file>]) -> Vec<Violation<'file>> {
-        let tangles = Tangle::ranked(
-            Self::groups(links).into_iter().map(|members| Tangle::closed(members, links, declared)).collect(),
-        );
+        let loops: BTreeSet<Definition<'_>> = links.iter().filter_map(Link::direct_loop).collect();
+        let groups: Vec<BTreeSet<Definition<'_>>> =
+            cycles.chain(loops.into_iter().map(|node| BTreeSet::from([node]))).collect();
+        let tangles =
+            Tangle::ranked(groups.into_iter().map(|members| Tangle::closed(members, links, declared)).collect());
         let tally = Tally::counted(declared.count(), links, &tangles);
         declared
             .first()
