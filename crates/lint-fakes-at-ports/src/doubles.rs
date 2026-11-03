@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath, Type};
+use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
@@ -88,11 +88,8 @@ impl<'file> Reader<'file, '_> {
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey<'file>> {
-        let name = match item.self_ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
-        name.filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
+        Name::of_type(&item.self_ty)
+            .filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
             .map(|name| DoubleKey { target: self.target, name })
     }
 
