@@ -20,13 +20,15 @@ defaults:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    env:
-      E2E_REPORT: ${{ runner.temp }}/e2e.txt
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
       - name: scenarios
+        env:
+          E2E_REPORT: ${{ runner.temp }}/e2e.txt
         run: cargo test --locked -p e2e --features measure --test e2e -- --nocapture
       - name: report
         if: always()
+        env:
+          E2E_REPORT: ${{ runner.temp }}/e2e.txt
         run: cargo run --locked -q --bin ci -- summarize "$E2E_REPORT" "$GITHUB_STEP_SUMMARY"

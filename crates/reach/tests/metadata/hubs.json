@@ -1,0 +1,9 @@
+{"workspace_root": "/w", "packages": [
+  {"name": "core", "manifest_path": "/w/crates/core/Cargo.toml", "dependencies": []},
+  {"name": "leaf", "manifest_path": "/w/crates/leaf/Cargo.toml", "dependencies": [
+    {"name": "core", "path": "/w/crates/core"}
+  ]},
+  {"name": "other-leaf", "manifest_path": "/w/crates/other-leaf/Cargo.toml", "dependencies": [
+    {"name": "core", "path": "/w/crates/core"}
+  ]}
+]}

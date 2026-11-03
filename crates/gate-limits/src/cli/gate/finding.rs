@@ -1,6 +1,8 @@
 use std::fmt;
 
+use crate::cli::failure::Failure;
 use crate::cli::gate::limit::Limit;
+use crate::cli::gate::record::Entry;
 use crate::cli::gate::seconds::Seconds;
 use crate::cli::gate::verdict::Verdict;
 use crate::cli::stage::Stage;
@@ -32,6 +34,10 @@ impl Finding {
     #[must_use]
     pub fn stage(&self) -> &Stage {
         &self.stage
+    }
+
+    pub fn lowered(self) -> Result<Entry, Failure> {
+        self.limit.lowered(&self.stage, self.measured).map(|seconds| Entry::new(self.stage, seconds))
     }
 }
 
