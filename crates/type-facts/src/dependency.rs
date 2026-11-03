@@ -7,7 +7,7 @@ use crate::via::Via;
 #[derive(Clone, Debug)]
 pub struct Dependency<'file> {
     name: Name,
-    qualifier: Option<Name>,
+    written: Vec<Name>,
     site: Site<'file>,
     via: Via,
     held: Held,
@@ -15,17 +15,22 @@ pub struct Dependency<'file> {
 
 impl<'file> Dependency<'file> {
     pub(crate) fn new(name: Name, site: Site<'file>, via: Via, held: Held) -> Dependency<'file> {
-        Dependency { name, qualifier: None, site, via, held }
+        Dependency { name, written: Vec::new(), site, via, held }
     }
 
-    pub(crate) fn qualified(mut self, qualifier: Option<Name>) -> Dependency<'file> {
-        self.qualifier = qualifier;
+    pub(crate) fn qualified(mut self, written: Vec<Name>) -> Dependency<'file> {
+        self.written = written;
         self
     }
 
     #[must_use]
     pub fn qualifier(&self) -> Option<&Name> {
-        self.qualifier.as_ref()
+        self.written.first()
+    }
+
+    #[must_use]
+    pub fn written(&self) -> &[Name] {
+        &self.written
     }
 
     #[must_use]

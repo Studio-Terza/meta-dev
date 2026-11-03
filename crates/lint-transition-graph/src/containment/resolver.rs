@@ -1,12 +1,14 @@
+mod place;
 mod reach;
 mod stand_ins;
+mod target;
 
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::{Site, SourceFile};
-use lint_item_graph::{ItemGraph, NodeIndex, Scope, Traversal};
+use lint_item_graph::{ReferencedNames, Scope, Traversal};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Nature, Transition};
@@ -14,14 +16,16 @@ use type_facts::Dependency;
 
 use super::link::Link;
 use super::member::Member;
+use place::Place;
 use reach::Reach;
 pub(crate) use stand_ins::StandIns;
+use target::Target;
 
 #[derive(Debug, Default)]
 pub(crate) struct Resolver<'found> {
     declaring: BTreeMap<&'found Name, Vec<Member<'found>>>,
     modules: BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    scopes: BTreeMap<&'found Path, Scope<'found>>,
+    places: BTreeMap<&'found Path, Place<'found>>,
     stand_ins: StandIns<'found>,
 }
 
@@ -36,77 +40,96 @@ impl<'found> Resolver<'found> {
             modules.entry(placement.package().crate_name()).or_default().extend(placement.module().segments());
             modules
         });
+        let places = files.iter().map(|file| {
+            let placement = file.placement();
+            let place = Place::new(
+                placement.package().crate_name(),
+                placement.module().segments(),
+                Scope::of_file(file.syntax()),
+            );
+            (file.path(), place)
+        });
         Resolver {
             declaring: members.fold(BTreeMap::new(), |mut declaring: BTreeMap<_, Vec<_>>, member| {
                 declaring.entry(member.name()).or_default().push(member);
                 declaring
             }),
             modules,
-            scopes: files.iter().map(|file| (file.path(), Scope::of_file(file.syntax()))).collect(),
+            places: places.collect(),
             stand_ins,
         }
     }
 
-    pub(crate) fn members(&self, from: &CrateName, name: &Name, hint: Option<&Name>) -> Vec<Member<'found>> {
+    fn target(&self, file: &Path, name: &Name, written: &[Name], origin: Option<&Name>) -> Option<Target<'found>> {
+        let place = self.places.get(file)?;
+        Reach::new(place, &self.modules).target(name, written, origin)
+    }
+
+    pub(crate) fn members(
+        &self,
+        file: &Path,
+        name: &Name,
+        written: &[Name],
+        origin: Option<&Name>,
+    ) -> Vec<Member<'found>> {
         let declaring = self.declaring.get(name).map_or(&[][..], Vec::as_slice);
         let single = || declaring.first().copied().filter(|_| declaring.len() == 1).into_iter().collect();
-        let reached = Reach::of_hint(hint, from, &self.modules).krate(from);
-        reached.map_or_else(Vec::new, |krate| {
-            Some(self.within(krate, name)).filter(|found| !found.is_empty()).unwrap_or_else(single)
+        self.target(file, name, written, origin).map_or_else(Vec::new, |target| {
+            Some(self.within(&target, name)).filter(|found| !found.is_empty()).unwrap_or_else(single)
         })
     }
 
-    fn in_crate(declaring: Option<&Vec<Member<'found>>>, krate: &CrateName) -> Option<Member<'found>> {
-        declaring?.iter().find(|member| member.cluster().krate() == Some(krate)).copied()
-    }
-
-    fn within(&self, krate: &CrateName, name: &Name) -> Vec<Member<'found>> {
-        let declared = |name: &Name| Self::in_crate(self.declaring.get(name), krate);
+    fn within(&self, target: &Target<'found>, name: &Name) -> Vec<Member<'found>> {
+        let krate = target.krate();
+        let declaring = |name: &Name| self.declaring.get(name).map_or(&[][..], Vec::as_slice);
         let stood = |name: &Name| self.stand_ins.standing_for(krate, name).iter();
-        declared(name).map_or_else(
-            || Traversal::trees(stood(name), stood).into_iter().flatten().filter_map(declared).collect(),
+        let unplaced = Target::new(krate, None, None);
+        target.declared(declaring(name)).map_or_else(
+            || {
+                let reached = Traversal::trees(stood(name), stood).into_iter().flatten();
+                reached.filter_map(|name| unplaced.declared(declaring(name))).collect()
+            },
             |member| vec![member],
         )
     }
 
-    pub(crate) fn dependency(&self, from: &CrateName, dependency: &Dependency<'_>) -> Vec<Member<'found>> {
-        let name: &Name = dependency.as_ref();
+    pub(crate) fn dependency(&self, dependency: &Dependency<'_>) -> Vec<Member<'found>> {
         let site: &Site<'_> = dependency.as_ref();
-        let written = dependency.qualifier();
-        let origin = self.scopes.get(site.path()).map_or_else(|| written.cloned(), |scope| scope.origin(name, written));
-        self.members(from, name, origin.as_ref())
+        self.members(site.path(), dependency.as_ref(), dependency.written(), None)
     }
 
-    pub(crate) fn endpoint(&self, from: &CrateName, endpoint: &Endpoint) -> Vec<Member<'found>> {
+    pub(crate) fn endpoint(&self, file: &Path, endpoint: &Endpoint) -> Vec<Member<'found>> {
         match endpoint.nature() {
-            Nature::Named => self.members(from, endpoint.as_ref(), endpoint.origin().map(Borrow::borrow)),
-            Nature::Interface => self.members(from, endpoint.as_ref(), None),
+            Nature::Named => self.members(file, endpoint.as_ref(), &[], endpoint.origin().map(Borrow::borrow)),
+            Nature::Interface => self.members(file, endpoint.as_ref(), &[], None),
             Nature::Primitive | Nature::Boxed => Vec::new(),
         }
     }
 
-    pub(crate) fn bodies(&self, krate: &CrateName, graph: &ItemGraph) -> Vec<Link<'found>> {
-        let owners = graph.links().iter().enumerate();
-        owners.flat_map(|(index, used)| self.body(krate, graph, NodeIndex::from(index), used)).collect()
+    pub(crate) fn bodies(&self, file: &SourceFile) -> Vec<Link<'found>> {
+        let path = file.path();
+        let krate = file.placement().package().crate_name();
+        let uses = ReferencedNames::of_file(file).into_uses();
+        uses.iter().flat_map(|(owner, used)| self.body(path, krate, owner, used)).collect()
     }
 
-    fn body(&self, krate: &CrateName, graph: &ItemGraph, owner: NodeIndex, used: &[NodeIndex]) -> Vec<Link<'found>> {
-        let local = |index: NodeIndex| {
-            let name = graph.name_at(index).map_or_else(Vec::new, |name| self.members(krate, name, None));
-            name.into_iter().filter(|member| member.cluster().krate() == Some(krate))
-        };
-        let holder = graph.name_at(owner).and_then(|name| Self::in_crate(self.declaring.get(name), krate));
+    fn body(&self, file: &Path, krate: &CrateName, owner: &Name, used: &BTreeSet<Name>) -> Vec<Link<'found>> {
+        let declaring = self.declaring.get(owner).map_or(&[][..], Vec::as_slice);
+        let holder = self.target(file, owner, &[], None).and_then(|target| target.declared(declaring));
+        let local = |name: &Name| self.members(file, name, &[], None);
         used.iter()
-            .flat_map(|index| local(*index))
+            .flat_map(local)
+            .filter(|member| member.cluster().krate() == Some(krate))
             .filter_map(|end| holder.map(|holder| Link::new(holder, end)))
             .collect()
     }
 
     pub(crate) fn signature(&self, transition: Transition<'found, '_>) -> Vec<Link<'found>> {
-        let from: &CrateName = transition.context().as_ref();
-        let holders = transition.context().subject().map_or_else(Vec::new, |subject| self.endpoint(from, subject));
+        let site: &Site<'_> = transition.as_ref();
+        let file = site.path();
+        let holders = transition.context().subject().map_or_else(Vec::new, |subject| self.endpoint(file, subject));
         let ends = transition.takes().iter().chain([transition.gives().endpoint()]);
-        ends.flat_map(|end| self.endpoint(from, end))
+        ends.flat_map(|end| self.endpoint(file, end))
             .flat_map(|end| holders.iter().map(move |holder| Link::new(*holder, end)))
             .collect()
     }

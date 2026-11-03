@@ -45,20 +45,36 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
 }
 
 #[test]
-fn a_linked_crate_is_not_reported_and_a_name_declared_twice_in_it_is_left_out() {
+fn a_linked_crate_is_not_reported() {
     let linked = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct A(a::B);\n"),
         Clustered::at("crates/x/src/a.rs", "pub struct B;\n"),
     ];
+    assert_eq!(
+        Clustered::lines(&linked, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_name_declared_in_two_modules_of_one_crate_resolves_by_its_own_module_and_its_imports() {
     let twins = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct T;\npub struct U(T);\n"),
-        Clustered::at("crates/x/src/a.rs", "pub struct T;\n"),
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod c;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct Platform;\npub struct Leg(Platform);\n"),
+        Clustered::at("crates/x/src/b.rs", "use crate::a::Leg;\npub struct Platform<'day>(&'day Leg);\n"),
+        Clustered::at("crates/x/src/c.rs", "use crate::b::Platform;\npub struct User<'day>(Platform<'day>);\n"),
     ];
-    let reported: Vec<Vec<String>> = [linked, twins]
-        .iter()
-        .map(|sources| Clustered::lines(sources, |view| view.report::<ConnectedClusters>().violations().to_vec()))
-        .collect();
-    assert_eq!(reported, [Vec::<String>::new(), Vec::new()]);
+    assert_eq!(
+        Clustered::lines(&twins, |view| view.report::<AcyclicQuotients>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        Clustered::lines(&twins, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/a.rs:2: x::a::Leg is used only within x::b; move it into the lowest cluster that holds all its users",
+            "crates/x/src/b.rs:2: x::b::Platform is used only within x::c; move it into the lowest cluster that holds all its users",
+        ]
+    );
 }
 
 #[test]
