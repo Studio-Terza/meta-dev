@@ -45,26 +45,27 @@ impl fmt::Display for Node<'_> {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Tuple<'found>(BTreeSet<Node<'found>>);
 
-impl fmt::Display for Tuple<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.first().filter(|_| self.0.len() == 1) {
-            Some(single) => write!(formatter, "{single}"),
-            None => {
-                write!(formatter, "({})", self.0.iter().map(ToString::to_string).collect::<Vec<String>>().join(", "))
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Hop<'found> {
     takes: Tuple<'found>,
     gives: Node<'found>,
 }
 
-impl fmt::Display for Hop<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}", self.takes, self.gives)
+impl<'found> Hop<'found> {
+    pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
+    where
+        'found: 'ends,
+    {
+        Count::new(ends.filter_map(Option::<Hop>::from).collect::<BTreeSet<Hop<'found>>>().len())
+    }
+}
+
+impl<'found> From<&Ends<'found>> for Option<Hop<'found>> {
+    fn from(ends: &Ends<'found>) -> Option<Hop<'found>> {
+        let takes: BTreeSet<Node<'found>> = ends.taken().copied().collect();
+        let gives = ends.gives.node?;
+        let first = takes.first().copied();
+        first.map(|_| Hop { takes: Tuple(takes), gives })
     }
 }
 
@@ -168,13 +169,6 @@ impl<'found> Ends<'found> {
 
     pub(crate) fn all(&self) -> impl Iterator<Item = &End<'found>> {
         self.takes.iter().chain([&self.gives])
-    }
-
-    pub(crate) fn hop(&self) -> Option<Hop<'found>> {
-        let takes: BTreeSet<Node<'found>> = self.taken().copied().collect();
-        let gives = self.gives.node?;
-        let first = takes.first().copied();
-        first.map(|_| Hop { takes: Tuple(takes), gives })
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
