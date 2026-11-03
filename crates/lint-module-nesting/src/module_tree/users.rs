@@ -21,20 +21,16 @@ impl<'file> Users<'file> {
         self
     }
 
-    #[must_use]
-    pub fn with_tests(self, modules: &ModuleIndex<'file>, files: &'file [SourceFile]) -> Users<'file> {
-        files.iter().fold(self, |users, file| users.with_test(modules, file))
-    }
-
     pub fn callers_of(&self, module: &ModulePath<'file>) -> Option<&BTreeSet<ModulePath<'file>>> {
         self.0.get(module)
     }
 
-    fn with_test(self, modules: &ModuleIndex<'file>, file: &'file SourceFile) -> Users<'file> {
+    #[must_use]
+    pub fn with_test(self, modules: &ModuleIndex<'file>, file: &'file SourceFile) -> Users<'file> {
         let caller = ModulePath::of_file(file);
         UseEdges::in_file(file.syntax()).iter().fold(self, |users, path| {
             let home =
-                ModulePath::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules).cloned());
+                ModulePath::from_use(&caller, path, modules).and_then(|target| modules.deepest(&target).cloned());
             users.recorded(home, &caller)
         })
     }

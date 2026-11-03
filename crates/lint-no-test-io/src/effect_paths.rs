@@ -31,10 +31,12 @@ impl EffectPaths {
             .iter()
             .find_map(|root| used.under(root))
             .filter(|_| Self::VALUES.iter().all(|value| used.under(value).is_none()))
-            .or_else(|| Self::WORLD.iter().find_map(|world| Self::named(used, world)))
-    }
-
-    fn named<'used>(used: &'used Use, world: &[Word<'_>]) -> Option<&'used UsePath> {
-        used.spelling(PathTail::new(world)).or_else(|| used.under(world))
+            .or_else(|| {
+                Self::WORLD
+                    .iter()
+                    .flat_map(|world| [used.spelling(PathTail::new(world)), used.under(world)])
+                    .flatten()
+                    .next()
+            })
     }
 }
