@@ -57,7 +57,9 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         )
     })?;
     let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
-    let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
+    let runner = include_str!("../src/lints.rs");
+    let listed_by_the_runner =
+        ["::report(files)", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/elegance.rs");
     let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]

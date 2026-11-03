@@ -74,7 +74,7 @@ impl Corpus {
     fn lints() -> usize {
         [include_str!("../src/lints.rs"), include_str!("../src/mode.rs")]
             .iter()
-            .map(|source| source.matches("::report(files)").count())
+            .flat_map(|source| ["::report(files)", "flows.report::<"].map(|call| source.matches(call).count()))
             .sum()
     }
 

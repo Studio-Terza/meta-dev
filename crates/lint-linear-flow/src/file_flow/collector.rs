@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use proc_macro2::{TokenStream, TokenTree};
+use syn::parse::Parse;
 use syn::visit::{self, Visit};
 use syn::{Block, ImplItemFn, ItemFn, Macro, Signature, TraitItemFn};
 
@@ -13,10 +15,29 @@ pub struct Collector<'file> {
 }
 
 impl<'file> Collector<'file> {
+    const FUNCTION: &'static str = "fn";
+
     pub fn collected(path: &'file Path, syntax: &syn::File) -> Vec<FunctionFlow<'file>> {
         let mut collector = Collector { path, functions: Vec::new() };
         collector.visit_file(syntax);
         collector.functions
+    }
+
+    fn declaring(invocation: &Macro) -> Option<&Macro> {
+        invocation
+            .parse_body_with(TokenStream::parse)
+            .into_iter()
+            .flat_map(TokenStream::into_iter)
+            .flat_map(Self::flattened)
+            .find(|tree| matches!(tree, TokenTree::Ident(ident) if ident == Self::FUNCTION))
+            .map(|_| invocation)
+    }
+
+    fn flattened(tree: TokenTree) -> Vec<TokenTree> {
+        match tree {
+            TokenTree::Group(group) => group.stream().into_iter().flat_map(Self::flattened).collect(),
+            other => vec![other],
+        }
     }
 
     fn judge(&mut self, signature: &Signature, body: Option<&Block>) {
@@ -30,7 +51,10 @@ impl<'file> Collector<'file> {
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        Self::declaring(invocation)
+            .into_iter()
+            .flat_map(Macros::statements)
+            .for_each(|statement| self.visit_stmt(&statement));
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
