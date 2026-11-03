@@ -43,8 +43,8 @@ impl Endpoint {
 
     pub(crate) fn originating(self, origin: Option<CrateName>) -> Endpoint {
         match self.nature {
-            Nature::Named => Endpoint { origin, spelling: None, ..self },
-            Nature::Interface | Nature::Primitive | Nature::Boxed => Endpoint { spelling: None, ..self },
+            Nature::Named => Endpoint { origin, ..self },
+            Nature::Interface | Nature::Primitive | Nature::Boxed => self,
         }
     }
 
