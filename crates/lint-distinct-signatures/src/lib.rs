@@ -8,6 +8,7 @@ use signature_index::SignatureIndex;
 use syn::Ident;
 use syn::visit::Visit;
 
+use lint_core::FileLint;
 use lint_core::Lint;
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name};
@@ -25,6 +26,12 @@ impl Lint for DistinctSignatures {
 }
 
 impl DistinctSignatures {
+    fn named(idents: &[Ident]) -> Vec<Name> {
+        idents.iter().map(Name::from).collect()
+    }
+}
+
+impl FileLint for DistinctSignatures {
     fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut index = SignatureIndex::default();
         index.visit_file(file.syntax());
@@ -36,9 +43,5 @@ impl DistinctSignatures {
                 Violation::new(Site::new(file.path(), line), Finding::new(Self::named(&idents), shape))
             })
             .collect()
-    }
-
-    fn named(idents: &[Ident]) -> Vec<Name> {
-        idents.iter().map(Name::from).collect()
     }
 }

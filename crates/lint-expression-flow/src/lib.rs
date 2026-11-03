@@ -1,5 +1,6 @@
 mod fn_body;
 
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use std::collections::BTreeMap;
 
@@ -40,12 +41,6 @@ impl Lint for ExpressionFlow {
 }
 
 impl ExpressionFlow {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut flows = Flows { path: file.path(), violations: Vec::new() };
-        flows.visit_file(file.syntax());
-        flows.violations
-    }
-
     fn dropped<'block>(statement: &'block Stmt, last: Option<&Stmt>) -> Option<&'block Stmt> {
         let inner = last.filter(|tail| std::ptr::eq(*tail, statement)).map_or(Some(statement), |_| None);
         match statement {
@@ -82,6 +77,14 @@ impl ExpressionFlow {
                     | BinOp::ShrAssign(_)
             )
         })
+    }
+}
+
+impl FileLint for ExpressionFlow {
+    fn violations(file: &SourceFile) -> Vec<Violation> {
+        let mut flows = Flows { path: file.path(), violations: Vec::new() };
+        flows.visit_file(file.syntax());
+        flows.violations
     }
 }
 

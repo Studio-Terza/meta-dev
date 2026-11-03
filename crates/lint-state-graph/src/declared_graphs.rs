@@ -5,6 +5,7 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ItemMod, Macro};
 
+use lint_core::FileLint;
 use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
 use lint_layout::{Name, Word};
 
@@ -16,10 +17,19 @@ pub struct DeclaredGraphs<'scan> {
     violations: Vec<Violation>,
 }
 
-impl<'scan> DeclaredGraphs<'scan> {
+impl DeclaredGraphs<'_> {
     const MACRO: &'static str = "states";
 
-    pub fn violations(file: &'scan SourceFile) -> Vec<Violation> {
+    fn found_in(&self, invocation: &Macro) -> Vec<Violation> {
+        match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
+            Some(_) => Graph::checked(invocation, self.path),
+            None => MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),
+        }
+    }
+}
+
+impl FileLint for DeclaredGraphs<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation> {
         let mut graphs = DeclaredGraphs {
             path: file.path(),
             names: MacroAliases::in_file(file.syntax(), Word::new(Self::MACRO)),
@@ -27,13 +37,6 @@ impl<'scan> DeclaredGraphs<'scan> {
         };
         graphs.visit_file(file.syntax());
         graphs.violations
-    }
-
-    fn found_in(&self, invocation: &Macro) -> Vec<Violation> {
-        match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
-            Some(_) => Graph::checked(invocation, self.path),
-            None => MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),
-        }
     }
 }
 

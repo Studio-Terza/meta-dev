@@ -10,6 +10,7 @@ use syn::visit::{self, Visit};
 use borrows::Borrows;
 use derived::Derived;
 use finding::Finding;
+use lint_core::FileLint;
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name};
 
@@ -17,14 +18,6 @@ use lint_layout::{LineNumber, Name};
 pub struct Ungenerated<'file> {
     path: &'file Path,
     found: Vec<Violation>,
-}
-
-impl<'file> Ungenerated<'file> {
-    pub fn in_file(file: &'file SourceFile) -> Vec<Violation> {
-        let mut ungenerated = Ungenerated { path: file.path(), found: Vec::new() };
-        ungenerated.visit_file(file.syntax());
-        ungenerated.found
-    }
 }
 
 impl<'ast> Visit<'ast> for Ungenerated<'_> {
@@ -37,5 +30,13 @@ impl<'ast> Visit<'ast> for Ungenerated<'_> {
             )
         }));
         visit::visit_item_struct(self, item);
+    }
+}
+
+impl FileLint for Ungenerated<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation> {
+        let mut ungenerated = Ungenerated { path: file.path(), found: Vec::new() };
+        ungenerated.visit_file(file.syntax());
+        ungenerated.found
     }
 }

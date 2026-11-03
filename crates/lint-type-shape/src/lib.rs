@@ -1,3 +1,4 @@
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
@@ -33,12 +34,6 @@ impl Lint for TypeShape {
 }
 
 impl TypeShape {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
-        shapes.visit_file(file.syntax());
-        shapes.violations
-    }
-
     fn findings(ty: &Type) -> Vec<Message> {
         let mut findings = TypeFindings::default();
         findings.visit_type(ty);
@@ -64,6 +59,14 @@ impl TypeShape {
             .map(|_| {
                 Message::new(Problem::new("Result with a String error"), Fix::new("errors are an enum with thiserror"))
             })
+    }
+}
+
+impl FileLint for TypeShape {
+    fn violations(file: &SourceFile) -> Vec<Violation> {
+        let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
+        shapes.visit_file(file.syntax());
+        shapes.violations
     }
 }
 

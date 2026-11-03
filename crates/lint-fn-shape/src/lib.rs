@@ -2,6 +2,7 @@ mod finding;
 mod nesting_depth;
 
 use finding::Finding;
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
@@ -43,12 +44,6 @@ impl FnShape {
     const NESTING: Most = Most::new(2);
     const PARAMETERS: Most = Most::new(4);
 
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut shapes = Shapes { path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
-        shapes.visit_file(file.syntax());
-        shapes.violations
-    }
-
     fn boolean(expr: &Expr) -> Option<&Expr> {
         match expr {
             Expr::Binary(binary)
@@ -84,6 +79,14 @@ impl FnShape {
             Pat::Type(typed) if matches!(&*typed.ty, Type::Path(path) if path.path.is_ident("bool")) => Some(local),
             _ => local.init.as_ref().and_then(|init| Self::boolean(&init.expr)).map(|_| local),
         }
+    }
+}
+
+impl FileLint for FnShape {
+    fn violations(file: &SourceFile) -> Vec<Violation> {
+        let mut shapes = Shapes { path: file.path(), depth: NestingDepth::default(), violations: Vec::new() };
+        shapes.visit_file(file.syntax());
+        shapes.violations
     }
 }
 
