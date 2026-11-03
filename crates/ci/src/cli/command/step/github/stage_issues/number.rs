@@ -1,6 +1,6 @@
-use newtype::{Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype};
 use serde::Deserialize;
 
-#[derive(Newtype, Display, Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Number(u64);

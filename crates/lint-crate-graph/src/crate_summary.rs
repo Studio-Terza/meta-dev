@@ -25,7 +25,6 @@ impl CrateSummary {
         let members = graph.tangles();
         let tangles = members
             .iter()
-            .filter(|members| members.len() > 1)
             .map(|members| Tangle::new(members.iter().filter_map(|member| graph.name_at(*member)).cloned().collect()))
             .collect();
         CrateSummary {

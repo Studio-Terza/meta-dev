@@ -1,5 +1,6 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_placement::CrateName;
 
 use super::measures::Measures;
@@ -17,10 +18,12 @@ impl<'name> Finding<'name> {
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "crate {}: {}; to break a cycle use a standard trait, else a generic over an existing trait, else a derive",
-            self.name, self.measures
-        )
+        write!(formatter, "crate {}: {}", self.name, self.measures)
+    }
+}
+
+impl lint_core::Finding for Finding<'_> {
+    fn fix(&self) -> Fix {
+        Fix::new("to break a cycle use a standard trait, else a generic over an existing trait, else a derive")
     }
 }

@@ -1,6 +1,7 @@
 mod collector;
 mod cover;
 mod ground;
+mod imports;
 mod module;
 mod resolver;
 mod scopes;
@@ -12,11 +13,13 @@ use collector::Collector;
 use lint_core::SourceFile;
 use lint_layout::Word;
 use resolver::Resolver;
+use scopes::Scopes;
 use walker::Walker;
 use wanted::Wanted;
 
 pub use cover::Cover;
 pub use ground::Ground;
+pub use imports::Imports;
 pub use module::Module;
 pub use uses::Use;
 
@@ -26,10 +29,18 @@ pub struct Paths;
 impl Paths {
     #[must_use]
     pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use> {
-        let files: Vec<&SourceFile> = files.into_iter().collect();
-        let scopes = Collector::collect(&files);
+        Self::walked(&files.into_iter().collect::<Vec<_>>(), |scopes| Wanted::among(scopes, finals))
+    }
+
+    #[must_use]
+    pub fn every<'file>(files: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use> {
+        Self::walked(&files.into_iter().collect::<Vec<_>>(), |_| Wanted::EVERY)
+    }
+
+    fn walked(files: &[&SourceFile], wanted: impl FnOnce(&Scopes) -> Wanted) -> Vec<Use> {
+        let scopes = Collector::collect(files);
         let resolver = Resolver::over(&scopes);
-        let wanted = Wanted::among(&scopes, finals);
+        let wanted = wanted(&scopes);
         files.iter().flat_map(|file| Walker::walk(file, &scopes, &wanted, &resolver)).collect()
     }
 }

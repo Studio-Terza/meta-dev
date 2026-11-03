@@ -2,6 +2,7 @@ use std::fmt;
 
 use syn::Ident;
 
+use lint_core::Fix;
 use lint_layout::Name;
 
 pub struct Finding(Name);
@@ -15,5 +16,11 @@ impl From<&Ident> for Finding {
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "fn {} -> bool", self.0)
+    }
+}
+
+impl lint_core::Finding for Finding {
+    fn fix(&self) -> Fix {
+        Fix::new("return an Option, an enum, or a proof type such as NonEmpty")
     }
 }

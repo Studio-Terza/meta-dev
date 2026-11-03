@@ -1,13 +1,16 @@
 use lint_core::{Lint, Readout, Report, SourceFile};
 
+use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
 use lint_distinct_signatures::DistinctSignatures;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
+use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
 use lint_literal_names::LiteralNames;
+use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
 use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
@@ -21,6 +24,7 @@ use lint_no_ignored_tests::NoIgnoredTests;
 use lint_no_numbers_in_binaries::NoNumbersInBinaries;
 use lint_no_parameter_bags::NoParameterBags;
 use lint_no_plaintext::NoPlaintext;
+use lint_no_test_io::NoTestIo;
 use lint_no_test_only_api::NoTestOnlyApi;
 use lint_primitive_boundary::PrimitiveBoundary;
 use lint_private_fns::PrivateFns;
@@ -76,8 +80,12 @@ impl Lints {
             PublicApiTests::report(files),
             NoTestOnlyApi::report(files),
             NoIgnoredTests::report(files),
+            NoTestIo::report(files),
+            FakesAtPorts::report(files),
+            LongExactStrings::report(files),
             NearDuplicateTests::report(files),
             MandatoryLaws::report(files),
+            ArbitraryNewtypes::report(files),
         ]
     }
 

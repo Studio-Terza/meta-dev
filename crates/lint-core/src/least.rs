@@ -1,6 +1,6 @@
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Least(usize);
 
 impl Least {

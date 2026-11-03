@@ -1,7 +1,8 @@
 use std::cmp::Reverse;
+use std::fmt;
 
 use lint_complexity::{Held, Logic};
-use lint_core::Violation;
+use lint_core::{Finding, Fix, Violation};
 use newtype::Newtype;
 
 use super::among::Among;
@@ -39,18 +40,28 @@ impl Hub {
     }
 }
 
+impl fmt::Display for Hub {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "crate {}: logic {}, depended on by {}, {}%; weighted {}",
+            self.crate_name,
+            self.held.logic(),
+            self.share,
+            self.share.percent(),
+            self.weight()
+        )
+    }
+}
+
+impl Finding for Hub {
+    fn fix(&self) -> Fix {
+        Fix::new("move the logic into leaf crates and keep types, traits and interfaces here")
+    }
+}
+
 impl From<&Hub> for Violation {
     fn from(hub: &Hub) -> Violation {
-        Violation::new(
-            hub.held.heaviest().clone(),
-            format_args!(
-                "crate {}: logic {}, depended on by {}, {}%; weighted {}",
-                hub.crate_name,
-                hub.held.logic(),
-                hub.share,
-                hub.share.percent(),
-                hub.weight()
-            ),
-        )
+        Violation::new(hub.held.heaviest().clone(), hub)
     }
 }

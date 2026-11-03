@@ -1,6 +1,7 @@
 use std::fmt;
 
 use lint_core::{Site, Violation};
+use lint_layout::Fix;
 use type_facts::Transition;
 
 use super::family::Family;
@@ -39,6 +40,14 @@ impl fmt::Display for Comparison {
             formatter,
             "workspace: {} transitions between workspace types compared, {} input-output pairs joined more than once by {} transitions; not compared: {} touching a primitive or unit, {} touching a foreign or generic type",
             self.compared, self.families, self.repeated, self.primitive, self.foreign
+        )
+    }
+}
+
+impl lint_layout::Finding for Comparison {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "route each repeated input-output pair through one transition, as From, TryFrom or FromStr where it fits",
         )
     }
 }

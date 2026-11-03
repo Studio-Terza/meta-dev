@@ -30,16 +30,18 @@ const_shape, type_shape, distinct_signatures, expression_flow, fn_shape, literal
 manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_binaries,
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
-near_duplicate_tests, mandatory_laws, rust_only, workflow_run.
+no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
 It is report only, no number blocks. The run also lists public `is_` and `has_` methods returning `bool`, in impls and in public traits
-(`bool_methods`), with the headline naming the alternatives, and public methods that form a pair such as
-`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with the headline saying to write a guard. Those lists are report only too,
+(`bool_methods`), with each entry naming the alternatives, and public methods that form a pair such as
+`start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. Those lists are report only too,
 so they are outside the lints above and never change the exit code.
 
-Every lint implements `Lint` and takes the same files. Limits are constants inside each lint, not
+Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
+`Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
+compile, and each violation prints as `path:line: problem; fix`. A constant message is a `Message` of a `Problem` and a `Fix`. Limits are constants inside each lint, not
 settings, and there is no per-repository configuration, switch or baseline. Where something is sometimes
 legitimate, the lint gates where by naming convention: starting a process (`process_starters`) and calling
 `fs::remove_dir_all`, `mem::forget` or `env::temp_dir` (`raw_resources`) are allowed only in a crate whose name
@@ -51,6 +53,34 @@ a raw call must sit in an impl of a type that implements `Drop`: the guard that 
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.
 
+`no_test_io` keeps effects out of tests. In a file under a package's `tests` directory it fails a path in an expression
+or a macro body that resolves, through imports as `process_starters` reads them, into `std::fs`, `std::net`, `std::env`,
+`std::process`, `std::os::unix::fs`, `std::os::unix::net`, `std::os::windows::fs` or the `tempfile` crate. `std::process::ExitCode`
+is a value and passes; so do types in signatures and `env!`, which is read at compile time. Raw I/O in test code is allowed
+only in a test target named `ports` (`tests/ports.rs` or `tests/ports/`) or a module named `ports`, where the tests of a port
+exercise the real effect; everywhere else a test goes through a fake of the port or a library API such as `golden!`, and
+the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
+a process in test code still also needs what `process_starters` asks for.
+
+`fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union
+whose name has the word `Fake`, `Stub`, `Mock`, `Spy` or `Dummy` among its camel-case words (`FakeClock`, `HTTPStub`, not
+`Fakery` or `Spyglass`) must implement a port: a trait whose path, read through the `use` items of its test target as
+`lint-paths` reads them, passes through a module named `ports`, starts at a crate whose name ends in the word `ports`, or
+names a trait that crate declares in a `ports` module or a crate whose name ends in ports (so a re-export such as `ci::Ports`
+counts). Besides ports it may implement only std traits: a path that starts at `std`, `core` or `alloc`, or a bare name
+of a prelude trait such as `Clone`, `Default` or `Drop`. Derives and inherent impls are not trait impls and pass. The impls
+of a double are matched by name within its test target, across its files. A double with no port fails at its declaration,
+and any other trait impl fails at the impl; the message names the fix: implement a port, or rename the type.
+
+`long_exact_strings` keeps long text out of assertions. It fails an `assert_eq!` or `assert_ne!`, an `assert!` whose condition is
+`==` or `!=`, or a row of `laws::table!` (also when `table` is imported or renamed), when a compared side, or an expected value of
+the table, is a string or byte string literal holding a line break (a `\n` escape or a real one), or is built with Debug
+formatting: `format!` or `format_args!` whose format string has a `{:?}`, `{:#?}` or `{name:?}` placeholder. The compared side
+is read through references, `to_owned`, `to_string`, `into`, `clone` and the like, `Some`, `Ok`, `Err`, `String::from`, arrays,
+tuples, struct fields, `concat!` and `vec!`, and through a local `let` or a `const` of the file that it names. Arguments of
+other calls are inputs and are not read, nor is the failure message of an assertion. The definition is structural: there is
+no length threshold. The message names the fix: compare a golden with `golden!`, or assert on the parts, such as the lines.
+
 A check that cannot run under plain `cargo test`, such as one that drives a browser or needs its own time budget,
 goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_ignored_tests` does not read
 `test = false` on an `[[example]]`, since an example is not a test.
@@ -59,9 +89,9 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 `cfg(test)` gate or `#[doc(hidden)]`. It matches by name across the files it is given, so a name that shipped code also
 uses elsewhere passes.
 
-Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters` and `raw_resources`), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
-library), `lint` (the binary), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
+Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `lint-runner` (the runner
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` and `lint-paired-apis` (the report-only lists), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output) and `text-lines` (lines of a text). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
@@ -242,8 +272,14 @@ A validated newtype has no `new`. With `#[newtype(check = ..., error = ...)]` th
     #[newtype(check = Even::check, error = Odd)]
     struct Even(u32);
 
-`#[derive(Arbitrary)]` implements proptest's `Arbitrary` through those constructors, so a validated newtype
-only generates values its check admits. The using crate needs `proptest` as a dependency.
+`#[derive(Arbitrary)]` (`newtype::Arbitrary`) implements proptest's `Arbitrary` through those constructors, so a validated newtype
+only generates values its check admits. It reaches proptest through `newtype::proptest`, so the using crate needs only
+`newtype`.
+
+`arbitrary_newtypes` fails a struct in shipped code that derives `Newtype` without `Arbitrary`, so `any::<T>()` works
+for every domain value. A newtype that borrows (a reference or a lifetime in its field or generics) passes, since
+proptest cannot own what it generates. When the inner type has no `Arbitrary`, the fix is `#[newtype(strategy = ...)]`
+or a generator for the inner type: `text_lines::OneLine` and `lint_layout::Name` have hand-written ones.
 
 `#[newtype(strategy = ...)]` gives the derived `Arbitrary` its own proptest strategy for the inner value, for checks
 that admit a small share of it (`strategy = 0u32..1000`, `strategy = "[0-9a-f]{40}"`). A validated newtype with a

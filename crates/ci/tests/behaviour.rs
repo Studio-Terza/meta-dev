@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs;
 use std::io::{self, Write};
 use std::num::NonZeroU8;
 use std::path::{Path, PathBuf};
@@ -10,18 +9,28 @@ use std::time::Duration;
 
 use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
+use ports::Scratch;
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
-const LEAF_REPORT: &str = "REACH=1 of 5 crates\nBUILD_SCOPE=-p leaf\nMUTANTS_SCOPE=--test-package=leaf\n";
-const TWO_REPORT: &str = "REACH=2 of 5 crates\nBUILD_SCOPE=-p middle -p tested-through\n\
-    MUTANTS_SCOPE=--test-package=middle --test-package=tested-through\n";
-const EMPTY_REPORT: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n";
-const EMPTY_NOTES: &str = "skipped: BUILD_SCOPE is empty, so the steps that use it do not run\n\
-    skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
-const EMPTY_REPORT_AND_NOTES: &str = "REACH=0 of 5 crates\nBUILD_SCOPE=\nMUTANTS_SCOPE=\n\
-    skipped: BUILD_SCOPE is empty, so the steps that use it do not run\n\
-    skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n";
-const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0\n";
+const LEAF_REPORT: [&str; 3] = ["REACH=1 of 5 crates", "BUILD_SCOPE=-p leaf", "MUTANTS_SCOPE=--test-package=leaf"];
+const TWO_REPORT: [&str; 3] = [
+    "REACH=2 of 5 crates",
+    "BUILD_SCOPE=-p middle -p tested-through",
+    "MUTANTS_SCOPE=--test-package=middle --test-package=tested-through",
+];
+const EMPTY_REPORT: [&str; 3] = ["REACH=0 of 5 crates", "BUILD_SCOPE=", "MUTANTS_SCOPE="];
+const EMPTY_NOTES: [&str; 2] = [
+    "skipped: BUILD_SCOPE is empty, so the steps that use it do not run",
+    "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run",
+];
+const EMPTY_REPORT_AND_NOTES: [&str; 5] = [
+    "REACH=0 of 5 crates",
+    "BUILD_SCOPE=",
+    "MUTANTS_SCOPE=",
+    "skipped: BUILD_SCOPE is empty, so the steps that use it do not run",
+    "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run",
+];
+const HISTORY_LINE: &str = "abc123\treach 1 of 5\tfan-in core=2 middle=1 leaf=0 serde-user=0 tested-through=0";
 const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
 const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
@@ -112,8 +121,7 @@ impl Ports for Fake {
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {
         self.recorded(invocation)?;
         self.logs.borrow_mut().push(log.to_path_buf());
-        log.parent().map_or(Ok(()), fs::create_dir_all)?;
-        fs::write(log, &self.logged_text)?;
+        Scratch::placed(log, &self.logged_text)?;
         Ok(Run::new(self.exit, self.elapsed))
     }
 }
@@ -126,6 +134,10 @@ struct Answer {
 }
 
 impl Answer {
+    fn lines(&self) -> Printed<'_> {
+        Printed { exit: self.exit, out: Text::lines(&self.out), err: Text::lines(&self.err) }
+    }
+
     fn to<Argument: AsRef<str>>(fake: &Fake, arguments: &[Argument]) -> Answer {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit =
@@ -140,30 +152,6 @@ impl Answer {
     fn refused(arguments: &[&str]) -> bool {
         let answer = Answer::to(&Fake::new(), arguments);
         answer.exit == ExitCode::FAILURE && answer.out.is_empty() && answer.err.contains("usage: ci ")
-    }
-}
-
-struct Scratch(tempfile::TempDir);
-
-impl Scratch {
-    fn new() -> Result<Scratch, io::Error> {
-        Ok(Scratch(tempfile::tempdir()?))
-    }
-
-    fn file(&self, name: &str) -> String {
-        self.0.path().join(name).display().to_string()
-    }
-
-    fn read(&self, name: &str) -> String {
-        fs::read_to_string(self.0.path().join(name)).unwrap_or_default()
-    }
-
-    fn write(&self, name: &str, text: &str) -> Result<(), io::Error> {
-        fs::write(self.0.path().join(name), text)
-    }
-
-    fn path(&self) -> &Path {
-        self.0.path()
     }
 }
 
@@ -184,30 +172,30 @@ impl Reach {
 struct Sample;
 
 impl Sample {
-    fn timed_line(elapsed: &Duration) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    fn timed_line(elapsed: &Duration) -> Vec<String> {
+        let scratch = Scratch::fresh();
         let fake = Fake { elapsed: *elapsed, ..Fake::new() };
         Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
-        scratch.read("m.toml")
+        Text::owned(&scratch.read("m.toml"))
     }
 
-    fn libtest_line(output: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
-        fs::write(scratch.path().join("out.txt"), output).ok();
+    fn libtest_line(output: &&str) -> Vec<String> {
+        let scratch = Scratch::fresh();
+        scratch.write("out.txt", output).ok();
         Answer::to(&Fake::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
-        scratch.read("m.toml")
+        Text::owned(&scratch.read("m.toml"))
     }
 
-    fn reach_report(changed: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    fn reach_report(changed: &&str) -> Vec<String> {
+        let scratch = Scratch::fresh();
         let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
-        Answer::to(&fake, &Reach::into(&scratch, "pull_request", "feature")).out
+        Text::owned(&Answer::to(&fake, &Reach::into(&scratch, "pull_request", "feature")).out)
     }
 
-    fn reach_into_main(changed: &&str) -> String {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    fn reach_into_main(changed: &&str) -> Vec<String> {
+        let scratch = Scratch::fresh();
         let fake = Fake { changed: (*changed).to_owned(), ..Fake::new() };
-        Answer::to(&fake, &Reach::into(&scratch, "pull_request", "main")).out
+        Text::owned(&Answer::to(&fake, &Reach::into(&scratch, "pull_request", "main")).out)
     }
 }
 
@@ -215,13 +203,13 @@ laws::table!(
     a_stage_is_recorded_in_seconds_to_two_places,
     Sample::timed_line,
     [
-        Duration::from_millis(1_500) => "clippy = 1.50\n",
-        ROUNDED_UP => "clippy = 2.00\n",
-        Duration::from_millis(4) => "clippy = 0.00\n",
-        Duration::from_millis(1_004) => "clippy = 1.00\n",
-        Duration::from_millis(1_006) => "clippy = 1.01\n",
-        Duration::ZERO => "clippy = 0.00\n",
-        Duration::from_secs(125) => "clippy = 125.00\n",
+        Duration::from_millis(1_500) => vec!["clippy = 1.50"],
+        ROUNDED_UP => vec!["clippy = 2.00"],
+        Duration::from_millis(4) => vec!["clippy = 0.00"],
+        Duration::from_millis(1_004) => vec!["clippy = 1.00"],
+        Duration::from_millis(1_006) => vec!["clippy = 1.01"],
+        Duration::ZERO => vec!["clippy = 0.00"],
+        Duration::from_secs(125) => vec!["clippy = 125.00"],
     ]
 );
 
@@ -229,24 +217,24 @@ laws::table!(
     the_libtest_seconds_of_every_result_line_are_added,
     Sample::libtest_line,
     [
-        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => "test-run = 0.50\n",
-        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => "test-run = 1.75\n",
-        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => "test-run = 2.00\n",
-        "test result: ok. 1 passed; 0 failed\n" => "test-run = 0.00\n",
-        "" => "",
-        "no result lines here\n" => "",
-        "test result: ok. finished in abc\n" => "test-run = 0.00\n",
-        "test result: ok. finished in 3s\n" => "test-run = 3.00\n",
-        "test result: ok. finished in 0.5\n" => "test-run = 0.50\n",
-        "test result: ok. finished in 1s in 2s\n" => "test-run = 3.00\n",
-        "  test result: ok. finished in 9s\n" => "",
-        "test results: ok. finished in 4s\n" => "test-run = 4.00\n",
-        "test result: ok. finished in\n" => "test-run = 0.00\n",
-        "test result: ok. finishedin 5s\n" => "test-run = 0.00\n",
-        "test result: ok. in 1.5.5s\n" => "test-run = 0.00\n",
-        "test resul: ok. finished in 5s\n" => "",
-        "test result: ok. finished  in\t7s\n" => "test-run = 7.00\n",
-        "test result: ok. finished in 0.004s\n" => "test-run = 0.00\n",
+        "test result: ok. 3 passed; 0 failed; finished in 0.50s\n" => vec!["test-run = 0.50"],
+        "test result: ok. 1 passed; finished in 0.50s\ntest result: ok. 2 passed; finished in 1.25s\n" => vec!["test-run = 1.75"],
+        "running 3 tests\n...\ntest result: ok. finished in 2.00s\nfinished in 9.00s\n" => vec!["test-run = 2.00"],
+        "test result: ok. 1 passed; 0 failed\n" => vec!["test-run = 0.00"],
+        "" => Vec::<&str>::new(),
+        "no result lines here\n" => Vec::<&str>::new(),
+        "test result: ok. finished in abc\n" => vec!["test-run = 0.00"],
+        "test result: ok. finished in 3s\n" => vec!["test-run = 3.00"],
+        "test result: ok. finished in 0.5\n" => vec!["test-run = 0.50"],
+        "test result: ok. finished in 1s in 2s\n" => vec!["test-run = 3.00"],
+        "  test result: ok. finished in 9s\n" => Vec::<&str>::new(),
+        "test results: ok. finished in 4s\n" => vec!["test-run = 4.00"],
+        "test result: ok. finished in\n" => vec!["test-run = 0.00"],
+        "test result: ok. finishedin 5s\n" => vec!["test-run = 0.00"],
+        "test result: ok. in 1.5.5s\n" => vec!["test-run = 0.00"],
+        "test resul: ok. finished in 5s\n" => Vec::<&str>::new(),
+        "test result: ok. finished  in\t7s\n" => vec!["test-run = 7.00"],
+        "test result: ok. finished in 0.004s\n" => vec!["test-run = 0.00"],
     ]
 );
 
@@ -254,11 +242,11 @@ laws::table!(
     the_scope_is_what_the_changed_files_reach,
     Sample::reach_report,
     [
-        "crates/leaf/src/lib.rs\n" => LEAF_REPORT,
-        "crates/middle/src/lib.rs\n" => TWO_REPORT,
-        "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n" => TWO_REPORT,
-        "README.md\n" => EMPTY_REPORT_AND_NOTES,
-        "" => EMPTY_REPORT_AND_NOTES,
+        "crates/leaf/src/lib.rs\n" => LEAF_REPORT.to_vec(),
+        "crates/middle/src/lib.rs\n" => TWO_REPORT.to_vec(),
+        "crates/middle/src/lib.rs\ncrates/middle/src/other.rs\n" => TWO_REPORT.to_vec(),
+        "README.md\n" => EMPTY_REPORT_AND_NOTES.to_vec(),
+        "" => EMPTY_REPORT_AND_NOTES.to_vec(),
     ]
 );
 
@@ -266,8 +254,8 @@ laws::table!(
     a_pull_request_into_main_runs_the_whole_workspace_but_reports_the_reach_for_mutants,
     Sample::reach_into_main,
     [
-        "crates/leaf/src/lib.rs\n" => "REACH=1 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=--test-package=leaf\n",
-        "README.md\n" => "REACH=0 of 5 crates\nBUILD_SCOPE=--workspace\nMUTANTS_SCOPE=\nskipped: MUTANTS_SCOPE is empty, so the steps that use it do not run\n",
+        "crates/leaf/src/lib.rs\n" => vec!["REACH=1 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=--test-package=leaf"],
+        "README.md\n" => vec!["REACH=0 of 5 crates", "BUILD_SCOPE=--workspace", "MUTANTS_SCOPE=", "skipped: MUTANTS_SCOPE is empty, so the steps that use it do not run"],
     ]
 );
 
@@ -276,14 +264,14 @@ fn a_timed_stage_runs_the_program_with_its_arguments() -> Result<(), Box<dyn Err
     let scratch = Scratch::new()?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo", "clippy", "--all-targets"]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["clippy", "--all-targets"])]);
     let calls = fake.calls.borrow();
     assert_eq!(
         calls.first().map(|call| call.arguments().to_vec()),
         Some(vec![OsString::from("clippy"), OsString::from("--all-targets")])
     );
-    assert_eq!(scratch.read("m.toml"), "clippy = 1.50\n");
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
     Ok(())
 }
 
@@ -293,7 +281,7 @@ fn a_timed_stage_is_appended_to_what_is_measured() -> Result<(), Box<dyn Error>>
     scratch.write("m.toml", "fmt = 0.10\n")?;
     Answer::to(&Fake::new(), &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
     Answer::to(&Fake::new(), &["timed", &scratch.file("m.toml"), "lint", "cargo"]);
-    assert_eq!(scratch.read("m.toml"), "fmt = 0.10\nclippy = 1.50\nlint = 1.50\n");
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["fmt = 0.10", "clippy = 1.50", "lint = 1.50"]);
     Ok(())
 }
 
@@ -303,7 +291,7 @@ fn a_failing_program_fails_the_step_with_its_code_and_is_still_measured() -> Res
     let fake = Fake { exit: Exit::Failure(FAILED_WITH), ..Fake::new() };
     let answer = Answer::to(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
     assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
-    assert_eq!(scratch.read("m.toml"), "clippy = 1.50\n");
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
     Ok(())
 }
 
@@ -312,7 +300,7 @@ fn a_program_that_cannot_start_is_reported_and_not_measured() -> Result<(), Box<
     let scratch = Scratch::new()?;
     let answer = Answer::to(&Fake::refusing("cargo"), &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert_eq!(answer.err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&answer.err), ["cannot run cargo: boom"]);
     assert_eq!(scratch.read("m.toml"), "");
     Ok(())
 }
@@ -335,8 +323,8 @@ fn libtest_seconds_are_appended_under_the_stage_name() -> Result<(), Box<dyn Err
     scratch.write("out.txt", "test result: ok. finished in 0.25s\n")?;
     let answer =
         Answer::to(&Fake::new(), &["libtest-seconds", &scratch.file("m.toml"), "test-run", &scratch.file("out.txt")]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
-    assert_eq!(scratch.read("m.toml"), "clippy = 1.00\ntest-run = 0.25\n");
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.00", "test-run = 0.25"]);
     Ok(())
 }
 
@@ -371,11 +359,11 @@ fn off_a_pull_request_the_scope_is_the_whole_workspace() -> Result<(), Box<dyn E
     let fake = Fake::new();
     let answer = Answer::to(&fake, &Reach::on(&scratch, "push"));
     assert_eq!(
-        answer,
-        Answer { exit: ExitCode::SUCCESS, out: "BUILD_SCOPE=--workspace\n".to_owned(), err: String::new() }
+        answer.lines(),
+        Printed { exit: ExitCode::SUCCESS, out: vec!["BUILD_SCOPE=--workspace"], err: Vec::<&str>::new() }
     );
-    assert_eq!(scratch.read("env"), "BUILD_SCOPE=--workspace\n");
-    assert_eq!(scratch.read("sum"), "BUILD_SCOPE=--workspace\n");
+    assert_eq!(Text::lines(&scratch.read("env")), ["BUILD_SCOPE=--workspace"]);
+    assert_eq!(Text::lines(&scratch.read("sum")), ["BUILD_SCOPE=--workspace"]);
     assert_eq!(
         *fake.calls.borrow(),
         [Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"])]
@@ -389,9 +377,9 @@ fn on_a_pull_request_the_changed_files_are_asked_of_git() -> Result<(), Box<dyn 
     let scratch = Scratch::new()?;
     let fake = Fake { changed: "crates/leaf/src/lib.rs\n".to_owned(), ..Fake::new() };
     let answer = Answer::to(&fake, &Reach::on(&scratch, "pull_request"));
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: LEAF_REPORT.to_owned(), err: String::new() });
-    assert_eq!(scratch.read("env"), LEAF_REPORT);
-    assert_eq!(scratch.read("sum"), LEAF_REPORT);
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: LEAF_REPORT.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&scratch.read("env")), LEAF_REPORT);
+    assert_eq!(Text::lines(&scratch.read("sum")), LEAF_REPORT);
     assert_eq!(
         *fake.calls.borrow(),
         [
@@ -415,9 +403,9 @@ fn a_history_line_names_the_revision_the_reach_and_every_fan_in_and_is_appended(
     let arguments = ["history", &scratch.file("metadata.json"), &scratch.file("history.tsv"), "abc123"];
     let answer = Answer::to(&fake, &arguments);
     assert_eq!(answer.exit, ExitCode::SUCCESS);
-    assert_eq!(answer.out, HISTORY_LINE);
+    assert_eq!(Text::lines(&answer.out), [HISTORY_LINE]);
     Answer::to(&fake, &arguments);
-    assert_eq!(scratch.read("history.tsv"), format!("older\n{HISTORY_LINE}{HISTORY_LINE}"));
+    assert_eq!(Text::lines(&scratch.read("history.tsv")), ["older", HISTORY_LINE, HISTORY_LINE]);
     Ok(())
 }
 
@@ -428,13 +416,15 @@ fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() 
     scratch.write("history.tsv", "older\n")?;
     let arguments = ["measured-history", &scratch.file("m.toml"), &scratch.file("history.tsv"), "abc123"];
     let answer = Answer::to(&Fake::new(), &arguments);
-    let line = "abc123\tcold-clippy = 52.3\tcold-test-compile = 80\n";
-    assert_eq!((answer.exit, answer.out), (ExitCode::SUCCESS, line.to_owned()));
-    assert_eq!(scratch.read("history.tsv"), format!("older\n{line}"));
+    let line = "abc123\tcold-clippy = 52.3\tcold-test-compile = 80";
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line]));
+    assert_eq!(Text::lines(&scratch.read("history.tsv")), ["older", line]);
     let missing = ["measured-history", &scratch.file("none.toml"), &scratch.file("history.tsv"), "abc123"];
     assert_eq!(Answer::to(&Fake::new(), &missing).exit, ExitCode::FAILURE);
     Ok(())
 }
+
+const LOWERED_RECORD: [&str; 2] = ["cold-clippy = 48.5", "cold-test-compile = 80"];
 
 #[test]
 fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Result<(), Box<dyn Error>> {
@@ -447,11 +437,11 @@ fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Res
     };
     let lowered = lower("lower.toml");
     assert_eq!(lowered.exit, ExitCode::SUCCESS);
-    assert_eq!(scratch.read("record.toml"), "cold-clippy = 48.5\ncold-test-compile = 80\n");
+    assert_eq!(Text::lines(&scratch.read("record.toml")), LOWERED_RECORD);
     let above = lower("above.toml");
     assert_eq!(above.exit, ExitCode::FAILURE);
     assert!(above.err.contains("cold-test-compile took 81s"), "{}", above.err);
-    assert_eq!(scratch.read("record.toml"), "cold-clippy = 48.5\ncold-test-compile = 80\n");
+    assert_eq!(Text::lines(&scratch.read("record.toml")), LOWERED_RECORD);
     Ok(())
 }
 
@@ -461,7 +451,7 @@ fn a_history_needs_git_and_readable_metadata_and_a_writable_file() -> Result<(),
     scratch.write("metadata.json", METADATA)?;
     let named = |file: &str| ["history".to_owned(), scratch.file("metadata.json"), scratch.file(file), "r".to_owned()];
     let git = Answer::to(&Fake::refusing("git"), &named("history.tsv"));
-    assert_eq!((git.exit, git.err.as_str()), (ExitCode::FAILURE, "cannot run git: boom\n"));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
     scratch.write("blocker", "")?;
     assert_eq!(Answer::to(&Fake::new(), &named("blocker/history.tsv")).exit, ExitCode::FAILURE);
     let broken = ["history".to_owned(), scratch.file("none.json"), scratch.file("history.tsv"), "r".to_owned()];
@@ -478,10 +468,8 @@ fn a_report_is_appended_to_the_summary_under_its_name_or_said_to_be_missing() ->
     let arguments = |report: &str| ["summarize".to_owned(), scratch.file(report), scratch.file("summary.md")];
     assert_eq!(Answer::to(&Fake::new(), &arguments("report.txt")).exit, ExitCode::SUCCESS);
     assert_eq!(Answer::to(&Fake::new(), &arguments("absent.txt")).exit, ExitCode::SUCCESS);
-    assert_eq!(
-        scratch.read("summary.md"),
-        format!("# Summary\n{}:\nfound\n{}:\nnot produced\n", scratch.file("report.txt"), scratch.file("absent.txt"))
-    );
+    let (found, absent) = (format!("{}:", scratch.file("report.txt")), format!("{}:", scratch.file("absent.txt")));
+    assert_eq!(Text::lines(&scratch.read("summary.md")), ["# Summary", &found, "found", &absent, "not produced"]);
     Ok(())
 }
 
@@ -514,9 +502,9 @@ impl Page {
 fn compile_time_is_summed_per_crate_longest_first_and_stored() -> Result<(), Box<dyn Error>> {
     let page = Page::with(&[Page::unit("aaa", "0.25"), Page::unit("zzz", "1.5"), Page::unit("zzz", "0.5")].join(","));
     let Timings { answer, stored } = Page::timed(&page)?;
-    let expected = "compile time per crate, seconds, longest first, 2.25 in all:\n2.00 zzz\n0.25 aaa\n";
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected.to_owned(), err: String::new() });
-    assert_eq!(stored, expected);
+    let expected = vec!["compile time per crate, seconds, longest first, 2.25 in all:", "2.00 zzz", "0.25 aaa"];
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.clone(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&stored), expected);
     Ok(())
 }
 
@@ -547,9 +535,9 @@ fn a_page_without_readable_unit_data_is_refused() -> Result<(), Box<dyn Error>> 
 fn a_program_the_scope_needs_that_cannot_start_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let cargo = Answer::to(&Fake::refusing("cargo"), &Reach::on(&scratch, "push"));
-    assert_eq!((cargo.exit, cargo.err.as_str()), (ExitCode::FAILURE, "cannot run cargo: boom\n"));
+    assert_eq!((cargo.exit, Text::lines(&cargo.err)), (ExitCode::FAILURE, vec!["cannot run cargo: boom"]));
     let git = Answer::to(&Fake::refusing("git"), &Reach::on(&scratch, "pull_request"));
-    assert_eq!((git.exit, git.err.as_str()), (ExitCode::FAILURE, "cannot run git: boom\n"));
+    assert_eq!((git.exit, Text::lines(&git.err)), (ExitCode::FAILURE, vec!["cannot run git: boom"]));
     assert_eq!(git.out, "");
     Ok(())
 }
@@ -646,8 +634,8 @@ fn a_reach_report_is_appended_to_the_environment_and_the_summary() -> Result<(),
     scratch.write("env", "KEPT=1\n")?;
     scratch.write("sum", "# Summary\n")?;
     Answer::to(&Fake::new(), &Reach::on(&scratch, "push"));
-    assert_eq!(scratch.read("env"), "KEPT=1\nBUILD_SCOPE=--workspace\n");
-    assert_eq!(scratch.read("sum"), "# Summary\nBUILD_SCOPE=--workspace\n");
+    assert_eq!(Text::lines(&scratch.read("env")), ["KEPT=1", "BUILD_SCOPE=--workspace"]);
+    assert_eq!(Text::lines(&scratch.read("sum")), ["# Summary", "BUILD_SCOPE=--workspace"]);
     Ok(())
 }
 
@@ -655,10 +643,10 @@ fn a_reach_report_is_appended_to_the_environment_and_the_summary() -> Result<(),
 fn an_empty_scope_is_said_in_the_output_and_the_summary_but_not_put_in_the_environment() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let answer = Answer::to(&Fake::new(), &Reach::on(&scratch, "pull_request"));
-    assert_eq!(answer.out, EMPTY_REPORT_AND_NOTES);
-    assert_eq!(scratch.read("env"), EMPTY_REPORT);
-    assert_eq!(scratch.read("sum"), EMPTY_REPORT_AND_NOTES);
-    assert_eq!(EMPTY_NOTES.len() + EMPTY_REPORT.len(), EMPTY_REPORT_AND_NOTES.len());
+    assert_eq!(Text::lines(&answer.out), EMPTY_REPORT_AND_NOTES);
+    assert_eq!(Text::lines(&scratch.read("env")), EMPTY_REPORT);
+    assert_eq!(Text::lines(&scratch.read("sum")), EMPTY_REPORT_AND_NOTES);
+    assert_eq!([EMPTY_REPORT.as_slice(), EMPTY_NOTES.as_slice()].concat(), EMPTY_REPORT_AND_NOTES);
     Ok(())
 }
 
@@ -673,11 +661,11 @@ fn a_scope_with_crates_says_nothing_is_skipped() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_tools_are_built_and_copied_to_the_tools_directory() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir(scratch.path().join("built"))?;
+    scratch.directory("built")?;
     ["reach", "lint", "ci"].iter().try_for_each(|name| scratch.write(&format!("built/{name}"), name))?;
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["tools", &scratch.file("built"), &scratch.file("a/b/tools")]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", [BUILD.as_slice(), &["--bin", "ci"]].concat())]);
     assert_eq!(["reach", "lint", "ci"].map(|name| scratch.read(&format!("a/b/tools/{name}"))), ["reach", "lint", "ci"]);
     Ok(())
@@ -708,7 +696,7 @@ fn tools_cannot_go_where_a_file_is_and_cargo_must_start() -> Result<(), Box<dyn 
     let blocked = Answer::to(&Fake::new(), &["tools", &scratch.file("built"), &scratch.file("blocker/tools")]);
     assert!(blocked.err.contains("blocker/tools"));
     let refused = Answer::to(&Fake::refusing("cargo"), &["tools", &scratch.file("built"), &scratch.file("tools")]);
-    assert_eq!(refused.err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
     Ok(())
 }
 
@@ -720,10 +708,20 @@ const TOOLS_WORKSPACE: &str = r#"{"workspace_root": "/w", "packages": [
   {"name": "lint-core", "manifest_path": "/w/crates/lint-core/Cargo.toml", "dependencies": []},
   {"name": "gate-limits", "manifest_path": "/w/crates/gate-limits/Cargo.toml", "dependencies": [{"name": "ci"}]}
 ]}"#;
-const TOOLS_SOURCES: &str = "sources<<TOOLS_SOURCES\n\
-    crates/ci/Cargo.toml\ncrates/ci/src/**\ncrates/lint/Cargo.toml\ncrates/lint/src/**\n\
-    crates/lint-core/Cargo.toml\ncrates/lint-core/src/**\ncrates/reach/Cargo.toml\ncrates/reach/src/**\n\
-    crates/text-lines/Cargo.toml\ncrates/text-lines/src/**\nTOOLS_SOURCES\n";
+const TOOLS_SOURCES: [&str; 12] = [
+    "sources<<TOOLS_SOURCES",
+    "crates/ci/Cargo.toml",
+    "crates/ci/src/**",
+    "crates/lint/Cargo.toml",
+    "crates/lint/src/**",
+    "crates/lint-core/Cargo.toml",
+    "crates/lint-core/src/**",
+    "crates/reach/Cargo.toml",
+    "crates/reach/src/**",
+    "crates/text-lines/Cargo.toml",
+    "crates/text-lines/src/**",
+    "TOOLS_SOURCES",
+];
 
 #[test]
 fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_others() -> Result<(), Box<dyn Error>> {
@@ -731,8 +729,8 @@ fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_o
     scratch.write("out", "KEPT=1\n")?;
     let fake = Fake { metadata: TOOLS_WORKSPACE.to_owned(), ..Fake::new() };
     let answer = Answer::to(&fake, &["tools-key", &scratch.file("m/metadata.json"), &scratch.file("out")]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
-    assert_eq!(scratch.read("out"), format!("KEPT=1\n{TOOLS_SOURCES}"));
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&scratch.read("out")), [["KEPT=1"].as_slice(), TOOLS_SOURCES.as_slice()].concat());
     Ok(())
 }
 
@@ -740,7 +738,7 @@ fn the_tools_key_lists_the_sources_of_the_tools_and_what_they_depend_on_and_no_o
 fn a_tools_key_needs_metadata_cargo_can_give_and_reach_can_read() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let arguments = ["tools-key", &scratch.file("metadata.json"), &scratch.file("out")];
-    assert_eq!(Answer::to(&Fake::refusing("cargo"), &arguments).err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&Answer::to(&Fake::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     let broken = Fake { metadata: "not json".to_owned(), ..Fake::new() };
     assert!(Answer::to(&broken, &arguments).err.contains("reach failed: cannot parse cargo metadata"));
     assert!(!scratch.path().join("out").exists());
@@ -752,12 +750,15 @@ fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Box<dyn Err
     let scratch = Scratch::new()?;
     let fake = Fake { logged_text: "seen\n".to_owned(), exit: Exit::Failure(FAILED_WITH), ..Fake::new() };
     let answer = Answer::to(&fake, &["logged", &scratch.file("logs/test.txt"), "cargo", "test", "-p", "leaf"]);
-    assert_eq!(answer, Answer { exit: ExitCode::from(FAILED_WITH.get()), out: String::new(), err: String::new() });
+    assert_eq!(
+        answer.lines(),
+        Printed { exit: ExitCode::from(FAILED_WITH.get()), out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+    );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["test", "-p", "leaf"])]);
     assert_eq!(*fake.logs.borrow(), [scratch.path().join("logs/test.txt")]);
-    assert_eq!(scratch.read("logs/test.txt"), "seen\n");
+    assert_eq!(Text::lines(&scratch.read("logs/test.txt")), ["seen"]);
     let refused = Answer::to(&Fake::refusing("cargo"), &["logged", &scratch.file("t.txt"), "cargo"]);
-    assert_eq!(refused.err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
     Ok(())
 }
 
@@ -797,7 +798,7 @@ impl Exits {
     }
 
     fn changed(code: &Code) -> ExitCode {
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let arguments = ["mutants-changed", &scratch.file("d.diff"), &scratch.file("out"), "--test-package=leaf"];
         Answer::to(&Fake::exiting(code.0), &arguments).exit
     }
@@ -832,10 +833,10 @@ laws::table!(
 fn a_shard_runs_cargo_mutants_for_its_slice() {
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["mutants-shard", "3/8", "/tmp/out"]);
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: String::new(), err: String::new() });
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: Vec::<&str>::new(), err: Vec::<&str>::new() });
     assert_eq!(*fake.calls.borrow(), [Cargo::mutants("3/8", "/tmp/out")]);
     let refused = Answer::to(&Fake::refusing("cargo"), &["mutants-shard", "3/8", "out"]);
-    assert_eq!(refused.err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&refused.err), ["cannot run cargo: boom"]);
 }
 
 #[test]
@@ -847,10 +848,10 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
         &["mutants-changed", &scratch.file("tmp/c.diff"), &scratch.file("out"), "--test-package=a", "--test-package=b"],
     );
     assert_eq!(
-        answer,
-        Answer { exit: ExitCode::SUCCESS, out: "mutants: none missed\n".to_owned(), err: String::new() }
+        answer.lines(),
+        Printed { exit: ExitCode::SUCCESS, out: vec!["mutants: none missed"], err: Vec::<&str>::new() }
     );
-    assert_eq!(scratch.read("tmp/c.diff"), "+a line\n");
+    assert_eq!(Text::lines(&scratch.read("tmp/c.diff")), ["+a line"]);
     assert_eq!(
         *fake.calls.borrow(),
         [
@@ -879,21 +880,21 @@ fn changed_lines_are_written_and_tested_in_the_scope() -> Result<(), Box<dyn Err
 #[test]
 fn missed_mutants_fail_the_step_and_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("out/mutants.out"))?;
+    scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "src/a.rs:1: replace f -> bool with true\n")?;
     let answer = Answer::to(&Fake::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
     assert_eq!(answer.exit, ExitCode::from(2));
-    assert_eq!(answer.out, "mutants missed:\nsrc/a.rs:1: replace f -> bool with true\n");
+    assert_eq!(Text::lines(&answer.out), ["mutants missed:", "src/a.rs:1: replace f -> bool with true"]);
     Ok(())
 }
 
 #[test]
 fn an_empty_missed_list_passes() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("out/mutants.out"))?;
+    scratch.directory("out/mutants.out")?;
     scratch.write("out/mutants.out/missed.txt", "")?;
     let answer = Answer::to(&Fake::new(), &["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"]);
-    assert_eq!((answer.exit, answer.out.as_str()), (ExitCode::SUCCESS, "mutants: none missed\n"));
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec!["mutants: none missed"]));
     Ok(())
 }
 
@@ -902,11 +903,11 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
     let fake = Fake::new();
     let answer = Answer::to(&fake, &["mutants-changed", "c.diff", "out"]);
     assert_eq!(
-        answer,
-        Answer {
+        answer.lines(),
+        Printed {
             exit: ExitCode::SUCCESS,
-            out: "mutants: skipped, no crate is reached by this change, so nothing was tested\n".to_owned(),
-            err: String::new(),
+            out: vec!["mutants: skipped, no crate is reached by this change, so nothing was tested"],
+            err: Vec::<&str>::new()
         }
     );
     assert!(fake.calls.borrow().is_empty());
@@ -916,8 +917,8 @@ fn a_change_that_reaches_no_crate_says_the_mutants_were_skipped() {
 fn a_failed_start_while_testing_changed_lines_is_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let arguments = ["mutants-changed", &scratch.file("c.diff"), &scratch.file("out"), "-p"];
-    assert_eq!(Answer::to(&Fake::refusing("git"), &arguments).err, "cannot run git: boom\n");
-    assert_eq!(Answer::to(&Fake::refusing("cargo"), &arguments).err, "cannot run cargo: boom\n");
+    assert_eq!(Text::lines(&Answer::to(&Fake::refusing("git"), &arguments).err), ["cannot run git: boom"]);
+    assert_eq!(Text::lines(&Answer::to(&Fake::refusing("cargo"), &arguments).err), ["cannot run cargo: boom"]);
     scratch.write("blocker", "")?;
     let blocked = Answer::to(&Fake::new(), &["mutants-changed", &scratch.file("blocker/c.diff"), "out", "-p"]);
     assert!(blocked.err.contains("blocker/c.diff"));
@@ -929,11 +930,11 @@ fn step_times_are_asked_of_github_for_the_job() {
     let fake = Fake::answering(vec![Reply::to("gh api", "clippy: 12\ntest-run: 3\n")]);
     let answer = Answer::to(&fake, &["wall-times", "Studio-Terza/meta-dev", "77", "gates"]);
     assert_eq!(
-        answer,
-        Answer {
+        answer.lines(),
+        Printed {
             exit: ExitCode::SUCCESS,
-            out: "wall time per step of gates, seconds:\nclippy: 12\ntest-run: 3\n".to_owned(),
-            err: String::new(),
+            out: vec!["wall time per step of gates, seconds:", "clippy: 12", "test-run: 3"],
+            err: Vec::<&str>::new()
         }
     );
     assert_eq!(
@@ -948,7 +949,10 @@ fn step_times_are_asked_of_github_for_the_job() {
             ]
         )]
     );
-    assert_eq!(Answer::to(&Fake::refusing("gh"), &["wall-times", "r", "1", "gates"]).err, "cannot run gh: boom\n");
+    assert_eq!(
+        Text::lines(&Answer::to(&Fake::refusing("gh"), &["wall-times", "r", "1", "gates"]).err),
+        ["cannot run gh: boom"]
+    );
 }
 
 const LIMITS: &str =
@@ -1040,7 +1044,7 @@ fn stages_within_their_warn_line_open_nothing() -> Result<(), Box<dyn Error>> {
 fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     let arguments = Gh::stage_issues(&scratch, "clippy = 12\nlint = 1\ntest-run = 1\n")?;
-    assert_eq!(Answer::to(&Fake::refusing("gh"), &arguments).err, "cannot run gh: boom\n");
+    assert_eq!(Text::lines(&Answer::to(&Fake::refusing("gh"), &arguments).err), ["cannot run gh: boom"]);
     let garbled = Fake::answering(vec![Reply::to("gh issue", "not json")]);
     assert!(Answer::to(&garbled, &arguments).err.contains("cannot read the list of issues"));
     let failing = Fake { exit: Exit::Failure(FAILED_WITH), ..Fake::answering(vec![Reply::to("gh issue", "[]")]) };
@@ -1055,8 +1059,9 @@ fn files_are_shown_under_their_names_and_absent_ones_are_said_to_be_absent() -> 
     let scratch = Scratch::new()?;
     scratch.write("a.txt", "one\n")?;
     let answer = Answer::to(&Fake::new(), &["show", &scratch.file("a.txt"), &scratch.file("b.txt")]);
-    let expected = format!("{}:\none\n{}:\nnot produced\n", scratch.file("a.txt"), scratch.file("b.txt"));
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected, err: String::new() });
+    let (shown, absent) = (format!("{}:", scratch.file("a.txt")), format!("{}:", scratch.file("b.txt")));
+    let expected = vec![shown.as_str(), "one", absent.as_str(), "not produced"];
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected, err: Vec::<&str>::new() });
     Ok(())
 }
 
@@ -1107,7 +1112,7 @@ impl Labelled {
             Reply::to("git -c", case.changes),
             Reply::to("gh pr", &[case.kind, "\n", case.labels].concat()),
         ]);
-        let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+        let scratch = Scratch::fresh();
         let answer = Answer::to(&fake, &["labels", "main", "121", &scratch.file("metadata.json")]);
         Verdict { exit: answer.exit, out: answer.out.get(Self::HEADER.len()..).unwrap_or_default().to_owned() }
     }
@@ -1199,10 +1204,10 @@ laws::table!(
 #[test]
 fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
     let fake = Fake::answering(vec![Reply::to("git merge-base", "abc123\n")]);
-    let scratch = Scratch(tempfile::tempdir().unwrap_or_else(|_| unreachable!("a temporary directory")));
+    let scratch = Scratch::fresh();
     let metadata = scratch.file("metadata.json");
     let answer = Answer::to(&fake, &["labels", "release", "7", &metadata]);
-    assert_eq!(answer.out, "labels of pull request 7 against the merge base with release\n");
+    assert_eq!(Text::lines(&answer.out), ["labels of pull request 7 against the merge base with release"]);
     assert_eq!(scratch.read("metadata.json"), METADATA);
     assert_eq!(
         *fake.calls.borrow(),
@@ -1236,11 +1241,17 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
             Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
         ]
     );
-    assert_eq!(Answer::to(&Fake::refusing("git"), &["labels", "main", "1", &metadata]).err, "cannot run git: boom\n");
-    assert_eq!(Answer::to(&Fake::refusing("gh"), &["labels", "main", "1", &metadata]).err, "cannot run gh: boom\n");
     assert_eq!(
-        Answer::to(&Fake::refusing("cargo"), &["labels", "main", "1", &metadata]).err,
-        "cannot run cargo: boom\n"
+        Text::lines(&Answer::to(&Fake::refusing("git"), &["labels", "main", "1", &metadata]).err),
+        ["cannot run git: boom"]
+    );
+    assert_eq!(
+        Text::lines(&Answer::to(&Fake::refusing("gh"), &["labels", "main", "1", &metadata]).err),
+        ["cannot run gh: boom"]
+    );
+    assert_eq!(
+        Text::lines(&Answer::to(&Fake::refusing("cargo"), &["labels", "main", "1", &metadata]).err),
+        ["cannot run cargo: boom"]
     );
 }
 
@@ -1329,14 +1340,16 @@ fn the_spec_line_is_read_from_the_body_of_the_pull_request() {
     let answer = Answer::to(&fake, &["spec-line", "9"]);
     assert_eq!(answer.exit, ExitCode::SUCCESS);
     assert_eq!(*fake.calls.borrow(), [Invocation::new("gh", ["pr", "view", "9", "--json", "body", "--jq", ".body"])]);
-    assert_eq!(Answer::to(&Fake::refusing("gh"), &["spec-line", "9"]).err, "cannot run gh: boom\n");
+    let refused = Answer::to(&Fake::refusing("gh"), &["spec-line", "9"]);
+    assert_eq!(Text::lines(&refused.err), ["cannot run gh: boom"]);
+    assert_eq!(refused.err.chars().last(), Some('\n'));
 }
 
 #[test]
 fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("shards/shard-0"))?;
-    fs::create_dir_all(scratch.path().join("shards/shard-1"))?;
+    scratch.directory("shards/shard-0")?;
+    scratch.directory("shards/shard-1")?;
     scratch.write("shards/shard-0/caught.txt", "c1\nc2\n")?;
     scratch.write("shards/shard-0/missed.txt", "m2\n")?;
     scratch.write("shards/shard-1/caught.txt", "c3\n")?;
@@ -1344,9 +1357,9 @@ fn shard_results_are_counted_and_the_missed_and_timed_out_are_listed() -> Result
     scratch.write("shards/shard-1/timeout.txt", "t1\n")?;
     scratch.write("sum", "before\n")?;
     let answer = Answer::to(&Fake::new(), &["shard-summary", &scratch.file("shards"), &scratch.file("sum")]);
-    let expected = "caught: 3\nmissed: 2\ntimeout: 1\nunviable: 0\n```\nm1\nm2\nt1\n```\n";
-    assert_eq!(answer, Answer { exit: ExitCode::SUCCESS, out: expected.to_owned(), err: String::new() });
-    assert_eq!(scratch.read("sum"), format!("before\n{expected}"));
+    let expected = ["caught: 3", "missed: 2", "timeout: 1", "unviable: 0", "```", "m1", "m2", "t1", "```"];
+    assert_eq!(answer.lines(), Printed { exit: ExitCode::SUCCESS, out: expected.to_vec(), err: Vec::<&str>::new() });
+    assert_eq!(Text::lines(&scratch.read("sum")), [["before"].as_slice(), expected.as_slice()].concat());
     Ok(())
 }
 
@@ -1363,8 +1376,8 @@ fn a_shard_summary_without_shards_is_reported() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_matrix_is_written_shown_and_added_to_the_summary() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    fs::create_dir_all(scratch.path().join("shards/shard-0"))?;
-    fs::create_dir_all(scratch.path().join("sources/crates"))?;
+    scratch.directory("shards/shard-0")?;
+    scratch.directory("sources/crates")?;
     scratch.write(
         "shards/shard-0/matrix.json",
         r#"{"baseline":["t :: one"],"mutants":[{"name":"m1","summary":"MissedMutant","failed":[]}]}"#,
@@ -1462,3 +1475,65 @@ laws::table!(
         Code(4) => Exit::Failure(NonZeroU8::MIN.saturating_add(3)),
     ]
 );
+
+#[derive(Debug, PartialEq)]
+struct Printed<'answer> {
+    exit: ExitCode,
+    out: Vec<&'answer str>,
+    err: Vec<&'answer str>,
+}
+
+struct Text;
+
+impl Text {
+    fn owned(text: &str) -> Vec<String> {
+        text_lines::Lines::from(text).map(str::to_owned).collect()
+    }
+
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
+    }
+}
+
+mod ports {
+    use std::fs;
+    use std::io;
+    use std::path::Path;
+
+    pub struct Scratch(tempfile::TempDir);
+
+    impl Scratch {
+        pub fn new() -> Result<Scratch, io::Error> {
+            Ok(Scratch(tempfile::tempdir()?))
+        }
+
+        pub fn fresh() -> Scratch {
+            Scratch::new().unwrap_or_else(|_| unreachable!("a temporary directory"))
+        }
+
+        pub fn placed(path: &Path, text: &str) -> Result<(), io::Error> {
+            path.parent().map_or(Ok(()), fs::create_dir_all)?;
+            fs::write(path, text)
+        }
+
+        pub fn directory(&self, name: &str) -> Result<(), io::Error> {
+            fs::create_dir_all(self.0.path().join(name))
+        }
+
+        pub fn file(&self, name: &str) -> String {
+            self.0.path().join(name).display().to_string()
+        }
+
+        pub fn read(&self, name: &str) -> String {
+            fs::read_to_string(self.0.path().join(name)).unwrap_or_default()
+        }
+
+        pub fn write(&self, name: &str, text: &str) -> Result<(), io::Error> {
+            fs::write(self.0.path().join(name), text)
+        }
+
+        pub fn path(&self) -> &Path {
+            self.0.path()
+        }
+    }
+}

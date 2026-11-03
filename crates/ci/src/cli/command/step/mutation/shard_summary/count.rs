@@ -1,4 +1,4 @@
-use newtype::{Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype};
 
-#[derive(Newtype, Display, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Count(usize);

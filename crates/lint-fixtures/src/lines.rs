@@ -1,10 +1,10 @@
 use std::fmt;
 
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
 use crate::flagged::Flagged;
 
-#[derive(Newtype, Debug, Default, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Debug, Default, PartialEq, Eq)]
 pub struct Lines(Vec<String>);
 
 impl PartialEq<Flagged> for Lines {

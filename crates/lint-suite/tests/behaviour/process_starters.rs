@@ -1,10 +1,9 @@
-use std::error::Error;
-use std::fs;
-
 use lint_core::Lint;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+
+use crate::ports::Checkout;
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
@@ -225,20 +224,18 @@ fn starting_a_process_is_flagged() {
 }
 
 #[test]
-fn a_crate_whose_name_ends_in_ports_may_start_processes() -> Result<(), Box<dyn Error>> {
+fn a_crate_whose_name_ends_in_ports_may_start_processes() {
     let mut wrong = Vec::new();
     for (name, flagged) in PACKAGES {
-        let root = tempfile::tempdir()?;
-        fs::create_dir(root.path().join("src"))?;
-        fs::write(root.path().join("Cargo.toml"), format!("[package]\nname = \"{name}\"\n"))?;
-        let file = Sources::file(root.path().join("src/lib.rs"), Text::new(IMPORTED));
+        let root =
+            Checkout::new().with("Cargo.toml", &format!("[package]\nname = \"{name}\"\n")).with("src/lib.rs", IMPORTED);
+        let file = Sources::file(root.file("src/lib.rs"), Text::new(IMPORTED));
         let found = ProcessStarters::report(&[file]).violations().len();
         if found != flagged {
             wrong.push(format!("{name} flagged {found}"));
         }
     }
     assert_eq!(wrong, Vec::<String>::new());
-    Ok(())
 }
 
 #[test]

@@ -40,4 +40,4 @@ pub use type_name::TypeName;
 pub use violation::Violation;
 pub use walk::Walk;
 
-pub use lint_layout::{Headline, SourceText};
+pub use lint_layout::{Finding, Fix, Headline, Message, Problem, SourceText};

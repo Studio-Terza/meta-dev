@@ -1,6 +1,9 @@
 use lint_core::{Headline, Lint};
 use rustc_lexer::{FrontmatterAllowed, TokenKind, strip_shebang, tokenize};
 
+use lint_core::Fix;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -19,7 +22,7 @@ impl Lint for NoComments {
                 .flat_map(|file| {
                     Self::comment_lines(file.text().as_ref())
                         .into_iter()
-                        .map(move |line| Violation::new(Site::new(file.path(), line), "comment"))
+                        .map(move |line| Violation::new(Site::new(file.path(), line), Self::COMMENT))
                 })
                 .collect(),
         )
@@ -27,6 +30,9 @@ impl Lint for NoComments {
 }
 
 impl NoComments {
+    const COMMENT: Message =
+        Message::new(Problem::new("comment"), Fix::new("delete it and say the same in the names of the code"));
+
     fn comment_lines(source: &str) -> Vec<LineNumber> {
         let shebang = strip_shebang(source).unwrap_or(0);
         tokenize(source.get(shebang..).unwrap_or_default(), FrontmatterAllowed::Yes)

@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::{Site, Violation};
+use lint_layout::Fix;
 use lint_placement::CrateName;
 use type_facts::Transition;
 
@@ -61,6 +62,14 @@ impl fmt::Display for CrateTransitions<'_> {
             Share::between(self.counted(Class::Covered), total),
             self.counted(Class::Primitive),
             self.counted(Class::Foreign)
+        )
+    }
+}
+
+impl lint_layout::Finding for CrateTransitions<'_> {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "cover primitive and foreign transitions with workspace types, and keep one transition per input-output pair",
         )
     }
 }

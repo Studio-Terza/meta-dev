@@ -1,13 +1,12 @@
-mod campaign;
 mod crash;
 mod input;
-mod pending;
+mod ports;
 mod shell;
 mod syntax;
 
-use campaign::Campaign;
 use crash::Crash;
 use input::{Input, Role};
+use ports::campaign::Campaign;
 use proptest::collection::vec;
 use proptest::prelude::{Strategy, any};
 use proptest::sample::{Index, select};

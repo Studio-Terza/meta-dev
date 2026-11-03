@@ -3,10 +3,10 @@ corpus: 0 tests in 8 files, 0 of 25 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/first.rs:1: fn run
-src/logic_user.rs:1: fn run
-src/second.rs:1: fn walk
-src/user.rs:1: fn run
+src/first.rs:1: fn run; make it an associated function or a method
+src/logic_user.rs:1: fn run; make it an associated function or a method
+src/second.rs:1: fn walk; make it an associated function or a method
+src/user.rs:1: fn run; make it an associated function or a method
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/bag.rs:1: Options only carries values into one other file; give it the logic that consumes it
 primitives appear only at a type's boundary:

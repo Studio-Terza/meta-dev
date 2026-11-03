@@ -3,15 +3,15 @@ corpus: 0 tests in 8 files, 0 of 57 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 free functions are not allowed; make them associated functions or methods:
-src/dropped.rs:1: fn f
-src/early.rs:1: fn f
-src/lonely.rs:1: fn f
-src/loops.rs:1: fn f
-src/loops.rs:6: fn g
-src/mutated.rs:1: fn f
-src/reassigned.rs:1: fn f
-src/reassigned.rs:6: fn g
-src/tail.rs:1: fn f
+src/dropped.rs:1: fn f; make it an associated function or a method
+src/early.rs:1: fn f; make it an associated function or a method
+src/lonely.rs:1: fn f; make it an associated function or a method
+src/loops.rs:1: fn f; make it an associated function or a method
+src/loops.rs:6: fn g; make it an associated function or a method
+src/mutated.rs:1: fn f; make it an associated function or a method
+src/reassigned.rs:1: fn f; make it an associated function or a method
+src/reassigned.rs:6: fn g; make it an associated function or a method
+src/tail.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
 src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns

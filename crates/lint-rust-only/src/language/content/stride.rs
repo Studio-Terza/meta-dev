@@ -1,8 +1,8 @@
 use std::iter::StepBy;
 
-use newtype::Newtype;
+use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug)]
 pub(super) struct Stride(usize);
 
 impl Stride {

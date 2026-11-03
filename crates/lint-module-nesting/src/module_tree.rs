@@ -69,7 +69,7 @@ impl ModuleTree {
     fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
-                let used = self.modules.deepest_containing(&target, module);
+                let used = target.deepest_in(&self.modules);
                 self.users.record(used.cloned(), module);
                 self.deep_uses.extend(target.crosses_directory_boundary(module, &self.modules).then(|| {
                     Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })

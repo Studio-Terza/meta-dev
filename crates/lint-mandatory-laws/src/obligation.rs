@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::need::Need;
 use crate::subject::Subject;
+use lint_core::Finding;
+use lint_core::Fix;
 use lint_core::Site;
 use lint_core::Violation;
 
@@ -25,5 +27,11 @@ impl Obligation {
 impl fmt::Display for Obligation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "`{}` {}", self.subject.owner(), self.need)
+    }
+}
+
+impl Finding for Obligation {
+    fn fix(&self) -> Fix {
+        self.need.fix()
     }
 }

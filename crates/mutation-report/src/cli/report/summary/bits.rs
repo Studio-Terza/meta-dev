@@ -1,7 +1,7 @@
-use newtype::{Display, Newtype};
+use newtype::{Arbitrary, Display, Newtype};
 use serde::Serialize;
 
-#[derive(Newtype, Display, Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Display, Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Count(usize);
 

@@ -11,7 +11,7 @@ impl Scored {
 
     fn highest_is(pair: &[&str]) -> bool {
         match pair {
-            [text, expected] => Self::of(text).contains(&format!("highest {expected}\n")),
+            [text, expected] => Self::of(text).contains(&format!("highest {expected}; ")),
             _ => false,
         }
     }
@@ -54,9 +54,9 @@ laws::table!(
     the_distribution_lists_each_crate_by_band_and_leaves_out_empty_ones,
     Scored::lists,
     [
-        [BAND_BODIES, "9 functions by complexity, 1: 1, 2-3: 2, 4-6: 2, 7-10: 2, 11+: 2; highest 12 in g"] => true,
-        ["fn a() { fn b(x: u8) { if x > 1 { f(); } } b(1); }", "2 functions by complexity, 1: 1, 2-3: 1; highest 2 in b"] => true,
-        ["mod m { fn a(x: u8) { if x > 1 { f(); } } }", "1 functions by complexity, 2-3: 1; highest 2 in a"] => true,
+        [BAND_BODIES, "9 functions by complexity, 1: 1, 2-3: 2, 4-6: 2, 7-10: 2, 11+: 2, highest 12 in g"] => true,
+        ["fn a() { fn b(x: u8) { if x > 1 { f(); } } b(1); }", "2 functions by complexity, 1: 1, 2-3: 1, highest 2 in b"] => true,
+        ["mod m { fn a(x: u8) { if x > 1 { f(); } } }", "1 functions by complexity, 2-3: 1, highest 2 in a"] => true,
         ["trait T { fn q(&self); }", "functions"] => false,
         ["struct S;", "functions"] => false,
     ]
@@ -73,6 +73,6 @@ fn each_crate_gets_its_own_line_and_a_crate_without_functions_none() {
     let report = Sources::report::<Complexity>(&sources);
     assert_eq!(report.violations().len(), 2);
     let text = report.to_string();
-    assert!(text.contains("crate x: 1 functions by complexity, 1: 1; highest 1 in a"), "{text}");
-    assert!(text.contains("crate z: 1 functions by complexity, 2-3: 1; highest 2 in b"), "{text}");
+    assert!(text.contains("crate x: 1 functions by complexity, 1: 1, highest 1 in a"), "{text}");
+    assert!(text.contains("crate z: 1 functions by complexity, 2-3: 1, highest 2 in b"), "{text}");
 }

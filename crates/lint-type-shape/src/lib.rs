@@ -9,7 +9,10 @@ use syn::{
     PathArguments, ReturnType, Signature, Type, TypePath, TypeTuple,
 };
 
+use lint_core::Fix;
 use lint_core::Macros;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -36,13 +39,13 @@ impl TypeShape {
         shapes.violations
     }
 
-    fn findings(ty: &Type) -> Vec<&'static str> {
+    fn findings(ty: &Type) -> Vec<Message> {
         let mut findings = TypeFindings::default();
         findings.visit_type(ty);
         findings.0
     }
 
-    fn string_error(path: &TypePath) -> Option<&'static str> {
+    fn string_error(path: &TypePath) -> Option<Message> {
         path.path
             .segments
             .last()
@@ -58,7 +61,9 @@ impl TypeShape {
                         if error.path.segments.last().is_some_and(|segment| segment.ident == "String")
                 )
             })
-            .map(|_| "Result with a String error; errors are an enum with thiserror")
+            .map(|_| {
+                Message::new(Problem::new("Result with a String error"), Fix::new("errors are an enum with thiserror"))
+            })
     }
 }
 
@@ -68,7 +73,7 @@ struct TypeShapes<'scan> {
 }
 
 impl TypeShapes<'_> {
-    fn violation(&self, span: Span, message: &str) -> Violation {
+    fn violation(&self, span: Span, message: Message) -> Violation {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
@@ -93,7 +98,10 @@ impl TypeShapes<'_> {
         .then(|| {
             self.violation(
                 field.ident.as_ref().map_or_else(|| field.ty.span(), Ident::span),
-                "bool field; a stored flag is a stored mode, make it an enum or a type parameter",
+                Message::new(
+                    Problem::new("bool field"),
+                    Fix::new("a stored flag is a stored mode, make it an enum or a type parameter"),
+                ),
             )
         })
     }
@@ -147,14 +155,14 @@ impl<'ast> Visit<'ast> for TypeShapes<'_> {
 }
 
 #[derive(Default)]
-struct TypeFindings(Vec<&'static str>);
+struct TypeFindings(Vec<Message>);
 
 impl<'ast> Visit<'ast> for TypeFindings {
     fn visit_type_tuple(&mut self, tuple: &'ast TypeTuple) {
-        self.0.extend(
-            (!tuple.elems.is_empty())
-                .then_some("tuple in a signature or field; values that travel together are a struct"),
-        );
+        self.0.extend((!tuple.elems.is_empty()).then_some(Message::new(
+            Problem::new("tuple in a signature or field"),
+            Fix::new("values that travel together are a struct"),
+        )));
         syn::visit::visit_type_tuple(self, tuple);
     }
 
