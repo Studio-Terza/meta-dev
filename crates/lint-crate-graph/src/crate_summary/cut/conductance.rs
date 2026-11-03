@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
@@ -11,10 +12,13 @@ impl Conductance {
     }
 
     pub fn loose(self) -> Option<Conductance> {
-        (self.0 < Self::LOOSE_BELOW).then_some(self)
+        match self.0.total_cmp(&Self::LOOSE_BELOW) {
+            Ordering::Less => Some(self),
+            Ordering::Equal | Ordering::Greater => None,
+        }
     }
 
-    pub fn total_cmp(self, other: Conductance) -> std::cmp::Ordering {
+    pub fn total_cmp(self, other: Conductance) -> Ordering {
         self.0.total_cmp(&other.0)
     }
 }

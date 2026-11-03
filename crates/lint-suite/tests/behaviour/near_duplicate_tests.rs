@@ -14,6 +14,7 @@ const FIRST_FILE: &str = "#[test]\nfn a() {\n    f(1);\n}\n";
 const SECOND_FILE: &str = "\n#[test]\nfn b() {\n    f(2);\n}\n";
 
 const PANICS: &str = "#[test]\n#[should_panic(expected = \"big\")]\nfn a() {\n    f(10);\n}\n#[test]\n#[should_panic(expected = \"small\")]\nfn b() {\n    f(1);\n}\n";
+const ROWS_ELSEWHERE: &str = "#[rstest]\nfn a() {\n    f(1);\n}\n#[rstest]\nfn b() {\n    f(2);\n}\n";
 const ASYNC: &str =
     "#[tokio::test]\nasync fn a() {\n    f(1).await;\n}\n#[tokio::test]\nasync fn b() {\n    f(2).await;\n}\n";
 const SIGNED: &str =
@@ -25,7 +26,12 @@ const OTHER_NAMES: &str = "#[test]\nfn a() {\n    assert_eq!(h(T), 1);\n}\n#[tes
 
 const GATED: &str = "#[test]\n#[cfg(unix)]\nfn a() {\n    f(1);\n}\n#[test]\n#[cfg(unix)]\nfn b() {\n    f(2);\n}\n";
 
-const CASES: [Case; 15] = [
+const CASES: [Case; 16] = [
+    Case::new(
+        Title::new("other test attributes"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(ROWS_ELSEWHERE))],
+        Flagged::new(&[]),
+    ),
     Case::new(
         Title::new("identical"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(IDENTICAL))],
