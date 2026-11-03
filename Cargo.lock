@@ -233,6 +233,8 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 name = "lint"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "lint-runner",
 ]
 
@@ -279,6 +281,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -397,6 +400,7 @@ dependencies = [
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "newtype",
  "proc-macro2",
@@ -601,6 +605,7 @@ dependencies = [
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -664,10 +669,12 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-roots",
+ "newtype",
  "syn 2.0.119",
 ]
 
@@ -700,6 +707,7 @@ dependencies = [
 name = "lint-roots"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "newtype",
 ]
@@ -708,6 +716,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "golden",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
@@ -770,6 +779,7 @@ dependencies = [
 name = "lint-rust-only"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "newtype",
 ]
@@ -789,6 +799,7 @@ dependencies = [
 name = "lint-suite"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
@@ -844,7 +855,6 @@ dependencies = [
  "lint-vec-out-params",
  "lint-walk-similarity",
  "lint-workflow-run",
- "tempfile",
 ]
 
 [[package]]
@@ -937,6 +947,7 @@ dependencies = [
 name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -1104,6 +1115,7 @@ dependencies = [
 name = "reach"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "lint-complexity",
  "lint-core",

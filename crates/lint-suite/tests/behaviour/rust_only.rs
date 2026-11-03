@@ -1,7 +1,6 @@
-use lint_core::RepoFile;
+use file_ports::{Bytes, Text};
+use lint_core::{Contents, RepoFile};
 use lint_rust_only::RustOnly;
-
-use crate::ports::Checkout;
 
 const EXTENSIONS: [(&str, &str); 83] = [
     ("py", "Python"),
@@ -109,6 +108,7 @@ const WEB: [(&str, &str); 15] = [
 
 const REWRITE: &str = "rewrite it in Rust";
 const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust";
+const ROOT: &str = "/checkout";
 
 struct Checked;
 
@@ -117,12 +117,20 @@ impl Checked {
         RustOnly::report(files).violations().iter().map(ToString::to_string).collect()
     }
 
+    fn file(path: &str) -> RepoFile {
+        RepoFile::new(path, path, Contents::Read(Bytes::default()))
+    }
+
     fn one(path: &str) -> Vec<String> {
-        Self::report(&[RepoFile::new(path, path)])
+        Self::report(&[Self::file(path)])
     }
 
     fn within(checkout: &str, path: &str) -> Vec<String> {
-        Self::report(&[RepoFile::new(format!("{checkout}/{path}"), path)])
+        Self::report(&[RepoFile::new(format!("{checkout}/{path}"), path, Contents::Read(Bytes::default()))])
+    }
+
+    fn holding(path: &str, text: &str) -> Vec<String> {
+        Self::report(&[RepoFile::new(format!("{ROOT}/{path}"), path, Contents::Read(Bytes::from(text)))])
     }
 }
 
@@ -204,7 +212,7 @@ fn the_directories_above_the_checkout_do_not_count() {
 
 #[test]
 fn findings_come_in_the_order_given() {
-    let files = ["b.sh", "a.py", "c.rs"].map(|path| RepoFile::new(path, path));
+    let files = ["b.sh", "a.py", "c.rs"].map(Checked::file);
     assert_eq!(
         Checked::report(&files),
         [
@@ -217,7 +225,7 @@ fn findings_come_in_the_order_given() {
 #[test]
 fn a_report_with_no_findings_is_clean() {
     assert!(RustOnly::report(&[]).dirty().is_none());
-    assert!(RustOnly::report(&[RepoFile::new("a.sh", "a.sh")]).dirty().is_some());
+    assert!(RustOnly::report(&[Checked::file("a.sh")]).dirty().is_some());
 }
 
 #[test]
@@ -231,10 +239,9 @@ fn an_extensionless_file_with_a_foreign_shebang_fails() {
         "#!",
         "#!/usr/bin/env",
     ] {
-        let checkout = Checkout::new().with("deploy", &format!("{first}\nfor i in a b; do echo $i; done\n"));
         assert_eq!(
-            Checked::within(&checkout.shown(), "deploy"),
-            [format!("{}/deploy:1: interpreted script source outside assets; {REWRITE}", checkout.shown())],
+            Checked::holding("deploy", &format!("{first}\nfor i in a b; do echo $i; done\n")),
+            [format!("{ROOT}/deploy:1: interpreted script source outside assets; {REWRITE}")],
             "{first}"
         );
     }
@@ -252,37 +259,30 @@ fn an_extensionless_file_without_a_foreign_shebang_passes() {
         " #!/bin/sh\n",
         "\n#!/bin/sh\n",
     ] {
-        let checkout = Checkout::new().with("tool", text);
-        assert_eq!(Checked::within(&checkout.shown(), "tool"), Vec::<String>::new(), "{text:?}");
+        assert_eq!(Checked::holding("tool", text), Vec::<String>::new(), "{text:?}");
     }
 }
 
 #[test]
 fn a_foreign_shebang_in_a_file_with_a_data_extension_fails_but_a_rust_attribute_passes() {
-    let checkout = Checkout::new()
-        .with("notes.txt", "#!/bin/bash\n")
-        .with("lib.rs", "#!/usr/bin/env python3\n")
-        .with("inner.txt", "#![allow(dead_code)]\n");
-    let root = checkout.shown();
     assert_eq!(
-        Checked::within(&root, "notes.txt"),
-        [format!("{root}/notes.txt:1: interpreted script source outside assets; {REWRITE}")]
+        Checked::holding("notes.txt", "#!/bin/bash\n"),
+        [format!("{ROOT}/notes.txt:1: interpreted script source outside assets; {REWRITE}")]
     );
-    assert_eq!(Checked::within(&root, "lib.rs"), Vec::<String>::new());
-    assert_eq!(Checked::within(&root, "inner.txt"), Vec::<String>::new());
+    assert_eq!(Checked::holding("lib.rs", "#!/usr/bin/env python3\n"), Vec::<String>::new());
+    assert_eq!(Checked::holding("inner.txt", "#![allow(dead_code)]\n"), Vec::<String>::new());
 }
 
 #[test]
 fn a_shebang_below_a_directory_named_assets_still_fails() {
-    let checkout = Checkout::new().with("assets/run", "#!/usr/bin/env node\n");
-    assert_eq!(Checked::within(&checkout.shown(), "assets/run").len(), 1);
+    assert_eq!(Checked::holding("assets/run", "#!/usr/bin/env node\n").len(), 1);
 }
 
 #[test]
 fn vendored_code_of_any_language_is_not_the_repositorys_logic() {
     let vendored: Vec<RepoFile> = ["vendor/run.py", "third/vendor/deep/app.js", "vendor/x.sh", "site/vendor/app.css"]
         .into_iter()
-        .map(|path| RepoFile::new(path, path))
+        .map(Checked::file)
         .collect();
     assert_eq!(Checked::report(&vendored), Vec::<String>::new());
 }
@@ -363,11 +363,9 @@ fn a_file_whose_content_is_source_fails_whatever_its_name() {
         ("deploy.cfg", "for f in a b; do\n  echo $f\ndone\n", "shell"),
         ("main.txt", "#include <stdio.h>\n", "C"),
     ] {
-        let checkout = Checkout::new().with(name, text);
-        let root = checkout.shown();
         assert_eq!(
-            Checked::within(&root, name),
-            [format!("{root}/{name}:1: {language} source outside assets; {REWRITE}")],
+            Checked::holding(name, text),
+            [format!("{ROOT}/{name}:1: {language} source outside assets; {REWRITE}")],
             "{name}"
         );
     }
@@ -386,13 +384,27 @@ fn ordinary_text_and_data_pass() {
         ("empty.txt", ""),
         ("poem", "Roses are red\nimport this\n"),
     ] {
-        let checkout = Checkout::new().with(name, text);
-        assert_eq!(Checked::within(&checkout.shown(), name), Vec::<String>::new(), "{name}");
+        assert_eq!(Checked::holding(name, text), Vec::<String>::new(), "{name}");
     }
 }
 
 #[test]
 fn source_by_content_below_platform_tests_passes() {
-    let checkout = Checkout::new().with("platform/UITests/Flow.txt", "import XCTest\n");
-    assert_eq!(Checked::within(&checkout.shown(), "platform/UITests/Flow.txt"), Vec::<String>::new());
+    assert_eq!(Checked::holding("platform/UITests/Flow.txt", "import XCTest\n"), Vec::<String>::new());
+}
+
+#[test]
+fn an_unreadable_file_is_judged_by_its_name_alone() {
+    let unreadable = |path: &str| RepoFile::new(path, path, Contents::Unreadable(Text::new(String::from("denied"))));
+    assert_eq!(Checked::report(&[unreadable("deploy")]), Vec::<String>::new());
+    assert_eq!(
+        Checked::report(&[unreadable("deploy.sh")]),
+        [format!("deploy.sh:1: shell source outside assets; {REWRITE}")]
+    );
+}
+
+#[test]
+fn only_the_first_window_of_a_file_is_read_for_its_content() {
+    let padded = format!("{}\nimport os\nimport sys\n", "x".repeat(8192));
+    assert_eq!(Checked::holding("tool", &padded), Vec::<String>::new());
 }

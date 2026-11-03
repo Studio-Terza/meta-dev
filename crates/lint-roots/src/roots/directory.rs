@@ -1,8 +1,8 @@
 mod ignored;
 
-use std::io;
 use std::path::{Path, PathBuf};
 
+use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype};
 
@@ -13,45 +13,42 @@ pub struct Directory(PathBuf);
 
 impl Directory {
     #[must_use]
-    pub fn real(path: &Path) -> Option<&Path> {
-        std::fs::symlink_metadata(path).ok().filter(std::fs::Metadata::is_dir).map(|_| path)
+    pub fn real<'path>(files: &impl Files, path: &'path Path) -> Option<&'path Path> {
+        (files.kind(path) == Kind::Directory).then_some(path)
     }
 
-    pub fn entries(&self) -> Result<Vec<PathBuf>, Failure> {
-        let failed = |source: io::Error| Failure::Io { path: self.0.clone(), source };
-        std::fs::read_dir(&self.0)
-            .map_err(failed)?
-            .map(|entry| entry.map(|found| found.path()).map_err(failed))
-            .collect::<Result<Vec<PathBuf>, Failure>>()
-            .map(|mut entries| {
+    pub fn entries(&self, files: &impl Files) -> Result<Vec<PathBuf>, Failure> {
+        files.entries(&self.0).map_err(|failure| Failure::Io { path: self.0.clone(), source: failure.into() }).map(
+            |mut entries| {
                 entries.sort();
                 entries
-            })
+            },
+        )
     }
 
-    pub fn tree(self) -> Result<Vec<Directory>, Failure> {
-        let below = self.entries()?;
+    pub fn tree(self, files: &impl Files) -> Result<Vec<Directory>, Failure> {
+        let below = self.entries(files)?;
         below
             .into_iter()
-            .filter_map(|entry| Self::real(&entry).map(Path::to_path_buf))
+            .filter_map(|entry| Self::real(files, &entry).map(Path::to_path_buf))
             .map(Directory)
-            .filter(|directory| directory.skipped(&Ignored::FOR_PACKAGES).is_none())
-            .try_fold(vec![self], |found, directory| Ok(found.into_iter().chain(directory.tree()?).collect()))
+            .filter(|directory| directory.skipped(files, &Ignored::FOR_PACKAGES).is_none())
+            .try_fold(vec![self], |found, directory| Ok(found.into_iter().chain(directory.tree(files)?).collect()))
     }
 
-    pub fn files(self) -> Result<Vec<PathBuf>, Failure> {
-        self.entries()?.into_iter().try_fold(Vec::new(), |found, entry| {
+    pub fn files(self, files: &impl Files) -> Result<Vec<PathBuf>, Failure> {
+        self.entries(files)?.into_iter().try_fold(Vec::new(), |found, entry| {
             let below = Directory(entry.clone());
-            Ok(match (Self::real(&entry), below.skipped(&Ignored::FOR_FILES)) {
+            Ok(match (Self::real(files, &entry), below.skipped(files, &Ignored::FOR_FILES)) {
                 (None, _) => found.into_iter().chain([entry]).collect(),
                 (Some(_), Some(_)) => found,
-                (Some(_), None) => found.into_iter().chain(below.files()?).collect(),
+                (Some(_), None) => found.into_iter().chain(below.files(files)?).collect(),
             })
         })
     }
 
-    fn skipped<'rules>(&self, ignored: &'rules [Ignored]) -> Option<&'rules Ignored> {
-        ignored.iter().find(|rule| rule.applying_to(self).is_some())
+    fn skipped<'rules>(&self, files: &impl Files, ignored: &'rules [Ignored]) -> Option<&'rules Ignored> {
+        ignored.iter().find(|rule| rule.applying_to(files, self).is_some())
     }
 }
 

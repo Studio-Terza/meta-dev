@@ -30,7 +30,6 @@ mod no_test_only_api;
 mod paired_apis;
 mod paths;
 mod placement;
-mod ports;
 mod primitive_boundary;
 mod private_fns;
 mod process_starters;

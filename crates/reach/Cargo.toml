@@ -15,6 +15,7 @@ lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 lint-reader = { path = "../lint-reader" }
+file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
 text-lines = { path = "../text-lines" }
 serde.workspace = true

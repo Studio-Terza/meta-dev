@@ -9,6 +9,7 @@ use std::path::Path;
 use content::Content;
 use extensions::Extensions;
 pub(crate) use fix::Fix;
+use lint_core::RepoFile;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -135,14 +136,14 @@ impl Language {
     const RUST: &'static str = "rs";
 
     #[must_use]
-    pub fn detect(path: &Path) -> Option<Language> {
-        Some(path)
+    pub fn detect(file: &RepoFile) -> Option<Language> {
+        Some(file.shown())
             .filter(|path| !path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case(Self::RUST)))
             .and_then(|path| {
                 path.extension()
                     .and_then(Self::by_extension)
                     .or_else(|| path.file_stem().map(Path::new).and_then(Path::extension).and_then(Self::by_extension))
-                    .or_else(|| Content::language_of(path))
+                    .or_else(|| Content::language_of(file.contents()))
             })
     }
 

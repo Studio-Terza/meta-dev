@@ -11,6 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
+file-ports = { path = "../file-ports" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
 lint-core = { path = "../lint-core" }

@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+file-ports = { path = "../file-ports" }
 lint-core = { path = "../lint-core" }
 newtype = { path = "../newtype" }
 

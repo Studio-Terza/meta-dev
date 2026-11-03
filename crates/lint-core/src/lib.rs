@@ -1,5 +1,6 @@
 mod binary_files;
 mod boundary;
+mod contents;
 mod declared_type;
 mod gate;
 mod home;
@@ -21,6 +22,7 @@ mod walk;
 
 pub use binary_files::BinaryFiles;
 pub use boundary::Violation;
+pub use contents::Contents;
 pub use declared_type::DeclaredType;
 pub use gate::Gate;
 pub use home::Home;

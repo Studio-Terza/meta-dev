@@ -1,6 +1,6 @@
 use newtype::{Arbitrary, Newtype};
 
-#[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bytes(Vec<u8>);
 
 impl AsRef<[u8]> for Bytes {

@@ -1,6 +1,6 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
+use file_ports::Files;
 use lint_layout::Failure;
 
 #[derive(Debug)]
@@ -10,8 +10,10 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn open(given: &Path) -> Result<Tree, Failure> {
-        let canonical = fs::canonicalize(given).map_err(|source| Failure::Io { path: given.to_path_buf(), source })?;
+    pub fn open(files: &impl Files, given: &Path) -> Result<Tree, Failure> {
+        let canonical = files
+            .canonical(given)
+            .map_err(|failure| Failure::Io { path: given.to_path_buf(), source: failure.into() })?;
         Ok(Tree { canonical, given: given.to_path_buf() })
     }
 

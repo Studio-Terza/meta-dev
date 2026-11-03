@@ -3,6 +3,7 @@ mod boundary;
 use std::path::{Path, PathBuf};
 
 use boundary::Nesting;
+use file_ports::Memory;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
@@ -26,16 +27,12 @@ impl SourceFile {
 
     pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
         let path = path.into();
-        let placement = Placement::locate(&path);
+        let placement = Placement::locate(&Memory::default(), &path);
         let located = path.clone();
-        Self::parse_placed(path, located, placement, text)
+        Self::parse_at(path, located, placement, text)
     }
 
-    pub fn parse_at(path: PathBuf, package: &Path, located: &Path, text: SourceText) -> Result<Self, Failure> {
-        Self::parse_placed(path, located.to_path_buf(), Placement::within(package, located), text)
-    }
-
-    fn parse_placed(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
+    pub fn parse_at(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
         let parsed = Nesting::within_limit(&text)
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
             .and_then(|text| syn::parse_file(text.as_ref()));

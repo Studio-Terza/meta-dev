@@ -1,9 +1,11 @@
-use lint_core::Lint;
+use std::path::PathBuf;
+
+use file_ports::{Bytes, Memory};
+use lint_core::{Lint, SourceFile, SourceText};
+use lint_placement::Placement;
 use lint_process_starters::{CommandPaths, ProcessStarters, Scope};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
-
-use crate::ports::Checkout;
 
 const IMPORTED: &str = "use std::process::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
 const OTHER_COMMAND: &str = "use clap::Command;\nfn f() {\n    Command::new(\"ls\").status();\n}\n";
@@ -227,10 +229,12 @@ fn starting_a_process_is_flagged() {
 fn a_crate_whose_name_ends_in_ports_may_start_processes() {
     let mut wrong = Vec::new();
     for (name, flagged) in PACKAGES {
-        let root =
-            Checkout::new().with("Cargo.toml", &format!("[package]\nname = \"{name}\"\n")).with("src/lib.rs", IMPORTED);
-        let file = Sources::file(root.file("src/lib.rs"), Text::new(IMPORTED));
-        let found = ProcessStarters::report(&[file]).violations().len();
+        let manifest = format!("[package]\nname = \"{name}\"\n");
+        let files: Memory = [(PathBuf::from("/r/Cargo.toml"), Bytes::from(manifest.as_str()))].into_iter().collect();
+        let path = PathBuf::from("/r/src/lib.rs");
+        let placement = Placement::locate(&files, &path);
+        let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
+        let found = parsed.map(|file| ProcessStarters::report(&[file]).violations().len()).unwrap_or(usize::MAX);
         if found != flagged {
             wrong.push(format!("{name} flagged {found}"));
         }

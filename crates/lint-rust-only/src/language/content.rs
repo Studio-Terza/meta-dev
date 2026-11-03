@@ -7,9 +7,10 @@ mod text;
 mod weight;
 
 use std::convert::Infallible;
-use std::path::Path;
 use std::str::FromStr;
 
+use file_ports::Bytes;
+use lint_core::Contents;
 use newtype::Newtype;
 
 use super::Language;
@@ -31,16 +32,16 @@ impl Content {
     const RETURN: char = '\r';
     const EVERY_OTHER: Stride = Stride::new(2);
 
-    pub(crate) fn language_of(path: &Path) -> Option<Language> {
-        Shebang::read_from(path)
+    pub(crate) fn language_of(contents: &Contents) -> Option<Language> {
+        let bytes = contents.read().ok()?;
+        Shebang::read_from(bytes)
             .and_then(Shebang::foreign)
             .map(|_| Language::Script)
-            .or_else(|| Self::read_from(path)?.language())
+            .or_else(|| Self::read_from(bytes)?.language())
     }
 
-    fn read_from(path: &Path) -> Option<Content> {
-        Self::WINDOW
-            .bytes(path)
+    fn read_from(contents: &Bytes) -> Option<Content> {
+        Some(Self::WINDOW.bytes(contents))
             .filter(|bytes| !bytes.contains(&b'\0'))
             .and_then(|bytes| {
                 String::from_utf8(bytes)

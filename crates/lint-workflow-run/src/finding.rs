@@ -1,5 +1,4 @@
 use std::fmt;
-use std::io;
 
 use lint_core::Fix;
 
@@ -19,7 +18,7 @@ pub(crate) enum Finding {
     LocalAction { target: Excerpt },
     Script,
     Unparsable { reason: Excerpt },
-    Unreadable { source: io::Error },
+    Unreadable { reason: Excerpt },
 }
 
 impl Finding {
@@ -43,7 +42,7 @@ impl fmt::Display for Finding {
             }
             Finding::Script => write!(formatter, "a script step holds logic in YAML"),
             Finding::Unparsable { reason } => write!(formatter, "cannot parse the workflow as YAML: {reason}"),
-            Finding::Unreadable { source } => write!(formatter, "cannot read the workflow: {source}"),
+            Finding::Unreadable { reason } => write!(formatter, "cannot read the workflow: {reason}"),
         }
     }
 }

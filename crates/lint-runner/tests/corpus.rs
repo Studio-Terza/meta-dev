@@ -100,7 +100,7 @@ mod ports {
             Self::copied(fixture, root.path())?;
             env::set_current_dir(root.path())?;
             let (mut printed, mut failed) = (Vec::new(), Vec::new());
-            let exit = Cli::from_args(std::iter::empty()).report_to(&mut printed, &mut failed);
+            let exit = Cli::from_args(std::iter::empty()).report_to(&file_ports::Disk, &mut printed, &mut failed);
             let verdict = if exit == ExitCode::SUCCESS { "passes\n" } else { "fails\n" };
             Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
         }

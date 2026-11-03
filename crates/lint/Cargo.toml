@@ -6,6 +6,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+console-ports = { path = "../console-ports" }
+file-ports = { path = "../file-ports" }
 lint-runner = { path = "../lint-runner" }
 
 [lints]
