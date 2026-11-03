@@ -3,14 +3,14 @@ mod characters;
 mod document;
 mod excerpt;
 mod finding;
+mod judged;
 mod word;
-
-use std::path::Path;
 
 use actions::Actions;
 use document::Document;
 use excerpt::Excerpt;
 use finding::Finding;
+use judged::Judged;
 use lint_core::{Headline, Lint, RepoFile, Report, Site, Violation};
 use lint_layout::LineNumber;
 use newtype::Newtype;
@@ -20,16 +20,6 @@ use saphyr::ScanError;
 pub struct WorkflowRun;
 
 impl WorkflowRun {
-    const WORKFLOWS: &'static str = ".github/workflows";
-    const EXTENSIONS: [&'static str; 2] = ["yml", "yaml"];
-
-    pub(crate) fn workflow(file: &RepoFile) -> Option<&RepoFile> {
-        file.below(Path::new(Self::WORKFLOWS))
-            .and(file.shown().extension())
-            .filter(|extension| Self::EXTENSIONS.iter().any(|known| *extension == *known))
-            .map(|_| file)
-    }
-
     fn violations<'file>(file: &'file RepoFile, actions: Actions<'_>) -> Vec<Violation<'file>> {
         let text = file
             .contents()
@@ -64,7 +54,7 @@ impl Lint<RepoFile> for WorkflowRun {
             Headline::new("a workflow run step is a short command; logic lives in Rust"),
             files
                 .iter()
-                .filter_map(|file| Self::workflow(file).or_else(|| Actions::manifest(file)))
+                .filter(|file| Judged::judging(file).is_some())
                 .flat_map(|file| Self::violations(file, actions))
                 .collect(),
         )
