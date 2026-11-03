@@ -28,7 +28,7 @@ use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
 pub use bisimilarity::Bisimilarity;
-pub use duplicates::DuplicateTransitions;
+pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::GraphLint;
 pub use live_nodes::LiveNodes;
 pub use motifs::RepeatedMotifs;

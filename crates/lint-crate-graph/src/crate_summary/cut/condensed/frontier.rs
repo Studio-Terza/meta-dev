@@ -36,7 +36,7 @@ impl<'condensed> Frontier<'condensed> {
         };
         let inward = weight(&|target| self.inside.contains(target));
         let outward = weight(&|target| *target != tangle && !self.inside.contains(target));
-        self.crossing = self.crossing + outward - inward;
+        self.crossing = self.crossing + (outward - inward);
         self.volume = self.volume + weight(&|_| true);
         self.items = self.items.plus(self.condensed.size(tangle));
         self.inside.insert(tangle);

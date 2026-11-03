@@ -82,7 +82,9 @@ impl Query {
             .map(|found| Candidate::of_trait(found, Kind::of_trait(ground(found.as_ref(), found.as_ref())), facts));
         let generics = facts.generic_impls().iter().map(Candidate::of_generic);
         let types = facts.types().iter().filter_map(|found| {
-            Kind::of_type(ground(found.as_ref(), found.as_ref())).map(|kind| Candidate::of_type(found, kind, facts))
+            Kind::of_trait(ground(found.as_ref(), found.as_ref()))
+                .implementer()
+                .map(|kind| Candidate::of_type(found, kind, facts))
         });
         Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top)
     }

@@ -27,11 +27,6 @@ impl Finding {
     }
 
     #[must_use]
-    pub fn past_warn(self) -> Option<Finding> {
-        (self.verdict != Verdict::Within).then_some(self)
-    }
-
-    #[must_use]
     pub fn stage(&self) -> &Stage {
         &self.stage
     }
@@ -47,5 +42,11 @@ impl Finding {
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}: {} took {}, {}", self.verdict, self.stage, self.measured, self.limit)
+    }
+}
+
+impl AsRef<Verdict> for Finding {
+    fn as_ref(&self) -> &Verdict {
+        &self.verdict
     }
 }

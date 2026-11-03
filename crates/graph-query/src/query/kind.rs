@@ -23,11 +23,11 @@ impl Kind {
     }
 
     #[must_use]
-    pub fn of_type(ground: Option<Ground>) -> Option<Kind> {
-        match ground {
-            Some(Ground::Ports) => Some(Kind::Port),
-            Some(Ground::Store) => Some(Kind::Store),
-            Some(Ground::Core | Ground::Boundary) | None => None,
+    pub fn implementer(self) -> Option<Kind> {
+        match self {
+            Kind::PortTrait => Some(Kind::Port),
+            Kind::StoreTrait => Some(Kind::Store),
+            Kind::Trait | Kind::GenericImpl | Kind::Port | Kind::Store => None,
         }
     }
 }

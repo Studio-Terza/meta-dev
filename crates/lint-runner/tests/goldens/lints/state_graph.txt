@@ -31,4 +31,6 @@ src/edges.rs:5: is a hidden edge Open -> Ajar; edges are pub
 src/edges.rs:8: takes &mut self on vertex Open; transitions consume self
 src/duplicate.rs:2: Closed -> Open has 2 edges, at most one allowed: force at src/duplicate.rs:5, open at src/duplicate.rs:2; keep one of these methods and remove the others
 src/crowded.rs:2: Ajar has 7 edges leaving it, at most 4 allowed; split the state into states with fewer edges each
+one edge per pair: in shipped code, a set of input types reaches one output type by one written edge (function, method or trait impl), read through references, Option, Result and collections, compared where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it; operations whose inputs and output are all one type (A, A -> A) are that type's algebra, judged by its laws, not edges; derived lifts and store operations are not written edges:
+src/duplicate.rs:2: corpus::Closed -> corpus::Open has 2 transitions: corpus::Closed::open at src/duplicate.rs:2, corpus::Closed::force at src/duplicate.rs:5; keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type
 fails
