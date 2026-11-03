@@ -3,6 +3,7 @@ mod rule;
 mod scan_bytes;
 mod shebang;
 mod stride;
+mod text;
 mod weight;
 
 use std::convert::Infallible;
@@ -17,17 +18,16 @@ use rule::Rule;
 use scan_bytes::ScanBytes;
 use shebang::Shebang;
 use stride::Stride;
+use text::Text;
 use weight::Weight;
 
 #[derive(Debug)]
-pub(crate) struct Content {
-    text: String,
-}
+pub(crate) struct Content(String);
 
 impl Content {
     const WINDOW: ScanBytes = ScanBytes::new(8192);
-    const FENCE: &'static str = "```";
-    const NEWLINE: &'static str = "\n";
+    const FENCE: Text<'static> = Text::new("```");
+    const NEWLINE: Text<'static> = Text::new("\n");
     const RETURN: char = '\r';
     const EVERY_OTHER: Stride = Stride::new(2);
 
@@ -73,9 +73,9 @@ impl Content {
         )
     }
 
-    fn unfenced_lines(&self) -> impl Iterator<Item = &str> {
+    fn unfenced_lines(&self) -> impl Iterator<Item = Text<'_>> {
         Self::EVERY_OTHER
-            .every_nth(Cuts::new(&self.text, Self::FENCE).pieces())
+            .every_nth(Cuts::new(Text::new(&self.0), Self::FENCE).pieces())
             .flat_map(|outside| Cuts::new(outside, Self::NEWLINE).pieces())
     }
 }
@@ -84,6 +84,6 @@ impl FromStr for Content {
     type Err = Infallible;
 
     fn from_str(text: &str) -> Result<Content, Infallible> {
-        Ok(Content { text: text.chars().filter(|letter| *letter != Self::RETURN).collect() })
+        Ok(Content(text.chars().filter(|letter| *letter != Self::RETURN).collect()))
     }
 }
