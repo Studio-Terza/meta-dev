@@ -2,13 +2,11 @@ mod ancestor;
 mod index;
 mod inside_sibling;
 mod relation;
-mod same;
 
 pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
 pub use relation::Relation;
-pub use same::Same;
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -83,6 +81,13 @@ impl ModulePath {
             let boundary = self.truncated_to_length(cut);
             modules.directory_same_as(&boundary) && !boundary.relates::<Ancestor>(user)
         })
+    }
+
+    pub fn deepest_in<'index>(&self, modules: &'index ModuleIndex) -> Option<&'index ModulePath> {
+        (0..=self.segments.len())
+            .rev()
+            .map(|length| self.truncated_to_length(length))
+            .find_map(|probe| modules.same_as(&probe))
     }
 
     pub fn truncated_to_length(&self, length: usize) -> ModulePath {

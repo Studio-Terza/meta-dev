@@ -1,11 +1,9 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use mutation_shard::Cli;
+use ports::Mutants;
 use serde_json::{Value, json};
 
 const BASELINE_LOG: &str = "   Running unittests src/lib.rs (target/debug/deps/foo-1)\ntest a ... ok\ntest b ... ok\n   Doc-tests foo\ntest src/lib.rs - f (line 1) ... ok\n";
@@ -13,57 +11,6 @@ const KILLING_LOG: &str =
     "Running unittests src/lib.rs (target/debug/deps/foo-1)\ntest a ... FAILED\ntest b ... ok\ntest c ... FAILED\n";
 const OTHER_KILLING_LOG: &str = "Running tests/t.rs (target/debug/deps/t-2)\ntest z ... FAILED\n";
 const PASSING_LOG: &str = "Running unittests src/lib.rs (target/debug/deps/foo-1)\ntest a ... ok\n";
-
-struct Mutants(tempfile::TempDir);
-
-impl Mutants {
-    fn new() -> Result<Mutants, io::Error> {
-        let mutants = Mutants(tempfile::tempdir()?);
-        fs::create_dir(mutants.0.path().join("log"))?;
-        Ok(mutants)
-    }
-
-    fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
-        fs::write(self.0.path().join("log").join(name), text)
-    }
-
-    fn outcomes(&self, outcomes: &Value) -> Result<(), io::Error> {
-        fs::write(self.0.path().join("outcomes.json"), json!({ "outcomes": outcomes }).to_string())
-    }
-
-    fn path(&self) -> &Path {
-        self.0.path()
-    }
-
-    fn destination(&self) -> PathBuf {
-        self.0.path().join("matrix.json")
-    }
-
-    fn shard(&self) -> Answer {
-        Answer::to(&[self.path().as_os_str(), self.destination().as_os_str()])
-    }
-
-    fn mutants_field(&self, name: &str) -> Vec<Value> {
-        self.matrix()
-            .get("mutants")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .map(|mutant| mutant.get(name).cloned().unwrap_or_default())
-            .collect()
-    }
-
-    fn baseline_field(&self) -> Value {
-        self.matrix().get("baseline").cloned().unwrap_or_default()
-    }
-
-    fn matrix(&self) -> Value {
-        fs::read_to_string(self.destination())
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
-    }
-}
 
 #[derive(Debug, PartialEq)]
 struct Answer {
@@ -192,7 +139,7 @@ fn the_log_is_the_first_one_that_exists_the_mutant_log_before_its_phases() -> Re
 #[test]
 fn a_directory_in_place_of_a_log_is_no_log() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
-    fs::create_dir(mutants.path().join("log").join("dir.log"))?;
+    mutants.log_directory("dir.log")?;
     mutants.log("baseline.log", BASELINE_LOG)?;
     mutants.outcomes(&json!([
         Outcome::baseline(),
@@ -224,7 +171,7 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use") && answer.err.contains("outcomes.json"));
-    fs::write(mutants.path().join("outcomes.json"), "not json")?;
+    mutants.broken_outcomes("not json")?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot parse") && answer.err.contains("outcomes.json"));
@@ -247,6 +194,83 @@ fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
     for arguments in [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]] {
         let answer = Answer::to(arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
-        assert_eq!(answer.err, "usage: mutation-shard <mutants.out> <out.json>\n");
+        assert_eq!(Text::lines(&answer.err), ["usage: mutation-shard <mutants.out> <out.json>"]);
+    }
+}
+
+struct Text;
+
+impl Text {
+    fn lines(text: &impl AsRef<str>) -> Vec<&str> {
+        text_lines::Lines::from(text.as_ref()).collect()
+    }
+}
+
+mod ports {
+    use std::fs;
+    use std::io;
+    use std::path::{Path, PathBuf};
+
+    use serde_json::{Value, json};
+
+    use super::Answer;
+
+    pub struct Mutants(tempfile::TempDir);
+
+    impl Mutants {
+        pub fn new() -> Result<Mutants, io::Error> {
+            let mutants = Mutants(tempfile::tempdir()?);
+            fs::create_dir(mutants.0.path().join("log"))?;
+            Ok(mutants)
+        }
+
+        pub fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
+            fs::write(self.0.path().join("log").join(name), text)
+        }
+
+        pub fn outcomes(&self, outcomes: &Value) -> Result<(), io::Error> {
+            fs::write(self.0.path().join("outcomes.json"), json!({ "outcomes": outcomes }).to_string())
+        }
+
+        pub fn log_directory(&self, name: &str) -> Result<(), io::Error> {
+            fs::create_dir(self.0.path().join("log").join(name))
+        }
+
+        pub fn broken_outcomes(&self, text: &str) -> Result<(), io::Error> {
+            fs::write(self.0.path().join("outcomes.json"), text)
+        }
+
+        pub fn path(&self) -> &Path {
+            self.0.path()
+        }
+
+        pub fn destination(&self) -> PathBuf {
+            self.0.path().join("matrix.json")
+        }
+
+        pub fn shard(&self) -> Answer {
+            Answer::to(&[self.path().as_os_str(), self.destination().as_os_str()])
+        }
+
+        pub fn mutants_field(&self, name: &str) -> Vec<Value> {
+            self.matrix()
+                .get("mutants")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .map(|mutant| mutant.get(name).cloned().unwrap_or_default())
+                .collect()
+        }
+
+        pub fn baseline_field(&self) -> Value {
+            self.matrix().get("baseline").cloned().unwrap_or_default()
+        }
+
+        pub fn matrix(&self) -> Value {
+            fs::read_to_string(self.destination())
+                .ok()
+                .and_then(|text| serde_json::from_str(&text).ok())
+                .unwrap_or_default()
+        }
     }
 }

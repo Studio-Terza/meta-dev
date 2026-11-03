@@ -1,6 +1,6 @@
-use newtype::{Counter, Newtype};
+use newtype::{Arbitrary, Counter, Newtype};
 
-#[derive(Newtype, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemCount(usize);
 
 impl ItemCount {

@@ -3,11 +3,11 @@ corpus: 0 tests in 3 files, 0 of 6 lines, 0 process starts
 report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 comments are not allowed in this repository:
-src/commented.rs:2: comment
-src/commented.rs:3: comment
+src/commented.rs:2: comment; delete it and say the same in the names of the code
+src/commented.rs:3: comment; delete it and say the same in the names of the code
 free functions are not allowed; make them associated functions or methods:
-src/commented.rs:1: fn a
-src/commented.rs:3: fn b
+src/commented.rs:1: fn a; make it an associated function or a method
+src/commented.rs:3: fn b; make it an associated function or a method
 function names say what the function does:
 src/commented.rs:1: fn a names nothing; say what it does
 src/commented.rs:3: fn b names nothing; say what it does

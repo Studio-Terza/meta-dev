@@ -47,7 +47,7 @@ laws::table!(
 #[test]
 fn a_ports_module_file_counts_its_effects_without_listing_them() {
     let text = Effects::of(&[Effects::at("crates/x/src/ports/run.rs", "fn f() {\n    std::env::var(\"A\");\n}\n")]);
-    assert!(text.contains("crate x: 1 effect sites, 1 in ports, 0 outside ports\n"), "{text}");
+    assert!(text.contains("crate x: 1 effect sites, 1 in ports, 0 outside ports;"), "{text}");
     assert!(!text.contains("environment effect"), "{text}");
 }
 

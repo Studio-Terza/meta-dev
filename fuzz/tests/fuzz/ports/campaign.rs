@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use lint_runner::Cli;
@@ -13,7 +13,7 @@ use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
 
 use crate::crash::Crash;
 use crate::input::Input;
-use crate::pending::Pending;
+use crate::ports::pending::Pending;
 
 const SECONDS: &str = "FUZZ_SECONDS";
 const CRASHES: &str = "FUZZ_CRASHES";
@@ -48,10 +48,19 @@ impl Campaign {
     fn linted(target: &str, input: &Input) -> io::Result<()> {
         Self::noted(target, input)?;
         let root = tempfile::tempdir()?;
-        input.written_into(root.path())?;
+        Self::planted(input, root.path())?;
         let arguments = [OsString::from(root.path())];
         let _ = Cli::from_args(arguments.into_iter()).report_to(&mut Vec::new(), &mut Vec::new());
         Ok(())
+    }
+
+    fn planted(input: &Input, root: &Path) -> io::Result<()> {
+        let file = root.join(input.file());
+        if let Some(parent) = file.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(root.join("Cargo.toml"), input.manifest())?;
+        fs::write(file, input.source())
     }
 
     fn kept(target: &str, input: &Input) -> Option<PathBuf> {

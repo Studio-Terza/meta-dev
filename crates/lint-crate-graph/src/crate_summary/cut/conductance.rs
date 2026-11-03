@@ -7,7 +7,7 @@ impl Conductance {
     const LOOSE_BELOW: f64 = 0.19;
 
     pub fn of_ratio(crossing: f64, volume: f64) -> Conductance {
-        Conductance(if volume > 0.0 { crossing / volume } else { 0.0 })
+        Conductance(crossing / volume)
     }
 
     pub fn is_loose(self) -> bool {

@@ -20,6 +20,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
+text-lines = { path = "../text-lines" }
 tempfile.workspace = true
 
 [lints]

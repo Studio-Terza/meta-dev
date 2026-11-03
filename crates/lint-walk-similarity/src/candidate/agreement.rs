@@ -1,8 +1,8 @@
 use std::fmt;
 
-use newtype::{Counter, Display, Newtype};
+use newtype::{Arbitrary, Counter, Display, Newtype};
 
-#[derive(Newtype, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Tally(usize);
 
 #[derive(Clone, Copy, Debug)]

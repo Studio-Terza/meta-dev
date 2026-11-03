@@ -17,6 +17,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+golden = { path = "../golden" }
 laws = { path = "../laws" }
 tempfile.workspace = true
 

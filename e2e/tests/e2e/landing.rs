@@ -1,10 +1,10 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use crate::desk::{Desk, Scope};
 use crate::fake::Fake;
-use crate::report::{Fraction, Report};
-use crate::world::World;
+use crate::ports::desk::{Desk, Scope};
+use crate::ports::report::{Fraction, Report};
+use crate::ports::world::World;
 
 #[derive(Debug, Default)]
 struct Spend {

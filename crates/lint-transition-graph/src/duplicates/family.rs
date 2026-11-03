@@ -1,7 +1,7 @@
 use std::fmt;
 
 use lint_core::{Site, Violation};
-use lint_layout::{Name, Whole, Word, words};
+use lint_layout::{Fix, Name, Whole, Word, words};
 use type_facts::Transition;
 
 use crate::end::Key;
@@ -37,13 +37,21 @@ impl fmt::Display for Family<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let paths: Vec<String> =
             self.members.iter().map(|member| format!("{member} at {}", AsRef::<Site>::as_ref(*member))).collect();
-        write!(formatter, "{} has {} transitions: {}; ", self.key, self.members.len(), paths.join(", "))?;
+        write!(formatter, "{} has {} transitions: {}", self.key, self.members.len(), paths.join(", "))?;
         match self.canonical() {
-            Some(conversion) => {
-                write!(formatter, "keep the standard conversion {conversion} and route the others through it")
-            }
-            None => formatter
-                .write_str("keep one, as From, TryFrom or FromStr where it fits, and route the others through it"),
+            Some(conversion) => write!(formatter, "; {conversion} is the standard conversion"),
+            None => Ok(()),
+        }
+    }
+}
+
+impl lint_layout::Finding for Family<'_> {
+    fn fix(&self) -> Fix {
+        match self.canonical() {
+            Some(_) => Fix::new("keep the standard conversion and route the other transitions through it"),
+            None => Fix::new(
+                "keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it",
+            ),
         }
     }
 }

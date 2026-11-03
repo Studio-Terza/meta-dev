@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [dev-dependencies]
+lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-bool-methods = { path = "../lint-bool-methods" }
 lint-complexity = { path = "../lint-complexity" }
 lint-const-shape = { path = "../lint-const-shape" }
@@ -15,11 +16,13 @@ lint-distinct-signatures = { path = "../lint-distinct-signatures" }
 lint-effect-sites = { path = "../lint-effect-sites" }
 lint-enum-predicates = { path = "../lint-enum-predicates" }
 lint-expression-flow = { path = "../lint-expression-flow" }
+lint-fakes-at-ports = { path = "../lint-fakes-at-ports" }
 lint-fixtures = { path = "../lint-fixtures" }
 lint-fn-shape = { path = "../lint-fn-shape" }
 lint-guard-must-use = { path = "../lint-guard-must-use" }
 lint-layout = { path = "../lint-layout" }
 lint-literal-names = { path = "../lint-literal-names" }
+lint-long-exact-strings = { path = "../lint-long-exact-strings" }
 lint-mandatory-laws = { path = "../lint-mandatory-laws" }
 lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-module-nesting = { path = "../lint-module-nesting" }
@@ -32,6 +35,7 @@ lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-plaintext = { path = "../lint-no-plaintext" }
+lint-no-test-io = { path = "../lint-no-test-io" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-paired-apis = { path = "../lint-paired-apis" }
 lint-paths = { path = "../lint-paths" }

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_layout::Name;
 
 use crate::declaration::Declaration;
@@ -14,10 +15,14 @@ impl<'declaration> From<&'declaration Declaration> for Finding<'declaration> {
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "trait {} has no generic consumer; use a standard trait such as From, AsRef or Display, else write the generic over an existing trait, else a derive",
-            AsRef::<Name>::as_ref(self.0)
+        write!(formatter, "trait {} has no generic consumer", AsRef::<Name>::as_ref(self.0))
+    }
+}
+
+impl lint_core::Finding for Finding<'_> {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "use a standard trait such as From, AsRef or Display, else write the generic over an existing trait, else a derive",
         )
     }
 }

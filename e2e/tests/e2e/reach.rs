@@ -1,9 +1,9 @@
 use std::error::Error;
 
-use crate::desk::Desk;
 use crate::fake::Fake;
-use crate::report::{Fraction, Report};
-use crate::world::World;
+use crate::ports::desk::Desk;
+use crate::ports::report::{Fraction, Report};
+use crate::ports::world::World;
 
 #[test]
 fn a_pull_request_into_a_project_branch_builds_the_reach_of_its_one_changed_crate() -> Result<(), Box<dyn Error>> {

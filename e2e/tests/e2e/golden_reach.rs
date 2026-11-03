@@ -1,9 +1,9 @@
 use std::error::Error;
 
-use crate::desk::Desk;
 use crate::fake::{Change, Edit, Fake};
-use crate::report::{Fraction, Report};
-use crate::world::World;
+use crate::ports::desk::Desk;
+use crate::ports::report::{Fraction, Report};
+use crate::ports::world::World;
 
 #[derive(Debug, Default)]
 struct Verdicts {

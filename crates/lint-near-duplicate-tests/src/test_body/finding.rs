@@ -1,5 +1,6 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_layout::Name;
 
 #[derive(Debug)]
@@ -16,10 +17,14 @@ impl Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "test {} differs from {} only in literals; make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!",
-            self.repeat, self.first
+        write!(formatter, "test {} differs from {} only in literals", self.repeat, self.first)
+    }
+}
+
+impl lint_core::Finding for Finding {
+    fn fix(&self) -> Fix {
+        Fix::new(
+            "make them rows of one laws::table!, or state the property with a law macro such as laws::roundtrip! or laws::idempotent!",
         )
     }
 }

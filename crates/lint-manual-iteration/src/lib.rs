@@ -8,7 +8,10 @@ use syn::{
     Block, Expr, ExprForLoop, ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Local, Macro, Pat, Stmt,
 };
 
+use lint_core::Fix;
 use lint_core::Macros;
+use lint_core::Message;
+use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -74,7 +77,7 @@ struct Iterations<'scan> {
 }
 
 impl Iterations<'_> {
-    fn violation(&self, span: Span, message: &str) -> Violation {
+    fn violation(&self, span: Span, message: Message) -> Violation {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 }
@@ -114,7 +117,10 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
         .then(|| {
             self.violation(
                 local.span(),
-                "mutable iterator local; drive it with combinators such as format, collect, or fold",
+                Message::new(
+                    Problem::new("mutable iterator local"),
+                    Fix::new("drive it with combinators such as format, collect, or fold"),
+                ),
             )
         });
         self.violations.extend(finding);
@@ -125,7 +131,10 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
         let finding = ManualIteration::accumulates(&expr.body).then(|| {
             self.violation(
                 expr.for_token.span,
-                "loop that only accumulates; extend or collect from an iterator instead",
+                Message::new(
+                    Problem::new("loop that only accumulates"),
+                    Fix::new("extend or collect from an iterator instead"),
+                ),
             )
         });
         self.violations.extend(finding);
