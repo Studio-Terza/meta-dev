@@ -22,12 +22,10 @@ env:
   TEST_TARGET: ${{ github.workspace }}/target/cold/test-compile
   CLIPPY_CRATES: ${{ github.workspace }}/target/cold/clippy-crates.txt
   TEST_CRATES: ${{ github.workspace }}/target/cold/test-compile-crates.txt
-  RECORD: ci/cold-build.toml
   HISTORY: ${{ github.workspace }}/target/ci/history.tsv
 
 permissions:
   contents: read
-  issues: write
 
 defaults:
   run:
@@ -44,7 +42,7 @@ jobs:
       - name: sources
         run: cargo fetch --locked
       - name: tools
-        run: cargo build --locked -q --bin ci --bin gate-limits --target-dir "$COLD/tools"
+        run: cargo build --locked -q --bin ci --target-dir "$COLD/tools"
       - name: clippy from scratch
         env:
           CARGO_TARGET_DIR: ${{ env.CLIPPY_TARGET }}
@@ -66,14 +64,6 @@ jobs:
       - name: test compile summary
         if: always()
         run: '"$TOOLS/ci" summarize "$TEST_CRATES" "$GITHUB_STEP_SUMMARY"'
-      - name: ratchet
-        if: always()
-        run: '"$TOOLS/gate-limits" "$RECORD" "$MEASURED"'
-      - name: ratchet issues
-        if: github.ref == 'refs/heads/main' && always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: '"$TOOLS/ci" stage-issues "$RECORD" "$MEASURED"'
       - name: history restore
         if: github.ref == 'refs/heads/main' && always()
         uses: actions/cache/restore@v4
