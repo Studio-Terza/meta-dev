@@ -35,6 +35,11 @@ impl Use {
     }
 
     #[must_use]
+    pub fn within(&self, root: &[Word<'_>]) -> Option<&UsePath> {
+        self.under(root).or_else(|| self.candidates.iter().find_map(|candidate| candidate.spells(root)))
+    }
+
+    #[must_use]
     pub fn ground(&self) -> Ground {
         self.ground
     }
