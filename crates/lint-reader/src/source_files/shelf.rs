@@ -6,11 +6,13 @@ use lint_core::SourceFile;
 use lint_layout::Failure;
 use lint_roots::{Fact, Survey};
 
+mod frontier;
 mod store;
 
 use super::located::{Located, Node};
 use super::modules::{Child, Modules};
 use super::scope::Scope;
+use frontier::Frontier;
 use store::Shelved;
 
 #[derive(Debug, Default)]
@@ -40,24 +42,22 @@ impl<'tree> Shelf<'tree> {
         self.shelved.get(&located).and_then(Shelved::opened).and_then(|opened| opened.parsed().ok())
     }
 
-    fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: &BTreeSet<Node<'tree>>) -> Shelf<'tree> {
-        let fresh: BTreeSet<Located<'tree>> =
-            level.iter().map(Node::located).filter(|located| !self.shelved.contains_key(*located)).cloned().collect();
+    pub fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: &BTreeSet<Node<'tree>>) -> Shelf<'tree> {
+        let (_, fresh): (Vec<&Located<'tree>>, Vec<&Located<'tree>>) =
+            level.iter().map(Node::located).partition(|located| self.shelved.contains_key(*located));
+        let fresh: BTreeSet<Located<'tree>> = fresh.into_iter().cloned().collect();
         let stocked = self.read(files, fresh.into_iter().collect());
         let candidates: Vec<PathBuf> = level.iter().flat_map(|node| stocked.candidates(node)).collect();
         let stocked = Shelf { survey: stocked.survey.learn(files, Fact::Followed, &candidates), ..stocked };
         let visited: BTreeSet<Node<'tree>> = visited.iter().chain(level).cloned().collect();
-        let next: BTreeSet<Node<'tree>> = level
+        let reached: BTreeSet<Node<'tree>> = level
             .iter()
             .flat_map(|node| stocked.declared(node).into_iter().map(move |child| (node, child)))
             .map(|(node, child)| child.canonical(&stocked.survey).visit(|file, children| node.child(file, children)))
-            .filter(|node| !visited.contains(node))
             .collect();
-        if next.is_empty() {
-            stocked
-        } else {
-            stocked.explored(files, &next.into_iter().collect::<Vec<Node<'tree>>>(), &visited)
-        }
+        let (_, next): (Vec<Node<'tree>>, Vec<Node<'tree>>) =
+            reached.into_iter().partition(|node| visited.contains(node));
+        Frontier::new(next, visited).explored(stocked, files)
     }
 
     fn read(self, files: &impl Files, fresh: Vec<Located<'tree>>) -> Shelf<'tree> {

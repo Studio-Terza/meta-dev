@@ -56,13 +56,14 @@ impl<'tree> Located<'tree> {
     }
 
     fn opened(&self, text: Result<Text, FileFailure>, placement: Placement) -> Result<Opened, Failure> {
-        let shown = self.tree.display(&self.file);
-        match text {
-            Ok(text) => {
-                Ok(Opened { shown, file: self.file.clone(), text: SourceText::new(text.into_inner()), placement })
-            }
-            Err(failure) => Err(Failure::Io { path: shown, source: failure.into() }),
-        }
+        text.map_err(|failure| Failure::Io { path: self.tree.display(&self.file), source: failure.into() }).map(
+            |text| Opened {
+                shown: self.tree.display(&self.file),
+                file: self.file.clone(),
+                text: SourceText::new(text.into_inner()),
+                placement,
+            },
+        )
     }
 }
 

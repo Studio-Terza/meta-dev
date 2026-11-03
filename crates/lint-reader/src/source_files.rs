@@ -66,12 +66,9 @@ impl<'tree> SourceFiles<'tree> {
     }
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {
-        if self.seen.insert(file.to_path_buf()) {
-            let source = self.shelf.source(scope, file);
-            self.opened(scope, file, children_directory, source)
-        } else {
-            self
-        }
+        let source =
+            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.source(scope, file));
+        self.opened(scope, file, children_directory, source)
     }
 
     fn opened(

@@ -25,21 +25,37 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
     }
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
-        if self.seen.insert(file.to_path_buf()) { self.opened(scope, file, children_directory) } else { self }
+        let source =
+            self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.test_source(scope, file));
+        self.opened(scope, file, children_directory, source)
     }
 
-    fn opened(self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
-        match self.shelf.test_source(scope, file) {
-            Some(source) => {
-                let nested =
-                    Modules::declared_in(self.shelf.survey(), file, children_directory, &source.syntax().items)
-                        .nested();
-                nested.into_iter().fold(
-                    TestModules { files: self.files.into_iter().chain([source]).collect(), ..self },
-                    |reading, child| reading.child(scope, child),
-                )
-            }
+    fn opened(
+        self,
+        scope: &Scope<'tree>,
+        file: &Path,
+        children_directory: &Path,
+        source: Option<SourceFile>,
+    ) -> TestModules<'shelf, 'tree> {
+        match source {
+            Some(source) => self.nested(scope, file, children_directory, source),
             None => self,
         }
+    }
+
+    fn nested(
+        self,
+        scope: &Scope<'tree>,
+        file: &Path,
+        children_directory: &Path,
+        source: SourceFile,
+    ) -> TestModules<'shelf, 'tree> {
+        let nested =
+            Modules::declared_in(self.shelf.survey(), file, children_directory, &source.syntax().items).nested();
+        nested
+            .into_iter()
+            .fold(TestModules { files: self.files.into_iter().chain([source]).collect(), ..self }, |reading, child| {
+                reading.child(scope, child)
+            })
     }
 }
