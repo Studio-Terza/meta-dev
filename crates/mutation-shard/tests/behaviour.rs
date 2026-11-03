@@ -3,7 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use mutation_shard::Cli;
 use serde_json::{Value, json};
 
@@ -175,12 +175,14 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
     let mutants = Mutants::new()?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot use") && answer.err.contains("outcomes.json"));
+    assert!(answer.err.contains("cannot use"));
+    assert!(answer.err.contains("outcomes.json"));
     mutants.broken_outcomes("not json")?;
     let answer = mutants.shard();
     assert_eq!(answer.exit, ExitCode::FAILURE);
-    assert!(answer.err.contains("cannot parse") && answer.err.contains("outcomes.json"));
-    assert!(!mutants.destination().exists());
+    assert!(answer.err.contains("cannot parse"));
+    assert!(answer.err.contains("outcomes.json"));
+    assert_eq!(mutants.files.kind(&mutants.destination()), Kind::Missing);
     Ok(())
 }
 
