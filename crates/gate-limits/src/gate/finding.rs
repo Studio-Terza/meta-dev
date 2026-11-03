@@ -1,11 +1,11 @@
 use std::fmt;
 
-use crate::cli::failure::Failure;
-use crate::cli::gate::limit::Limit;
-use crate::cli::gate::record::Entry;
-use crate::cli::gate::seconds::Seconds;
-use crate::cli::gate::verdict::Verdict;
-use crate::cli::stage::Stage;
+use super::entry::Entry;
+use crate::failure::Failure;
+use crate::gate::limit::Limit;
+use crate::gate::verdict::Verdict;
+use crate::seconds::Seconds;
+use crate::stage::Stage;
 
 #[derive(Debug)]
 pub struct Finding {

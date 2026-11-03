@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use crate::cli::failure::Failure;
-use crate::cli::gate::finding::Finding;
-use crate::cli::gate::limit::Limit;
-use crate::cli::gate::seconds::Seconds;
-use crate::cli::stage::Stage;
+use crate::failure::Failure;
+use crate::gate::finding::Finding;
+use crate::gate::limit::Limit;
+use crate::seconds::Seconds;
+use crate::stage::Stage;
 
 #[derive(Debug, Default)]
 pub struct Pairing {

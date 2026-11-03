@@ -1,24 +1,24 @@
+mod entry;
 mod finding;
 mod limit;
 mod pairing;
 mod record;
-mod seconds;
 mod verdict;
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 
-use crate::cli::contents::Contents;
-use crate::cli::document::Document;
-use crate::cli::failure::Failure;
-use crate::cli::stage::Stage;
+use crate::contents::Contents;
+use crate::document::Document;
+use crate::failure::Failure;
+use crate::seconds::Seconds;
+use crate::stage::Stage;
 pub use finding::Finding;
 use limit::Limit;
 use newtype::Newtype;
 use pairing::Pairing;
 pub use record::Record;
-pub(crate) use seconds::Seconds;
 use verdict::Verdict;
 
 #[derive(Debug)]

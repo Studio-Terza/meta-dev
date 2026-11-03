@@ -2,9 +2,9 @@ use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 
-use crate::cli::document::Document;
-use crate::cli::gate::Seconds;
-use crate::cli::stage::Stage;
+use crate::document::Document;
+use crate::seconds::Seconds;
+use crate::stage::Stage;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure<'cli> {

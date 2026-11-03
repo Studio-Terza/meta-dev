@@ -2,10 +2,10 @@ use std::fmt;
 
 use serde::Deserialize;
 
-use crate::cli::failure::Failure;
-use crate::cli::gate::seconds::Seconds;
-use crate::cli::gate::verdict::Verdict;
-use crate::cli::stage::Stage;
+use crate::failure::Failure;
+use crate::gate::verdict::Verdict;
+use crate::seconds::Seconds;
+use crate::stage::Stage;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(untagged)]
