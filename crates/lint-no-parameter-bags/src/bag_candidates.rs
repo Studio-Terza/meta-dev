@@ -7,9 +7,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use method_shape::MethodShape;
 use syn::visit::Visit;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct, Type};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
@@ -30,15 +31,8 @@ impl BagCandidates {
     pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
-            .filter(|(name, _)| !self.disqualified.contains(*name))
+            .filter(|(name, _)| self.disqualified.iter().all(|disqualified| disqualified != *name))
             .map(|(name, line)| Candidate::new(name, *line))
-    }
-
-    fn self_name(item: &ItemImpl) -> Option<Name> {
-        match &*item.self_ty {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
     }
 
     fn logic_carrier(item: &ItemImpl, self_name: Name) -> Option<Name> {
@@ -49,12 +43,7 @@ impl BagCandidates {
     }
 
     fn logic<'member>(member: &'member ImplItem, self_name: &Name) -> Option<&'member ImplItemFn> {
-        match member {
-            ImplItem::Fn(function) if MethodShape::classify(function, self_name) == MethodShape::Logic => {
-                Some(function)
-            }
-            _ => None,
-        }
+        Syntax::impl_fn(member).filter(|function| MethodShape::classify(function, self_name) == MethodShape::Logic)
     }
 }
 
@@ -71,6 +60,6 @@ impl<'ast> Visit<'ast> for BagCandidates {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        self.disqualified.extend(Self::self_name(item).and_then(|name| Self::logic_carrier(item, name)));
+        self.disqualified.extend(Syntax::last_name(&item.self_ty).and_then(|name| Self::logic_carrier(item, name)));
     }
 }

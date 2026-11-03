@@ -45,17 +45,15 @@ impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         Walk::enter(&item.attrs, || {
             let generics = self.judge.generics(&self.module, &item.generics);
-            let held: BTreeSet<Name> = item
-                .fields
+            item.fields
                 .iter()
                 .filter(|field| self.judge.port_type(&self.module, &generics, &field.ty).is_some())
                 .filter_map(|field| field.ident.as_ref())
                 .map(Name::from)
-                .collect();
-            Some(held).filter(|held| !held.is_empty()).into_iter().fold(&mut self.owners, |owners, held| {
-                owners.entry(Name::from(&item.ident)).or_default().extend(held);
-                owners
-            });
+                .fold(&mut self.owners, |owners, field| {
+                    owners.entry(Name::from(&item.ident)).or_default().insert(field);
+                    owners
+                });
         });
     }
 }
