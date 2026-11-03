@@ -24,7 +24,7 @@ const TEST_ONLY_ALL: &str = "#[cfg(all(test, unix))]\nmod tests {\n    fn f() ->
 const FEATURE_ONLY: &str =
     "#[cfg(feature = \"proptest\")]\nmod support {\n    pub fn f() -> u32 {\n        42\n    }\n}\n";
 
-const CASES: [Case; 17] = [
+const CASES: [Case; 18] = [
     Case::new(
         Title::new("static"),
         &[Source::new(Located::new("a.rs"), Text::new(STATIC))],
@@ -42,6 +42,15 @@ const CASES: [Case; 17] = [
             Source::new(Located::new("src/fixtures.rs"), Text::new(LITERAL)),
         ],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("support module beside a plain file"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("src/fixtures.rs"), Text::new(LITERAL)),
+            Source::new(Located::new("src/clock.rs"), Text::new(LITERAL)),
+        ],
+        Flagged::new(&["src/clock.rs:2"]),
     ),
     Case::new(
         Title::new("test or feature ships"),

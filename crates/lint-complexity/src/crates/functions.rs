@@ -28,7 +28,8 @@ impl<'file> Functions<'file> {
             )
         };
         let found = body
-            .filter(|_| Walk::outside_tests(attributes) == Walk::Entered && TestMarks::mark_test(attributes).is_none())
+            .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
+            .filter(|_| TestMarks::mark_test(attributes).is_none())
             .map(function);
         self.found.extend(found);
     }

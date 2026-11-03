@@ -11,11 +11,11 @@ pub enum Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Finding::Return => "return",
-            Finding::Break => "break",
-            Finding::Continue => "continue",
-        })
+        match self {
+            Finding::Return => formatter.write_str("return"),
+            Finding::Break => formatter.write_str("break"),
+            Finding::Continue => formatter.write_str("continue"),
+        }
     }
 }
 
