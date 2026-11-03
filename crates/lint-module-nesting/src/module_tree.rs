@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath};
+use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -61,23 +61,20 @@ impl<'file> ModuleTree<'file> {
 
     fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
         let module = ModulePath::of_file(file);
-        self.reexports.insert(module.clone(), ReexportCount::of_file(file.syntax()));
-        self.users = std::mem::take(&mut self.users).with_tests(&self.modules, file.test_modules());
-        UseEdges::in_file(file.syntax()).iter().fold(self, |tree, path| tree.absorbing(&module, path))
+        self.reexports.insert(module, ReexportCount::of_file(file.syntax()));
+        self.users.add_tests(&self.modules, file.test_modules());
+        UseEdges::each(file.syntax(), |path| self.absorb(module, path));
+        self
     }
 
-    fn absorbing(mut self, module: &ModulePath<'file>, path: &UsePath) -> ModuleTree<'file> {
-        match ModulePath::from_use(module, path, &self.modules) {
-            Some(target) => {
-                let used = target.deepest_in(&self.modules);
-                self.users = std::mem::take(&mut self.users).recorded(used.cloned(), module);
-                self.deep_uses.extend(target.crossed_directory(module, &self.modules).map(|_| {
-                    Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target: target.clone() })
-                }));
-                self
-            }
-            None => self,
-        }
+    fn absorb(&mut self, module: ModulePath<'file>, path: &UsePath) {
+        let target = Target::from_use(&module, path, &self.modules);
+        let used = target.as_ref().and_then(|target| target.deepest_in(&self.modules));
+        self.users.record(used, module);
+        let crossed = target.as_ref().and_then(|target| target.crossed_directory(&module, &self.modules));
+        self.deep_uses.extend(
+            crossed.map(|target| Violation::new(Site::of_file(module.file()), Finding::ReachesPastModRs { target })),
+        );
     }
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
