@@ -31,7 +31,7 @@ manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_bi
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, near_duplicate_tests, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, rust_only, workflow_run.
+effects_in_ports, no_early_exits, rust_only, workflow_run.
 
 Every run also prints the test budget: tests, files, lines, test lines and process starts per package, counting law macros as tests. Process starts
 are counted everywhere, behind `ports` or not; only those outside `ports` are violations.
@@ -62,6 +62,12 @@ ports and outside.
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
 like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
+
+`no_early_exits` blocks the `return`, `break` and `continue` keywords in shipped and test code alike: function bodies,
+const fns, trait impls, closures, labeled blocks, `#[cfg(test)]` modules, files under `tests` and macro bodies. A body
+leaves through its tail value or through `?`, which stays allowed. The message names the fix: yield the value from an
+`if` or `match` expression, drive the iteration with `find`, `take_while`, `try_fold` or `position`, or split it into
+smaller functions. There is no function-size lint.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not

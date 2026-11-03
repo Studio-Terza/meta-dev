@@ -15,15 +15,12 @@ control flow is an expression; every branch yields the value the function return
 src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-src/early.rs:3: early return; make the value the tail expression or exit through ? on a Result
 src/lonely.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/lonely.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
 src/loops.rs:2: for loop; drive the iterator with combinators, const fns excepted
 src/loops.rs:3: while loop; drive an iterator with combinators, const fns excepted
 src/loops.rs:4: loop; drive an iterator with combinators, const fns excepted
 src/loops.rs:7: for loop; drive the iterator with combinators, const fns excepted
-src/loops.rs:9: break; fold with ControlFlow or find the element with an iterator
-src/loops.rs:11: continue; filter the iterator instead
 src/reassigned.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
 src/reassigned.rs:3: assignment to a local; build the value in one expression or give its type an updater method
 src/reassigned.rs:7: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
@@ -55,4 +52,8 @@ src/reassigned.rs:1: bare u8 in f; take and return a domain type (a newtype, an 
 src/reassigned.rs:6: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/tail.rs:1: bare bool in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/tail.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+a body leaves through its tail value or ?, never through return, break or continue:
+src/early.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+src/loops.rs:9: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+src/loops.rs:11: continue; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 fails

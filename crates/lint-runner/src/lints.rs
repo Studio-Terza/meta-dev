@@ -20,6 +20,7 @@ use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
 use lint_near_duplicate_tests::NearDuplicateTests;
 use lint_no_comments::NoComments;
+use lint_no_early_exits::NoEarlyExits;
 use lint_no_forwarders::NoForwarders;
 use lint_no_free_fns::NoFreeFns;
 use lint_no_ignored_tests::NoIgnoredTests;
@@ -92,6 +93,7 @@ impl Lints {
             ArbitraryNewtypes::report(files),
             BoolMethods::report(files),
             EffectsInPorts::report(files),
+            NoEarlyExits::report(files),
         ]
     }
 

@@ -36,6 +36,7 @@ lint-named-lifetimes = { path = "../lint-named-lifetimes" }
 lint-named-numbers = { path = "../lint-named-numbers" }
 lint-near-duplicate-tests = { path = "../lint-near-duplicate-tests" }
 lint-no-comments = { path = "../lint-no-comments" }
+lint-no-early-exits = { path = "../lint-no-early-exits" }
 lint-no-forwarders = { path = "../lint-no-forwarders" }
 lint-no-free-fns = { path = "../lint-no-free-fns" }
 lint-no-numbers-in-binaries = { path = "../lint-no-numbers-in-binaries" }
