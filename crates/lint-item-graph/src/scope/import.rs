@@ -30,4 +30,8 @@ impl<'file> Import<'file> {
     pub fn original(&self) -> &'file Ident {
         self.original
     }
+
+    pub fn root_of<Spelled: PartialEq<Ident>>(&self, name: &Spelled) -> Option<Name> {
+        self.names(name).map(|import| Name::from(import.root))
+    }
 }

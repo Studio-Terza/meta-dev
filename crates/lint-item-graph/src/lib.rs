@@ -4,6 +4,7 @@ mod scope;
 mod traversal;
 
 pub use node_index::NodeIndex;
+pub use scope::Scope;
 pub use traversal::Traversal;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,12 +12,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use lint_core::SourceFile;
 use lint_layout::Name;
 use referenced_names::ReferencedNames;
-use scope::Scope;
 
 #[derive(Clone, Debug, Default)]
 pub struct ItemGraph<Node = Name> {
     names: Vec<Node>,
     links: Vec<Vec<NodeIndex>>,
+    stand_ins: BTreeSet<NodeIndex>,
 }
 
 impl ItemGraph {
@@ -26,12 +27,22 @@ impl ItemGraph {
             .iter()
             .map(|file| ReferencedNames::of_items(&file.syntax().items, &Scope::of_file(file.syntax())))
             .fold(ReferencedNames::default(), ReferencedNames::merged);
-        ItemGraph::of_references(references.into_map())
+        references.into_graph()
+    }
+
+    fn standing_in(self, names: &BTreeSet<Name>) -> ItemGraph {
+        let indexed = self.names.iter().enumerate().filter(|(_, name)| names.contains(*name));
+        ItemGraph { stand_ins: indexed.map(|(index, _)| NodeIndex::from(index)).collect(), ..self }
     }
 
     #[must_use]
     pub fn links(&self) -> &[Vec<NodeIndex>] {
         &self.links
+    }
+
+    #[must_use]
+    pub fn stand_ins(&self) -> &BTreeSet<NodeIndex> {
+        &self.stand_ins
     }
 }
 
@@ -54,7 +65,7 @@ impl<Node: Ord> ItemGraph<Node> {
                 linked.into_iter().collect()
             })
             .collect();
-        ItemGraph { names: references.into_keys().collect(), links }
+        ItemGraph { names: references.into_keys().collect(), links, stand_ins: BTreeSet::new() }
     }
 
     #[must_use]

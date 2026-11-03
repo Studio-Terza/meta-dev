@@ -25,6 +25,7 @@ impl<'file> Scope<'file> {
     const LOCAL_ROOTS: [&str; 3] = ["crate", "self", "super"];
     const SELF_IMPORT: &str = "self";
 
+    #[must_use]
     pub fn of_file(file: &'file syn::File) -> Scope<'file> {
         let mut scope = Scope::default();
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
@@ -32,6 +33,7 @@ impl<'file> Scope<'file> {
         scope
     }
 
+    #[must_use]
     pub fn referenced(&self, tokens: TokenStream) -> Vec<Name> {
         let path = PathTokens::new(tokens);
         path.tokens()
@@ -43,6 +45,14 @@ impl<'file> Scope<'file> {
                 TokenTree::Punct(_) | TokenTree::Literal(_) => Vec::new(),
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn origin(&self, name: &Name, written: Option<&Name>) -> Option<Name> {
+        let root = |spelled: &Name| self.imports.root_of(spelled);
+        let head = written.cloned().or_else(|| root(name))?;
+        let origin = root(&head).unwrap_or(head);
+        Some(origin).filter(|origin| !self.local_roots.contains(origin))
     }
 
     fn kept(&self, token: &TokenTree, root: Option<&TokenTree>, name: Name) -> Option<Name> {
