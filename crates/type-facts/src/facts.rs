@@ -8,6 +8,7 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
 use crate::method::Method;
 use crate::trait_fact::TraitFact;
@@ -19,6 +20,7 @@ pub(crate) use members::Members;
 pub struct Facts<'file> {
     types: Vec<TypeFact<'file>>,
     traits: Vec<TraitFact<'file>>,
+    generic_impls: Vec<GenericImpl<'file>>,
     members: BTreeMap<&'file CrateName, BTreeMap<Name, Members>>,
 }
 
@@ -34,6 +36,10 @@ impl<'file> Facts<'file> {
 
     pub(crate) fn add_trait(&mut self, found: Option<TraitFact<'file>>) {
         self.traits.extend(found);
+    }
+
+    pub(crate) fn add_generic(&mut self, found: Option<GenericImpl<'file>>) {
+        self.generic_impls.extend(found);
     }
 
     pub(crate) fn add_block(&mut self, found: Option<ImplBlock<'file>>) {
@@ -53,6 +59,23 @@ impl<'file> Facts<'file> {
     #[must_use]
     pub fn traits(&self) -> &[TraitFact<'file>] {
         &self.traits
+    }
+
+    #[must_use]
+    pub fn generic_impls(&self) -> &[GenericImpl<'file>] {
+        &self.generic_impls
+    }
+
+    #[must_use]
+    pub fn implementers(&self, implemented: &Name) -> Vec<&Name> {
+        self.members
+            .values()
+            .flat_map(BTreeMap::iter)
+            .filter(|(_, members)| {
+                members.implementations().iter().any(|each| AsRef::<Name>::as_ref(each) == implemented)
+            })
+            .map(|(name, _)| name)
+            .collect()
     }
 
     #[must_use]

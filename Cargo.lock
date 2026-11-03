@@ -197,6 +197,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph-query"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "lint-fixtures",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "syn 2.0.119",
+ "text-lines",
+ "transition-facts",
+ "type-facts",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -808,6 +824,7 @@ version = "0.1.0"
 dependencies = [
  "file-ports",
  "golden",
+ "graph-query",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
  "lint-clones",
@@ -1474,6 +1491,7 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "newtype",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 

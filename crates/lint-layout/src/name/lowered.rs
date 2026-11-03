@@ -1,3 +1,4 @@
+use crate::name::Name;
 use crate::word::Word;
 use newtype::Newtype;
 
@@ -13,5 +14,11 @@ impl FromIterator<char> for Lowered {
 impl PartialEq<Word<'_>> for Lowered {
     fn eq(&self, word: &Word<'_>) -> bool {
         self.0 == word.into_inner()
+    }
+}
+
+impl From<Lowered> for Name {
+    fn from(lowered: Lowered) -> Name {
+        Name(lowered.0)
     }
 }

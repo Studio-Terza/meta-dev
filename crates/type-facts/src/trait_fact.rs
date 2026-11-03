@@ -3,6 +3,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::dependency::Dependency;
+use crate::method::Method;
 
 #[derive(Clone, Debug)]
 pub struct TraitFact<'file> {
@@ -10,6 +11,7 @@ pub struct TraitFact<'file> {
     name: Name,
     site: Site<'file>,
     dependencies: Vec<Dependency<'file>>,
+    methods: Vec<Method>,
 }
 
 impl<'file> TraitFact<'file> {
@@ -19,7 +21,12 @@ impl<'file> TraitFact<'file> {
         site: Site<'file>,
         dependencies: Vec<Dependency<'file>>,
     ) -> TraitFact<'file> {
-        TraitFact { krate, name, site, dependencies }
+        TraitFact { krate, name, site, dependencies, methods: Vec::new() }
+    }
+
+    pub(crate) fn with_methods(mut self, methods: Vec<Method>) -> TraitFact<'file> {
+        self.methods = methods;
+        self
     }
 
     #[must_use]
@@ -43,5 +50,11 @@ impl AsRef<Name> for TraitFact<'_> {
 impl<'file> AsRef<Site<'file>> for TraitFact<'file> {
     fn as_ref(&self) -> &Site<'file> {
         &self.site
+    }
+}
+
+impl AsRef<[Method]> for TraitFact<'_> {
+    fn as_ref(&self) -> &[Method] {
+        &self.methods
     }
 }

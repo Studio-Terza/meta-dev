@@ -19,6 +19,7 @@ const CLEAN: &str = "struct A;\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n}\n";
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
+const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\n";
 const MODULES: &str = "mod one;\nmod two;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
@@ -45,15 +46,15 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let implemented = workspace.entries(&crates)?.iter().try_fold(0, |found, entry| {
         Ok::<usize, FileFailure>(found + Trees::occurrences(&workspace, &entry.join("src"), "impl Lint for")?)
     })?;
-    let listed_by_the_cli = include_str!("../src/cli.rs").matches("::report(files)").count();
+    let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
-    assert!(listed_by_the_cli < implemented);
+    assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/elegance.rs");
     let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]
         .iter()
         .map(|call| elegance.matches(call).count())
         .sum::<usize>();
-    assert_eq!(listed_by_the_runner, implemented - listed_by_the_cli - listed_by_elegance);
+    assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
 
@@ -117,6 +118,30 @@ fn the_report_flag_fails_on_an_unreadable_root() {
     let run = Trees::flagged(&Memory::default(), Path::new("/no/such/root"), &["--report"]);
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert_ne!(run.err, "");
+}
+
+#[test]
+fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", &format!("{DIRTY}{INDEX}"))?;
+    let run = root.flagged(&["query", "index", "--role", "fn f(&self, q: &Q) -> Vec<Hit>", "--in"]);
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    let lines: Vec<&str> = text_lines::Lines::from(run.out.as_str()).collect();
+    assert_eq!(
+        lines.first().map(|line| line.contains("score 5: trait Index in r at /scratch/src/lib.rs:3")),
+        Some(true)
+    );
+    assert_eq!(lines.get(1).map(|line| line.contains("search fn(&self, _) -> many")), Some(true));
+    assert_eq!(run.err, "");
+    Ok(())
+}
+
+#[test]
+fn the_query_command_refuses_a_malformed_role() {
+    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["query", "--role", "nonsense", "--in"]);
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("is not a Rust signature"), "{}", run.err);
+    assert_eq!(run.out, "");
 }
 
 #[test]

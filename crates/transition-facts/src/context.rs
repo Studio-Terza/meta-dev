@@ -40,6 +40,11 @@ impl<'file> Context<'file> {
     }
 
     #[must_use]
+    pub fn subject(&self) -> Option<&Endpoint> {
+        self.filler.owned().map(|_| &self.selfish)
+    }
+
+    #[must_use]
     pub fn trait_name(&self) -> Option<&Name> {
         self.filler.trait_name(self.selfish.as_ref())
     }
