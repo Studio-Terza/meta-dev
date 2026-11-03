@@ -23,6 +23,7 @@ env:
   CLIPPY_CRATES: ${{ github.workspace }}/target/cold/clippy-crates.txt
   TEST_CRATES: ${{ github.workspace }}/target/cold/test-compile-crates.txt
   HISTORY: ${{ github.workspace }}/target/ci/history.tsv
+  FORTNIGHT: ${{ github.workspace }}/target/fortnight
 
 permissions:
   contents: read
@@ -35,6 +36,11 @@ jobs:
   cold-build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/toolchain
@@ -55,6 +61,11 @@ jobs:
         run: '"$TOOLS/ci" timed "$MEASURED" cold-test-compile cargo test --locked --no-run --workspace --timings'
       - name: test compile per crate
         run: '"$TOOLS/ci" compile-times "$TEST_TARGET/cargo-timings/cargo-timing.html" "$TEST_CRATES"'
+      - name: compile trend
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$TOOLS/ci" compile-trend "$COLD" "$FORTNIGHT"'
       - name: stage times
         if: always()
         run: '"$TOOLS/ci" show "$MEASURED"'
