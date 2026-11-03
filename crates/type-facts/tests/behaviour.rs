@@ -25,7 +25,7 @@ impl Described {
             .iter()
             .map(|method| {
                 let returns = method.returns().map(ToString::to_string).unwrap_or_default();
-                format!("{}/{}->{returns}", AsRef::<Name>::as_ref(method), method.arity())
+                format!("{}->{returns}", AsRef::<Name>::as_ref(method))
             })
             .collect()
     }
@@ -66,16 +66,13 @@ fn derives_through_paths_and_other_attributes_are_read_by_their_last_name() {
 }
 
 #[test]
-fn inherent_methods_are_kept_with_arity_and_returned_type() {
+fn inherent_methods_are_kept_with_their_returned_type() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
     let facts = Facts::of_files(&files);
-    assert_eq!(
-        Described::methods(&facts, Described::only(&facts)),
-        ["one/1->", "two/2->Vec", "three/1->B", "four/0->"]
-    );
+    assert_eq!(Described::methods(&facts, Described::only(&facts)), ["one->", "two->Vec", "three->B", "four->"]);
 }
 
 #[test]
@@ -108,7 +105,7 @@ fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_ty
     ]);
     let facts = Facts::of_files(&files);
     let methods: Vec<Vec<String>> = facts.types().iter().map(|found| Described::methods(&facts, found)).collect();
-    assert_eq!(methods, [vec!["here/1->"], vec!["there/1->", "by_ref/1->", "bare/1->"]]);
+    assert_eq!(methods, [vec!["here->"], vec!["there->", "by_ref->", "bare->"]]);
     let crates: Vec<String> = facts.types().iter().map(|found| AsRef::<CrateName>::as_ref(found).to_string()).collect();
     assert_eq!(crates, ["x", "y"]);
 }

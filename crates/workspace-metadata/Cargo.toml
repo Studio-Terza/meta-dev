@@ -1,5 +1,5 @@
 [package]
-name = "lint-walk-similarity"
+name = "workspace-metadata"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,11 +10,10 @@ test = false
 doctest = false
 
 [dependencies]
-lint-core = { path = "../lint-core" }
-lint-layout = { path = "../lint-layout" }
-lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
-type-facts = { path = "../type-facts" }
+text-lines = { path = "../text-lines" }
+serde.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

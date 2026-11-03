@@ -1,8 +1,6 @@
 mod distribution;
 mod function;
 mod functions;
-mod held;
-mod logic;
 
 use std::collections::BTreeMap;
 
@@ -12,8 +10,6 @@ use lint_placement::CrateName;
 use distribution::Distribution;
 use function::Function;
 use functions::Functions;
-pub use held::Held;
-pub use logic::Logic;
 
 #[derive(Debug)]
 pub(crate) struct Crates<'file>(BTreeMap<CrateName, Vec<Function<'file>>>);
@@ -25,10 +21,6 @@ impl<'file> Crates<'file> {
             crates.entry(name).or_default().extend(Functions::of_file(file));
             crates
         }))
-    }
-
-    pub(crate) fn held(&self) -> Vec<Held<'file>> {
-        self.0.values().filter_map(|functions| Held::summed(functions)).collect()
     }
 
     pub(crate) fn violations(&self) -> Vec<Violation<'file>> {

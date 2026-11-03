@@ -1,18 +1,11 @@
-mod bisimilarity;
 mod count;
 mod coverage;
 mod crate_transitions;
 mod duplicates;
 mod edge;
 mod end;
-mod graph;
 mod graph_lint;
-mod live_nodes;
-mod motifs;
 mod mutation;
-mod summary;
-mod tangles;
-mod triangles;
 mod workspace_types;
 
 use std::collections::BTreeMap;
@@ -27,14 +20,9 @@ use crate_transitions::CrateTransitions;
 use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
-pub use bisimilarity::Bisimilarity;
 pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::GraphLint;
-pub use live_nodes::LiveNodes;
-pub use motifs::RepeatedMotifs;
 pub use mutation::CoreMutation;
-pub use tangles::Tangles;
-pub use triangles::CommutingTriangles;
 
 #[derive(Debug)]
 pub struct TransitionGraph;

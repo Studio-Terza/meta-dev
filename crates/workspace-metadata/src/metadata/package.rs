@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::cli::workspace::crate_name::CrateName;
+use crate::crate_name::CrateName;
 use declared::Declared;
 use dependency::Dependency;
 
