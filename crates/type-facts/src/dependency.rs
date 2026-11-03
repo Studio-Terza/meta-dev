@@ -1,7 +1,6 @@
 use lint_core::Site;
 use lint_layout::Name;
 
-use crate::held::Held;
 use crate::via::Via;
 
 #[derive(Clone, Debug)]
@@ -10,12 +9,11 @@ pub struct Dependency<'file> {
     written: Vec<Name>,
     site: Site<'file>,
     via: Via,
-    held: Held,
 }
 
 impl<'file> Dependency<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>, via: Via, held: Held) -> Dependency<'file> {
-        Dependency { name, written: Vec::new(), site, via, held }
+    pub(crate) fn new(name: Name, site: Site<'file>, via: Via) -> Dependency<'file> {
+        Dependency { name, written: Vec::new(), site, via }
     }
 
     pub(crate) fn qualified(mut self, written: Vec<Name>) -> Dependency<'file> {
@@ -31,11 +29,6 @@ impl<'file> Dependency<'file> {
     #[must_use]
     pub fn written(&self) -> &[Name] {
         &self.written
-    }
-
-    #[must_use]
-    pub fn held(&self) -> Held {
-        self.held
     }
 }
 

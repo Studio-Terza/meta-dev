@@ -1,13 +1,12 @@
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem, TypeReference};
+use syn::{Field, Generics, Ident, ItemTrait, PathSegment, TraitItem};
 
 use lint_core::Site;
 use lint_layout::{LineNumber, Name, Whole, Word, words};
 
 use crate::dependency::Dependency;
-use crate::held::Held;
 use crate::via::Via;
 
 pub(crate) struct Referenced<'item, 'file> {
@@ -15,12 +14,10 @@ pub(crate) struct Referenced<'item, 'file> {
     own: &'item Ident,
     parameters: Vec<&'item Ident>,
     via: Via,
-    held: Held,
     found: Vec<Dependency<'file>>,
 }
 
 impl<'item, 'file> Referenced<'item, 'file> {
-    const POINTERS: [Word<'static>; 6] = words!["Box", "Rc", "Arc", "Weak", "Vec", "VecDeque"];
     const ITSELF: [Word<'static>; 1] = words!["Self"];
 
     pub(crate) fn started(file: &'file Path, own: &'item Ident, generics: &'item Generics) -> Referenced<'item, 'file> {
@@ -29,7 +26,6 @@ impl<'item, 'file> Referenced<'item, 'file> {
             own,
             parameters: generics.type_params().map(|parameter| &parameter.ident).collect(),
             via: Via::Bound,
-            held: Held::Directly,
             found: Vec::new(),
         }
     }
@@ -73,17 +69,11 @@ impl<'item, 'file> Referenced<'item, 'file> {
         };
         let site = Site::new(self.file, LineNumber::from(segment.ident.span()));
         (!self.parameters.contains(&&segment.ident))
-            .then(|| Dependency::new(resolved, site, self.via, self.held).qualified(written))
+            .then(|| Dependency::new(resolved, site, self.via).qualified(written))
     }
 
     fn visit_arguments(&mut self, segment: &PathSegment) {
-        let outer = self.held;
-        self.held = match Name::from(&segment.ident).matches::<Whole>(&Self::POINTERS) {
-            Some(_) => Held::Indirectly,
-            None => outer,
-        };
         visit::visit_path_arguments(self, &segment.arguments);
-        self.held = outer;
     }
 }
 
@@ -92,12 +82,5 @@ impl<'ast> Visit<'ast> for Referenced<'_, '_> {
         let found = path.segments.last().and_then(|segment| self.dependency(path, segment));
         self.found.extend(found);
         path.segments.iter().for_each(|segment| self.visit_arguments(segment));
-    }
-
-    fn visit_type_reference(&mut self, reference: &'ast TypeReference) {
-        let outer = self.held;
-        self.held = Held::Indirectly;
-        visit::visit_type_reference(self, reference);
-        self.held = outer;
     }
 }
