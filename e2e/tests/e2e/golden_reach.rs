@@ -31,7 +31,7 @@ fn goldens_and_new_scenarios_pass_only_inside_the_reach_of_the_rest_of_the_chang
     const BASE: &str = "project/e2e";
     let world = World::of_this_repository()?;
     let metadata = world.metadata();
-    let desk = Desk::new()?;
+    let desk = Desk::default();
     let (mut goldens, mut scenarios) = (Verdicts::default(), Verdicts::default());
     for changed in world.names() {
         let source = world.source_of(changed);

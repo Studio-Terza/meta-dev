@@ -1,7 +1,7 @@
-use std::env;
 use std::fmt;
-use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::io;
+
+use e2e::ports::Measurements;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Fraction {
@@ -30,18 +30,11 @@ pub struct Report {
 }
 
 impl Report {
-    const TARGET: &'static str = "E2E_REPORT";
-
     pub fn named(scenario: &'static str) -> Report {
         Report { scenario }
     }
 
     pub fn line(&self, name: &str, value: impl fmt::Display) -> io::Result<()> {
-        let line = format!("e2e {} {name}={value}\n", self.scenario);
-        print!("{line}");
-        match env::var_os(Self::TARGET) {
-            Some(path) => OpenOptions::new().append(true).create(true).open(path)?.write_all(line.as_bytes()),
-            None => Ok(()),
-        }
+        Measurements::record(&format!("e2e {} {name}={value}\n", self.scenario))
     }
 }

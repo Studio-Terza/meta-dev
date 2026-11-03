@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use ci::Cli;
-use tempfile::TempDir;
 
 use crate::fake::Fake;
 
@@ -64,16 +64,12 @@ struct Answer {
     out: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Desk {
-    scratch: TempDir,
+    root: PathBuf,
 }
 
 impl Desk {
-    pub fn new() -> Result<Desk, Box<dyn Error>> {
-        Ok(Desk { scratch: TempDir::new()? })
-    }
-
     pub fn scope(&self, fake: &Fake, event: &str, base: &str) -> Result<Scope, Box<dyn Error>> {
         let answer = self.answer(
             fake,
@@ -94,6 +90,6 @@ impl Desk {
     }
 
     fn file(&self, name: &str) -> String {
-        self.scratch.path().join(name).display().to_string()
+        self.root.join(name).display().to_string()
     }
 }

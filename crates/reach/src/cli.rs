@@ -71,7 +71,7 @@ impl Cli {
             }
             Some(Self::HUBS) => {
                 let repository = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.hubs(&repository)?)?)
+                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.hubs(files, &repository)?)?)
             }
             Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(files, &metadata)?.fan_in())?),
             _ => Err(Failure::Usage),

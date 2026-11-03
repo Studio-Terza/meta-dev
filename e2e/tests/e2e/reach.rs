@@ -9,7 +9,7 @@ use crate::ports::world::World;
 fn a_pull_request_into_a_project_branch_builds_the_reach_of_its_one_changed_crate() -> Result<(), Box<dyn Error>> {
     let world = World::of_this_repository()?;
     let metadata = world.metadata();
-    let desk = Desk::new()?;
+    let desk = Desk::default();
     let (mut built, mut misses, mut extras) = (0, 0, 0);
     for name in world.names() {
         let changed = [world.source_of(name)];
