@@ -4,7 +4,7 @@ use lint_core::{Fix, Headline, Violation};
 
 use crate::count::Count;
 
-use super::cluster::{Cluster, Level};
+use super::cluster::Cluster;
 use super::{ClusterLint, Containment};
 
 #[derive(Debug)]
@@ -35,16 +35,14 @@ struct Deep<'found> {
 
 impl<'found> Deep<'found> {
     fn measured(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Deep<'found>> {
-        let judged = match cluster.level() {
-            Level::Crate | Level::Module => Some(cluster),
-            Level::Workspace => None,
-        }?;
+        let judged = cluster.bounded()?;
         let members = view.members(judged);
         let exports = view.exports(judged, &members);
         let exported = Count::new(exports.len());
         let private = Count::new(members.difference(&exports).count());
         Some(Deep { cluster: judged, exported, private })
-            .filter(|deep| deep.exported > Count::default() && deep.exported < deep.private)
+            .filter(|deep| deep.exported > Count::default())
+            .filter(|deep| deep.exported < deep.private)
     }
 }
 

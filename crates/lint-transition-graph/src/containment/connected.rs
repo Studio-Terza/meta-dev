@@ -36,14 +36,18 @@ impl<'found> Divided<'found> {
     fn found_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Divided<'found>> {
         let members = view.members(cluster);
         let nested = members.iter().find_map(|member| Part::toward(cluster, member.cluster()).nested());
-        let judged = match cluster.level() {
-            Level::Crate => Some(cluster),
-            Level::Module => nested.map(|_| cluster),
-            Level::Workspace => None,
-        };
+        let judged = Self::judged(cluster, nested);
         let links = view.links_within(&members, Toward::Used);
         let groups = judged.and_then(|_| Groups::linked(&members, links.into_iter()).split())?;
         Some(Divided { cluster, members, groups })
+    }
+
+    fn judged(cluster: Cluster<'found>, nested: Option<Cluster<'found>>) -> Option<Cluster<'found>> {
+        match cluster.level() {
+            Level::Crate => Some(cluster),
+            Level::Module => nested.map(|_| cluster),
+            Level::Workspace => None,
+        }
     }
 }
 
