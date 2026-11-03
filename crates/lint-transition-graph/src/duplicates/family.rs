@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use lint_core::{Site, Violation};
@@ -5,6 +6,7 @@ use lint_layout::{Fix, Name, Whole, Word, words};
 use transition_facts::Transition;
 
 use crate::count::Count;
+use crate::edge::{Edge, Role};
 use crate::end::Key;
 
 #[derive(Debug)]
@@ -16,11 +18,26 @@ pub(super) struct Family<'found, 'file> {
 impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
-    pub(super) fn repeated(
-        key: Key<'found>,
-        members: Vec<&'found Transition<'found, 'file>>,
-    ) -> Option<Family<'found, 'file>> {
-        (members.len() > 1).then_some(Family { key, members })
+    pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
+        let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(
+            BTreeMap::new(),
+            |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
+                edge.ends().key().into_iter().for_each(|key| keys.entry(key).or_default().push(edge.transition()));
+                keys
+            },
+        );
+        keyed
+            .into_iter()
+            .filter(|(_, members)| members.len() > 1)
+            .map(|(key, members)| Family { key, members })
+            .filter(|family| family.distinct_traits().is_none())
+            .collect()
+    }
+
+    fn distinct_traits(&self) -> Option<BTreeSet<&'found Name>> {
+        let traits: Option<BTreeSet<&'found Name>> =
+            self.members.iter().map(|member| member.context().trait_name()).collect();
+        traits.filter(|names| names.len() == self.members.len())
     }
 
     pub(super) fn violation(&self) -> Option<Violation<'file>> {
@@ -54,9 +71,11 @@ impl fmt::Display for Family<'_, '_> {
 impl lint_layout::Finding for Family<'_, '_> {
     fn fix(&self) -> Fix {
         match self.canonical() {
-            Some(_) => Fix::new("keep the standard conversion and route the other transitions through it"),
+            Some(_) => Fix::new(
+                "keep the standard conversion and route the other transitions through it; where they mean different things, give each its own output type, or make each an impl of a different named trait",
+            ),
             None => Fix::new(
-                "keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it",
+                "keep one transition, as From, TryFrom or FromStr where it fits, and route the others through it; delete a hand-written copy of a map, filter or fold over the element transition; where the transitions mean different things, give each its own output type, or make each an impl of a different named trait",
             ),
         }
     }
