@@ -44,7 +44,9 @@ impl Step for CompileTrend {
             let merged = Fortnight::merged(ports)?;
             let report = slower.reported(&merged);
             write!(out, "{report}")?;
-            Issue::titled(Self::TITLE, ports)?.filed(&report, ports, out)
+            let issues = Issue::titled(&[Self::TITLE], ports)?;
+            let filings = issues.iter().map(|issue| issue.filing(&report, out)).collect::<Result<Vec<_>, Failure>>()?;
+            Issue::filed(&filings, ports)
         } else {
             writeln!(out, "{notice}")?;
             Ok(Exit::Success)

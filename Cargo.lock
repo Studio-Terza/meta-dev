@@ -593,6 +593,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-port-batching"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-fakes-at-ports",
+ "lint-layout",
+ "lint-paths",
+ "lint-placement",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
@@ -729,6 +741,7 @@ dependencies = [
  "lint-no-test-io",
  "lint-no-test-only-api",
  "lint-paired-apis",
+ "lint-port-batching",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
@@ -811,6 +824,7 @@ dependencies = [
  "lint-paired-apis",
  "lint-paths",
  "lint-placement",
+ "lint-port-batching",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",

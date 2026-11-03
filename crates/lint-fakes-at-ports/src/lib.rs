@@ -2,9 +2,10 @@ mod doubles;
 mod port_traits;
 
 use doubles::Doubles;
+pub use doubles::Kind;
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_paths::Imports;
-use port_traits::PortTraits;
+pub use port_traits::PortTraits;
 
 #[derive(Debug)]
 pub struct FakesAtPorts;
