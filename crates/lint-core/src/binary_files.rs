@@ -42,11 +42,11 @@ impl BinaryFiles {
             Some(()) => members,
             None => Self::children(file, by_path)
                 .into_iter()
-                .fold(Self::with(members, file.path()), |members, child| Self::gather(child, by_path, members)),
+                .fold(Self::joined_by(members, file.path()), |members, child| Self::gather(child, by_path, members)),
         }
     }
 
-    fn with(mut members: BTreeSet<PathBuf>, path: &Path) -> BTreeSet<PathBuf> {
+    fn joined_by(mut members: BTreeSet<PathBuf>, path: &Path) -> BTreeSet<PathBuf> {
         members.insert(path.to_owned());
         members
     }
