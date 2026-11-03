@@ -1,7 +1,5 @@
-mod count;
 mod definition;
 mod link;
-mod tally;
 mod tangle;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,7 +10,6 @@ use type_facts::Facts;
 
 use definition::{Declared, Definition};
 use link::Link;
-use tally::Tally;
 use tangle::Tangle;
 
 #[derive(Debug)]
@@ -34,32 +31,20 @@ impl Layering {
                 .map(|members| Tangle::closed(members, links, declared))
                 .collect(),
         );
-        let tally = Tally::counted(declared.count(), links, &tangles);
-        declared
-            .first()
-            .map(|site| Violation::new(site, tally))
-            .into_iter()
-            .chain(tangles.iter().map(Violation::from))
-            .collect()
-    }
-}
-
-impl Layering {
-    #[must_use]
-    pub fn report_facts<'file>(facts: &Facts<'file>) -> Report<'file> {
-        let declared = Declared::of_facts(facts);
-        let links: Vec<Link<'_, 'file>> = declared.links(facts);
-        Report::new(
-            Headline::new(
-                "report only, layering: strongly connected groups of type and trait definitions over the definition graph, where A depends on B when A has a field of type B, an enum variant carrying B, or a bound on B, resolved by name within the workspace (same crate first, then a crate-qualified path, then the one crate declaring it); self-recursion through a reference, Box, Rc, Arc, Weak, Vec or VecDeque is allowed, every other cycle is a tangle",
-            ),
-            Self::violations(&declared, &links),
-        )
+        tangles.iter().map(Violation::from).collect()
     }
 }
 
 impl Lint for Layering {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Self::report_facts(&Facts::of_files(files))
+        let facts = Facts::of_files(files);
+        let declared = Declared::of_facts(&facts);
+        let links: Vec<Link<'_, '_>> = declared.links(&facts);
+        Report::new(
+            Headline::new(
+                "type definitions are layered: over the definition graph, where A depends on B when A has a field of type B, an enum variant carrying B, or a bound on B, resolved by name within the workspace (same crate first, then a crate-qualified path, then the one crate declaring it), the only cycle is a type's explicit recursion into itself through a reference, Box, Rc, Arc, Weak, Vec or VecDeque",
+            ),
+            Self::violations(&declared, &links),
+        )
     }
 }
