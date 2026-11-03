@@ -16,7 +16,7 @@ use lint_placement::Role;
 
 use crate::port_traits::PortTraits;
 use finding::Finding;
-use kind::Kind;
+pub use kind::Kind;
 use words::DoubleWords;
 
 #[derive(Debug, Default)]
