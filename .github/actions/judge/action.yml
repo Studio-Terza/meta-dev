@@ -10,9 +10,11 @@ runs:
   using: composite
   steps:
     - name: limits
-      if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+      if: github.ref == 'refs/heads/main' || github.base_ref == 'main' || startsWith(github.base_ref, 'project/')
       shell: bash
-      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" ${{ inputs.stages }}'
+      env:
+        REPORT_ONLY: ${{ startsWith(github.base_ref, 'project/') && '--report-only=clippy --report-only=test-run --report-only=lint' || '--report-only=test-compile' }}
+      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $REPORT_ONLY ${{ inputs.stages }}'
     - name: step times
       if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
       shell: bash

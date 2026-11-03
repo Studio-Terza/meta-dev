@@ -22,17 +22,24 @@ pub struct Cli {
     limits: PathBuf,
     measured: PathBuf,
     only: Vec<OsString>,
+    report_only: Vec<OsString>,
 }
 
 impl Cli {
     const DEFAULT_LIMITS: &'static str = "ci/limits.toml";
     const DEFAULT_MEASURED: &'static str = "ci/measured.toml";
+    const REPORT_ONLY: &'static str = "--report-only=";
 
     pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Cli {
         let limits = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_LIMITS), PathBuf::from);
         let measured = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_MEASURED), PathBuf::from);
-        let only = arguments.collect();
-        Cli { limits, measured, only }
+        let (report_only, only): (Vec<OsString>, Vec<OsString>) =
+            arguments.partition(|argument| argument.to_string_lossy().starts_with(Self::REPORT_ONLY));
+        let report_only = report_only
+            .into_iter()
+            .map(|argument| OsString::from(&argument.to_string_lossy()[Self::REPORT_ONLY.len()..]))
+            .collect();
+        Cli { limits, measured, only, report_only }
     }
 
     #[must_use]
@@ -45,7 +52,7 @@ impl Cli {
         match self.gate() {
             Ok(gate) => {
                 write!(out, "{gate}").ok();
-                if gate.blocks() { ExitCode::FAILURE } else { ExitCode::SUCCESS }
+                if gate.blocks_outside(&self.report_only) { ExitCode::FAILURE } else { ExitCode::SUCCESS }
             }
             Err(failure) => {
                 writeln!(err, "{failure}").ok();
