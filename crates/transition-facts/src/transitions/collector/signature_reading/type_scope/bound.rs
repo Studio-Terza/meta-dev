@@ -16,7 +16,7 @@ impl<'bound> Bound<'bound> {
         Bound(bound)
     }
 
-    pub(super) fn endpoint(&self, scope: &TypeScope) -> Option<Endpoint> {
+    pub(super) fn endpoint(&self, scope: &TypeScope<'_>) -> Option<Endpoint> {
         let traited = match self.0 {
             TypeParamBound::Trait(found) if matches!(found.modifier, TraitBoundModifier::None) => {
                 found.path.segments.last()

@@ -19,7 +19,7 @@ pub struct DuplicateTransitions;
 
 impl GraphLint for DuplicateTransitions {
     fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
-        let types = WorkspaceTypes::declared(facts);
+        let types = WorkspaceTypes::declared(facts, transitions);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(
             BTreeMap::new(),

@@ -19,7 +19,7 @@ pub struct CoreMutation;
 
 impl GraphLint for CoreMutation {
     fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
-        let types = WorkspaceTypes::declared(facts);
+        let types = WorkspaceTypes::declared(facts, transitions);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let counted: Vec<&Edge<'_>> = edges.iter().filter_map(Tally::counts).collect();
         let grouped = counted.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&Edge<'_>>>, edge| {

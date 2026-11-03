@@ -1,4 +1,5 @@
 use lint_layout::{Name, Word};
+use lint_placement::CrateName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Nature {
@@ -18,6 +19,7 @@ pub(crate) enum Unnamed {
 pub struct Endpoint {
     nature: Nature,
     name: Name,
+    origin: Option<CrateName>,
 }
 
 impl Endpoint {
@@ -25,7 +27,14 @@ impl Endpoint {
     const OPAQUE: Word<'static> = Word::new("_");
 
     pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
-        Endpoint { nature, name }
+        Endpoint { nature, name, origin: None }
+    }
+
+    pub(crate) fn originating(self, origin: Option<CrateName>) -> Endpoint {
+        match self.nature {
+            Nature::Named => Endpoint { origin, ..self },
+            Nature::Interface | Nature::Primitive | Nature::Boxed => self,
+        }
     }
 
     pub(crate) fn tupled(elements: impl Iterator<Item = Endpoint>) -> Endpoint {
@@ -39,6 +48,11 @@ impl Endpoint {
     pub fn nature(&self) -> Nature {
         self.nature
     }
+
+    #[must_use]
+    pub fn origin(&self) -> Option<&CrateName> {
+        self.origin.as_ref()
+    }
 }
 
 impl From<Unnamed> for Endpoint {
@@ -47,7 +61,7 @@ impl From<Unnamed> for Endpoint {
             Unnamed::Unit => Self::UNIT,
             Unnamed::Opaque => Self::OPAQUE,
         };
-        Endpoint { nature: Nature::Boxed, name: Name::from(name) }
+        Endpoint { nature: Nature::Boxed, name: Name::from(name), origin: None }
     }
 }
 

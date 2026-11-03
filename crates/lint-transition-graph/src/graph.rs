@@ -24,7 +24,7 @@ pub(crate) struct Graph<'found> {
 
 impl<'found> Graph<'found> {
     pub(crate) fn built(facts: &'found Facts, transitions: &'found Transitions) -> Graph<'found> {
-        let types = WorkspaceTypes::declared(facts);
+        let types = WorkspaceTypes::declared(facts, transitions);
         let edges: Vec<Edge<'found>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let hyperedges = edges.iter().filter_map(Hyperedge::of_edge).collect();
         let nodes = facts.types().iter().fold(BTreeMap::new(), |mut nodes, found| {

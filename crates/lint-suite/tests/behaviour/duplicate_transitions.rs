@@ -53,3 +53,41 @@ fn duplicates_are_found_across_crates() {
     ]);
     assert!(text.contains("x::Raw -> y::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:3, y::Policy::read at crates/y/src/lib.rs:3"), "{text}");
 }
+
+#[test]
+fn a_name_declared_in_several_crates_resolves_through_its_import() {
+    let text = Duplicates::of(&[
+        Duplicates::at("crates/x/src/lib.rs", "struct Report;\n"),
+        Duplicates::at("crates/y/src/lib.rs", "struct Report;\nstruct File;\n"),
+        Duplicates::at(
+            "crates/z/src/lib.rs",
+            "use y::{File, Report};\nstruct One;\nimpl One {\n    fn report(file: &File) -> Report {}\n}\nstruct Two;\nimpl Two {\n    fn report(file: &File) -> y::Report {}\n}\n",
+        ),
+    ]);
+    assert!(text.contains("y::File -> y::Report has 2 transitions"), "{text}");
+}
+
+#[test]
+fn a_foreign_import_is_a_black_box_even_when_the_workspace_declares_the_name() {
+    let text = Duplicates::of(&[
+        Duplicates::at("crates/x/src/lib.rs", "struct Command;\nstruct Line;\n"),
+        Duplicates::at(
+            "crates/y/src/lib.rs",
+            "use std::process::Command;\nuse x::Line;\nstruct Run;\nimpl Run {\n    fn first(line: &Line) -> Command {}\n    fn second(line: &Line) -> Command {}\n}\n",
+        ),
+    ]);
+    assert!(!text.contains("has 2 transitions"), "{text}");
+}
+
+#[test]
+fn an_import_from_a_child_module_stays_in_the_crate() {
+    let text = Duplicates::of(&[
+        Duplicates::at("crates/x/src/lib.rs", "struct Policy;\n"),
+        Duplicates::at(
+            "crates/y/src/lib.rs",
+            "mod inner;\nuse inner::Policy;\nstruct Raw;\nimpl Raw {\n    fn policy(&self) -> Policy {}\n    fn read(&self) -> Policy {}\n}\n",
+        ),
+        Duplicates::at("crates/y/src/inner.rs", "pub struct Policy;\n"),
+    ]);
+    assert!(text.contains("y::Raw -> y::Policy has 2 transitions"), "{text}");
+}

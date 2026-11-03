@@ -7,6 +7,7 @@ use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use super::origins::Origins;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::filler::Filler;
 use crate::ground::Ground;
@@ -15,43 +16,43 @@ use crate::transition::Transition;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
-pub(super) struct SignatureReading {
+pub(super) struct SignatureReading<'file> {
     krate: CrateName,
     owner: Option<Name>,
-    scope: TypeScope,
+    scope: TypeScope<'file>,
     ground: Ground,
     filler: Filler,
 }
 
-impl SignatureReading {
-    pub(super) fn free(krate: CrateName, ground: Ground) -> SignatureReading {
-        let scope = TypeScope::new(Endpoint::from(Unnamed::Opaque));
-        SignatureReading { krate, owner: None, scope, ground, filler: Filler::Free }
+impl<'file> SignatureReading<'file> {
+    pub(super) fn free(origins: &'file Origins, ground: Ground) -> SignatureReading<'file> {
+        let scope = TypeScope::new(Endpoint::from(Unnamed::Opaque), origins);
+        SignatureReading { krate: origins.own().clone(), owner: None, scope, ground, filler: Filler::Free }
     }
 
-    pub(super) fn of_impl(krate: CrateName, found: &ItemImpl, ground: Ground) -> SignatureReading {
+    pub(super) fn of_impl(origins: &'file Origins, found: &ItemImpl, ground: Ground) -> SignatureReading<'file> {
         let selfish =
-            TypeScope::new(Endpoint::from(Unnamed::Opaque)).extended(&found.generics).endpoint(&found.self_ty);
+            TypeScope::new(Endpoint::from(Unnamed::Opaque), origins).extended(&found.generics).endpoint(&found.self_ty);
         let filler = found
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map_or(Filler::Inherent, |segment| Filler::Implemented(Name::from(&segment.ident)));
         SignatureReading {
-            krate,
+            krate: origins.own().clone(),
             owner: Some(AsRef::<Name>::as_ref(&selfish).clone()),
-            scope: TypeScope::new(selfish).extended(&found.generics),
+            scope: TypeScope::new(selfish, origins).extended(&found.generics),
             ground,
             filler,
         }
     }
 
-    pub(super) fn of_trait(krate: CrateName, found: &ItemTrait, ground: Ground) -> SignatureReading {
+    pub(super) fn of_trait(origins: &'file Origins, found: &ItemTrait, ground: Ground) -> SignatureReading<'file> {
         let name = Name::from(&found.ident);
         SignatureReading {
-            krate,
+            krate: origins.own().clone(),
             owner: Some(name.clone()),
-            scope: TypeScope::new(Endpoint::new(Nature::Interface, name.clone())).extended(&found.generics),
+            scope: TypeScope::new(Endpoint::new(Nature::Interface, name.clone()), origins).extended(&found.generics),
             ground,
             filler: Filler::Provided(name),
         }

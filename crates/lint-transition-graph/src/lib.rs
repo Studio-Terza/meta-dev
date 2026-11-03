@@ -43,7 +43,7 @@ pub struct TransitionGraph;
 
 impl GraphLint for TransitionGraph {
     fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
-        let types = WorkspaceTypes::declared(facts);
+        let types = WorkspaceTypes::declared(facts, transitions);
         let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let grouped = edges.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, Vec<&Edge<'_>>>, edge| {
             crates.entry(edge.transition().as_ref()).or_default().push(edge);
