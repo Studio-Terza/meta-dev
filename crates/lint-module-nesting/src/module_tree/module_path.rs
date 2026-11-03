@@ -2,13 +2,11 @@ mod ancestor;
 mod index;
 mod inside_sibling;
 mod relation;
-mod same;
 
 pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
 pub use inside_sibling::InsideSibling;
 pub use relation::Relation;
-pub use same::Same;
 
 use std::fmt;
 use std::path::{Path, PathBuf};

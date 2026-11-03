@@ -68,7 +68,7 @@ impl ModuleTree {
     fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
-                let used = self.modules.deepest_containing(&target, module).cloned();
+                let used = self.modules.deepest_containing(&target);
                 self.users =
                     used.into_iter().fold(std::mem::take(&mut self.users), |users, home| users.recorded(home, module));
                 self.deep_uses.extend(target.crossed_directory(module, &self.modules).map(|_| {

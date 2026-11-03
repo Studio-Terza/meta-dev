@@ -1,7 +1,6 @@
 use super::ModulePath;
 use super::ancestor::Ancestor;
 use super::relation::Relation;
-use super::same::Same;
 
 pub struct InsideSibling;
 
@@ -12,6 +11,5 @@ impl Relation for InsideSibling {
             .parent()
             .and_then(|parent| parent.relates::<Ancestor>(this).map(|_| module))
             .filter(|_| this.segments.len() >= length)
-            .filter(|_| this.truncated_to_length(length).relates::<Same>(module).is_none())
     }
 }

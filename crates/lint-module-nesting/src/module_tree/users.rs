@@ -28,8 +28,7 @@ impl Users {
         UseEdges::in_file(file.syntax())
             .iter()
             .filter_map(|path| {
-                ModulePath::from_use(&caller, path, modules)
-                    .and_then(|target| modules.deepest_containing(&target, &caller).cloned())
+                ModulePath::from_use(&caller, path, modules).and_then(|target| modules.deepest_containing(&target))
             })
             .fold(self, |users, home| users.recorded(home, &caller))
     }
