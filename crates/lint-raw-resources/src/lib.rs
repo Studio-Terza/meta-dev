@@ -1,7 +1,5 @@
-mod finding;
 mod raw_paths;
 
-use finding::Finding;
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_paths::Paths;
 use raw_paths::RawPaths;

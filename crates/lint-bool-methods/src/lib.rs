@@ -1,7 +1,5 @@
-mod finding;
 mod returns;
 
-use finding::Finding;
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_file::FileLint;
 use returns::Returns;

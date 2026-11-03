@@ -1,7 +1,9 @@
+mod finding;
+
 use std::collections::BTreeSet;
 
-use crate::Finding;
 use crate::declared::Declared;
+use finding::Finding;
 use lint_core::Violation;
 use lint_layout::{Name, Word};
 
