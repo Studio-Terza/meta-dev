@@ -14,8 +14,8 @@ impl Declaration {
         Declaration { name, site }
     }
 
-    pub(crate) fn is_consumed_by(&self, consumers: &BTreeSet<Name>) -> bool {
-        consumers.contains(&self.name)
+    pub(crate) fn unconsumed(self, consumers: &BTreeSet<Name>) -> Option<Declaration> {
+        (!consumers.contains(&self.name)).then_some(self)
     }
 }
 

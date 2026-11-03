@@ -26,15 +26,16 @@ impl TestFeatures {
         features.found
     }
 
-    fn is_condition(path: &syn::Path) -> bool {
-        Self::CONDITIONS.iter().any(|condition| path.is_ident(condition))
+    fn condition(path: &syn::Path) -> Option<&syn::Path> {
+        Self::CONDITIONS.iter().find(|condition| path.is_ident(condition)).map(|_| path)
     }
 
     fn flagged(key: &Ident, value: &Literal) -> Option<Flagged> {
         match Lit::new(value.clone()) {
             Lit::Str(feature) if key == Self::FEATURE => {
                 let name = Name::from(feature.value().as_str());
-                FeatureWord::is_test(&name).then(|| Flagged::new(LineNumber::from(key.span()), Finding::Feature(name)))
+                FeatureWord::test_word(&name)
+                    .map(|_| Flagged::new(LineNumber::from(key.span()), Finding::Feature(name)))
             }
             _ => None,
         }
@@ -57,20 +58,14 @@ impl TestFeatures {
 impl<'ast> Visit<'ast> for TestFeatures {
     fn visit_attribute(&mut self, attribute: &'ast Attribute) {
         self.found.extend(
-            Some(attribute)
-                .filter(|attribute| Self::is_condition(attribute.path()))
-                .into_iter()
-                .flat_map(|attribute| Self::scanned(attribute.to_token_stream())),
+            Self::condition(attribute.path()).into_iter().flat_map(|_| Self::scanned(attribute.to_token_stream())),
         );
         visit::visit_attribute(self, attribute);
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         self.found.extend(
-            Some(invocation)
-                .filter(|invocation| Self::is_condition(&invocation.path))
-                .into_iter()
-                .flat_map(|invocation| Self::scanned(invocation.tokens.clone())),
+            Self::condition(&invocation.path).into_iter().flat_map(|_| Self::scanned(invocation.tokens.clone())),
         );
     }
 }

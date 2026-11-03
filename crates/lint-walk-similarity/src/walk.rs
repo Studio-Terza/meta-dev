@@ -20,10 +20,11 @@ impl<'facts> Walk<'facts> {
 
     pub(crate) fn walked(found: &'facts TypeFact, local: &BTreeSet<Name>) -> Option<Walk<'facts>> {
         let steps: BTreeSet<Step> = Step::walked_by(found, local).into_iter().collect();
-        (!found.derives().iter().any(|name| name.matches::<Whole>(&Self::EXCLUDED_DERIVE))
-            && found.shape() == Shape::Other
-            && Self::SMALLEST.allows(steps.len()))
-        .then_some(Walk { found, steps })
+        Self::SMALLEST
+            .allows(steps.len())
+            .filter(|_| found.shape() == Shape::Other)
+            .filter(|_| found.derives().iter().all(|name| name.matches::<Whole>(&Self::EXCLUDED_DERIVE).is_none()))
+            .map(|_| Walk { found, steps })
     }
 
     pub(crate) fn steps(&self) -> &BTreeSet<Step> {

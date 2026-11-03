@@ -33,11 +33,11 @@ impl Journal {
     }
 
     pub(crate) fn read_or(&self, absent: &str) -> Result<String, Failure> {
-        if self.exists() { self.read() } else { Ok(absent.to_owned()) }
+        self.existing().map_or_else(|| Ok(absent.to_owned()), Journal::read)
     }
 
-    pub(crate) fn exists(&self) -> bool {
-        self.0.is_file()
+    pub(crate) fn existing(&self) -> Option<&Journal> {
+        self.0.is_file().then_some(self)
     }
 
     fn prepared(&self) -> io::Result<()> {

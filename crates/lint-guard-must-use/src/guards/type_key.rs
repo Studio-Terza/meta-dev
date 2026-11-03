@@ -23,7 +23,7 @@ impl TypeKey {
         TypeKey { module: self.module.clone(), name }
     }
 
-    pub fn shares_crate(&self, other: &TypeKey) -> bool {
-        self.module.root() == other.module.root()
+    pub fn sharing_crate<'other>(&self, other: &'other TypeKey) -> Option<&'other TypeKey> {
+        (self.module.root() == other.module.root()).then_some(other)
     }
 }

@@ -12,7 +12,7 @@ pub enum Outcome {
 impl Outcome {
     #[must_use]
     pub fn from_reports(reports: Vec<Report>, failures: Vec<Failure>) -> Outcome {
-        let dirty: Vec<Report> = reports.into_iter().filter(|report| !report.is_clean()).collect();
+        let dirty: Vec<Report> = reports.into_iter().filter_map(Report::dirty).collect();
         if dirty.is_empty() && failures.is_empty() {
             Outcome::Clean
         } else {

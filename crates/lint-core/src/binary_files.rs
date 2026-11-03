@@ -27,8 +27,8 @@ impl BinaryFiles {
     }
 
     #[must_use]
-    pub fn contains(&self, path: &Path) -> bool {
-        self.0.contains(path)
+    pub fn holding<'path>(&self, path: &'path Path) -> Option<&'path Path> {
+        self.0.contains(path).then_some(path)
     }
 
     fn gather(

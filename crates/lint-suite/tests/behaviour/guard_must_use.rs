@@ -22,6 +22,8 @@ const TEST_MODULE: &str =
 const OTHER_CONDITIONAL: &str =
     "#[cfg_attr(all(), derive(Debug))]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const PLAIN: &str = "pub struct Lock;\n";
+const MARK_AS_ARGUMENT: &str =
+    "#[derive(Debug, must_use)]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const CONDITIONAL_MARK: &str =
     "#[cfg_attr(all(), must_use)]\npub struct Lock;\nimpl Drop for Lock {\n    fn drop(&mut self) {}\n}\n";
 const ALIASED: &str = "pub struct Lock;\ntype Held = Lock;\nimpl Drop for Held {\n    fn drop(&mut self) {}\n}\n";
@@ -38,6 +40,7 @@ laws::table!(unmarked_guards_are_flagged, Sources::flagged::<GuardMustUse>, [
     [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => ["a.rs:1"],
     [Source::new(Located::new("a.rs"), Text::new(UNION))] => ["a.rs:1"],
     [Source::new(Located::new("a.rs"), Text::new(OTHER_CONDITIONAL))] => ["a.rs:2"],
+    [Source::new(Located::new("a.rs"), Text::new(MARK_AS_ARGUMENT))] => ["a.rs:2"],
 ]);
 
 laws::table!(marked_guards_and_other_types_are_not, Sources::flagged::<GuardMustUse>, [

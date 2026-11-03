@@ -17,7 +17,7 @@ pub struct UnconsumedTraits;
 
 impl Lint for UnconsumedTraits {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let consumers: BTreeSet<Name> = shipped.iter().flat_map(|file| Bounds::of_file(file)).collect();
         Report::new(
             Headline::new(
@@ -26,7 +26,7 @@ impl Lint for UnconsumedTraits {
             shipped
                 .iter()
                 .flat_map(|file| Declared::of_file(file))
-                .filter(|declaration| !declaration.is_consumed_by(&consumers))
+                .filter_map(|declaration| declaration.unconsumed(&consumers))
                 .map(|declaration| {
                     Violation::new(AsRef::<Site>::as_ref(&declaration).clone(), Finding::from(&declaration))
                 })

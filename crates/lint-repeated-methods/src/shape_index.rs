@@ -41,7 +41,7 @@ impl ShapeIndex {
     pub fn repeated(self, most: Most) -> Vec<Violation> {
         self.shapes
             .into_iter()
-            .filter(|(_, types)| !most.allows(types.len()))
+            .filter(|(_, types)| most.allows(types.len()).is_none())
             .filter_map(|(shape, types)| {
                 let site = types.values().min().cloned()?;
                 let repeated = RepeatedShape::new(shape, types.into_keys().collect());

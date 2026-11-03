@@ -16,7 +16,7 @@ impl Home {
     }
 
     #[must_use]
-    pub fn in_crate_with(&self, other: &Home) -> bool {
-        self.crate_file == other.crate_file
+    pub fn in_crate_with<'other>(&self, other: &'other Home) -> Option<&'other Home> {
+        (self.crate_file == other.crate_file).then_some(other)
     }
 }

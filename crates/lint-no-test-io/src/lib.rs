@@ -13,7 +13,7 @@ impl Lint for NoTestIo {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("unit tests do no I/O and start no process"),
-            Paths::every(files.iter().filter(|file| EffectPaths::tested(file)))
+            Paths::every(files.iter().filter_map(EffectPaths::tested))
                 .iter()
                 .filter(|used| used.ground() == Ground::Open)
                 .filter_map(|used| {

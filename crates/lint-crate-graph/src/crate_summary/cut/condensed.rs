@@ -126,7 +126,7 @@ impl Condensed {
             .iter()
             .enumerate()
             .take(order.len().saturating_sub(1))
-            .filter(|(_, (_, items))| floor.allows(items.smaller_of(total).count()))
+            .filter(|(_, (_, items))| floor.allows(items.smaller_of(total).count()).is_some())
             .min_by(|(_, (left, _)), (_, (right, _))| left.total_cmp(*right))?;
         Some(self.split(&order.iter().take(best.0 + 1).copied().collect()))
     }

@@ -45,12 +45,15 @@ impl Profile {
     pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation> {
         let roundtrips = coverage.roundtrips_naming(&self.subject);
         let methods = self.method_pairs();
-        let spare =
-            roundtrips.iter().filter(|mentions| !methods.iter().any(|pair| pair.witnessed_by(mentions))).count();
-        let unwitnessed = methods.iter().filter(|pair| !roundtrips.iter().any(|mentions| pair.witnessed_by(mentions)));
+        let spare = roundtrips
+            .iter()
+            .filter(|mentions| methods.iter().find_map(|pair| pair.witnessed_by(mentions)).is_none())
+            .count();
+        let unwitnessed =
+            methods.iter().filter(|pair| roundtrips.iter().find_map(|mentions| pair.witnessed_by(mentions)).is_none());
         let unspared = self.trait_pairs().into_iter().skip(spare);
-        let law = Self::ORDERS.iter().any(|order| self.knows(order)).then_some(Need::Law);
-        let unlawed = law.filter(|_| !coverage.names(&self.subject));
+        let law = Self::ORDERS.iter().find_map(|order| self.known(order)).map(|_| Need::Law);
+        let unlawed = law.filter(|_| coverage.law_naming(&self.subject).is_none());
         unwitnessed
             .cloned()
             .chain(unspared)
@@ -60,22 +63,21 @@ impl Profile {
             .collect()
     }
 
-    fn knows(&self, fact: &str) -> bool {
-        self.facts.contains(&Name::from(fact))
+    fn known(&self, fact: &str) -> Option<&Name> {
+        self.facts.get(&Name::from(fact))
     }
 
     fn trait_pairs(&self) -> Vec<Pair> {
         Self::TRAIT_PAIRS
             .iter()
-            .filter(|(left, right)| self.knows(left) && self.knows(right))
-            .map(|(left, right)| Pair::new(Name::from(*left), Name::from(*right)))
+            .filter_map(|(left, right)| Some(Pair::new(self.known(left)?.clone(), self.known(right)?.clone())))
             .collect()
     }
 
     fn method_pairs(&self) -> BTreeSet<Pair> {
         let (encode, decode) = Self::METHOD_PAIR;
         let coded =
-            (self.knows(encode) && self.knows(decode)).then(|| Pair::new(Name::from(encode), Name::from(decode)));
+            self.known(encode).zip(self.known(decode)).map(|(left, right)| Pair::new(left.clone(), right.clone()));
         let from = self.forms(Self::FROM);
         let formed = self
             .forms(Self::TO)

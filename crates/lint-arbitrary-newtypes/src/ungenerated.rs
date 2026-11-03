@@ -29,14 +29,13 @@ impl<'file> Ungenerated<'file> {
 
 impl<'ast> Visit<'ast> for Ungenerated<'_> {
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        self.found.extend((Derived::from(item.attrs.as_slice()).lacks_generator() && !Borrows::within(item)).then(
-            || {
-                Violation::new(
-                    Site::new(self.path, LineNumber::from(item.struct_token.span)),
-                    Finding::from(Name::from(&item.ident)),
-                )
-            },
-        ));
+        let derived = Derived::from(item.attrs.as_slice());
+        self.found.extend(derived.lacks_generator().and(Borrows::owning(item)).map(|owning| {
+            Violation::new(
+                Site::new(self.path, LineNumber::from(owning.struct_token.span)),
+                Finding::from(Name::from(&owning.ident)),
+            )
+        }));
         visit::visit_item_struct(self, item);
     }
 }

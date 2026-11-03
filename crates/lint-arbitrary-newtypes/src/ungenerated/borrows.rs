@@ -5,11 +5,11 @@ use syn::{ItemStruct, Lifetime, TypeReference};
 pub struct Borrows(usize);
 
 impl Borrows {
-    pub fn within(item: &ItemStruct) -> bool {
+    pub fn owning(item: &ItemStruct) -> Option<&ItemStruct> {
         let mut borrows = Borrows::default();
         borrows.visit_generics(&item.generics);
         borrows.visit_fields(&item.fields);
-        borrows.0 != 0
+        (borrows.0 == 0).then_some(item)
     }
 }
 

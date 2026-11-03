@@ -18,7 +18,7 @@ impl Facts {
     #[must_use]
     pub fn of_files(files: &[SourceFile]) -> Facts {
         let collected: Vec<Collector<'_>> =
-            files.iter().filter(|file| file.is_shipped()).map(Collector::of_file).collect();
+            files.iter().filter_map(SourceFile::shipped).map(Collector::of_file).collect();
         let blocks: Vec<_> = collected.iter().flat_map(|found| found.blocks().iter()).collect();
         Facts {
             types: collected
@@ -37,8 +37,8 @@ impl Facts {
     }
 
     #[must_use]
-    pub fn is_declared_once(&self, found: &TypeFact) -> bool {
-        self.types.iter().filter(|other| other.is_named_like(found)).count() == 1
+    pub fn declared_once<'found>(&self, found: &'found TypeFact) -> Option<&'found TypeFact> {
+        (self.types.iter().filter_map(|other| other.named_like(found)).count() == 1).then_some(found)
     }
 
     #[must_use]

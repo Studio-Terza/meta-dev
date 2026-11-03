@@ -32,7 +32,7 @@ impl<'run> Walker<'run> {
         wanted: &'run Wanted,
         resolver: &'run Resolver<'run>,
     ) -> Vec<Use> {
-        let ground = if Gate::PORTS.admits(file) { Ground::Ports } else { Ground::Open };
+        let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
         let mut walker = Walker {
             file,
             scopes,
@@ -48,17 +48,17 @@ impl<'run> Walker<'run> {
     }
 
     fn made(&self, path: &UsePath, line: LineNumber) -> Option<Use> {
-        self.wanted(path).then(|| {
+        self.wanted(path).map(|_| {
             let candidates = self.resolver.candidates(&self.module, path);
             Use::new(Site::new(self.file.path(), line), candidates, self.ground, self.cover)
         })
     }
 
-    fn wanted(&self, path: &UsePath) -> bool {
+    fn wanted<'path>(&self, path: &'path UsePath) -> Option<&'path UsePath> {
         match path.segments().split_last() {
-            Some((last, [_, ..])) => self.wanted.holds(last),
-            Some((_, [])) => self.scopes.renames_head(&self.module, path),
-            None => false,
+            Some((last, [_, ..])) => self.wanted.holds(last).map(|_| path),
+            Some((_, [])) => self.scopes.renames_head(&self.module, path).map(|_| path),
+            None => None,
         }
     }
 
@@ -82,7 +82,7 @@ impl<'ast> Visit<'ast> for Walker<'_> {
         let outer = self.module.clone();
         let ground = self.ground;
         self.module = outer.within(&Name::from(&module.ident));
-        self.ground = if Gate::PORTS.names(module) { Ground::Ports } else { ground };
+        self.ground = Gate::PORTS.names(module).map_or(ground, |_| Ground::Ports);
         visit::visit_item_mod(self, module);
         self.module = outer;
         self.ground = ground;
@@ -91,14 +91,12 @@ impl<'ast> Visit<'ast> for Walker<'_> {
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let outer = self.cover;
         let guarded = match item.self_ty.as_ref() {
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .is_some_and(|last| self.scopes.guarded(&self.module, &Name::from(&last.ident))),
-            _ => false,
+            Type::Path(path) => {
+                path.path.segments.last().and_then(|last| self.scopes.guarded(&self.module, &Name::from(&last.ident)))
+            }
+            _ => None,
         };
-        self.cover = if guarded { Cover::Guarded } else { outer };
+        self.cover = guarded.map_or(outer, |_| Cover::Guarded);
         visit::visit_item_impl(self, item);
         self.cover = outer;
     }

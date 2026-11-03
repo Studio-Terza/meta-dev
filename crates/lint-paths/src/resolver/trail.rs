@@ -17,8 +17,8 @@ pub(crate) struct Trail {
 }
 
 impl Trail {
-    pub(crate) fn has_followed(&self, module: &Module, name: &Name) -> bool {
-        self.seen.get(module).is_some_and(|names| names.contains(name))
+    pub(crate) fn followed(&self, module: &Module, name: &Name) -> Option<&Name> {
+        self.seen.get(module)?.get(name)
     }
 
     pub(crate) fn following(&self, module: &Module, name: &Name) -> Trail {

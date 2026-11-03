@@ -5,8 +5,11 @@ use super::relation::Relation;
 pub struct InsideSibling;
 
 impl Relation for InsideSibling {
-    fn holds(this: &ModulePath, module: &ModulePath) -> bool {
+    fn holds<'module>(this: &ModulePath, module: &'module ModulePath) -> Option<&'module ModulePath> {
         let length = module.segments.len();
-        module.parent().is_some_and(|parent| parent.relates::<Ancestor>(this)) && this.segments.len() >= length
+        module
+            .parent()
+            .and_then(|parent| parent.relates::<Ancestor>(this).map(|_| module))
+            .filter(|_| this.segments.len() >= length)
     }
 }

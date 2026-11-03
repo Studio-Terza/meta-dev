@@ -6,7 +6,7 @@ use crate::word::Word;
 pub struct Whole;
 
 impl Matching for Whole {
-    fn holds(name: &Name, word: Word<'_>) -> bool {
-        *name == word
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
+        (*name == word).then_some(word)
     }
 }

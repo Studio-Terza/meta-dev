@@ -17,8 +17,8 @@ impl RootExports {
         exports
     }
 
-    pub fn contains(&self, file: &SourceFile, name: &Name) -> bool {
-        self.0.get(&CrateName::from(file.placement().crate_root())).is_some_and(|names| names.contains(name))
+    pub fn exported(&self, file: &SourceFile, name: &Name) -> Option<&Name> {
+        self.0.get(&CrateName::from(file.placement().crate_root()))?.get(name)
     }
 
     fn record(&mut self, file: &SourceFile) {

@@ -6,7 +6,7 @@ use lint_core::{Macros, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 
-use super::{EnumPredicates, Finding};
+use super::{EnumPredicates, Finding, Kind};
 
 pub struct Predicates<'scan> {
     known: &'scan EnumPredicates,
@@ -57,10 +57,9 @@ impl<'ast> Visit<'ast> for Predicates<'_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let found = if block.trait_.is_none() && self.known.is_enum(self.file, &self.module, &block.self_ty) {
-            self.predicates(block)
-        } else {
-            Vec::new()
+        let found = match (&block.trait_, self.known.kind(self.file, &self.module, &block.self_ty)) {
+            (None, Kind::Enum) => self.predicates(block),
+            _ => Vec::new(),
         };
         self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);

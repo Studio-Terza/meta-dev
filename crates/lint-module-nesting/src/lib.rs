@@ -11,7 +11,7 @@ pub struct ModuleNesting;
 
 impl Lint for ModuleNesting {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let tree = ModuleTree::from(shipped.as_slice());
         Report::new(
             Headline::new("modules nest by use: a file used only inside one sibling belongs inside it"),

@@ -33,7 +33,7 @@ impl Content {
 
     pub(crate) fn language_of(path: &Path) -> Option<Language> {
         Shebang::read_from(path)
-            .filter(Shebang::is_foreign)
+            .and_then(Shebang::foreign)
             .map(|_| Language::Script)
             .or_else(|| Self::read_from(path)?.language())
     }

@@ -28,7 +28,7 @@ impl TypeHomes {
         candidates
             .iter()
             .find(|declared| declared.home() == from)
-            .or_else(|| candidates.iter().find(|declared| declared.home().in_crate_with(from)))
+            .or_else(|| candidates.iter().find(|declared| declared.home().in_crate_with(from).is_some()))
             .or_else(|| candidates.first())
             .cloned()
             .unwrap_or_else(|| DeclaredType::new(from.clone(), name.clone()))

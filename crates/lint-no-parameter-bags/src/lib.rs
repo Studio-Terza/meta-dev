@@ -20,7 +20,7 @@ pub struct NoParameterBags;
 
 impl Lint for NoParameterBags {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let uses: Vec<NameUses> = shipped.iter().map(|file| NameUses::in_file(file)).collect();
         let exports = RootExports::in_files(&shipped);
         Report::new(
@@ -32,8 +32,8 @@ impl Lint for NoParameterBags {
                     let candidates = BagCandidates::in_file(file);
                     candidates
                         .candidates()
-                        .filter(|candidate| !exports.contains(file, candidate.name()))
-                        .filter(|candidate| Self::has_one_consumer_besides(&uses, own, candidate.name()))
+                        .filter(|candidate| exports.exported(file, candidate.name()).is_none())
+                        .filter(|candidate| Self::one_consumer_besides(&uses, own, candidate.name()).is_some())
                         .map(|candidate| {
                             Violation::new(
                                 Site::new(file.path(), candidate.line()),
@@ -48,12 +48,16 @@ impl Lint for NoParameterBags {
 }
 
 impl NoParameterBags {
-    fn has_one_consumer_besides(uses: &[NameUses], own: &NameUses, name: &Name) -> bool {
-        uses.iter()
-            .filter(|file_uses| {
-                !std::ptr::eq(*file_uses, own) && file_uses.shares_crate(own) && file_uses.mentions(name)
-            })
-            .count()
-            == 1
+    fn one_consumer_besides<'uses>(uses: &'uses [NameUses], own: &NameUses, name: &Name) -> Option<&'uses NameUses> {
+        let consumers: Vec<&NameUses> = uses
+            .iter()
+            .filter(|file_uses| !std::ptr::eq(*file_uses, own))
+            .filter_map(|file_uses| file_uses.sharing_crate(own))
+            .filter_map(|file_uses| file_uses.mentions(name).map(|_| file_uses))
+            .collect();
+        match consumers.as_slice() {
+            [only] => Some(only),
+            _ => None,
+        }
     }
 }

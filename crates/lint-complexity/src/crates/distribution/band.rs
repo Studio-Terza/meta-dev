@@ -29,7 +29,7 @@ impl Band {
             (Self::MANY, Band::Many),
         ]
         .into_iter()
-        .find(|(limit, _)| limit.allows(at))
+        .find(|(limit, _)| limit.allows(at).is_some())
         .map_or(Band::Hairy, |(_, band)| band)
     }
 }

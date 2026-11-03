@@ -33,11 +33,11 @@ impl Families {
     }
 
     fn admitted(mut kept: Vec<Family>, family: Family) -> Vec<Family> {
-        kept.extend(family.copies().iter().any(|copy| !Self::is_covered(&kept, copy)).then_some(family));
+        kept.extend(family.copies().iter().any(|copy| Self::cover(&kept, copy).is_none()).then_some(family));
         kept
     }
 
-    fn is_covered(kept: &[Family], copy: &Occurrence) -> bool {
-        kept.iter().flat_map(Family::copies).any(|outer| copy.lies_within(outer))
+    fn cover<'kept>(kept: &'kept [Family], copy: &Occurrence) -> Option<&'kept Occurrence> {
+        kept.iter().flat_map(Family::copies).find_map(|outer| copy.lies_within(outer))
     }
 }

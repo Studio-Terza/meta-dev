@@ -8,15 +8,21 @@ pub(super) struct Constructor;
 impl Constructor {
     const SELF: &str = "Self";
 
-    pub(super) fn is_made_by(signature: &Signature, owner: &Ident) -> bool {
-        signature.receiver().is_none() && Self::mentions(signature.output.to_token_stream(), owner)
+    pub(super) fn made_by<'signature>(
+        signature: &'signature Signature,
+        owner: &Ident,
+    ) -> Option<&'signature Signature> {
+        match signature.receiver() {
+            Some(_) => None,
+            None => Self::mention(signature.output.to_token_stream(), owner).map(|_| signature),
+        }
     }
 
-    fn mentions(tokens: TokenStream, owner: &Ident) -> bool {
-        tokens.into_iter().any(|tree| match tree {
-            TokenTree::Ident(ident) => ident == Self::SELF || ident == *owner,
-            TokenTree::Group(group) => Self::mentions(group.stream(), owner),
-            TokenTree::Punct(_) | TokenTree::Literal(_) => false,
+    fn mention(tokens: TokenStream, owner: &Ident) -> Option<Ident> {
+        tokens.into_iter().find_map(|tree| match tree {
+            TokenTree::Ident(ident) => (ident == Self::SELF || ident == *owner).then_some(ident),
+            TokenTree::Group(group) => Self::mention(group.stream(), owner),
+            TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         })
     }
 }

@@ -41,7 +41,7 @@ impl ShardSummary {
         self.directories()?
             .iter()
             .map(|directory| Journal::file(&directory.join(outcome.file_name())))
-            .filter(Journal::exists)
+            .filter(|journal| journal.existing().is_some())
             .try_fold(String::new(), |text, file| Ok(text + &file.read()?))
     }
 

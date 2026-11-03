@@ -52,14 +52,15 @@ impl<'scan> EdgeScan<'scan> {
                 fan_out
             },
         );
-        let crowded =
-            fan_out.into_iter().filter(|(_, names)| !most.allows(names.len())).filter_map(|(source, names)| {
+        let crowded = fan_out.into_iter().filter(|(_, names)| most.allows(names.len()).is_none()).filter_map(
+            |(source, names)| {
                 let site = (*names.values().min()?).clone();
                 Some(Violation::new(
                     site,
                     Finding::CrowdedVertex { source: source.clone(), edges: EdgeCount::new(names.len()), most },
                 ))
-            });
+            },
+        );
         let structural: Vec<Violation> = duplicates.chain(crowded).collect();
         self.violations.extend(structural);
         self.violations
@@ -74,7 +75,7 @@ impl<'scan> EdgeScan<'scan> {
         let receiver = function.sig.receiver();
         let source = shape.vertex_parameters().first();
         match (receiver, shape.returns().vertex(), source) {
-            (None, Some(target), Some(source)) if context.in_trait() => {
+            (None, Some(target), Some(source)) if context.kind().trait_name().is_some() => {
                 let edge = Edge::new(source.clone(), target.clone());
                 self.record_edge(context, function, &shape, edge);
             }
@@ -100,14 +101,15 @@ impl<'scan> EdgeScan<'scan> {
     }
 
     fn record_edge(&mut self, context: &ImplContext, function: &ImplItemFn, shape: &FunctionShape, edge: Edge) {
-        if context.is_public(function) {
-            self.edges
-                .entry(edge)
-                .or_default()
-                .entry(context.edge_name(function))
-                .or_insert_with(|| shape.site().clone());
-        } else {
-            self.violations.push(Violation::new(shape.site().clone(), Finding::HiddenEdge { edge }));
+        match context.public(function) {
+            Some(function) => {
+                self.edges
+                    .entry(edge)
+                    .or_default()
+                    .entry(context.edge_name(function))
+                    .or_insert_with(|| shape.site().clone());
+            }
+            None => self.violations.push(Violation::new(shape.site().clone(), Finding::HiddenEdge { edge })),
         }
     }
 

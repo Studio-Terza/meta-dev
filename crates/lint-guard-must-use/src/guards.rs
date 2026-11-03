@@ -51,7 +51,7 @@ impl Guards {
         } else {
             self.declared
                 .iter()
-                .filter(|other| other.type_name() == key.type_name() && other.shares_crate(&key))
+                .filter(|other| other.type_name() == key.type_name() && other.sharing_crate(&key).is_some())
                 .cloned()
                 .collect()
         }
@@ -71,15 +71,21 @@ impl Guards {
         let site = Site::new(&self.path, LineNumber::from(name.span()));
         let key = TypeKey::new(self.module.clone(), Name::from(name));
         self.declared.insert(key.clone());
-        self.unmarked.extend((!attributes.iter().any(Self::marks)).then_some((site, key)));
+        self.unmarked.extend(attributes.iter().find_map(Self::mark).map_or(Some((site, key)), |_| None));
     }
 
-    fn marks(attribute: &Attribute) -> bool {
-        attribute.path().is_ident(Self::MUST_USE)
-            || (attribute.path().is_ident(Self::CONDITIONAL)
-                && attribute
-                    .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                    .is_ok_and(|metas| metas.iter().skip(1).any(|meta| meta.path().is_ident(Self::MUST_USE))))
+    fn mark(attribute: &Attribute) -> Option<&Attribute> {
+        match attribute.path() {
+            path if path.is_ident(Self::MUST_USE) => Some(attribute),
+            path if path.is_ident(Self::CONDITIONAL) => attribute
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .ok()?
+                .into_iter()
+                .skip(1)
+                .find(|meta| meta.path().is_ident(Self::MUST_USE))
+                .map(|_| attribute),
+            _ => None,
+        }
     }
 }
 

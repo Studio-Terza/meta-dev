@@ -41,29 +41,31 @@ impl EnumPredicates {
         scan.into_violations()
     }
 
-    fn is_enum(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> bool {
+    fn kind(&self, file: &SourceFile, module: &ModulePath, implemented: &Type) -> Kind {
         match implemented {
             Type::Path(path) => path
                 .path
                 .segments
                 .last()
-                .is_some_and(|last| self.names_enum(file, module, path, &Name::from(&last.ident))),
-            _ => false,
+                .map_or(Kind::Other, |last| self.kind_named(file, module, path, &Name::from(&last.ident))),
+            _ => Kind::Other,
         }
     }
 
-    fn names_enum(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> bool {
+    fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
         let candidates: Vec<&Declaration> = self
             .declarations
             .iter()
-            .filter(|declaration| declaration.is_named(file.placement().crate_root(), name))
+            .filter_map(|declaration| declaration.named(file.placement().crate_root(), name))
             .collect();
         let local = (path.qself.is_none() && path.path.segments.len() == 1)
-            .then(|| candidates.iter().find(|declaration| declaration.is_in(module)))
+            .then(|| candidates.iter().find_map(|declaration| declaration.in_module(module)))
             .flatten();
-        match local {
-            Some(declaration) => declaration.kind() == Kind::Enum,
-            None => !candidates.is_empty() && candidates.iter().all(|declaration| declaration.kind() == Kind::Enum),
+        match (local, candidates.as_slice()) {
+            (Some(declaration), _) => declaration.kind(),
+            (None, []) => Kind::Other,
+            (None, all) if all.iter().all(|declaration| declaration.kind() == Kind::Enum) => Kind::Enum,
+            (None, _) => Kind::Other,
         }
     }
 }

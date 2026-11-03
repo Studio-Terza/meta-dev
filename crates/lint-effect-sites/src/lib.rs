@@ -12,7 +12,7 @@ pub struct EffectSites;
 
 impl EffectSites {
     fn crates(files: &[SourceFile]) -> BTreeMap<CrateName, Vec<&SourceFile>> {
-        files.iter().filter(|file| file.is_shipped()).fold(BTreeMap::new(), |mut crates, file| {
+        files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
             crates.entry(CrateName::from(file.placement().package().root())).or_insert_with(Vec::new).push(file);
             crates
         })

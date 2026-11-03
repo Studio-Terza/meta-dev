@@ -26,8 +26,11 @@ impl Shebang {
             .ok()
     }
 
-    pub(crate) fn is_foreign(&self) -> bool {
-        self.interpreter.as_deref().is_none_or(|name| !Self::RUST.contains(&name))
+    pub(crate) fn foreign(self) -> Option<Shebang> {
+        match self.interpreter.as_deref() {
+            Some(name) if Self::RUST.contains(&name) => None,
+            _ => Some(self),
+        }
     }
 
     fn named(path: &str) -> Option<&str> {
@@ -42,10 +45,6 @@ impl Shebang {
             .map(|chunk| chunk.iter().collect())
             .collect()
     }
-
-    fn is_argument(word: &str) -> bool {
-        matches!(word.chars().next(), Some('-')) || word.contains('=')
-    }
 }
 
 impl FromStr for Shebang {
@@ -55,9 +54,12 @@ impl FromStr for Shebang {
         let words = Self::words(line);
         let program = words.first().map(String::as_str).and_then(Self::named);
         let interpreter = match program {
-            Some(Self::LAUNCHER) => {
-                words.iter().skip(1).find(|word| !Self::is_argument(word)).map(String::as_str).and_then(Self::named)
-            }
+            Some(Self::LAUNCHER) => words
+                .iter()
+                .skip(1)
+                .find(|word| !matches!(word.chars().next(), Some('-')) && !word.contains('='))
+                .map(String::as_str)
+                .and_then(Self::named),
             other => other,
         };
         Ok(Shebang { interpreter: interpreter.map(str::to_owned) })

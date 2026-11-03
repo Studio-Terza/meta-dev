@@ -36,8 +36,7 @@ impl SourceFile {
     }
 
     fn parse_placed(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
-        let parsed = Some(&text)
-            .filter(|text| Nesting::within_limit(text))
+        let parsed = Nesting::within_limit(&text)
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
             .and_then(|text| syn::parse_file(text.as_ref()));
         let syntax = parsed.map_err(|source| Failure::Parse {
@@ -76,7 +75,7 @@ impl SourceFile {
 
     #[must_use]
     pub fn switched_off(&self) -> Option<&Path> {
-        self.placement.package().untested().holds(&self.located).then_some(self.path.as_path())
+        self.placement.package().untested().holds(&self.located).map(|_| self.path.as_path())
     }
 
     #[must_use]
@@ -92,8 +91,8 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn is_shipped(&self) -> bool {
-        self.placement.role() != Role::Target
+    pub fn shipped(&self) -> Option<&SourceFile> {
+        (self.placement.role() != Role::Target).then_some(self)
     }
 
     #[must_use]

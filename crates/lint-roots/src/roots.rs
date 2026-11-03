@@ -27,7 +27,10 @@ impl Roots {
         let below = Directory::new(tree.canonical().to_path_buf()).tree()?;
         let above = tree.canonical().ancestors().skip(1).map(|ancestor| Directory::new(ancestor.to_path_buf()));
         let manifests = below.into_iter().chain(above).try_fold(Vec::new(), |found, directory| {
-            Ok(found.into_iter().chain(Manifest::read(directory.as_ref())?.filter(Manifest::is_package)).collect())
+            Ok(found
+                .into_iter()
+                .chain(Manifest::read(directory.as_ref())?.filter(|manifest| manifest.package().is_some()))
+                .collect())
         })?;
         Admission::members_among(manifests)?.iter().try_fold(Vec::new(), |roots, manifest| {
             Ok(roots

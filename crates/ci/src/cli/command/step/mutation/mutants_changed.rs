@@ -31,7 +31,7 @@ impl MutantsChanged {
 
     fn judged(&self, out: &mut impl Write) -> Result<Exit, Failure> {
         let list = self.missed_list();
-        let missed = if list.exists() { list.read()? } else { String::new() };
+        let missed = list.read_or("")?;
         if missed.is_empty() {
             writeln!(out, "mutants: none missed")?;
             Ok(Exit::Success)

@@ -38,13 +38,12 @@ impl Declarations {
         self.aliases.get(&name).cloned().unwrap_or(name)
     }
 
-    pub fn is_vertex(&self, name: &TypeName) -> bool {
-        self.vertices.contains(name)
+    pub fn vertex_named(&self, name: &TypeName) -> Option<&TypeName> {
+        self.vertices.get(name)
     }
 
-    pub fn is_foreign_sum_type(&self, enum_name: &Name, from: &Home) -> bool {
-        let declared = self.homes.resolve(enum_name, from);
-        self.sum_types.contains(&declared) && declared.home() != from
+    pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home) -> Option<&DeclaredType> {
+        self.sum_types.get(&self.homes.resolve(enum_name, from)).filter(|declared| declared.home() != from)
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {
@@ -57,11 +56,11 @@ impl Declarations {
 
     fn record_enum(&mut self, item: &ItemEnum) {
         let declared = DeclaredType::new(self.reading.clone(), Name::from(&item.ident));
-        self.sum_types.extend(Self::is_sum_type(item).then_some(declared));
+        self.sum_types.extend(Self::sum_type(item).map(|_| declared));
     }
 
-    fn is_sum_type(item: &ItemEnum) -> bool {
-        item.variants.iter().any(|variant| !matches!(variant.fields, Fields::Unit))
+    fn sum_type(item: &ItemEnum) -> Option<&ItemEnum> {
+        item.variants.iter().find(|variant| !matches!(variant.fields, Fields::Unit)).map(|_| item)
     }
 }
 

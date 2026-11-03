@@ -36,7 +36,7 @@ impl<'scan> VariantMatches<'scan> {
     fn foreign_variant(&self, pat: &Pat) -> Option<Name> {
         VariantPaths::in_pat(pat)
             .into_iter()
-            .find(|enum_name| self.declarations.is_foreign_sum_type(enum_name, &self.home))
+            .find_map(|enum_name| self.declarations.foreign_sum_type(&enum_name, &self.home).map(|_| enum_name))
     }
 
     fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation {
@@ -47,19 +47,20 @@ impl<'scan> VariantMatches<'scan> {
     }
 
     fn foreign_match(&self, arm: &Arm) -> Option<Violation> {
-        self.foreign_variant(&arm.pat)
-            .filter(|_| !Self::is_table(&arm.body))
-            .map(|enum_name| self.violation(&arm.pat, &enum_name))
+        match Self::table(&arm.body) {
+            Some(_) => None,
+            None => self.foreign_variant(&arm.pat).map(|enum_name| self.violation(&arm.pat, &enum_name)),
+        }
     }
 
-    fn is_table(expr: &Expr) -> bool {
+    fn table(expr: &Expr) -> Option<&Expr> {
         match expr {
-            Expr::Lit(_) | Expr::Path(_) => true,
-            Expr::Unary(unary) => Self::is_table(&unary.expr),
-            Expr::Paren(paren) => Self::is_table(&paren.expr),
-            Expr::Tuple(tuple) => tuple.elems.iter().all(Self::is_table),
-            Expr::Array(array) => array.elems.iter().all(Self::is_table),
-            _ => false,
+            Expr::Lit(_) | Expr::Path(_) => Some(expr),
+            Expr::Unary(unary) => Self::table(&unary.expr).map(|_| expr),
+            Expr::Paren(paren) => Self::table(&paren.expr).map(|_| expr),
+            Expr::Tuple(tuple) => tuple.elems.iter().map(Self::table).collect::<Option<Vec<_>>>().map(|_| expr),
+            Expr::Array(array) => array.elems.iter().map(Self::table).collect::<Option<Vec<_>>>().map(|_| expr),
+            _ => None,
         }
     }
 }

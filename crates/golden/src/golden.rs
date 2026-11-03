@@ -46,15 +46,16 @@ impl Golden {
                     Err(Failure::Differs { path: self.path.clone(), difference: Box::new(difference) })
                 })
             }
-            Mode::Record if self.chosen_for_package() => {
-                self.written(actual).map_err(|source| Failure::Unwritable { path: self.path.clone(), source })
-            }
-            Mode::Record => Err(Failure::NotChosen { path: self.path.clone() }),
+            Mode::Record => self
+                .chosen_for_package()
+                .ok_or_else(|| Failure::NotChosen { path: self.path.clone() })?
+                .written(actual)
+                .map_err(|source| Failure::Unwritable { path: self.path.clone(), source }),
         }
     }
 
-    fn chosen_for_package(&self) -> bool {
-        !self.package.join(Self::MANIFEST).exists() || Mode::current().ok() == Some(Mode::Record)
+    fn chosen_for_package(&self) -> Option<&Self> {
+        (!self.package.join(Self::MANIFEST).exists() || Mode::current().ok() == Some(Mode::Record)).then_some(self)
     }
 
     fn written(&self, actual: Output<'_>) -> io::Result<()> {

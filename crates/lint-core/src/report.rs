@@ -21,8 +21,8 @@ impl Report {
     }
 
     #[must_use]
-    pub fn is_clean(&self) -> bool {
-        self.violations.is_empty()
+    pub fn dirty(self) -> Option<Report> {
+        (!self.violations.is_empty()).then_some(self)
     }
 }
 

@@ -8,10 +8,12 @@ L3 `repeated_methods` stays a failing gate and does not flag derived code.
 D1 `Newtype` trait with `type Inner`, `new`, `into_inner`, and a separate fallible form for validated newtypes, plus `#[derive(Newtype)]`. A derived `Arbitrary` works with it.
 D2 Blanket traits for counters, for example increment and count. after: D1
 D3 Phantom-tagged generic form, for example `Count<Rounds>`, if it proves simpler than many derived types. Report if not. after: D2
-D4 Report-only lint: public `is_*` and `has_*` methods returning `bool` are listed, with a message naming `Option`, an enum, or a proof type such as `NonEmpty`. Blocks nothing.
+D4 Blocking lint `bool_methods`: in shipped code no function returns `bool`, whatever its name or visibility: free functions, functions inside bodies, inherent methods and trait declarations. A trait impl is exempt, since the trait fixes the signature (`PartialEq::eq`, `PartialOrd`, `Iterator` adaptors and the like); closures are not functions. The message names the fixes: an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`, so the caller's control flow is an expression over values rather than a branch on a flag.
 Out: changing chess, typestate, RAII lints.
 
 ## History
+
+D4, made strict (owner 1139c842, 2605e95a): it was report only, listing public `is_*` and `has_*` methods returning `bool`. It now blocks every function returning `bool`, and the pull request that tightened it fixed every violation, 151 of them.
 
 D3, measured, not built: the phantom form is not simpler. A prototype on main at a4e6e6e moved all 19 `usize` newtypes to `newtype::Count<Tag>`, with hand-written generic impls of `Clone`, `Copy`, `Debug`, `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Display`, `Serialize` and `Newtype`. It compiled and passed clippy.
 

@@ -10,7 +10,7 @@ impl Lint for ArbitraryNewtypes {
     fn report(files: &[SourceFile]) -> Report {
         Report::new(
             Headline::new("a newtype that owns its value derives Arbitrary"),
-            files.iter().filter(|file| file.is_shipped()).flat_map(Ungenerated::in_file).collect(),
+            files.iter().filter_map(SourceFile::shipped).flat_map(Ungenerated::in_file).collect(),
         )
     }
 }

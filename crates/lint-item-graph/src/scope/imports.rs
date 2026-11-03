@@ -12,8 +12,8 @@ impl Imports {
         self.0.push(import);
     }
 
-    pub fn holds(&self, name: &Name) -> bool {
-        self.0.iter().any(|import| import.names(name).is_some())
+    pub fn holds(&self, name: &Name) -> Option<&UsePath> {
+        self.0.iter().find_map(|import| import.names(name))
     }
 
     pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<Name> {

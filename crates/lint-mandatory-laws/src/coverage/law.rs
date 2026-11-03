@@ -18,8 +18,8 @@ impl Law {
         Law { package, kind, mentions }
     }
 
-    pub(crate) fn names(&self, subject: &Subject) -> bool {
-        self.package == *subject.package() && self.mentions.contains(subject.owner())
+    pub(crate) fn naming(&self, subject: &Subject) -> Option<&Law> {
+        (self.package == *subject.package() && self.mentions.contains(subject.owner())).then_some(self)
     }
 
     pub(crate) fn kind(&self) -> Kind {

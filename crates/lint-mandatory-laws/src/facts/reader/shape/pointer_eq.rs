@@ -8,40 +8,44 @@ impl PointerEq {
     const POINTER_MODULE: &str = "ptr";
     const POINTER_METHODS: [&'static str; 2] = ["ptr_eq", "addr_eq"];
 
-    pub(super) fn is_whole_impl(item: &ItemImpl) -> bool {
-        item.items.iter().any(|member| matches!(member, ImplItem::Fn(function) if Self::is_whole_body(function)))
+    pub(super) fn whole_impl(item: &ItemImpl) -> Option<&ImplItemFn> {
+        item.items.iter().find_map(|member| match member {
+            ImplItem::Fn(function) => Self::whole_body(function),
+            _ => None,
+        })
     }
 
-    fn is_whole_body(function: &ImplItemFn) -> bool {
+    fn whole_body(function: &ImplItemFn) -> Option<&ImplItemFn> {
         match function.block.stmts.as_slice() {
-            [Stmt::Expr(expr, None)] => Self::compares_addresses(expr),
-            _ => false,
+            [Stmt::Expr(expr, None)] => Self::address_comparison(expr).map(|_| function),
+            _ => None,
         }
     }
 
-    fn compares_addresses(expr: &Expr) -> bool {
+    fn address_comparison(expr: &Expr) -> Option<&Expr> {
         match expr {
-            Expr::Call(call) => Self::is_pointer_call(call),
-            Expr::MethodCall(call) => Self::POINTER_METHODS.iter().any(|name| call.method == *name),
-            Expr::Paren(paren) => Self::compares_addresses(&paren.expr),
-            _ => false,
+            Expr::Call(call) => Self::pointer_call(call).map(|_| expr),
+            Expr::MethodCall(call) => Self::POINTER_METHODS.iter().find(|name| call.method == **name).map(|_| expr),
+            Expr::Paren(paren) => Self::address_comparison(&paren.expr),
+            _ => None,
         }
     }
 
-    fn is_pointer_call(call: &ExprCall) -> bool {
+    fn pointer_call(call: &ExprCall) -> Option<&ExprCall> {
         match &*call.func {
-            Expr::Path(path) => Self::ends_in_pointer_compare(
-                &path.path.segments.iter().map(|segment| &segment.ident).collect::<Vec<_>>(),
-            ),
-            _ => false,
+            Expr::Path(path) => {
+                Self::pointer_compare(&path.path.segments.iter().map(|segment| &segment.ident).collect::<Vec<_>>())
+                    .map(|_| call)
+            }
+            _ => None,
         }
     }
 
-    fn ends_in_pointer_compare(names: &[&Ident]) -> bool {
+    fn pointer_compare<'name>(names: &[&'name Ident]) -> Option<&'name Ident> {
         match names {
-            [.., module, last] if **module == Self::POINTER_MODULE && **last == Self::COMPARING => true,
-            [.., last] => Self::POINTER_METHODS.iter().any(|name| **last == *name),
-            [] => false,
+            [.., module, last] if **module == Self::POINTER_MODULE && **last == Self::COMPARING => Some(last),
+            [.., last] => Self::POINTER_METHODS.iter().find(|name| **last == **name).map(|_| *last),
+            [] => None,
         }
     }
 }

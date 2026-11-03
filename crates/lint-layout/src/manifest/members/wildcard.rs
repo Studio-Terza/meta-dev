@@ -12,15 +12,17 @@ pub struct Wildcard(Vec<char>);
 impl Wildcard {
     const ANY: char = '*';
 
-    fn agrees(pattern: &[char], text: &[char]) -> bool {
+    fn agrees<'text>(pattern: &[char], text: &'text [char]) -> Option<&'text [char]> {
         match pattern.split_first() {
-            None => text.is_empty(),
+            None => text.is_empty().then_some(text),
             Some((&Self::ANY, rest)) => {
-                Self::agrees(rest, text) || text.split_first().is_some_and(|(_, tail)| Self::agrees(pattern, tail))
+                Self::agrees(rest, text).or_else(|| Self::agrees(pattern, text.get(1..)?)).map(|_| text)
             }
-            Some((letter, rest)) => {
-                text.split_first().is_some_and(|(first, tail)| first == letter && Self::agrees(rest, tail))
-            }
+            Some((letter, rest)) => text
+                .split_first()
+                .filter(|(first, _)| *first == letter)
+                .and_then(|(_, tail)| Self::agrees(rest, tail))
+                .map(|_| text),
         }
     }
 }
@@ -34,9 +36,9 @@ impl FromStr for Wildcard {
 }
 
 impl Matching for Wildcard {
-    fn holds(name: &Name, pattern: Word<'_>) -> bool {
+    fn holds<'word>(name: &Name, pattern: Word<'word>) -> Option<Word<'word>> {
         let letters = pattern.into_inner().parse::<Wildcard>();
         let spelled = name.spelled().parse::<Wildcard>();
-        letters.iter().zip(&spelled).any(|(wanted, found)| Self::agrees(&wanted.0, &found.0))
+        letters.iter().zip(&spelled).find_map(|(wanted, found)| Self::agrees(&wanted.0, &found.0)).map(|_| pattern)
     }
 }

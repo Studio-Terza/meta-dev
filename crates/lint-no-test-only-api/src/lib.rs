@@ -31,7 +31,7 @@ pub struct NoTestOnlyApi;
 impl NoTestOnlyApi {
     fn in_source(file: &SourceFile) -> Vec<Violation> {
         let shipped =
-            iter::once(file).filter(|file| file.is_shipped()).flat_map(|file| GatedItems::in_file(file.syntax()));
+            iter::once(file).filter_map(SourceFile::shipped).flat_map(|file| GatedItems::in_file(file.syntax()));
         shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
     }
 
@@ -44,8 +44,10 @@ impl NoTestOnlyApi {
         package
             .features()
             .iter()
-            .filter(|(name, _)| FeatureWord::is_test(name))
-            .map(|(name, line)| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
+            .filter_map(|(name, line)| {
+                FeatureWord::test_word(name)
+                    .map(|_| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
+            })
             .collect()
     }
 }

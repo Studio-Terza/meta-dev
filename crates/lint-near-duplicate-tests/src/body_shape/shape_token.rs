@@ -43,8 +43,8 @@ impl ShapeToken {
 
     fn of_word(word: Name) -> ShapeToken {
         match (word.matches::<Whole>(&Self::LITERAL_WORDS), word.casing()) {
-            (true, _) => ShapeToken::Literal,
-            (false, Casing::Shouting) if word.length() > 1 => ShapeToken::Literal,
+            (Some(_), _) => ShapeToken::Literal,
+            (None, Casing::Shouting) if word.length() > 1 => ShapeToken::Literal,
             _ => ShapeToken::Word(word),
         }
     }

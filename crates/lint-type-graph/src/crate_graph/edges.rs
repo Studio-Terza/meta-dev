@@ -29,8 +29,8 @@ impl Edges {
         let this: &Name = found.as_ref();
         let kind: &Name = implementation.as_ref();
         match implementation.argument() {
-            Some(other) if kind.matches::<Whole>(&Self::INTO_SELF) => self.linked(other, this),
-            Some(other) if kind.matches::<Whole>(&Self::FROM_SELF) => self.linked(this, other),
+            Some(other) if kind.matches::<Whole>(&Self::INTO_SELF).is_some() => self.linked(other, this),
+            Some(other) if kind.matches::<Whole>(&Self::FROM_SELF).is_some() => self.linked(this, other),
             _ if traits.contains(kind) => self.linked(this, kind),
             _ => self,
         }

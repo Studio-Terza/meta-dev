@@ -19,7 +19,7 @@ pub(crate) struct Facts {
 
 impl Facts {
     pub(crate) fn read_all(files: &[SourceFile]) -> Facts {
-        files.iter().filter(|file| file.is_shipped()).fold(Facts::default(), Facts::read)
+        files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Facts::read)
     }
 
     pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation> {

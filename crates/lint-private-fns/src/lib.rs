@@ -26,11 +26,11 @@ impl Lint for PrivateFns {
             Headline::new("too many private fns; a type's logic belongs in its interface or in more types"),
             files
                 .iter()
-                .filter(|file| file.is_shipped())
+                .filter_map(SourceFile::shipped)
                 .flat_map(|file| {
                     Self::private_fns(file.syntax())
                         .into_iter()
-                        .filter(|(_, names)| !Self::PER_TYPE.allows(names.len()))
+                        .filter(|(_, names)| Self::PER_TYPE.allows(names.len()).is_none())
                         .map(move |(type_name, names)| {
                             Violation::new(
                                 Site::of_file(file.path()),

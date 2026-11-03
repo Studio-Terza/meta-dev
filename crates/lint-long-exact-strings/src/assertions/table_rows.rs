@@ -33,18 +33,20 @@ impl TableRows {
     }
 
     fn wanted(row: &[TokenTree]) -> Option<Expr> {
-        let arrow = row.iter().zip(row.iter().skip(1)).position(|(start, end)| Self::arrow(start, end))?;
+        let arrow = row.iter().zip(row.iter().skip(1)).position(|(start, end)| Self::arrow(start, end).is_some())?;
         syn::parse2(row.iter().skip(arrow.checked_add(Self::ARROW_LENGTH)?).cloned().collect()).ok()
     }
 
-    fn arrow(start: &TokenTree, end: &TokenTree) -> bool {
+    fn arrow<'end>(start: &TokenTree, end: &'end TokenTree) -> Option<&'end TokenTree> {
         match (start, end) {
-            (TokenTree::Punct(start), TokenTree::Punct(end)) => {
-                start.as_char() == Self::ARROW_START
-                    && start.spacing() == Spacing::Joint
-                    && end.as_char() == Self::ARROW_END
+            (TokenTree::Punct(first), TokenTree::Punct(second))
+                if first.as_char() == Self::ARROW_START
+                    && first.spacing() == Spacing::Joint
+                    && second.as_char() == Self::ARROW_END =>
+            {
+                Some(end)
             }
-            _ => false,
+            _ => None,
         }
     }
 }

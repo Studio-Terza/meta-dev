@@ -22,8 +22,8 @@ impl Finding {
     }
 
     #[must_use]
-    pub fn blocks(&self) -> bool {
-        self.verdict == Verdict::Block
+    pub fn blocks(&self) -> Option<&Finding> {
+        (self.verdict == Verdict::Block).then_some(self)
     }
 
     #[must_use]

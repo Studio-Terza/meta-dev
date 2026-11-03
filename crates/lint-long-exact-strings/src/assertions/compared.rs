@@ -38,11 +38,11 @@ impl<'run> Compared<'run> {
             Expr::Lit(literal) => Literal::pinning(&literal.lit, Reading::Plain),
             Expr::Reference(reference) => self.traced(&reference.expr, seen),
             Expr::Paren(inner) => self.traced(&inner.expr, seen),
-            Expr::MethodCall(call) if Name::from(&call.method).matches::<Whole>(&Self::PEELED) => {
+            Expr::MethodCall(call) if Name::from(&call.method).matches::<Whole>(&Self::PEELED).is_some() => {
                 self.traced(&call.receiver, seen)
             }
             Expr::Call(call)
-                if Literal::called(&call.func).is_some_and(|last| last.matches::<Whole>(&Self::WRAPPERS)) =>
+                if Literal::called(&call.func).and_then(|last| last.matches::<Whole>(&Self::WRAPPERS)).is_some() =>
             {
                 call.args.iter().find_map(|argument| self.traced(argument, seen))
             }
@@ -68,10 +68,10 @@ impl<'run> Compared<'run> {
             .map(|arguments| arguments.into_iter().collect())
             .unwrap_or_default();
         match arguments.first() {
-            Some(Expr::Lit(literal)) if name.matches::<Whole>(&Self::FORMATS) => {
+            Some(Expr::Lit(literal)) if name.matches::<Whole>(&Self::FORMATS).is_some() => {
                 Literal::pinning(&literal.lit, Reading::Format)
             }
-            _ if name.matches::<Whole>(&Self::LISTS) => {
+            _ if name.matches::<Whole>(&Self::LISTS).is_some() => {
                 arguments.iter().find_map(|argument| self.traced(argument, seen))
             }
             _ => None,

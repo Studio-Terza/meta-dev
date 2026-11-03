@@ -39,17 +39,16 @@ impl Package {
     }
 
     fn crate_roots(directory: &Path) -> Result<Vec<PathBuf>, Failure> {
-        Some(directory).filter(|candidate| Directory::is_real(candidate)).map_or_else(
+        Directory::real(directory).map_or_else(
             || Ok(Vec::new()),
             |real| Ok(Directory::new(real.to_path_buf()).entries()?.into_iter().filter_map(Self::crate_root).collect()),
         )
     }
 
     fn crate_root(entry: PathBuf) -> Option<PathBuf> {
-        if Directory::is_real(&entry) {
-            Some(entry.join(Self::BINARY_ROOT)).filter(|main| main.is_file())
-        } else {
-            Some(entry).filter(|file| file.extension() == Some(OsStr::new(Self::SOURCE_EXTENSION)))
+        match Directory::real(&entry) {
+            Some(real) => Some(real.join(Self::BINARY_ROOT)).filter(|main| main.is_file()),
+            None => Some(entry).filter(|file| file.extension() == Some(OsStr::new(Self::SOURCE_EXTENSION))),
         }
     }
 }

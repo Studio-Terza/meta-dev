@@ -11,7 +11,7 @@ pub struct FakesAtPorts;
 
 impl Lint for FakesAtPorts {
     fn report(files: &[SourceFile]) -> Report {
-        let tested: Vec<&SourceFile> = files.iter().filter(|file| Doubles::tested(file)).collect();
+        let tested: Vec<&SourceFile> = files.iter().filter_map(Doubles::tested).collect();
         let imports = Imports::across(tested.iter().copied());
         let ports = PortTraits::declared(files);
         let doubles = tested.iter().fold(Doubles::default(), |mut doubles, file| {

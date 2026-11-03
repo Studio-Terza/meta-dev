@@ -1,5 +1,5 @@
 use super::ModulePath;
 
 pub trait Relation {
-    fn holds(this: &ModulePath, other: &ModulePath) -> bool;
+    fn holds<'other>(this: &ModulePath, other: &'other ModulePath) -> Option<&'other ModulePath>;
 }

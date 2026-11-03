@@ -143,7 +143,7 @@ fn a_type_name_declared_twice_in_one_crate_is_not_declared_once() {
     let once: Vec<String> = facts
         .types()
         .iter()
-        .filter(|found| facts.is_declared_once(found))
+        .filter_map(|found| facts.declared_once(found))
         .map(|found| format!("{}:{}", AsRef::<CrateName>::as_ref(found), AsRef::<Name>::as_ref(found)))
         .collect();
     assert_eq!(once, ["x:B", "y:B", "y:A"]);

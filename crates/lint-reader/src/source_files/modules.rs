@@ -90,10 +90,10 @@ impl Modules {
                 Child::new(own.join(Self::MODULE_FILE), own),
             ],
         };
-        let primary = choices.into_iter().find(Child::exists);
+        let primary = choices.into_iter().find_map(Child::existing);
         let found: Vec<Child> = primary.iter().cloned().collect();
         let conditional = Redirects::conditional(file_directory, declaration.module());
-        let found = conditional.into_iter().filter(Child::exists).fold(found, |found, child| {
+        let found = conditional.into_iter().filter_map(Child::existing).fold(found, |found, child| {
             if found.contains(&child) { found } else { found.into_iter().chain([child]).collect() }
         });
         if found.is_empty() {

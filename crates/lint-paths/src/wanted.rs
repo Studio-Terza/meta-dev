@@ -14,7 +14,10 @@ impl Wanted {
         Wanted(Some(finals.iter().map(|name| Name::from(*name)).chain(renamed).collect()))
     }
 
-    pub(crate) fn holds(&self, name: &Name) -> bool {
-        self.0.as_ref().is_none_or(|names| names.contains(name))
+    pub(crate) fn holds<'name>(&self, name: &'name Name) -> Option<&'name Name> {
+        match &self.0 {
+            None => Some(name),
+            Some(names) => names.contains(name).then_some(name),
+        }
     }
 }

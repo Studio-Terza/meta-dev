@@ -20,12 +20,12 @@ impl NameUses {
         uses
     }
 
-    pub fn mentions(&self, name: &Name) -> bool {
-        self.names.contains(name)
+    pub fn mentions(&self, name: &Name) -> Option<&Name> {
+        self.names.get(name)
     }
 
-    pub fn shares_crate(&self, other: &NameUses) -> bool {
-        self.crate_name == other.crate_name
+    pub fn sharing_crate(&self, other: &NameUses) -> Option<&NameUses> {
+        (self.crate_name == other.crate_name).then_some(self)
     }
 }
 

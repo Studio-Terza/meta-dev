@@ -20,7 +20,7 @@ impl Scope {
     pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> Vec<Name> {
         self.imports
             .iter()
-            .filter(|(_, target)| target.segments().last().is_some_and(|last| last.matches::<Whole>(finals)))
+            .filter(|(_, target)| target.segments().last().and_then(|last| last.matches::<Whole>(finals)).is_some())
             .map(|(local, _)| local.clone())
             .collect()
     }

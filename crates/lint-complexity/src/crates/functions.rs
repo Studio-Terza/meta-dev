@@ -30,7 +30,7 @@ impl Functions<'_> {
             )
         };
         let found = body
-            .filter(|_| Walk::outside_tests(attributes) == Walk::Entered && !TestMarks::mark_test(attributes))
+            .filter(|_| Walk::outside_tests(attributes) == Walk::Entered && TestMarks::mark_test(attributes).is_none())
             .map(function);
         self.found.extend(found);
     }

@@ -12,13 +12,12 @@ pub struct TextMention {
 impl TextMention {
     const TEXT: [&'static str; 2] = ["String", "str"];
 
-    pub fn in_type(ty: &Type, wrappers: &Wrappers) -> bool {
+    pub fn in_type(ty: &Type, wrappers: &Wrappers) -> Option<Ident> {
         let mut mention = TextMention { named: Vec::new() };
         mention.visit_type(ty);
-        mention
-            .named
-            .iter()
-            .any(|ident| Self::TEXT.iter().any(|text| ident == text) || wrappers.holds_text(&Name::from(ident)))
+        mention.named.into_iter().find(|ident| {
+            Self::TEXT.iter().any(|text| ident == text) || wrappers.holds_text(&Name::from(ident)).is_some()
+        })
     }
 }
 

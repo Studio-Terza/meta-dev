@@ -49,16 +49,14 @@ impl<'owner> TypeScope<'owner> {
 
     fn named(&self, segment: &PathSegment) -> Endpoint {
         let name = Name::from(&segment.ident);
-        if name.matches::<Whole>(&Self::WRAPPERS) {
-            self.argument(&segment.arguments).unwrap_or(Endpoint::Unit)
-        } else if name.matches::<Whole>(&Self::PRIMITIVES) {
-            Endpoint::Primitive(name)
-        } else if name.matches::<Whole>(&Self::SELF) {
-            self.receiver()
-        } else if self.generics.contains(&name) {
-            Endpoint::Opaque
-        } else {
-            Endpoint::Named(name)
+        match name {
+            _ if name.matches::<Whole>(&Self::WRAPPERS).is_some() => {
+                self.argument(&segment.arguments).unwrap_or(Endpoint::Unit)
+            }
+            _ if name.matches::<Whole>(&Self::PRIMITIVES).is_some() => Endpoint::Primitive(name),
+            _ if name.matches::<Whole>(&Self::SELF).is_some() => self.receiver(),
+            _ if self.generics.contains(&name) => Endpoint::Opaque,
+            _ => Endpoint::Named(name),
         }
     }
 
@@ -81,7 +79,9 @@ impl<'owner> TypeScope<'owner> {
     fn generic(&self, argument: &GenericArgument) -> Option<Endpoint> {
         match argument {
             GenericArgument::Type(inner) => Some(self.endpoint(inner)),
-            GenericArgument::AssocType(associated) if Name::from(&associated.ident).matches::<Whole>(&Self::ITEM) => {
+            GenericArgument::AssocType(associated)
+                if Name::from(&associated.ident).matches::<Whole>(&Self::ITEM).is_some() =>
+            {
                 Some(self.endpoint(&associated.ty))
             }
             _ => None,

@@ -26,7 +26,7 @@ impl Ignored {
         let path: &Path = directory.as_ref();
         let named = path.file_name();
         let applies = match self {
-            Ignored::Hidden => named.is_some_and(|name| Name::from(name).matches::<Prefix>(&[Self::HIDDEN])),
+            Ignored::Hidden => named.is_some_and(|name| Name::from(name).matches::<Prefix>(&[Self::HIDDEN]).is_some()),
             Ignored::VersionControl => named.is_some_and(|name| name == Self::VERSION_CONTROL),
             Ignored::BuildOutput => {
                 named.is_some_and(|name| name == Self::BUILD_DIRECTORY)

@@ -55,8 +55,8 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn is_package(&self) -> bool {
-        self.table.contains_key(Self::PACKAGE)
+    pub fn package(&self) -> Option<&Manifest> {
+        self.table.contains_key(Self::PACKAGE).then_some(self)
     }
 
     #[must_use]

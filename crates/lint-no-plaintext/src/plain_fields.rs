@@ -27,8 +27,8 @@ impl<'file> PlainFields<'file> {
 
     fn read_in(attributes: &[Attribute]) -> Walk {
         let attrs = Attributes::flattened_from(attributes);
-        match (Walk::outside_tests(attributes), attrs.derives_deserialize() && attrs.validation().is_none()) {
-            (Walk::Entered, true) => Walk::Entered,
+        match (Walk::outside_tests(attributes), attrs.deserialize_derive(), attrs.validation()) {
+            (Walk::Entered, Some(_), None) => Walk::Entered,
             _ => Walk::Skipped,
         }
     }
@@ -36,7 +36,7 @@ impl<'file> PlainFields<'file> {
     fn inspect(&mut self, owner: &Name, fields: &Fields) {
         let file = self.file;
         let wrappers = self.wrappers;
-        self.found.extend(fields.iter().filter(|field| TextMention::in_type(&field.ty, wrappers)).map(
+        self.found.extend(fields.iter().filter(|field| TextMention::in_type(&field.ty, wrappers).is_some()).map(
             |field: &Field| {
                 let context = field.ident.as_ref().map_or_else(|| owner.clone(), Name::from);
                 Violation::new(Site::new(file.path(), LineNumber::from(field.ty.span())), Finding::FreeText { context })

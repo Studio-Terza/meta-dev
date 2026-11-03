@@ -26,18 +26,17 @@ impl WorkflowRun {
             Headline::new("a workflow run step is a short command; logic lives in Rust"),
             files
                 .iter()
-                .filter(|file| Self::is_workflow(file) || Actions::is_manifest(file))
+                .filter_map(|file| Self::workflow(file).or_else(|| Actions::manifest(file)))
                 .flat_map(|file| Self::violations(file, actions))
                 .collect(),
         )
     }
 
-    pub(crate) fn is_workflow(file: &RepoFile) -> bool {
-        file.below(Path::new(Self::WORKFLOWS)).is_some()
-            && file
-                .shown()
-                .extension()
-                .is_some_and(|extension| Self::EXTENSIONS.iter().any(|known| extension == *known))
+    pub(crate) fn workflow(file: &RepoFile) -> Option<&RepoFile> {
+        file.below(Path::new(Self::WORKFLOWS))
+            .and(file.shown().extension())
+            .filter(|extension| Self::EXTENSIONS.iter().any(|known| *extension == *known))
+            .map(|_| file)
     }
 
     fn violations(file: &RepoFile, actions: Actions<'_>) -> Vec<Violation> {

@@ -6,7 +6,7 @@ use crate::word::Word;
 pub struct LoweredInfix;
 
 impl Matching for LoweredInfix {
-    fn holds(name: &Name, word: Word<'_>) -> bool {
+    fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
         name.lowered().contains(word)
     }
 }

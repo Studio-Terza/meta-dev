@@ -31,21 +31,16 @@ impl Scopes {
         self.scopes.get(module)
     }
 
-    pub(crate) fn renames_head(&self, module: &Module, path: &UsePath) -> bool {
-        path.first().is_some_and(|head| {
-            self.scope(module).is_some_and(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
-        })
+    pub(crate) fn renames_head(&self, module: &Module, path: &UsePath) -> Option<&Scope> {
+        let head = path.first()?;
+        self.scope(module).filter(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
     }
 
     pub(crate) fn renamed_to(&self, finals: &[Word<'_>]) -> Vec<Name> {
         self.scopes.values().flat_map(|scope| scope.renamed_to(finals)).collect()
     }
 
-    pub(crate) fn declares(&self, module: &Module) -> bool {
-        self.scopes.contains_key(module)
-    }
-
-    pub(crate) fn guarded(&self, module: &Module, name: &Name) -> bool {
-        self.guards.get(&module.root()).is_some_and(|names| names.contains(name))
+    pub(crate) fn guarded(&self, module: &Module, name: &Name) -> Option<&Name> {
+        self.guards.get(&module.root())?.get(name)
     }
 }

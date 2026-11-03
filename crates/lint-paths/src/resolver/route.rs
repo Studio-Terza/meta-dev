@@ -15,10 +15,10 @@ impl Route {
     pub(crate) fn leading(scopes: &Scopes, module: &Module, head: &Name, trail: &Trail) -> Vec<Route> {
         let scope = scopes.scope(module);
         let imported = scope
-            .filter(|_| !trail.has_followed(module, head))
+            .filter(|_| trail.followed(module, head).is_none())
             .and_then(|scope| scope.imported(head))
             .map(|target| Route::Imported { head: head.clone(), target: target.clone() });
-        let entered = Some(module.within(head)).filter(|child| scopes.declares(child)).map(Route::Entered);
+        let entered = Some(module.within(head)).filter(|child| scopes.scope(child).is_some()).map(Route::Entered);
         let globbed = scope
             .filter(|_| imported.is_none() && trail.globbing() == Globbing::Open)
             .into_iter()

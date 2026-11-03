@@ -19,8 +19,8 @@ impl RecordedMutant {
         &self.name
     }
 
-    pub(crate) fn has_summary(&self, summary: Verdict) -> bool {
-        self.summary == summary
+    pub(crate) fn summary(&self) -> Verdict {
+        self.summary
     }
 
     pub(crate) fn failed(&self) -> &[OneLine] {

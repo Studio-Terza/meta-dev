@@ -26,8 +26,8 @@ impl<'text> Command<'text> {
 
     pub(crate) fn finding(self, setting: Key) -> Option<Finding> {
         self.0
-            .spans_lines()
-            .then_some(Finding::Block)
+            .multiline()
+            .map(|_| Finding::Block)
             .or_else(|| self.excess().map(|characters| Finding::TooLong { characters, limit: Self::LIMIT }))
             .or_else(|| Self::operator_in(self, setting).map(|symbol| Finding::Operator { symbol }))
             .or_else(|| Self::keyword_in(self.0).map(|word| Finding::Control { word }))

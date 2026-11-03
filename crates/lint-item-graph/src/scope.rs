@@ -47,20 +47,19 @@ impl Scope {
     fn kept_at_index(&self, path: &PathTokens, index: usize, name: Name) -> Option<Name> {
         match path.root_index(index) {
             Some(root) if root == index => self.imports.local_item(&name, &self.local_roots),
-            Some(root) => self.is_local_root(path.tokens().get(root)).then_some(name),
+            Some(root) => self.local_root(path.tokens().get(root)).map(|_| name),
             None => None,
         }
     }
 
-    fn is_local_root(&self, token: Option<&TokenTree>) -> bool {
-        token.is_some_and(|token| match token {
-            TokenTree::Ident(ident) => {
-                let name = Name::from(ident);
-                self.local_roots.contains(&name)
-                    || (self.imports.holds(&name) && self.imports.local_item(&name, &self.local_roots).is_some())
-            }
-            TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => false,
-        })
+    fn local_root(&self, token: Option<&TokenTree>) -> Option<Name> {
+        match token? {
+            TokenTree::Ident(ident) => Some(Name::from(ident)).filter(|name| {
+                self.local_roots.contains(name)
+                    || self.imports.holds(name).and(self.imports.local_item(name, &self.local_roots)).is_some()
+            }),
+            TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
+        }
     }
 
     fn import(&mut self, prefix: &UsePath, tree: &UseTree) {

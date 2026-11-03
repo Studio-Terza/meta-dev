@@ -61,11 +61,11 @@ impl Assertions<'_> {
                 .unwrap_or_default()
         };
         match name {
-            _ if name.matches::<Whole>(&Self::EQUALITIES) => {
+            _ if name.matches::<Whole>(&Self::EQUALITIES).is_some() => {
                 Some(arguments().into_iter().take(Self::SIDES_LENGTH).collect())
             }
             _ if *name == Self::ASSERT => Some(arguments().into_iter().take(1).flat_map(Self::sides).collect()),
-            _ if self.tables.call(name) => Some(TableRows::expected(&invocation.tokens)),
+            _ if self.tables.call(name).is_some() => Some(TableRows::expected(&invocation.tokens)),
             _ => None,
         }
     }

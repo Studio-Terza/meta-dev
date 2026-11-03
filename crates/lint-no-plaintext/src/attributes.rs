@@ -1,5 +1,5 @@
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Meta, Token};
+use syn::{Attribute, Meta, Path, Token};
 
 pub struct Attributes {
     metas: Vec<Meta>,
@@ -16,10 +16,11 @@ impl Attributes {
         Attributes { metas: attributes.iter().flat_map(|attribute| Self::flattened(&attribute.meta)).collect() }
     }
 
-    pub fn derives_deserialize(&self) -> bool {
-        self.metas.iter().flat_map(|meta| Self::nested(meta, Self::DERIVE)).any(
-            |derived| matches!(derived, Meta::Path(path) if path.segments.last().is_some_and(|last| last.ident == Self::DESERIALIZE)),
-        )
+    pub fn deserialize_derive(&self) -> Option<Path> {
+        self.metas.iter().flat_map(|meta| Self::nested(meta, Self::DERIVE)).find_map(|derived| match derived {
+            Meta::Path(path) if path.segments.last().is_some_and(|last| last.ident == Self::DESERIALIZE) => Some(path),
+            _ => None,
+        })
     }
 
     pub fn validation(&self) -> Option<Meta> {

@@ -13,7 +13,7 @@ pub struct NoPlaintext;
 
 impl Lint for NoPlaintext {
     fn report(files: &[SourceFile]) -> Report {
-        let shipped: Vec<&SourceFile> = files.iter().filter(|file| file.is_shipped()).collect();
+        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let wrappers = Wrappers::settled_in(&shipped);
         Report::new(
             Headline::new(

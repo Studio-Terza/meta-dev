@@ -8,11 +8,17 @@ use lint_layout::UseEdges;
 pub struct Users(BTreeMap<ModulePath, BTreeSet<ModulePath>>);
 
 impl Users {
-    pub fn record(&mut self, home: Option<ModulePath>, caller: &ModulePath) -> bool {
+    #[must_use]
+    pub fn recorded(self, home: Option<ModulePath>, caller: &ModulePath) -> Users {
         match home {
-            Some(home) => self.0.entry(home).or_default().insert(caller.clone()),
-            None => false,
+            Some(home) => self.with_caller(home, caller),
+            None => self,
         }
+    }
+
+    fn with_caller(mut self, home: ModulePath, caller: &ModulePath) -> Users {
+        self.0.entry(home).or_default().insert(caller.clone());
+        self
     }
 
     #[must_use]
@@ -26,11 +32,10 @@ impl Users {
 
     fn with_test(self, modules: &ModuleIndex, file: &SourceFile) -> Users {
         let caller = ModulePath::of_file(file);
-        UseEdges::in_file(file.syntax()).iter().fold(self, |mut users, path| {
+        UseEdges::in_file(file.syntax()).iter().fold(self, |users, path| {
             let home =
                 ModulePath::from_use(&caller, path, modules).and_then(|target| target.deepest_in(modules).cloned());
-            users.record(home, &caller);
-            users
+            users.recorded(home, &caller)
         })
     }
 }

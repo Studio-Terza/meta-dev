@@ -45,25 +45,29 @@ impl Gate {
     }
 
     fn sliced(limits: BTreeMap<Stage, Limit>, only: &[OsString]) -> Result<BTreeMap<Stage, Limit>, Failure> {
-        match only.iter().find(|name| !limits.keys().any(|stage| Self::names(name, stage))) {
+        match only.iter().find(|name| limits.keys().find_map(|stage| Self::names(name, stage)).is_none()) {
             Some(name) => Err(Failure::UnknownStage { name: name.clone() }),
-            None => Ok(limits.into_iter().filter(|(stage, _)| Self::asked(only, stage)).collect()),
+            None => Ok(limits.into_iter().filter(|(stage, _)| Self::asked(only, stage).is_some()).collect()),
         }
     }
 
-    fn asked(only: &[OsString], stage: &Stage) -> bool {
-        only.is_empty() || only.iter().any(|name| Self::names(name, stage))
+    fn asked<'stage>(only: &[OsString], stage: &'stage Stage) -> Option<&'stage Stage> {
+        match only {
+            [] => Some(stage),
+            named => named.iter().find_map(|name| Self::names(name, stage)),
+        }
     }
 
-    fn names(name: &OsStr, stage: &Stage) -> bool {
-        name == OsStr::new(stage.as_ref())
+    fn names<'stage>(name: &OsStr, stage: &'stage Stage) -> Option<&'stage Stage> {
+        (name == OsStr::new(stage.as_ref())).then_some(stage)
     }
 
     #[must_use]
-    pub fn blocks_outside(&self, report_only: &[OsString]) -> bool {
+    pub fn blocking(&self, report_only: &[OsString]) -> Option<&Finding> {
         self.findings
             .iter()
-            .any(|finding| finding.blocks() && !report_only.iter().any(|name| Self::names(name, finding.stage())))
+            .filter_map(Finding::blocks)
+            .find(|finding| report_only.iter().find_map(|name| Self::names(name, finding.stage())).is_none())
     }
 
     #[must_use]

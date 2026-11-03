@@ -1,6 +1,5 @@
 test budget, report only:
 corpus: 4 tests in 2 files, 18 of 18 lines, 0 process starts
-report only, a public is_ or has_ method forgets what it found; return an Option, an enum, or a proof type such as NonEmpty:
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 assertions do not pin long text:
 tests/text.rs:5: assertion pins text with a line break; compare a golden with golden!, or assert on the parts
