@@ -42,10 +42,6 @@ impl Files for Disk {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        fs::symlink_metadata(path).map_or(Kind::Missing, |metadata| match metadata.file_type() {
-            found if found.is_dir() => Kind::Directory,
-            found if found.is_symlink() => Kind::Link,
-            _ => Kind::File,
-        })
+        fs::symlink_metadata(path).map_or(Kind::Missing, |metadata| Kind::from(metadata.file_type()))
     }
 }

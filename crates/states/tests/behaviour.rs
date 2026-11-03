@@ -24,11 +24,20 @@ struct Flow;
 impl Flow {
     fn run<'id>(pr: Working<'id>, reworks: u8, verdict: Verdict, passes: &Cell<u8>) -> Finished<'id> {
         passes.set(passes.get().saturating_add(1));
-        let review: Reviewing<'id> = pr.review();
-        match (reworks, verdict) {
-            (0, Verdict::Approve) => Self::merged(review.approve()),
-            (0, Verdict::Reject) => Self::dropped(review.reject()),
-            (left, verdict) => Self::run(review.rework(), left.saturating_sub(1), verdict, passes),
+        Self::reviewed(pr.review(), reworks.checked_sub(1), verdict, passes)
+    }
+
+    fn reviewed<'id>(review: Reviewing<'id>, left: Option<u8>, verdict: Verdict, passes: &Cell<u8>) -> Finished<'id> {
+        match left {
+            Some(left) => Self::run(review.rework(), left, verdict, passes),
+            None => Self::decided(review, verdict),
+        }
+    }
+
+    fn decided(review: Reviewing<'_>, verdict: Verdict) -> Finished<'_> {
+        match verdict {
+            Verdict::Approve => Self::merged(review.approve()),
+            Verdict::Reject => Self::dropped(review.reject()),
         }
     }
 

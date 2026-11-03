@@ -20,7 +20,10 @@ impl TryFrom<String> for OneLine {
     type Error = NotOneLine;
 
     fn try_from(text: String) -> Result<OneLine, NotOneLine> {
-        if text.chars().any(char::is_control) { Err(NotOneLine) } else { Ok(OneLine(text)) }
+        match text.chars().find(|letter| letter.is_control()) {
+            Some(_) => Err(NotOneLine),
+            None => Ok(OneLine(text)),
+        }
     }
 }
 

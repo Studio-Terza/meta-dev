@@ -16,12 +16,18 @@ impl Resolved {
     }
 }
 
-impl From<&Path> for Resolved {
-    fn from(path: &Path) -> Resolved {
-        Resolved(path.components().fold(PathBuf::new(), |resolved, component| match component {
+impl Resolved {
+    fn stepped(resolved: PathBuf, component: Component) -> PathBuf {
+        match component {
             Component::CurDir => resolved,
             Component::ParentDir => Self::parent_of(resolved),
             kept => resolved.join(kept),
-        }))
+        }
+    }
+}
+
+impl From<&Path> for Resolved {
+    fn from(path: &Path) -> Resolved {
+        Resolved(path.components().fold(PathBuf::new(), Self::stepped))
     }
 }
