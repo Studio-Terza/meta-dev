@@ -23,7 +23,7 @@ impl<'change> Owed<'change> {
     }
 
     pub(crate) fn outstanding(&self) -> Option<&Owed<'change>> {
-        (!self.failing.is_empty()).then_some(self)
+        self.failing.first().map(|_| self)
     }
 
     pub(crate) fn complained(&self, out: &mut impl Write) -> Result<(), Failure<'static>> {

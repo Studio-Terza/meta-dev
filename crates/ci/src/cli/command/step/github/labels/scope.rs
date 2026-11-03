@@ -43,7 +43,7 @@ impl<'journal> Scope<'journal> {
             .collect();
         let produced: BTreeSet<&Path> = asked
             .iter()
-            .filter(|(check, _)| !matches!((check, refactor), (Check::Goldens, Some(_))))
+            .filter(|(check, _)| check.waived_by(refactor).is_none())
             .flat_map(|(_, flagged)| flagged)
             .flat_map(|change| change.paths())
             .collect();
@@ -62,9 +62,9 @@ impl<'journal> Scope<'journal> {
         refactor: Option<&PullRequest>,
         flagged: Vec<&'change Change>,
     ) -> Owed<'change> {
-        match (check, refactor) {
-            (Check::Goldens, Some(_)) => Owed::new(Fault::Refactor, flagged),
-            _ => Owed::new(
+        match check.waived_by(refactor) {
+            Some(fault) => Owed::new(fault, flagged),
+            None => Owed::new(
                 Fault::Beyond(check),
                 flagged.into_iter().filter(|change| Self::reaching(answers, change).is_none()).collect(),
             ),

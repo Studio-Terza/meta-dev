@@ -3,6 +3,7 @@ use std::io::Write;
 
 use super::Step;
 use crate::cli::command::failure::Failure;
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 
 #[derive(Debug)]
@@ -12,10 +13,11 @@ pub struct RatchetLower {
 
 impl Step for RatchetLower {
     fn from_arguments(arguments: Vec<OsString>) -> Result<RatchetLower, Failure<'static>> {
-        match arguments.as_slice() {
-            [_, _] => Ok(RatchetLower { record: gate_limits::Cli::from_args(arguments.into_iter()) }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let record = arguments.taken()?;
+        let measured = arguments.taken()?;
+        arguments.ended()?;
+        Ok(RatchetLower { record: gate_limits::Cli::from_args([record, measured].into_iter()) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

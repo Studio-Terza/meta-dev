@@ -37,14 +37,29 @@ impl<'title> Issue<'title> {
         body: &impl fmt::Display,
         out: &mut impl Write,
     ) -> Result<Invocation, Failure<'static>> {
-        let body = body.to_string();
-        if let Some(number) = self.number {
-            writeln!(out, "updating issue {number}: {}", self.title)?;
-            Ok(Invocation::new("gh", ["issue", "edit", &number.to_string(), "--body", &body]))
-        } else {
-            writeln!(out, "opening an issue: {}", self.title)?;
-            Ok(Invocation::new("gh", ["issue", "create", "--title", self.title.into_inner(), "--body", &body]))
+        match self.number {
+            Some(number) => self.updating(number, body, out),
+            None => Self::opening(self.title, body, out),
         }
+    }
+
+    fn updating(
+        &self,
+        number: Number,
+        body: &impl fmt::Display,
+        out: &mut impl Write,
+    ) -> Result<Invocation, Failure<'static>> {
+        writeln!(out, "updating issue {number}: {}", self.title)?;
+        Ok(Invocation::new("gh", ["issue", "edit", &number.to_string(), "--body", &body.to_string()]))
+    }
+
+    fn opening(
+        title: Title<'_>,
+        body: &impl fmt::Display,
+        out: &mut impl Write,
+    ) -> Result<Invocation, Failure<'static>> {
+        writeln!(out, "opening an issue: {title}")?;
+        Ok(Invocation::new("gh", ["issue", "create", "--title", title.into_inner(), "--body", &body.to_string()]))
     }
 
     fn search(title: Title<'title>) -> Invocation {

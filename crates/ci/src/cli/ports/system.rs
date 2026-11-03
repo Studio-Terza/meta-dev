@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io;
 use std::num::NonZeroU8;
 use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, ExitStatus, Output, Stdio};
 use std::time::Instant;
 
 use file_ports::Disk;
@@ -14,17 +14,18 @@ pub struct System;
 
 impl System {
     fn exit_of(status: ExitStatus) -> Exit {
-        if status.success() {
-            Exit::Success
-        } else {
-            Exit::Failure(
-                status
-                    .code()
-                    .and_then(|code| u8::try_from(code).ok())
-                    .and_then(NonZeroU8::new)
-                    .unwrap_or(NonZeroU8::MIN),
-            )
-        }
+        Some(status).filter(ExitStatus::success).map_or_else(
+            || {
+                Exit::Failure(
+                    status
+                        .code()
+                        .and_then(|code| u8::try_from(code).ok())
+                        .and_then(NonZeroU8::new)
+                        .unwrap_or(NonZeroU8::MIN),
+                )
+            },
+            |_| Exit::Success,
+        )
     }
 
     fn command(invocation: &Invocation) -> Command {
@@ -48,12 +49,11 @@ impl Ports for System {
     }
 
     fn output(&self, invocation: &Invocation) -> io::Result<Text> {
-        let output = Self::command(invocation).output()?;
-        if output.status.success() {
-            String::from_utf8(output.stdout).map(Text::new).map_err(io::Error::other)
-        } else {
-            Err(io::Error::other(String::from_utf8(output.stderr).unwrap_or_default()))
-        }
+        let Output { status, stdout, stderr } = Self::command(invocation).output()?;
+        Some(status).filter(ExitStatus::success).map(|_| stdout).ok_or(stderr).map_or_else(
+            |stderr| Err(io::Error::other(String::from_utf8(stderr).unwrap_or_default())),
+            |stdout| String::from_utf8(stdout).map(Text::new).map_err(io::Error::other),
+        )
     }
 
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {

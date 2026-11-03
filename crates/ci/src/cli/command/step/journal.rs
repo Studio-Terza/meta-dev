@@ -86,10 +86,7 @@ impl Journal {
         let groups: Vec<Vec<Held>> = journals
             .into_iter()
             .zip(kinds)
-            .map(|(journal, kind)| match kind {
-                Kind::File => vec![journal],
-                Kind::Directory | Kind::Link | Kind::Missing => Vec::new(),
-            })
+            .map(|(journal, kind)| Some(kind).filter(|kind| *kind == Kind::File).map(|_| journal).into_iter().collect())
             .collect();
         Self::read_groups(files, groups).into_iter().map(|group| group.into_iter().next()).collect()
     }

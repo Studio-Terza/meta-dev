@@ -20,11 +20,14 @@ enum Stamp {
 
 impl fmt::Display for Stamp {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let field = match self {
-            Stamp::Created => "createdAt",
-            Stamp::Merged => "mergedAt",
-        };
-        write!(formatter, "(.{field} | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
+        match self {
+            Stamp::Created => {
+                write!(formatter, "(.createdAt | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
+            }
+            Stamp::Merged => {
+                write!(formatter, "(.mergedAt | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
+            }
+        }
     }
 }
 

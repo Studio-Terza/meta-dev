@@ -1,3 +1,4 @@
+mod arguments;
 mod branch;
 mod changed;
 mod compile_times;
@@ -22,6 +23,7 @@ use std::io::Write;
 
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
+pub(crate) use arguments::Arguments;
 
 pub use compile_times::CompileTimes;
 pub use history::History;
