@@ -41,4 +41,15 @@ impl Failure {
     pub(crate) fn starting(invocation: &Invocation) -> impl FnOnce(io::Error) -> Failure + '_ {
         move |source| Failure::Program { program: invocation.program().to_owned(), source }
     }
+
+    pub(crate) fn started<Value>(
+        results: Vec<io::Result<Value>>,
+        invocations: &[Invocation],
+    ) -> Result<Vec<Value>, Failure> {
+        results
+            .into_iter()
+            .zip(invocations)
+            .map(|(result, invocation)| result.map_err(Failure::starting(invocation)))
+            .collect()
+    }
 }

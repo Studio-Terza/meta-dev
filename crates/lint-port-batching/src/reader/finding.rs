@@ -58,7 +58,11 @@ impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.within {
             Within::Closure(adaptor) => {
-                write!(formatter, "port {} is called inside the closure passed to {adaptor}, once per element", self.port)
+                write!(
+                    formatter,
+                    "port {} is called inside the closure passed to {adaptor}, once per element",
+                    self.port
+                )
             }
             Within::Loop(looping) => {
                 write!(formatter, "port {} is called inside a {looping} loop body, once per iteration", self.port)

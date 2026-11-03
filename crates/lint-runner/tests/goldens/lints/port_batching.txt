@@ -1,0 +1,6 @@
+test budget, report only:
+corpus: 0 tests in 4 files, 0 of 28 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+ports are called once per batch, not once per element:
+src/per_element.rs:7: port store is called inside the closure passed to map, once per element; add a batch method to the port, such as fetch_many or write_all, and call it once outside the per-element code; consuming a stream from a port is fine, and deliberate pacing is a Pacing parameter on the port method
+fails

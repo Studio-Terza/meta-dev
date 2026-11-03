@@ -10,7 +10,11 @@ impl Pointer {
 
     pub fn pointee(segment: &PathSegment) -> Option<&Type> {
         let pointer = Some(segment).filter(|last| Name::from(&last.ident).matches::<Whole>(&Self::POINTERS).is_some());
-        pointer.and_then(|last| Self::angled(&last.arguments)).into_iter().flat_map(|angled| &angled.args).find_map(Self::typed)
+        pointer
+            .and_then(|last| Self::angled(&last.arguments))
+            .into_iter()
+            .flat_map(|angled| &angled.args)
+            .find_map(Self::typed)
     }
 
     fn angled(arguments: &PathArguments) -> Option<&AngleBracketedGenericArguments> {
