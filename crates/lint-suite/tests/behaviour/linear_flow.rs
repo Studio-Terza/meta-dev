@@ -25,6 +25,10 @@ const INTEGRATION: &str = "#[test]\nfn f() {\n    loop {}\n}\n";
 const IN_MACRO: &str = "fn f() -> Vec<u8> {\n    vec![if p { 1 } else { 2 }]\n}\n";
 const METHODS: &str = "trait T {\n    fn f(&self) {\n        loop {}\n    }\n}\nimpl T for A {\n    fn f(&self) {\n        loop {}\n    }\n}\n";
 
+const IN_MACRO_RULES: &str =
+    "macro_rules! m {\n    () => {\n        fn f() {\n            loop {}\n        }\n    };\n}\n";
+const WRAPPED: &str = "fn f(count: &u8) -> u8 {\n    match count {\n        &0 => g(),\n        n @ 1 => h(n),\n        (2) => k(),\n        3 | 4 => m(),\n        _ => 0,\n    }\n}\n";
+
 const GUARD: &str =
     "fn f(on: Switch) -> u8 {\n    match on {\n        Switch::On if p => 1,\n        _ => 0,\n    }\n}\n";
 const LITERAL: &str = "fn f(count: u8) -> u8 {\n    match count {\n        0 => g(),\n        1..=3 => h(),\n        _ => k(),\n    }\n}\n";
@@ -43,7 +47,7 @@ const OPERATOR_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f() {\n       
 
 const SHAPES: &str = "struct A;\nimpl A {\n    fn piped(&self) -> u8 {\n        g().h()\n    }\n    fn routed(&self, on: Switch) -> u8 {\n        match on {\n            Switch::On => 1,\n            Switch::Off => 0,\n        }\n    }\n    fn tangled(&self) -> u8 {\n        if p { 1 } else { 0 }\n    }\n    const fn fixed() -> u8 {\n        if p { 1 } else { 0 }\n    }\n}\n";
 
-const LINEAR: [Case; 16] = [
+const LINEAR: [Case; 17] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -104,13 +108,18 @@ const LINEAR: [Case; 16] = [
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
+        Title::new("fn inside macro_rules"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_MACRO_RULES))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
         Title::new("trait default and impl"),
         &[Source::new(Located::new("a.rs"), Text::new(METHODS))],
         Flagged::new(&["a.rs:3", "a.rs:8"]),
     ),
 ];
 
-const ROUTERS: [Case; 11] = [
+const ROUTERS: [Case; 12] = [
     Case::new(Title::new("pure router"), &[Source::new(Located::new("a.rs"), Text::new(ROUTER))], Flagged::new(&[])),
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("guard"), &[Source::new(Located::new("a.rs"), Text::new(GUARD))], Flagged::new(&["a.rs:3"])),
@@ -144,6 +153,11 @@ const ROUTERS: [Case; 11] = [
         Title::new("if let literal with logic"),
         &[Source::new(Located::new("a.rs"), Text::new(IF_LET_LITERAL))],
         Flagged::new(&["a.rs:2", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("wrapped literals"),
+        &[Source::new(Located::new("a.rs"), Text::new(WRAPPED))],
+        Flagged::new(&["a.rs:3", "a.rs:4", "a.rs:5", "a.rs:6"]),
     ),
     Case::new(
         Title::new("guard outside a router"),
@@ -190,6 +204,22 @@ fn each_crate_counts_its_pipelines_routers_and_the_rest() {
         [
             "crates/x/src/lib.rs:3: workspace: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
             "crates/x/src/lib.rs:3: crate x: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
+        ]
+    );
+}
+
+#[test]
+fn messages_name_the_branch_and_its_fix() {
+    let files = Sources::parsed(&[
+        Source::new(Located::new("a.rs"), Text::new(IF)),
+        Source::new(Located::new("b.rs"), Text::new(IF_LET_INSIDE)),
+    ]);
+    let shown: Vec<String> = LinearBodies::report(&files).violations().iter().map(ToString::to_string).collect();
+    assert_eq!(
+        shown,
+        [
+            "a.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result",
+            "b.rs:3: if let that is not the whole body; use combinators on Option and Result (map, and_then, map_or), or extract it into its own function whose whole body is the if let",
         ]
     );
 }
