@@ -4,7 +4,7 @@ use std::fmt;
 use lint_core::{Fix, Headline, Violation};
 use lint_item_graph::ItemGraph;
 
-use super::cluster::{Cluster, Part};
+use super::cluster::{Cluster, Level, Part};
 use super::link::Link;
 use super::member::Member;
 use super::{ClusterLint, Containment, Toward};
@@ -14,12 +14,13 @@ pub struct AcyclicQuotients;
 
 impl ClusterLint for AcyclicQuotients {
     const HEADLINE: Headline = Headline::new(
-        "report only, the parts of each cluster are layered: collapse the crates of the workspace, and the own file and child modules of each crate and module, into single nodes of the definition graph that layering reads (fields, variants and bounds), and no group of them depends on one another in a cycle; signatures and bodies may cycle, as functions do",
+        "the parts of each crate and module are layered: collapse the own file and child modules of each crate and module into single nodes of the definition graph (fields, variants and bounds), and no group of them depends on one another in a cycle; signatures and bodies may cycle, as functions do",
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
         view.clusters()
             .into_iter()
+            .filter(|cluster| cluster.level() != Level::Workspace)
             .flat_map(|cluster| Cycle::all(view, cluster))
             .filter_map(|cycle| view.first_site(&cycle.members).map(|site| Violation::new(site, &cycle)))
             .collect()
