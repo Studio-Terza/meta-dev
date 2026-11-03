@@ -164,7 +164,10 @@ fn a_report_only_stage_is_judged_and_printed_but_never_blocks() -> io::Result<()
     let run = Run::reported_only("report-only", LIMITS, "test-run = 4\nclippy = 30", &only)?;
     assert_eq!(
         Text::lines(&run.out),
-        ["BLOCK: clippy took 30s, warn above 10.5s, block above 20s", "WARN: test-run took 4s, warn above 3s, block above 5s"]
+        [
+            "BLOCK: clippy took 30s, warn above 10.5s, block above 20s",
+            "WARN: test-run took 4s, warn above 3s, block above 5s"
+        ]
     );
     assert_eq!(run.exit, ExitCode::SUCCESS);
     let other = Run::reported_only("report-only-other", LIMITS, "test-run = 6\nclippy = 30", &only)?;
