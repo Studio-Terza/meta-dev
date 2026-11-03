@@ -19,7 +19,10 @@ impl<'files> Actions<'files> {
     fn provided<'file>(file: &'file RepoFile, target: &Path) -> Option<&'file RepoFile> {
         let rest = file.below(target)?;
         Judged::MANIFESTS.iter().find(|manifest| rest == Path::new(manifest)).map(|_| file).or_else(|| {
-            (Judged::judging(file) == Some(Judged::Workflow) && rest.as_os_str().is_empty()).then_some(file)
+            Judged::judging(file)
+                .filter(|judged| *judged == Judged::Workflow)
+                .filter(|_| rest.as_os_str().is_empty())
+                .map(|_| file)
         })
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
-use syn::{File, ItemMod, ItemUse, Path, UseTree};
+use syn::{File, ItemMod, ItemUse, Path, PathSegment, UseTree};
 
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
@@ -17,10 +17,13 @@ pub(crate) enum Spelling {
 
 impl Spelling {
     pub(crate) fn of_path(path: &Path) -> Option<Spelling> {
-        let first = Name::from(&path.segments.first()?.ident);
-        match path.segments.len() {
-            1 => Some(Spelling::Bare(first)),
-            _ => Some(Spelling::Pathed(first)),
+        path.segments.first().map(|first| Spelling::of_head(Name::from(&first.ident), path.segments.iter().nth(1)))
+    }
+
+    fn of_head(head: Name, second: Option<&PathSegment>) -> Spelling {
+        match second {
+            Some(_) => Spelling::Pathed(head),
+            None => Spelling::Bare(head),
         }
     }
 }
@@ -50,28 +53,37 @@ impl<'file> Origins<'file> {
     }
 
     pub(crate) fn endpoint(&self, endpoint: Endpoint) -> Endpoint {
-        let origin = match endpoint.spelling() {
-            Some(Spelling::Bare(head)) => self.imported.get(head).map(|imported| self.crate_of(imported)),
-            Some(Spelling::Pathed(head)) => Some(self.crate_of(head)),
-            None => None,
-        };
+        let origin = self.origin_of(endpoint.spelling());
         endpoint.originating(origin)
     }
 
-    fn crate_of(&self, head: &Name) -> CrateName {
-        match (head.matches::<Whole>(&Self::LOCAL), self.modules.contains(head)) {
-            (Some(_), _) | (None, true) => self.own.clone(),
-            (None, false) => CrateName::from(head),
+    fn origin_of(&self, spelling: Option<&Spelling>) -> Option<CrateName> {
+        match spelling {
+            Some(Spelling::Bare(head)) => self.imported.get(head).map(|imported| self.crate_of(imported)),
+            Some(Spelling::Pathed(head)) => Some(self.crate_of(head)),
+            None => None,
         }
     }
 
+    fn crate_of(&self, head: &Name) -> CrateName {
+        head.matches::<Whole>(&Self::LOCAL)
+            .map(|_| ())
+            .or_else(|| self.modules.get(head).map(|_| ()))
+            .map_or_else(|| CrateName::from(head), |()| self.own.clone())
+    }
+
+    fn headed(head: Option<&Name>, found: Name) -> Name {
+        head.cloned().unwrap_or(found)
+    }
+
     fn imports(head: Option<&Name>, tree: &UseTree) -> Vec<Import> {
-        let from = |found: Name| head.cloned().unwrap_or(found);
         match tree {
-            UseTree::Path(path) => Self::imports(Some(&from(Name::from(&path.ident))), &path.tree),
-            UseTree::Name(name) => vec![Import { name: Name::from(&name.ident), head: from(Name::from(&name.ident)) }],
+            UseTree::Path(path) => Self::imports(Some(&Self::headed(head, Name::from(&path.ident))), &path.tree),
+            UseTree::Name(name) => {
+                vec![Import { name: Name::from(&name.ident), head: Self::headed(head, Name::from(&name.ident)) }]
+            }
             UseTree::Rename(rename) => {
-                vec![Import { name: Name::from(&rename.rename), head: from(Name::from(&rename.ident)) }]
+                vec![Import { name: Name::from(&rename.rename), head: Self::headed(head, Name::from(&rename.ident)) }]
             }
             UseTree::Glob(_) => Vec::new(),
             UseTree::Group(group) => group.items.iter().flat_map(|item| Self::imports(head, item)).collect(),

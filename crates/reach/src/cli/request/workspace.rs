@@ -56,7 +56,7 @@ impl<'meta> Workspace<'meta> {
     pub fn beyond<'produced>(&self, produced: &'produced Path, changed: &[PathBuf]) -> Option<&'produced Path> {
         let owners = self.touched(produced);
         let reached = self.reached(changed);
-        (owners.is_empty() || reached.covering(&owners).is_none()).then_some(produced)
+        owners.first().and_then(|_| reached.covering(&owners)).map_or(Some(produced), |_| None)
     }
 
     pub fn history(&self, changed: &[PathBuf]) -> History<'meta> {
@@ -73,7 +73,9 @@ impl<'meta> Workspace<'meta> {
         Sources::new(
             self.directories
                 .iter()
-                .filter(|(name, _)| !self.closure(BTreeSet::from([**name])).is_disjoint(&wanted))
+                .filter(|(name, _)| {
+                    self.closure(BTreeSet::from([**name])).iter().any(|reached| wanted.contains(reached))
+                })
                 .map(|(_, directory)| *directory)
                 .collect(),
         )
@@ -108,11 +110,10 @@ impl<'meta> Workspace<'meta> {
     }
 
     fn touched(&self, path: &Path) -> BTreeSet<&'meta CrateName> {
-        if path.file_name().is_some_and(|name| name == Self::MANIFEST) {
-            self.everything()
-        } else {
-            self.owned(path).into_iter().chain(self.readers.reached_by(path)).collect()
-        }
+        path.file_name().filter(|name| *name == Self::MANIFEST).map_or_else(
+            || self.owned(path).into_iter().chain(self.readers.reached_by(path)).collect(),
+            |_| self.everything(),
+        )
     }
 
     fn everything(&self) -> BTreeSet<&'meta CrateName> {
@@ -123,19 +124,21 @@ impl<'meta> Workspace<'meta> {
         let owners: Vec<&CrateName> = self
             .directories
             .iter()
-            .filter(|(_, directory)| !directory.as_os_str().is_empty() && path.starts_with(directory))
+            .filter(|(_, directory)| directory.components().next().is_some())
+            .filter(|(_, directory)| path.starts_with(directory))
             .map(|(name, _)| *name)
             .collect();
-        if owners.is_empty() && !Self::INERT.iter().any(|inert| path.starts_with(inert)) {
-            self.everything().into_iter().collect()
-        } else {
-            owners
-        }
+        let inert = Self::INERT.iter().find(|inert| path.starts_with(inert));
+        owners
+            .first()
+            .map(|_| ())
+            .or(inert.map(|_| ()))
+            .map_or_else(|| self.everything().into_iter().collect(), |()| owners)
     }
 
     fn closure(&self, crates: BTreeSet<&'meta CrateName>) -> BTreeSet<&'meta CrateName> {
         let grown: BTreeSet<&CrateName> =
             crates.iter().filter_map(|name| self.dependents.get(name)).flatten().chain(&crates).copied().collect();
-        if grown.len() == crates.len() { crates } else { self.closure(grown) }
+        Some(grown).filter(|grown| grown.len() > crates.len()).map_or(crates, |grown| self.closure(grown))
     }
 }

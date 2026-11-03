@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use newtype::Newtype;
 
-use crate::cli::workspace::crate_name::CrateName;
+use crate::cli::request::workspace::crate_name::CrateName;
 
 #[derive(Newtype, Debug)]
 pub struct Readers<'meta>(BTreeMap<&'meta CrateName, &'meta [PathBuf]>);
