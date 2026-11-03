@@ -26,7 +26,7 @@ impl Lint for LinearBodies {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "report only, linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let",
+                "linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let",
             ),
             FileFlow::violations(&FileFlow::of_files(files), Rule::LinearBodies),
         )
@@ -37,7 +37,7 @@ impl Lint for PureRouters {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "report only, pure routers: a body that is one match or if let matches an enum, Option or Result without guards, and each arm is a single call or value",
+                "pure routers: a body that is one match or if let matches an enum, Option or Result without guards, and each arm is a single call or value",
             ),
             FileFlow::violations(&FileFlow::of_files(files), Rule::PureRouters),
         )
@@ -48,7 +48,7 @@ impl Lint for PlainConditions {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "report only, no boolean operators: &&, || and ! stay out of bodies; a condition is named as an enum or a predicate type",
+                "no boolean operators: &&, || and ! stay out of bodies; a condition is named as an enum or a predicate type",
             ),
             FileFlow::violations(&FileFlow::of_files(files), Rule::PlainConditions),
         )

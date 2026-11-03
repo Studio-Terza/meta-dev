@@ -35,4 +35,9 @@ src/filtered.rs:1: bare u8 in f; take and return a domain type (a newtype, an en
 src/filtered.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/mutable.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/working.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/accumulating.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/filtered.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/filtered.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/working.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 fails

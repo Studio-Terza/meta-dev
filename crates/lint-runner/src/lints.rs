@@ -12,6 +12,7 @@ use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
 use lint_layering::Layering;
+use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -98,6 +99,9 @@ impl Lints {
             BoolMethods::report(files),
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
+            LinearBodies::report(files),
+            PureRouters::report(files),
+            PlainConditions::report(files),
             OnGraph::<OneEdge>::report(files),
             UnconsumedTraits::report(files),
             Layering::report(files),

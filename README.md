@@ -99,8 +99,8 @@ leaves through its tail value or through `?`, which stays allowed. The message n
 `if` or `match` expression, drive the iteration with `find`, `take_while`, `try_fold` or `position`, or split it into
 smaller functions. There is no function-size lint.
 
-The `--report` run prints the linear flow reports of `lint-linear-flow`, report only until the fix pass makes them
-blocking; they replace the hidden-states report. A body is let bindings plus pipeline expressions, and the one non-linear
+The linear flow lints of `lint-linear-flow` block in shipped and test code alike; they replace the hidden-states
+report. A body is let bindings plus pipeline expressions, and the one non-linear
 form is a pure router: a function whose whole body is one `match` or `if let`. `linear_bodies` lists every `if`, `if let`,
 `match`, `while`, `for`, `loop` and let-else in shipped and test code, closures and macro bodies included, except the
 `match` or `if let` that is a function's whole body; const fns are skipped, since combinators are not const.
@@ -109,8 +109,9 @@ form is a pure router: a function whose whole body is one `match` or `if let`. `
 path, literal, constructor, macro, reference, field, index, cast, closure, `?` or `.await`, or a block holding one of
 these). `plain_conditions` lists every `&&`, `||` and `!`, inside conditions and out. There are no thresholds. The
 fixes: combinators on `Option`, `Result` and iterators; extract an arm's logic into its own linear function; name the
-condition as an enum or a predicate type. `flow_shapes` counts per crate the functions that are a pipeline, a pure
-router, or neither.
+condition as an enum or a predicate type. Shared routers over syn and token shapes live in `lint_core::Syntax`. The
+`--report` run keeps `flow_shapes`, which counts per crate the functions that are a pipeline, a pure router, or
+neither.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
@@ -166,7 +167,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow reports), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose items fall into two loosely linked groups of
 five or more, or whose cycle spans more than 40 items; its conductance floor is 19%.
 
