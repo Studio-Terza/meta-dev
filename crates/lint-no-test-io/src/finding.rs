@@ -20,8 +20,6 @@ impl fmt::Display for Finding<'_> {
 
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(
-            "use a fake of the port or a library API such as golden!, or move the test into a test target or module named ports",
-        )
+        Fix::new("use a fake of the port or a library API such as golden!")
     }
 }

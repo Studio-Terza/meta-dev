@@ -3,6 +3,7 @@ mod suffix;
 use syn::ItemMod;
 
 use lint_layout::{Name, Word};
+use lint_placement::Placement;
 
 use crate::source_file::SourceFile;
 use suffix::Suffix;
@@ -25,6 +26,13 @@ impl Gate {
             .and_then(|suffix| placement.crate_root().package()?.matches::<Suffix>(&[suffix]))
             .map(|_| file)
             .or_else(|| placement.module().segments().iter().find(|segment| **segment == self.module).map(|_| file))
+    }
+
+    #[must_use]
+    pub fn owns<'placement>(&self, placement: &'placement Placement) -> Option<&'placement Placement> {
+        self.package_suffix
+            .and_then(|suffix| placement.package().root().package()?.matches::<Suffix>(&[suffix]))
+            .map(|_| placement)
     }
 
     #[must_use]

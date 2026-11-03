@@ -48,4 +48,15 @@ pub trait Files {
     fn kinds(&self, paths: &[PathBuf]) -> Vec<Kind> {
         paths.iter().map(|path| self.kind(path)).collect()
     }
+
+    fn mirror(&self, root: &Path, into: &impl Files) -> Result<(), FileFailure>
+    where
+        Self: Sized,
+    {
+        into.create_directories(root)?;
+        self.entries(root)?.iter().try_for_each(|path| match self.kind(path) {
+            Kind::Directory => self.mirror(path, into),
+            _ => into.write(path, &self.read(path)?),
+        })
+    }
 }

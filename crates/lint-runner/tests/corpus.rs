@@ -1,11 +1,13 @@
 use std::error::Error;
+use std::ffi::OsStr;
 use std::path::Path;
+use std::process::ExitCode;
 
-use golden::{Disk, Golden, Output, Process};
-use ports::Corpus;
+use file_ports::{FileFailure, Files, Kind, Memory};
+use lint_runner::Cli;
 use text_lines::Lines;
 
-const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
+const FIXTURES: &str = "tests/fixtures";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
@@ -13,19 +15,15 @@ const FIX_START: &str = "; ";
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
-    let fixtures = Corpus::fixtures()?;
-    assert_eq!(fixtures.len(), Corpus::lints()?);
+    let corpus = golden::fixtures!(FIXTURES)?;
+    let fixtures = corpus.entries(&Path::new(env!("CARGO_MANIFEST_DIR")).join(FIXTURES))?;
+    assert_eq!(fixtures.len(), Corpus::lints());
     let outputs = fixtures
         .iter()
-        .map(|fixture| Ok((fixture.as_path(), Corpus::output(fixture)?)))
+        .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
         .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
-    let differences: Vec<String> = outputs
-        .iter()
-        .map(|(fixture, output)| Corpus::difference(fixture, output))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
+    let differences: Vec<String> =
+        outputs.iter().filter_map(|(fixture, output)| Corpus::difference(fixture, output)).collect();
     assert_eq!(differences, Vec::<String>::new());
     let printed: Vec<&str> = outputs
         .iter()
@@ -38,7 +36,48 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     Ok(())
 }
 
+struct Corpus;
+
 impl Corpus {
+    fn renamed(path: &Path) -> &OsStr {
+        match path.file_name().unwrap_or_default() {
+            name if name == STORED_MANIFEST => MANIFEST.as_ref(),
+            name => name,
+        }
+    }
+
+    fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<(), FileFailure> {
+        match corpus.kind(found) {
+            Kind::Directory => {
+                into.create_directories(target)?;
+                corpus
+                    .entries(found)?
+                    .iter()
+                    .try_for_each(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
+            }
+            _ => into.write(target, &corpus.read(found)?),
+        }
+    }
+
+    fn output(corpus: &Memory, fixture: &Path) -> Result<String, Box<dyn Error>> {
+        let root = Memory::default();
+        corpus
+            .entries(fixture)?
+            .iter()
+            .try_for_each(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))?;
+        let (mut printed, mut failed) = (Vec::new(), Vec::new());
+        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
+        let verdict = if exit == ExitCode::SUCCESS { "passes\n" } else { "fails\n" };
+        Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
+    }
+
+    fn lints() -> usize {
+        [include_str!("../src/lints.rs"), include_str!("../src/cli.rs")]
+            .iter()
+            .map(|source| source.matches("::report(files)").count())
+            .sum()
+    }
+
     fn is_violation(line: &str) -> bool {
         line.match_indices(SITE_END)
             .next()
@@ -54,64 +93,8 @@ impl Corpus {
             .is_some_and(|fix| fix.chars().any(|letter| !letter.is_whitespace()))
     }
 
-    fn difference(fixture: &Path, output: &str) -> Result<Option<String>, Box<dyn Error>> {
+    fn difference(fixture: &Path, output: &str) -> Option<String> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        let golden = Golden::in_package(env!("CARGO_MANIFEST_DIR"), format!("lints/{name}.txt"))?;
-        Ok(golden.verify(&Process, &Disk, Output::new(output)).err().map(|failure| format!("{failure:?}")))
-    }
-}
-
-mod ports {
-    use std::env;
-    use std::error::Error;
-    use std::fs;
-    use std::io;
-    use std::path::{Path, PathBuf};
-    use std::process::ExitCode;
-
-    use lint_runner::Cli;
-
-    use super::{FIXTURES, MANIFEST, STORED_MANIFEST};
-
-    pub struct Corpus;
-
-    impl Corpus {
-        pub fn fixtures() -> io::Result<Vec<PathBuf>> {
-            fs::read_dir(FIXTURES)?.map(|entry| Ok(entry?.path())).collect()
-        }
-
-        fn copied(from: &Path, to: &Path) -> io::Result<()> {
-            fs::create_dir_all(to)?;
-            for entry in fs::read_dir(from)? {
-                let found = entry?.path();
-                let name = found.file_name().unwrap_or_default();
-                let target = to.join(if name == STORED_MANIFEST { MANIFEST.as_ref() } else { name });
-                if found.is_dir() {
-                    Self::copied(&found, &target)?;
-                } else {
-                    fs::copy(&found, &target)?;
-                }
-            }
-            Ok(())
-        }
-
-        pub fn output(fixture: &Path) -> Result<String, Box<dyn Error>> {
-            let root = tempfile::tempdir()?;
-            Self::copied(fixture, root.path())?;
-            env::set_current_dir(root.path())?;
-            let (mut printed, mut failed) = (Vec::new(), Vec::new());
-            let exit = Cli::from_args(std::iter::empty()).report_to(&file_ports::Disk, &mut printed, &mut failed);
-            let verdict = if exit == ExitCode::SUCCESS { "passes\n" } else { "fails\n" };
-            Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
-        }
-
-        pub fn lints() -> io::Result<usize> {
-            let listed = |file: &str| -> io::Result<usize> {
-                Ok(fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(file))?
-                    .matches("::report(files)")
-                    .count())
-            };
-            Ok(listed("src/lints.rs")? + listed("src/cli.rs")?)
-        }
+        golden::golden!(format!("lints/{name}.txt"), output).err().map(|failure| format!("{failure:?}"))
     }
 }

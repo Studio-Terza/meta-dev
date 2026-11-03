@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use lint_core::SourceFile;
-use lint_layout::{UsePath, Word, words};
+use lint_core::{Gate, SourceFile};
+use lint_layout::{PathTail, UsePath, Word, words};
 use lint_paths::Use;
 use lint_placement::Role;
 
@@ -11,7 +11,6 @@ pub struct EffectPaths;
 
 impl EffectPaths {
     const TESTS: &str = "tests";
-    const PORTS: &str = "ports";
     const EFFECTS: [&[Word<'static>]; 8] = [
         &words!["std", "fs"],
         &words!["std", "net"],
@@ -22,14 +21,22 @@ impl EffectPaths {
         &words!["std", "os", "windows", "fs"],
         &words!["tempfile"],
     ];
+    const WORLD: [&[Word<'static>]; 7] = [
+        &words!["std", "io", "stdin"],
+        &words!["std", "io", "stdout"],
+        &words!["std", "io", "stderr"],
+        &words!["file_ports", "Disk"],
+        &words!["console_ports", "Process"],
+        &words!["golden", "Disk"],
+        &words!["golden", "Process"],
+    ];
     const VALUES: [&[Word<'static>]; 1] = [&words!["std", "process", "ExitCode"]];
 
     pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
         let placement = file.placement();
-        let target = placement.crate_root().directory();
         (placement.role() == Role::Target
-            && target.parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
-            && target.file_stem() != Some(OsStr::new(Self::PORTS)))
+            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
+            && Gate::PORTS.owns(placement).is_none())
         .then_some(file)
     }
 
@@ -38,5 +45,10 @@ impl EffectPaths {
             .iter()
             .find_map(|root| used.under(root))
             .filter(|_| Self::VALUES.iter().all(|value| used.under(value).is_none()))
+            .or_else(|| Self::WORLD.iter().find_map(|world| Self::named(used, world)))
+    }
+
+    fn named<'used>(used: &'used Use, world: &[Word<'_>]) -> Option<&'used UsePath> {
+        used.spelling(PathTail::new(world)).or_else(|| used.under(world))
     }
 }

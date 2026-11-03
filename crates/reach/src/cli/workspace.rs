@@ -15,7 +15,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use file_ports::Disk;
+use file_ports::Files;
 use lint_complexity::Complexity;
 use lint_reader::SourceFiles;
 
@@ -92,8 +92,8 @@ impl Workspace {
         })
     }
 
-    pub fn hubs(&self, repository: &Path) -> Result<Hubs, Failure> {
-        let readout = SourceFiles::read(&Disk, repository)?;
+    pub fn hubs(&self, files: &impl Files, repository: &Path) -> Result<Hubs, Failure> {
+        let readout = SourceFiles::read(files, repository)?;
         let fan_in = self.fan_in();
         Ok(Hubs::weighed(
             Complexity::held(readout.files())

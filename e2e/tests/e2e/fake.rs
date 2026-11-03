@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use ci::ports::{Invocation, Ports, Run, Text};
-use file_ports::Disk;
+use file_ports::Memory;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Edit {
@@ -35,6 +35,7 @@ impl Change {
 pub struct Fake {
     metadata: String,
     changes: Vec<Change>,
+    files: Memory,
 }
 
 impl Fake {
@@ -42,7 +43,7 @@ impl Fake {
     const UNLABELLED_CHANGE: &'static str = "change\n";
 
     pub fn new(metadata: &str, changes: Vec<Change>) -> Fake {
-        Fake { metadata: metadata.to_owned(), changes }
+        Fake { metadata: metadata.to_owned(), changes, files: Memory::default() }
     }
 
     pub fn modifying(metadata: &str, changed: &[PathBuf]) -> Fake {
@@ -74,10 +75,10 @@ impl Fake {
 }
 
 impl Ports for Fake {
-    type Files = Disk;
+    type Files = Memory;
 
-    fn files(&self) -> &Disk {
-        &Disk
+    fn files(&self) -> &Memory {
+        &self.files
     }
 
     fn run(&self, invocation: &Invocation) -> io::Result<Run> {

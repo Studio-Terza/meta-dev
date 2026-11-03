@@ -1,10 +1,7 @@
-mod fake_files;
-
 use std::io;
 use std::path::{Path, PathBuf};
 
-use fake_files::FakeFiles;
-use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Text};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -74,6 +71,18 @@ impl<Port: Files> Contract<'_, Port> {
         Self::named(&written.and_then(|()| self.files.read_text(&path).map(|_| ())))
     }
 
+    fn beneath_a_file(&self) -> String {
+        let written = self.files.write(&self.at("blocker"), &Bytes::from(""));
+        Self::named(&written.and_then(|()| self.files.create_directories(&self.at("blocker/inner"))))
+    }
+
+    fn resolved(&self) -> Result<[PathBuf; 2], FileFailure> {
+        let real = self.files.canonical(&self.at("outer/a.txt"))?;
+        let dotted = self.files.canonical(&self.at("outer/./inner/../a.txt"))?;
+        assert_eq!(Self::named(&self.files.read(&self.at("outer")).map(|_| ())), "failed");
+        Ok([real, dotted])
+    }
+
     fn canonical_file(&self) -> Result<PathBuf, FileFailure> {
         let path = self.at("here.txt");
         self.files.write(&path, &Bytes::from("here"))?;
@@ -85,14 +94,18 @@ impl<Port: Files> Contract<'_, Port> {
 struct Checks;
 
 impl Checks {
-    fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
+    fn on(files: &(impl Files + Sync), root: &Path) -> Result<(), FileFailure> {
         let contract = Contract { files, root: root.to_path_buf() };
         assert_eq!(contract.written_then_read()?.as_ref(), "written");
         assert_eq!(contract.appended()?, Text::new("one two".to_owned()));
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
+        let [real, dotted] = std::thread::scope(|scope| scope.spawn(|| contract.resolved()).join())
+            .unwrap_or_else(|_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
+        assert_eq!(dotted, real);
         assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
         assert_eq!(contract.not_text(), "failed");
+        assert_eq!(contract.beneath_a_file(), "failed");
         assert_eq!(contract.canonical_file()?.file_name(), Some(std::ffi::OsStr::new("here.txt")));
         Ok(())
     }
@@ -106,19 +119,22 @@ fn disk_keeps_the_contract() -> Result<(), FileFailure> {
 
 #[test]
 fn fake_keeps_the_contract() -> Result<(), FileFailure> {
-    let memory = FakeFiles::default();
+    let memory = Memory::default();
     memory.create_directories(Path::new("/scratch"))?;
     Checks::on(&memory, Path::new("/scratch"))
 }
 
 #[test]
 fn fake_starts_from_its_entries() -> Result<(), FileFailure> {
-    let memory: FakeFiles = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
+    let memory: Memory = [(PathBuf::from("/a/b.txt"), Bytes::from("b"))].into_iter().collect();
     assert_eq!(memory.kind(Path::new("/a")), Kind::Directory);
     assert_eq!(memory.entries(Path::new("/a"))?, [PathBuf::from("/a/b.txt")]);
     assert_eq!(memory.read_text(Path::new("/a/b.txt"))?, Text::new("b".to_owned()));
     memory.write(Path::new("top.txt"), &Bytes::from("top"))?;
     assert_eq!(memory.kind(Path::new("top.txt")), Kind::File);
+    let empty = Memory::default();
+    empty.write(Path::new("alone.txt"), &Bytes::from("alone"))?;
+    assert_eq!(empty.kind(Path::new("alone.txt")), Kind::File);
     Ok(())
 }
 
@@ -184,6 +200,17 @@ impl Batches {
         assert_eq!(copied.iter().map(Result::is_ok).collect::<Vec<bool>>(), [false, true]);
         assert_eq!(files.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
         assert!(files.copy_into(&[root.join("none")], &root.join("copies")).is_err());
+        let mirrored = Memory::default();
+        files.mirror(root, &mirrored)?;
+        assert_eq!(
+            mirrored.entries(root)?,
+            files.entries(root).map(|mut entries| {
+                entries.sort();
+                entries
+            })?
+        );
+        assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
+        assert!(files.mirror(&root.join("none"), &Memory::default()).is_err());
         Ok(())
     }
 }
@@ -192,7 +219,7 @@ impl Batches {
 fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
     let scratch = tempfile::tempdir().map_err(FileFailure::from)?;
     Batches::on(&Disk, scratch.path())?;
-    let fake = FakeFiles::default();
+    let fake = Memory::default();
     fake.create_directories(Path::new("/batch"))?;
     Batches::on(&fake, Path::new("/batch"))
 }
