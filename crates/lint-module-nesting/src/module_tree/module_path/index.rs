@@ -7,7 +7,6 @@ use super::ModulePath;
 
 #[derive(Debug)]
 pub struct ModuleIndex<'file> {
-    modules: Vec<ModulePath<'file>>,
     latest: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>,
     directories: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>,
 }
@@ -28,16 +27,12 @@ impl<'file> From<Vec<ModulePath<'file>>> for ModuleIndex<'file> {
                 found.entry(module.crate_root).or_default().insert(module.segments.iter().collect());
                 found
             });
-        ModuleIndex { modules, latest, directories }
+        ModuleIndex { latest, directories }
     }
 }
 
 impl<'file> ModuleIndex<'file> {
     const MODULE_FILE: &'static str = "mod.rs";
-
-    pub fn modules(&self) -> &[ModulePath<'file>] {
-        &self.modules
-    }
 
     pub fn same_as(&self, crate_root: &CrateRoot, segments: &[&Name]) -> Option<ModulePath<'file>> {
         let found: &HashMap<Vec<&Name>, ModulePath<'file>> = self.latest.get(crate_root)?;

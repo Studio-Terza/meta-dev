@@ -58,4 +58,6 @@ src/fields.rs:2: field on of A is pub; struct fields are private
 src/real.rs:3: field on of S is pub; struct fields are private
 tests go through public APIs:
 src/fine.rs:5: test code in src; move it to the package's tests directory and call the public API from there
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/real.rs:3: crate corpus falls into 2 groups: [Cmd] [S] with no link between them; split it along the groups, or link them through a type they share
 fails

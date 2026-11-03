@@ -17,4 +17,6 @@ src/shared.rs:2: bare u8 in depth; take and return a domain type (a newtype, an 
 state graph violated:
 src/bag.rs:2: field depth of Options is pub; struct fields are private
 src/shared.rs:2: field depth of Shared is pub; struct fields are private
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/bag.rs:1: crate corpus falls into 3 groups: [Options] [Settled] [Shared] with no link between them; split it along the groups, or link them through a type they share
 fails

@@ -52,17 +52,19 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
-                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
+                + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
     let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
     let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/elegance.rs");
-    let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]
-        .iter()
-        .map(|call| elegance.matches(call).count())
-        .sum::<usize>();
+    let listed_by_elegance =
+        ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)", "containment.report::<"]
+            .iter()
+            .map(|call| elegance.matches(call).count())
+            .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
@@ -475,20 +477,6 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
 }
 
 #[test]
-fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dyn Error>> {
-    let root = Scratch::package()?;
-    root.write("src/lib.rs", "pub mod a;\n")?;
-    root.write("src/a.rs", "mod helper;\npub mod user;\n#[cfg(test)]\nmod tests;\n")?;
-    root.write("src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
-    root.write("src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
-    root.write("src/a/tests.rs", "use super::helper::Help;\n")?;
-    assert_eq!(root.reported().violations(), 1);
-    root.write("src/a/tests.rs", "")?;
-    assert_eq!(root.reported().violations(), 2);
-    Ok(())
-}
-
-#[test]
 fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n")?;
@@ -496,7 +484,7 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
     root.write("crates/engine-impl/src/lib.rs", "mod x;\npub use x::{Used, Unused};\n")?;
     root.write(
         "crates/engine-impl/src/x.rs",
-        "pub struct Used;\nimpl Used {\n    pub fn lift(&self) {}\n}\npub struct Unused;\nimpl Unused {\n    pub fn lift(&self) {}\n}\n",
+        "pub struct Used;\nimpl Used {\n    pub fn lift(&self) {}\n}\npub struct Unused(Used);\nimpl Unused {\n    pub fn lift(&self) {}\n}\n",
     )?;
     root.write("crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
     root.write("crates/app/src/lib.rs", "pub use engine::Used;\n")?;
@@ -518,7 +506,8 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    let ring: String = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
+    let ring: Vec<String> = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
+    let ring = ring.concat();
     root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
     root.write("code/a.rs", CHAIN_A)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());

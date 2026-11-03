@@ -3,8 +3,7 @@ use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
 use lint_transition_graph::{
-    AcyclicQuotients, ConnectedClusters, Containment, CoreMutation, DeepClusters, DuplicateTransitions, GraphLint,
-    InterfaceByConsumers, InterfaceByInternals, LowestCluster, TransitionGraph,
+    ConnectedDirectories, Containment, CoreMutation, CrateInterfaces, DuplicateTransitions, GraphLint, TransitionGraph,
 };
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -23,12 +22,8 @@ impl Elegance {
             TransitionGraph::report_graph(&facts, &transitions),
             DuplicateTransitions::report_graph(&facts, &transitions),
             CoreMutation::report_graph(&facts, &transitions),
-            containment.report::<ConnectedClusters>(),
-            containment.report::<AcyclicQuotients>(),
-            containment.report::<InterfaceByConsumers>(),
-            containment.report::<InterfaceByInternals>(),
-            containment.report::<LowestCluster>(),
-            containment.report::<DeepClusters>(),
+            containment.report::<ConnectedDirectories>(),
+            containment.report::<CrateInterfaces>(),
             EffectSites::report(files),
             FlowShapes::report(files),
             LinearBodies::report(files),

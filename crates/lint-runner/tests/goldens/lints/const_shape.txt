@@ -46,4 +46,6 @@ state graph violated:
 src/contexts.rs:4: field b of A is pub; struct fields are private
 a body leaves through its tail value or ?, never through return, break or continue:
 src/loops.rs:4: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/contexts.rs:3: crate corpus falls into 2 groups: [A E] [T] with no link between them; split it along the groups, or link them through a type they share
 fails

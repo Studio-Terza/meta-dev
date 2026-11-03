@@ -47,10 +47,6 @@ impl<'path> Target<'path> {
         Some(Target { crate_root: file.crate_root, segments })
     }
 
-    pub fn deepest_in<'file>(&self, modules: &ModuleIndex<'file>) -> Option<ModulePath<'file>> {
-        self.prefixes().rev().find_map(|prefix| modules.same_as(self.crate_root, prefix))
-    }
-
     pub fn crossed_directory(&self, user: &ModulePath<'_>, modules: &ModuleIndex<'_>) -> Option<&Target<'path>> {
         self.prefixes()
             .take(self.segments.len())

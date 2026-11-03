@@ -5,4 +5,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 a crate exports exactly what another crate uses:
 exporter/src/lib.rs:2: Unused is exported but no other crate names it; export it when a user appears
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+exporter/src/inner.rs:1: crate exporter falls into 2 groups: [Unused] [Used] with no link between them; split it along the groups, or link them through a type they share
 fails

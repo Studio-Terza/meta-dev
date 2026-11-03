@@ -1,7 +1,6 @@
 mod cluster;
 mod connected;
 mod declaration;
-mod depth;
 mod groups;
 mod interface;
 mod layered;
@@ -14,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_item_graph::{ItemGraph, Traversal};
+use lint_item_graph::ItemGraph;
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
@@ -26,9 +25,8 @@ use link::Link;
 use member::Member;
 use resolver::{Resolver, StandIns};
 
-pub use connected::ConnectedClusters;
-pub use depth::DeepClusters;
-pub use interface::{InterfaceByConsumers, InterfaceByInternals};
+pub use connected::{ConnectedClusters, ConnectedDirectories};
+pub use interface::{CrateInterfaces, InterfaceByConsumers};
 pub use layered::AcyclicQuotients;
 pub use placed::LowestCluster;
 
@@ -154,28 +152,10 @@ impl<'found, 'file> Containment<'found, 'file> {
             .collect()
     }
 
-    pub(crate) fn reach(&self, start: Member<'found>, within: &BTreeSet<Member<'found>>) -> Vec<Member<'found>> {
-        let step = |member: Member<'found>| self.adjacent(member, Toward::Used).filter(|used| within.contains(used));
-        Traversal::trees([start], |member| step(member).collect::<Vec<_>>().into_iter()).into_iter().flatten().collect()
-    }
-
     pub(crate) fn outside_users(&self, cluster: Cluster<'found>, export: Member<'found>) -> Vec<Link<'found>> {
         self.adjacent(export, Toward::Users)
             .filter(|user| cluster.holding(user.cluster()).is_none())
             .map(|user| Link::new(user, export))
-            .collect()
-    }
-
-    pub(crate) fn private_reached(
-        &self,
-        members: &BTreeSet<Member<'found>>,
-        exports: &BTreeSet<Member<'found>>,
-        export: Member<'found>,
-    ) -> Vec<Link<'found>> {
-        self.reach(export, members)
-            .into_iter()
-            .filter(|reached| !exports.contains(reached))
-            .map(|reached| Link::new(reached, export))
             .collect()
     }
 

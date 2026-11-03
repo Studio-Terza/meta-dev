@@ -19,11 +19,11 @@ use edge::Edge;
 use workspace_types::WorkspaceTypes;
 
 pub use containment::{
-    AcyclicQuotients, ConnectedClusters, Containment, DeepClusters, InterfaceByConsumers, InterfaceByInternals,
-    LowestCluster,
+    AcyclicQuotients, ClusterLint, ConnectedClusters, ConnectedDirectories, Containment, CrateInterfaces,
+    InterfaceByConsumers, LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{GraphLint, OnGraph};
+pub use graph_lint::{GraphLint, OnContainment, OnGraph};
 pub use mutation::CoreMutation;
 
 #[derive(Debug)]

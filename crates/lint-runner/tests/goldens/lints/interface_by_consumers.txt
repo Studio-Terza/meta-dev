@@ -1,0 +1,10 @@
+test budget, report only:
+corpus: 0 tests in 2 files, 0 of 5 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+a struct with no logic of its own that one other file consumes is a parameter bag:
+src/a.rs:1: P only carries values into one other file; give it the logic that consumes it
+src/a.rs:2: Q only carries values into one other file; give it the logic that consumes it
+each module has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, and the linked exports form one group:
+src/a.rs:1: the exports of corpus::a fall into 2 groups: [P] [Q] that no outside user joins; split it along the groups, one part for each kind of user
+fails
