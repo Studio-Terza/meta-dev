@@ -50,7 +50,6 @@ impl<'place, 'found> Reach<'place, 'found> {
                 Some(self.place.target(Some(within(base, path.get(parents..).unwrap_or_default()))))
             }
             (_, _, Some(_)) => Some(self.place.target(Some(within(here, path)))),
-            (_, Some(krate), None) if krate == self.place.krate() => Some(self.place.target(Some(rest.to_vec()))),
             (_, Some(krate), None) => Some(Target::new(krate, Some(rest.to_vec()), None)),
             (_, None, None) => {
                 head.matches::<Whole>(&Self::EXTERNAL).map_or(own.map(|_| self.place.target(None)), |_| None)

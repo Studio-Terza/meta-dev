@@ -330,7 +330,10 @@ fn a_const_or_a_macro_used_in_a_body_links_the_types_it_names() {
 #[test]
 fn a_twin_resolves_through_self_super_and_child_module_paths() {
     let pathed = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\npub struct Platform;\n"),
+        Clustered::at(
+            "crates/x/src/lib.rs",
+            "mod a;\nmod b;\npub struct Platform;\npub struct Lounge(crate::a::Seat);\n",
+        ),
         Clustered::at(
             "crates/x/src/a/mod.rs",
             "mod deep;\nmod inner;\npub struct Platform;\npub struct Bench(self::inner::Seat);\n",
@@ -353,7 +356,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
     assert_eq!(
         Clustered::lines(&pathed, |view| view.report::<ConnectedClusters>().violations().to_vec()),
         [
-            "crates/x/src/a/deep/kid.rs:1: crate x falls into 6 groups: [Bench Seat] [Gauge Holder] [Gauge] [Platform Root] [Platform Uses] [Seat] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/a/deep/kid.rs:1: crate x falls into 6 groups: [Bench Lounge Seat] [Gauge Holder] [Gauge] [Platform Root] [Platform Uses] [Seat] with no link between them; split it along the groups, or link them through a type they share",
             "crates/x/src/a/deep/kid.rs:1: x::a falls into 4 groups: [Bench Seat] [Gauge Holder] [Platform Uses] [Root] with no link between them; split it along the groups, or link them through a type they share",
         ]
     );
