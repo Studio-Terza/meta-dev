@@ -16,24 +16,24 @@ enum Kind {
 }
 
 #[derive(Debug)]
-pub(super) struct Tangle<'graph, 'found> {
+pub(super) struct Tangle<'graph, 'file> {
     members: Vec<&'graph Node>,
-    sites: Vec<&'graph Site>,
-    closing: Vec<&'graph Hyperedge<'found>>,
+    sites: Vec<Site<'file>>,
+    closing: Vec<&'graph Hyperedge<'graph, 'file>>,
     kind: Kind,
 }
 
-impl<'graph, 'found> Tangle<'graph, 'found> {
+impl<'graph, 'file> Tangle<'graph, 'file> {
     const SHOWN: usize = 8;
     const PAIR: usize = 2;
     const CONVERSIONS: [Word<'static>; 4] = words!["from", "try_from", "from_str", "into"];
 
     pub(super) fn closed(
         members: BTreeSet<&'graph Node>,
-        consuming: &Consuming<'graph, 'found>,
-        graph: &'graph Graph<'found>,
-    ) -> Tangle<'graph, 'found> {
-        let closing: Vec<&'graph Hyperedge<'found>> = members
+        consuming: &Consuming<'graph, 'file>,
+        graph: &'graph Graph<'_, 'file>,
+    ) -> Tangle<'graph, 'file> {
+        let closing: Vec<&'graph Hyperedge<'graph, 'file>> = members
             .iter()
             .flat_map(|node| consuming.led_within(node, &members))
             .filter(|edge| members.contains(AsRef::<Hop>::as_ref(*edge).reached()))
@@ -49,24 +49,23 @@ impl<'graph, 'found> Tangle<'graph, 'found> {
         Tangle { members: members.into_iter().collect(), sites, closing, kind }
     }
 
-    pub(super) fn ranked(mut tangles: Vec<Tangle<'graph, 'found>>) -> Vec<Tangle<'graph, 'found>> {
+    pub(super) fn ranked(mut tangles: Vec<Tangle<'graph, 'file>>) -> Vec<Tangle<'graph, 'file>> {
         tangles.sort_by(|left, right| {
             right.members.len().cmp(&left.members.len()).then_with(|| left.first().cmp(&right.first()))
         });
         tangles
     }
 
-    fn first(&self) -> Option<&'graph Site> {
+    fn first(&self) -> Option<Site<'file>> {
         self.sites.iter().copied().min()
     }
 }
 
-impl From<&Tangle<'_, '_>> for Violation {
-    fn from(tangle: &Tangle<'_, '_>) -> Violation {
+impl<'file> From<&Tangle<'_, 'file>> for Violation<'file> {
+    fn from(tangle: &Tangle<'_, 'file>) -> Violation<'file> {
         let site = tangle
             .first()
-            .or_else(|| tangle.closing.first().map(|edge| AsRef::<Site>::as_ref(*edge)))
-            .cloned()
+            .or_else(|| tangle.closing.first().map(|edge| *AsRef::<Site<'file>>::as_ref(*edge)))
             .unwrap_or_else(|| Site::of_file(std::path::Path::new(".")));
         Violation::new(site, tangle)
     }

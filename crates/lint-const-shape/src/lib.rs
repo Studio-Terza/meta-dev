@@ -25,7 +25,7 @@ use lint_layout::LineNumber;
 pub struct ConstShape;
 
 impl Lint for ConstShape {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("casts live in const fns or boundary modules, and const loops walk slices"),
             files.iter().flat_map(Self::violations).collect(),
@@ -42,7 +42,7 @@ enum Context {
 }
 
 impl FileLint for ConstShape {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut contexts = ConstContexts {
             path: file.path(),
             context: Context::Surface,
@@ -80,11 +80,11 @@ struct ConstContexts<'scan> {
     path: &'scan Path,
     context: Context,
     zone: Zone,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
-impl ConstContexts<'_> {
-    fn violation(&self, span: Span, message: Message) -> Violation {
+impl<'scan> ConstContexts<'scan> {
+    fn violation(&self, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
@@ -94,7 +94,7 @@ impl ConstContexts<'_> {
         self.context = outer;
     }
 
-    fn cast_finding(&self, cast: &ExprCast) -> Option<Violation> {
+    fn cast_finding(&self, cast: &ExprCast) -> Option<Violation<'scan>> {
         (self.context == Context::Surface && self.zone == Zone::Elsewhere).then(|| {
             self.violation(
                 cast.as_token.span,
@@ -103,7 +103,7 @@ impl ConstContexts<'_> {
         })
     }
 
-    fn loop_finding(&self, span: Span, message: Message) -> Option<Violation> {
+    fn loop_finding(&self, span: Span, message: Message) -> Option<Violation<'scan>> {
         (self.context == Context::Const).then(|| self.violation(span, message))
     }
 }

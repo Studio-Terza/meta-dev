@@ -21,8 +21,8 @@ pub(super) struct Comparison {
 }
 
 impl Comparison {
-    pub(super) fn of_families(edges: &[Edge<'_>], families: &[Family<'_>]) -> Comparison {
-        let written: Vec<&Edge<'_>> = edges.iter().filter(|edge| edge.role() == Role::Written).collect();
+    pub(super) fn of_families(edges: &[Edge<'_, '_>], families: &[Family<'_, '_>]) -> Comparison {
+        let written: Vec<&Edge<'_, '_>> = edges.iter().filter(|edge| edge.role() == Role::Written).collect();
         let compared = Count::new(written.iter().filter(|edge| edge.ends().key().is_some()).count());
         let primitive = Count::new(written.iter().filter(|edge| edge.ends().class() == Class::Primitive).count());
         Comparison {
@@ -35,8 +35,12 @@ impl Comparison {
         }
     }
 
-    pub(super) fn violation(&self, transitions: &[Transition]) -> Option<Violation> {
-        transitions.iter().map(AsRef::<Site>::as_ref).min().map(|first| Violation::new(first.clone(), self))
+    pub(super) fn violation<'file>(&self, transitions: &[Transition<'file>]) -> Option<Violation<'file>> {
+        transitions
+            .iter()
+            .map(|found| *AsRef::<Site<'file>>::as_ref(found))
+            .min()
+            .map(|first| Violation::new(first, self))
     }
 }
 

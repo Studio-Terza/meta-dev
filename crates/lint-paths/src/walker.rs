@@ -14,24 +14,24 @@ use lint_core::{Gate, Site, SourceFile};
 use lint_layout::{LineNumber, Name, UsePath};
 use token_paths::TokenPaths;
 
-pub(crate) struct Walker<'run> {
-    file: &'run SourceFile,
+pub(crate) struct Walker<'file, 'run> {
+    file: &'file SourceFile,
     scopes: &'run Scopes,
     wanted: &'run Wanted,
     resolver: &'run Resolver<'run>,
     module: Module,
     ground: Ground,
     cover: Cover,
-    found: Vec<Use>,
+    found: Vec<Use<'file>>,
 }
 
-impl<'run> Walker<'run> {
+impl<'file, 'run> Walker<'file, 'run> {
     pub(crate) fn walk(
-        file: &'run SourceFile,
+        file: &'file SourceFile,
         scopes: &'run Scopes,
         wanted: &'run Wanted,
         resolver: &'run Resolver<'run>,
-    ) -> Vec<Use> {
+    ) -> Vec<Use<'file>> {
         let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
         let mut walker = Walker {
             file,
@@ -47,7 +47,7 @@ impl<'run> Walker<'run> {
         walker.found
     }
 
-    fn made(&self, path: &UsePath, line: LineNumber) -> Option<Use> {
+    fn made(&self, path: &UsePath, line: LineNumber) -> Option<Use<'file>> {
         self.wanted(path).map(|_| {
             let candidates = self.resolver.candidates(&self.module, path);
             Use::new(Site::new(self.file.path(), line), candidates, self.ground, self.cover)
@@ -77,7 +77,7 @@ impl<'run> Walker<'run> {
     }
 }
 
-impl<'ast> Visit<'ast> for Walker<'_> {
+impl<'ast, 'file> Visit<'ast> for Walker<'file, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.module.clone();
         let ground = self.ground;
@@ -104,7 +104,7 @@ impl<'ast> Visit<'ast> for Walker<'_> {
     fn visit_expr_path(&mut self, expression: &'ast ExprPath) {
         let path = Self::written(expression);
         let line = expression.path.segments.first().map(|segment| LineNumber::from(segment.ident.span()));
-        let made: Vec<Use> = line
+        let made: Vec<Use<'file>> = line
             .filter(|_| !path.segments().is_empty())
             .into_iter()
             .filter_map(|line| self.made(&path, line))
@@ -114,7 +114,7 @@ impl<'ast> Visit<'ast> for Walker<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        let made: Vec<Use> = TokenPaths::within(invocation.tokens.clone())
+        let made: Vec<Use<'file>> = TokenPaths::within(invocation.tokens.clone())
             .iter()
             .filter_map(|spelled| self.made(spelled.path(), spelled.started_on()))
             .collect();

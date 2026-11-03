@@ -15,7 +15,15 @@ use lint_layout::Name;
 
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
+}
+
+impl FileLint for FieldVisibility<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
+        fields.visit_file(file.syntax());
+        fields.violations
+    }
 }
 
 impl<'ast> Visit<'ast> for FieldVisibility<'_> {
@@ -25,14 +33,6 @@ impl<'ast> Visit<'ast> for FieldVisibility<'_> {
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         Walk::enter(&item.attrs, || self.exposed(item));
-    }
-}
-
-impl FileLint for FieldVisibility<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
-        fields.visit_file(file.syntax());
-        fields.violations
     }
 }
 

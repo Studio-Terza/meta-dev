@@ -10,7 +10,7 @@ use lint_paths::Paths;
 pub struct NoTestIo;
 
 impl Lint for NoTestIo {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("unit tests do no I/O and start no process"),
             Paths::every(
@@ -21,9 +21,7 @@ impl Lint for NoTestIo {
                     .map(TestFile::file),
             )
             .iter()
-            .filter_map(|used| {
-                EffectPaths::effect(used).map(|path| Violation::new(used.place().clone(), Finding::from(path)))
-            })
+            .filter_map(|used| EffectPaths::effect(used).map(|path| Violation::new(used.place(), Finding::from(path))))
             .collect(),
         )
     }

@@ -8,14 +8,14 @@ use crate::body_shape::BodyShape;
 use finding::Finding;
 
 #[derive(Debug)]
-pub(crate) struct TestBody {
+pub(crate) struct TestBody<'file> {
     name: Name,
-    site: Site,
+    site: Site<'file>,
     shape: BodyShape,
 }
 
-impl TestBody {
-    pub(crate) fn new(name: Name, site: Site, shape: BodyShape) -> TestBody {
+impl<'file> TestBody<'file> {
+    pub(crate) fn new(name: Name, site: Site<'file>, shape: BodyShape) -> TestBody<'file> {
         TestBody { name, site, shape }
     }
 
@@ -23,7 +23,7 @@ impl TestBody {
         &self.shape
     }
 
-    pub(crate) fn repeating(&self, first: &TestBody) -> Violation {
-        Violation::new(self.site.clone(), Finding::new(&self.name, &first.name))
+    pub(crate) fn repeating(&self, first: &TestBody<'_>) -> Violation<'file> {
+        Violation::new(self.site, Finding::new(&self.name, &first.name))
     }
 }

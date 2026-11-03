@@ -16,9 +16,9 @@ use finding::Finding;
 pub use kind::Kind;
 
 #[derive(Debug, Default)]
-pub struct Doubles {
-    declared: BTreeMap<DoubleKey, Site>,
-    implemented: Vec<Implemented>,
+pub struct Doubles<'file> {
+    declared: BTreeMap<DoubleKey, Site<'file>>,
+    implemented: Vec<Implemented<'file>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,15 +28,15 @@ struct DoubleKey {
 }
 
 #[derive(Debug)]
-struct Implemented {
+struct Implemented<'file> {
     double: DoubleKey,
-    site: Site,
+    site: Site<'file>,
     trait_path: UsePath,
     kind: Kind,
 }
 
-impl Doubles {
-    pub fn scan(&mut self, file: &SourceFile, imports: &Imports, ports: &PortTraits) {
+impl<'file> Doubles<'file> {
+    pub fn scan(&mut self, file: &'file SourceFile, imports: &Imports, ports: &PortTraits) {
         let mut reader = Reader {
             file,
             target: file.placement().crate_root().directory().to_path_buf(),
@@ -48,7 +48,7 @@ impl Doubles {
         reader.visit_file(file.syntax());
     }
 
-    pub fn violations(self) -> Vec<Violation> {
+    pub fn violations(self) -> Vec<Violation<'file>> {
         let ported = |double: &DoubleKey| {
             self.implemented.iter().any(|implemented| implemented.double == *double && implemented.kind == Kind::Port)
         };
@@ -56,29 +56,29 @@ impl Doubles {
             .declared
             .iter()
             .filter(|(double, _)| !ported(double))
-            .map(|(double, site)| Violation::new(site.clone(), Finding::Unported(double.name.clone())));
+            .map(|(double, site)| Violation::new(*site, Finding::Unported(double.name.clone())));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
             Violation::new(
-                implemented.site.clone(),
+                implemented.site,
                 Finding::Beside(implemented.double.name.clone(), implemented.trait_path.clone()),
             )
         });
-        let mut violations: Vec<Violation> = unported.chain(beside).collect();
+        let mut violations: Vec<Violation<'file>> = unported.chain(beside).collect();
         violations.sort_by(|left, right| left.site().cmp(right.site()));
         violations
     }
 }
 
-struct Reader<'run> {
-    file: &'run SourceFile,
+struct Reader<'file, 'run> {
+    file: &'file SourceFile,
     target: PathBuf,
     module: Module,
     imports: &'run Imports,
     ports: &'run PortTraits,
-    doubles: &'run mut Doubles,
+    doubles: &'run mut Doubles<'file>,
 }
 
-impl Reader<'_> {
+impl<'file> Reader<'file, '_> {
     const DOUBLES: [Word<'static>; 5] = words!["fake", "stub", "mock", "spy", "dummy"];
 
     fn declared(&mut self, name: &Ident) {
@@ -96,7 +96,7 @@ impl Reader<'_> {
             .map(|name| DoubleKey { target: self.target.clone(), name })
     }
 
-    fn implementation(&self, double: DoubleKey, path: &TraitPath) -> Implemented {
+    fn implementation(&self, double: DoubleKey, path: &TraitPath) -> Implemented<'file> {
         let trait_path = UsePath::from(path);
         let candidates = self.imports.candidates(&self.module, &trait_path);
         let line = path.segments.first().map_or(LineNumber::FIRST, |first| LineNumber::from(first.ident.span()));
@@ -109,7 +109,7 @@ impl Reader<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for Reader<'_> {
+impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.module.clone();
         self.module = outer.within(&Name::from(&module.ident));

@@ -10,7 +10,7 @@ use super::Finding;
 
 pub struct Exits<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl Exits<'_> {
@@ -20,7 +20,7 @@ impl Exits<'_> {
 }
 
 impl FileLint for Exits<'_> {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut scan = Exits { file, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found.extend(file.test_modules().iter().flat_map(Exits::violations));

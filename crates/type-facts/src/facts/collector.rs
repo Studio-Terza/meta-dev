@@ -23,8 +23,8 @@ use spelled::Spelled;
 pub(crate) struct Collector<'file> {
     file: &'file SourceFile,
     krate: CrateName,
-    types: Vec<TypeFact>,
-    traits: Vec<TraitFact>,
+    types: Vec<TypeFact<'file>>,
+    traits: Vec<TraitFact<'file>>,
     blocks: Vec<ImplBlock>,
 }
 
@@ -41,11 +41,11 @@ impl<'file> Collector<'file> {
         scan
     }
 
-    pub(super) fn types(&self) -> &[TypeFact] {
+    pub(super) fn types(&self) -> &[TypeFact<'file>] {
         &self.types
     }
 
-    pub(super) fn traits(&self) -> &[TraitFact] {
+    pub(super) fn traits(&self) -> &[TraitFact<'file>] {
         &self.traits
     }
 
@@ -53,7 +53,7 @@ impl<'file> Collector<'file> {
         &self.blocks
     }
 
-    fn site(&self, name: &Ident) -> Site {
+    fn site(&self, name: &Ident) -> Site<'file> {
         Site::new(self.file.path(), LineNumber::from(name.span()))
     }
 

@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::CoreMutation;
 
@@ -5,7 +6,7 @@ struct Mutating;
 
 impl Mutating {
     fn of(sources: &[Source]) -> String {
-        Sources::report::<CoreMutation>(sources).to_string()
+        CoreMutation::report(&Sources::parsed(sources)).to_string()
     }
 
     fn shows(pair: &[&str]) -> bool {

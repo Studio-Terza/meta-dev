@@ -8,7 +8,7 @@ use lint_core::{Fix, Headline, Message, Problem, Report, SourceFile, Violation};
 pub struct ProcessStarters;
 
 impl Lint for ProcessStarters {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("only ports start processes"),
             CommandPaths::across(files, Scope::OutsidePorts)

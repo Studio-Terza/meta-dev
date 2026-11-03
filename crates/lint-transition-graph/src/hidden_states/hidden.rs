@@ -8,21 +8,21 @@ use transition_facts::Transition;
 use crate::count::Count;
 
 #[derive(Debug)]
-pub(super) struct Hidden<'found>(&'found Transition);
+pub(super) struct Hidden<'found, 'file>(&'found Transition<'file>);
 
-impl<'found> Hidden<'found> {
-    pub(super) fn new(found: &'found Transition) -> Hidden<'found> {
+impl<'found, 'file> Hidden<'found, 'file> {
+    pub(super) fn new(found: &'found Transition<'file>) -> Hidden<'found, 'file> {
         Hidden(found)
     }
 }
 
-impl From<Hidden<'_>> for Violation {
-    fn from(hidden: Hidden<'_>) -> Violation {
-        Violation::new(AsRef::<Site>::as_ref(hidden.0).clone(), hidden)
+impl<'file> From<Hidden<'_, 'file>> for Violation<'file> {
+    fn from(hidden: Hidden<'_, 'file>) -> Violation<'file> {
+        Violation::new(*AsRef::<Site<'file>>::as_ref(hidden.0), hidden)
     }
 }
 
-impl fmt::Display for Hidden<'_> {
+impl fmt::Display for Hidden<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let branches = self.0.branches();
         write!(
@@ -34,7 +34,7 @@ impl fmt::Display for Hidden<'_> {
     }
 }
 
-impl lint_layout::Finding for Hidden<'_> {
+impl lint_layout::Finding for Hidden<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "name the intermediate states as an enum or a typestate and split the body into small edges between them",
@@ -50,7 +50,7 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counted(written: &[&Transition], above: &[&Transition]) -> Tally {
+    pub(super) fn counted(written: &[&Transition<'_>], above: &[&Transition<'_>]) -> Tally {
         Tally {
             written: Count::new(written.len()),
             above: Count::new(above.len()),

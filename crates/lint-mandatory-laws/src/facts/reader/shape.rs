@@ -23,19 +23,19 @@ impl Shape {
     const EQUALITY: [Word<'static>; 1] = words!["PartialEq"];
     const LEADS: [Word<'static>; 2] = words!["to", "from"];
 
-    pub(crate) fn of_struct(file: &SourceFile, item: &ItemStruct) -> Profile {
+    pub(crate) fn of_struct<'file>(file: &'file SourceFile, item: &ItemStruct) -> Profile<'file> {
         Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
-    pub(crate) fn of_enum(file: &SourceFile, item: &ItemEnum) -> Profile {
+    pub(crate) fn of_enum<'file>(file: &'file SourceFile, item: &ItemEnum) -> Profile<'file> {
         Self::declared(file, &item.ident, Exposure::declared_by(&item.vis), Derives::named(&item.attrs))
     }
 
-    pub(crate) fn of_impl(file: &SourceFile, item: &ItemImpl) -> Option<Profile> {
+    pub(crate) fn of_impl<'file>(file: &'file SourceFile, item: &ItemImpl) -> Option<Profile<'file>> {
         Self::owner(&item.self_ty).map(|owner| Self::declared(file, owner, Exposure::Private, Self::implemented(item)))
     }
 
-    fn declared(file: &SourceFile, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile {
+    fn declared<'file>(file: &'file SourceFile, owner: &Ident, exposure: Exposure, facts: Vec<Name>) -> Profile<'file> {
         let site = Site::new(file.path(), LineNumber::from(owner.span()));
         Profile::declared(Subject::new(file, Name::from(owner)), site, exposure, facts)
     }

@@ -2,7 +2,7 @@ use std::fmt;
 
 use lint_core::Fix;
 
-use crate::pair::Pair;
+use super::pair::Pair;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Need {

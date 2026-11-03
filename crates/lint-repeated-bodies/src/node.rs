@@ -2,13 +2,13 @@ use crate::occurrence::Occurrence;
 use body_shape::Shape;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Node {
+pub(crate) struct Node<'file> {
     shape: Shape,
-    occurrence: Occurrence,
+    occurrence: Occurrence<'file>,
 }
 
-impl Node {
-    pub(crate) fn new(shape: Shape, occurrence: Occurrence) -> Node {
+impl<'file> Node<'file> {
+    pub(crate) fn new(shape: Shape, occurrence: Occurrence<'file>) -> Node<'file> {
         Node { shape, occurrence }
     }
 
@@ -16,7 +16,7 @@ impl Node {
         self.shape
     }
 
-    pub(crate) fn into_occurrence(self) -> Occurrence {
+    pub(crate) fn into_occurrence(self) -> Occurrence<'file> {
         self.occurrence
     }
 }

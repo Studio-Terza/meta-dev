@@ -51,7 +51,7 @@ pub struct Lints;
 
 impl Lints {
     #[must_use]
-    pub fn checked(mut readout: Readout) -> Outcome {
+    pub fn checked(readout: &Readout) -> Outcome<'_> {
         let files = readout.files();
         let reports = vec![
             NoComments::report(files),
@@ -98,6 +98,6 @@ impl Lints {
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),
         ];
-        Outcome::from_reports(reports, readout.take_failures())
+        Outcome::from_reports(reports, readout.failures())
     }
 }

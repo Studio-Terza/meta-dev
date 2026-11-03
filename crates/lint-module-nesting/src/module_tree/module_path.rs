@@ -9,7 +9,7 @@ pub use inside_sibling::InsideSibling;
 pub use relation::Relation;
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lint_core::SourceFile;
 use lint_layout::UsePath;
@@ -17,27 +17,31 @@ use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateRoot;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ModulePath {
+pub struct ModulePath<'file> {
     crate_root: CrateRoot,
     segments: Vec<Name>,
-    file: PathBuf,
+    file: &'file Path,
 }
 
-impl ModulePath {
+impl<'file> ModulePath<'file> {
     const MODULE_FILE: &'static str = "mod.rs";
     const CRATE: &'static str = "crate";
     const SUPER: &'static str = "super";
     const ANCHORS: [Word<'static>; 3] = words!["crate", "super", "self"];
 
-    pub fn of_file(file: &SourceFile) -> ModulePath {
+    pub fn of_file(file: &'file SourceFile) -> ModulePath<'file> {
         ModulePath {
             crate_root: file.placement().crate_root().clone(),
             segments: file.placement().module().segments().to_vec(),
-            file: file.path().to_path_buf(),
+            file: file.path(),
         }
     }
 
-    pub fn from_use(file: &ModulePath, path: &UsePath, modules: &ModuleIndex) -> Option<ModulePath> {
+    pub fn from_use(
+        file: &ModulePath<'file>,
+        path: &UsePath,
+        modules: &ModuleIndex<'file>,
+    ) -> Option<ModulePath<'file>> {
         let first = path.segments().first()?;
         let start = if *first == Self::CRATE {
             Vec::new()
@@ -57,58 +61,62 @@ impl ModulePath {
                 Some(segments)
             }
         })?;
-        Some(ModulePath { crate_root: file.crate_root.clone(), segments, file: PathBuf::new() })
+        Some(ModulePath { crate_root: file.crate_root.clone(), segments, file: Path::new("") })
     }
 
-    pub fn file(&self) -> &Path {
-        &self.file
+    pub fn file(&self) -> &'file Path {
+        self.file
     }
 
-    pub fn parent(&self) -> Option<ModulePath> {
+    pub fn parent(&self) -> Option<ModulePath<'file>> {
         let (_, parents) = self.segments.split_last()?;
-        Some(ModulePath { crate_root: self.crate_root.clone(), segments: parents.to_vec(), file: PathBuf::new() })
+        Some(ModulePath { crate_root: self.crate_root.clone(), segments: parents.to_vec(), file: Path::new("") })
     }
 
-    pub fn relates<'other, R: Relation>(&self, other: &'other ModulePath) -> Option<&'other ModulePath> {
+    pub fn relates<'other, R: Relation>(&self, other: &'other ModulePath<'file>) -> Option<&'other ModulePath<'file>> {
         R::holds(self, other)
     }
 
-    pub fn crossed_directory(&self, user: &ModulePath, modules: &ModuleIndex) -> Option<ModulePath> {
+    pub fn crossed_directory(
+        &self,
+        user: &ModulePath<'file>,
+        modules: &ModuleIndex<'file>,
+    ) -> Option<ModulePath<'file>> {
         self.prefixes().take(self.segments.len()).skip(1).find(|boundary| {
             modules.directory_same_as(boundary).is_some() && boundary.relates::<Ancestor>(user).is_none()
         })
     }
 
-    pub fn deepest_in<'index>(&self, modules: &'index ModuleIndex) -> Option<&'index ModulePath> {
+    pub fn deepest_in<'index>(&self, modules: &'index ModuleIndex<'file>) -> Option<&'index ModulePath<'file>> {
         self.prefixes().rev().find_map(|probe| modules.same_as(&probe))
     }
 
-    pub fn truncated_like(&self, other: &ModulePath) -> ModulePath {
+    pub fn truncated_like(&self, other: &ModulePath<'file>) -> ModulePath<'file> {
         self.with_segments(self.segments.iter().take(other.segments.len()).cloned().collect())
     }
 
-    fn prefixes(&self) -> impl DoubleEndedIterator<Item = ModulePath> + '_ {
+    fn prefixes(&self) -> impl DoubleEndedIterator<Item = ModulePath<'file>> + '_ {
         (0..=self.segments.len()).map(|length| self.with_segments(self.segments.iter().take(length).cloned().collect()))
     }
 
-    fn with_segments(&self, segments: Vec<Name>) -> ModulePath {
-        ModulePath { crate_root: self.crate_root.clone(), segments, file: PathBuf::new() }
+    fn with_segments(&self, segments: Vec<Name>) -> ModulePath<'file> {
+        ModulePath { crate_root: self.crate_root.clone(), segments, file: Path::new("") }
     }
 
-    fn child(&self, name: &Name) -> ModulePath {
+    fn child(&self, name: &Name) -> ModulePath<'file> {
         ModulePath {
             crate_root: self.crate_root.clone(),
             segments: self.segments.iter().cloned().chain(Some(name.clone())).collect(),
-            file: PathBuf::new(),
+            file: Path::new(""),
         }
     }
 
-    fn directory_module(&self) -> Option<&ModulePath> {
+    fn directory_module(&self) -> Option<&ModulePath<'file>> {
         self.file.file_name().filter(|name| *name == Self::MODULE_FILE).map(|_| self)
     }
 }
 
-impl fmt::Display for ModulePath {
+impl fmt::Display for ModulePath<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "crate")?;
         self.segments.iter().try_for_each(|segment| write!(formatter, "::{segment}"))

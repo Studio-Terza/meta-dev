@@ -30,7 +30,7 @@ impl WorkflowRun {
             .map(|_| file)
     }
 
-    fn violations(file: &RepoFile, actions: Actions<'_>) -> Vec<Violation> {
+    fn violations<'file>(file: &'file RepoFile, actions: Actions<'_>) -> Vec<Violation<'file>> {
         let text = file
             .contents()
             .read()
@@ -42,7 +42,11 @@ impl WorkflowRun {
         }
     }
 
-    fn violations_in(file: &RepoFile, parsed: Result<Document<'_>, ScanError>, actions: Actions<'_>) -> Vec<Violation> {
+    fn violations_in<'file>(
+        file: &'file RepoFile,
+        parsed: Result<Document<'_>, ScanError>,
+        actions: Actions<'_>,
+    ) -> Vec<Violation<'file>> {
         match parsed {
             Ok(document) => document.findings(actions).into_iter().map(|found| found.violation(file.shown())).collect(),
             Err(error) => vec![Violation::new(
@@ -54,7 +58,7 @@ impl WorkflowRun {
 }
 
 impl Lint<RepoFile> for WorkflowRun {
-    fn report(files: &[RepoFile]) -> Report {
+    fn report(files: &[RepoFile]) -> Report<'_> {
         let actions = Actions::among(files);
         Report::new(
             Headline::new("a workflow run step is a short command; logic lives in Rust"),

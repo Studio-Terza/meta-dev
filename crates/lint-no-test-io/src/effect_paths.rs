@@ -26,7 +26,7 @@ impl EffectPaths {
     ];
     const VALUES: [&[Word<'static>]; 1] = [&words!["std", "process", "ExitCode"]];
 
-    pub fn effect(used: &Use) -> Option<&UsePath> {
+    pub fn effect<'used>(used: &'used Use<'_>) -> Option<&'used UsePath> {
         Self::EFFECTS
             .iter()
             .find_map(|root| used.under(root))

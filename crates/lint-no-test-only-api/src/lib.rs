@@ -34,21 +34,21 @@ impl NoTestOnlyApi {
         files.iter().flat_map(|file| Mentions::in_file(file, ground)).collect()
     }
 
-    fn in_manifest(package: &PackageRoot, file: &SourceFile) -> Vec<Violation> {
+    fn in_manifest<'file>(package: &PackageRoot, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let manifest = file.manifest_file();
         package
             .features()
             .iter()
             .filter_map(|(name, line)| {
                 name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
-                    .map(|_| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
+                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(name.clone())))
             })
             .collect()
     }
 }
 
 impl FileLint for NoTestOnlyApi {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let shipped =
             iter::once(file).filter_map(SourceFile::shipped).flat_map(|file| GatedItems::in_file(file.syntax()));
         shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
@@ -56,7 +56,7 @@ impl FileLint for NoTestOnlyApi {
 }
 
 impl Lint for NoTestOnlyApi {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
         let shipped = Self::mentioned(files, Ground::Shipped);

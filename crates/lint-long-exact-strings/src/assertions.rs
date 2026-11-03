@@ -21,10 +21,10 @@ use table_rows::TableRows;
 #[derive(Debug)]
 pub struct Assertions<'file> {
     path: &'file Path,
-    constants: Bindings,
-    locals: Bindings,
+    constants: Bindings<'file>,
+    locals: Bindings<'file>,
     tables: MacroAliases,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl<'file> From<&'file SourceFile> for Assertions<'file> {
@@ -41,13 +41,13 @@ impl<'file> From<&'file SourceFile> for Assertions<'file> {
     }
 }
 
-impl From<Assertions<'_>> for Vec<Violation> {
-    fn from(assertions: Assertions<'_>) -> Vec<Violation> {
+impl<'file> From<Assertions<'file>> for Vec<Violation<'file>> {
+    fn from(assertions: Assertions<'file>) -> Vec<Violation<'file>> {
         assertions.found
     }
 }
 
-impl Assertions<'_> {
+impl<'file> Assertions<'file> {
     const EQUALITIES: [Word<'static>; 2] = words!["assert_eq", "assert_ne"];
     const ASSERT: &str = "assert";
     const TABLE: Word<'static> = Word::new("table");
@@ -87,27 +87,33 @@ impl Assertions<'_> {
         self.found.extend(pinned.map(|pinning| Violation::new(Site::new(self.path, line), Finding::from(pinning))));
     }
 
-    fn within_body(&mut self, locals: Bindings, visit: impl FnOnce(&mut Self)) {
+    fn within_body(&mut self, locals: Bindings<'file>, visit: impl FnOnce(&mut Self)) {
         let outer = std::mem::replace(&mut self.locals, locals);
         visit(self);
         self.locals = outer;
     }
 }
 
-impl<'ast> Visit<'ast> for Assertions<'_> {
-    fn visit_item_fn(&mut self, item: &'ast ItemFn) {
+impl<'file> Visit<'file> for Assertions<'file> {
+    fn visit_item_fn(&mut self, item: &'file ItemFn) {
         self.within_body(Bindings::locals(&item.block), |assertions| visit::visit_item_fn(assertions, item));
     }
 
-    fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
+    fn visit_impl_item_fn(&mut self, item: &'file ImplItemFn) {
         self.within_body(Bindings::locals(&item.block), |assertions| visit::visit_impl_item_fn(assertions, item));
     }
 
-    fn visit_macro(&mut self, invocation: &'ast Macro) {
+    fn visit_macro(&mut self, invocation: &'file Macro) {
+        self.met(invocation);
+    }
+}
+
+impl Assertions<'_> {
+    fn met(&mut self, invocation: &Macro) {
         let name = invocation.path.segments.last().map(|last| Name::from(&last.ident)).unwrap_or_default();
         match self.compared(invocation, &name) {
             Some(compared) => self.judged(invocation, &compared),
-            None => MacroCalls::within(invocation).iter().for_each(|inner| self.visit_macro(inner)),
+            None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
         }
     }
 }

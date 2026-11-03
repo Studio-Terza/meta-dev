@@ -15,13 +15,13 @@ use crate::occurrence::Occurrence;
 
 pub(crate) struct Scan<'file> {
     file: &'file SourceFile,
-    nodes: Vec<Node>,
+    nodes: Vec<Node<'file>>,
 }
 
-impl Scan<'_> {
+impl<'file> Scan<'file> {
     const FLOOR: Least = Least::new(40);
 
-    pub(crate) fn of_file(file: &SourceFile) -> Vec<Node> {
+    pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Node<'file>> {
         let mut scan = Scan { file, nodes: Vec::new() };
         scan.visit_file(file.syntax());
         scan.nodes

@@ -11,7 +11,7 @@ use place::Place;
 pub struct RustOnly;
 
 impl Lint<RepoFile> for RustOnly {
-    fn report(files: &[RepoFile]) -> Report {
+    fn report(files: &[RepoFile]) -> Report<'_> {
         Report::new(
             Headline::new("logic is Rust; web assets live under a directory named assets"),
             files

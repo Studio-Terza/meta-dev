@@ -1,0 +1,10 @@
+test budget, report only:
+corpus: 0 tests in 2 files, 0 of 10 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+src/lib.rs:5: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+free functions are not allowed; make them associated functions or methods:
+src/boundary.rs:1: fn kept; make it an associated function or a method
+primitives appear in signatures and fields only inside a boundary:
+src/lib.rs:4: bare String in copied; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+fails

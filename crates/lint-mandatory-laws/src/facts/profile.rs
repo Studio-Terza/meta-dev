@@ -1,30 +1,35 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::exposure::Exposure;
+use super::need::Need;
+use super::obligation::Obligation;
+use super::pair::Pair;
 use crate::coverage::Coverage;
-use crate::need::Need;
-use crate::obligation::Obligation;
-use crate::pair::Pair;
 use crate::subject::Subject;
 use lint_core::Site;
 use lint_layout::{Name, Word, words};
 
 #[derive(Debug)]
-pub(crate) struct Profile {
+pub(crate) struct Profile<'file> {
     subject: Subject,
-    site: Site,
+    site: Site<'file>,
     exposure: Exposure,
     facts: BTreeSet<Name>,
 }
 
-impl Profile {
+impl<'file> Profile<'file> {
     const TRAIT_PAIRS: [[Word<'static>; 2]; 2] = [words!["Display", "FromStr"], words!["Serialize", "Deserialize"]];
     const METHOD_PAIR: [Word<'static>; 2] = words!["encode", "decode"];
     const ORDERS: [Word<'static>; 2] = words!["Ord", "PartialEq"];
     const TO: Word<'static> = Word::new("to");
     const FROM: Word<'static> = Word::new("from");
 
-    pub(crate) fn declared(subject: Subject, site: Site, exposure: Exposure, facts: Vec<Name>) -> Profile {
+    pub(crate) fn declared(
+        subject: Subject,
+        site: Site<'file>,
+        exposure: Exposure,
+        facts: Vec<Name>,
+    ) -> Profile<'file> {
         Profile { subject, site, exposure, facts: facts.into_iter().collect() }
     }
 
@@ -36,13 +41,13 @@ impl Profile {
         self.exposure
     }
 
-    pub(crate) fn merged(mut self, other: Profile) -> Profile {
+    pub(crate) fn merged(mut self, other: Profile<'file>) -> Profile<'file> {
         self.facts.extend(other.facts);
         self.exposure = self.exposure.max(other.exposure);
         self
     }
 
-    pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation> {
+    pub(crate) fn unmet(&self, coverage: &Coverage) -> Vec<Obligation<'file>> {
         let roundtrips = coverage.roundtrips_naming(&self.subject);
         let methods = self.method_pairs();
         let spare = roundtrips
@@ -59,7 +64,7 @@ impl Profile {
             .chain(unspared)
             .map(Need::Roundtrip)
             .chain(unlawed)
-            .map(|need| Obligation::new(self.subject.clone(), self.site.clone(), need))
+            .map(|need| Obligation::new(self.subject.clone(), self.site, need))
             .collect()
     }
 

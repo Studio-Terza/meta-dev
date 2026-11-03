@@ -1,4 +1,4 @@
-use lint_core::{Site, SourceFile};
+use lint_core::Site;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -11,20 +11,15 @@ impl Described {
         Source::new(Located::new(path), Text::new(text))
     }
 
-    fn facts(files: &[Source]) -> Facts {
-        let parsed: Vec<SourceFile> = files.iter().map(|source| Sources::file(source.path(), source.text())).collect();
-        Facts::of_files(&parsed)
-    }
-
-    fn names(facts: &Facts) -> Vec<String> {
+    fn names(facts: &Facts<'_>) -> Vec<String> {
         facts.types().iter().map(|found| AsRef::<Name>::as_ref(found).to_string()).collect()
     }
 
-    fn only(facts: &Facts) -> &TypeFact {
+    fn only<'facts>(facts: &'facts Facts<'facts>) -> &'facts TypeFact<'facts> {
         facts.types().first().unwrap_or_else(|| unreachable!("a type was declared"))
     }
 
-    fn methods(found: &TypeFact) -> Vec<String> {
+    fn methods(found: &TypeFact<'_>) -> Vec<String> {
         found
             .methods()
             .iter()
@@ -35,7 +30,7 @@ impl Described {
             .collect()
     }
 
-    fn implemented(found: &TypeFact) -> Vec<String> {
+    fn implemented(found: &TypeFact<'_>) -> Vec<String> {
         found
             .implementations()
             .iter()
@@ -49,10 +44,11 @@ impl Described {
 
 #[test]
 fn structs_and_enums_are_types_with_their_derives_and_site() {
-    let facts = Described::facts(&[Described::file(
+    let files = Sources::parsed(&[Described::file(
         "a.rs",
         "#[derive(Debug, Clone)]\nstruct A;\n\nenum B { X }\nunion U { x: u8 }\n",
     )]);
+    let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A", "B"]);
     let first = Described::only(&facts);
     assert_eq!(first.derives().iter().map(ToString::to_string).collect::<Vec<_>>(), ["Debug", "Clone"]);
@@ -61,28 +57,31 @@ fn structs_and_enums_are_types_with_their_derives_and_site() {
 
 #[test]
 fn derives_through_paths_and_other_attributes_are_read_by_their_last_name() {
-    let facts = Described::facts(&[Described::file(
+    let files = Sources::parsed(&[Described::file(
         "a.rs",
         "#[derive(newtype::Newtype)]\n#[allow(dead_code)]\nstruct A(u8);\n",
     )]);
+    let facts = Facts::of_files(&files);
     assert_eq!(Described::only(&facts).derives().iter().map(ToString::to_string).collect::<Vec<_>>(), ["Newtype"]);
 }
 
 #[test]
 fn inherent_methods_are_kept_with_arity_and_returned_type() {
-    let facts = Described::facts(&[Described::file(
+    let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
+    let facts = Facts::of_files(&files);
     assert_eq!(Described::methods(Described::only(&facts)), ["one/1->", "two/2->Vec", "three/1->B", "four/0->"]);
 }
 
 #[test]
 fn trait_impls_keep_the_trait_and_its_first_type_argument() {
-    let facts = Described::facts(&[Described::file(
+    let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A;\nimpl From<B> for A { fn from(b: B) -> A { f() } }\nimpl std::fmt::Display for A {}\nimpl AsRef<&C> for A {}\nimpl Tr<'a, D> for A {}\nimpl Plain<1> for A {}\n",
     )]);
+    let facts = Facts::of_files(&files);
     let found = Described::only(&facts);
     assert_eq!(Described::implemented(found), ["From<B>", "Display<>", "AsRef<C>", "Tr<D>", "Plain<>"]);
     assert_eq!(Described::methods(found), Vec::<String>::new());
@@ -96,7 +95,7 @@ fn trait_impls_keep_the_trait_and_its_first_type_argument() {
 
 #[test]
 fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_types() {
-    let facts = Described::facts(&[
+    let files = Sources::parsed(&[
         Described::file("crates/x/src/lib.rs", "pub struct A;\nmod m;\n"),
         Described::file("crates/x/src/m.rs", "impl A { fn here(&self) {} }\nimpl Foreign { fn lost(&self) {} }\n"),
         Described::file(
@@ -104,6 +103,7 @@ fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_ty
             "impl A { fn there(&self) {} }\npub struct A;\nimpl &A { fn by_ref(&self) {} }\nimpl (A) { fn bare(&self) {} }\n",
         ),
     ]);
+    let facts = Facts::of_files(&files);
     let methods: Vec<Vec<String>> = facts.types().iter().map(Described::methods).collect();
     assert_eq!(methods, [vec!["here/1->"], vec!["there/1->", "by_ref/1->", "bare/1->"]]);
     let crates: Vec<String> = facts.types().iter().map(|found| AsRef::<CrateName>::as_ref(found).to_string()).collect();
@@ -112,7 +112,8 @@ fn impls_attach_across_files_of_one_crate_but_not_across_crates_or_to_foreign_ty
 
 #[test]
 fn local_traits_are_listed_with_their_crate() {
-    let facts = Described::facts(&[Described::file("crates/x/src/lib.rs", "pub trait T { fn m(&self); }\n")]);
+    let files = Sources::parsed(&[Described::file("crates/x/src/lib.rs", "pub trait T { fn m(&self); }\n")]);
+    let facts = Facts::of_files(&files);
     let found = facts.traits().first().unwrap_or_else(|| unreachable!("a trait was declared"));
     assert_eq!(AsRef::<Name>::as_ref(found).to_string(), "T");
     assert_eq!(AsRef::<CrateName>::as_ref(found).to_string(), "x");
@@ -121,13 +122,14 @@ fn local_traits_are_listed_with_their_crate() {
 
 #[test]
 fn test_code_and_target_files_are_left_out() {
-    let facts = Described::facts(&[
+    let files = Sources::parsed(&[
         Described::file(
             "a.rs",
             "struct A;\n#[cfg(test)]\nmod tests { struct B; trait T {} }\n#[cfg(test)]\nstruct C;\n#[cfg(test)]\ntrait U {}\n#[cfg(test)]\nimpl A { fn lost(&self) {} }\n",
         ),
         Described::file("tests/b.rs", "struct D;\n"),
     ]);
+    let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A"]);
     assert_eq!(Described::methods(Described::only(&facts)), Vec::<String>::new());
     assert_eq!(facts.traits().len(), 0);
@@ -135,11 +137,12 @@ fn test_code_and_target_files_are_left_out() {
 
 #[test]
 fn a_type_name_declared_twice_in_one_crate_is_not_declared_once() {
-    let facts = Described::facts(&[
+    let files = Sources::parsed(&[
         Described::file("crates/x/src/lib.rs", "struct A;\nmod m;\nstruct B;\n"),
         Described::file("crates/x/src/m.rs", "struct A;\n"),
         Described::file("crates/y/src/lib.rs", "struct B;\nstruct A;\n"),
     ]);
+    let facts = Facts::of_files(&files);
     let once: Vec<String> = facts
         .types()
         .iter()
@@ -151,18 +154,20 @@ fn a_type_name_declared_twice_in_one_crate_is_not_declared_once() {
 
 #[test]
 fn a_tuple_struct_of_one_field_is_a_newtype_shape_and_nothing_else_is() {
-    let facts = Described::facts(&[Described::file(
+    let files = Sources::parsed(&[Described::file(
         "a.rs",
         "struct A(u8);\nstruct B(u8, u8);\nstruct C { x: u8 }\nstruct D;\nenum E { X(u8) }\nstruct F(pub Vec<u8>);\n",
     )]);
+    let facts = Facts::of_files(&files);
     let shapes: Vec<Shape> = facts.types().iter().map(TypeFact::shape).collect();
     assert_eq!(shapes, [Shape::OneField, Shape::Other, Shape::Other, Shape::Other, Shape::Other, Shape::OneField]);
 }
 
 #[test]
 fn types_and_traits_inside_inline_modules_are_found() {
-    let facts =
-        Described::facts(&[Described::file("a.rs", "mod m { struct A; trait T {} impl A { fn x(&self) {} } }\n")]);
+    let files =
+        Sources::parsed(&[Described::file("a.rs", "mod m { struct A; trait T {} impl A { fn x(&self) {} } }\n")]);
+    let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A"]);
     assert_eq!(facts.traits().len(), 1);
 }

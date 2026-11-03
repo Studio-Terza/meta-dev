@@ -1,6 +1,7 @@
 test budget, report only:
 corpus: 0 tests in 8 files, 0 of 13 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 modules nest by use: a file used only inside one sibling belongs inside it:
 src/helper.rs:1: used only from crate::parent; move it inside that module
 src/reaching.rs:1: reaches into crate::outer::inner; import the parent's re-export instead

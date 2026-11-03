@@ -16,9 +16,9 @@ impl Tail {
         Tail { effect, words }
     }
 
-    fn site_of(&self, used: &Use) -> Option<EffectSite> {
+    fn site_of<'file>(&self, used: &Use<'file>) -> Option<EffectSite<'file>> {
         used.spelling(PathTail::new(self.words))
-            .map(|path| EffectSite::new(used.place().clone(), self.effect, Called::Path(path.clone()), used.ground()))
+            .map(|path| EffectSite::new(used.place(), self.effect, Called::Path(path.clone()), used.ground()))
     }
 }
 
@@ -125,7 +125,7 @@ impl Vocabulary {
         Tail::new(Effect::Clock, &words!["chrono", "Utc", "now"]),
     ];
 
-    pub(super) fn site_of(used: &Use) -> Option<EffectSite> {
+    pub(super) fn site_of<'file>(used: &Use<'file>) -> Option<EffectSite<'file>> {
         Self::LONG
             .iter()
             .find_map(|tail| tail.site_of(used))

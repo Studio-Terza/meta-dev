@@ -3,14 +3,14 @@ use lint_core::Site;
 use lint_layout::Name;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Function {
+pub(crate) struct Function<'file> {
     name: Name,
-    site: Site,
+    site: Site<'file>,
     score: Branching,
 }
 
-impl Function {
-    pub(crate) fn new(name: Name, site: Site, score: Branching) -> Function {
+impl<'file> Function<'file> {
+    pub(crate) fn new(name: Name, site: Site<'file>, score: Branching) -> Function<'file> {
         Function { name, site, score }
     }
 
@@ -19,14 +19,14 @@ impl Function {
     }
 }
 
-impl AsRef<Name> for Function {
+impl AsRef<Name> for Function<'_> {
     fn as_ref(&self) -> &Name {
         &self.name
     }
 }
 
-impl AsRef<Site> for Function {
-    fn as_ref(&self) -> &Site {
+impl<'file> AsRef<Site<'file>> for Function<'file> {
+    fn as_ref(&self) -> &Site<'file> {
         &self.site
     }
 }

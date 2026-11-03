@@ -17,7 +17,7 @@ impl Flagged {
         Flagged { line, finding }
     }
 
-    pub(crate) fn in_file(self, path: &Path) -> Violation {
+    pub(crate) fn in_file(self, path: &Path) -> Violation<'_> {
         Violation::new(Site::new(path, self.line), self.finding)
     }
 }

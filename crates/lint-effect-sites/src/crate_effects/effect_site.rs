@@ -8,20 +8,20 @@ use super::called::Called;
 use super::effect::Effect;
 
 #[derive(Clone, Debug)]
-pub(super) struct EffectSite {
-    site: Site,
+pub(super) struct EffectSite<'file> {
+    site: Site<'file>,
     effect: Effect,
     called: Called,
     ground: Ground,
 }
 
-impl EffectSite {
-    pub(super) fn new(site: Site, effect: Effect, called: Called, ground: Ground) -> EffectSite {
+impl<'file> EffectSite<'file> {
+    pub(super) fn new(site: Site<'file>, effect: Effect, called: Called, ground: Ground) -> EffectSite<'file> {
         EffectSite { site, effect, called, ground }
     }
 
-    pub(super) fn place(&self) -> &Site {
-        &self.site
+    pub(super) fn place(&self) -> Site<'file> {
+        self.site
     }
 
     pub(super) fn effect(&self) -> Effect {
@@ -32,18 +32,18 @@ impl EffectSite {
         self.ground
     }
 
-    pub(super) fn outside_ports(&self) -> Option<Violation> {
-        (self.ground == Ground::Open).then(|| Violation::new(self.site.clone(), self))
+    pub(super) fn outside_ports(&self) -> Option<Violation<'file>> {
+        (self.ground == Ground::Open).then(|| Violation::new(self.site, self))
     }
 }
 
-impl fmt::Display for EffectSite {
+impl fmt::Display for EffectSite<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} effect outside ports: calls {}", self.effect, self.called)
     }
 }
 
-impl lint_layout::Finding for EffectSite {
+impl lint_layout::Finding for EffectSite<'_> {
     fn fix(&self) -> Fix {
         Fix::new("move the effect behind a port in a ports module and call the port from here")
     }

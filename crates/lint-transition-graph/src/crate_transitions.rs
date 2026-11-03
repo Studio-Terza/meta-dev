@@ -12,9 +12,9 @@ use crate::end::{End, Hop, Place};
 use crate::workspace_types::WorkspaceTypes;
 
 #[derive(Debug)]
-pub(crate) struct CrateTransitions<'found> {
+pub(crate) struct CrateTransitions<'found, 'file> {
     name: &'found CrateName,
-    first: Option<&'found Site>,
+    first: Option<Site<'file>>,
     domain: Count,
     interfaces: BTreeSet<&'found End>,
     boxes: BTreeSet<&'found End>,
@@ -22,16 +22,16 @@ pub(crate) struct CrateTransitions<'found> {
     coverage: Coverage,
 }
 
-impl<'found> CrateTransitions<'found> {
+impl<'found, 'file> CrateTransitions<'found, 'file> {
     pub(crate) fn measured(
         types: &WorkspaceTypes,
         name: &'found CrateName,
-        edges: &[&'found Edge<'found>],
-    ) -> CrateTransitions<'found> {
+        edges: &[&'found Edge<'found, 'file>],
+    ) -> CrateTransitions<'found, 'file> {
         let ends = || edges.iter().flat_map(|edge| edge.ends().all());
         CrateTransitions {
             name,
-            first: edges.iter().map(|edge| AsRef::<Site>::as_ref(edge.transition())).min(),
+            first: edges.iter().map(|edge| edge.site()).min(),
             domain: types.declared_in(name),
             interfaces: ends().filter(|end| end.place() == Place::Interface).collect(),
             boxes: ends().filter(|end| end.place() == Place::External).collect(),
@@ -40,12 +40,12 @@ impl<'found> CrateTransitions<'found> {
         }
     }
 
-    pub(crate) fn violation(&self) -> Option<Violation> {
-        self.first.map(|site| Violation::new(site.clone(), self))
+    pub(crate) fn violation(&self) -> Option<Violation<'file>> {
+        self.first.map(|site| Violation::new(site, self))
     }
 }
 
-impl fmt::Display for CrateTransitions<'_> {
+impl fmt::Display for CrateTransitions<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -60,7 +60,7 @@ impl fmt::Display for CrateTransitions<'_> {
     }
 }
 
-impl lint_layout::Finding for CrateTransitions<'_> {
+impl lint_layout::Finding for CrateTransitions<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair",

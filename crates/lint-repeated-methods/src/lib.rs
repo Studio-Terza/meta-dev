@@ -9,7 +9,7 @@ use shape_index::ShapeIndex;
 pub struct RepeatedMethods;
 
 impl Lint for RepeatedMethods {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
                 "one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive",

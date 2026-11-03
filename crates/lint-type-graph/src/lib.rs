@@ -12,12 +12,12 @@ use crate_graph::CrateGraph;
 pub struct TypeGraph;
 
 impl TypeGraph {
-    fn grouped<'facts>(
-        types: &'facts [TypeFact],
-        traits: &'facts [TraitFact],
-    ) -> BTreeMap<&'facts CrateName, CrateGraph<'facts>> {
+    fn grouped<'facts, 'file>(
+        types: &'facts [TypeFact<'file>],
+        traits: &'facts [TraitFact<'file>],
+    ) -> BTreeMap<&'facts CrateName, CrateGraph<'facts, 'file>> {
         let with_types =
-            types.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, CrateGraph<'_>>, found| {
+            types.iter().fold(BTreeMap::new(), |mut crates: BTreeMap<&CrateName, CrateGraph<'_, 'file>>, found| {
                 crates.entry(found.as_ref()).or_default().add_type(found);
                 crates
             });
@@ -29,7 +29,7 @@ impl TypeGraph {
 }
 
 impl FactsLint for TypeGraph {
-    fn report_facts(facts: &Facts) -> Report {
+    fn report_facts<'file>(facts: &Facts<'file>) -> Report<'file> {
         Report::new(
             Headline::new(
                 "report only, the type-trait graph per crate, types and local traits as nodes, conversions (From, TryFrom, AsRef, Into) and local trait impls as edges; resolved by name, so same-named types merge",
@@ -43,7 +43,7 @@ impl FactsLint for TypeGraph {
 }
 
 impl Lint for TypeGraph {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_facts(&Facts::of_files(files))
     }
 }
