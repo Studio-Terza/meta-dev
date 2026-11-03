@@ -1,7 +1,6 @@
 mod dependency;
 mod facts;
 mod generic_impl;
-mod held;
 mod implementation;
 mod method;
 mod method_shape;
@@ -14,7 +13,6 @@ mod via;
 pub use dependency::Dependency;
 pub use facts::Facts;
 pub use generic_impl::GenericImpl;
-pub use held::Held;
 pub use implementation::Implementation;
 pub use method::Method;
 pub use method_shape::MethodShape;
