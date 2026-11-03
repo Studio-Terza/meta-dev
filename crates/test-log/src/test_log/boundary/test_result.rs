@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
+use super::super::test_name::TestName;
+use super::super::verdict::Verdict;
 use super::binary::Binary;
-use super::test_name::TestName;
 use super::unmatched::Unmatched;
-use super::verdict::Verdict;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TestResult {

@@ -1,9 +1,7 @@
-mod binary;
+mod boundary;
 mod line;
 mod reading;
 mod test_name;
-mod test_result;
-mod unmatched;
 mod verdict;
 
 use std::collections::{BTreeMap, BTreeSet};
