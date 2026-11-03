@@ -24,7 +24,7 @@ impl GraphLint for LiveNodes {
             .iter()
             .filter_map(|edge| edge.ends().entered(*AsRef::<Ground>::as_ref(edge.transition())))
             .collect();
-        let reached = Consuming::indexed(&graph, Moves::All).closure(entered);
+        let reached = Consuming::indexed(&graph, Moves::All).closure(&entered);
         let consumed: BTreeSet<&Node> = graph.edges().iter().flat_map(|edge| edge.ends().taken()).collect();
         let found: Vec<Liveness<'_, 'file>> = graph
             .nodes()

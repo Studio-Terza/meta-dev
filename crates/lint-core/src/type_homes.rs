@@ -24,14 +24,18 @@ impl<'file> TypeHomes<'file> {
 
     #[must_use]
     pub fn resolve(&self, name: Name, from: Home<'file>) -> DeclaredType<'file> {
-        let candidates = self.declared.get(&name).map_or(&[][..], Vec::as_slice);
-        let home = candidates
+        DeclaredType::new(self.home_of(&name, from), name)
+    }
+
+    #[must_use]
+    pub fn home_of(&self, name: &Name, from: Home<'file>) -> Home<'file> {
+        let candidates = self.declared.get(name).map_or(&[][..], Vec::as_slice);
+        candidates
             .iter()
             .find(|home| **home == from)
             .or_else(|| candidates.iter().find(|home| home.in_crate_with(from).is_some()))
             .or_else(|| candidates.first())
-            .map_or(from, |home| *home);
-        DeclaredType::new(home, name)
+            .map_or(from, |home| *home)
     }
 
     fn reading(self, file: &'file SourceFile) -> TypeHomes<'file> {

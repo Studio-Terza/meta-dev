@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
 
-use lint_core::DeclaredType;
 use lint_core::Home;
 use lint_core::SourceFile;
 use lint_core::TypeHomes;
@@ -15,21 +14,20 @@ pub struct Declarations<'file> {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
     homes: TypeHomes<'file>,
-    sum_types: BTreeSet<DeclaredType<'file>>,
-    reading: Home<'file>,
+    sum_types: BTreeMap<Home<'file>, BTreeSet<Name>>,
+    reading: BTreeSet<Name>,
 }
 
 impl<'file> From<&[&'file SourceFile]> for Declarations<'file> {
     fn from(files: &[&'file SourceFile]) -> Declarations<'file> {
         let seeded = Declarations { homes: TypeHomes::declared_in(files), ..Declarations::default() };
-        let declarations = files.iter().fold(seeded, |declarations, file| {
-            let mut declarations = Declarations { reading: Home::containing(file), ..declarations };
-            declarations.visit_file(file.syntax());
-            declarations
-        });
-        let resolved: BTreeSet<TypeName> =
-            declarations.vertices.iter().map(|vertex| declarations.resolve(vertex.clone())).collect();
-        Declarations { vertices: resolved, ..declarations }
+        files
+            .iter()
+            .fold(seeded, |mut declarations, file| {
+                declarations.visit_file(file.syntax());
+                declarations.filed(Home::containing(file))
+            })
+            .with_resolved_vertices()
     }
 }
 
@@ -46,9 +44,21 @@ impl<'file> Declarations<'file> {
         self.vertices.get(name)
     }
 
-    pub fn foreign_sum_type(&self, enum_name: Name, from: Home<'file>) -> Option<Name> {
-        let declared = self.homes.resolve(enum_name, from);
-        self.sum_types.get(&declared).filter(|known| known.home() != from).map(|_| ()).map(|()| declared.into_name())
+    pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home<'file>) -> Option<&Name> {
+        let home = self.homes.home_of(enum_name, *from);
+        self.sum_types.get(&home).and_then(|names| names.get(enum_name)).filter(|_| home != *from)
+    }
+
+    fn filed(mut self, home: Home<'file>) -> Declarations<'file> {
+        let enums = std::mem::take(&mut self.reading);
+        self.sum_types.entry(home).or_default().extend(enums);
+        self
+    }
+
+    fn with_resolved_vertices(mut self) -> Declarations<'file> {
+        let vertices = std::mem::take(&mut self.vertices);
+        self.vertices = vertices.into_iter().map(|vertex| self.resolve(vertex)).collect();
+        self
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {
@@ -57,11 +67,6 @@ impl<'file> Declarations<'file> {
             .and_then(|(_, path, _)| path.segments.last())
             .filter(|segment| segment.ident == "State")
             .map(|_| TypeName::from_type(&item.self_ty))
-    }
-
-    fn record_enum(&mut self, item: &ItemEnum) {
-        let declared = DeclaredType::new(self.reading, Name::from(&item.ident));
-        self.sum_types.extend(Self::sum_type(item).map(|_| declared));
     }
 
     fn sum_type(item: &ItemEnum) -> Option<&ItemEnum> {
@@ -82,7 +87,7 @@ impl<'ast> Visit<'ast> for Declarations<'_> {
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-        Walk::enter(&item.attrs, || self.record_enum(item));
+        Walk::enter(&item.attrs, || self.reading.extend(Self::sum_type(item).map(|found| Name::from(&found.ident))));
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {

@@ -5,20 +5,20 @@ use transition_facts::Transition;
 
 use crate::edge::Role;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum Label {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum Label<'found> {
     Written,
-    Trait(Name),
+    Trait(&'found Name),
     Lift,
-    Operation(Name),
+    Operation(&'found Name),
 }
 
-impl Label {
-    pub(crate) fn read(role: Role, transition: &Transition) -> Label {
-        match (role, transition.filler().trait_name()) {
-            (Role::Operation, _) => Label::Operation(AsRef::<Name>::as_ref(transition).clone()),
+impl<'found> Label<'found> {
+    pub(crate) fn read(role: Role, transition: &Transition<'found, '_>) -> Label<'found> {
+        match (role, transition.context().trait_name()) {
+            (Role::Operation, _) => Label::Operation(transition.function().as_ref()),
             (Role::Lift, _) => Label::Lift,
-            (Role::Written, Some(name)) => Label::Trait(name.clone()),
+            (Role::Written, Some(name)) => Label::Trait(name),
             (Role::Written, None) => Label::Written,
         }
     }
@@ -27,20 +27,20 @@ impl Label {
 #[derive(Debug)]
 pub(crate) struct Lifted;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Interface(Name);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Interface<'found>(&'found Name);
 
-impl Label {
-    pub(crate) fn written(&self) -> Option<&Label> {
+impl<'found> Label<'found> {
+    pub(crate) fn written(&self) -> Option<&Label<'found>> {
         match self {
             Label::Written | Label::Trait(_) => Some(self),
             Label::Lift | Label::Operation(_) => None,
         }
     }
 
-    pub(crate) fn interface(&self) -> Option<Interface> {
+    pub(crate) fn interface(&self) -> Option<Interface<'found>> {
         match self {
-            Label::Trait(name) => Some(Interface(name.clone())),
+            Label::Trait(name) => Some(Interface(name)),
             Label::Written | Label::Lift | Label::Operation(_) => None,
         }
     }
@@ -53,7 +53,7 @@ impl Label {
     }
 }
 
-impl fmt::Display for Label {
+impl fmt::Display for Label<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Label::Written => write!(formatter, "written"),

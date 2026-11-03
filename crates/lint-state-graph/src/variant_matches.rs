@@ -36,14 +36,11 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     fn foreign_variant(&self, pat: &Pat) -> Option<Name> {
         VariantPaths::in_pat(pat)
             .into_iter()
-            .find_map(|enum_name| self.declarations.foreign_sum_type(enum_name, self.home))
+            .find_map(|enum_name| self.declarations.foreign_sum_type(&enum_name, &self.home).map(|_| enum_name))
     }
 
     fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation<'file> {
-        Violation::new(
-            Site::new(self.path, LineNumber::from(pat.span())),
-            Finding::ForeignMatch { enum_name: enum_name.clone() },
-        )
+        Violation::new(Site::new(self.path, LineNumber::from(pat.span())), Finding::ForeignMatch { enum_name })
     }
 
     fn foreign_match(&self, arm: &Arm) -> Option<Violation<'file>> {

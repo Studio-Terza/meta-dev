@@ -12,20 +12,20 @@ use lint_layout::Name;
 use reader::Reader;
 
 #[derive(Debug, Default)]
-pub(crate) struct Coverage {
-    laws: Vec<Law>,
+pub(crate) struct Coverage<'file> {
+    laws: Vec<Law<'file>>,
 }
 
-impl Coverage {
-    pub(crate) fn read_all(files: &[SourceFile]) -> Coverage {
+impl<'file> Coverage<'file> {
+    pub(crate) fn read_all(files: &'file [SourceFile]) -> Coverage<'file> {
         files.iter().fold(Coverage::default(), Coverage::read)
     }
 
-    pub(crate) fn law_naming(&self, subject: &Subject) -> Option<&Law> {
+    pub(crate) fn law_naming(&self, subject: &Subject<'_>) -> Option<&Law<'file>> {
         self.laws.iter().find_map(|law| law.naming(subject))
     }
 
-    pub(crate) fn roundtrips_naming(&self, subject: &Subject) -> Vec<&BTreeSet<Name>> {
+    pub(crate) fn roundtrips_naming(&self, subject: &Subject<'_>) -> Vec<&BTreeSet<Name>> {
         self.laws
             .iter()
             .filter_map(|law| law.naming(subject))
@@ -34,7 +34,7 @@ impl Coverage {
             .collect()
     }
 
-    fn read(mut self, file: &SourceFile) -> Coverage {
+    fn read(mut self, file: &'file SourceFile) -> Coverage<'file> {
         self.laws.extend(Reader::read(file));
         file.test_modules().iter().fold(self, Coverage::read)
     }

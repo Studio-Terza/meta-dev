@@ -10,7 +10,7 @@ use file_ports::Files;
 use lint_reader::SourceFiles;
 
 use failure::Failure;
-use workspace::Workspace;
+use workspace::{Metadata, Workspace};
 
 #[derive(Debug)]
 pub struct Cli;
@@ -50,40 +50,44 @@ impl Cli {
         match command.as_deref().and_then(OsStr::to_str) {
             Some(Self::AFFECTED) => {
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.reached(&changed))?)
+                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, &metadata)?).reached(&changed))?)
             }
             Some(Self::WIDENED) => {
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.reached(&changed).widened())?)
+                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, &metadata)?).reached(&changed).widened())?)
             }
             Some(Self::HISTORY) => {
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.history(&changed))?)
+                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, &metadata)?).history(&changed))?)
             }
             Some(Self::SOURCES) => {
                 let roots: Vec<OsString> = arguments.collect();
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.sources(&roots))?)
+                Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, &metadata)?).sources(&roots))?)
             }
             Some(Self::BEYOND) => {
                 let produced = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
-                let beyond = Self::workspace(files, &metadata)?.beyond(&produced, &changed);
+                let beyond = Workspace::from(&Self::metadata(files, &metadata)?).beyond(&produced, &changed);
                 Ok(beyond.map_or(Ok(()), |path| writeln!(out, "{}", path.display()))?)
             }
             Some(Self::HUBS) => {
                 let repository = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
                 let readout = SourceFiles::read(files, &repository)?;
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.hubs(readout.files(), &repository))?)
+                Ok(write!(
+                    out,
+                    "{}",
+                    Workspace::from(&Self::metadata(files, &metadata)?).hubs(readout.files(), &repository)
+                )?)
             }
-            Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(files, &metadata)?.fan_in())?),
+            Some(Self::FAN_IN) => Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, &metadata)?).fan_in())?),
             _ => Err(Failure::Usage),
         }
     }
 
-    fn workspace(files: &impl Files, metadata: &Path) -> Result<Workspace, Failure> {
+    fn metadata(files: &impl Files, metadata: &Path) -> Result<Metadata, Failure> {
         let text = files
             .read_text(metadata)
             .map_err(|failure| Failure::Read { path: metadata.to_path_buf(), source: io::Error::from(failure) })?;
-        text.as_ref().parse()
+        serde_json::from_str::<Metadata>(text.as_ref())?.checked()
     }
 }

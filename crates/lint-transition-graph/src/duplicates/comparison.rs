@@ -2,7 +2,7 @@ use std::fmt;
 
 use lint_core::{Site, Violation};
 use lint_layout::Fix;
-use transition_facts::Transition;
+use transition_facts::Transitions;
 
 use super::family::Family;
 use crate::count::Count;
@@ -35,10 +35,10 @@ impl Comparison {
         }
     }
 
-    pub(super) fn violation<'file>(&self, transitions: &[Transition<'file>]) -> Option<Violation<'file>> {
+    pub(super) fn violation<'file>(&self, transitions: &Transitions<'file>) -> Option<Violation<'file>> {
         transitions
-            .iter()
-            .map(|found| *AsRef::<Site<'file>>::as_ref(found))
+            .all()
+            .map(|found| *AsRef::<Site<'file>>::as_ref(&found))
             .min()
             .map(|first| Violation::new(first, self))
     }

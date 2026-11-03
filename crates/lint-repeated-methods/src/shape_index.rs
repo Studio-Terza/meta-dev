@@ -19,7 +19,7 @@ use repeated_shape::RepeatedShape;
 
 #[derive(Debug)]
 pub struct ShapeIndex<'file> {
-    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType<'file>, Site<'file>>>,
+    owners: BTreeMap<DeclaredType<'file>, BTreeMap<MethodShape, Site<'file>>>,
     inners: Inners<'file>,
     homes: TypeHomes<'file>,
     home: Home<'file>,
@@ -30,7 +30,7 @@ impl<'file> ShapeIndex<'file> {
     #[must_use]
     pub fn of_files(files: &[&'file SourceFile]) -> ShapeIndex<'file> {
         let index = ShapeIndex {
-            shapes: BTreeMap::new(),
+            owners: BTreeMap::new(),
             inners: Inners::gathered_from(files),
             homes: TypeHomes::declared_in(files),
             home: Home::default(),
@@ -41,13 +41,24 @@ impl<'file> ShapeIndex<'file> {
 
     #[must_use]
     pub fn repeated(self, most: Most) -> Vec<Violation<'file>> {
-        self.shapes
+        let shapes = self
+            .owners
+            .iter()
+            .flat_map(|(owner, methods)| methods.iter().map(move |(shape, site)| (shape, owner, *site)))
+            .fold(
+                BTreeMap::new(),
+                |mut shapes: BTreeMap<&MethodShape, BTreeMap<&DeclaredType<'file>, Site<'file>>>,
+                 (shape, owner, site)| {
+                    shapes.entry(shape).or_default().insert(owner, site);
+                    shapes
+                },
+            );
+        shapes
             .into_iter()
             .filter(|(_, types)| most.allows(Length::new(types.len())).is_none())
             .filter_map(|(shape, types)| {
                 let site = types.values().min().copied()?;
-                let repeated = RepeatedShape::new(shape, types.into_keys().collect());
-                Some(Violation::new(site, repeated))
+                Some(Violation::new(site, RepeatedShape::new(shape, types.into_keys().collect())))
             })
             .collect()
     }
@@ -65,24 +76,26 @@ impl<'file> ShapeIndex<'file> {
         }
     }
 
-    fn placed(&self, item: &ItemImpl, written: Name) -> Vec<Placed<'file>> {
+    fn placed(&self, item: &ItemImpl, written: Name) -> Placed<'file> {
         let self_type = self.homes.resolve(written, self.home);
-        let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type));
-        item.items
+        let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type.home(), self_type.as_ref()));
+        let shapes = item
+            .items
             .iter()
             .filter_map(|member| match (member, &item.trait_) {
                 (ImplItem::Fn(function), None)
                     if !matches!(function.vis, Visibility::Inherited) && function.sig.constness.is_none() =>
                 {
-                    Some((function, MethodShape::described(&function.sig, &erasure)))
+                    Some(function)
                 }
                 _ => None,
             })
-            .map(|(function, shape)| {
+            .fold(BTreeMap::new(), |mut shapes, function| {
                 let site = Site::new(self.file, LineNumber::from(function.sig.ident.span()));
-                Placed::new(self_type.clone(), shape, site)
-            })
-            .collect()
+                shapes.entry(MethodShape::described(&function.sig, &erasure)).or_insert(site);
+                shapes
+            });
+        Placed::new(self_type, shapes)
     }
 }
 
@@ -96,10 +109,10 @@ impl<'ast> Visit<'ast> for ShapeIndex<'_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed = self_type.map(|self_type| self.placed(item, self_type)).unwrap_or_default();
-        placed.into_iter().fold(&mut self.shapes, |shapes, placed| {
-            placed.recorded_in(shapes);
-            shapes
+        let placed = self_type.map(|self_type| self.placed(item, self_type));
+        placed.into_iter().fold(&mut self.owners, |owners, placed| {
+            placed.recorded_in(owners);
+            owners
         });
     }
 }

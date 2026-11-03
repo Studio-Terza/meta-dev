@@ -1,7 +1,5 @@
-mod finding;
 mod guards;
 
-use finding::Finding;
 use guards::Guards;
 use lint_core::{Headline, Lint, Report, SourceFile};
 

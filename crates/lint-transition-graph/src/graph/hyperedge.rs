@@ -9,9 +9,9 @@ use crate::end::Hop;
 
 #[derive(Debug)]
 pub(crate) struct Hyperedge<'found, 'file> {
-    hop: Hop,
-    label: Label,
-    transition: &'found Transition<'file>,
+    hop: Hop<'found>,
+    label: Label<'found>,
+    transition: Transition<'found, 'file>,
 }
 
 impl<'found, 'file> Hyperedge<'found, 'file> {
@@ -19,7 +19,7 @@ impl<'found, 'file> Hyperedge<'found, 'file> {
         edge.ends().hop().and_then(Hop::onward).map(|hop| Hyperedge {
             hop,
             label: Label::read(edge.role(), edge.transition()),
-            transition: edge.transition(),
+            transition: *edge.transition(),
         })
     }
 
@@ -34,19 +34,19 @@ impl<'found, 'file> Hyperedge<'found, 'file> {
         (!ptr::eq(self, than)).then_some(self)
     }
 
-    pub(crate) fn transition(&self) -> &'found Transition<'file> {
-        self.transition
+    pub(crate) fn transition(&self) -> &Transition<'found, 'file> {
+        &self.transition
     }
 }
 
-impl AsRef<Hop> for Hyperedge<'_, '_> {
-    fn as_ref(&self) -> &Hop {
+impl<'found> AsRef<Hop<'found>> for Hyperedge<'found, '_> {
+    fn as_ref(&self) -> &Hop<'found> {
         &self.hop
     }
 }
 
-impl AsRef<Label> for Hyperedge<'_, '_> {
-    fn as_ref(&self) -> &Label {
+impl<'found> AsRef<Label<'found>> for Hyperedge<'found, '_> {
+    fn as_ref(&self) -> &Label<'found> {
         &self.label
     }
 }

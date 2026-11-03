@@ -6,13 +6,13 @@ use lint_core::Fix;
 use super::method_shape::MethodShape;
 
 #[derive(Debug)]
-pub struct RepeatedShape<'file> {
-    shape: MethodShape,
-    types: Vec<DeclaredType<'file>>,
+pub struct RepeatedShape<'index> {
+    shape: &'index MethodShape,
+    types: Vec<&'index DeclaredType<'index>>,
 }
 
-impl<'file> RepeatedShape<'file> {
-    pub fn new(shape: MethodShape, types: Vec<DeclaredType<'file>>) -> RepeatedShape<'file> {
+impl<'index> RepeatedShape<'index> {
+    pub fn new(shape: &'index MethodShape, types: Vec<&'index DeclaredType<'index>>) -> RepeatedShape<'index> {
         RepeatedShape { shape, types }
     }
 }

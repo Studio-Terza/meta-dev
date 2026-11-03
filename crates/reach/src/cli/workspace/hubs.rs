@@ -12,14 +12,14 @@ use among::Among;
 pub use hub::Hub;
 
 #[derive(Debug)]
-pub struct Hubs<'file> {
-    hubs: Vec<Hub<'file>>,
+pub struct Hubs<'meta, 'file> {
+    hubs: Vec<Hub<'meta, 'file>>,
 }
 
-impl<'file> Hubs<'file> {
+impl<'meta, 'file> Hubs<'meta, 'file> {
     const HEADLINE: &'static str = "report only, hub thickness: the logic each crate holds, its shipped functions' cyclomatic complexity above one summed, weighted by the crates that depend on it; a crate many depend on should hold types, traits and interfaces, with the logic in the leaves";
 
-    pub fn weighed(hubs: Vec<Hub<'file>>) -> Hubs<'file> {
+    pub fn weighed(hubs: Vec<Hub<'meta, 'file>>) -> Hubs<'meta, 'file> {
         Hubs { hubs: Hub::ranked(hubs) }
     }
 
@@ -28,7 +28,7 @@ impl<'file> Hubs<'file> {
     }
 }
 
-impl fmt::Display for Hubs<'_> {
+impl fmt::Display for Hubs<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let violations: Vec<Violation<'_>> = self.hubs.iter().map(Violation::from).collect();
         write!(formatter, "{}", Report::new(Headline::new(Self::HEADLINE), violations))?;

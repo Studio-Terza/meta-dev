@@ -42,10 +42,10 @@ impl GraphLint for Tangles {
 
 impl Tangles {
     fn component<'graph>(
-        node: &'graph Node,
-        reached: &BTreeSet<&'graph Node>,
-        reach: &BTreeMap<&'graph Node, BTreeSet<&'graph Node>>,
-    ) -> BTreeSet<&'graph Node> {
+        node: &'graph Node<'graph>,
+        reached: &BTreeSet<&'graph Node<'graph>>,
+        reach: &BTreeMap<&'graph Node<'graph>, BTreeSet<&'graph Node<'graph>>>,
+    ) -> BTreeSet<&'graph Node<'graph>> {
         reached
             .iter()
             .copied()
@@ -54,8 +54,11 @@ impl Tangles {
             .collect()
     }
 
-    fn reached<'graph>(start: &'graph Node, consuming: &Consuming<'graph, '_>) -> BTreeSet<&'graph Node> {
-        let mut reached = consuming.closure(BTreeSet::from([start]));
+    fn reached<'graph>(
+        start: &'graph Node<'graph>,
+        consuming: &Consuming<'graph, '_>,
+    ) -> BTreeSet<&'graph Node<'graph>> {
+        let mut reached = consuming.closure(&BTreeSet::from([start]));
         reached.remove(start);
         reached
     }

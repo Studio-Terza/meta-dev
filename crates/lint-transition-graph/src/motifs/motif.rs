@@ -12,19 +12,19 @@ use crate::graph::Hyperedge;
 #[derive(Clone, Debug)]
 pub(super) struct Occurrence<'graph, 'file> {
     edges: Vec<&'graph Hyperedge<'graph, 'file>>,
-    start: &'graph Tuple,
-    reached: Vec<&'graph Node>,
+    start: &'graph Tuple<'graph>,
+    reached: Vec<&'graph Node<'graph>>,
 }
 
 impl<'graph, 'file> Occurrence<'graph, 'file> {
     pub(super) fn started(edge: &'graph Hyperedge<'graph, 'file>) -> Occurrence<'graph, 'file> {
-        let hop: &'graph Hop = edge.as_ref();
+        let hop: &'graph Hop<'graph> = edge.as_ref();
         Occurrence { edges: vec![edge], start: hop.as_ref(), reached: vec![hop.reached()] }
     }
 
     pub(super) fn extended(&self, edge: &'graph Hyperedge<'graph, 'file>) -> Option<Occurrence<'graph, 'file>> {
-        let hop: &'graph Hop = edge.as_ref();
-        let available: BTreeSet<&'graph Node> = self.nodes().collect();
+        let hop: &'graph Hop<'graph> = edge.as_ref();
+        let available: BTreeSet<&'graph Node<'graph>> = self.nodes().collect();
         hop.fired(&available).filter(|reached| !available.contains(reached)).map(|reached| Occurrence {
             edges: self.edges.iter().copied().chain([edge]).collect(),
             start: self.start,
@@ -32,15 +32,15 @@ impl<'graph, 'file> Occurrence<'graph, 'file> {
         })
     }
 
-    pub(super) fn last(&self) -> Option<&'graph Node> {
+    pub(super) fn last(&self) -> Option<&'graph Node<'graph>> {
         self.reached.last().copied()
     }
 
     pub(super) fn shape(&self) -> Vec<&'graph Name> {
-        self.edges.iter().map(|edge| AsRef::<Name>::as_ref(edge.transition())).collect()
+        self.edges.iter().map(|edge| AsRef::<Name>::as_ref(edge.transition().function())).collect()
     }
 
-    fn nodes(&self) -> impl Iterator<Item = &'graph Node> + '_ {
+    fn nodes(&self) -> impl Iterator<Item = &'graph Node<'graph>> + '_ {
         self.start.iter().chain(self.reached.iter().copied())
     }
 
@@ -60,7 +60,7 @@ impl fmt::Display for Occurrence<'_, '_> {
 #[derive(Debug, Default)]
 struct Chosen<'graph, 'file> {
     repeats: Vec<Occurrence<'graph, 'file>>,
-    used: BTreeSet<&'graph Node>,
+    used: BTreeSet<&'graph Node<'graph>>,
 }
 
 impl<'graph, 'file> Chosen<'graph, 'file> {

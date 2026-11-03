@@ -14,23 +14,23 @@ use lint_core::Site;
 use lint_core::TypeName;
 use lint_layout::LineNumber;
 
-pub struct FunctionShape<'file> {
+pub struct FunctionShape<'found, 'file> {
     site: Site<'file>,
-    returns: Returns,
-    vertex_parameters: Vec<TypeName>,
+    returns: Returns<'found>,
+    vertex_parameters: Vec<&'found TypeName>,
     body: Body,
 }
 
-impl<'file> FunctionShape<'file> {
+impl<'found, 'file> FunctionShape<'found, 'file> {
     pub fn describe(
         path: &'file Path,
         function: &ImplItemFn,
-        context: &ImplContext,
-        declarations: &Declarations<'_>,
-    ) -> FunctionShape<'file> {
+        context: &ImplContext<'_>,
+        declarations: &'found Declarations<'_>,
+    ) -> FunctionShape<'found, 'file> {
         let vertex = |ty: &Type| {
             let written = TypeName::from_type(ty);
-            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).cloned()
+            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type())))
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),
@@ -52,11 +52,11 @@ impl<'file> FunctionShape<'file> {
         self.site
     }
 
-    pub fn returns(&self) -> &Returns {
+    pub fn returns(&self) -> &Returns<'found> {
         &self.returns
     }
 
-    pub fn vertex_parameters(&self) -> &[TypeName] {
+    pub fn vertex_parameters(&self) -> &[&'found TypeName] {
         &self.vertex_parameters
     }
 
