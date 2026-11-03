@@ -9,7 +9,7 @@ impl From<usize> for NodeIndex {
 
 impl NodeIndex {
     #[must_use]
-    pub fn index(self) -> usize {
+    pub fn into_inner(self) -> usize {
         self.0
     }
 }

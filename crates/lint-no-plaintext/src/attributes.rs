@@ -1,14 +1,16 @@
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Meta, Path, Token};
 
+use lint_layout::{Name, Word};
+
 pub struct Attributes {
     metas: Vec<Meta>,
 }
 
 impl Attributes {
-    const CONDITIONAL: &'static str = "cfg_attr";
-    const DERIVE: &'static str = "derive";
-    const SERDE: &'static str = "serde";
+    const CONDITIONAL: Word<'static> = Word::new("cfg_attr");
+    const DERIVE: Word<'static> = Word::new("derive");
+    const SERDE: Word<'static> = Word::new("serde");
     const DESERIALIZE: &'static str = "Deserialize";
     const VALIDATING: &'static str = "try_from";
 
@@ -35,9 +37,9 @@ impl Attributes {
         if inner.is_empty() { vec![meta.clone()] } else { inner.into_iter().skip(1).collect() }
     }
 
-    fn nested(meta: &Meta, name: &str) -> Vec<Meta> {
+    fn nested(meta: &Meta, name: Word<'_>) -> Vec<Meta> {
         match meta {
-            Meta::List(list) if list.path.is_ident(name) => list
+            Meta::List(list) if list.path.get_ident().is_some_and(|ident| Name::from(ident) == name) => list
                 .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
                 .map(|parsed| parsed.into_iter().collect())
                 .unwrap_or_default(),

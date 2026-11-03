@@ -5,19 +5,23 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use newtype::Newtype;
+use toml::Spanned;
 use toml::de::DeTable;
 use toml::{Table, Value};
 
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::name::Name;
+use crate::source_text::SourceText;
 use crate::untested::Untested;
+use crate::word::Word;
 use members::Members;
 
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
-    text: String,
+    text: SourceText,
     table: Table,
 }
 
@@ -42,7 +46,9 @@ impl Manifest {
         match fs::read_to_string(&file) {
             Ok(text) => text
                 .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: text.clone(), table }))
+                .map(|table| {
+                    Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text.clone()), table })
+                })
                 .map_err(|source| Failure::Manifest { path: file, source }),
             Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(source) => Err(Failure::Io { path: file, source }),
@@ -66,7 +72,7 @@ impl Manifest {
 
     #[must_use]
     pub fn features(&self) -> BTreeMap<Name, LineNumber> {
-        DeTable::parse(&self.text)
+        DeTable::parse(self.text.as_ref())
             .map(|document| {
                 document
                     .get_ref()
@@ -74,21 +80,21 @@ impl Manifest {
                     .filter(|(key, _)| key.get_ref() == Self::FEATURES)
                     .filter_map(|(_, value)| value.get_ref().as_table())
                     .flat_map(|features| features.keys())
-                    .map(|key| (Name::from(key.get_ref().as_ref()), self.line_at(key.span().start)))
+                    .map(|key| (Name::from(key.get_ref().as_ref()), self.line_of(key)))
                     .collect()
             })
             .unwrap_or_default()
     }
 
-    fn line_at(&self, byte_index: usize) -> LineNumber {
-        LineNumber::from(self.text.get(..byte_index).unwrap_or_default().matches('\n').count() + 1)
+    fn line_of<Key>(&self, key: &Spanned<Key>) -> LineNumber {
+        LineNumber::from(self.text.as_ref().get(..key.span().start).unwrap_or_default().matches('\n').count() + 1)
     }
 
     #[must_use]
     pub fn workspace(&self) -> Option<Members> {
-        self.table
-            .get(Self::WORKSPACE)
-            .map(|_| Members::new(self.workspace_strings("members"), self.workspace_strings("exclude")))
+        self.table.get(Self::WORKSPACE).map(|_| {
+            Members::new(self.workspace_names(Word::new("members")), self.workspace_names(Word::new("exclude")))
+        })
     }
 
     #[must_use]
@@ -126,28 +132,30 @@ impl Manifest {
                 .filter(|target| target.get(Self::TEST).and_then(Value::as_bool) == Some(false))
                 .flat_map(|target| {
                     let explicit = target.get(Self::PATH).and_then(Value::as_str).map(|path| vec![PathBuf::from(path)]);
-                    explicit.unwrap_or_else(|| Self::default_files(target.get(Self::NAME).and_then(Value::as_str)))
+                    explicit.unwrap_or_else(|| {
+                        Self::default_files(target.get(Self::NAME).and_then(Value::as_str).map(Name::from))
+                    })
                 })
                 .filter_map(|path| fs::canonicalize(self.directory.join(path)).ok())
                 .collect(),
         )
     }
 
-    fn default_files(name: Option<&str>) -> Vec<PathBuf> {
+    fn default_files(name: Option<Name>) -> Vec<PathBuf> {
         name.into_iter()
             .flat_map(|name| {
-                Self::TARGET_DIRECTORIES.iter().flat_map(move |directory| {
-                    let target = PathBuf::from(directory).join(name);
-                    [target.with_extension(Self::SOURCE_EXTENSION), target.join(Self::MAIN_FILE)]
-                })
+                Self::TARGET_DIRECTORIES
+                    .iter()
+                    .map(move |directory| PathBuf::from(directory).join(&name))
+                    .flat_map(|target| [target.with_extension(Self::SOURCE_EXTENSION), target.join(Self::MAIN_FILE)])
             })
             .collect()
     }
 
-    fn workspace_strings(&self, key: &str) -> Vec<Name> {
+    fn workspace_names(&self, key: Word<'_>) -> Vec<Name> {
         self.table
             .get(Self::WORKSPACE)
-            .and_then(|workspace| workspace.get(key))
+            .and_then(|workspace| workspace.get(key.into_inner()))
             .and_then(Value::as_array)
             .into_iter()
             .flatten()

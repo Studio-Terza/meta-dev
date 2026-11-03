@@ -1,3 +1,7 @@
+use newtype::Newtype;
+
+use crate::document::text::Text;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Key {
     Run,
@@ -9,8 +13,8 @@ pub(crate) enum Key {
 }
 
 impl Key {
-    pub(crate) fn named(text: &str) -> Option<Key> {
-        match text {
+    pub(crate) fn named(text: Text<'_>) -> Option<Key> {
+        match text.into_inner() {
             "run" => Some(Key::Run),
             "shell" => Some(Key::Shell),
             "uses" => Some(Key::Uses),

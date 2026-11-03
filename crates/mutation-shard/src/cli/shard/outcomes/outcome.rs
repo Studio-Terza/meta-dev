@@ -1,6 +1,6 @@
 mod named;
+mod title;
 
-use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -9,6 +9,7 @@ use text_lines::LossyText;
 
 use named::Named;
 use test_log::{TestLog, TestName};
+pub use title::Title;
 
 use crate::cli::shard::mutant_result::MutantResult;
 use crate::cli::shard::verdict::Verdict;
@@ -44,9 +45,7 @@ impl Outcome {
     pub fn mutant(&self, directory: &Path) -> Option<MutantResult> {
         match &self.scenario {
             Scenario::Mutant(named) => {
-                let mut title = String::new();
-                write!(title, "{named}").ok();
-                Some(MutantResult::new(title, self.summary, self.log(directory).failed()))
+                Some(MutantResult::new(Title::from(named), self.summary, self.log(directory).failed()))
             }
             Scenario::Baseline => None,
         }

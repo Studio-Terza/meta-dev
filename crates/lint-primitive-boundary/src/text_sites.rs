@@ -1,4 +1,5 @@
 mod owner;
+pub use owner::Owner;
 mod sighting;
 
 use std::path::Path;
@@ -6,11 +7,12 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
 
+use lint_core::Gate;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::{Name, Whole, Word, words};
-use owner::Owner;
+
 use sighting::Sighting;
 
 #[derive(Default)]
@@ -76,8 +78,8 @@ impl TextSites {
 impl<'ast> Visit<'ast> for TextSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => syn::visit::visit_item_mod(self, module),
-            Walk::Skipped => {}
+            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
+            Walk::Entered | Walk::Skipped => {}
         }
     }
 

@@ -1,3 +1,5 @@
+mod question;
+
 use std::ffi::OsString;
 use std::process::ExitCode;
 
@@ -5,13 +7,14 @@ use text_lines::Lines;
 
 use super::journal::Journal;
 use crate::cli::command::failure::{Failure, Refusal};
-use crate::cli::ports::{Invocation, Ports};
+use crate::cli::ports::{Invocation, Ports, Text};
+pub(crate) use question::Question;
 
 #[derive(Debug)]
 pub(crate) struct Changed;
 
 impl Changed {
-    pub(crate) fn asked(ports: &impl Ports, invocation: &Invocation) -> Result<String, Failure> {
+    pub(crate) fn asked(ports: &impl Ports, invocation: &Invocation) -> Result<Text, Failure> {
         ports.output(invocation).map_err(|source| Failure::Program { program: invocation.program().to_owned(), source })
     }
 
@@ -23,17 +26,17 @@ impl Changed {
         metadata.replace(&text)
     }
 
-    pub(crate) fn reach(arguments: impl Iterator<Item = OsString>) -> Result<String, Failure> {
+    pub(crate) fn reach(arguments: impl Iterator<Item = OsString>) -> Result<Text, Failure> {
         let mut report = Vec::new();
         let mut refusal = Vec::new();
         if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {
-            Ok(String::from_utf8(report).unwrap_or_default())
+            Ok(Text::new(String::from_utf8(report).unwrap_or_default()))
         } else {
             Err(Failure::Reach(Refusal::from(refusal)))
         }
     }
 
-    pub(crate) fn answered(command: &str, metadata: &Journal, ports: &impl Ports) -> Result<String, Failure> {
+    pub(crate) fn answered(question: Question, metadata: &Journal, ports: &impl Ports) -> Result<Text, Failure> {
         let changed = Self::asked(
             ports,
             &Invocation::new(
@@ -41,9 +44,9 @@ impl Changed {
                 ["-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"],
             ),
         )?;
-        let arguments = [OsString::from(command), metadata.as_ref().as_os_str().to_owned()]
+        let arguments = [OsString::from(question), metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
-            .chain(Lines::from(changed.as_str()).map(OsString::from));
+            .chain(Lines::from(changed.as_ref()).map(OsString::from));
         Self::reach(arguments)
     }
 }

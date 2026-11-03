@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::io::Write;
 
 use super::Step;
-use super::issue::Issue;
+use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 
@@ -24,7 +24,7 @@ impl Step for StageIssues {
             exit.followed_by(|| {
                 let stage = finding.stage();
                 writeln!(out, "{stage} is past its warn level")?;
-                Issue::titled(stage.as_ref(), ports)?.filed(finding, ports, out)
+                Issue::titled(Title::new(stage.as_ref()), ports)?.filed(finding, ports, out)
             })
         })
     }

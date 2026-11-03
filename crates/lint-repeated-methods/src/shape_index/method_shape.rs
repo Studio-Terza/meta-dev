@@ -8,11 +8,15 @@ use syn::{FnArg, ReturnType, Signature};
 use lint_layout::Name;
 
 pub use erasure::Erasure;
+use newtype::{Arbitrary, Display, Newtype};
+
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Spelling(String);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MethodShape {
     name: Name,
-    signature: String,
+    signature: Spelling,
 }
 
 impl MethodShape {
@@ -32,7 +36,11 @@ impl MethodShape {
         };
         MethodShape {
             name: Name::from(&signature.ident),
-            signature: format!("{}({}){output}", erasure.spelled(&signature.generics), inputs.join(", ")),
+            signature: Spelling::new(format!(
+                "{}({}){output}",
+                erasure.spelled(&signature.generics),
+                inputs.join(", ")
+            )),
         }
     }
 }

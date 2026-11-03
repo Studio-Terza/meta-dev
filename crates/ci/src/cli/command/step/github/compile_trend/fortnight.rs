@@ -6,11 +6,27 @@ use serde::Deserialize;
 
 use super::build::Build;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Invocation, Ports};
+use crate::cli::ports::{Invocation, Ports, Text};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Deserialize)]
 #[serde(transparent)]
 struct RunId(u64);
+
+#[derive(Clone, Copy, Debug)]
+enum Stamp {
+    Created,
+    Merged,
+}
+
+impl fmt::Display for Stamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let field = match self {
+            Stamp::Created => "createdAt",
+            Stamp::Merged => "mergedAt",
+        };
+        write!(formatter, "(.{field} | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
+    }
+}
 
 #[derive(Debug)]
 pub struct Fortnight {
@@ -27,10 +43,6 @@ impl Fortnight {
 
     pub(super) fn downloading_to(downloads: PathBuf) -> Fortnight {
         Fortnight { downloads }
-    }
-
-    fn since(stamp: &str) -> String {
-        format!("(.{stamp} | fromdate) > now - {} * {}", Self::DAYS, Self::DAY_SECONDS)
     }
 
     pub(super) fn downloaded(&self, ports: &impl Ports) -> Result<Vec<Build>, Failure> {
@@ -50,11 +62,11 @@ impl Fortnight {
                 "--json".to_owned(),
                 "databaseId,createdAt".to_owned(),
                 "--jq".to_owned(),
-                format!("[.[] | select({}) | .databaseId]", Self::since("createdAt")),
+                format!("[.[] | select({}) | .databaseId]", Stamp::Created),
             ],
         );
         let listed = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
-        let runs: Vec<RunId> = serde_json::from_str(&listed).map_err(Failure::Runs)?;
+        let runs: Vec<RunId> = serde_json::from_str(listed.as_ref()).map_err(Failure::Runs)?;
         runs.into_iter().map(|run| self.download(run, ports)).collect()
     }
 
@@ -76,7 +88,7 @@ impl Fortnight {
         Build::try_from(directory.as_path())
     }
 
-    pub(super) fn merged(ports: &impl Ports) -> Result<String, Failure> {
+    pub(super) fn merged(ports: &impl Ports) -> Result<Text, Failure> {
         let invocation = Invocation::new(
             "gh",
             [
@@ -93,7 +105,7 @@ impl Fortnight {
                 "--json".to_owned(),
                 "number,title,mergedAt".to_owned(),
                 "--jq".to_owned(),
-                format!(r##".[] | select({}) | "#\(.number) \(.title)""##, Self::since("mergedAt")),
+                format!(r##".[] | select({}) | "#\(.number) \(.title)""##, Stamp::Merged),
             ],
         );
         ports.output(&invocation).map_err(Failure::starting(&invocation))

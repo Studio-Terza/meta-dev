@@ -113,9 +113,9 @@ impl Ports for Fake {
         Ok(Run::new(self.exit, self.elapsed))
     }
 
-    fn output(&self, invocation: &Invocation) -> io::Result<String> {
+    fn output(&self, invocation: &Invocation) -> io::Result<ci::ports::Text> {
         self.recorded(invocation)?;
-        Ok(self.answer_to(invocation))
+        Ok(ci::ports::Text::new(self.answer_to(invocation)))
     }
 
     fn logged(&self, invocation: &Invocation, log: &Path) -> io::Result<Run> {

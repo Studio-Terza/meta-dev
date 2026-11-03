@@ -2,7 +2,6 @@ use saphyr::YamlData;
 
 use crate::document::found::Found;
 use crate::document::node::Node;
-use crate::document::text::Text;
 use crate::finding::Finding;
 
 #[derive(Debug)]
@@ -21,9 +20,6 @@ impl Environment {
     }
 
     fn multiline_entry(name: Node<'_, '_>, value: Node<'_, '_>) -> Option<Found> {
-        value
-            .text()
-            .and_then(|text| Text::new(text).trimmed().multiline())
-            .map(|_| Found::new(name.line(), Finding::Environment))
+        value.text().and_then(|text| text.trimmed().multiline()).map(|_| Found::new(name.line(), Finding::Environment))
     }
 }

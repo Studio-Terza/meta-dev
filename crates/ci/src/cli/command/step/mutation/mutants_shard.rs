@@ -32,7 +32,7 @@ impl Step for MutantsShard {
             .into_iter()
             .chain(Self::SHARDING.iter().map(OsStr::new))
             .collect();
-        let invocation = CargoMutants::invocation(&self.output, &selection, &Self::PASSED_ON);
+        let invocation = CargoMutants::invocation(&self.output, &selection, &Self::PASSED_ON.map(OsStr::new));
         ports
             .run(&invocation)
             .map(|run| run.exit().excusing(&[CargoMutants::MISSED, CargoMutants::TIMEOUT]))

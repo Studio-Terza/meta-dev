@@ -47,9 +47,12 @@ impl ExpressionFlow {
         flows.violations
     }
 
-    fn dropped(statement: &Stmt, last: bool) -> Option<&Stmt> {
+    fn dropped<'block>(statement: &'block Stmt, last: Option<&Stmt>) -> Option<&'block Stmt> {
+        let inner = last.filter(|tail| std::ptr::eq(*tail, statement)).map_or(Some(statement), |_| None);
         match statement {
-            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) if semicolon.is_some() || !last => Some(statement),
+            Stmt::Expr(Expr::If(_) | Expr::Match(_), semicolon) if semicolon.is_some() || inner.is_some() => {
+                Some(statement)
+            }
             _ => None,
         }
     }
@@ -158,23 +161,18 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
-        let last = block.stmts.len().saturating_sub(1);
+        let last = block.stmts.last();
         self.violations.extend(
-            block
-                .stmts
-                .iter()
-                .enumerate()
-                .filter_map(|(index, statement)| ExpressionFlow::dropped(statement, index == last))
-                .map(|statement| {
-                    Self::found(
-                        self.path,
-                        statement.span(),
-                        Message::new(
-                            Problem::new("if or match whose value is dropped"),
-                            Fix::new("let it produce the value the function returns"),
-                        ),
-                    )
-                }),
+            block.stmts.iter().filter_map(|statement| ExpressionFlow::dropped(statement, last)).map(|statement| {
+                Self::found(
+                    self.path,
+                    statement.span(),
+                    Message::new(
+                        Problem::new("if or match whose value is dropped"),
+                        Fix::new("let it produce the value the function returns"),
+                    ),
+                )
+            }),
         );
         syn::visit::visit_block(self, block);
     }

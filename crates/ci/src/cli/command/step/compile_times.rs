@@ -27,7 +27,8 @@ impl CompileTimes {
     const UNIT_DATA: &'static str = "const UNIT_DATA = ";
 
     pub(crate) fn per_crate(page: &Journal) -> Result<BTreeMap<OneLine, Seconds>, Failure> {
-        let text = page.read()?;
+        let read = page.read()?;
+        let text = read.as_ref();
         let units: Vec<Unit> = text
             .match_indices(Self::UNIT_DATA)
             .next()

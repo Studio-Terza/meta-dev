@@ -4,113 +4,68 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 
 const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
 const TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    fn f(x: u32) {}\n}\n";
-
-const INLINE_BITS: &str = "mod bits {\n    pub fn f(x: u32) {}\n}\n";
+const INLINE_BOUNDARY: &str = "mod boundary {\n    pub fn f(x: u32) -> String {\n        x.to_string()\n    }\n}\n";
 const INLINE_OTHER: &str = "mod masks {\n    pub fn f(x: u32) {}\n}\n";
-
 const METHOD: &str = "struct A;\nimpl A {\n    fn f(x: u32) {}\n}\n";
-const TRAIT_METHOD: &str = "struct A;\nimpl Tr for A {\n    fn f(x: u32) {}\n}\n";
-const ENUM_SIZE: &str = "enum Buffer {\n    Full(usize),\n}\n";
-const ENUM_OF_LENGTHS: &str = "enum Length {\n    Full(usize),\n}\n";
-const CONST_SIZE: &str = "const LIMIT: usize = 1;\n";
-const CONST_LENGTH: &str = "const LENGTH: usize = 1;\n";
-const IMPL_CONST: &str = "struct A;\nimpl A {\n    const LIMIT: usize = 1;\n}\n";
-const IMPL_LENGTH: &str = "struct A;\nimpl A {\n    const LENGTH: usize = 1;\n}\n";
-const TRAIT_CONST: &str = "trait T {\n    const LIMIT: usize;\n}\n";
-const TRAIT_LENGTH: &str = "trait T {\n    const LENGTH: usize;\n}\n";
-const ALIAS: &str = "type Limit = usize;\n";
-const ALIAS_OF_LENGTH: &str = "type Length = usize;\n";
-const PAIR: &str = "struct Pair(u32, u32);\n";
+const TRAIT_METHOD: &str = "struct A;\nimpl Tr for A {\n    fn f(x: u32) -> bool {\n        g(x)\n    }\n}\n";
+const TRAIT_DECLARATION: &str = "trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
+const VARIANT: &str = "enum Buffer {\n    Full(usize),\n    Named { count: u8 },\n}\n";
+const CONSTANT: &str = "const LIMIT: usize = 1;\nstatic NAME: &str = \"a\";\n";
+const NEWTYPE: &str = "struct Count(usize);\nstruct Label<'text>(&'text str);\n";
+const TWO_FIELDS: &str = "struct Pair(u32, u32);\n";
+const NAMED_FIELD: &str = "pub struct A {\n    name: String,\n    size: Size,\n}\n";
+const NEWTYPE_EDGES: &str = "struct Count(usize);\nimpl Count {\n    const fn new(count: usize) -> Count {\n        Count(count)\n    }\n    fn try_new(count: usize) -> Result<Count, E> {\n        g(count)\n    }\n    fn into_inner(self) -> usize {\n        self.0\n    }\n}\n";
+const NEWTYPE_ACCESSOR: &str =
+    "struct Count(usize);\nimpl Count {\n    fn count(self) -> usize {\n        self.0\n    }\n}\n";
+const CONSTRUCTOR_ELSEWHERE: &str =
+    "struct A {\n    b: B,\n}\nimpl A {\n    fn new(x: u32) -> A {\n        g(x)\n    }\n}\n";
+const WIDE_CONSTRUCTOR: &str = "struct Count(usize);\nimpl Count {\n    fn new(count: usize, more: usize) -> Count {\n        g(count, more)\n    }\n}\n";
+const NESTED: &str = "pub fn f(x: Option<String>, y: Vec<&str>, z: &mut [u8]) {}\n";
+const FLAG: &str = "fn f(x: bool) {}\n";
+const TUPLE: &str = "fn f(x: (u8, char)) {}\n";
+const CLOSURE: &str = "fn f(x: impl Fn(&str) -> bool) {}\n";
+const BOUND: &str = "fn m<T>(a: T)\nwhere\n    T: AsRef<str>,\n{\n}\n";
+const ALIASED: &str = "type Label = String;\nfn f(x: Label) {}\n";
+const ALIASED_QUALIFIED: &str = "type Label = <A>::String;\nfn f(x: Label) {}\n";
+const TWO_FIELD_CONSTRUCTOR: &str =
+    "struct Pair(A, B);\nimpl Pair {\n    fn new(x: u32) -> Pair {\n        g(x)\n    }\n}\n";
+const QUALIFIED: &str = "fn m(a: std::string::String, b: alloc::string::String) {}\n";
+const RENAMED: &str = "use std::string::String as S;\nfn m(a: S) {}\n";
+const FOREIGN_PATHS: &str = "fn f(x: other::String, y: &other::str, z: <A>::String) {}\n";
+const IN_BODY: &str = "fn f() {\n    fn g(x: &str) {}\n}\n";
+const BODY_TYPES: &str = "fn f(x: A) -> B {\n    let y: u32 = x.into();\n    h(y.cast::<u64>())\n}\n";
+const UNIT: &str = "fn f(x: A) {}\nfn g(x: A) -> Result<(), E> {\n    h(x)\n}\n";
+const WIRE: &str = "fn f(x: serde_json::Value) {}\nstruct A {\n    b: toml::Value,\n}\n";
+const EXTERN: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
+const UNION: &str = "union U {\n    a: &'static str,\n}\n";
+const DEFAULTED: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
+const FROM_STR: &str = "pub struct A;\nimpl FromStr for A {\n    type Err = E;\n    fn from_str(text: &str) -> Result<A, E> {\n        g(text)\n    }\n}\n";
 const STRING_FROM: &str = "fn f() -> Name {\n    String::from(\"a\")\n}\n";
-const VEC_FROM: &str = "fn f() -> Items {\n    Vec::from(x)\n}\n";
-const STRING_NEW: &str = "fn f() -> Name {\n    String::new()\n}\n";
 const MACROS: &str = "fn f() {\n    let t = format!(\"x\");\n    let u = vec!(1);\n}\n";
 const INLINE_TEXT: &str = "mod inner {\n    pub fn f(x: Name) {\n        x.trim();\n    }\n}\n";
-const METHOD_TEXT: &str = "struct A;\nimpl A {\n    fn f(x: Name) {\n        x.trim();\n    }\n}\n";
-const OTHER_PATH: &str = "fn f(x: other::Thing) {}\n";
-
-const PARAM_SIZE: &str = "struct A;\nimpl A {\n    fn at(&self, index: usize) {}\n}\n";
-const PARAM_UNNAMED_SIZE: &str = "struct A;\nimpl A {\n    fn len(&self, step: usize) {}\n}\n";
-const RETURN_SIZE: &str = "struct A;\nimpl A {\n    fn len(&self) -> usize {\n        1\n    }\n}\n";
-const RETURN_UNNAMED_SIZE: &str = "struct A;\nimpl A {\n    fn step(&self) -> usize {\n        1\n    }\n}\n";
 const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\n";
-const DOOR_AND_TRIM: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nfn g(x: Name) {\n    x.trim();\n}\n";
-
 const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 
-const DOOR_ON_A_REFERENCE: &str = "struct A;\nimpl fmt::Display for &A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nfn g(x: Name) {\n    x.trim();\n}\n";
-
-const PUBLIC_STR: &str = "pub fn f(x: &str) {}\n";
-const PUBLIC_STRING: &str = "pub fn f() -> String {\n    g()\n}\n";
-const PRIVATE_TEXT: &str = "fn f(x: &str) -> String {\n    g()\n}\n";
-const CRATE_TEXT: &str = "pub(crate) fn f(x: &str) {}\n";
-const NESTED_TEXT: &str = "pub fn f(x: Option<String>, y: Vec<&str>, z: &mut String) {}\n";
-const LIFETIME_TEXT: &str = "pub fn f<'a>(x: &'a str) {}\n";
-const METHOD_TEXT_PARAM: &str = "pub struct A;\nimpl A {\n    pub fn f(&self, x: &str) {}\n}\n";
-const METHOD_PRIVATE_TEXT: &str = "pub struct A;\nimpl A {\n    fn f(&self, x: &str) {}\n}\n";
-const FROM_STR: &str = "pub struct A;\nimpl FromStr for A {\n    type Err = E;\n    fn from_str(text: &str) -> Result<A, E> {\n        g()\n    }\n}\n";
-const TRAIT_TEXT: &str = "pub trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
-const TRAIT_TEXT_DEFAULT: &str = "pub trait T {\n    fn f(&self, x: &str) {\n        g(x)\n    }\n}\n";
-const TRAIT_PRIVATE_TEXT: &str = "trait T {\n    fn f(&self, x: &str) -> String;\n}\n";
-const TRAIT_TEXT_CONST: &str = "pub trait T {\n    const NAME: &'static str;\n    type Label = String;\n}\n";
-const ALIASED_TEXT: &str = "type Label = String;\npub fn f(x: Label) {}\n";
-const ALIASED_UNSIZED: &str = "type Label = str;\npub fn f(x: &Label) {}\n";
-const ALIASED_NUMBER: &str = "type Label = other::Thing;\npub fn f(x: Label) {}\n";
-const ALIASED_QUALIFIED: &str = "type Label = <A>::String;\npub fn f(x: Label) {}\n";
-const ALIASED_PRIVATE: &str = "type Label = String;\nfn f(x: Label) {}\n";
-const PUBLIC_FIELD: &str = "pub struct A {\n    pub name: String,\n}\n";
-const PRIVATE_FIELD: &str = "pub struct A {\n    name: String,\n}\n";
-const TUPLE_FIELD: &str = "pub struct A(pub String);\n";
-const PRIVATE_TUPLE_FIELD: &str = "pub struct A(String);\n";
-const PUBLIC_ENUM: &str = "pub enum E {\n    Named(String),\n}\n";
-const PRIVATE_ENUM: &str = "enum E {\n    Named(String),\n}\n";
-const TEXT_CONST: &str =
-    "pub const NAME: &str = \"a\";\npub static OTHER: &str = \"b\";\npub type Words = Vec<String>;\n";
-const TEXT_ASSOCIATED: &str = "pub struct A;\nimpl A {\n    pub const NAME: &str = \"a\";\n}\n";
-const TEXT_IN_BODY: &str = "pub fn f() {\n    pub fn g(x: &str) {}\n}\n";
-const FOREIGN_PATHS: &str = "pub fn f(x: other::String, y: &other::str) {}\n";
-const INLINE_TEXT_MODULE: &str = "mod inner {\n    pub fn f(x: &str) {}\n}\n";
-const PORTS_MODULE: &str = "mod ports {\n    pub fn f(x: &str) {}\n}\n";
-const TEXT_TEST_MODULE: &str = "#[cfg(test)]\nmod tests {\n    pub fn f(x: &str) {}\n}\n";
-const WIDER_0: &str = "pub fn m(a: std::borrow::Cow<'_, str>) {}\n";
-const WIDER_1: &str = "pub struct A {\n    pub a: Box<str>,\n}\n";
-const WIDER_2: &str = "pub fn m(a: std::sync::Arc<str>) {}\n";
-const WIDER_3: &str = "pub fn m(a: impl AsRef<str>) {}\n";
-const WIDER_4: &str = "pub fn m<T>(a: T)\nwhere\n    T: AsRef<str>,\n{\n}\n";
-const WIDER_5: &str = "pub fn m(a: *const str) {}\n";
-const WIDER_6: &str = "pub fn m(a: std::string::String) {}\n";
-const WIDER_7: &str = "pub fn m(a: alloc::string::String) {}\n";
-const WIDER_8: &str = "use std::string::String as S;\npub fn m(a: S) {}\n";
-const WIDER_9: &str = "pub struct A<T = String> {\n    pub a: T,\n}\n";
-const WIDER_10: &str = "union U {\n    a: &'static str,\n}\n";
-const WIDER_11: &str = "unsafe extern \"C\" {\n    fn m(a: &str);\n}\n";
-const PUBLIC_UNION: &str = "pub union U {\n    pub a: &'static str,\n}\n";
-const AS_REF_IMPL: &str =
-    "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        self.0.trim()\n    }\n}\n";
-const BORROW_IMPL: &str = "pub struct A(Name);\nimpl std::borrow::Borrow<str> for A {\n    fn borrow(&self) -> &str {\n        self.0.trim()\n    }\n}\n";
-const AS_REF_HELPER: &str = "pub struct A(Name);\nimpl AsRef<str> for A {\n    fn as_ref(&self) -> &str {\n        \"\"\n    }\n}\nimpl A {\n    fn g(&self) {\n        self.0.trim();\n    }\n}\n";
-const PUBLIC_EXTERN: &str = "unsafe extern \"C\" {\n    pub fn m(a: &str);\n}\n";
-
-const CASES: [Case; 87] = [
+const CASES: [Case; 46] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("bits module file"),
-        &[Source::new(Located::new("crates/x/src/bits/mask.rs"), Text::new(BARE))],
+        Title::new("boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/mask.rs"), Text::new(BARE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("bits module root"),
-        &[Source::new(Located::new("crates/x/src/bits.rs"), Text::new(BARE))],
+        Title::new("boundary module root"),
+        &[Source::new(Located::new("crates/x/src/boundary.rs"), Text::new(BARE))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("inline bits module"),
-        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BITS))],
+        Title::new("inline boundary module, signatures and text"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_BOUNDARY))],
         Flagged::new(&[]),
     ),
     Case::new(
@@ -129,80 +84,152 @@ const CASES: [Case; 87] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("inherent method"),
+        Title::new("private inherent method"),
         &[Source::new(Located::new("a.rs"), Text::new(METHOD))],
         Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
-        Title::new("trait method"),
+        Title::new("trait impl"),
         &[Source::new(Located::new("a.rs"), Text::new(TRAIT_METHOD))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("enum context"),
-        &[Source::new(Located::new("a.rs"), Text::new(ENUM_SIZE))],
+        Title::new("trait declaration"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_DECLARATION))],
+        Flagged::new(&["a.rs:2", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("enum variant fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(VARIANT))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("constants and statics"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTANT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(Title::new("newtypes"), &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE))], Flagged::new(&[])),
+    Case::new(
+        Title::new("two fields are no newtype"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_FIELDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a private named field"),
+        &[Source::new(Located::new("a.rs"), Text::new(NAMED_FIELD))],
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(
-        Title::new("enum named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(ENUM_OF_LENGTHS))],
+        Title::new("a newtype's own new, try_new and into_inner"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE_EDGES))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("const context"),
-        &[Source::new(Located::new("a.rs"), Text::new(CONST_SIZE))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("const named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(CONST_LENGTH))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("impl const context"),
-        &[Source::new(Located::new("a.rs"), Text::new(IMPL_CONST))],
+        Title::new("any other newtype accessor"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE_ACCESSOR))],
         Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
-        Title::new("impl const named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(IMPL_LENGTH))],
-        Flagged::new(&[]),
+        Title::new("new on a type that is not a newtype"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTOR_ELSEWHERE))],
+        Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
-        Title::new("trait const context"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_CONST))],
-        Flagged::new(&["a.rs:2"]),
+        Title::new("a newtype constructor with two inputs"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIDE_CONSTRUCTOR))],
+        Flagged::new(&["a.rs:3", "a.rs:3"]),
     ),
     Case::new(
-        Title::new("trait const named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_LENGTH))],
-        Flagged::new(&[]),
+        Title::new("primitives nested in other types"),
+        &[Source::new(Located::new("a.rs"), Text::new(NESTED))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1"]),
     ),
     Case::new(
-        Title::new("alias context"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIAS))],
+        Title::new("a bool parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(FLAG))],
         Flagged::new(&["a.rs:1"]),
     ),
     Case::new(
-        Title::new("alias named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIAS_OF_LENGTH))],
+        Title::new("a tuple of primitives"),
+        &[Source::new(Located::new("a.rs"), Text::new(TUPLE))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a closure in a signature"),
+        &[Source::new(Located::new("a.rs"), Text::new(CLOSURE))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a where bound"),
+        &[Source::new(Located::new("a.rs"), Text::new(BOUND))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("an alias of a primitive is read through"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("an alias of a qualified path is not read through"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("two fields are no newtype"),
-        &[Source::new(Located::new("a.rs"), Text::new(PAIR))],
+        Title::new("new on a tuple struct of two fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(TWO_FIELD_CONSTRUCTOR))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("qualified String"),
+        &[Source::new(Located::new("a.rs"), Text::new(QUALIFIED))],
         Flagged::new(&["a.rs:1", "a.rs:1"]),
     ),
+    Case::new(
+        Title::new("a renamed import"),
+        &[Source::new(Located::new("a.rs"), Text::new(RENAMED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("foreign and qualified paths"),
+        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_PATHS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a function inside a body"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_BODY))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("types inside a body"),
+        &[Source::new(Located::new("a.rs"), Text::new(BODY_TYPES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(Title::new("unit returns"), &[Source::new(Located::new("a.rs"), Text::new(UNIT))], Flagged::new(&[])),
+    Case::new(
+        Title::new("wire forms"),
+        &[Source::new(Located::new("a.rs"), Text::new(WIRE))],
+        Flagged::new(&["a.rs:1", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("an extern function"),
+        &[Source::new(Located::new("a.rs"), Text::new(EXTERN))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a union field"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNION))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a defaulted generic"),
+        &[Source::new(Located::new("a.rs"), Text::new(DEFAULTED))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(Title::new("FromStr"), &[Source::new(Located::new("a.rs"), Text::new(FROM_STR))], Flagged::new(&[])),
     Case::new(
         Title::new("String::from"),
         &[Source::new(Located::new("a.rs"), Text::new(STRING_FROM))],
         Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(Title::new("Vec::from"), &[Source::new(Located::new("a.rs"), Text::new(VEC_FROM))], Flagged::new(&[])),
-    Case::new(
-        Title::new("String::new"),
-        &[Source::new(Located::new("a.rs"), Text::new(STRING_NEW))],
-        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("format and other macros"),
@@ -212,36 +239,6 @@ const CASES: [Case; 87] = [
     Case::new(
         Title::new("text in an inline module"),
         &[Source::new(Located::new("a.rs"), Text::new(INLINE_TEXT))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("text in a method"),
-        &[Source::new(Located::new("a.rs"), Text::new(METHOD_TEXT))],
-        Flagged::new(&["a.rs:4"]),
-    ),
-    Case::new(
-        Title::new("another two-part path"),
-        &[Source::new(Located::new("a.rs"), Text::new(OTHER_PATH))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a size parameter named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(PARAM_SIZE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a size parameter in a method named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(PARAM_UNNAMED_SIZE))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("a size return in a method named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(RETURN_SIZE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a size return in a method not named for a size"),
-        &[Source::new(Located::new("a.rs"), Text::new(RETURN_UNNAMED_SIZE))],
         Flagged::new(&["a.rs:3"]),
     ),
     Case::new(
@@ -260,273 +257,18 @@ const CASES: [Case; 87] = [
         Flagged::new(&["a.rs:10"]),
     ),
     Case::new(
-        Title::new("text in a free function beside a Display impl on a reference"),
-        &[Source::new(Located::new("a.rs"), Text::new(DOOR_ON_A_REFERENCE))],
-        Flagged::new(&["a.rs:8"]),
-    ),
-    Case::new(
-        Title::new("a public function taking &str"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_STR))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a public function returning String"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_STRING))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a private function with text"),
-        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_TEXT))],
+        Title::new("text in a boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/parse.rs"), Text::new(INLINE_TEXT))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("a crate-visible function with text"),
-        &[Source::new(Located::new("a.rs"), Text::new(CRATE_TEXT))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text nested in other types"),
-        &[Source::new(Located::new("a.rs"), Text::new(NESTED_TEXT))],
-        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("text behind a lifetime"),
-        &[Source::new(Located::new("a.rs"), Text::new(LIFETIME_TEXT))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a public method taking &str"),
-        &[Source::new(Located::new("a.rs"), Text::new(METHOD_TEXT_PARAM))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("a private method taking &str"),
-        &[Source::new(Located::new("a.rs"), Text::new(METHOD_PRIVATE_TEXT))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a FromStr impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(FROM_STR))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a public trait declaration"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT))],
-        Flagged::new(&["a.rs:2", "a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("text in a default method of a public trait"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT_DEFAULT))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("text in a private trait declaration"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_PRIVATE_TEXT))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a trait constant and associated type"),
-        &[Source::new(Located::new("a.rs"), Text::new(TRAIT_TEXT_CONST))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text behind a type alias in a public signature"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_TEXT))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("unsized text behind a type alias"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_UNSIZED))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("an alias of another type in a public signature"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_NUMBER))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a qualified path that ends in String is not text"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text behind a type alias in a private signature"),
-        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_PRIVATE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a public field of String"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_FIELD))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("a private field of String"),
-        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_FIELD))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a public tuple field of String"),
-        &[Source::new(Located::new("a.rs"), Text::new(TUPLE_FIELD))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a private tuple field of String"),
-        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_TUPLE_FIELD))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a field of a public enum"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_ENUM))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("a field of a private enum"),
-        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_ENUM))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in constants and aliases"),
-        &[Source::new(Located::new("a.rs"), Text::new(TEXT_CONST))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in an associated constant"),
-        &[Source::new(Located::new("a.rs"), Text::new(TEXT_ASSOCIATED))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a function body"),
-        &[Source::new(Located::new("a.rs"), Text::new(TEXT_IN_BODY))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text spelled through another path"),
-        &[Source::new(Located::new("a.rs"), Text::new(FOREIGN_PATHS))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("an inline module"),
-        &[Source::new(Located::new("a.rs"), Text::new(INLINE_TEXT_MODULE))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("an inline ports module"),
-        &[Source::new(Located::new("a.rs"), Text::new(PORTS_MODULE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a file in a ports module"),
-        &[Source::new(Located::new("crates/x/src/ports/run.rs"), Text::new(PUBLIC_STR))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a ports module root"),
-        &[Source::new(Located::new("crates/x/src/ports.rs"), Text::new(PUBLIC_STR))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a public function in a test module"),
-        &[Source::new(Located::new("a.rs"), Text::new(TEXT_TEST_MODULE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a public function in an integration test"),
-        &[Source::new(Located::new("x/tests/a.rs"), Text::new(PUBLIC_STR))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text beside a Display impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(DOOR_AND_TRIM))],
-        Flagged::new(&["a.rs:8"]),
-    ),
-    Case::new(
-        Title::new("text in a Cow"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_0))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("text in a box"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_1))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("text in a shared pointer"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_2))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("text behind AsRef"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_3))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("text behind AsRef in a where clause"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_4))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("text behind a raw pointer"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_5))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a qualified String"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_6))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a String from alloc"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_7))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("a renamed String"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_8))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("a String as a default type"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_9))],
-        Flagged::new(&["a.rs:1"]),
-    ),
-    Case::new(
-        Title::new("text in a private union"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_10))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a private extern block"),
-        &[Source::new(Located::new("a.rs"), Text::new(WIDER_11))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in a public union"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_UNION))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("text in a public extern function"),
-        &[Source::new(Located::new("a.rs"), Text::new(PUBLIC_EXTERN))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("text inside an AsRef<str> impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(AS_REF_IMPL))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text inside a Borrow<str> impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(BORROW_IMPL))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("text in an inherent impl beside an AsRef<str> impl"),
-        &[Source::new(Located::new("a.rs"), Text::new(AS_REF_HELPER))],
-        Flagged::new(&[]),
+        Title::new("a ports module is no boundary"),
+        &[Source::new(Located::new("crates/x/src/ports.rs"), Text::new(FLAG))],
+        Flagged::new(&["crates/x/src/ports.rs:1"]),
     ),
 ];
 
 #[test]
-fn primitives_away_from_a_types_boundary_are_flagged() {
+fn primitives_outside_a_boundary_are_flagged() {
     assert_eq!(Sources::mismatches::<PrimitiveBoundary>(&CASES), Lines::default());
 }

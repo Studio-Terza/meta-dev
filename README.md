@@ -39,6 +39,17 @@ It is report only, no number blocks. The run also lists public methods that form
 `start` and `stop` (`paired_apis`), also when the two sit in different impl blocks of one type in a crate, with each entry saying to write a guard. That list is report only too,
 so it is outside the lints above and never changes the exit code.
 
+`primitive_boundary` keeps primitives at the boundary, by convention as `ports` keeps effects. In shipped code, `bool`, the
+integers, the floats, `char`, `String` and `str`, and tuples of them, may appear in a function signature (parameters, return
+type, generics and bounds, nested in `Option`, `Vec`, slices, references or closures) or in a struct, enum variant or union
+field only inside a module named `boundary` or a crate whose name ends in the word `boundary`. Allowed everywhere: a newtype
+(a struct with one unnamed field) and its own `new`, `try_new` and `into_inner` with one input, and trait impls, since the
+trait fixes the signature (`Display`, `FromStr`, `From`, `TryFrom`, `Debug`, `Hash`, `Ord` and the like); the trait
+declaration is read instead. A unit return is not flagged, nor are consts, statics and types inside bodies. Wire forms such
+as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
+is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
+boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
+
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
 like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
@@ -52,7 +63,7 @@ legitimate, the lint gates where by naming convention: starting a process (`proc
 ends in the word `ports` (`meta-ports`, not `meta-reports`) or a module named `ports`. Both lints read paths through
 `use` items in any order, renames, type aliases, glob imports, re-exports across the files of a crate, qualified
 `<T>::f` calls and macro bodies, so `matches!(..., Ok(s) if s.success())` is read like any other call. Inside `ports`,
-a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Code a platform requires in its own language (XCUITest Swift, say) is allowed only under a directory named `platform`, and only as test code (`rust_only`). In a module named `bits` only: casts (`const_shape`), bare numbers
+a raw call must sit in an impl of a type that implements `Drop`: the guard that does the cleanup. Code a platform requires in its own language (XCUITest Swift, say) is allowed only under a directory named `platform`, and only as test code (`rust_only`). In a module named `boundary`, or a crate whose name ends in the word `boundary`, only: casts (`const_shape`), bare numbers
 (`named_numbers`) and bare primitives (`primitive_boundary`). Files under
 `tests`, `examples` and `benches` are checked only by the lints that are not
 about shipped code; code under `#[cfg(test)]` is skipped as before.

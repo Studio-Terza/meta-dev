@@ -4,19 +4,21 @@ use std::io;
 use lint_core::Fix;
 
 use crate::characters::Characters;
+use crate::excerpt::Excerpt;
+use crate::word::Word;
 
 #[derive(Debug)]
 pub(crate) enum Finding {
     Block,
     TooLong { characters: Characters, limit: Characters },
-    Operator { symbol: &'static str },
-    Control { word: &'static str },
-    Interpreter { name: String },
-    Inline { word: &'static str },
+    Operator { symbol: Word },
+    Control { word: Word },
+    Interpreter { name: Excerpt },
+    Inline { word: Word },
     Environment,
-    LocalAction { target: String },
+    LocalAction { target: Excerpt },
     Script,
-    Unparsable { reason: String },
+    Unparsable { reason: Excerpt },
     Unreadable { source: io::Error },
 }
 

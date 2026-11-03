@@ -2,7 +2,9 @@ use text_lines::Lines;
 
 use super::change::Change;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Invocation, Ports};
+use crate::cli::command::step::branch::Branch;
+use crate::cli::command::step::revision::Revision;
+use crate::cli::ports::{Invocation, Ports, Text};
 
 #[derive(Debug)]
 pub struct Git<'ports, Host: Ports> {
@@ -18,7 +20,7 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         Git { ports }
     }
 
-    pub(crate) fn changes_since_fork(&self, base: &str) -> Result<Vec<Change>, Failure> {
+    pub(crate) fn changes_since_fork(&self, base: &Branch) -> Result<Vec<Change>, Failure> {
         let fork = self.fork_point(base)?;
         let listed = self.asked(&Invocation::new(
             "git",
@@ -29,20 +31,20 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
                 "--name-status",
                 "--find-renames",
                 "--find-copies",
-                fork.as_str(),
+                fork.as_ref(),
                 Self::HEAD,
             ],
         ))?;
-        Ok(Lines::from(listed.as_str()).filter_map(|line| line.parse::<Change>().ok()).collect())
+        Ok(Lines::from(listed.as_ref()).filter_map(|line| line.parse::<Change>().ok()).collect())
     }
 
-    fn fork_point(&self, base: &str) -> Result<String, Failure> {
-        let remote = [Self::REMOTE, base].concat();
+    fn fork_point(&self, base: &Branch) -> Result<Revision, Failure> {
+        let remote = [Self::REMOTE, base.as_ref()].concat();
         let found = self.asked(&Invocation::new("git", ["merge-base", remote.as_str(), Self::HEAD]))?;
-        Ok(Lines::from(found.as_str()).next().unwrap_or_default().to_owned())
+        Ok(Revision::new(Lines::from(found.as_ref()).next().unwrap_or_default().to_owned()))
     }
 
-    fn asked(&self, invocation: &Invocation) -> Result<String, Failure> {
+    fn asked(&self, invocation: &Invocation) -> Result<Text, Failure> {
         self.ports.output(invocation).map_err(Failure::starting(invocation))
     }
 }

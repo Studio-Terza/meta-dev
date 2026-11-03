@@ -18,7 +18,7 @@ impl Count {
         Count(self.0.saturating_sub(limit.0))
     }
 
-    pub(crate) fn first(self, items: &[String]) -> impl Iterator<Item = &String> {
+    pub(crate) fn first<Item>(self, items: &[Item]) -> impl Iterator<Item = &Item> {
         items.iter().take(self.0)
     }
 }

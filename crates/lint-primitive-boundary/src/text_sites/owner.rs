@@ -18,4 +18,11 @@ impl Owner {
             _ => Owner::Free,
         }
     }
+
+    pub fn name(&self) -> Option<&Name> {
+        match self {
+            Owner::Named(name) => Some(name),
+            Owner::Free => None,
+        }
+    }
 }

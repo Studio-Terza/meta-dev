@@ -21,7 +21,6 @@ impl Band {
     const MANY: Most = Most::new(10);
 
     pub(crate) fn containing(score: Score) -> Band {
-        let at = score.count();
         [
             (Self::STRAIGHT, Band::Straight),
             (Self::FEW, Band::Few),
@@ -29,7 +28,7 @@ impl Band {
             (Self::MANY, Band::Many),
         ]
         .into_iter()
-        .find(|(limit, _)| limit.allows(at).is_some())
+        .find(|(limit, _)| limit.allows(score).is_some())
         .map_or(Band::Hairy, |(_, band)| band)
     }
 }

@@ -15,7 +15,7 @@ use link::Link;
 use lint_core::Least;
 use lint_item_graph::Traversal;
 use lint_item_graph::{ItemGraph, NodeIndex};
-use newtype::Counter;
+use newtype::{Counter, Newtype};
 use spectrum::{Spectrum, Weight};
 
 #[derive(Debug)]
@@ -85,7 +85,7 @@ impl Condensed {
                         .collect()
                 })
                 .collect(),
-            origins: island.iter().filter_map(|tangle| self.origins.get(tangle.index()).copied()).collect(),
+            origins: island.iter().filter_map(|tangle| self.origins.get(tangle.into_inner()).copied()).collect(),
         }
     }
 
@@ -94,11 +94,11 @@ impl Condensed {
     }
 
     pub fn size(&self, tangle: TangleIndex) -> ItemCount {
-        self.sizes.get(tangle.index()).copied().unwrap_or_default()
+        self.sizes.get(tangle.into_inner()).copied().unwrap_or_default()
     }
 
     pub fn row(&self, tangle: TangleIndex) -> &[Link] {
-        self.rows.get(tangle.index()).map_or(&[], Vec::as_slice)
+        self.rows.get(tangle.into_inner()).map_or(&[], Vec::as_slice)
     }
 
     pub fn volume(&self) -> Weight {
@@ -107,13 +107,13 @@ impl Condensed {
 
     pub fn split(&self, inside: &BTreeSet<TangleIndex>) -> Split {
         let origin = |side: &BTreeSet<TangleIndex>| -> BTreeSet<TangleIndex> {
-            side.iter().filter_map(|tangle| self.origins.get(tangle.index()).copied()).collect()
+            side.iter().filter_map(|tangle| self.origins.get(tangle.into_inner()).copied()).collect()
         };
         Split::new(self.conductance(inside), origin(inside), origin(&self.all().difference(inside).copied().collect()))
     }
 
     pub fn sweep(&self, floor: Least) -> Option<Split> {
-        let order = self.sweep_order();
+        let order = Spectrum::new(&self.rows).sweep_order();
         let total = self.items(&self.all());
         let candidates: Vec<(Conductance, ItemCount)> = order
             .iter()
@@ -126,33 +126,23 @@ impl Condensed {
             .iter()
             .enumerate()
             .take(order.len().saturating_sub(1))
-            .filter(|(_, (_, items))| floor.allows(items.smaller_of(total).count()).is_some())
+            .filter(|(_, (_, items))| floor.allows(items.smaller_of(total)).is_some())
             .min_by(|(_, (left, _)), (_, (right, _))| left.total_cmp(*right))?;
         Some(self.split(&order.iter().take(best.0 + 1).copied().collect()))
-    }
-
-    fn sweep_order(&self) -> Vec<TangleIndex> {
-        let mut order: Vec<(TangleIndex, f64)> = Spectrum::new(&self.rows)
-            .fiedler()
-            .into_iter()
-            .enumerate()
-            .map(|(index, value)| (TangleIndex::from(index), value))
-            .collect();
-        order.sort_by(|left, right| left.1.total_cmp(&right.1));
-        order.into_iter().map(|(tangle, _)| tangle).collect()
     }
 
     pub fn conductance(&self, side: &BTreeSet<TangleIndex>) -> Conductance {
         let rows = |inside: bool| {
             self.rows.iter().enumerate().filter(move |(row, _)| side.contains(&TangleIndex::from(*row)) == inside)
         };
-        let volume =
-            |inside: bool| -> f64 { rows(inside).flat_map(|(_, row)| row).map(|link| link.weight().crossings()).sum() };
+        let volume = |inside: bool| -> f64 {
+            rows(inside).flat_map(|(_, row)| row).map(|link| link.weight().into_inner()).sum()
+        };
         let crossing: f64 = rows(true)
             .flat_map(|(_, row)| row)
             .filter(|link| !side.contains(&link.target()))
-            .map(|link| link.weight().crossings())
+            .map(|link| link.weight().into_inner())
             .sum();
-        Conductance::of_ratio(crossing, volume(true).min(volume(false)))
+        Conductance::new(crossing / volume(true).min(volume(false)))
     }
 }

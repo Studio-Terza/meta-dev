@@ -1,4 +1,5 @@
 mod count;
+mod mutant;
 mod outcome;
 mod report;
 mod tally;
@@ -13,8 +14,9 @@ use text_lines::Lines;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 use count::Count;
+use mutant::Mutant;
 use outcome::Outcome;
 use report::Report;
 use tally::Tally;
@@ -37,23 +39,24 @@ impl ShardSummary {
         Ok(found)
     }
 
-    fn text_of(&self, outcome: Outcome) -> Result<String, Failure> {
+    fn text_of(&self, outcome: Outcome) -> Result<Text, Failure> {
         self.directories()?
             .iter()
             .map(|directory| Journal::file(&directory.join(outcome.file_name())))
             .filter(|journal| journal.existing().is_some())
-            .try_fold(String::new(), |text, file| Ok(text + &file.read()?))
+            .try_fold(String::new(), |text, file| Ok(text + file.read()?.as_ref()))
+            .map(Text::new)
     }
 
     fn report(&self) -> Result<Report, Failure> {
         let tallies = Outcome::ALL
             .into_iter()
-            .map(|outcome| Ok(Tally::new(outcome, Count::new(Lines::from(self.text_of(outcome)?.as_str()).count()))))
+            .map(|outcome| Ok(Tally::new(outcome, Count::new(Lines::from(self.text_of(outcome)?.as_ref()).count()))))
             .collect::<Result<_, Failure>>()?;
         let listed = Outcome::LISTED
             .into_iter()
-            .try_fold(String::new(), |text, outcome| Ok::<String, Failure>(text + &self.text_of(outcome)?))?;
-        let mut names: Vec<String> = Lines::from(listed.as_str()).map(str::to_owned).collect();
+            .try_fold(String::new(), |text, outcome| Ok::<String, Failure>(text + self.text_of(outcome)?.as_ref()))?;
+        let mut names: Vec<Mutant> = Lines::from(listed.as_str()).map(|name| Mutant::new(name.to_owned())).collect();
         names.sort();
         Ok(Report::new(tallies, names))
     }

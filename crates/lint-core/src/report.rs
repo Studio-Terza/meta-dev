@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::violation::Violation;
+use crate::boundary::Violation;
 use lint_layout::Headline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

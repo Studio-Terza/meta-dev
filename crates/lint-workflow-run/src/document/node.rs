@@ -2,6 +2,7 @@ use lint_layout::LineNumber;
 use saphyr::{MarkedYaml, Scalar, YamlData};
 
 use crate::document::key::Key;
+use crate::document::text::Text;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Node<'node, 'input>(&'node MarkedYaml<'input>);
@@ -19,9 +20,9 @@ impl<'node, 'input> Node<'node, 'input> {
         LineNumber::from(self.0.span.start.line())
     }
 
-    pub(crate) fn text(self) -> Option<&'node str> {
+    pub(crate) fn text(self) -> Option<Text<'node>> {
         match self.structure() {
-            YamlData::Value(Scalar::String(text)) | YamlData::Representation(text, _, _) => Some(text),
+            YamlData::Value(Scalar::String(text)) | YamlData::Representation(text, _, _) => Some(Text::new(text)),
             YamlData::Tagged(_, inner) => Node(inner).text(),
             _ => None,
         }

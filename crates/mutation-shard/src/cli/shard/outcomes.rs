@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use outcome::Outcome;
+pub(crate) use outcome::Title;
 use serde::Deserialize;
 use test_log::TestName;
 

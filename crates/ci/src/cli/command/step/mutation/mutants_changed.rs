@@ -6,7 +6,7 @@ use super::super::journal::Journal;
 use super::Step;
 use super::cargo_mutants::CargoMutants;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Invocation, Ports};
+use crate::cli::ports::{Exit, Invocation, Ports, Text};
 
 #[derive(Debug)]
 pub struct MutantsChanged {
@@ -20,7 +20,7 @@ impl MutantsChanged {
     const DIFF: [&'static str; 6] = ["diff", "--no-renames", "HEAD^1", "HEAD", "--", "*.rs"];
     const MISSED_LIST: [&'static str; 2] = ["mutants.out", "missed.txt"];
 
-    fn changed_lines(ports: &impl Ports) -> Result<String, Failure> {
+    fn changed_lines(ports: &impl Ports) -> Result<Text, Failure> {
         let invocation = Invocation::new("git", Self::DIFF);
         ports.output(&invocation).map_err(Failure::starting(&invocation))
     }
@@ -31,8 +31,8 @@ impl MutantsChanged {
 
     fn judged(&self, out: &mut impl Write) -> Result<Exit, Failure> {
         let list = self.missed_list();
-        let missed = list.read_or("")?;
-        if missed.is_empty() {
+        let missed = list.read_or(Text::default())?;
+        if missed.as_ref().is_empty() {
             writeln!(out, "mutants: none missed")?;
             Ok(Exit::Success)
         } else {

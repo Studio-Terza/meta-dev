@@ -3,6 +3,7 @@ mod golden_tests;
 mod recorded_mutant;
 mod shard_matrix;
 mod summary;
+mod test_name;
 
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -38,16 +39,11 @@ impl Report {
 
     pub fn write_summary(&self) -> Result<(), Failure> {
         let matrices = self.matrices()?;
-        let summary = Summary::from_results(
-            &matrices.iter().flat_map(|matrix| matrix.baseline().iter().map(ToString::to_string)).collect(),
-            &matrices.iter().flat_map(|matrix| matrix.mutants().iter().cloned()).collect::<Vec<_>>(),
-            GoldenTests::under(&self.sources)?.names(),
-        );
+        let summary = Summary::from_results(&matrices, &GoldenTests::under(&self.sources)?);
         File::create(&self.markdown)
             .and_then(|mut file| write!(file, "{summary}"))
             .map_err(|source| Failure::Io { path: self.markdown.clone(), source })?;
-        let json = summary.json().map_err(|source| Failure::Parse { path: self.json.clone(), source })?;
-        fs::write(&self.json, json).map_err(|source| Failure::Io { path: self.json.clone(), source })
+        summary.written_as_json(&self.json)
     }
 
     fn matrices(&self) -> Result<Vec<ShardMatrix>, Failure> {

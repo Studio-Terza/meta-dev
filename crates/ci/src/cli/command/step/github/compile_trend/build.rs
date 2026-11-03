@@ -37,7 +37,7 @@ impl TryFrom<&Path> for Build {
 
     fn try_from(directory: &Path) -> Result<Build, Failure> {
         let measured = Journal::file(&directory.join(Build::MEASURED));
-        let stages: BTreeMap<OneLine, Seconds> = toml::from_str(&measured.read()?)
+        let stages: BTreeMap<OneLine, Seconds> = toml::from_str(measured.read()?.as_ref())
             .map_err(|source| Failure::Measured { path: measured.as_ref().to_path_buf(), source })?;
         let pages = Build::PAGES
             .iter()

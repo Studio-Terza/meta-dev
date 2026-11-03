@@ -38,17 +38,17 @@ impl fmt::Display for Fault {
             Fault::Beyond(Check::Goldens) => write!(
                 formatter,
                 "this PR changes goldens of crates that nothing else it changes reaches, so it did not produce them; only the owner passes this, with the label {}",
-                Check::Goldens.label()
+                Check::GOLDENS
             ),
             Fault::Beyond(Check::Scenarios) => write!(
                 formatter,
                 "this PR adds files under tests/fixtures or tests/e2e of crates that nothing else it changes reaches; only the owner passes this, with the label {}",
-                Check::Scenarios.label()
+                Check::SCENARIOS
             ),
             Fault::Refactor => write!(
                 formatter,
                 "this PR's title starts with refactor:, and a refactor leaves behaviour unchanged, so it changes no golden; only the owner passes this, with the label {}",
-                Check::Goldens.label()
+                Check::GOLDENS
             ),
         }
     }

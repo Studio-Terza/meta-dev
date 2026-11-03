@@ -21,11 +21,7 @@ use script::Script;
 #[derive(Debug)]
 pub(crate) struct Document<'text>(Vec<MarkedYaml<'text>>);
 
-impl<'text> Document<'text> {
-    pub(crate) fn parse(text: &'text str) -> Result<Document<'text>, ScanError> {
-        MarkedYaml::load_from_str(text).map(Document)
-    }
-
+impl Document<'_> {
     pub(crate) fn findings(&self, actions: Actions<'_>) -> Vec<Found> {
         self.0.iter().flat_map(|root| Self::judged(Node::new(root), actions)).collect()
     }
@@ -59,5 +55,13 @@ impl<'text> Document<'text> {
             }
             None => Self::judged(value, actions),
         }
+    }
+}
+
+impl<'text> TryFrom<&'text str> for Document<'text> {
+    type Error = ScanError;
+
+    fn try_from(text: &'text str) -> Result<Document<'text>, ScanError> {
+        MarkedYaml::load_from_str(text).map(Document)
     }
 }

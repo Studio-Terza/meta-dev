@@ -45,7 +45,7 @@ impl Cut {
         let total: BTreeSet<TangleIndex> = islands.iter().flatten().copied().collect();
         let inside = Self::balanced(whole, islands, &total);
         let outside: BTreeSet<TangleIndex> = total.difference(&inside).copied().collect();
-        let smaller = whole.items(&inside).count().min(whole.items(&outside).count());
+        let smaller = whole.items(&inside).min(whole.items(&outside));
         floor.allows(smaller).map(|_| Split::new(whole.conductance(&inside), inside, outside))
     }
 
@@ -68,7 +68,7 @@ impl Cut {
 
     fn names(graph: &ItemGraph, tangles: &[Vec<NodeIndex>], side: &BTreeSet<TangleIndex>) -> Vec<Name> {
         side.iter()
-            .filter_map(|tangle| tangles.get(tangle.index()))
+            .filter_map(|tangle| tangles.get(tangle.into_inner()))
             .flatten()
             .filter_map(|member| graph.name_at(*member))
             .cloned()

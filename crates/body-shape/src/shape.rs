@@ -1,3 +1,4 @@
+mod mark;
 mod neighbours;
 mod position;
 mod raw_token;
@@ -40,8 +41,8 @@ impl From<TokenStream> for Shape {
         let mut slots = Slots::default();
         let shaped: Vec<ShapeToken> = raw
             .iter()
-            .enumerate()
-            .filter_map(|(index, token)| token.shaped(Neighbours::around(&raw, index).position(), &mut slots))
+            .zip(Neighbours::all(&raw))
+            .filter_map(|(token, neighbours)| token.shaped(neighbours.position(), &mut slots))
             .collect();
         Shape { key: ShapeKey::from(shaped.as_slice()), size: TokenCount::new(shaped.len()) }
     }

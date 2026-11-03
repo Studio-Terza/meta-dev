@@ -13,8 +13,10 @@ use std::num::NonZeroU8;
 use std::path::Path;
 
 use super::super::Step;
+use super::super::branch::Branch;
 use super::super::changed::Changed;
 use super::super::journal::Journal;
+use super::pull_number::PullNumber;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 use check::Check;
@@ -25,8 +27,8 @@ use scope::Scope;
 
 #[derive(Debug)]
 pub struct Labels {
-    base: String,
-    pull_request: String,
+    base: Branch,
+    pull_request: PullNumber,
     metadata: Journal,
 }
 
@@ -40,8 +42,8 @@ impl Step for Labels {
     fn from_arguments(arguments: &[OsString]) -> Result<Labels, Failure> {
         match arguments {
             [base, pull_request, metadata] => Ok(Labels {
-                base: base.to_str().ok_or(Failure::Usage)?.to_owned(),
-                pull_request: pull_request.to_str().ok_or(Failure::Usage)?.to_owned(),
+                base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
+                pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
                 metadata: Journal::file(Path::new(metadata)),
             }),
             _ => Err(Failure::Usage),
@@ -56,7 +58,7 @@ impl Step for Labels {
         let scope = Scope::reached_by(&self.metadata, &changes);
         let judged: Vec<Owed> = Check::ALL
             .into_iter()
-            .filter(|check| pull_request.carrying(check.label()).is_none())
+            .filter(|check| pull_request.carrying(*check).is_none())
             .map(|check| scope.judged(check, pull_request.refactor(), &changes))
             .collect::<Result<_, Failure>>()?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();

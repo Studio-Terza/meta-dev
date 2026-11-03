@@ -6,6 +6,7 @@ use std::fmt;
 
 use super::build::Build;
 use super::fortnight::Fortnight;
+use crate::cli::ports::Text;
 use growth::Growth;
 use range::Range;
 
@@ -20,7 +21,7 @@ pub struct Notice<'builds> {
 #[derive(Debug)]
 pub struct Report<'notice> {
     notice: &'notice Notice<'notice>,
-    merged: &'notice str,
+    merged: &'notice Text,
 }
 
 impl<'builds> Notice<'builds> {
@@ -39,7 +40,7 @@ impl<'builds> Notice<'builds> {
         self.range.and_then(|range| range.below(self.today.total())).map(|_| self)
     }
 
-    pub(super) fn reported<'notice>(&'notice self, merged: &'notice str) -> Report<'notice> {
+    pub(super) fn reported<'notice>(&'notice self, merged: &'notice Text) -> Report<'notice> {
         Report { notice: self, merged }
     }
 
@@ -83,6 +84,6 @@ impl fmt::Display for Report<'_> {
         self.notice.grown().iter().try_for_each(|growth| writeln!(formatter, "{growth}"))?;
         writeln!(formatter)?;
         writeln!(formatter, "Pull requests merged into main in {}, as context:", self.notice.fortnight)?;
-        formatter.write_str(self.merged)
+        formatter.write_str(self.merged.as_ref())
     }
 }

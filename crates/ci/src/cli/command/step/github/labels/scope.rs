@@ -4,9 +4,11 @@ use std::path::Path;
 use super::change::Change;
 use super::check::Check;
 use super::fault::{Fault, Owed};
+use super::hub::PullRequest;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::changed::Changed;
 use crate::cli::command::step::journal::Journal;
+use crate::cli::ports::Text;
 
 #[derive(Debug)]
 pub struct Scope<'journal> {
@@ -30,7 +32,7 @@ impl<'journal> Scope<'journal> {
     pub(crate) fn judged<'change>(
         &self,
         check: Check,
-        refactor: Option<&str>,
+        refactor: Option<&PullRequest>,
         changes: &'change [Change],
     ) -> Result<Owed<'change>, Failure> {
         let flagged = check.flagged(changes);
@@ -46,12 +48,12 @@ impl<'journal> Scope<'journal> {
     }
 
     fn reaching<'change>(&self, change: &'change Change) -> Result<Option<&'change Change>, Failure> {
-        let beyond: Vec<String> = change
+        let beyond: Vec<Text> = change
             .paths()
             .into_iter()
             .map(|produced| Changed::reach(self.arguments(produced)))
             .collect::<Result<_, _>>()?;
-        Ok(beyond.iter().all(String::is_empty).then_some(change))
+        Ok(beyond.iter().all(|listed| listed.as_ref().is_empty()).then_some(change))
     }
 
     fn arguments(&self, produced: &Path) -> impl Iterator<Item = OsString> {

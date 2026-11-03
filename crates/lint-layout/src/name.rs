@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
@@ -5,9 +7,11 @@ use std::path::Path;
 use syn::Ident;
 
 use crate::casing::Casing;
+use crate::length::Length;
 use crate::matching::Matching;
 use crate::whole::Whole;
 use crate::word::Word;
+use boundary::Letters;
 use newtype::Newtype;
 use newtype::proptest::arbitrary::{Arbitrary, any};
 use newtype::proptest::strategy::{BoxedStrategy, Strategy};
@@ -17,17 +21,13 @@ pub struct Name(String);
 
 impl Name {
     #[must_use]
-    pub fn length(&self) -> usize {
-        self.0.chars().count()
+    pub fn length(&self) -> Length {
+        Length::new(self.0.chars().count())
     }
 
     #[must_use]
     pub fn matches<'word, Rule: Matching>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
         words.iter().find_map(|word| Rule::holds(self, *word))
-    }
-
-    pub(crate) fn spelled(&self) -> &str {
-        &self.0
     }
 
     #[must_use]
@@ -69,51 +69,23 @@ impl Name {
     pub fn camel_word<'word>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
         self.words()
             .iter()
-            .flat_map(|chunk| Self::humps(&chunk.0))
+            .flat_map(|chunk| Letters::humps(&chunk.0).into_iter().map(Name))
             .find_map(|hump| hump.lowered().matches::<Whole>(words))
-    }
-
-    fn humps(chunk: &str) -> Vec<Name> {
-        let letters: Vec<char> = chunk.chars().collect();
-        let cuts = (0..letters.len()).filter(|index| Self::cut(&letters, *index).is_some());
-        let bounds: Vec<usize> = cuts.chain(Some(letters.len())).collect();
-        bounds
-            .iter()
-            .zip(bounds.iter().skip(1))
-            .filter_map(|(start, end)| letters.get(*start..*end))
-            .map(|hump| Name(hump.iter().collect()))
-            .collect()
-    }
-
-    fn cut(letters: &[char], index: usize) -> Option<&char> {
-        let at = |place: usize| letters.get(place).copied();
-        let previous = index.checked_sub(1).and_then(at);
-        let next = index.checked_add(1).and_then(at);
-        (previous.is_none()
-            || (at(index).is_some_and(char::is_uppercase)
-                && previous.is_some_and(|before| {
-                    before.is_lowercase()
-                        || before.is_ascii_digit()
-                        || (before.is_uppercase() && next.is_some_and(char::is_lowercase))
-                })))
-        .then(|| letters.get(index))
-        .flatten()
     }
 
     #[must_use]
     pub fn casing(&self) -> Casing {
+        let rest = || self.0.chars().skip(1);
         match self.0.chars().next() {
             Some(first) if first.is_ascii_lowercase() => Casing::Lower,
-            Some(first) if first.is_ascii_uppercase() => Self::capitalized(&self.0),
+            Some(first)
+                if first.is_ascii_uppercase()
+                    && rest().any(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit()) =>
+            {
+                Casing::Camel
+            }
+            Some(first) if first.is_ascii_uppercase() => Casing::Shouting,
             _ => Casing::Other,
-        }
-    }
-
-    fn capitalized(text: &str) -> Casing {
-        if text.chars().skip(1).any(|letter| letter.is_ascii_lowercase() || letter.is_ascii_digit()) {
-            Casing::Camel
-        } else {
-            Casing::Shouting
         }
     }
 }

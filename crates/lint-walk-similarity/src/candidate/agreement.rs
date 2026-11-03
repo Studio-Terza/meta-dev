@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::walk::Walk;
 use newtype::{Arbitrary, Counter, Display, Newtype};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -15,8 +16,11 @@ impl Agreement {
     const AT_LEAST_PARTS: usize = 4;
     const OUT_OF_PARTS: usize = 5;
 
-    pub(crate) fn counted(shared: usize, all: usize) -> Agreement {
-        Agreement { shared: Tally::new(shared), all: Tally::new(all) }
+    pub(crate) fn between(first: &Walk<'_>, second: &Walk<'_>) -> Agreement {
+        Agreement {
+            shared: Tally::new(first.steps().intersection(second.steps()).count()),
+            all: Tally::new(first.steps().union(second.steps()).count()),
+        }
     }
 
     pub(crate) fn near_identical(self) -> Option<Agreement> {

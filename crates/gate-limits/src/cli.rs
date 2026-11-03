@@ -71,10 +71,10 @@ impl Cli {
     }
 
     fn gate(&self) -> Result<Gate, Failure> {
-        Gate::judge(Contents::new(&Self::read(&self.limits)?), Contents::new(&Self::read(&self.measured)?), &self.only)
+        Gate::judge(Self::read(&self.limits)?, Self::read(&self.measured)?, &self.only)
     }
 
-    fn read(path: &Path) -> Result<String, Failure> {
-        fs::read_to_string(path).map_err(|source| Failure::Io { path: path.to_path_buf(), source })
+    fn read(path: &Path) -> Result<Contents, Failure> {
+        fs::read_to_string(path).map(Contents::new).map_err(|source| Failure::Io { path: path.to_path_buf(), source })
     }
 }

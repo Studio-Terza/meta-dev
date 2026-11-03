@@ -11,4 +11,7 @@ src/short.rs:2: 'b; name the lifetime with a word that says what it borrows from
 function names say what the function does:
 src/named.rs:2: fn f names nothing; say what it does
 src/short.rs:2: fn f names nothing; say what it does
+primitives appear in signatures and fields only inside a boundary:
+src/named.rs:2: bare str in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/short.rs:2: bare str in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 fails
