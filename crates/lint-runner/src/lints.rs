@@ -11,6 +11,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
+use lint_layering::Layering;
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -18,7 +19,6 @@ use lint_manual_iteration::ManualIteration;
 use lint_module_nesting::ModuleNesting;
 use lint_named_lifetimes::NamedLifetimes;
 use lint_named_numbers::NamedNumbers;
-use lint_near_duplicate_tests::NearDuplicateTests;
 use lint_no_comments::NoComments;
 use lint_no_early_exits::NoEarlyExits;
 use lint_no_forwarders::NoForwarders;
@@ -37,11 +37,13 @@ use lint_public_api_tests::PublicApiTests;
 use lint_public_surface::PublicSurface;
 use lint_raw_resources::RawResources;
 use lint_repeated_methods::RepeatedMethods;
+use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::OneEdge;
+use lint_transition_graph::{OnGraph, OneEdge};
 use lint_type_shape::TypeShape;
+use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
@@ -90,13 +92,15 @@ impl Lints {
             FakesAtPorts::report(files),
             PortBatching::report(files),
             LongExactStrings::report(files),
-            NearDuplicateTests::report(files),
+            RepeatedShapes::report(files),
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),
             BoolMethods::report(files),
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
-            OneEdge::report(files),
+            OnGraph::<OneEdge>::report(files),
+            UnconsumedTraits::report(files),
+            Layering::report(files),
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),
         ];

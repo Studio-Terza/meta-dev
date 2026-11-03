@@ -1,6 +1,6 @@
 use laws::proptest::collection::vec;
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
-use newtype::{Counter, Display, Newtype, Validated};
+use newtype::{Counter, Display, Newtype};
 use newtype_derive::Arbitrary;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,11 +23,11 @@ struct Word(String);
 
 impl Word {
     fn check(text: &str) -> Result<(), Empty> {
-        if text.is_empty() { Err(Empty) } else { Ok(()) }
+        text.chars().next().map(|_| ()).ok_or(Empty)
     }
 
     fn checked(text: &&str) -> Result<String, Empty> {
-        Word::try_new((*text).to_owned()).map(Validated::into_inner)
+        Word::try_new((*text).to_owned()).map(Word::into_inner)
     }
 }
 
@@ -37,7 +37,7 @@ struct Small(u128);
 
 impl Small {
     fn check(number: &u128) -> Result<(), Empty> {
-        if *number < 1000 { Ok(()) } else { Err(Empty) }
+        (*number < 1000).then_some(()).ok_or(Empty)
     }
 }
 
@@ -47,7 +47,7 @@ struct Digest(String);
 
 impl Digest {
     fn check(text: &str) -> Result<(), Empty> {
-        if text.len() == 40 { Ok(()) } else { Err(Empty) }
+        (text.len() == 40).then_some(()).ok_or(Empty)
     }
 }
 

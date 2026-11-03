@@ -14,9 +14,6 @@ use syntax::Syntax;
 
 const MAX_BYTES: usize = 512;
 const NO_BYTES: usize = 0;
-const TRUNCATE: u8 = 0;
-const FLIP: u8 = 1;
-const INSERT: u8 = 2;
 const MUTATIONS: u8 = 3;
 
 struct Targets;
@@ -49,19 +46,14 @@ impl Targets {
     fn damaged() -> impl Strategy<Value = Input> {
         (Self::roles(), Syntax::file(), any::<Index>(), any::<u8>(), 0..MUTATIONS).prop_map(
             |(role, text, place, byte, kind)| {
-                let mut bytes = text.into_bytes();
+                let bytes = text.into_bytes();
                 let at = place.index(bytes.len().saturating_add(1));
-                match kind {
-                    TRUNCATE => bytes.truncate(at),
-                    FLIP => {
-                        if let Some(found) = bytes.get_mut(at) {
-                            *found ^= byte | 1;
-                        }
-                    }
-                    INSERT => bytes.insert(at, byte),
-                    _ => {}
-                }
-                Input::new(role, bytes)
+                let mutated = Mutation::ALL
+                    .iter()
+                    .skip(usize::from(kind))
+                    .take(1)
+                    .fold(bytes, |bytes, mutation| mutation.applied(&bytes, at, byte));
+                Input::new(role, mutated)
             },
         )
     }
@@ -95,4 +87,33 @@ fn deeply_nested_syntax_does_not_panic_the_runner() -> Result<(), Crash> {
 #[test]
 fn long_chains_do_not_panic_the_runner() -> Result<(), Crash> {
     Campaign::run("chained", Targets::chained())
+}
+
+#[derive(Clone, Copy)]
+enum Mutation {
+    Truncate,
+    Flip,
+    Insert,
+}
+
+impl Mutation {
+    const ALL: [Mutation; 3] = [Mutation::Truncate, Mutation::Flip, Mutation::Insert];
+
+    fn applied(self, bytes: &[u8], at: usize, byte: u8) -> Vec<u8> {
+        match self {
+            Mutation::Truncate => bytes.iter().take(at).copied().collect(),
+            Mutation::Flip => Self::replaced(bytes, at, bytes.get(at).map(|found| found ^ (byte | 1)), 1),
+            Mutation::Insert => Self::replaced(bytes, at, Some(byte), 0),
+        }
+    }
+
+    fn replaced(bytes: &[u8], at: usize, put: Option<u8>, removed: usize) -> Vec<u8> {
+        bytes
+            .iter()
+            .take(at)
+            .copied()
+            .chain(put)
+            .chain(bytes.iter().skip(at.saturating_add(removed)).copied())
+            .collect()
+    }
 }

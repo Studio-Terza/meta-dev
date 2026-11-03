@@ -18,14 +18,12 @@ impl Letters {
         let at = |place: usize| letters.get(place).copied();
         let previous = index.checked_sub(1).and_then(at);
         let next = index.checked_add(1).and_then(at);
-        (previous.is_none()
-            || (at(index).is_some_and(char::is_uppercase)
-                && previous.is_some_and(|before| {
-                    before.is_lowercase()
-                        || before.is_ascii_digit()
-                        || (before.is_uppercase() && next.is_some_and(char::is_lowercase))
-                })))
-        .then(|| letters.get(index))
-        .flatten()
+        let first = (index == 0).then_some(());
+        let after_lower = previous.filter(|before| before.is_lowercase());
+        let after_digit = previous.filter(char::is_ascii_digit);
+        let acronym_end =
+            previous.filter(|before| before.is_uppercase()).and(next.filter(|after| after.is_lowercase()));
+        let humped = at(index).filter(|letter| letter.is_uppercase()).and(after_lower.or(after_digit).or(acronym_end));
+        first.or(humped.map(|_| ())).and(letters.get(index))
     }
 }

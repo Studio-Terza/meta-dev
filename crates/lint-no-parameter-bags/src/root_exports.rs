@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use syn::{Item, UseTree, Visibility};
+use syn::{UseTree, Visibility};
 
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_layout::Name;
 use lint_placement::CrateName;
 use lint_placement::Role;
@@ -22,10 +23,13 @@ impl RootExports {
     }
 
     fn record(&mut self, file: &SourceFile) {
-        let names = file.syntax().items.iter().flat_map(|item| match item {
-            Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Self::leaves(&used.tree),
-            _ => Vec::new(),
-        });
+        let names = file
+            .syntax()
+            .items
+            .iter()
+            .filter_map(Syntax::item_use)
+            .filter(|used| matches!(used.vis, Visibility::Public(_)))
+            .flat_map(|used| Self::leaves(&used.tree));
         self.0.entry(CrateName::from(file.placement().crate_root())).or_default().extend(names);
     }
 

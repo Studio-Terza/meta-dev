@@ -9,9 +9,6 @@ pub struct ArbitraryNewtypes;
 
 impl Lint for ArbitraryNewtypes {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Report::new(
-            Headline::new("a newtype that owns its value derives Arbitrary"),
-            files.iter().filter_map(SourceFile::shipped).flat_map(Ungenerated::violations).collect(),
-        )
+        Report::new(Headline::new("a newtype that owns its value derives Arbitrary"), Ungenerated::in_shipped(files))
     }
 }

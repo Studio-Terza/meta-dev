@@ -24,21 +24,18 @@ impl Memory {
 
     fn stored(&self, path: &Path) -> Result<Bytes, FileFailure> {
         let found = self.files.held().get(path).cloned();
-        match found {
-            Some(bytes) => Ok(bytes),
-            None if self.kind(path) == Kind::Directory => {
-                Err(FileFailure::Failed(io::Error::from(io::ErrorKind::IsADirectory)))
-            }
-            None => Err(Self::missing()),
-        }
+        found.ok_or_else(|| {
+            Some(self.kind(path))
+                .filter(|kind| *kind == Kind::Directory)
+                .map_or_else(Self::missing, |_| FileFailure::Failed(io::Error::from(io::ErrorKind::IsADirectory)))
+        })
     }
 
     fn placed<'path>(&self, path: &'path Path) -> Result<&'path Path, FileFailure> {
-        match path.parent().map(|parent| (parent, self.kind(parent))) {
-            Some((_, Kind::Directory)) | None => Ok(path),
-            Some((parent, _)) if parent.as_os_str().is_empty() => Ok(path),
-            Some(_) => Err(Self::missing()),
-        }
+        path.parent()
+            .filter(|parent| self.kind(parent) != Kind::Directory)
+            .filter(|parent| parent.components().next().is_some())
+            .map_or(Ok(path), |_| Err(Self::missing()))
     }
 
     fn holds_below(&self, path: &Path) -> Option<Kind> {
@@ -47,7 +44,8 @@ impl Memory {
         files
             .keys()
             .chain(directories.iter())
-            .find(|held| *held != path && held.starts_with(path))
+            .filter(|held| *held != path)
+            .find(|held| held.starts_with(path))
             .map(|_| Kind::Directory)
     }
 }
@@ -82,12 +80,14 @@ impl Files for Memory {
     }
 
     fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
-        if path.ancestors().any(|ancestor| self.files.held().contains_key(ancestor)) {
-            Err(FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory)))
-        } else {
-            self.directories.held().insert(path.to_path_buf());
-            Ok(())
-        }
+        let blocked = path.ancestors().find(|ancestor| self.files.held().contains_key(*ancestor));
+        blocked.map_or_else(
+            || {
+                self.directories.held().insert(path.to_path_buf());
+                Ok(())
+            },
+            |_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::NotADirectory))),
+        )
     }
 
     fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
@@ -95,29 +95,24 @@ impl Files for Memory {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        match self.kind(directory) {
-            Kind::Directory => {
-                let files = self.files.held();
-                let directories = self.directories.held();
-                let children: BTreeSet<PathBuf> = files
-                    .keys()
-                    .chain(directories.iter())
-                    .filter_map(|held| held.strip_prefix(directory).ok())
-                    .filter_map(|inside| inside.components().next())
-                    .map(|first| directory.join(first))
-                    .collect();
-                Ok(children.into_iter().collect())
-            }
-            _ => Err(Self::missing()),
-        }
+        Some(self.kind(directory)).filter(|kind| *kind == Kind::Directory).ok_or_else(Self::missing).map(|_| {
+            let files = self.files.held();
+            let directories = self.directories.held();
+            let children: BTreeSet<PathBuf> = files
+                .keys()
+                .chain(directories.iter())
+                .filter_map(|held| held.strip_prefix(directory).ok())
+                .filter_map(|inside| inside.components().next())
+                .map(|first| directory.join(first))
+                .collect();
+            children.into_iter().collect()
+        })
     }
 
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
-        let resolved = Resolved::from(path).into_inner();
-        match self.kind(&resolved) {
-            Kind::Missing => Err(Self::missing()),
-            _ => Ok(resolved),
-        }
+        Some(Resolved::from(path).into_inner())
+            .filter(|resolved| self.kind(resolved) != Kind::Missing)
+            .ok_or_else(Self::missing)
     }
 
     fn kind(&self, path: &Path) -> Kind {

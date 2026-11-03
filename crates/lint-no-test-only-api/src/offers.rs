@@ -29,7 +29,8 @@ impl<'file> Offers<'file> {
     fn offered(&mut self, ident: &Ident, visibility: &Visibility) {
         let violation = Violation::new(Site::new(self.path, LineNumber::from(ident.span())), Finding::OnlyTests);
         self.found.extend(
-            (!matches!(visibility, Visibility::Inherited)).then_some(Candidate::new(Name::from(ident), violation)),
+            matches!(visibility, Visibility::Public(_) | Visibility::Restricted(_))
+                .then_some(Candidate::new(Name::from(ident), violation)),
         );
     }
 

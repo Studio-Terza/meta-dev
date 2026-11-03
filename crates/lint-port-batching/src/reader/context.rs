@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
-use syn::{FnArg, Signature, Type};
+use syn::{Signature, Type};
 
+use lint_core::Syntax;
 use lint_layout::Name;
 use lint_paths::Module;
 use lint_placement::CrateName;
@@ -36,10 +37,7 @@ impl<'run> Context<'run> {
         signature
             .inputs
             .iter()
-            .filter_map(|input| match input {
-                FnArg::Typed(typed) => Some(typed),
-                FnArg::Receiver(_) => None,
-            })
+            .filter_map(Syntax::typed)
             .filter(|typed| self.parameter(module, generics, &typed.ty).is_some())
             .filter_map(|typed| Scope::bound(&typed.pat))
             .collect()

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use syn::{GenericParam, Generics, Type, TypeParamBound, WherePredicate};
 
+use lint_core::Syntax;
 use lint_fakes_at_ports::{Kind, PortTraits};
 use lint_layout::Name;
 use lint_paths::{Imports, Module};
@@ -41,12 +42,7 @@ impl<'run> Judge<'run> {
     }
 
     fn bounded(&self, module: &Module<'_>, ty: &Type) -> Option<Name> {
-        let bounds = match ty {
-            Type::ImplTrait(bounded) => Some(&bounded.bounds),
-            Type::TraitObject(bounded) => Some(&bounded.bounds),
-            _ => None,
-        };
-        bounds.into_iter().flatten().find_map(|bound| self.bound(module, bound))
+        Syntax::bounds(ty).into_iter().flatten().find_map(|bound| self.bound(module, bound))
     }
 
     fn param(&self, module: &Module<'_>, param: &GenericParam) -> Option<Name> {
@@ -71,11 +67,7 @@ impl<'run> Judge<'run> {
     }
 
     fn bound(&self, module: &Module<'_>, bound: &TypeParamBound) -> Option<Name> {
-        let traited = match bound {
-            TypeParamBound::Trait(traited) => Some(traited),
-            _ => None,
-        };
-        traited
+        Syntax::trait_bound(bound)
             .filter(|traited| self.ports.judged(self.imports, module, &traited.path) == Kind::Port)
             .and_then(|traited| traited.path.segments.last())
             .map(|last| Name::from(&last.ident))

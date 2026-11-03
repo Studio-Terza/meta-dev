@@ -76,10 +76,7 @@ impl<'newtypes, 'file> SignatureSites<'newtypes, 'file> {
 
 impl<'ast> Visit<'ast> for SignatureSites<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered if Gate::BOUNDARY.names(module).is_none() => syn::visit::visit_item_mod(self, module),
-            Walk::Entered | Walk::Skipped => {}
-        }
+        Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {

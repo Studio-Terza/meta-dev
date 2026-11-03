@@ -36,7 +36,6 @@ lint-manual-iteration = { path = "../lint-manual-iteration" }
 lint-module-nesting = { path = "../lint-module-nesting" }
 lint-named-lifetimes = { path = "../lint-named-lifetimes" }
 lint-named-numbers = { path = "../lint-named-numbers" }
-lint-near-duplicate-tests = { path = "../lint-near-duplicate-tests" }
 lint-no-comments = { path = "../lint-no-comments" }
 lint-no-early-exits = { path = "../lint-no-early-exits" }
 lint-no-forwarders = { path = "../lint-no-forwarders" }
@@ -65,9 +64,7 @@ lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 lint-type-shape = { path = "../lint-type-shape" }
 lint-layering = { path = "../lint-layering" }
-lint-type-graph = { path = "../lint-type-graph" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
-lint-walk-similarity = { path = "../lint-walk-similarity" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
 transition-facts = { path = "../transition-facts" }

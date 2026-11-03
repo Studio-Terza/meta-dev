@@ -11,9 +11,10 @@ impl Applied {
             Expr::Paren(paren) => Self::traced(&paren.expr),
             Expr::Field(field) => Self::traced(&field.base),
             Expr::MethodCall(call) => Self::each(call.args.iter()).and_then(|_| Self::traced(&call.receiver)),
-            Expr::Call(call) if matches!(call.func.as_ref(), Expr::Path(_)) => {
-                Self::each(call.args.iter())?.into_iter().next()
-            }
+            Expr::Call(call) => Some(call)
+                .filter(|call| matches!(call.func.as_ref(), Expr::Path(_)))
+                .and_then(|call| Self::each(call.args.iter()))
+                .and_then(|arguments| arguments.into_iter().next()),
             _ => None,
         }
     }

@@ -14,7 +14,6 @@ lint-core = { path = "../lint-core" }
 lint-item-graph = { path = "../lint-item-graph" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
-newtype = { path = "../newtype" }
 type-facts = { path = "../type-facts" }
 
 [lints]

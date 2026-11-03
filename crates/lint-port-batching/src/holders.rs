@@ -5,7 +5,7 @@ use syn::{ItemMod, ItemStruct};
 
 use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
-use lint_paths::Module;
+use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
 
 use crate::judge::Judge;
@@ -35,27 +35,29 @@ struct Reader<'file, 'run> {
     owners: BTreeMap<Name, BTreeSet<Name>>,
 }
 
+impl<'file> Nested<'file> for Reader<'file, '_> {
+    fn module(&mut self) -> &mut Module<'file> {
+        &mut self.module
+    }
+}
+
 impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        self.module.enter(Name::from(&module.ident));
-        Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
-        self.module.leave();
+        self.nested(module, |reader| visit::visit_item_mod(reader, module));
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         Walk::enter(&item.attrs, || {
             let generics = self.judge.generics(&self.module, &item.generics);
-            let held: BTreeSet<Name> = item
-                .fields
+            item.fields
                 .iter()
                 .filter(|field| self.judge.port_type(&self.module, &generics, &field.ty).is_some())
                 .filter_map(|field| field.ident.as_ref())
                 .map(Name::from)
-                .collect();
-            Some(held).filter(|held| !held.is_empty()).into_iter().fold(&mut self.owners, |owners, held| {
-                owners.entry(Name::from(&item.ident)).or_default().extend(held);
-                owners
-            });
+                .fold(&mut self.owners, |owners, field| {
+                    owners.entry(Name::from(&item.ident)).or_default().insert(field);
+                    owners
+                });
         });
     }
 }

@@ -1,7 +1,7 @@
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use type_facts::{Dependency, Facts, TraitFact, TypeFact};
+use type_facts::{Dependency, Facts};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Declaration<'facts, 'file> {
@@ -29,24 +29,16 @@ impl<'facts, 'file> Declaration<'facts, 'file> {
     }
 }
 
-impl<'facts, 'file> From<&'facts TypeFact<'file>> for Declaration<'facts, 'file> {
-    fn from(found: &'facts TypeFact<'file>) -> Declaration<'facts, 'file> {
+impl<'facts, 'file, Fact> From<&'facts Fact> for Declaration<'facts, 'file>
+where
+    Fact: AsRef<CrateName> + AsRef<Name> + AsRef<Site<'file>> + AsRef<[Dependency<'file>]>,
+{
+    fn from(found: &'facts Fact) -> Declaration<'facts, 'file> {
         Declaration {
             krate: found.as_ref(),
             name: found.as_ref(),
             site: *AsRef::<Site<'file>>::as_ref(found),
-            dependencies: found.dependencies(),
-        }
-    }
-}
-
-impl<'facts, 'file> From<&'facts TraitFact<'file>> for Declaration<'facts, 'file> {
-    fn from(found: &'facts TraitFact<'file>) -> Declaration<'facts, 'file> {
-        Declaration {
-            krate: found.as_ref(),
-            name: found.as_ref(),
-            site: *AsRef::<Site<'file>>::as_ref(found),
-            dependencies: found.dependencies(),
+            dependencies: found.as_ref(),
         }
     }
 }

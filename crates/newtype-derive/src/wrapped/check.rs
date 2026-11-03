@@ -25,7 +25,7 @@ impl Check {
             ::newtype::proptest::strategy::Strategy::prop_filter_map(
                 inner,
                 "the check refuses this value",
-                |value| <Self as ::newtype::Validated>::try_new(value).ok(),
+                |value| Self::try_new(value).ok(),
             )
         }
     }

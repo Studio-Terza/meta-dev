@@ -42,12 +42,7 @@ impl Golden {
     ) -> Result<(), Failure> {
         match mode {
             Mode::Check => self.checked(files, actual),
-            Mode::Record => {
-                let written = (files.kind(&self.package.join(Self::MANIFEST)) == Kind::Missing
-                    || Mode::current(environment).ok() == Some(Mode::Record))
-                .then(|| self.written(files, actual));
-                self.recorded(written)
-            }
+            Mode::Record => self.record(Mode::current(environment), files, actual),
         }
     }
 
@@ -69,17 +64,22 @@ impl Golden {
         }
     }
 
-    fn written(&self, files: &impl Files, actual: Output<'_>) -> Result<(), FileFailure> {
-        files
-            .create_directories(self.path.parent().unwrap_or(Path::new("")))
-            .and_then(|()| files.write(&self.path, Bytes::from(actual.into_inner())))
+    fn record(self, current: Result<Mode, Failure>, files: &impl Files, actual: Output<'_>) -> Result<(), Failure> {
+        let fresh = (files.kind(&self.package.join(Self::MANIFEST)) == Kind::Missing).then_some(());
+        let written = fresh.or_else(|| current.ok().filter(|mode| *mode == Mode::Record).map(|_| ())).map(|()| {
+            files
+                .create_directories(self.path.parent().unwrap_or(Path::new("")))
+                .and_then(|()| files.write(&self.path, Bytes::from(actual.into_inner())))
+        });
+        self.recorded(written)
     }
 
     fn unread(self, files: &impl Files, failure: FileFailure) -> Failure {
-        if files.kind(&self.path) == Kind::Missing {
-            Failure::Missing { path: self.path }
-        } else {
-            Failure::Unreadable { path: self.path, source: io::Error::from(failure) }
+        match files.kind(&self.path) {
+            Kind::Missing => Failure::Missing { path: self.path },
+            Kind::File | Kind::Directory | Kind::Link => {
+                Failure::Unreadable { path: self.path, source: io::Error::from(failure) }
+            }
         }
     }
 }

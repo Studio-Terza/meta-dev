@@ -40,11 +40,11 @@ impl fmt::Display for Finding<'_> {
 
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::GatedOnTest => "remove the gate and test through the real public API",
-            Finding::DocHidden => "document it as real API, or make it private",
-            Finding::OnlyTests => "remove it and test through the API shipped code uses",
-            Finding::Feature(_) => "remove the feature and test through the API every build has",
-        })
+        match self {
+            Finding::GatedOnTest => Fix::new("remove the gate and test through the real public API"),
+            Finding::DocHidden => Fix::new("document it as real API, or make it private"),
+            Finding::OnlyTests => Fix::new("remove it and test through the API shipped code uses"),
+            Finding::Feature(_) => Fix::new("remove the feature and test through the API every build has"),
+        }
     }
 }

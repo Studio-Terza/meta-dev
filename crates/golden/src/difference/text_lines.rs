@@ -14,6 +14,6 @@ impl<'text> Iterator for TextLines<'text> {
         let end = self.0.match_indices(Self::BREAK).next().map_or(self.0.len(), |(at, _)| at + Self::BREAK.len_utf8());
         let (line, rest) = self.0.split_at(end);
         self.0 = rest;
-        (!line.is_empty()).then_some(line)
+        line.as_bytes().first().map(|_| line)
     }
 }

@@ -1,16 +1,14 @@
-mod macro_items;
+mod declared;
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use quote::ToTokens;
-use syn::{Attribute, Item, Type};
+use syn::Item;
 
-use lint_core::Walk;
 use lint_layout::Name;
 
 use crate::scope::Scope;
-use macro_items::MacroItems;
+use declared::Declared;
 
 #[derive(Debug, Default)]
 pub struct ReferencedNames {
@@ -46,36 +44,8 @@ impl ReferencedNames {
     }
 
     fn with_item(self, item: &Item, scope: &Scope<'_>) -> ReferencedNames {
-        let (attributes, owner, nested): (&[Attribute], Option<Name>, Cow<'_, [Item]>) = match item {
-            Item::Struct(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Enum(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Trait(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Fn(item) => (&item.attrs, Some(Name::from(&item.sig.ident)), Cow::Borrowed(&[])),
-            Item::Type(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Const(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Static(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Impl(item) => (&item.attrs, None, Cow::Borrowed(&[])),
-            Item::Mod(module) => (
-                &module.attrs,
-                None,
-                module.content.as_ref().map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
-            ),
-            Item::Macro(call) => (&call.attrs, None, Cow::Owned(MacroItems::declared_by(call))),
-            _ => (&[], None, Cow::Borrowed(&[])),
-        };
-        match Walk::outside_tests(attributes) {
-            Walk::Skipped => self,
-            Walk::Entered => {
-                let own = match item {
-                    Item::Impl(item) => ReferencedNames {
-                        implemented: Self::named(Self::self_type(&item.self_ty), scope, item),
-                        ..ReferencedNames::default()
-                    },
-                    _ => ReferencedNames { declared: Self::named(owner, scope, item), ..ReferencedNames::default() },
-                };
-                self.merged(own).merged(Self::of_items(&nested, scope))
-            }
-        }
+        let referenced = Declared::from(item).entered().map(|declared| declared.referenced(scope)).unwrap_or_default();
+        self.merged(referenced)
     }
 
     fn named(owner: Option<Name>, scope: &Scope<'_>, item: &impl ToTokens) -> BTreeMap<Name, Vec<Name>> {
@@ -84,12 +54,5 @@ impl ReferencedNames {
             .map(|owner| (owner, scope.referenced(item.to_token_stream())))
             .into_iter()
             .collect()
-    }
-
-    fn self_type(self_type: &Type) -> Option<Name> {
-        match self_type {
-            Type::Path(path) => path.path.segments.last().map(|segment| Name::from(&segment.ident)),
-            _ => None,
-        }
     }
 }
