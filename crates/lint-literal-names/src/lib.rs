@@ -19,7 +19,7 @@ use lint_layout::{Name, Whole, Word, words};
 pub struct LiteralNames;
 
 impl Lint for LiteralNames {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("function names say what the function does"),
             files

@@ -19,7 +19,7 @@ impl<'file> Function<'file> {
     }
 }
 
-impl<'file> AsRef<Name> for Function<'file> {
+impl AsRef<Name> for Function<'_> {
     fn as_ref(&self) -> &Name {
         &self.name
     }

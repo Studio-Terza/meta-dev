@@ -17,7 +17,7 @@ use lint_layout::{Length, Name};
 pub struct NamedLifetimes;
 
 impl Lint for NamedLifetimes {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("lifetimes are named with a word, never a letter"),
             files

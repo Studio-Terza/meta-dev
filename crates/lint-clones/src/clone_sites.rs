@@ -10,13 +10,13 @@ use finding::Finding;
 
 pub struct CloneSites<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
-impl CloneSites<'_> {
+impl<'file> CloneSites<'file> {
     const CLONE: &str = "clone";
 
-    pub fn within(file: &SourceFile) -> std::vec::IntoIter<Violation> {
+    pub fn within(file: &'file SourceFile) -> std::vec::IntoIter<Violation<'file>> {
         let mut sites = CloneSites { file, found: Vec::new() };
         sites.visit_file(file.syntax());
         sites.found.into_iter()

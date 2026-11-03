@@ -16,7 +16,7 @@ use lint_layout::Name;
 pub struct NoFreeFns;
 
 impl Lint for NoFreeFns {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("free functions are not allowed; make them associated functions or methods"),
             files

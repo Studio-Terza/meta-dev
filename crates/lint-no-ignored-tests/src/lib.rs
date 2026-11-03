@@ -25,7 +25,7 @@ impl NoIgnoredTests {
 }
 
 impl Lint for NoIgnoredTests {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("every test runs"),
             files

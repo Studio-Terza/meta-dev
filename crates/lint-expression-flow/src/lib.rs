@@ -31,7 +31,7 @@ use lint_layout::Name;
 pub struct ExpressionFlow;
 
 impl Lint for ExpressionFlow {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("control flow is an expression; every branch yields the value the function returns"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -40,7 +40,7 @@ impl Lint for ExpressionFlow {
 }
 
 impl ExpressionFlow {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut flows = Flows { path: file.path(), violations: Vec::new() };
         flows.visit_file(file.syntax());
         flows.violations
@@ -87,11 +87,11 @@ impl ExpressionFlow {
 
 struct Flows<'scan> {
     path: &'scan Path,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
-impl Flows<'_> {
-    fn found(path: &Path, span: Span, message: Message) -> Violation {
+impl<'scan> Flows<'scan> {
+    fn found(path: &'scan Path, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), message)
     }
 

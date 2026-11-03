@@ -26,9 +26,7 @@ impl GraphLint for Bisimilarity {
             groups.entry(*block).or_default().push(*node);
             groups
         });
-        let groups = Group::ranked(
-            grouped.into_values().filter_map(|members| Group::alike(members, &graph, &behaviour)).collect(),
-        );
+        let groups = Group::ranked(grouped.into_values(), &graph, &behaviour);
         Report::new(
             Headline::new(
                 "report only, bisimilar types: partition refinement over the domain types on their moves beyond any trait, each labelled written for inherent and free functions, lift for a derived lift and the operation for a store operation, carrying the other domain inputs of a multi-input edge, and leading to an equivalent type or to the same black box; trait impls are the shared interface the fillers of a trait already group under (D7), so they are not evidence; types in one group answer the same labelled moves into the same groups, so they behave identically; groups whose types make fewer than two such moves are left out; candidates to merge into one type or one generic",
@@ -45,7 +43,7 @@ impl GraphLint for Bisimilarity {
 }
 
 impl Lint for Bisimilarity {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

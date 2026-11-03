@@ -24,7 +24,7 @@ pub struct Assertions<'file> {
     constants: Bindings,
     locals: Bindings,
     tables: MacroAliases,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl<'file> From<&'file SourceFile> for Assertions<'file> {
@@ -41,8 +41,8 @@ impl<'file> From<&'file SourceFile> for Assertions<'file> {
     }
 }
 
-impl From<Assertions<'_>> for Vec<Violation> {
-    fn from(assertions: Assertions<'_>) -> Vec<Violation> {
+impl<'file> From<Assertions<'file>> for Vec<Violation<'file>> {
+    fn from(assertions: Assertions<'file>) -> Vec<Violation<'file>> {
         assertions.found
     }
 }

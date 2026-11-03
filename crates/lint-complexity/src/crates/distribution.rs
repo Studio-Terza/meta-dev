@@ -34,11 +34,11 @@ impl<'file, 'crate_functions> Distribution<'file, 'crate_functions> {
 
     pub(crate) fn violation(&self) -> Violation<'file> {
         let site: &Site<'file> = self.hairiest.as_ref();
-        Violation::new(site.clone(), self)
+        Violation::new(*site, self)
     }
 }
 
-impl<'file> fmt::Display for Distribution<'file, '_> {
+impl fmt::Display for Distribution<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let hairiest: &Name = self.hairiest.as_ref();
         write!(formatter, "crate {}: {} functions by complexity", self.name, self.total.len())?;
@@ -47,7 +47,7 @@ impl<'file> fmt::Display for Distribution<'file, '_> {
     }
 }
 
-impl<'file> Finding for Distribution<'file, '_> {
+impl Finding for Distribution<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
             "turn the branches of the highest into a standard trait, a generic over an existing trait, or a derive",

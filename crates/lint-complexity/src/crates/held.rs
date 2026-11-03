@@ -15,7 +15,7 @@ impl<'file> Held<'file> {
         let heaviest = functions.iter().max_by_key(|function| function.score())?;
         let logic =
             Logic::total(functions.iter().map(|function| Logic::new(function.score().into_inner().saturating_sub(1))));
-        Some(Held { logic, heaviest: AsRef::<Site<'file>>::as_ref(heaviest).clone() })
+        Some(Held { logic, heaviest: *AsRef::<Site<'file>>::as_ref(heaviest) })
     }
 
     #[must_use]
@@ -24,7 +24,7 @@ impl<'file> Held<'file> {
     }
 
     #[must_use]
-    pub fn heaviest(&self) -> &Site<'file> {
-        &self.heaviest
+    pub fn heaviest(&self) -> Site<'file> {
+        self.heaviest
     }
 }

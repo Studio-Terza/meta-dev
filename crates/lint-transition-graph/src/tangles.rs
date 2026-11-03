@@ -62,7 +62,7 @@ impl Tangles {
 }
 
 impl Lint for Tangles {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

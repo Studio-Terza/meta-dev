@@ -34,7 +34,7 @@ impl<'file> Functions<'file> {
     }
 }
 
-impl<'file, 'ast> Visit<'ast> for Functions<'file> {
+impl<'ast> Visit<'ast> for Functions<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
     }

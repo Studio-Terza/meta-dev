@@ -8,23 +8,23 @@ use lint_placement::ModulePath;
 
 use super::{EnumPredicates, Finding, Kind};
 
-pub struct Predicates<'scan> {
+pub struct Predicates<'scan, 'file> {
     known: &'scan EnumPredicates,
-    file: &'scan SourceFile,
+    file: &'file SourceFile,
     module: ModulePath,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'file>>,
 }
 
-impl<'scan> Predicates<'scan> {
-    pub fn new(known: &'scan EnumPredicates, file: &'scan SourceFile) -> Predicates<'scan> {
+impl<'scan, 'file> Predicates<'scan, 'file> {
+    pub fn new(known: &'scan EnumPredicates, file: &'file SourceFile) -> Predicates<'scan, 'file> {
         Predicates { known, file, module: file.placement().module().clone(), violations: Vec::new() }
     }
 
-    pub fn into_violations(self) -> Vec<Violation> {
+    pub fn into_violations(self) -> Vec<Violation<'file>> {
         self.violations
     }
 
-    fn predicates(&self, block: &ItemImpl) -> Vec<Violation> {
+    fn predicates(&self, block: &ItemImpl) -> Vec<Violation<'file>> {
         block
             .items
             .iter()
@@ -48,7 +48,7 @@ impl<'scan> Predicates<'scan> {
     }
 }
 
-impl<'ast> Visit<'ast> for Predicates<'_> {
+impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let inner = self.module.child(&Name::from(&module.ident));
         let outer = std::mem::replace(&mut self.module, inner);

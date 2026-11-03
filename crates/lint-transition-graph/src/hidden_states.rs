@@ -20,9 +20,9 @@ impl HiddenStates {
 impl GraphLint for HiddenStates {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
-        let written: Vec<&Transition> =
+        let written: Vec<&Transition<'file>> =
             graph.edges().iter().filter(|edge| edge.role() == Role::Written).map(Edge::transition).collect();
-        let mut above: Vec<&Transition> =
+        let mut above: Vec<&Transition<'file>> =
             written.iter().copied().filter(|found| Self::FLOOR.allows(found.branches()).is_some()).collect();
         above.sort_by(|left, right| {
             right.branches().cmp(&left.branches()).then_with(|| AsRef::<Site>::as_ref(*left).cmp(right.as_ref()))
@@ -32,7 +32,7 @@ impl GraphLint for HiddenStates {
                 "report only, hidden states: a written edge whose body branches six ways or more (if, loops, match arms beyond the first, && and ||; the ? operator is error propagation, allowed everywhere, and is not a branch) holds unnamed intermediate states between its input and its output; each branch is a state the types do not name; listed by branching, highest first",
             ),
             Summary::placed(
-                written.iter().map(|found| AsRef::<Site>::as_ref(*found)).min(),
+                written.iter().map(|found| *AsRef::<Site<'file>>::as_ref(*found)).min(),
                 Tally::counted(&written, &above),
             )
             .into_iter()
@@ -43,7 +43,7 @@ impl GraphLint for HiddenStates {
 }
 
 impl Lint for HiddenStates {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

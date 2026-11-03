@@ -85,7 +85,7 @@ impl<'file> Collector<'file> {
     }
 }
 
-impl<'ast, 'file> Visit<'ast> for Collector<'file> {
+impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
     }

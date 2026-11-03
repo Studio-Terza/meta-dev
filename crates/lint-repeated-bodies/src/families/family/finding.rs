@@ -6,11 +6,11 @@ use lint_core::Site;
 
 pub(super) struct Finding<'sites> {
     size: TokenCount,
-    others: &'sites [&'sites Site],
+    others: &'sites [&'sites Site<'sites>],
 }
 
 impl<'sites> Finding<'sites> {
-    pub(super) fn new(size: TokenCount, others: &'sites [&'sites Site]) -> Finding<'sites> {
+    pub(super) fn new(size: TokenCount, others: &'sites [&'sites Site<'sites>]) -> Finding<'sites> {
         Finding { size, others }
     }
 }

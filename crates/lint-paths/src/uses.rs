@@ -17,8 +17,8 @@ impl<'file> Use<'file> {
     }
 
     #[must_use]
-    pub fn place(&self) -> &Site<'file> {
-        &self.site
+    pub fn place(&self) -> Site<'file> {
+        self.site
     }
 
     #[must_use]

@@ -19,7 +19,7 @@ impl GraphLint for CommutingTriangles {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::All);
-        let triangles: Vec<Triangle<'_, '_>> = graph
+        let triangles: Vec<Triangle<'_, 'file>> = graph
             .hyperedges()
             .iter()
             .filter_map(Hyperedge::written)
@@ -38,10 +38,10 @@ impl GraphLint for CommutingTriangles {
 }
 
 impl CommutingTriangles {
-    fn paths<'graph, 'found>(
-        direct: &'graph Hyperedge<'found>,
-        consuming: &Consuming<'graph, 'found>,
-    ) -> Vec<Detour<'graph, 'found>> {
+    fn paths<'graph, 'file>(
+        direct: &'graph Hyperedge<'graph, 'file>,
+        consuming: &Consuming<'graph, 'file>,
+    ) -> Vec<Detour<'graph, 'file>> {
         let hop: &Hop = direct.as_ref();
         let end = hop.reached();
         let tuple: &Tuple = hop.as_ref();
@@ -63,14 +63,14 @@ impl CommutingTriangles {
                     .filter(|second| AsRef::<Hop>::as_ref(*second).reached() == end)
                     .filter(move |second| AsRef::<Hop>::as_ref(*second).fired(&available).is_some())
                     .map(move |second| Detour::new(first, second))
-                    .collect::<Vec<Detour<'graph, 'found>>>()
+                    .collect::<Vec<Detour<'graph, 'file>>>()
             })
             .collect()
     }
 }
 
 impl Lint for CommutingTriangles {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

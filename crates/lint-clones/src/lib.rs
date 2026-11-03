@@ -7,7 +7,7 @@ use lint_core::{Gate, Headline, Lint, Report, SourceFile};
 pub struct Clones;
 
 impl Lint for Clones {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
                 "report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value",

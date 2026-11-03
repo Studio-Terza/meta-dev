@@ -11,12 +11,12 @@ pub(crate) struct Found {
     finding: Finding,
 }
 
-impl<'file> Found {
+impl Found {
     pub(crate) fn new(line: LineNumber, finding: Finding) -> Found {
         Found { line, finding }
     }
 
-    pub(crate) fn violation(self, shown: &'file Path) -> Violation<'file> {
+    pub(crate) fn violation(self, shown: &Path) -> Violation<'_> {
         Violation::new(Site::new(shown, self.line), self.finding)
     }
 }

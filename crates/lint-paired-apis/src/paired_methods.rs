@@ -11,11 +11,11 @@ use crate::owner::Owner;
 pub struct PairedMethods<'file> {
     file: &'file SourceFile,
     module: Module,
-    found: Vec<Declared>,
+    found: Vec<Declared<'file>>,
 }
 
-impl PairedMethods<'_> {
-    pub fn of_file(file: &SourceFile) -> Vec<Declared> {
+impl<'file> PairedMethods<'file> {
+    pub fn of_file(file: &'file SourceFile) -> Vec<Declared<'file>> {
         let mut scan = PairedMethods { file, module: Module::of_file(file), found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found

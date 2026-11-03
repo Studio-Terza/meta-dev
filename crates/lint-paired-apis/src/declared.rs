@@ -3,14 +3,14 @@ use lint_core::Site;
 use lint_layout::Name;
 
 #[derive(Debug)]
-pub struct Declared {
+pub struct Declared<'file> {
     owner: Owner,
     method: Name,
-    location: Site,
+    location: Site<'file>,
 }
 
-impl Declared {
-    pub fn new(owner: Owner, method: Name, location: Site) -> Declared {
+impl<'file> Declared<'file> {
+    pub fn new(owner: Owner, method: Name, location: Site<'file>) -> Declared<'file> {
         Declared { owner, method, location }
     }
 
@@ -22,7 +22,7 @@ impl Declared {
         &self.method
     }
 
-    pub fn location(&self) -> &Site {
-        &self.location
+    pub fn location(&self) -> Site<'file> {
+        self.location
     }
 }

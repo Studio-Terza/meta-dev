@@ -20,15 +20,15 @@ pub struct DuplicateTransitions;
 impl GraphLint for DuplicateTransitions {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let types = WorkspaceTypes::declared(facts);
-        let edges: Vec<Edge<'_>> = transitions.all().iter().map(|found| types.edge(found)).collect();
+        let edges: Vec<Edge<'_, 'file>> = transitions.all().iter().map(|found| types.edge(found)).collect();
         let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(
             BTreeMap::new(),
-            |mut keys: BTreeMap<Key, Vec<&Transition>>, edge| {
+            |mut keys: BTreeMap<Key, Vec<&Transition<'file>>>, edge| {
                 edge.ends().key().into_iter().for_each(|key| keys.entry(key).or_default().push(edge.transition()));
                 keys
             },
         );
-        let families: Vec<Family<'_>> =
+        let families: Vec<Family<'_, 'file>> =
             keyed.into_iter().filter_map(|(key, found)| Family::repeated(key, found)).collect();
         Report::new(
             Headline::new(
@@ -44,7 +44,7 @@ impl GraphLint for DuplicateTransitions {
 }
 
 impl Lint for DuplicateTransitions {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

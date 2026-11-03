@@ -15,7 +15,6 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use file_ports::Files;
 use lint_complexity::Complexity;
 use lint_core::SourceFile;
 

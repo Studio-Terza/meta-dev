@@ -5,10 +5,10 @@ use lint_layout::Name;
 
 use crate::declaration::Declaration;
 
-pub(crate) struct Finding<'declaration>(&'declaration Declaration);
+pub(crate) struct Finding<'declaration>(&'declaration Declaration<'declaration>);
 
-impl<'declaration> From<&'declaration Declaration> for Finding<'declaration> {
-    fn from(declaration: &'declaration Declaration) -> Finding<'declaration> {
+impl<'declaration> From<&'declaration Declaration<'declaration>> for Finding<'declaration> {
+    fn from(declaration: &'declaration Declaration<'declaration>) -> Finding<'declaration> {
         Finding(declaration)
     }
 }

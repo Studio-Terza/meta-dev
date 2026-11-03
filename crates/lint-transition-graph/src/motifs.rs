@@ -19,17 +19,17 @@ impl GraphLint for RepeatedMotifs {
     fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let consuming = Consuming::indexed(&graph, Moves::All);
-        let pairs: Vec<Occurrence<'_, '_>> = graph
+        let pairs: Vec<Occurrence<'_, 'file>> = graph
             .hyperedges()
             .iter()
             .filter_map(Hyperedge::written)
             .map(Occurrence::started)
             .flat_map(|path| Self::next(&path, &consuming))
             .collect();
-        let triples: Vec<Occurrence<'_, '_>> = pairs.iter().flat_map(|path| Self::next(path, &consuming)).collect();
+        let triples: Vec<Occurrence<'_, 'file>> = pairs.iter().flat_map(|path| Self::next(path, &consuming)).collect();
         let shaped = pairs.into_iter().chain(triples).fold(
             BTreeMap::new(),
-            |mut shapes: BTreeMap<Vec<&Name>, Vec<Occurrence<'_, '_>>>, path| {
+            |mut shapes: BTreeMap<Vec<&Name>, Vec<Occurrence<'_, 'file>>>, path| {
                 shapes.entry(path.shape()).or_default().push(path);
                 shapes
             },
@@ -49,10 +49,10 @@ impl GraphLint for RepeatedMotifs {
 }
 
 impl RepeatedMotifs {
-    fn next<'graph, 'found>(
-        path: &Occurrence<'graph, 'found>,
-        consuming: &Consuming<'graph, 'found>,
-    ) -> Vec<Occurrence<'graph, 'found>> {
+    fn next<'graph, 'file>(
+        path: &Occurrence<'graph, 'file>,
+        consuming: &Consuming<'graph, 'file>,
+    ) -> Vec<Occurrence<'graph, 'file>> {
         path.last()
             .into_iter()
             .flat_map(|node| consuming.taking(node))
@@ -63,7 +63,7 @@ impl RepeatedMotifs {
 }
 
 impl Lint for RepeatedMotifs {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

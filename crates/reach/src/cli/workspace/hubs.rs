@@ -28,9 +28,9 @@ impl<'file> Hubs<'file> {
     }
 }
 
-impl<'file> fmt::Display for Hubs<'file> {
+impl fmt::Display for Hubs<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let violations: Vec<Violation<'file>> = self.hubs.iter().map(Violation::from).collect();
+        let violations: Vec<Violation<'_>> = self.hubs.iter().map(Violation::from).collect();
         write!(formatter, "{}", Report::new(Headline::new(Self::HEADLINE), violations))?;
         let held = self.logic(Among::Majority);
         let all = self.logic(Among::All);

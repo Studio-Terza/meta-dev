@@ -69,10 +69,10 @@ impl<'file> Doubles<'file> {
             .declared
             .iter()
             .filter(|(double, _)| !ported(double))
-            .map(|(double, site)| Violation::new(site.clone(), Finding::Unported(double.name.clone())));
+            .map(|(double, site)| Violation::new(*site, Finding::Unported(double.name.clone())));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
             Violation::new(
-                implemented.site.clone(),
+                implemented.site,
                 Finding::Beside(implemented.double.name.clone(), implemented.trait_path.clone()),
             )
         });
@@ -120,7 +120,7 @@ impl<'file> Reader<'file, '_> {
     }
 }
 
-impl<'file, 'ast> Visit<'ast> for Reader<'file, '_> {
+impl<'ast> Visit<'ast> for Reader<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.module.clone();
         self.module = outer.within(&Name::from(&module.ident));

@@ -40,7 +40,7 @@ impl<'file> Hub<'file> {
     }
 }
 
-impl<'file> fmt::Display for Hub<'file> {
+impl fmt::Display for Hub<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -54,7 +54,7 @@ impl<'file> fmt::Display for Hub<'file> {
     }
 }
 
-impl<'file> Finding for Hub<'file> {
+impl Finding for Hub<'_> {
     fn fix(&self) -> Fix {
         Fix::new("move the logic into leaf crates and keep types, traits and interfaces here")
     }
@@ -62,6 +62,6 @@ impl<'file> Finding for Hub<'file> {
 
 impl<'file> From<&Hub<'file>> for Violation<'file> {
     fn from(hub: &Hub<'file>) -> Violation<'file> {
-        Violation::new(hub.held.heaviest().clone(), hub)
+        Violation::new(hub.held.heaviest(), hub)
     }
 }

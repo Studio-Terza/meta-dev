@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::DuplicateTransitions;
 
@@ -5,7 +6,7 @@ struct Duplicates;
 
 impl Duplicates {
     fn of(sources: &[Source]) -> String {
-        Sources::report::<DuplicateTransitions>(sources).to_string()
+        DuplicateTransitions::report(&Sources::parsed(sources)).to_string()
     }
 
     fn at(path: &'static str, text: &str) -> Source {

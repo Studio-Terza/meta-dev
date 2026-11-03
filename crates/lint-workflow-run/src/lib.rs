@@ -19,12 +19,12 @@ use saphyr::ScanError;
 #[derive(Debug)]
 pub struct WorkflowRun;
 
-impl<'file> WorkflowRun {
+impl WorkflowRun {
     const WORKFLOWS: &'static str = ".github/workflows";
     const EXTENSIONS: [&'static str; 2] = ["yml", "yaml"];
 
     #[must_use]
-    pub fn report(files: &'file [RepoFile]) -> Report<'file> {
+    pub fn report(files: &[RepoFile]) -> Report<'_> {
         let actions = Actions::among(files);
         Report::new(
             Headline::new("a workflow run step is a short command; logic lives in Rust"),
@@ -43,7 +43,7 @@ impl<'file> WorkflowRun {
             .map(|_| file)
     }
 
-    fn violations(file: &'file RepoFile, actions: Actions<'_>) -> Vec<Violation<'file>> {
+    fn violations<'file>(file: &'file RepoFile, actions: Actions<'_>) -> Vec<Violation<'file>> {
         let text = file
             .contents()
             .read()
@@ -55,7 +55,7 @@ impl<'file> WorkflowRun {
         }
     }
 
-    fn violations_in(
+    fn violations_in<'file>(
         file: &'file RepoFile,
         parsed: Result<Document<'_>, ScanError>,
         actions: Actions<'_>,

@@ -5,13 +5,13 @@ use super::reexport_count::ReexportCount;
 use lint_core::Fix;
 use lint_core::Most;
 
-pub enum Finding {
-    UsedFromOneSibling { home: ModulePath },
-    ReachesPastModRs { target: ModulePath },
+pub enum Finding<'file> {
+    UsedFromOneSibling { home: ModulePath<'file> },
+    ReachesPastModRs { target: ModulePath<'file> },
     CrowdedReexports { count: ReexportCount, most: Most },
 }
 
-impl fmt::Display for Finding {
+impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Finding::UsedFromOneSibling { home } => write!(formatter, "used only from {home}"),
@@ -23,7 +23,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_core::Finding for Finding {
+impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(match self {
             Finding::UsedFromOneSibling { .. } => "move it inside that module",

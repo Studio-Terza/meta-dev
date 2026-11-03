@@ -92,19 +92,19 @@ impl<'file> Transition<'file> {
     }
 }
 
-impl<'file> AsRef<Ground> for Transition<'file> {
+impl AsRef<Ground> for Transition<'_> {
     fn as_ref(&self) -> &Ground {
         &self.ground
     }
 }
 
-impl<'file> AsRef<CrateName> for Transition<'file> {
+impl AsRef<CrateName> for Transition<'_> {
     fn as_ref(&self) -> &CrateName {
         &self.krate
     }
 }
 
-impl<'file> AsRef<Name> for Transition<'file> {
+impl AsRef<Name> for Transition<'_> {
     fn as_ref(&self) -> &Name {
         &self.name
     }
@@ -116,7 +116,7 @@ impl<'file> AsRef<Site<'file>> for Transition<'file> {
     }
 }
 
-impl<'file> fmt::Display for Transition<'file> {
+impl fmt::Display for Transition<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.owner {
             Some(owner) => write!(formatter, "{}::{owner}::{}", self.krate, self.name),

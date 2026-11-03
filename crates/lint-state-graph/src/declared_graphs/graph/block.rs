@@ -31,19 +31,19 @@ impl Block {
         self.transitions.iter().map(|transition| Edge::new(self.state.clone(), transition.target().clone()))
     }
 
-    pub fn violations(
+    pub fn violations<'file>(
         &self,
-        path: &Path,
+        path: &'file Path,
         reachable: &BTreeSet<TypeName>,
         ending: &BTreeSet<TypeName>,
-    ) -> Vec<Violation> {
+    ) -> Vec<Violation<'file>> {
         let state = || self.state.clone();
         let lost = (!reachable.contains(&self.state)).then(|| Finding::UnreachableState { state: state() });
         let stuck = (!ending.contains(&self.state)).then(|| Finding::NoTerminalAhead { state: state() });
         let open = (self.kind == Kind::Terminal && !self.transitions.is_empty())
             .then(|| Finding::TerminalHasEdges { state: state() });
         let site = Site::new(path, self.line);
-        [lost, stuck, open].into_iter().flatten().map(|finding| Violation::new(site.clone(), finding)).collect()
+        [lost, stuck, open].into_iter().flatten().map(|finding| Violation::new(site, finding)).collect()
     }
 }
 
