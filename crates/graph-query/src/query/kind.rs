@@ -50,22 +50,22 @@ impl Kind {
 
 impl fmt::Display for Relation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Relation::ImplementedBy => "implemented by",
-            Relation::Implements => "implements",
-        })
+        match self {
+            Relation::ImplementedBy => formatter.write_str("implemented by"),
+            Relation::Implements => formatter.write_str("implements"),
+        }
     }
 }
 
 impl fmt::Display for Kind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Kind::Trait => "trait",
-            Kind::PortTrait => "port trait",
-            Kind::StoreTrait => "store trait",
-            Kind::GenericImpl => "generic impl",
-            Kind::Port => "port",
-            Kind::Store => "store",
-        })
+        match self {
+            Kind::Trait => formatter.write_str("trait"),
+            Kind::PortTrait => formatter.write_str("port trait"),
+            Kind::StoreTrait => formatter.write_str("store trait"),
+            Kind::GenericImpl => formatter.write_str("generic impl"),
+            Kind::Port => formatter.write_str("port"),
+            Kind::Store => formatter.write_str("store"),
+        }
     }
 }
