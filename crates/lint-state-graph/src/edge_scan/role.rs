@@ -1,6 +1,7 @@
 use syn::{ImplItemFn, Receiver};
 
-use super::{Edge, EdgeScan};
+use super::EdgeScan;
+use crate::edge::Edge;
 use crate::finding::Finding;
 use crate::function_shape::FunctionShape;
 use crate::impl_context::ImplContext;

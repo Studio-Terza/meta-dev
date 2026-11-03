@@ -4,8 +4,8 @@ use lint_layout::{Name, Whole, Word, words};
 
 use super::TypeScope;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
-use crate::origins::Spelling;
 use crate::resolved::Resolved;
+use crate::spelling::Spelling;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Naming {

@@ -1,13 +1,17 @@
+mod need;
+mod obligation;
+mod pair;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::super::exposure::Exposure;
-use super::super::need::Need;
-use super::super::obligation::Obligation;
-use super::super::pair::Pair;
 use crate::coverage::Coverage;
 use crate::subject::Subject;
-use lint_core::Site;
+use lint_core::{Site, Violation};
 use lint_layout::{Name, Word, words};
+use need::Need;
+use obligation::Obligation;
+use pair::Pair;
 
 #[derive(Debug)]
 pub(crate) struct Facets<'file> {
@@ -48,7 +52,7 @@ impl<'file> Facets<'file> {
         &'facts self,
         subject: &'facts Subject<'file>,
         coverage: &Coverage<'_>,
-    ) -> Vec<Obligation<'facts, 'file>> {
+    ) -> Vec<Violation<'file>> {
         let roundtrips = coverage.roundtrips_naming(subject);
         let methods = self.method_pairs();
         let spare = roundtrips
@@ -65,7 +69,7 @@ impl<'file> Facets<'file> {
             .map(Need::Roundtrip)
             .chain(unspared)
             .chain(unlawed)
-            .map(|need| Obligation::new(subject, self.site, need))
+            .map(|need| Violation::new(self.site, Obligation::new(subject, need)))
             .collect()
     }
 

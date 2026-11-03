@@ -1,3 +1,5 @@
+mod tee;
+
 use std::fs::{self, File};
 use std::io;
 use std::num::NonZeroU8;
@@ -7,7 +9,8 @@ use std::time::Instant;
 
 use file_ports::Disk;
 
-use super::{Exit, Invocation, Ports, Run, Tee, Text};
+use super::{Exit, Invocation, Ports, Run, Text};
+pub use tee::Tee;
 
 #[derive(Debug)]
 pub struct System;

@@ -8,7 +8,7 @@ use lint_layout::{Name, UsePath};
 use lint_paths::{Ground, Imports, Module};
 use lint_placement::CrateName;
 
-use crate::doubles::Kind;
+use crate::kind::Kind;
 
 #[derive(Debug, Default)]
 pub struct PortTraits {

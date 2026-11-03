@@ -1,8 +1,10 @@
-use std::fmt;
+use std::fmt::{self, Write};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use text_lines::OneLine;
+
+use crate::cli::shard::title::Title;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Named {
@@ -16,6 +18,12 @@ impl Named {
 
     fn given_name(&self) -> Option<&OneLine> {
         self.name.as_ref().filter(|name| AsRef::<str>::as_ref(name).chars().next().is_some())
+    }
+
+    pub fn title(&self) -> Title {
+        let mut title = String::new();
+        write!(title, "{self}").ok();
+        Title::from(title)
     }
 }
 

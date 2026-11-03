@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use e2e::ports::Checkout;
+use e2e::ports::System;
 use file_ports::{Files, Kind};
 use serde_json::{Value as Json, json};
 use toml::{Table, Value};
@@ -27,7 +27,7 @@ impl World {
     const DEPENDENCY_TABLES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
     pub fn of_this_repository() -> Result<World, Box<dyn Error>> {
-        World::of(&Checkout::manifests()?, Checkout::root())
+        World::of(&System::manifests()?, System::root())
     }
 
     fn of(files: &impl Files, root: PathBuf) -> Result<World, Box<dyn Error>> {

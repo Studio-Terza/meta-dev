@@ -2,7 +2,6 @@ mod exit;
 mod invocation;
 mod run;
 mod system;
-mod tee;
 
 use std::ffi::OsStr;
 use std::io;
@@ -15,8 +14,7 @@ pub use exit::Exit;
 pub use file_ports::Text;
 pub use invocation::Invocation;
 pub use run::Run;
-pub use system::System;
-pub use tee::Tee;
+pub use system::{System, Tee};
 
 pub trait Ports {
     type Files: Files;

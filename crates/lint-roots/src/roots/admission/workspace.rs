@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use crate::regrouped::Regrouped;
 use crate::roots::directory::Directory;
+use crate::roots::regrouped::Regrouped;
 use crate::survey::{Fact, Survey};
 use file_ports::Files;
 use lint_layout::Failure;

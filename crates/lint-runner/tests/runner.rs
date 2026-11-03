@@ -23,8 +23,7 @@ const INDEX: &str = "pub trait Index {\n    fn search(&self, query: &Query) -> V
 const MODULES: &str = "mod one;\nmod two;\n";
 const CHAIN_A: &str =
     "pub struct A0(A1);\npub struct A1(A2);\npub struct A2(A3);\npub struct A3(A4);\npub struct A4;\n";
-const CHAIN_B: &str =
-    "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3(B4);\npub struct B4;\n";
+const RING: usize = 41;
 const SHORT_CHAIN_B: &str = "pub struct B0(B1);\npub struct B1(B2);\npub struct B2(B3);\npub struct B3;\n";
 const LONG_CHAIN_LINKS: usize = 20_000;
 const DEEP_NESTING: usize = 5_000;
@@ -53,19 +52,21 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
-                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
+                + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
+                + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
-    let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
-    let runner = include_str!("../src/lints.rs");
+    let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
+    let runner = include_str!("../src/cli/mode/lints.rs");
     let listed_by_the_runner =
         ["::report(files)", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
     assert!(listed_by_the_mode < implemented);
-    let elegance = include_str!("../src/elegance.rs");
-    let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]
-        .iter()
-        .map(|call| elegance.matches(call).count())
-        .sum::<usize>();
+    let elegance = include_str!("../src/cli/mode/elegance.rs");
+    let listed_by_elegance =
+        ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)", "containment.report::<"]
+            .iter()
+            .map(|call| elegance.matches(call).count())
+            .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
@@ -522,8 +523,10 @@ fn a_library_and_its_binary_are_judged_apart() -> Result<(), Box<dyn Error>> {
 fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Box<dyn Error>> {
     let root = Scratch::temporary()?;
     root.write("Cargo.toml", &format!("{MANIFEST}[lib]\npath = \"code/lib.rs\"\n"))?;
-    root.write("code/lib.rs", &format!("pub mod a;\n{CHAIN_A}"))?;
-    root.write("code/a.rs", CHAIN_B)?;
+    let ring: Vec<String> = (0..RING).map(|index| format!("pub struct R{index}(R{});\n", (index + 1) % RING)).collect();
+    let ring = ring.concat();
+    root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
+    root.write("code/a.rs", CHAIN_A)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
     assert_eq!(root.crate_graph_lines()?, [named.as_str()]);
     Ok(())

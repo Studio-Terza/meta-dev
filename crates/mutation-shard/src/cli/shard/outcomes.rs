@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 use file_ports::{Bytes, FileFailure, Files, Kind, Text};
 
 use outcome::Outcome;
-pub(crate) use outcome::Title;
 use serde::Deserialize;
 use test_log::{TestLog, TestName};
 use text_lines::LossyText;

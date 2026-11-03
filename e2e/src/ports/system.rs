@@ -7,10 +7,11 @@ use console_ports::{Environment, Process};
 use file_ports::{Bytes, Disk, FileFailure, Files, Kind, Memory};
 
 #[derive(Debug)]
-pub struct Checkout;
+pub struct System;
 
-impl Checkout {
+impl System {
     const MANIFEST: &'static str = "Cargo.toml";
+    const TARGET: &'static str = "E2E_REPORT";
 
     pub fn root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().map(Path::to_path_buf).unwrap_or_default()
@@ -53,13 +54,6 @@ impl Checkout {
             .map(|(child, _)| child)
             .collect())
     }
-}
-
-#[derive(Debug)]
-pub struct Measurements;
-
-impl Measurements {
-    const TARGET: &'static str = "E2E_REPORT";
 
     pub fn record(line: &impl fmt::Display) -> io::Result<()> {
         print!("{line}");

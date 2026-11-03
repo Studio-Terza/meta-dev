@@ -1,3 +1,4 @@
+mod class;
 mod containment;
 mod count;
 mod coverage;
@@ -6,6 +7,7 @@ mod duplicates;
 mod edge;
 mod end;
 mod graph_lint;
+mod key;
 mod mutation;
 mod workspace_types;
 
@@ -23,7 +25,7 @@ pub use containment::{
     LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{GraphLint, OnGraph};
+pub use graph_lint::{GraphLint, OnContainment, OnGraph};
 pub use mutation::CoreMutation;
 
 #[derive(Debug)]

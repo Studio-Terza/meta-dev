@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use crate::class::Class;
+use crate::count::Count;
+use crate::key::Key;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use newtype::Counter;
-
-use crate::count::Count;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Node<'found> {
@@ -69,25 +69,6 @@ impl<'found> From<&Ends<'found>> for Option<Hop<'found>> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Key<'found> {
-    takes: Vec<Node<'found>>,
-    gives: Node<'found>,
-}
-
-impl<'found> Key<'found> {
-    pub(crate) fn algebraic(&self) -> Option<&Key<'found>> {
-        self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
-    }
-}
-
-impl fmt::Display for Key<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let takes: Vec<String> = self.takes.iter().map(ToString::to_string).collect();
-        write!(formatter, "{} -> {}", takes.join(", "), self.gives)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Place {
     Domain,
@@ -136,21 +117,6 @@ impl fmt::Display for End<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Class {
-    Covered,
-    Primitive,
-}
-
-impl Class {
-    pub(crate) fn covering(self, covered: Count) -> Count {
-        match self {
-            Class::Covered => covered.incremented(),
-            Class::Primitive => covered,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct Ends<'found> {
     takes: Vec<End<'found>>,
@@ -194,7 +160,7 @@ impl<'found> Ends<'found> {
         takes.extend(selector);
         takes.sort();
         let first = takes.first().copied();
-        first.map(|_| Key { takes, gives })
+        first.map(|_| Key::new(takes, gives))
     }
 
     pub(crate) fn applied(&self) -> Applied<'_, 'found> {

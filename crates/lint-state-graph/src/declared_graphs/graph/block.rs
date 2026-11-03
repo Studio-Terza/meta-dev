@@ -11,7 +11,7 @@ use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
 
 use super::kind::Kind;
-use crate::edge_scan::Edge;
+use crate::edge::Edge;
 use crate::finding::Finding;
 use transition::Transition;
 

@@ -1,13 +1,20 @@
+mod case;
+mod flagged;
+mod lines;
+mod source;
+mod text;
+
 use std::fmt;
 use std::path::PathBuf;
 
 use lint_core::{Lint, Report, SourceFile, SourceText};
 use newtype::Newtype;
 
-use crate::case::Case;
-use crate::lines::Lines;
-use crate::source::Source;
-use crate::text::Text;
+pub use case::{Case, Title};
+pub use flagged::Flagged;
+pub use lines::Lines;
+pub use source::{Located, Source};
+pub use text::Text;
 
 #[derive(Debug)]
 pub struct Sources(&'static [Source]);

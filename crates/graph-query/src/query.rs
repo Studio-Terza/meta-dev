@@ -1,6 +1,8 @@
+mod boundary;
 mod candidate;
 mod kind;
 mod matches;
+mod term;
 mod top;
 
 use std::collections::BTreeMap;
@@ -12,10 +14,10 @@ use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
 use crate::role::Role;
-use crate::term::Term;
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
+pub use term::Term;
 use top::Top;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

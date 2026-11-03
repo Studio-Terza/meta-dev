@@ -1,3 +1,7 @@
+mod mode;
+mod outcome;
+mod stack_size;
+
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
@@ -11,7 +15,9 @@ use lint_core::Readout;
 use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
-use crate::{Mode, Outcome, StackSize};
+use mode::Mode;
+use outcome::Outcome;
+use stack_size::StackSize;
 
 #[derive(Debug)]
 pub struct Cli {
@@ -36,8 +42,8 @@ impl Cli {
         err: &mut (impl Write + Send),
     ) -> ExitCode {
         let spawned = thread::scope(|scope| {
-            thread::Builder::new()
-                .stack_size(StackSize::LINT.into_inner())
+            StackSize::LINT
+                .builder()
                 .spawn_scoped(scope, || self.reported_to(files, out, err))
                 .map(ScopedJoinHandle::join)
         });

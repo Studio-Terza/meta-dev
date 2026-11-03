@@ -3,7 +3,7 @@ use std::fmt;
 use lint_layout::SourceText;
 use newtype::{Arbitrary, Counter, Newtype};
 
-use crate::Most;
+use crate::Bound;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Depth(usize);
@@ -71,7 +71,7 @@ impl Step {
 pub struct Nesting;
 
 impl Nesting {
-    const LIMIT: Most = Most::new(256);
+    const LIMIT: Bound = Bound::Most(256);
 
     pub fn within_limit(text: &SourceText) -> Option<&SourceText> {
         let chars: Vec<char> = text.as_ref().chars().collect();

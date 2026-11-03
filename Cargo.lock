@@ -305,7 +305,6 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-placement",
- "newtype",
  "syn 2.0.119",
 ]
 

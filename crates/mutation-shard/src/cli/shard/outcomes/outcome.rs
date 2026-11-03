@@ -1,5 +1,4 @@
 mod named;
-mod title;
 
 use std::path::{Path, PathBuf};
 
@@ -7,7 +6,6 @@ use serde::Deserialize;
 
 use named::Named;
 use test_log::{TestLog, TestName};
-pub use title::Title;
 
 use crate::cli::shard::mutant_result::MutantResult;
 use crate::cli::shard::verdict::Verdict;
@@ -42,7 +40,7 @@ impl Outcome {
 
     pub fn mutant<'log>(&self, log: &'log TestLog) -> Option<MutantResult<'log>> {
         match &self.scenario {
-            Scenario::Mutant(named) => Some(MutantResult::new(Title::from(named), self.summary, log.failed())),
+            Scenario::Mutant(named) => Some(MutantResult::new(named.title(), self.summary, log.failed())),
             Scenario::Baseline => None,
         }
     }

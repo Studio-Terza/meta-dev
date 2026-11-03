@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::boundary::Violation;
-use lint_layout::Headline;
+use crate::headline::Headline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Report<'file> {

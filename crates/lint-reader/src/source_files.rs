@@ -1,5 +1,6 @@
 mod located;
 mod modules;
+mod opened;
 mod scope;
 mod shelf;
 mod staged;

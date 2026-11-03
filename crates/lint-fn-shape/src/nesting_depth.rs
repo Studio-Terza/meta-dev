@@ -1,7 +1,6 @@
 use std::ops::{AddAssign, SubAssign};
 
-use lint_core::Most;
-use newtype::Counter;
+use lint_core::Bound;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NestingDepth(usize);
@@ -10,8 +9,8 @@ impl NestingDepth {
     pub const LEVEL: NestingDepth = NestingDepth(1);
 
     #[must_use]
-    pub fn beyond(most: Most) -> NestingDepth {
-        NestingDepth(most.count() + Self::LEVEL.0)
+    pub fn beyond(most: Bound) -> NestingDepth {
+        NestingDepth(most.limit() + Self::LEVEL.0)
     }
 }
 
