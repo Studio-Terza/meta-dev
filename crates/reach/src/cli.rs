@@ -17,6 +17,7 @@ impl Cli {
     const AFFECTED: &'static str = "affected";
     const WIDENED: &'static str = "widened";
     const FAN_IN: &'static str = "fan-in";
+    const HUBS: &'static str = "hubs";
     const HISTORY: &'static str = "history";
     const SOURCES: &'static str = "sources";
     const BEYOND: &'static str = "beyond";
@@ -57,6 +58,10 @@ impl Cli {
                 let changed: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
                 let beyond = Self::workspace(&metadata)?.beyond(&produced, &changed);
                 Ok(beyond.map_or(Ok(()), |path| writeln!(out, "{}", path.display()))?)
+            }
+            Some(Self::HUBS) => {
+                let repository = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
+                Ok(write!(out, "{}", Self::workspace(&metadata)?.hubs(&repository)?)?)
             }
             Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(&metadata)?.fan_in())?),
             _ => Err(Failure::Usage),

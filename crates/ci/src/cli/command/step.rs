@@ -8,6 +8,7 @@ mod libtest_seconds;
 mod logged;
 mod measured;
 pub mod mutation;
+pub mod ratchet;
 mod reach_scope;
 mod seconds;
 mod timed;

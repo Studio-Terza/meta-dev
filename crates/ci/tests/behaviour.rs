@@ -410,6 +410,42 @@ fn a_history_line_names_the_revision_the_reach_and_every_fan_in_and_is_appended(
 }
 
 #[test]
+fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("m.toml", "cold-clippy = 52.3\ncold-test-compile = 80\n")?;
+    scratch.write("history.tsv", "older\n")?;
+    let arguments = ["measured-history", &scratch.file("m.toml"), &scratch.file("history.tsv"), "abc123"];
+    let answer = Answer::to(&Fake::new(), &arguments);
+    let line = "abc123\tcold-clippy = 52.3\tcold-test-compile = 80";
+    assert_eq!((answer.exit, Text::lines(&answer.out)), (ExitCode::SUCCESS, vec![line]));
+    assert_eq!(Text::lines(&scratch.read("history.tsv")), ["older", line]);
+    let missing = ["measured-history", &scratch.file("none.toml"), &scratch.file("history.tsv"), "abc123"];
+    assert_eq!(Answer::to(&Fake::new(), &missing).exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+const LOWERED_RECORD: [&str; 2] = ["cold-clippy = 48.5", "cold-test-compile = 80"];
+
+#[test]
+fn a_ratchet_record_is_lowered_to_a_run_at_or_below_it_and_never_raised() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.write("record.toml", "cold-clippy = 50\ncold-test-compile = 80\n")?;
+    scratch.write("lower.toml", "cold-clippy = 48.5\ncold-test-compile = 80\n")?;
+    scratch.write("above.toml", "cold-clippy = 40\ncold-test-compile = 81\n")?;
+    let lower = |measured: &str| {
+        Answer::to(&Fake::new(), &["ratchet-lower", &scratch.file("record.toml"), &scratch.file(measured)])
+    };
+    let lowered = lower("lower.toml");
+    assert_eq!(lowered.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&scratch.read("record.toml")), LOWERED_RECORD);
+    let above = lower("above.toml");
+    assert_eq!(above.exit, ExitCode::FAILURE);
+    assert!(above.err.contains("cold-test-compile took 81s"), "{}", above.err);
+    assert_eq!(Text::lines(&scratch.read("record.toml")), LOWERED_RECORD);
+    Ok(())
+}
+
+#[test]
 fn a_history_needs_git_and_readable_metadata_and_a_writable_file() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
     scratch.write("metadata.json", METADATA)?;
@@ -555,6 +591,9 @@ laws::table!(
         ["history", "metadata.json"] => true,
         ["history", "metadata.json", "history.tsv"] => true,
         ["history", "metadata.json", "history.tsv", "abc", "extra"] => true,
+        ["measured-history", "m.toml", "history.tsv"] => true,
+        ["ratchet-lower", "record.toml"] => true,
+        ["ratchet-lower", "record.toml", "m.toml", "extra"] => true,
         ["logged"] => true,
         ["logged", "log.txt"] => true,
         ["tools"] => true,

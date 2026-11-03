@@ -1,0 +1,8 @@
+{"workspace_root": "/w", "packages": [
+  {"name": "core", "manifest_path": "/w/crates/core/Cargo.toml", "dependencies": []},
+  {"name": "leaf-a", "manifest_path": "/w/crates/leaf-a/Cargo.toml", "dependencies": [{"name": "core"}]},
+  {"name": "leaf-b", "manifest_path": "/w/crates/leaf-b/Cargo.toml", "dependencies": [{"name": "core"}]},
+  {"name": "leaf-c", "manifest_path": "/w/crates/leaf-c/Cargo.toml", "dependencies": [{"name": "core"}]},
+  {"name": "lone-a", "manifest_path": "/w/crates/lone-a/Cargo.toml", "dependencies": []},
+  {"name": "lone-b", "manifest_path": "/w/crates/lone-b/Cargo.toml", "dependencies": []}
+]}
