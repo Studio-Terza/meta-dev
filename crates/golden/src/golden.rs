@@ -72,7 +72,7 @@ impl Golden {
     fn written(&self, files: &impl Files, actual: Output<'_>) -> Result<(), FileFailure> {
         files
             .create_directories(self.path.parent().unwrap_or(Path::new("")))
-            .and_then(|()| files.write(&self.path, &Bytes::from(actual.into_inner())))
+            .and_then(|()| files.write(&self.path, Bytes::from(actual.into_inner())))
     }
 
     fn unread(self, files: &impl Files, failure: FileFailure) -> Failure {

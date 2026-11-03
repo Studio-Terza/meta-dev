@@ -42,7 +42,7 @@ impl<'arguments> Report<'arguments> {
         let matrices = self.matrices(files)?;
         let summary = Summary::from_results(&matrices, &GoldenTests::under(files, self.sources)?);
         files
-            .write(self.markdown, &Bytes::from(&summary))
+            .write(self.markdown, Bytes::from(&summary))
             .map_err(|failure| Failure::Io { path: Cow::Borrowed(self.markdown), source: io::Error::from(failure) })?;
         summary.written_as_json(files, self.json)
     }

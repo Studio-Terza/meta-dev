@@ -1714,7 +1714,7 @@ impl Scratch {
 
     fn placed(&self, path: &Path, text: &str) -> Result<(), FileFailure> {
         path.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(path, &Bytes::from(text))
+        self.files.write(path, Bytes::from(text))
     }
 
     fn directory(&self, name: &str) -> Result<(), FileFailure> {
@@ -1730,7 +1730,7 @@ impl Scratch {
     }
 
     fn write(&self, name: &str, text: &str) -> Result<(), FileFailure> {
-        self.files.write(&self.root.join(name), &Bytes::from(text))
+        self.files.write(&self.root.join(name), Bytes::from(text))
     }
 
     fn holds(&self, name: &str) -> bool {
