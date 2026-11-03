@@ -19,20 +19,20 @@ impl<'raw> Slots<'raw> {
         name.matches::<Whole>(&Self::LITERAL_WORDS)
             .map(|_| ShapeToken::Literal)
             .or_else(|| name.matches::<Whole>(&Self::KEYWORDS).map(|_| ShapeToken::Word(name)))
-            .unwrap_or_else(|| self.cased(name, position))
+            .unwrap_or_else(|| self.cased(name, name.casing(), position))
     }
 
-    fn cased(&mut self, name: &'raw Name, position: Position) -> ShapeToken<'raw> {
-        match name.casing() {
-            Casing::Lower => self.lowered(name, position),
+    fn cased(&mut self, name: &'raw Name, casing: Casing, position: Position) -> ShapeToken<'raw> {
+        match casing {
+            Casing::Lower => self.lowered(name, position).map_or(ShapeToken::Word(name), ShapeToken::Local),
             Casing::Camel | Casing::Shouting | Casing::Other => ShapeToken::Word(name),
         }
     }
 
-    fn lowered(&mut self, name: &'raw Name, position: Position) -> ShapeToken<'raw> {
+    fn lowered(&mut self, name: &'raw Name, position: Position) -> Option<Slot> {
         match position {
-            Position::Named => ShapeToken::Word(name),
-            Position::BeforeLiteral | Position::Plain => ShapeToken::Local(self.numbered(name)),
+            Position::Named => None,
+            Position::BeforeLiteral | Position::Plain => Some(self.numbered(name)),
         }
     }
 
