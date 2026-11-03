@@ -3,7 +3,10 @@ use std::fmt;
 
 use lint_layout::Name;
 use lint_placement::CrateName;
+use newtype::Counter;
 use transition_facts::Ground;
+
+use crate::count::Count;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Node<'found> {
@@ -59,10 +62,11 @@ impl<'found> Tuple<'found> {
 
 impl fmt::Display for Tuple<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let nodes: Vec<String> = self.0.iter().map(ToString::to_string).collect();
-        match nodes.as_slice() {
-            [single] => write!(formatter, "{single}"),
-            _ => write!(formatter, "({})", nodes.join(", ")),
+        match self.0.first().filter(|_| self.0.len() == 1) {
+            Some(single) => write!(formatter, "{single}"),
+            None => {
+                write!(formatter, "({})", self.0.iter().map(ToString::to_string).collect::<Vec<String>>().join(", "))
+            }
         }
     }
 }
@@ -79,7 +83,8 @@ impl<'found> Hop<'found> {
     }
 
     pub(crate) fn onward(self) -> Option<Hop<'found>> {
-        (!self.takes.0.contains(&self.gives)).then_some(self)
+        let looped = self.takes.0.get(&self.gives).copied();
+        looped.map_or(Some(self), |_| None)
     }
 
     pub(crate) fn fired(&self, available: &BTreeSet<&Node<'_>>) -> Option<&Node<'found>> {
@@ -127,6 +132,15 @@ pub(crate) enum Place {
     Primitive,
 }
 
+impl Place {
+    fn written(self, name: &Name, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Place::Interface => write!(formatter, "impl {name}"),
+            Place::Domain | Place::Shared | Place::External | Place::Primitive => write!(formatter, "{name}"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct End<'found> {
     place: Place,
@@ -154,10 +168,9 @@ impl<'found> End<'found> {
 
 impl fmt::Display for End<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (&self.node, self.place) {
-            (Some(node), _) => write!(formatter, "{node}"),
-            (None, Place::Interface) => write!(formatter, "impl {}", self.name),
-            (None, _) => write!(formatter, "{}", self.name),
+        match &self.node {
+            Some(node) => write!(formatter, "{node}"),
+            None => self.place.written(self.name, formatter),
         }
     }
 }
@@ -166,6 +179,15 @@ impl fmt::Display for End<'_> {
 pub(crate) enum Class {
     Covered,
     Primitive,
+}
+
+impl Class {
+    pub(crate) fn covering(self, covered: Count) -> Count {
+        match self {
+            Class::Covered => covered.incremented(),
+            Class::Primitive => covered,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -191,7 +213,8 @@ impl<'found> Ends<'found> {
     pub(crate) fn hop(&self) -> Option<Hop<'found>> {
         let takes: BTreeSet<Node<'found>> = self.taken().copied().collect();
         let gives = self.gives.node?;
-        (!takes.is_empty()).then_some(Hop { takes: Tuple(takes), gives })
+        let first = takes.first().copied();
+        first.map(|_| Hop { takes: Tuple(takes), gives })
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
@@ -199,9 +222,9 @@ impl<'found> Ends<'found> {
     }
 
     pub(crate) fn entered(&self, ground: Ground) -> Option<&Node<'found>> {
-        match (ground, self.taken().next()) {
-            (Ground::Ports | Ground::Boundary, _) | (_, None) => self.gives.node.as_ref(),
-            (Ground::Core | Ground::Store, Some(_)) => None,
+        match ground {
+            Ground::Ports | Ground::Boundary => self.gives.node.as_ref(),
+            Ground::Core | Ground::Store => self.taken().next().map_or(self.gives.node.as_ref(), |_| None),
         }
     }
 
@@ -219,10 +242,12 @@ impl<'found> Ends<'found> {
             .implementer
             .as_ref()
             .and_then(|implementer| implementer.node)
-            .filter(|implementer| *implementer != gives && !takes.contains(implementer));
+            .filter(|implementer| *implementer != gives)
+            .filter(|implementer| takes.iter().all(|taken| taken != implementer));
         takes.extend(selector);
         takes.sort();
-        (!takes.is_empty()).then_some(Key { takes, gives })
+        let first = takes.first().copied();
+        first.map(|_| Key { takes, gives })
     }
 
     pub(crate) fn applied(&self) -> Applied<'_, 'found> {

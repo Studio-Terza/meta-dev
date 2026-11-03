@@ -31,7 +31,7 @@ impl<'found, 'file> Hyperedge<'found, 'file> {
         &'edge self,
         than: &Hyperedge<'found, 'file>,
     ) -> Option<&'edge Hyperedge<'found, 'file>> {
-        (!ptr::eq(self, than)).then_some(self)
+        (ptr::from_ref(self) != ptr::from_ref(than)).then_some(self)
     }
 
     pub(crate) fn transition(&self) -> &Transition<'found, 'file> {

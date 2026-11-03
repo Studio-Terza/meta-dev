@@ -15,11 +15,10 @@ pub(crate) enum Label<'found> {
 
 impl<'found> Label<'found> {
     pub(crate) fn read(role: Role, transition: &Transition<'found, '_>) -> Label<'found> {
-        match (role, transition.context().trait_name()) {
-            (Role::Operation, _) => Label::Operation(transition.function().as_ref()),
-            (Role::Lift, _) => Label::Lift,
-            (Role::Written, Some(name)) => Label::Trait(name),
-            (Role::Written, None) => Label::Written,
+        match role {
+            Role::Operation => Label::Operation(transition.function().as_ref()),
+            Role::Lift => Label::Lift,
+            Role::Written => transition.context().trait_name().map_or(Label::Written, Label::Trait),
         }
     }
 }

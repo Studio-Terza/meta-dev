@@ -1,14 +1,29 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod spread;
+
 use super::Graph;
 use super::hyperedge::Hyperedge;
 use super::label::Label;
 use crate::end::{Hop, Node, Tuple};
+use spread::Spread;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Moves {
     All,
     Unlifted,
+}
+
+impl Moves {
+    fn kept<'edge, 'graph, 'file>(
+        self,
+        edge: &'edge Hyperedge<'graph, 'file>,
+    ) -> Option<&'edge Hyperedge<'graph, 'file>> {
+        match self {
+            Moves::All => Some(edge),
+            Moves::Unlifted => AsRef::<Label>::as_ref(edge).lifted().map_or(Some(edge), |_| None),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -18,10 +33,7 @@ pub(crate) struct Consuming<'graph, 'file> {
 
 impl<'graph, 'file> Consuming<'graph, 'file> {
     pub(crate) fn indexed(graph: &'graph Graph<'_, 'file>, moves: Moves) -> Consuming<'graph, 'file> {
-        let kept = graph.hyperedges().iter().filter(|edge| match moves {
-            Moves::All => true,
-            Moves::Unlifted => AsRef::<Label>::as_ref(*edge).lifted().is_none(),
-        });
+        let kept = graph.hyperedges().iter().filter_map(|edge| moves.kept(edge));
         let by = kept.fold(
             BTreeMap::new(),
             |mut by: BTreeMap<&'graph Node<'graph>, Vec<&'graph Hyperedge<'graph, 'file>>>, edge| {
@@ -62,12 +74,11 @@ impl<'graph, 'file> Consuming<'graph, 'file> {
         frontier: &BTreeSet<&'graph Node<'graph>>,
     ) -> BTreeSet<&'graph Node<'graph>> {
         reached.extend(frontier.iter().copied());
-        let fresh: BTreeSet<&'graph Node<'graph>> = frontier
+        let (_, fresh): (BTreeSet<&'graph Node<'graph>>, BTreeSet<&'graph Node<'graph>>) = frontier
             .iter()
             .flat_map(|node| self.taking(node))
             .filter_map(|edge| AsRef::<Hop>::as_ref(edge).fired(&reached))
-            .filter(|node| !reached.contains(node))
-            .collect();
-        if fresh.is_empty() { reached } else { self.grown(reached, &fresh) }
+            .partition(|node| reached.contains(node));
+        Spread::new(reached, fresh).grown(self)
     }
 }
