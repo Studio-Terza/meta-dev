@@ -1,15 +1,23 @@
 use std::path::{Path, PathBuf};
 
+use crate::contents::Contents;
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RepoFile {
     shown: PathBuf,
     inside: PathBuf,
+    contents: Contents,
 }
 
 impl RepoFile {
     #[must_use]
-    pub fn new(shown: impl Into<PathBuf>, inside: impl Into<PathBuf>) -> RepoFile {
-        RepoFile { shown: shown.into(), inside: inside.into() }
+    pub fn new(shown: impl Into<PathBuf>, inside: impl Into<PathBuf>, contents: Contents) -> RepoFile {
+        RepoFile { shown: shown.into(), inside: inside.into(), contents }
+    }
+
+    #[must_use]
+    pub fn contents(&self) -> &Contents {
+        &self.contents
     }
 
     #[must_use]

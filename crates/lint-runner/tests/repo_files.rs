@@ -32,7 +32,7 @@ impl Run {
 impl Checkout {
     fn run(roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&mut out, &mut err);
+        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(&file_ports::Disk, &mut out, &mut err);
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 

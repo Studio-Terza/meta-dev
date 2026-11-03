@@ -60,6 +60,8 @@ dependencies = [
 name = "ci"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "gate-limits",
  "laws",
  "mutation-report",
@@ -72,6 +74,10 @@ dependencies = [
  "thiserror",
  "toml",
 ]
+
+[[package]]
+name = "console-ports"
+version = "0.1.0"
 
 [[package]]
 name = "core_detect"
@@ -93,6 +99,7 @@ name = "e2e"
 version = "0.1.0"
 dependencies = [
  "ci",
+ "file-ports",
  "serde_json",
  "tempfile",
  "toml",
@@ -130,6 +137,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "file-ports"
+version = "0.1.0"
+dependencies = [
+ "newtype",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -139,6 +155,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-runner",
  "proptest",
  "tempfile",
@@ -148,6 +165,8 @@ dependencies = [
 name = "gate-limits"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "newtype",
  "serde",
  "text-lines",
@@ -171,6 +190,8 @@ dependencies = [
 name = "golden"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "laws",
  "newtype",
  "tempfile",
@@ -229,6 +250,8 @@ checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 name = "lint"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "lint-runner",
 ]
 
@@ -276,6 +299,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "lint-placement",
  "newtype",
@@ -394,6 +418,7 @@ dependencies = [
 name = "lint-layout"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "newtype",
  "proc-macro2",
@@ -598,6 +623,7 @@ dependencies = [
 name = "lint-placement"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "syn 2.0.119",
 ]
@@ -673,10 +699,12 @@ dependencies = [
 name = "lint-reader"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "lint-layout",
  "lint-placement",
  "lint-roots",
+ "newtype",
  "syn 2.0.119",
 ]
 
@@ -709,6 +737,7 @@ dependencies = [
 name = "lint-roots"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-layout",
  "newtype",
 ]
@@ -717,6 +746,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "golden",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
@@ -782,6 +812,7 @@ dependencies = [
 name = "lint-rust-only"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "newtype",
 ]
@@ -801,6 +832,7 @@ dependencies = [
 name = "lint-suite"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
@@ -857,7 +889,6 @@ dependencies = [
  "lint-vec-out-params",
  "lint-walk-similarity",
  "lint-workflow-run",
- "tempfile",
  "transition-facts",
 ]
 
@@ -953,6 +984,7 @@ dependencies = [
 name = "lint-workflow-run"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "lint-core",
  "lint-layout",
  "newtype",
@@ -975,6 +1007,8 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "mutation-report"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "golden",
  "laws",
  "newtype",
@@ -989,6 +1023,8 @@ dependencies = [
 name = "mutation-shard"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "laws",
  "serde",
  "serde_json",
@@ -1120,6 +1156,8 @@ dependencies = [
 name = "reach"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
+ "file-ports",
  "laws",
  "lint-complexity",
  "lint-core",

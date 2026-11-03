@@ -3,19 +3,26 @@ mod invocation;
 mod run;
 mod system;
 mod tee;
-mod text;
 
+use std::ffi::OsString;
 use std::io;
 use std::path::Path;
+use std::process::ExitCode;
+
+use file_ports::Files;
 
 pub use exit::Exit;
+pub use file_ports::Text;
 pub use invocation::Invocation;
 pub use run::Run;
 pub use system::System;
 pub use tee::Tee;
-pub use text::Text;
 
 pub trait Ports {
+    type Files: Files;
+
+    fn files(&self) -> &Self::Files;
+
     fn run(&self, invocation: &Invocation) -> io::Result<Run>;
 
     fn output(&self, invocation: &Invocation) -> io::Result<Text>;
@@ -25,4 +32,16 @@ pub trait Ports {
     fn runs(&self, invocations: &[Invocation]) -> Vec<io::Result<Run>>;
 
     fn outputs(&self, invocations: &[Invocation]) -> Vec<io::Result<Text>>;
+
+    fn reached(&self, arguments: &[OsString]) -> Result<Text, Text> {
+        let mut report = Vec::new();
+        let mut refusal = Vec::new();
+        let answered = reach::Cli::answer(arguments.iter().cloned(), self.files(), &mut report, &mut refusal);
+        let text = |bytes: Vec<u8>| Text::new(String::from_utf8(bytes).unwrap_or_default());
+        if answered == ExitCode::SUCCESS { Ok(text(report)) } else { Err(text(refusal)) }
+    }
+
+    fn reaches(&self, questions: &[Vec<OsString>]) -> Vec<Result<Text, Text>> {
+        questions.iter().map(|arguments| self.reached(arguments)).collect()
+    }
 }

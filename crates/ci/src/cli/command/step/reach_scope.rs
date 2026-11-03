@@ -5,7 +5,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
 
-use text_lines::Lines;
+use file_ports::Files;
 
 use super::Step;
 use super::branch::Branch;
@@ -14,7 +14,7 @@ use super::journal::Journal;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports, Text};
 use event::Event;
-use skipped::Skipped;
+use skipped::Skips;
 
 #[derive(Debug)]
 pub struct ReachScope {
@@ -29,14 +29,12 @@ impl ReachScope {
     const MAIN: &'static str = "main";
     const WHOLE_WORKSPACE: &'static str = "BUILD_SCOPE=--workspace\n";
 
-    fn recorded(&self, report: &Text, out: &mut impl Write) -> Result<(), Failure> {
+    fn recorded(&self, files: &impl Files, report: &Text, out: &mut impl Write) -> Result<(), Failure> {
+        let skipped = Skips::from(report.as_ref());
         write!(out, "{report}")?;
-        self.environment.append(report)?;
-        self.summary.append(report)?;
-        Lines::from(report.as_ref()).filter_map(|line| Skipped::try_from(line).ok()).try_for_each(|skipped| {
-            writeln!(out, "{skipped}")?;
-            self.summary.append(format_args!("{skipped}\n"))
-        })
+        self.environment.append(files, report)?;
+        self.summary.append(files, format_args!("{report}{skipped}"))?;
+        Ok(write!(out, "{skipped}")?)
     }
 }
 
@@ -61,6 +59,6 @@ impl Step for ReachScope {
             (Event::PullRequest, true) => Changed::answered(Question::Widened, &self.metadata, ports)?,
             (Event::Other, _) => Text::new(Self::WHOLE_WORKSPACE.to_owned()),
         };
-        self.recorded(&report, out).map(|()| Exit::Success)
+        self.recorded(ports.files(), &report, out).map(|()| Exit::Success)
     }
 }

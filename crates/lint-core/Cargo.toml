@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 newtype = { path = "../newtype" }
+file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }
 proc-macro2.workspace = true
 quote.workspace = true

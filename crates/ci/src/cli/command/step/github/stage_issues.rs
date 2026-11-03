@@ -20,7 +20,7 @@ impl Step for StageIssues {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let findings = self.limits.past_warn()?;
+        let findings = self.limits.past_warn(ports.files())?;
         let titles: Vec<Title<'_>> = findings.iter().map(|finding| Title::new(finding.stage().as_ref())).collect();
         let issues = Issue::titled(&titles, ports)?;
         let filings = findings

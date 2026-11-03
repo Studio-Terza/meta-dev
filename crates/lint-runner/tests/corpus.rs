@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use golden::{Golden, Output};
+use golden::{Disk, Golden, Output, Process};
 use ports::Corpus;
 use text_lines::Lines;
 
@@ -56,8 +56,8 @@ impl Corpus {
 
     fn difference(fixture: &Path, output: &str) -> Result<Option<String>, Box<dyn Error>> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        let golden = Golden::in_running_package(format!("lints/{name}.txt"))?;
-        Ok(golden.verify(Output::new(output)).err().map(|failure| format!("{failure:?}")))
+        let golden = Golden::in_package(env!("CARGO_MANIFEST_DIR"), format!("lints/{name}.txt"))?;
+        Ok(golden.verify(&Process, &Disk, Output::new(output)).err().map(|failure| format!("{failure:?}")))
     }
 }
 
@@ -100,7 +100,7 @@ mod ports {
             Self::copied(fixture, root.path())?;
             env::set_current_dir(root.path())?;
             let (mut printed, mut failed) = (Vec::new(), Vec::new());
-            let exit = Cli::from_args(std::iter::empty()).report_to(&mut printed, &mut failed);
+            let exit = Cli::from_args(std::iter::empty()).report_to(&file_ports::Disk, &mut printed, &mut failed);
             let verdict = if exit == ExitCode::SUCCESS { "passes\n" } else { "fails\n" };
             Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
         }

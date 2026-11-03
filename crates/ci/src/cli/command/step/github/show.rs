@@ -2,6 +2,8 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
 
+use file_ports::Files;
+
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
@@ -15,9 +17,12 @@ pub struct Show {
 impl Show {
     const ABSENT: &'static str = "not produced\n";
 
-    pub(super) fn shown(file: &Journal, out: &mut impl Write) -> Result<(), Failure> {
-        writeln!(out, "{file}:")?;
-        Ok(write!(out, "{}", file.read_or(Text::new(Self::ABSENT.to_owned()))?)?)
+    pub(super) fn shown(files: &impl Files, journals: &[Journal], out: &mut impl Write) -> Result<(), Failure> {
+        journals.iter().zip(Journal::read_present(files, journals)).try_for_each(|(journal, text)| {
+            writeln!(out, "{journal}:")?;
+            let text = text.unwrap_or_else(|| Ok(Text::new(Self::ABSENT.to_owned())))?;
+            Ok(write!(out, "{text}")?)
+        })
     }
 }
 
@@ -29,7 +34,8 @@ impl Step for Show {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        self.files.iter().try_for_each(|file| Self::shown(&Journal::file(file), out)).map(|()| Exit::Success)
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+        let journals: Vec<Journal> = self.files.iter().map(|file| Journal::file(file)).collect();
+        Self::shown(ports.files(), &journals, out).map(|()| Exit::Success)
     }
 }

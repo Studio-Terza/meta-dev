@@ -1,9 +1,6 @@
-use std::path::Path;
-
-use lint_core::RepoFile;
+use file_ports::{Bytes, Text};
+use lint_core::{Contents, RepoFile};
 use lint_workflow_run::WorkflowRun;
-
-use crate::ports::Checkout;
 
 const WORKFLOW: &str = ".github/workflows/ci.yml";
 const SPANS: &str = "a run step spans several lines; put the logic in a Rust command";
@@ -26,32 +23,20 @@ struct Checked;
 
 impl Checked {
     fn at(path: &str, text: &str) -> Vec<String> {
-        let checkout = Checkout::new().with(path, text);
-        Self::reported(checkout.path(), path)
+        Self::listed(&[RepoFile::new(path, path, Contents::Read(Bytes::from(text)))])
     }
 
-    fn reported(checkout: &Path, path: &str) -> Vec<String> {
-        let shown = checkout.join(path);
-        let files = [RepoFile::new(shown, path)];
-        let prefix = format!("{}/", checkout.display());
-        WorkflowRun::report(&files)
-            .violations()
-            .iter()
-            .map(|violation| violation.to_string().get(prefix.len()..).unwrap_or_default().to_owned())
-            .collect()
+    fn listed(files: &[RepoFile]) -> Vec<String> {
+        WorkflowRun::report(files).violations().iter().map(ToString::to_string).collect()
     }
 
     fn tree(tree: &Tree) -> Vec<String> {
-        let checkout =
-            tree.0.iter().fold(Checkout::new(), |checkout, planted| checkout.with(planted.path, planted.text));
-        let files: Vec<RepoFile> =
-            tree.0.iter().map(|planted| RepoFile::new(checkout.file(planted.path), planted.path)).collect();
-        let prefix = format!("{}/", checkout.path().display());
-        WorkflowRun::report(&files)
-            .violations()
+        let files: Vec<RepoFile> = tree
+            .0
             .iter()
-            .map(|violation| violation.to_string().get(prefix.len()..).unwrap_or_default().to_owned())
-            .collect()
+            .map(|planted| RepoFile::new(planted.path, planted.path, Contents::Read(Bytes::from(planted.text))))
+            .collect();
+        Self::listed(&files)
     }
 
     fn flagged(text: &&str) -> usize {
@@ -177,8 +162,16 @@ laws::table!(
 
 #[test]
 fn a_workflow_that_cannot_be_read_is_reported_not_passed() {
-    let checkout = Checkout::new();
-    let reported = Checked::reported(checkout.path(), WORKFLOW);
+    let unreadable = Contents::Unreadable(Text::new(String::from("denied")));
+    assert_eq!(
+        Checked::listed(&[RepoFile::new(WORKFLOW, WORKFLOW, unreadable)]),
+        [format!("{WORKFLOW}:1: cannot read the workflow: denied; make the file readable as UTF-8 text")]
+    );
+}
+
+#[test]
+fn a_workflow_that_is_not_utf8_is_reported_not_passed() {
+    let reported = Checked::listed(&[RepoFile::new(WORKFLOW, WORKFLOW, Contents::Read(Bytes::new(vec![b'a', 0xff])))]);
     assert_eq!(reported.len(), 1);
     assert!(reported.iter().all(|line| line.contains(&format!("{WORKFLOW}:1: cannot read the workflow: "))));
 }

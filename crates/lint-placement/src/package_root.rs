@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::crate_root::CrateRoot;
+use file_ports::Files;
 use lint_layout::LineNumber;
 use lint_layout::Manifest;
 use lint_layout::Name;
@@ -16,13 +17,26 @@ pub struct PackageRoot {
 
 impl PackageRoot {
     #[must_use]
-    pub fn read(directory: &Path) -> PackageRoot {
-        let manifest = Manifest::read(directory).ok().flatten();
-        PackageRoot {
-            root: CrateRoot::of_manifest(directory, manifest.as_ref()),
-            features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
-            untested: manifest.as_ref().map(Manifest::untested_targets).unwrap_or_default(),
-        }
+    pub fn read_many(files: &impl Files, directories: &[PathBuf]) -> Vec<PackageRoot> {
+        let manifests: Vec<Option<Manifest>> =
+            Manifest::read_many(files, directories).into_iter().map(|read| read.ok().flatten()).collect();
+        let named: Vec<PathBuf> = manifests.iter().flatten().flat_map(Manifest::named_paths).collect();
+        let found: BTreeMap<PathBuf, PathBuf> = named
+            .iter()
+            .cloned()
+            .zip(files.canonical_many(&named))
+            .filter_map(|(path, real)| Some((path, real.ok()?)))
+            .collect();
+        let canonical = |path: &Path| found.get(path).cloned();
+        directories
+            .iter()
+            .zip(&manifests)
+            .map(|(directory, manifest)| PackageRoot {
+                root: CrateRoot::of_manifest(directory, manifest.as_ref()),
+                features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
+                untested: manifest.as_ref().map(|manifest| manifest.untested_targets(canonical)).unwrap_or_default(),
+            })
+            .collect()
     }
 
     #[must_use]

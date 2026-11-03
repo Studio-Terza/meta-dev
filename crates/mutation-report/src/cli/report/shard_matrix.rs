@@ -1,6 +1,7 @@
-use std::fs;
+use std::io;
 use std::path::Path;
 
+use file_ports::{FileFailure, Text};
 use serde::Deserialize;
 use text_lines::OneLine;
 
@@ -16,9 +17,10 @@ pub struct ShardMatrix {
 impl ShardMatrix {
     pub const FILE: &'static str = "matrix.json";
 
-    pub fn read(path: &Path) -> Result<ShardMatrix, Failure> {
-        let text = fs::read_to_string(path).map_err(|source| Failure::Io { path: path.to_path_buf(), source })?;
-        serde_json::from_str(&text).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })
+    pub fn parsed(path: &Path, text: Result<Text, FileFailure>) -> Result<ShardMatrix, Failure> {
+        let text =
+            text.map_err(|failure| Failure::Io { path: path.to_path_buf(), source: io::Error::from(failure) })?;
+        serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path: path.to_path_buf(), source })
     }
 
     pub(crate) fn baseline(&self) -> &[OneLine] {

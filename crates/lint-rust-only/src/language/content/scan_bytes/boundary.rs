@@ -1,7 +1,4 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
-
+use file_ports::Bytes;
 use newtype::Newtype;
 
 use super::ScanBytes;
@@ -9,17 +6,17 @@ use super::ScanBytes;
 impl ScanBytes {
     const BREAK: u8 = b'\n';
 
-    pub(crate) fn first_line(self, path: &Path) -> Option<String> {
-        let mut line = Vec::new();
-        BufReader::new(File::open(path).ok()?.take(self.into_inner())).read_until(Self::BREAK, &mut line).ok()?;
-        String::from_utf8(line).ok()
+    pub(crate) fn first_line(self, contents: &Bytes) -> Option<String> {
+        let window = self.bytes(contents);
+        let line = window.split_inclusive(|byte| *byte == Self::BREAK).next().unwrap_or_default();
+        String::from_utf8(line.to_vec()).ok()
     }
 }
 
 impl ScanBytes {
-    pub(crate) fn bytes(self, path: &Path) -> Option<Vec<u8>> {
-        let mut bytes = Vec::new();
-        File::open(path).ok()?.take(self.into_inner()).read_to_end(&mut bytes).ok()?;
-        Some(bytes)
+    pub(crate) fn bytes(self, contents: &Bytes) -> Vec<u8> {
+        let all = contents.as_ref();
+        let limit = usize::try_from(self.into_inner()).unwrap_or(usize::MAX);
+        all.get(..limit).unwrap_or(all).to_vec()
     }
 }

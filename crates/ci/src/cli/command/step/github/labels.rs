@@ -56,11 +56,9 @@ impl Step for Labels {
         Changed::stored_metadata(ports, &self.metadata)?;
         writeln!(out, "{self}")?;
         let scope = Scope::reached_by(&self.metadata, &changes);
-        let judged: Vec<Owed> = Check::ALL
-            .into_iter()
-            .filter(|check| pull_request.carrying(*check).is_none())
-            .map(|check| scope.judged(check, pull_request.refactor(), &changes))
-            .collect::<Result<_, Failure>>()?;
+        let checks: Vec<Check> =
+            Check::ALL.into_iter().filter(|check| pull_request.carrying(*check).is_none()).collect();
+        let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.refactor(), &changes)?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
         faults.iter().try_for_each(|owed| owed.complained(out))?;
         Ok(if faults.is_empty() { Exit::Success } else { Exit::Failure(NonZeroU8::MIN) })

@@ -1,0 +1,20 @@
+[package]
+name = "file-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

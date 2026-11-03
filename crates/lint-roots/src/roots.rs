@@ -1,17 +1,19 @@
 mod admission;
 mod directory;
-mod package;
+mod packages;
 mod target;
 
 use admission::Admission;
 use directory::Directory;
-use package::Package;
+use packages::Packages;
 
 pub use target::Target;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use crate::regrouped::Regrouped;
 use crate::tree::Tree;
+use file_ports::Files;
 use lint_layout::Failure;
 use lint_layout::Manifest;
 
@@ -19,27 +21,35 @@ use lint_layout::Manifest;
 pub struct Roots;
 
 impl Roots {
-    pub fn files(tree: &Tree) -> Result<Vec<PathBuf>, Failure> {
-        Directory::new(tree.canonical().to_path_buf()).files()
+    pub fn files(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Vec<PathBuf>, Failure>> {
+        Directory::files(files, &Self::canonical(trees))
     }
 
-    pub fn under(tree: &Tree) -> Result<Vec<Target>, Failure> {
-        let below = Directory::new(tree.canonical().to_path_buf()).tree()?;
-        let above = tree.canonical().ancestors().skip(1).map(|ancestor| Directory::new(ancestor.to_path_buf()));
-        let manifests = below.into_iter().chain(above).try_fold(Vec::new(), |found, directory| {
-            Ok(found
-                .into_iter()
-                .chain(Manifest::read(directory.as_ref())?.filter(|manifest| manifest.package().is_some()))
-                .collect())
-        })?;
-        Admission::members_among(manifests)?.iter().try_fold(Vec::new(), |roots, manifest| {
-            Ok(roots
-                .into_iter()
-                .chain(
-                    Package::in_directory(manifest.directory().to_path_buf(), manifest.declared_roots())
-                        .targets_under(tree)?,
-                )
-                .collect())
-        })
+    pub fn under(files: &impl Files, trees: &[&Tree]) -> Vec<Result<Vec<Target>, Failure>> {
+        let below = Directory::trees(files, &Self::canonical(trees));
+        let directories: Vec<Vec<PathBuf>> =
+            trees.iter().zip(&below).map(|(tree, below)| Self::searched(tree, below)).collect();
+        let read = Regrouped::like(&directories, Manifest::read_many(files, &directories.concat()));
+        let manifests =
+            below.into_iter().zip(read).map(|(below, read)| below.and_then(|_| Self::manifests(read))).collect();
+        Packages::targets_of(files, trees, Admission::members_among(files, manifests))
+    }
+
+    fn searched(tree: &Tree, below: &Result<Vec<Directory>, Failure>) -> Vec<PathBuf> {
+        below
+            .iter()
+            .flatten()
+            .map(|directory| directory.as_ref().to_path_buf())
+            .chain(below.iter().flat_map(|_| tree.canonical().ancestors().skip(1).map(Path::to_path_buf)))
+            .collect()
+    }
+
+    fn canonical(trees: &[&Tree]) -> Vec<PathBuf> {
+        trees.iter().map(|tree| tree.canonical().to_path_buf()).collect()
+    }
+
+    fn manifests(read: Vec<Result<Option<Manifest>, Failure>>) -> Result<Vec<Manifest>, Failure> {
+        let found = read.into_iter().collect::<Result<Vec<Option<Manifest>>, Failure>>()?;
+        Ok(found.into_iter().flatten().collect())
     }
 }

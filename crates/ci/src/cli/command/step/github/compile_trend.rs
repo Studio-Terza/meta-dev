@@ -37,7 +37,7 @@ impl Step for CompileTrend {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let today = Build::try_from(self.today.as_path())?;
+        let today = Build::measured_in(ports.files(), &self.today)?;
         let earlier = self.fortnight.downloaded(ports)?;
         let notice = Notice::new(&today, &earlier, &self.fortnight);
         if let Some(slower) = notice.slower() {

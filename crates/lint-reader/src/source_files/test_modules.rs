@@ -1,41 +1,39 @@
 use std::collections::BTreeSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::modules::{Child, Modules};
 use super::scope::Scope;
-use lint_core::{SourceFile, SourceText};
+use super::shelf::Shelf;
+use lint_core::SourceFile;
 
-#[derive(Debug, Default)]
-pub struct TestModules {
+#[derive(Debug)]
+pub struct TestModules<'shelf, 'tree> {
+    shelf: &'shelf Shelf<'tree>,
     seen: BTreeSet<PathBuf>,
     files: Vec<SourceFile>,
 }
 
-impl TestModules {
+impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
     #[must_use]
-    pub fn read(scope: &Scope<'_>, children: &[Child]) -> Vec<SourceFile> {
-        children.iter().cloned().fold(TestModules::default(), |reading, child| reading.child(scope, child)).files
+    pub fn read(shelf: &'shelf Shelf<'tree>, scope: &Scope<'tree>, children: &[Child]) -> Vec<SourceFile> {
+        let started = TestModules { shelf, seen: BTreeSet::new(), files: Vec::new() };
+        children.iter().cloned().fold(started, |reading, child| reading.child(scope, child)).files
     }
 
-    fn child(self, scope: &Scope<'_>, child: Child) -> TestModules {
-        child.canonically(|path, directory| self.file(scope, path, directory))
+    fn child(self, scope: &Scope<'tree>, child: Child) -> TestModules<'shelf, 'tree> {
+        child.canonical(self.shelf.survey()).visit(|path, directory| self.file(scope, path, directory))
     }
 
-    fn file(mut self, scope: &Scope<'_>, file: &Path, children_directory: &Path) -> TestModules {
+    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
         if self.seen.insert(file.to_path_buf()) { self.opened(scope, file, children_directory) } else { self }
     }
 
-    fn opened(self, scope: &Scope<'_>, file: &Path, children_directory: &Path) -> TestModules {
-        let parsed = fs::read_to_string(file)
-            .map(SourceText::new)
-            .ok()
-            .and_then(|text| SourceFile::parse_at(scope.tree().display(file), scope.package(), file, text).ok());
-        match parsed {
+    fn opened(self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
+        match self.shelf.test_source(scope, file) {
             Some(source) => {
-                let mut modules = Modules::declared_in(file, children_directory, &source.syntax().items);
-                let nested: Vec<Child> =
-                    modules.take_children().into_iter().chain(modules.tests().iter().cloned()).collect();
+                let nested =
+                    Modules::declared_in(self.shelf.survey(), file, children_directory, &source.syntax().items)
+                        .nested();
                 nested.into_iter().fold(
                     TestModules { files: self.files.into_iter().chain([source]).collect(), ..self },
                     |reading, child| reading.child(scope, child),

@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use ci::Cli;
 use ci::ports::{Exit, Invocation, Ports, Run, Tee};
+use file_ports::Disk;
 use ports::Scratch;
 
 const METADATA: &str = include_str!("../../reach/tests/metadata/workspace.json");
@@ -108,6 +109,12 @@ impl Fake {
 }
 
 impl Ports for Fake {
+    type Files = Disk;
+
+    fn files(&self) -> &Disk {
+        &Disk
+    }
+
     fn run(&self, invocation: &Invocation) -> io::Result<Run> {
         self.recorded(invocation)?;
         Ok(Run::new(self.exit, self.elapsed))

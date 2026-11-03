@@ -1,6 +1,6 @@
 mod boundary;
 
-use std::path::Path;
+use file_ports::Bytes;
 
 use super::scan_bytes::ScanBytes;
 
@@ -13,8 +13,8 @@ impl Shebang {
     const SCANNED: ScanBytes = ScanBytes::new(256);
     const RUST: [&'static str; 2] = ["rust-script", "cargo"];
 
-    pub(crate) fn read_from(path: &Path) -> Option<Shebang> {
-        let line = Self::SCANNED.first_line(path)?;
+    pub(crate) fn read_from(contents: &Bytes) -> Option<Shebang> {
+        let line = Self::SCANNED.first_line(contents)?;
         line.get(..Self::MARK.len())
             .filter(|start| *start == Self::MARK)
             .filter(|_| line.get(..Self::ATTRIBUTE.len()) != Some(Self::ATTRIBUTE))

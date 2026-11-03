@@ -5,6 +5,7 @@ use lint_bool_methods::BoolMethods;
 use lint_const_shape::ConstShape;
 use lint_crate_graph::CrateGraph;
 use lint_distinct_signatures::DistinctSignatures;
+use lint_effect_sites::EffectsInPorts;
 use lint_enum_predicates::EnumPredicates;
 use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
@@ -90,6 +91,7 @@ impl Lints {
             MandatoryLaws::report(files),
             ArbitraryNewtypes::report(files),
             BoolMethods::report(files),
+            EffectsInPorts::report(files),
         ]
     }
 

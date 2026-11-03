@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
+use std::slice;
 
 use text_lines::LossyText;
 
@@ -26,9 +27,9 @@ impl Step for Summarize {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
         let mut shown = Vec::new();
-        Show::shown(&self.report, &mut shown)?;
-        self.summary.append(LossyText::from(shown.as_slice())).map(|()| Exit::Success)
+        Show::shown(ports.files(), slice::from_ref(&self.report), &mut shown)?;
+        self.summary.append(ports.files(), LossyText::from(shown.as_slice())).map(|()| Exit::Success)
     }
 }

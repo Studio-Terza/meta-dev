@@ -2,6 +2,8 @@ use std::path::Path;
 
 use text_lines::Lines;
 
+use file_ports::Files;
+
 use super::journal::Journal;
 use super::seconds::Seconds;
 use super::stage::Stage;
@@ -19,12 +21,12 @@ impl Measured {
         Measured(Journal::file(path))
     }
 
-    pub(crate) fn append(&self, stage: &Stage, seconds: Seconds) -> Result<(), Failure> {
-        self.0.append(format_args!("{stage}{}{seconds}\n", Self::ASSIGN))
+    pub(crate) fn append(&self, files: &impl Files, stage: &Stage, seconds: Seconds) -> Result<(), Failure> {
+        self.0.append(files, format_args!("{stage}{}{seconds}\n", Self::ASSIGN))
     }
 
-    pub(crate) fn row(&self) -> Result<Text, Failure> {
-        let text = self.0.read()?;
+    pub(crate) fn row(&self, files: &impl Files) -> Result<Text, Failure> {
+        let text = self.0.read(files)?;
         Ok(Text::new(Lines::from(text.as_ref()).collect::<Vec<&str>>().join(Self::TAB)))
     }
 }

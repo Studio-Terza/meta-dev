@@ -2,6 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use ci::ports::{Invocation, Ports, Run, Text};
+use file_ports::Disk;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Edit {
@@ -73,6 +74,12 @@ impl Fake {
 }
 
 impl Ports for Fake {
+    type Files = Disk;
+
+    fn files(&self) -> &Disk {
+        &Disk
+    }
+
     fn run(&self, invocation: &Invocation) -> io::Result<Run> {
         Err(Self::refused(invocation))
     }

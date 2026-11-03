@@ -5,7 +5,6 @@ mod excerpt;
 mod finding;
 mod word;
 
-use std::fs;
 use std::path::Path;
 
 use actions::Actions;
@@ -14,6 +13,7 @@ use excerpt::Excerpt;
 use finding::Finding;
 use lint_core::{Headline, RepoFile, Report, Site, Violation};
 use lint_layout::LineNumber;
+use newtype::Newtype;
 use saphyr::ScanError;
 
 #[derive(Debug)]
@@ -44,9 +44,14 @@ impl WorkflowRun {
     }
 
     fn violations(file: &RepoFile, actions: Actions<'_>) -> Vec<Violation> {
-        match fs::read_to_string(file.shown()) {
+        let text = file
+            .contents()
+            .read()
+            .map_err(Excerpt::from)
+            .and_then(|bytes| String::from_utf8(bytes.clone().into_inner()).map_err(Excerpt::from));
+        match text {
             Ok(text) => Self::violations_in(file, Document::try_from(text.as_str()), actions),
-            Err(source) => vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { source })],
+            Err(reason) => vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { reason })],
         }
     }
 

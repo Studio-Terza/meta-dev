@@ -1,11 +1,9 @@
 mod named;
 mod title;
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use text_lines::LossyText;
 
 use named::Named;
 use test_log::{TestLog, TestName};
@@ -35,30 +33,25 @@ enum Scenario {
 }
 
 impl Outcome {
-    pub(crate) fn baseline(&self, directory: &Path) -> Option<Vec<TestName>> {
+    pub(crate) fn baseline(&self, log: &TestLog) -> Option<Vec<TestName>> {
         match self.scenario {
-            Scenario::Baseline => Some(self.log(directory).names().into_iter().collect()),
+            Scenario::Baseline => Some(log.names().into_iter().collect()),
             Scenario::Mutant(_) => None,
         }
     }
 
-    pub fn mutant(&self, directory: &Path) -> Option<MutantResult> {
+    pub fn mutant(&self, log: &TestLog) -> Option<MutantResult> {
         match &self.scenario {
-            Scenario::Mutant(named) => {
-                Some(MutantResult::new(Title::from(named), self.summary, self.log(directory).failed()))
-            }
+            Scenario::Mutant(named) => Some(MutantResult::new(Title::from(named), self.summary, log.failed())),
             Scenario::Baseline => None,
         }
     }
 
-    fn log(&self, directory: &Path) -> TestLog {
+    pub(crate) fn logs(&self, directory: &Path) -> Vec<PathBuf> {
         self.log_path
             .iter()
             .chain(self.phase_results.iter().filter_map(|phase| phase.log_path.as_ref()))
             .map(|path| directory.join(path))
-            .find(|path| path.is_file())
-            .and_then(|path| fs::read(path).ok())
-            .map(|bytes| TestLog::from(LossyText::from(bytes.as_slice()).as_ref()))
-            .unwrap_or_default()
+            .collect()
     }
 }

@@ -6,10 +6,10 @@ mod summary;
 mod test_name;
 
 use std::ffi::OsString;
-use std::fs::{self, File};
-use std::io::Write;
+use std::io;
 use std::path::{Path, PathBuf};
 
+use file_ports::{Bytes, Files, Kind};
 use golden_tests::GoldenTests;
 use shard_matrix::ShardMatrix;
 use summary::Summary;
@@ -37,29 +37,28 @@ impl Report {
         }
     }
 
-    pub fn write_summary(&self) -> Result<(), Failure> {
-        let matrices = self.matrices()?;
-        let summary = Summary::from_results(&matrices, &GoldenTests::under(&self.sources)?);
-        File::create(&self.markdown)
-            .and_then(|mut file| write!(file, "{summary}"))
-            .map_err(|source| Failure::Io { path: self.markdown.clone(), source })?;
-        summary.written_as_json(&self.json)
+    pub fn write_summary(&self, files: &impl Files) -> Result<(), Failure> {
+        let matrices = self.matrices(files)?;
+        let summary = Summary::from_results(&matrices, &GoldenTests::under(files, &self.sources)?);
+        files
+            .write(&self.markdown, &Bytes::from(&summary))
+            .map_err(|failure| Failure::Io { path: self.markdown.clone(), source: io::Error::from(failure) })?;
+        summary.written_as_json(files, &self.json)
     }
 
-    fn matrices(&self) -> Result<Vec<ShardMatrix>, Failure> {
-        let failed = |source| Failure::Io { path: self.shards.clone(), source };
-        let mut directories: Vec<PathBuf> = fs::read_dir(&self.shards)
-            .map_err(failed)?
-            .map(|entry| entry.map(|found| found.path()))
-            .collect::<Result<_, _>>()
-            .map_err(failed)?;
+    fn matrices(&self, files: &impl Files) -> Result<Vec<ShardMatrix>, Failure> {
+        let mut directories = files
+            .entries(&self.shards)
+            .map_err(|failure| Failure::Io { path: self.shards.clone(), source: io::Error::from(failure) })?;
         directories.sort();
-        directories
+        let shard_files: Vec<PathBuf> = directories.iter().map(|directory| Self::shard_file(directory)).collect();
+        let present: Vec<PathBuf> = shard_files
             .iter()
-            .map(|directory| Self::shard_file(directory))
-            .filter(|file| file.is_file())
-            .map(|file| ShardMatrix::read(&file))
-            .collect()
+            .zip(files.kinds(&shard_files))
+            .filter(|(_, kind)| *kind == Kind::File)
+            .map(|(file, _)| file.clone())
+            .collect();
+        present.iter().zip(files.read_text_many(&present)).map(|(file, text)| ShardMatrix::parsed(file, text)).collect()
     }
 
     fn shard_file(directory: &Path) -> PathBuf {

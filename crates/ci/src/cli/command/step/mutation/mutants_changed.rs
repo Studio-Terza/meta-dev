@@ -2,6 +2,8 @@ use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use file_ports::Files;
+
 use super::super::journal::Journal;
 use super::Step;
 use super::cargo_mutants::CargoMutants;
@@ -29,9 +31,9 @@ impl MutantsChanged {
         Journal::file(&Self::MISSED_LIST.iter().fold(self.output.clone(), |path, part| path.join(part)))
     }
 
-    fn judged(&self, out: &mut impl Write) -> Result<Exit, Failure> {
+    fn judged(&self, files: &impl Files, out: &mut impl Write) -> Result<Exit, Failure> {
         let list = self.missed_list();
-        let missed = list.read_or(Text::default())?;
+        let missed = list.read_or(files, Text::default())?;
         if missed.as_ref().is_empty() {
             writeln!(out, "mutants: none missed")?;
             Ok(Exit::Success)
@@ -43,7 +45,7 @@ impl MutantsChanged {
 
     fn tested(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
         let changed = Self::changed_lines(ports)?;
-        self.diff.replace(&changed)?;
+        self.diff.replace(ports.files(), &changed)?;
         let diff: &Path = self.diff.as_ref();
         let selection: Vec<&OsStr> = [OsStr::new(Self::IN_DIFF), diff.as_os_str()]
             .into_iter()
@@ -51,7 +53,7 @@ impl MutantsChanged {
             .collect();
         let invocation = CargoMutants::invocation(&self.output, &selection, &[]);
         let run = ports.run(&invocation).map_err(Failure::starting(&invocation))?;
-        run.exit().excusing(&[CargoMutants::TIMEOUT]).followed_by(|| self.judged(out))
+        run.exit().excusing(&[CargoMutants::TIMEOUT]).followed_by(|| self.judged(ports.files(), out))
     }
 }
 

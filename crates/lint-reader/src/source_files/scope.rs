@@ -17,8 +17,8 @@ impl<'tree> Scope<'tree> {
     }
 
     #[must_use]
-    pub fn crate_file(&self) -> &CrateFile {
-        &self.crate_file
+    pub fn tree(&self) -> &'tree Tree {
+        self.tree
     }
 
     #[must_use]
@@ -27,7 +27,7 @@ impl<'tree> Scope<'tree> {
     }
 
     #[must_use]
-    pub fn tree(&self) -> &Tree {
-        self.tree
+    pub fn crate_file(&self) -> &CrateFile {
+        &self.crate_file
     }
 }
