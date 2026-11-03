@@ -1,6 +1,7 @@
 use std::ops::{AddAssign, SubAssign};
 
 use lint_core::Most;
+use newtype::Counter;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NestingDepth(usize);

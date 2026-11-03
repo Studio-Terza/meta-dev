@@ -11,7 +11,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_layout::LineNumber;
-use lint_layout::Name;
+use lint_layout::{Length, Name};
 
 #[derive(Debug)]
 pub struct NamedLifetimes;
@@ -36,7 +36,7 @@ impl Lint for NamedLifetimes {
 }
 
 impl NamedLifetimes {
-    const MINIMUM_LENGTH: usize = 2;
+    const MINIMUM_LENGTH: Length = Length::new(2);
 
     fn short_lifetimes(file: &syn::File) -> Vec<Ident> {
         let mut visitor = ShortLifetimes { found: Vec::new() };

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
 pub struct Show {
@@ -13,9 +13,11 @@ pub struct Show {
 }
 
 impl Show {
+    const ABSENT: &'static str = "not produced\n";
+
     pub(super) fn shown(file: &Journal, out: &mut impl Write) -> Result<(), Failure> {
         writeln!(out, "{file}:")?;
-        Ok(write!(out, "{}", file.read_or("not produced\n")?)?)
+        Ok(write!(out, "{}", file.read_or(Text::new(Self::ABSENT.to_owned()))?)?)
     }
 }
 

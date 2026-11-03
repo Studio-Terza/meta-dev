@@ -1,17 +1,18 @@
 use std::fmt;
 
+use super::mutant::Mutant;
 use super::tally::Tally;
 
 #[derive(Debug)]
 pub struct Report {
     tallies: Vec<Tally>,
-    names: Vec<String>,
+    names: Vec<Mutant>,
 }
 
 impl Report {
     const FENCE: &'static str = "```";
 
-    pub(crate) fn new(tallies: Vec<Tally>, names: Vec<String>) -> Report {
+    pub(crate) fn new(tallies: Vec<Tally>, names: Vec<Mutant>) -> Report {
         Report { tallies, names }
     }
 }

@@ -1,7 +1,10 @@
 use std::fmt;
 use std::str::FromStr;
 
+use newtype::Newtype;
+
 use crate::document::text::Text;
+use crate::word::Word;
 
 pub(super) mod hidden;
 mod quote;
@@ -14,7 +17,7 @@ pub(super) struct Unquoted(String);
 impl Unquoted {
     pub(super) fn new(text: Text<'_>, hidden: Hidden) -> Unquoted {
         Unquoted(
-            text.rendered()
+            text.to_string()
                 .chars()
                 .scan(Quote::Outside, |quote, letter| {
                     let before = *quote;
@@ -30,9 +33,9 @@ impl Unquoted {
         self.to_string().parse()
     }
 
-    pub(super) fn first_of(&self, symbols: &[&'static str]) -> Option<&'static str> {
+    pub(super) fn first_of(&self, symbols: &[Word]) -> Option<Word> {
         let shown = self.to_string();
-        symbols.iter().copied().find(|symbol| shown.contains(*symbol))
+        symbols.iter().copied().find(|symbol| shown.contains(symbol.into_inner()))
     }
 }
 

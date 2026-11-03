@@ -3,8 +3,9 @@ use std::io::Write;
 use std::path::Path;
 
 use super::Step;
-use super::changed::Changed;
+use super::changed::{Changed, Question};
 use super::journal::Journal;
+use super::revision::Revision;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
 
@@ -12,11 +13,7 @@ use crate::cli::ports::{Exit, Ports};
 pub struct History {
     metadata: Journal,
     file: Journal,
-    revision: String,
-}
-
-impl History {
-    const COMMAND: &'static str = "history";
+    revision: Revision,
 }
 
 impl Step for History {
@@ -25,14 +22,14 @@ impl Step for History {
             [metadata, file, revision] => Ok(History {
                 metadata: Journal::file(Path::new(metadata)),
                 file: Journal::file(Path::new(file)),
-                revision: revision.to_str().ok_or(Failure::Usage)?.to_owned(),
+                revision: Revision::new(revision.to_str().ok_or(Failure::Usage)?.to_owned()),
             }),
             _ => Err(Failure::Usage),
         }
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let record = Changed::answered(Self::COMMAND, &self.metadata, ports)?;
+        let record = Changed::answered(Question::History, &self.metadata, ports)?;
         write!(out, "{}\t{record}", self.revision)?;
         self.file.append(format_args!("{}\t{record}", self.revision)).map(|()| Exit::Success)
     }

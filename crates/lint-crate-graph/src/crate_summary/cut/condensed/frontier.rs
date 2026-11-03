@@ -5,7 +5,7 @@ use super::spectrum::Weight;
 use super::tangle_index::TangleIndex;
 use crate::crate_summary::cut::conductance::Conductance;
 use crate::crate_summary::item_count::ItemCount;
-use newtype::Counter;
+use newtype::{Counter, Newtype};
 
 #[derive(Debug)]
 pub struct Frontier<'condensed> {
@@ -43,7 +43,7 @@ impl<'condensed> Frontier<'condensed> {
     }
 
     pub fn admitted_conductance(&self) -> Conductance {
-        Conductance::of_ratio(self.crossing.crossings(), self.volume.lesser(self.whole - self.volume).crossings())
+        Conductance::new(self.crossing.into_inner() / self.volume.lesser(self.whole - self.volume).into_inner())
     }
 
     pub fn items(&self) -> ItemCount {

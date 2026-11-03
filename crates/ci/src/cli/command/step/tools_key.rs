@@ -7,7 +7,7 @@ use super::changed::Changed;
 use super::install_tools::InstallTools;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 
 #[derive(Debug)]
 pub struct ToolsKey {
@@ -19,10 +19,10 @@ impl ToolsKey {
     const SOURCES: &'static str = "sources";
     const DELIMITER: &'static str = "TOOLS_SOURCES";
 
-    fn listed(&self) -> Result<String, Failure> {
+    fn listed(&self) -> Result<Text, Failure> {
         let arguments = [OsString::from(Self::SOURCES), self.metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
-            .chain(InstallTools::PROGRAMS.iter().map(OsString::from));
+            .chain(InstallTools::PROGRAMS.iter().map(|tool| tool.as_ref().to_owned()));
         Changed::reach(arguments)
     }
 }

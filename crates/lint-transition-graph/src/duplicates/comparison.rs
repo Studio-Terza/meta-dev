@@ -7,6 +7,7 @@ use type_facts::Transition;
 use super::family::Family;
 use crate::count::Count;
 use crate::end::{Class, Ends};
+use newtype::Counter;
 
 #[derive(Debug)]
 pub(super) struct Comparison {
@@ -23,7 +24,7 @@ impl Comparison {
         Comparison {
             compared: Count::new(ends.iter().filter(|found| found.key().is_some()).count()),
             families: Count::new(families.len()),
-            repeated: Count::new(families.iter().map(Family::size).sum()),
+            repeated: Count::total(families.iter().map(Family::size)),
             primitive: classed(Class::Primitive),
             foreign: classed(Class::Foreign),
         }

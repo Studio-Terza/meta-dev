@@ -1,7 +1,13 @@
+mod first_change;
+mod line;
+mod mark;
 mod text_lines;
 
 use std::fmt;
 
+use first_change::FirstChange;
+use line::Line;
+use mark::Mark;
 use newtype::Newtype;
 use text_lines::TextLines;
 
@@ -9,11 +15,11 @@ use crate::Output;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Difference {
-    before: Vec<String>,
-    recorded: Vec<String>,
-    actual: Vec<String>,
-    after: Vec<String>,
-    first_changed_index: usize,
+    before: Vec<Line>,
+    recorded: Vec<Line>,
+    actual: Vec<Line>,
+    after: Vec<Line>,
+    first_change: FirstChange,
 }
 
 impl Difference {
@@ -24,39 +30,35 @@ impl Difference {
         (recorded != actual).then(|| Self::of_lines(&Self::lines(recorded), &Self::lines(actual)))
     }
 
-    fn lines(text: Output<'_>) -> Vec<&str> {
-        TextLines::new(text.into_inner()).collect()
+    fn lines(text: Output<'_>) -> Vec<Line> {
+        TextLines::new(text.into_inner()).map(|line| Line::new(line.to_owned())).collect()
     }
 
-    fn of_lines(recorded: &[&str], actual: &[&str]) -> Self {
-        let same = |pair: &(&&str, &&str)| pair.0 == pair.1;
+    fn of_lines(recorded: &[Line], actual: &[Line]) -> Self {
+        let same = |pair: &(&Line, &Line)| pair.0 == pair.1;
         let head = recorded.iter().zip(actual).take_while(same).count();
         let tail = recorded.iter().skip(head).rev().zip(actual.iter().skip(head).rev()).take_while(same).count();
-        let middle = |lines: &[&str]| Self::owned(lines.iter().skip(head).take(lines.len() - head - tail));
+        let middle = |lines: &[Line]| lines.iter().skip(head).take(lines.len() - head - tail).cloned().collect();
         Self {
-            before: Self::owned(recorded.iter().take(head).skip(head.saturating_sub(Self::CONTEXT_LEN))),
+            before: recorded.iter().take(head).skip(head.saturating_sub(Self::CONTEXT_LEN)).cloned().collect(),
             recorded: middle(recorded),
             actual: middle(actual),
-            after: Self::owned(recorded.iter().rev().take(tail).rev().take(Self::CONTEXT_LEN)),
-            first_changed_index: head,
+            after: recorded.iter().rev().take(tail).rev().take(Self::CONTEXT_LEN).cloned().collect(),
+            first_change: FirstChange::new(head),
         }
     }
 
-    fn owned<'line>(lines: impl Iterator<Item = &'line &'line str>) -> Vec<String> {
-        lines.map(|line| (*line).to_owned()).collect()
-    }
-
-    fn marked(formatter: &mut fmt::Formatter<'_>, mark: char, lines: &[String]) -> fmt::Result {
-        lines.iter().try_for_each(|line| writeln!(formatter, "{mark} {line:?}"))
+    fn marked(formatter: &mut fmt::Formatter<'_>, mark: Mark, lines: &[Line]) -> fmt::Result {
+        lines.iter().try_for_each(|line| writeln!(formatter, "{mark} {:?}", line.as_ref()))
     }
 }
 
 impl fmt::Display for Difference {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "@ first change at line {}; - golden, + actual", self.first_changed_index + 1)?;
-        Self::marked(formatter, ' ', &self.before)?;
-        Self::marked(formatter, '-', &self.recorded)?;
-        Self::marked(formatter, '+', &self.actual)?;
-        Self::marked(formatter, ' ', &self.after)
+        writeln!(formatter, "@ first change at line {}; - golden, + actual", self.first_change)?;
+        Self::marked(formatter, Mark::Context, &self.before)?;
+        Self::marked(formatter, Mark::Recorded, &self.recorded)?;
+        Self::marked(formatter, Mark::Actual, &self.actual)?;
+        Self::marked(formatter, Mark::Context, &self.after)
     }
 }

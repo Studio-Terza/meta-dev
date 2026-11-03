@@ -8,7 +8,7 @@ impl From<usize> for TangleIndex {
 }
 
 impl TangleIndex {
-    pub fn index(self) -> usize {
+    pub fn into_inner(self) -> usize {
         self.0
     }
 }

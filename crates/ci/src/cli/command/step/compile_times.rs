@@ -10,7 +10,7 @@ use serde_json::Deserializer;
 use super::Step;
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
-use crate::cli::ports::{Exit, Ports};
+use crate::cli::ports::{Exit, Ports, Text};
 use listing::Listing;
 use unit::Unit;
 
@@ -23,7 +23,8 @@ pub struct CompileTimes {
 impl CompileTimes {
     const UNIT_DATA: &'static str = "const UNIT_DATA = ";
 
-    fn units(&self, page: &str) -> Result<Vec<Unit>, Failure> {
+    fn units(&self, page: &Text) -> Result<Vec<Unit>, Failure> {
+        let page = page.as_ref();
         page.match_indices(Self::UNIT_DATA)
             .next()
             .and_then(|(at, found)| page.get(at + found.len()..))

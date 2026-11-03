@@ -1,13 +1,16 @@
+use newtype::Newtype;
+
 use super::Language;
+use super::text::Text;
 use super::weight::Weight;
 
 #[derive(Clone, Copy)]
 pub(super) struct Rule {
     language: Language,
     weight: Weight,
-    start: &'static str,
-    middle: &'static str,
-    end: &'static str,
+    start: Text<'static>,
+    middle: Text<'static>,
+    end: Text<'static>,
 }
 
 impl Rule {
@@ -16,40 +19,139 @@ impl Rule {
     pub(super) const ENOUGH: Weight = Weight::new(2);
 
     pub(super) const ALL: [Rule; 17] = [
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import XCTest", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import SwiftUI", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import UIKit", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import Foundation", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import Cocoa", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "import AppKit", middle: "", end: "" },
-        Rule { language: Language::Swift, weight: Self::CLEAR, start: "class ", middle: ": XCTestCase", end: "{" },
         Rule {
             language: Language::Swift,
             weight: Self::CLEAR,
-            start: "final class ",
-            middle: ": XCTestCase",
-            end: "{",
+            start: Text::new("import XCTest"),
+            middle: Text::new(""),
+            end: Text::new(""),
         },
-        Rule { language: Language::Python, weight: Self::CLEAR, start: "def ", middle: "(", end: ":" },
-        Rule { language: Language::Python, weight: Self::CLEAR, start: "async def ", middle: "(", end: ":" },
-        Rule { language: Language::Python, weight: Self::HINT, start: "from ", middle: " import ", end: "" },
-        Rule { language: Language::Python, weight: Self::HINT, start: "import ", middle: "", end: "" },
-        Rule { language: Language::Shell, weight: Self::CLEAR, start: "set -", middle: "", end: "" },
-        Rule { language: Language::Shell, weight: Self::CLEAR, start: "if ", middle: "", end: "; then" },
-        Rule { language: Language::Shell, weight: Self::CLEAR, start: "for ", middle: "", end: "; do" },
-        Rule { language: Language::C, weight: Self::CLEAR, start: "#include <", middle: "", end: ">" },
-        Rule { language: Language::C, weight: Self::CLEAR, start: "#include \"", middle: "", end: "\"" },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("import SwiftUI"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("import UIKit"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("import Foundation"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("import Cocoa"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("import AppKit"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("class "),
+            middle: Text::new(": XCTestCase"),
+            end: Text::new("{"),
+        },
+        Rule {
+            language: Language::Swift,
+            weight: Self::CLEAR,
+            start: Text::new("final class "),
+            middle: Text::new(": XCTestCase"),
+            end: Text::new("{"),
+        },
+        Rule {
+            language: Language::Python,
+            weight: Self::CLEAR,
+            start: Text::new("def "),
+            middle: Text::new("("),
+            end: Text::new(":"),
+        },
+        Rule {
+            language: Language::Python,
+            weight: Self::CLEAR,
+            start: Text::new("async def "),
+            middle: Text::new("("),
+            end: Text::new(":"),
+        },
+        Rule {
+            language: Language::Python,
+            weight: Self::HINT,
+            start: Text::new("from "),
+            middle: Text::new(" import "),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Python,
+            weight: Self::HINT,
+            start: Text::new("import "),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Shell,
+            weight: Self::CLEAR,
+            start: Text::new("set -"),
+            middle: Text::new(""),
+            end: Text::new(""),
+        },
+        Rule {
+            language: Language::Shell,
+            weight: Self::CLEAR,
+            start: Text::new("if "),
+            middle: Text::new(""),
+            end: Text::new("; then"),
+        },
+        Rule {
+            language: Language::Shell,
+            weight: Self::CLEAR,
+            start: Text::new("for "),
+            middle: Text::new(""),
+            end: Text::new("; do"),
+        },
+        Rule {
+            language: Language::C,
+            weight: Self::CLEAR,
+            start: Text::new("#include <"),
+            middle: Text::new(""),
+            end: Text::new(">"),
+        },
+        Rule {
+            language: Language::C,
+            weight: Self::CLEAR,
+            start: Text::new("#include \""),
+            middle: Text::new(""),
+            end: Text::new("\""),
+        },
     ];
 
     pub(super) fn language(&self) -> Language {
         self.language
     }
 
-    pub(super) fn weighs(&self, line: &str) -> Option<Weight> {
-        Some(line)
-            .filter(|line| line.get(..self.start.len()) == Some(self.start))
-            .filter(|line| line.len().checked_sub(self.end.len()).and_then(|from| line.get(from..)) == Some(self.end))
-            .filter(|line| line.contains(self.middle))
+    pub(super) fn weighs(&self, line: Text<'_>) -> Option<Weight> {
+        let start = self.start.into_inner();
+        let middle = self.middle.into_inner();
+        let end = self.end.into_inner();
+        Some(line.into_inner())
+            .filter(|line| line.get(..start.len()) == Some(start))
+            .filter(|line| line.len().checked_sub(end.len()).and_then(|from| line.get(from..)) == Some(end))
+            .filter(|line| line.contains(middle))
             .map(|_| self.weight)
     }
 }

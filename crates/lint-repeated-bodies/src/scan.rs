@@ -8,7 +8,6 @@ use syn::{
 use body_shape::Shape;
 use lint_core::{Least, Site, SourceFile, Walk};
 use lint_layout::LineNumber;
-use newtype::Counter;
 
 use crate::extent::Extent;
 use crate::node::Node;
@@ -32,7 +31,7 @@ impl Scan<'_> {
         let shape = Shape::from(node.to_token_stream());
         let span = node.span();
         let occurrence = Occurrence::new(Site::new(self.file.path(), LineNumber::from(span)), Extent::from(span));
-        self.nodes.extend(Self::FLOOR.allows(shape.size().count()).map(|_| Node::new(shape, occurrence)));
+        self.nodes.extend(Self::FLOOR.allows(shape.size()).map(|_| Node::new(shape, occurrence)));
     }
 
     fn gate(attributes: &[Attribute], signature: &Signature) -> Walk {

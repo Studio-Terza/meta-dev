@@ -9,7 +9,7 @@ use syn::{
 };
 
 use lint_core::{Headline, Macros, Report, Site, SourceFile, Violation, Walk};
-use lint_layout::{LineNumber, Name};
+use lint_layout::{LineNumber, Name, Word};
 
 #[derive(Debug)]
 pub struct VecOutParams<'file> {
@@ -36,8 +36,8 @@ impl Lint for VecOutParams<'_> {
 }
 
 impl VecOutParams<'_> {
-    const VECTOR: &'static str = "Vec";
-    const OPTION: &'static str = "Option";
+    const VECTOR: Word<'static> = Word::new("Vec");
+    const OPTION: Word<'static> = Word::new("Option");
 
     fn vec_out(parameter: &Type) -> Option<&Type> {
         match parameter {
@@ -66,8 +66,8 @@ impl VecOutParams<'_> {
         }
     }
 
-    fn last_segment<'path>(path: &'path TypePath, name: &str) -> Option<&'path PathSegment> {
-        path.path.segments.last().filter(|segment| segment.ident == name)
+    fn last_segment<'path>(path: &'path TypePath, name: Word<'_>) -> Option<&'path PathSegment> {
+        path.path.segments.last().filter(|segment| Name::from(&segment.ident) == name)
     }
 }
 

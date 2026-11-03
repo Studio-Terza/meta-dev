@@ -33,7 +33,7 @@ impl Nesting {
     pub fn within_limit(text: &SourceText) -> Option<&SourceText> {
         let chars: Vec<char> = text.as_ref().chars().collect();
         let deepest = Self::peak(&chars, Self::delimited).max(Self::peak(&chars, Depth::angled));
-        Self::LIMIT.allows(deepest.count()).map(|_| text)
+        Self::LIMIT.allows(deepest).map(|_| text)
     }
 
     fn peak(chars: &[char], step: impl Fn(Depth, &[char]) -> Depth) -> Depth {
