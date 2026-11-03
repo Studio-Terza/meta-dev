@@ -10,21 +10,21 @@ use crate::cli::workspace::share::Share;
 use band::Band;
 
 #[derive(Debug)]
-pub struct FanIn {
+pub struct FanIn<'meta> {
     total: CrateCount,
-    by_count: BTreeMap<Reverse<CrateCount>, BTreeSet<CrateName>>,
+    by_count: BTreeMap<Reverse<CrateCount>, BTreeSet<&'meta CrateName>>,
 }
 
-impl FanIn {
-    pub fn among(total: CrateCount) -> FanIn {
+impl<'meta> FanIn<'meta> {
+    pub fn among(total: CrateCount) -> FanIn<'meta> {
         FanIn { total, by_count: BTreeMap::new() }
     }
 
-    pub fn inline(&self) -> Inline<'_> {
+    pub fn inline(&self) -> Inline<'_, 'meta> {
         Inline(self)
     }
 
-    pub fn counted(mut self, count: CrateCount, name: CrateName) -> FanIn {
+    pub fn counted(mut self, count: CrateCount, name: &'meta CrateName) -> FanIn<'meta> {
         self.by_count.entry(Reverse(count)).or_default().insert(name);
         self
     }
@@ -71,9 +71,9 @@ impl FanIn {
 }
 
 #[derive(Debug)]
-pub struct Inline<'fan_in>(&'fan_in FanIn);
+pub struct Inline<'fan_in, 'meta>(&'fan_in FanIn<'meta>);
 
-impl fmt::Display for Inline<'_> {
+impl fmt::Display for Inline<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entries: Vec<String> = self
             .0
@@ -85,7 +85,7 @@ impl fmt::Display for Inline<'_> {
     }
 }
 
-impl fmt::Display for FanIn {
+impl fmt::Display for FanIn<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             formatter,
