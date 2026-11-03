@@ -3,6 +3,7 @@ mod imports;
 mod path_tokens;
 
 use std::collections::BTreeSet;
+use std::ptr;
 
 use lint_core::Walk;
 use lint_layout::{Name, UsePath};
@@ -35,19 +36,19 @@ impl Scope {
         let path = PathTokens::new(tokens);
         path.tokens()
             .iter()
-            .enumerate()
-            .flat_map(|(index, token)| match token {
-                TokenTree::Ident(ident) => self.kept_at_index(&path, index, Name::from(ident)).into_iter().collect(),
+            .zip(path.roots())
+            .flat_map(|(token, root)| match token {
+                TokenTree::Ident(ident) => self.kept(token, root, Name::from(ident)).into_iter().collect(),
                 TokenTree::Group(group) => self.referenced(group.stream()),
                 TokenTree::Punct(_) | TokenTree::Literal(_) => Vec::new(),
             })
             .collect()
     }
 
-    fn kept_at_index(&self, path: &PathTokens, index: usize, name: Name) -> Option<Name> {
-        match path.root_index(index) {
-            Some(root) if root == index => self.imports.local_item(&name, &self.local_roots),
-            Some(root) => self.local_root(path.tokens().get(root)).map(|_| name),
+    fn kept(&self, token: &TokenTree, root: Option<&TokenTree>, name: Name) -> Option<Name> {
+        match root {
+            Some(root) if ptr::eq(root, token) => self.imports.local_item(&name, &self.local_roots),
+            Some(root) => self.local_root(Some(root)).map(|_| name),
             None => None,
         }
     }

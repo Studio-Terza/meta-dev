@@ -8,16 +8,16 @@ use super::ModulePath;
 #[derive(Debug)]
 pub struct ModuleIndex {
     modules: Vec<ModulePath>,
-    last_index: HashMap<CrateRoot, HashMap<Vec<Name>, usize>>,
+    latest: HashMap<CrateRoot, HashMap<Vec<Name>, ModulePath>>,
     directories: HashMap<CrateRoot, HashSet<Vec<Name>>>,
 }
 
 impl From<Vec<ModulePath>> for ModuleIndex {
     fn from(modules: Vec<ModulePath>) -> ModuleIndex {
-        let last_index = modules.iter().enumerate().fold(
+        let latest = modules.iter().fold(
             HashMap::new(),
-            |mut found: HashMap<CrateRoot, HashMap<Vec<Name>, usize>>, (index, module)| {
-                found.entry(module.crate_root.clone()).or_default().insert(module.segments.clone(), index);
+            |mut found: HashMap<CrateRoot, HashMap<Vec<Name>, ModulePath>>, module| {
+                found.entry(module.crate_root.clone()).or_default().insert(module.segments.clone(), module.clone());
                 found
             },
         );
@@ -28,7 +28,7 @@ impl From<Vec<ModulePath>> for ModuleIndex {
                 found
             },
         );
-        ModuleIndex { modules, last_index, directories }
+        ModuleIndex { modules, latest, directories }
     }
 }
 
@@ -38,10 +38,7 @@ impl ModuleIndex {
     }
 
     pub fn same_as(&self, probe: &ModulePath) -> Option<&ModulePath> {
-        self.last_index
-            .get(&probe.crate_root)
-            .and_then(|positions| positions.get(probe.segments.as_slice()))
-            .and_then(|index| self.modules.get(*index))
+        self.latest.get(&probe.crate_root).and_then(|found| found.get(probe.segments.as_slice()))
     }
 
     pub fn directory_same_as<'probe>(&self, probe: &'probe ModulePath) -> Option<&'probe ModulePath> {
