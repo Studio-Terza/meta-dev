@@ -20,11 +20,6 @@ impl<'file> DeclaredType<'file> {
     pub fn home(&self) -> Home<'file> {
         self.home
     }
-
-    #[must_use]
-    pub fn into_name(self) -> Name {
-        self.name
-    }
 }
 
 impl AsRef<Name> for DeclaredType<'_> {
