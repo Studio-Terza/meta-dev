@@ -179,7 +179,7 @@ fn types_and_traits_inside_inline_modules_are_found() {
 fn method_shapes_erase_names_but_keep_the_receiver_self_arguments_and_return_shape() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
-        "struct A;\nimpl A {\n    fn one(&self, other: &A, key: Key) -> Option<A> {}\n    fn two(&mut self) -> Vec<B> {}\n    fn three(self) -> Result<Self, E> {}\n    fn four(item: Self) -> impl Iterator<Item = B> {}\n    fn five(&self) -> &[B] {}\n    fn six() -> Self {}\n    fn seven(&self) -> B {}\n    fn eight(&self) -> () {}\n}\n",
+        "struct A;\nimpl A {\n    fn one(&self, other: &A, key: Key) -> Option<A> {}\n    fn two(&mut self) -> Vec<B> {}\n    fn three(self) -> Result<Self, E> {}\n    fn four(item: Self) -> impl Iterator<Item = B> {}\n    fn five(&self) -> &[B] {}\n    fn six() -> Self {}\n    fn seven(&self) -> B {}\n    fn eight(&self) -> () {}\n    fn nine(&self) -> (Self) {}\n    fn ten(&self) -> (A, B) {}\n}\n",
     )]);
     let facts = Facts::of_files(&files);
     let shapes: Vec<String> =
@@ -195,6 +195,8 @@ fn method_shapes_erase_names_but_keep_the_receiver_self_arguments_and_return_sha
             "fn() -> Self",
             "fn(&self) -> _",
             "fn(&self)",
+            "fn(&self) -> Self",
+            "fn(&self) -> _",
         ]
     );
 }

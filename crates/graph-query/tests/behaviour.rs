@@ -8,7 +8,7 @@ use text_lines::Lines;
 use transition_facts::Transitions;
 use type_facts::{Facts, MethodShape};
 
-const SEARCH: &str = "pub trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\npub struct TextIndex;\nimpl Index for TextIndex {\n    fn insert(&mut self, item: Item) {}\n    fn search(&self, query: &Query) -> Vec<Hit> {}\n}\npub struct Plain;\nimpl Plain {\n    pub fn search_text(&self) {}\n}\nimpl<T: Index> Lookup for T {\n    fn find(&self, query: &Query) -> Vec<Hit> {}\n}\nmod store {\n    pub struct Records;\n    impl Records {\n        pub fn insert(&mut self, record: Record) {}\n        pub fn all(&self) -> Vec<Record> {}\n    }\n}\n";
+const SEARCH: &str = "pub trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Hit>;\n}\npub struct TextIndex;\nimpl Index for TextIndex {\n    fn insert(&mut self, item: Item) {}\n    fn search(&self, query: &Query) -> Vec<Hit> {}\n}\npub struct Plain;\nimpl Plain {\n    pub fn search_text(&self) {}\n}\nimpl<T: Index> Lookup for T {\n    fn find(&self, query: &Query) -> Vec<Hit> {}\n}\nmod store {\n    pub struct Records;\n    impl Records {\n        pub fn insert(&mut self, record: Record) {}\n        pub fn all(&self) -> Vec<Record> {}\n    }\n}\nimpl<T> Holder<T> {\n    pub fn get(&self) -> Option<T> {}\n}\n";
 const FILES: &str = "pub trait Files {\n    fn read(&self, path: &Path) -> Result<Contents, Failure>;\n}\npub struct Disk;\nimpl Files for Disk {\n    fn read(&self, path: &Path) -> Result<Contents, Failure> {}\n}\n";
 const LOOKUP_ROLE: &str = "fn lookup(&self, wanted: &Wanted) -> Vec<Found>";
 
@@ -48,6 +48,7 @@ laws::table!(terms_rank_names_above_methods_and_implementers_and_label_ports_and
         "score 2: port Disk in disk at crates/disk/src/ports.rs:4; implements Files".to_owned(),
     ],
     &["insert", "records", "--top", "1"][..] => vec!["score 4: store Records in search at crates/search/src/lib.rs:18".to_owned()],
+    &["holder"][..] => vec!["score 3: generic impl Holder in search at crates/search/src/lib.rs:24".to_owned()],
     &["unrelated"][..] => vec!["no existing traits, generic impls, ports or stores match".to_owned()],
 ]);
 
@@ -90,6 +91,8 @@ fn terms_match_camel_and_snake_words_and_plurals() {
     assert!(term.found_in(&Name::from("AllRecords")).is_some());
     assert!(term.found_in(&Name::from("read_record")).is_some());
     assert!(term.found_in(&Name::from("Recorder")).is_none());
+    let short: Term = "bus".parse().unwrap_or_else(|never| match never {});
+    assert!(short.found_in(&Name::from("BuReader")).is_none());
 }
 
 #[test]
