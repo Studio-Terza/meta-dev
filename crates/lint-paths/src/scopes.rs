@@ -1,30 +1,36 @@
 mod scope;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter;
 
 use crate::module::Module;
 use lint_layout::{Name, UsePath, Word};
+use lint_placement::CrateFile;
 use scope::Scope;
 
 #[derive(Debug, Default)]
 pub(crate) struct Scopes {
     scopes: BTreeMap<Module, Scope>,
-    guards: BTreeMap<Module, BTreeSet<Name>>,
+    guards: BTreeMap<CrateFile, BTreeSet<Name>>,
 }
 
 impl Scopes {
     pub(crate) fn declare(&mut self, module: &Module) {
-        module.ancestry().into_iter().for_each(|ancestor| {
+        iter::successors(Some(module.clone()), Module::parent).for_each(|ancestor| {
             self.scopes.entry(ancestor).or_default();
         });
     }
 
-    pub(crate) fn scope_of(&mut self, module: &Module) -> &mut Scope {
-        self.scopes.entry(module.clone()).or_default()
+    pub(crate) fn import(&mut self, module: &Module, local: Option<Name>, target: UsePath) {
+        self.scopes.entry(module.clone()).or_default().import(local, target);
+    }
+
+    pub(crate) fn glob(&mut self, module: &Module, prefix: UsePath) {
+        self.scopes.entry(module.clone()).or_default().glob(prefix);
     }
 
     pub(crate) fn guard(&mut self, module: &Module, name: Option<Name>) {
-        self.guards.entry(module.root()).or_default().extend(name);
+        self.guards.entry(AsRef::<CrateFile>::as_ref(module).clone()).or_default().extend(name);
     }
 
     pub(crate) fn scope(&self, module: &Module) -> Option<&Scope> {
@@ -41,6 +47,6 @@ impl Scopes {
     }
 
     pub(crate) fn guarded(&self, module: &Module, name: &Name) -> Option<&Name> {
-        self.guards.get(&module.root())?.get(name)
+        self.guards.get(AsRef::<CrateFile>::as_ref(module))?.get(name)
     }
 }

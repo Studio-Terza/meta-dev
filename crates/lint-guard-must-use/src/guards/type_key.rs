@@ -1,3 +1,4 @@
+use lint_placement::CrateFile;
 use std::collections::BTreeMap;
 
 use lint_layout::Name;
@@ -24,6 +25,6 @@ impl TypeKey {
     }
 
     pub fn sharing_crate<'other>(&self, other: &'other TypeKey) -> Option<&'other TypeKey> {
-        (self.module.root() == other.module.root()).then_some(other)
+        (AsRef::<CrateFile>::as_ref(&self.module) == AsRef::<CrateFile>::as_ref(&other.module)).then_some(other)
     }
 }

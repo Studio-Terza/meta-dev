@@ -15,14 +15,14 @@ impl RawPaths {
     pub fn found<'file>(uses: &[Use<'file>]) -> Vec<Violation<'file>> {
         uses.iter()
             .filter_map(|used| {
-                Self::raw(used).and_then(|path| Self::finding(used, path)).map(|finding| (used, finding))
+                Self::RAW
+                    .iter()
+                    .find_map(|tail| used.spelling(PathTail::new(tail)))
+                    .and_then(|path| Self::finding(used, path))
+                    .map(|finding| (used, finding))
             })
             .map(|(used, finding)| Violation::new(used.place(), finding))
             .collect()
-    }
-
-    fn raw<'used>(used: &'used Use<'_>) -> Option<&'used UsePath> {
-        Self::RAW.iter().find_map(|tail| used.spelling(PathTail::new(tail)))
     }
 
     fn finding(used: &Use<'_>, path: &UsePath) -> Option<Finding> {
