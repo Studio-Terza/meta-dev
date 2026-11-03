@@ -17,11 +17,11 @@ use type_key::TypeKey;
 #[derive(Debug)]
 pub struct Guards<'file> {
     path: &'file Path,
-    module: Module,
-    declared: BTreeSet<TypeKey>,
-    unmarked: BTreeMap<Site<'file>, TypeKey>,
-    aliases: BTreeMap<TypeKey, Name>,
-    dropped: Vec<TypeKey>,
+    module: Module<'file>,
+    declared: BTreeSet<TypeKey<'file>>,
+    unmarked: BTreeMap<Site<'file>, TypeKey<'file>>,
+    aliases: BTreeMap<TypeKey<'file>, Name>,
+    dropped: Vec<TypeKey<'file>>,
 }
 
 impl<'file> Guards<'file> {
@@ -46,7 +46,7 @@ impl<'file> Guards<'file> {
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
-        let bound: BTreeSet<TypeKey> = self.dropped.iter().flat_map(|key| self.bound(key)).collect();
+        let bound: BTreeSet<TypeKey<'file>> = self.dropped.iter().flat_map(|key| self.bound(key)).collect();
         self.unmarked
             .into_iter()
             .filter(|(_, key)| bound.contains(key))
@@ -54,7 +54,7 @@ impl<'file> Guards<'file> {
             .collect()
     }
 
-    fn bound(&self, written: &TypeKey) -> Vec<TypeKey> {
+    fn bound(&self, written: &TypeKey<'file>) -> Vec<TypeKey<'file>> {
         let key = written.aliased(&self.aliases);
         if self.declared.contains(&key) {
             vec![key]
@@ -67,7 +67,7 @@ impl<'file> Guards<'file> {
         }
     }
 
-    fn dropped_type(&self, item: &ItemImpl) -> Option<TypeKey> {
+    fn dropped_type(&self, item: &ItemImpl) -> Option<TypeKey<'file>> {
         item.trait_.as_ref().and_then(|(_, path, _)| path.segments.last()).filter(|last| last.ident == Self::DROP)?;
         match item.self_ty.as_ref() {
             Type::Path(path) => {
@@ -102,7 +102,7 @@ impl<'file> Guards<'file> {
 impl<'ast> Visit<'ast> for Guards<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.module.clone();
-        self.module = outer.within(&Name::from(&module.ident));
+        self.module = outer.within(Name::from(&module.ident));
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
         self.module = outer;
     }

@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use boundary::Nesting;
-use located::Located;
 use file_ports::Absent;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
@@ -14,6 +13,7 @@ use lint_placement::CrateFile;
 use lint_placement::ManifestFile;
 use lint_placement::Placement;
 use lint_placement::Role;
+use located::Located;
 
 #[derive(Debug)]
 pub struct SourceFile {

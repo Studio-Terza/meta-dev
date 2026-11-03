@@ -41,10 +41,7 @@ impl Manifest {
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub fn read_many(
-        files: &impl Files,
-        directories: &[impl AsRef<Path>],
-    ) -> Vec<Result<Option<Manifest>, Failure>> {
+    pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
         directories
             .iter()

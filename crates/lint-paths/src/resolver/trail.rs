@@ -1,5 +1,3 @@
-use std::collections::{BTreeMap, BTreeSet};
-
 use crate::module::Module;
 use lint_layout::Name;
 
@@ -10,25 +8,33 @@ pub(crate) enum Globbing {
     Spent,
 }
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct Trail {
-    seen: BTreeMap<Module, BTreeSet<Name>>,
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Trail<'trail> {
+    followed: Option<Followed<'trail>>,
     globbing: Globbing,
 }
 
-impl Trail {
-    pub(crate) fn followed(&self, module: &Module, name: &Name) -> Option<&Name> {
-        self.seen.get(module)?.get(name)
+#[derive(Clone, Copy, Debug)]
+struct Followed<'trail> {
+    earlier: &'trail Trail<'trail>,
+    module: &'trail Module<'trail>,
+    name: &'trail Name,
+}
+
+impl<'trail> Trail<'trail> {
+    pub(crate) fn followed(&self, module: &Module<'_>, name: &Name) -> Option<&'trail Name> {
+        let step = self.followed?;
+        (step.module == module && step.name == name)
+            .then_some(step.name)
+            .or_else(|| step.earlier.followed(module, name))
     }
 
-    pub(crate) fn following(&self, module: &Module, name: &Name) -> Trail {
-        let mut seen = self.seen.clone();
-        seen.entry(module.clone()).or_default().insert(name.clone());
-        Trail { seen, globbing: self.globbing }
+    pub(crate) fn following(&'trail self, module: &'trail Module<'trail>, name: &'trail Name) -> Trail<'trail> {
+        Trail { followed: Some(Followed { earlier: self, module, name }), globbing: self.globbing }
     }
 
-    pub(crate) fn spent(&self) -> Trail {
-        Trail { seen: self.seen.clone(), globbing: Globbing::Spent }
+    pub(crate) fn spent(&self) -> Trail<'trail> {
+        Trail { followed: self.followed, globbing: Globbing::Spent }
     }
 
     pub(crate) fn globbing(&self) -> Globbing {

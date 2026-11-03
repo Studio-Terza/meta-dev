@@ -48,11 +48,7 @@ impl<'file> Declarations<'file> {
 
     pub fn foreign_sum_type(&self, enum_name: Name, from: Home<'file>) -> Option<Name> {
         let declared = self.homes.resolve(enum_name, from);
-        self.sum_types
-            .get(&declared)
-            .filter(|known| known.home() != from)
-            .map(|_| ())
-            .map(|()| declared.into_name())
+        self.sum_types.get(&declared).filter(|known| known.home() != from).map(|_| ()).map(|()| declared.into_name())
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {
