@@ -67,11 +67,9 @@ impl<'facts, 'file> Declared<'facts, 'file> {
 
     fn resolved(&self, from: &CrateName, dependency: &Dependency<'_>) -> Option<Definition<'facts>> {
         let (name, declaring) = self.declaring.get_key_value(AsRef::<Name>::as_ref(dependency))?;
-        let krate = match dependency.qualifier() {
-            Some(qualifier) if qualifier.matches::<Whole>(&Self::EXTERNAL).is_some() => None,
-            Some(qualifier) => Self::named(declaring, qualifier).or_else(|| Self::nearest(declaring, from)),
-            None => Self::nearest(declaring, from),
-        };
+        let external = dependency.qualifier().and_then(|qualifier| qualifier.matches::<Whole>(&Self::EXTERNAL));
+        let named = dependency.qualifier().and_then(|qualifier| Self::named(declaring, qualifier));
+        let krate = external.map_or_else(|| named.or_else(|| Self::nearest(declaring, from)), |_| None);
         krate.map(|krate| Definition { krate, name })
     }
 

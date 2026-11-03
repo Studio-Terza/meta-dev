@@ -51,14 +51,14 @@ impl Manifest {
     }
 
     fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
-        let file = directory.join(Self::FILE);
         match read.map(Newtype::into_inner).map_err(io::Error::from) {
             Ok(text) => text
                 .parse::<Table>()
                 .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
-                .map_err(|source| Failure::Manifest { path: file, source }),
-            Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(source) => Err(Failure::Io { path: file, source }),
+                .map_err(|source| Failure::Manifest { path: directory.join(Self::FILE), source }),
+            Err(source) => Some(source.kind())
+                .filter(|kind| *kind == io::ErrorKind::NotFound)
+                .map_or(Err(Failure::Io { path: directory.join(Self::FILE), source }), |_| Ok(None)),
         }
     }
 

@@ -20,10 +20,9 @@ impl Members {
 
     #[must_use]
     pub fn admits<'path>(&self, relative: &'path Path) -> Option<&'path Path> {
-        match (Self::any_matches(&self.listed, relative), Self::any_matches(&self.excluded, relative)) {
-            (Some(_), None) => Some(relative),
-            _ => None,
-        }
+        Self::any_matches(&self.listed, relative)
+            .filter(|_| Self::any_matches(&self.excluded, relative).is_none())
+            .map(|_| relative)
     }
 
     fn any_matches<'pattern>(patterns: &'pattern [Name], relative: &Path) -> Option<&'pattern Name> {
@@ -33,12 +32,16 @@ impl Members {
     fn matches<'path>(pattern: &Path, relative: &'path Path) -> Option<&'path Path> {
         let wanted: Vec<Component> = pattern.components().filter(|part| matches!(part, Component::Normal(_))).collect();
         let found: Vec<Component> = relative.components().collect();
-        (wanted.len() == found.len()
-            && wanted.iter().zip(&found).all(|(expected, part)| {
-                expected.as_os_str().to_str().is_some_and(|spelled| {
-                    Name::from(part.as_os_str()).matches::<Wildcard>(&[Word::new(spelled)]).is_some()
-                })
-            }))
-        .then_some(relative)
+        (wanted.len() == found.len())
+            .then_some(relative)
+            .filter(|_| wanted.iter().zip(&found).all(|(expected, part)| Self::fits(expected, part).is_some()))
+    }
+
+    fn fits(expected: &Component, part: &Component) -> Option<()> {
+        expected
+            .as_os_str()
+            .to_str()
+            .and_then(|spelled| Name::from(part.as_os_str()).matches::<Wildcard>(&[Word::new(spelled)]))
+            .map(|_| ())
     }
 }

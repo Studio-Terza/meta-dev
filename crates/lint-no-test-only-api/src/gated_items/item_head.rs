@@ -1,6 +1,6 @@
 use proc_macro2::{Ident, TokenTree};
 use syn::spanned::Spanned;
-use syn::{Attribute, Field, ImplItem, Item, Meta, MetaList, Visibility};
+use syn::{Attribute, Field, ImplItem, Item, MetaList, Visibility};
 
 use lint_core::Walk;
 use lint_layout::LineNumber;
@@ -50,7 +50,7 @@ impl<'item> ItemHead<'item> {
     pub(super) fn flagged(&self, enclosing: Option<Gate>) -> Option<Flagged> {
         Self::gate_of(self.attributes)
             .or(enclosing)
-            .filter(|_| !matches!(self.visibility, Visibility::Inherited))
+            .filter(|_| matches!(self.visibility, Visibility::Public(_) | Visibility::Restricted(_)))
             .map(|gate| Flagged::new(LineNumber::from(self.visibility.span()), Finding::from(gate)))
     }
 
@@ -61,16 +61,23 @@ impl<'item> ItemHead<'item> {
     }
 
     fn hiding(attribute: &Attribute) -> Option<&Attribute> {
-        match &attribute.meta {
-            Meta::List(list) if list.path.is_ident(Self::DOCUMENTATION) => Self::hidden_named(list).map(|_| attribute),
-            _ => None,
-        }
+        attribute
+            .meta
+            .require_list()
+            .ok()
+            .filter(|list| list.path.is_ident(Self::DOCUMENTATION))
+            .and_then(Self::hidden_named)
+            .map(|_| attribute)
     }
 
     fn hidden_named(list: &MetaList) -> Option<Ident> {
-        list.tokens.clone().into_iter().find_map(|tree| match tree {
-            TokenTree::Ident(ident) if ident == Self::HIDDEN => Some(ident),
+        list.tokens.clone().into_iter().filter_map(Self::ident).find(|ident| *ident == Self::HIDDEN)
+    }
+
+    fn ident(tree: TokenTree) -> Option<Ident> {
+        match tree {
+            TokenTree::Ident(ident) => Some(ident),
             _ => None,
-        })
+        }
     }
 }

@@ -1,8 +1,8 @@
 use syn::punctuated::Punctuated;
 use syn::{
-    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, Item,
-    ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, PatType, PathArguments, ReturnType, Token, TraitBound, TraitItem,
-    TraitItemFn, Type, TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, FnArg, GenericArgument, GenericParam, Ident, ImplItem,
+    ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType, PathArguments,
+    ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound, TypePath,
 };
 
 use lint_layout::Name;
@@ -125,6 +125,30 @@ impl Syntax {
     pub fn string_literal(value: &Expr) -> Option<&LitStr> {
         match value {
             Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn tail(statement: &Stmt) -> Option<&Expr> {
+        match statement {
+            Stmt::Expr(expr, None) => Some(expr),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn pat_ident(pattern: &Pat) -> Option<&PatIdent> {
+        match pattern {
+            Pat::Ident(binding) => Some(binding),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn type_param(param: &GenericParam) -> Option<&TypeParam> {
+        match param {
+            GenericParam::Type(parameter) => Some(parameter),
             _ => None,
         }
     }
