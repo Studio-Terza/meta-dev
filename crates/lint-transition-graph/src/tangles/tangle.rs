@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::{Site, Violation};
@@ -6,8 +6,8 @@ use lint_layout::{Fix, Name, Whole, Word, words};
 use newtype::Counter;
 
 use crate::count::Count;
-use crate::end::{Node, Step};
-use crate::graph::{Arc, Graph};
+use crate::end::{Hop, Node};
+use crate::graph::{Consuming, Graph, Hyperedge};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
@@ -19,7 +19,7 @@ enum Kind {
 pub(super) struct Tangle<'graph, 'found> {
     members: Vec<&'graph Node>,
     sites: Vec<&'graph Site>,
-    closing: Vec<&'graph Arc<'found>>,
+    closing: Vec<&'graph Hyperedge<'found>>,
     kind: Kind,
 }
 
@@ -30,17 +30,17 @@ impl<'graph, 'found> Tangle<'graph, 'found> {
 
     pub(super) fn closed(
         members: BTreeSet<&'graph Node>,
-        leaving: &BTreeMap<&'graph Node, Vec<&'graph Arc<'found>>>,
+        consuming: &Consuming<'graph, 'found>,
         graph: &'graph Graph<'found>,
     ) -> Tangle<'graph, 'found> {
-        let closing: Vec<&'graph Arc<'found>> = members
+        let closing: Vec<&'graph Hyperedge<'found>> = members
             .iter()
-            .flat_map(|node| leaving.get(node).into_iter().flatten().copied())
-            .filter(|arc| members.contains(AsRef::<Step>::as_ref(*arc).reached()))
+            .flat_map(|node| consuming.led_within(node, &members))
+            .filter(|edge| members.contains(AsRef::<Hop>::as_ref(*edge).reached()))
             .collect();
         let converting = closing
             .iter()
-            .find(|arc| AsRef::<Name>::as_ref(arc.transition()).matches::<Whole>(&Self::CONVERSIONS).is_none());
+            .find(|edge| AsRef::<Name>::as_ref(edge.transition()).matches::<Whole>(&Self::CONVERSIONS).is_none());
         let kind = match (members.len() == Self::PAIR, converting) {
             (true, None) => Kind::RoundTrip,
             _ => Kind::Tangle,
@@ -65,7 +65,7 @@ impl From<&Tangle<'_, '_>> for Violation {
     fn from(tangle: &Tangle<'_, '_>) -> Violation {
         let site = tangle
             .first()
-            .or_else(|| tangle.closing.first().map(|arc| AsRef::<Site>::as_ref(*arc)))
+            .or_else(|| tangle.closing.first().map(|edge| AsRef::<Site>::as_ref(*edge)))
             .cloned()
             .unwrap_or_else(|| Site::of_file(std::path::Path::new(".")));
         Violation::new(site, tangle)
@@ -80,7 +80,7 @@ impl fmt::Display for Tangle<'_, '_> {
             .closing
             .iter()
             .take(Self::SHOWN)
-            .map(|arc| format!("{} at {}", arc.transition(), AsRef::<Site>::as_ref(*arc)))
+            .map(|edge| format!("{} at {}", edge.transition(), AsRef::<Site>::as_ref(*edge)))
             .collect();
         let said = match self.kind {
             Kind::RoundTrip => "round trip",

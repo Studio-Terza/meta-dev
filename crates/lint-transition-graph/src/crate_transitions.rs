@@ -8,7 +8,7 @@ use lint_placement::CrateName;
 use crate::count::Count;
 use crate::coverage::Coverage;
 use crate::edge::Edge;
-use crate::end::{End, Key, Place};
+use crate::end::{End, Hop, Place};
 use crate::workspace_types::WorkspaceTypes;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ pub(crate) struct CrateTransitions<'found> {
     domain: Count,
     interfaces: BTreeSet<&'found End>,
     boxes: BTreeSet<&'found End>,
-    pairs: BTreeSet<Key>,
+    pairs: BTreeSet<Hop>,
     coverage: Coverage,
 }
 
@@ -35,7 +35,7 @@ impl<'found> CrateTransitions<'found> {
             domain: types.declared_in(name),
             interfaces: ends().filter(|end| end.place() == Place::Interface).collect(),
             boxes: ends().filter(|end| end.place() == Place::External).collect(),
-            pairs: edges.iter().flat_map(|edge| edge.ends().edges()).collect(),
+            pairs: edges.iter().filter_map(|edge| edge.ends().hop()).collect(),
             coverage: Coverage::tallied(edges.iter().copied()),
         }
     }

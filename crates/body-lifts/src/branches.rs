@@ -5,15 +5,22 @@ use newtype::Counter;
 
 use crate::branching::Branching;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Propagation {
+    Branch,
+    Ambient,
+}
+
 #[derive(Debug)]
 pub struct Branches {
     score: Branching,
+    propagation: Propagation,
 }
 
 impl Branches {
     #[must_use]
-    pub fn scored(body: &Block) -> Branching {
-        let mut scan = Branches { score: Branching::new(1) };
+    pub fn scored(body: &Block, propagation: Propagation) -> Branching {
+        let mut scan = Branches { score: Branching::new(1), propagation };
         scan.visit_block(body);
         scan.score
     }
@@ -42,7 +49,7 @@ impl<'ast> Visit<'ast> for Branches {
     }
 
     fn visit_expr_try(&mut self, found: &'ast ExprTry) {
-        self.counted(Branching::new(1));
+        self.counted(Branching::new(usize::from(self.propagation == Propagation::Branch)));
         visit::visit_expr_try(self, found);
     }
 

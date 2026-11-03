@@ -29,7 +29,7 @@ impl GraphLint for HiddenStates {
         });
         Report::new(
             Headline::new(
-                "report only, hidden states: a written edge whose body branches six ways or more holds unnamed intermediate states between its input and its output; each branch is a state the types do not name; listed by branching, highest first",
+                "report only, hidden states: a written edge whose body branches six ways or more (if, loops, match arms beyond the first, && and ||; the ? operator is error propagation, allowed everywhere, and is not a branch) holds unnamed intermediate states between its input and its output; each branch is a state the types do not name; listed by branching, highest first",
             ),
             Summary::placed(
                 written.iter().map(|found| AsRef::<Site>::as_ref(*found)).min(),

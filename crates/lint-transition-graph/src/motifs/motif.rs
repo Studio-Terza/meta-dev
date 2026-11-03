@@ -6,47 +6,54 @@ use lint_layout::{Fix, Name};
 use newtype::Counter;
 
 use crate::count::Count;
-use crate::end::{Node, Step};
-use crate::graph::Arc;
+use crate::end::{Hop, Node, Tuple};
+use crate::graph::Hyperedge;
 
 #[derive(Clone, Debug)]
 pub(super) struct Occurrence<'graph, 'found> {
-    arcs: Vec<&'graph Arc<'found>>,
-    nodes: Vec<&'graph Node>,
+    edges: Vec<&'graph Hyperedge<'found>>,
+    start: &'graph Tuple,
+    reached: Vec<&'graph Node>,
 }
 
 impl<'graph, 'found> Occurrence<'graph, 'found> {
-    pub(super) fn started(arc: &'graph Arc<'found>) -> Occurrence<'graph, 'found> {
-        let step: &'graph Step = arc.as_ref();
-        Occurrence { arcs: vec![arc], nodes: vec![step.as_ref(), step.reached()] }
+    pub(super) fn started(edge: &'graph Hyperedge<'found>) -> Occurrence<'graph, 'found> {
+        let hop: &'graph Hop = edge.as_ref();
+        Occurrence { edges: vec![edge], start: hop.as_ref(), reached: vec![hop.reached()] }
     }
 
-    pub(super) fn extended(&self, arc: &'graph Arc<'found>) -> Option<Occurrence<'graph, 'found>> {
-        let reached = AsRef::<Step>::as_ref(arc).reached();
-        (!self.nodes.contains(&reached)).then(|| Occurrence {
-            arcs: self.arcs.iter().copied().chain([arc]).collect(),
-            nodes: self.nodes.iter().copied().chain([reached]).collect(),
+    pub(super) fn extended(&self, edge: &'graph Hyperedge<'found>) -> Option<Occurrence<'graph, 'found>> {
+        let hop: &'graph Hop = edge.as_ref();
+        let available: BTreeSet<&'graph Node> = self.nodes().collect();
+        hop.fired(&available).filter(|reached| !available.contains(reached)).map(|reached| Occurrence {
+            edges: self.edges.iter().copied().chain([edge]).collect(),
+            start: self.start,
+            reached: self.reached.iter().copied().chain([reached]).collect(),
         })
     }
 
     pub(super) fn last(&self) -> Option<&'graph Node> {
-        self.nodes.last().copied()
+        self.reached.last().copied()
     }
 
     pub(super) fn shape(&self) -> Vec<&'found Name> {
-        self.arcs.iter().map(|arc| AsRef::<Name>::as_ref(arc.transition())).collect()
+        self.edges.iter().map(|edge| AsRef::<Name>::as_ref(edge.transition())).collect()
+    }
+
+    fn nodes(&self) -> impl Iterator<Item = &'graph Node> + '_ {
+        self.start.iter().chain(self.reached.iter().copied())
     }
 
     fn first(&self) -> Option<&'graph Site> {
-        self.arcs.first().map(|arc| AsRef::<Site>::as_ref(*arc))
+        self.edges.first().map(|edge| AsRef::<Site>::as_ref(*edge))
     }
 }
 
 impl fmt::Display for Occurrence<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let nodes: Vec<String> = self.nodes.iter().map(ToString::to_string).collect();
-        let sites: Vec<String> = self.arcs.iter().map(|arc| AsRef::<Site>::as_ref(*arc).to_string()).collect();
-        write!(formatter, "{} at {}", nodes.join(" -> "), sites.join(", "))
+        let reached: Vec<String> = self.reached.iter().map(ToString::to_string).collect();
+        let sites: Vec<String> = self.edges.iter().map(|edge| AsRef::<Site>::as_ref(*edge).to_string()).collect();
+        write!(formatter, "{} -> {} at {}", self.start, reached.join(" -> "), sites.join(", "))
     }
 }
 
@@ -58,10 +65,10 @@ struct Chosen<'graph, 'found> {
 
 impl<'graph, 'found> Chosen<'graph, 'found> {
     fn kept(mut self, path: Occurrence<'graph, 'found>) -> Chosen<'graph, 'found> {
-        if path.nodes.iter().any(|node| self.used.contains(*node)) {
+        if path.nodes().any(|node| self.used.contains(node)) {
             self
         } else {
-            self.used.extend(path.nodes.iter().copied());
+            self.used.extend(path.nodes());
             self.repeats.push(path);
             self
         }
