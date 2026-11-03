@@ -19,7 +19,7 @@ use lint_layout::{Length, Name};
 pub struct NamedLifetimes;
 
 impl Lint for NamedLifetimes {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("lifetimes are named with a word, never a letter"),
             files.iter().flat_map(|file| Self::short_lifetimes(file.path(), file.syntax())).collect(),
@@ -30,7 +30,7 @@ impl Lint for NamedLifetimes {
 impl NamedLifetimes {
     const MINIMUM_LENGTH: Length = Length::new(2);
 
-    fn short_lifetimes(path: &Path, file: &syn::File) -> Vec<Violation> {
+    fn short_lifetimes<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
         let mut visitor = ShortLifetimes { path, found: Vec::new() };
         visitor.visit_file(file);
         visitor.found
@@ -39,7 +39,7 @@ impl NamedLifetimes {
 
 struct ShortLifetimes<'file> {
     path: &'file Path,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl<'ast> Visit<'ast> for ShortLifetimes<'_> {

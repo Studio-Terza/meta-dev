@@ -1,4 +1,5 @@
 use lint_complexity::Complexity;
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 
 struct Scored;
@@ -6,7 +7,7 @@ struct Scored;
 impl Scored {
     fn of(text: &str) -> String {
         let sources = [Source::new(Located::new("a.rs"), Text::new(Box::leak(text.to_owned().into_boxed_str())))];
-        Sources::report::<Complexity>(&sources).to_string()
+        Complexity::report(&Sources::parsed(&sources)).to_string()
     }
 
     fn highest_is(pair: &[&str]) -> bool {
@@ -70,7 +71,8 @@ fn each_crate_gets_its_own_line_and_a_crate_without_functions_none() {
         Source::new(Located::new("crates/z/src/lib.rs"), Text::new("fn b(x: u8) { if x > 1 { f(); } }")),
         Source::new(Located::new("crates/w/tests/t.rs"), Text::new("fn c(x: u8) { if x > 1 { f(); } }")),
     ];
-    let report = Sources::report::<Complexity>(&sources);
+    let files = Sources::parsed(&sources);
+    let report = Complexity::report(&files);
     assert_eq!(report.violations().len(), 2);
     let text = report.to_string();
     assert!(text.contains("crate x: 1 functions by complexity, 1: 1, highest 1 in a"), "{text}");

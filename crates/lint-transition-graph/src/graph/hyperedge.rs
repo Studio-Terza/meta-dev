@@ -8,14 +8,14 @@ use crate::edge::Edge;
 use crate::end::Hop;
 
 #[derive(Debug)]
-pub(crate) struct Hyperedge<'found> {
+pub(crate) struct Hyperedge<'found, 'file> {
     hop: Hop,
     label: Label,
-    transition: &'found Transition,
+    transition: &'found Transition<'file>,
 }
 
-impl<'found> Hyperedge<'found> {
-    pub(super) fn of_edge(edge: &Edge<'found>) -> Option<Hyperedge<'found>> {
+impl<'found, 'file> Hyperedge<'found, 'file> {
+    pub(super) fn of_edge(edge: &Edge<'found, 'file>) -> Option<Hyperedge<'found, 'file>> {
         edge.ends().hop().and_then(Hop::onward).map(|hop| Hyperedge {
             hop,
             label: Label::read(edge.role(), edge.transition()),
@@ -23,33 +23,36 @@ impl<'found> Hyperedge<'found> {
         })
     }
 
-    pub(crate) fn written(&self) -> Option<&Hyperedge<'found>> {
+    pub(crate) fn written(&self) -> Option<&Hyperedge<'found, 'file>> {
         self.label.written().map(|_| self)
     }
 
-    pub(crate) fn other<'edge>(&'edge self, than: &Hyperedge<'found>) -> Option<&'edge Hyperedge<'found>> {
+    pub(crate) fn other<'edge>(
+        &'edge self,
+        than: &Hyperedge<'found, 'file>,
+    ) -> Option<&'edge Hyperedge<'found, 'file>> {
         (!ptr::eq(self, than)).then_some(self)
     }
 
-    pub(crate) fn transition(&self) -> &'found Transition {
+    pub(crate) fn transition(&self) -> &'found Transition<'file> {
         self.transition
     }
 }
 
-impl AsRef<Hop> for Hyperedge<'_> {
+impl AsRef<Hop> for Hyperedge<'_, '_> {
     fn as_ref(&self) -> &Hop {
         &self.hop
     }
 }
 
-impl AsRef<Label> for Hyperedge<'_> {
+impl AsRef<Label> for Hyperedge<'_, '_> {
     fn as_ref(&self) -> &Label {
         &self.label
     }
 }
 
-impl AsRef<Site> for Hyperedge<'_> {
-    fn as_ref(&self) -> &Site {
+impl<'file> AsRef<Site<'file>> for Hyperedge<'_, 'file> {
+    fn as_ref(&self) -> &Site<'file> {
         self.transition.as_ref()
     }
 }

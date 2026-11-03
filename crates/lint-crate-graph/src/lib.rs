@@ -12,7 +12,7 @@ use lint_item_graph::ItemGraph;
 pub struct CrateGraph;
 
 impl Lint for CrateGraph {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let crates = files.iter().filter_map(SourceFile::shipped).fold(
             BTreeMap::<&CrateFile, Vec<&SourceFile>>::new(),
             |mut crates, file| {

@@ -36,13 +36,13 @@ impl TextSites {
     ];
     const PRODUCING: [Word<'static>; 2] = words!["to_string", "push_str"];
 
-    pub fn violations(file: &SourceFile) -> Vec<Violation> {
+    pub fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut sites = TextSites::default();
         sites.visit_file(file.syntax());
         sites.into_violations(file.path())
     }
 
-    fn into_violations(self, path: &Path) -> Vec<Violation> {
+    fn into_violations(self, path: &Path) -> Vec<Violation<'_>> {
         self.found
             .into_iter()
             .filter_map(|sighting| sighting.outside(&self.doors))

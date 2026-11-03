@@ -2,13 +2,13 @@ use lint_core::Violation;
 use lint_layout::Name;
 
 #[derive(Debug)]
-pub(crate) struct Candidate {
+pub(crate) struct Candidate<'file> {
     called: Name,
-    violation: Violation,
+    violation: Violation<'file>,
 }
 
-impl Candidate {
-    pub(crate) fn new(called: Name, violation: Violation) -> Candidate {
+impl<'file> Candidate<'file> {
+    pub(crate) fn new(called: Name, violation: Violation<'file>) -> Candidate<'file> {
         Candidate { called, violation }
     }
 
@@ -16,7 +16,7 @@ impl Candidate {
         &self.called
     }
 
-    pub(crate) fn violation(self) -> Violation {
+    pub(crate) fn violation(self) -> Violation<'file> {
         self.violation
     }
 }

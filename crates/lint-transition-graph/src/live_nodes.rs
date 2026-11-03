@@ -17,7 +17,7 @@ use liveness::{Liveness, Reach, Tally, Usage};
 pub struct LiveNodes;
 
 impl GraphLint for LiveNodes {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report {
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
         let graph = Graph::built(facts, transitions);
         let entered: BTreeSet<&Node> = graph
             .edges()
@@ -26,13 +26,13 @@ impl GraphLint for LiveNodes {
             .collect();
         let reached = Consuming::indexed(&graph, Moves::All).closure(entered);
         let consumed: BTreeSet<&Node> = graph.edges().iter().flat_map(|edge| edge.ends().taken()).collect();
-        let found: Vec<Liveness<'_>> = graph
+        let found: Vec<Liveness<'_, 'file>> = graph
             .nodes()
             .iter()
             .filter_map(|(node, site)| {
                 let reach = reached.get(node).map_or(Reach::Unreached, |_| Reach::Reached);
                 let usage = consumed.get(node).map_or(Usage::Unconsumed, |_| Usage::Consumed);
-                Liveness::judged(node, site, reach, usage)
+                Liveness::judged(node, *site, reach, usage)
             })
             .collect();
         Report::new(
@@ -51,7 +51,7 @@ impl GraphLint for LiveNodes {
 }
 
 impl Lint for LiveNodes {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Self::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
     }
 }

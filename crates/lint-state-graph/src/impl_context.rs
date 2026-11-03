@@ -50,7 +50,7 @@ impl ImplContext {
         self.kind.trait_name().map_or_else(|| Name::from(&function.sig.ident), Name::clone)
     }
 
-    pub fn edge_source(&self, shape: &FunctionShape) -> Option<TypeName> {
+    pub fn edge_source(&self, shape: &FunctionShape<'_>) -> Option<TypeName> {
         self.kind.edge_source(&self.self_type, shape.vertex_parameters().first())
     }
 }

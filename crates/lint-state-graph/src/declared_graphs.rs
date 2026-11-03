@@ -13,13 +13,13 @@ use graph::Graph;
 pub struct DeclaredGraphs<'scan> {
     path: &'scan Path,
     names: MacroAliases,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
 impl<'scan> DeclaredGraphs<'scan> {
     const MACRO: &'static str = "states";
 
-    pub fn violations(file: &'scan SourceFile) -> Vec<Violation> {
+    pub fn violations(file: &'scan SourceFile) -> Vec<Violation<'scan>> {
         let mut graphs = DeclaredGraphs {
             path: file.path(),
             names: MacroAliases::in_file(file.syntax(), Word::new(Self::MACRO)),
@@ -29,7 +29,7 @@ impl<'scan> DeclaredGraphs<'scan> {
         graphs.violations
     }
 
-    fn found_in(&self, invocation: &Macro) -> Vec<Violation> {
+    fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
         match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
             Some(_) => Graph::checked(invocation, self.path),
             None => MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),

@@ -21,7 +21,7 @@ use lint_layout::{Name, Whole, Word, words};
 pub struct LiteralNames;
 
 impl Lint for LiteralNames {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("function names say what the function does"),
             files
@@ -47,7 +47,7 @@ impl LiteralNames {
         }
     }
 
-    fn vague_names(path: &Path, file: &syn::File) -> Vec<Violation> {
+    fn vague_names<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
         let mut names = VagueNames { path, found: Vec::new() };
         names.visit_file(file);
         names.found
@@ -56,7 +56,7 @@ impl LiteralNames {
 
 struct VagueNames<'file> {
     path: &'file Path,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl VagueNames<'_> {

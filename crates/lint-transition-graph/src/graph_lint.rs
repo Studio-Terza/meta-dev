@@ -3,5 +3,5 @@ use transition_facts::Transitions;
 use type_facts::Facts;
 
 pub trait GraphLint {
-    fn report_graph(facts: &Facts, transitions: &Transitions) -> Report;
+    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file>;
 }

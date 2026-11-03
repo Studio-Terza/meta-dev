@@ -24,7 +24,7 @@ use lint_layout::{Name, Whole, Word, words};
 pub struct ManualIteration;
 
 impl Lint for ManualIteration {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("iterators are driven by combinators, not by hand"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -53,7 +53,7 @@ impl ManualIteration {
     ];
     const ACCUMULATORS: [Word<'static>; 4] = words!["push", "extend", "insert", "push_str"];
 
-    fn violations(file: &SourceFile) -> Vec<Violation> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
         iterations.visit_file(file.syntax());
         iterations.violations
@@ -72,11 +72,11 @@ impl ManualIteration {
 
 struct Iterations<'scan> {
     path: &'scan Path,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
-impl Iterations<'_> {
-    fn violation(&self, span: Span, message: Message) -> Violation {
+impl<'scan> Iterations<'scan> {
+    fn violation(&self, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 }

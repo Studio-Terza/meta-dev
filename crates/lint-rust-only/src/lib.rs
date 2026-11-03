@@ -12,7 +12,7 @@ pub struct RustOnly;
 
 impl RustOnly {
     #[must_use]
-    pub fn report(files: &[RepoFile]) -> Report {
+    pub fn report(files: &[RepoFile]) -> Report<'_> {
         Report::new(
             Headline::new("logic is Rust; web assets live under a directory named assets"),
             files

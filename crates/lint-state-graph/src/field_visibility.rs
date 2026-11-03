@@ -14,11 +14,11 @@ use lint_layout::Name;
 
 pub struct FieldVisibility<'scan> {
     path: &'scan Path,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'scan>>,
 }
 
 impl<'scan> FieldVisibility<'scan> {
-    pub fn violations(file: &'scan SourceFile) -> Vec<Violation> {
+    pub fn violations(file: &'scan SourceFile) -> Vec<Violation<'scan>> {
         let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
         fields.visit_file(file.syntax());
         fields.violations

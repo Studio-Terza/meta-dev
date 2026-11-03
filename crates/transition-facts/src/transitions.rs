@@ -6,16 +6,16 @@ use crate::transition::Transition;
 use collector::Collector;
 
 #[derive(Clone, Debug, Default)]
-pub struct Transitions(Vec<Transition>);
+pub struct Transitions<'file>(Vec<Transition<'file>>);
 
-impl Transitions {
+impl<'file> Transitions<'file> {
     #[must_use]
-    pub fn of_files(files: &[SourceFile]) -> Transitions {
+    pub fn of_files(files: &'file [SourceFile]) -> Transitions<'file> {
         Transitions(files.iter().filter_map(SourceFile::shipped).flat_map(Collector::collected).collect())
     }
 
     #[must_use]
-    pub fn all(&self) -> &[Transition] {
+    pub fn all(&self) -> &[Transition<'file>] {
         &self.0
     }
 }

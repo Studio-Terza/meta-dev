@@ -51,7 +51,7 @@ pub struct Lints;
 
 impl Lints {
     #[must_use]
-    pub fn reports(files: &[SourceFile]) -> Vec<Report> {
+    pub fn reports(files: &[SourceFile]) -> Vec<Report<'_>> {
         vec![
             NoComments::report(files),
             NoFreeFns::report(files),
@@ -98,11 +98,11 @@ impl Lints {
     }
 
     #[must_use]
-    pub fn checked(mut readout: Readout) -> Outcome {
+    pub fn checked(readout: &Readout) -> Outcome<'_> {
         let reports = Self::reports(readout.files())
             .into_iter()
             .chain([RustOnly::report(readout.repo_files()), WorkflowRun::report(readout.repo_files())])
             .collect();
-        Outcome::from_reports(reports, readout.take_failures())
+        Outcome::from_reports(reports, readout.failures())
     }
 }

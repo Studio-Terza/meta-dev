@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_paired_apis::PairedApis;
 
@@ -58,6 +59,7 @@ laws::table!(unpaired_methods_are_not, Sources::flagged::<PairedApis>, [
 
 #[test]
 fn the_message_says_to_write_a_guard() {
-    let shown = Sources::report::<PairedApis>(&[Source::new(Located::new("a.rs"), Text::new(SUFFIXED))]).to_string();
+    let shown =
+        PairedApis::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(SUFFIXED))])).to_string();
     assert!(["guard", "fn start_server pairs with fn stop_server"].iter().all(|word| shown.contains(word)));
 }

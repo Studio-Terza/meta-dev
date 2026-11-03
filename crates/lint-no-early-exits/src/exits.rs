@@ -9,11 +9,11 @@ use super::Finding;
 
 pub struct Exits<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
-impl Exits<'_> {
-    pub fn of_file(file: &SourceFile) -> Vec<Violation> {
+impl<'file> Exits<'file> {
+    pub fn of_file(file: &'file SourceFile) -> Vec<Violation<'file>> {
         let mut scan = Exits { file, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found.extend(file.test_modules().iter().flat_map(Exits::of_file));

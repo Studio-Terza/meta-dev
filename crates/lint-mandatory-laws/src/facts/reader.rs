@@ -9,11 +9,11 @@ use shape::Shape;
 
 pub(crate) struct Reader<'file> {
     file: &'file SourceFile,
-    profiles: Vec<Profile>,
+    profiles: Vec<Profile<'file>>,
 }
 
 impl<'file> Reader<'file> {
-    pub(crate) fn read(file: &'file SourceFile) -> Vec<Profile> {
+    pub(crate) fn read(file: &'file SourceFile) -> Vec<Profile<'file>> {
         let mut reader = Reader { file, profiles: Vec::new() };
         reader.visit_file(file.syntax());
         reader.profiles

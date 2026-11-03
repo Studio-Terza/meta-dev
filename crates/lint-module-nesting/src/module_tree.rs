@@ -17,15 +17,15 @@ use lint_layout::UsePath;
 use reexport_count::ReexportCount;
 use users::Users;
 
-pub struct ModuleTree {
-    modules: ModuleIndex,
-    users: Users,
-    deep_uses: Vec<Violation>,
-    reexports: BTreeMap<ModulePath, ReexportCount>,
+pub struct ModuleTree<'file> {
+    modules: ModuleIndex<'file>,
+    users: Users<'file>,
+    deep_uses: Vec<Violation<'file>>,
+    reexports: BTreeMap<ModulePath<'file>, ReexportCount>,
 }
 
-impl From<&[&SourceFile]> for ModuleTree {
-    fn from(files: &[&SourceFile]) -> ModuleTree {
+impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
+    fn from(files: &[&'file SourceFile]) -> ModuleTree<'file> {
         let empty = ModuleTree {
             modules: ModuleIndex::from(files.iter().map(|file| ModulePath::of_file(file)).collect::<Vec<_>>()),
             users: Users::default(),
@@ -36,8 +36,8 @@ impl From<&[&SourceFile]> for ModuleTree {
     }
 }
 
-impl ModuleTree {
-    pub fn violations(&self) -> impl Iterator<Item = Violation> + '_ {
+impl<'file> ModuleTree<'file> {
+    pub fn violations(&self) -> impl Iterator<Item = Violation<'file>> + '_ {
         let most = ModuleNesting::REEXPORTS;
         let deep_uses = self.deep_uses.iter().cloned();
         let crowded = self
@@ -59,14 +59,14 @@ impl ModuleTree {
             .chain(crowded)
     }
 
-    fn absorbed(mut self, file: &SourceFile) -> ModuleTree {
+    fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
         let module = ModulePath::of_file(file);
         self.reexports.insert(module.clone(), ReexportCount::of_file(file.syntax()));
         self.users = std::mem::take(&mut self.users).with_tests(&self.modules, file.test_modules());
         UseEdges::in_file(file.syntax()).iter().fold(self, |tree, path| tree.absorbing(&module, path))
     }
 
-    fn absorbing(mut self, module: &ModulePath, path: &UsePath) -> ModuleTree {
+    fn absorbing(mut self, module: &ModulePath<'file>, path: &UsePath) -> ModuleTree<'file> {
         match ModulePath::from_use(module, path, &self.modules) {
             Some(target) => {
                 let used = target.deepest_in(&self.modules);
@@ -80,14 +80,15 @@ impl ModuleTree {
         }
     }
 
-    fn home_of(&self, module: &ModulePath) -> Option<ModulePath> {
-        let outsiders: Vec<&ModulePath> =
+    fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
+        let outsiders: Vec<&ModulePath<'file>> =
             self.users.callers_of(module)?.iter().filter(|user| module.relates::<Ancestor>(user).is_none()).collect();
         outsiders
             .iter()
             .all(|user| user.relates::<InsideSibling>(module).is_some())
             .then(|| {
-                let homes: BTreeSet<ModulePath> = outsiders.iter().map(|user| user.truncated_like(module)).collect();
+                let homes: BTreeSet<ModulePath<'file>> =
+                    outsiders.iter().map(|user| user.truncated_like(module)).collect();
                 (homes.len() == 1).then(|| homes.into_iter().next()).flatten()
             })
             .flatten()

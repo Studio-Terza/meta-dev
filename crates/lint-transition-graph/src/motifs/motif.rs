@@ -10,19 +10,19 @@ use crate::end::{Hop, Node, Tuple};
 use crate::graph::Hyperedge;
 
 #[derive(Clone, Debug)]
-pub(super) struct Occurrence<'graph, 'found> {
-    edges: Vec<&'graph Hyperedge<'found>>,
+pub(super) struct Occurrence<'graph, 'file> {
+    edges: Vec<&'graph Hyperedge<'graph, 'file>>,
     start: &'graph Tuple,
     reached: Vec<&'graph Node>,
 }
 
-impl<'graph, 'found> Occurrence<'graph, 'found> {
-    pub(super) fn started(edge: &'graph Hyperedge<'found>) -> Occurrence<'graph, 'found> {
+impl<'graph, 'file> Occurrence<'graph, 'file> {
+    pub(super) fn started(edge: &'graph Hyperedge<'graph, 'file>) -> Occurrence<'graph, 'file> {
         let hop: &'graph Hop = edge.as_ref();
         Occurrence { edges: vec![edge], start: hop.as_ref(), reached: vec![hop.reached()] }
     }
 
-    pub(super) fn extended(&self, edge: &'graph Hyperedge<'found>) -> Option<Occurrence<'graph, 'found>> {
+    pub(super) fn extended(&self, edge: &'graph Hyperedge<'graph, 'file>) -> Option<Occurrence<'graph, 'file>> {
         let hop: &'graph Hop = edge.as_ref();
         let available: BTreeSet<&'graph Node> = self.nodes().collect();
         hop.fired(&available).filter(|reached| !available.contains(reached)).map(|reached| Occurrence {
@@ -36,7 +36,7 @@ impl<'graph, 'found> Occurrence<'graph, 'found> {
         self.reached.last().copied()
     }
 
-    pub(super) fn shape(&self) -> Vec<&'found Name> {
+    pub(super) fn shape(&self) -> Vec<&'graph Name> {
         self.edges.iter().map(|edge| AsRef::<Name>::as_ref(edge.transition())).collect()
     }
 
@@ -44,8 +44,8 @@ impl<'graph, 'found> Occurrence<'graph, 'found> {
         self.start.iter().chain(self.reached.iter().copied())
     }
 
-    fn first(&self) -> Option<&'graph Site> {
-        self.edges.first().map(|edge| AsRef::<Site>::as_ref(*edge))
+    fn first(&self) -> Option<Site<'file>> {
+        self.edges.first().map(|edge| *AsRef::<Site<'file>>::as_ref(*edge))
     }
 }
 
@@ -58,13 +58,13 @@ impl fmt::Display for Occurrence<'_, '_> {
 }
 
 #[derive(Debug, Default)]
-struct Chosen<'graph, 'found> {
-    repeats: Vec<Occurrence<'graph, 'found>>,
+struct Chosen<'graph, 'file> {
+    repeats: Vec<Occurrence<'graph, 'file>>,
     used: BTreeSet<&'graph Node>,
 }
 
-impl<'graph, 'found> Chosen<'graph, 'found> {
-    fn kept(mut self, path: Occurrence<'graph, 'found>) -> Chosen<'graph, 'found> {
+impl<'graph, 'file> Chosen<'graph, 'file> {
+    fn kept(mut self, path: Occurrence<'graph, 'file>) -> Chosen<'graph, 'file> {
         if path.nodes().any(|node| self.used.contains(node)) {
             self
         } else {
@@ -76,23 +76,23 @@ impl<'graph, 'found> Chosen<'graph, 'found> {
 }
 
 #[derive(Debug)]
-pub(super) struct Motif<'graph, 'found> {
-    shape: Vec<&'found Name>,
-    repeats: Vec<Occurrence<'graph, 'found>>,
+pub(super) struct Motif<'graph, 'file> {
+    shape: Vec<&'graph Name>,
+    repeats: Vec<Occurrence<'graph, 'file>>,
 }
 
-impl<'graph, 'found> Motif<'graph, 'found> {
+impl<'graph, 'file> Motif<'graph, 'file> {
     const SHOWN: usize = 3;
 
     pub(super) fn repeated(
-        shape: Vec<&'found Name>,
-        found: Vec<Occurrence<'graph, 'found>>,
-    ) -> Option<Motif<'graph, 'found>> {
+        shape: Vec<&'graph Name>,
+        found: Vec<Occurrence<'graph, 'file>>,
+    ) -> Option<Motif<'graph, 'file>> {
         let chosen = found.into_iter().fold(Chosen::default(), Chosen::kept);
         (chosen.repeats.len() > 1).then_some(Motif { shape, repeats: chosen.repeats })
     }
 
-    pub(super) fn ranked(mut motifs: Vec<Motif<'graph, 'found>>) -> Vec<Motif<'graph, 'found>> {
+    pub(super) fn ranked(mut motifs: Vec<Motif<'graph, 'file>>) -> Vec<Motif<'graph, 'file>> {
         motifs.sort_by(|left, right| {
             right
                 .shape
@@ -104,14 +104,14 @@ impl<'graph, 'found> Motif<'graph, 'found> {
         motifs
     }
 
-    fn first(&self) -> Option<&'graph Site> {
+    fn first(&self) -> Option<Site<'file>> {
         self.repeats.iter().filter_map(Occurrence::first).min()
     }
 }
 
-impl From<&Motif<'_, '_>> for Violation {
-    fn from(motif: &Motif<'_, '_>) -> Violation {
-        let site = motif.first().cloned().unwrap_or_else(|| Site::of_file(std::path::Path::new(".")));
+impl<'file> From<&Motif<'_, 'file>> for Violation<'file> {
+    fn from(motif: &Motif<'_, 'file>) -> Violation<'file> {
+        let site = motif.first().unwrap_or_else(|| Site::of_file(std::path::Path::new(".")));
         Violation::new(site, motif)
     }
 }

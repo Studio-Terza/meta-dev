@@ -4,21 +4,21 @@ use lint_core::Site;
 use lint_layout::{PathTail, UsePath, Word};
 
 #[derive(Clone, Debug)]
-pub struct Use {
-    site: Site,
+pub struct Use<'file> {
+    site: Site<'file>,
     candidates: Vec<UsePath>,
     ground: Ground,
     cover: Cover,
 }
 
-impl Use {
-    pub(crate) fn new(site: Site, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Use {
+impl<'file> Use<'file> {
+    pub(crate) fn new(site: Site<'file>, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Use<'file> {
         Use { site, candidates, ground, cover }
     }
 
     #[must_use]
-    pub fn place(&self) -> &Site {
-        &self.site
+    pub fn place(&self) -> Site<'file> {
+        self.site
     }
 
     #[must_use]
