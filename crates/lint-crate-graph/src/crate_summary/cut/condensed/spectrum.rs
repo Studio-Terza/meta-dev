@@ -3,16 +3,13 @@ use std::iter::Sum;
 use std::ops::{Add, Sub};
 
 use super::link::Link;
+use super::tangle_index::TangleIndex;
 use newtype::{Arbitrary, Newtype};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Weight(f64);
 
 impl Weight {
-    pub fn crossings(self) -> f64 {
-        self.0
-    }
-
     pub fn lesser(self, other: Weight) -> Weight {
         Weight(self.0.min(other.0))
     }
@@ -41,9 +38,12 @@ impl Sum for Weight {
 }
 
 #[derive(Debug)]
+struct Vector(Vec<f64>);
+
+#[derive(Debug)]
 pub struct Spectrum<'graph> {
     rows: &'graph [Vec<Link>],
-    degrees: Vec<f64>,
+    degrees: Vector,
 }
 
 impl<'graph> Spectrum<'graph> {
@@ -55,47 +55,59 @@ impl<'graph> Spectrum<'graph> {
     pub fn new(rows: &'graph [Vec<Link>]) -> Spectrum<'graph> {
         Spectrum {
             rows,
-            degrees: rows.iter().map(|row| row.iter().map(|link| link.weight().crossings()).sum()).collect(),
+            degrees: Vector(rows.iter().map(|row| row.iter().map(|link| link.weight().into_inner()).sum()).collect()),
         }
     }
 
-    pub fn fiedler(&self) -> Vec<f64> {
-        let top = Self::unit(self.degrees.iter().map(|degree| degree.sqrt()).collect());
+    pub fn sweep_order(&self) -> Vec<TangleIndex> {
+        let mut order: Vec<(TangleIndex, f64)> =
+            self.fiedler().0.into_iter().enumerate().map(|(index, value)| (TangleIndex::from(index), value)).collect();
+        order.sort_by(|left, right| left.1.total_cmp(&right.1));
+        order.into_iter().map(|(tangle, _)| tangle).collect()
+    }
+
+    fn fiedler(&self) -> Vector {
+        let top = Vector(self.degrees.0.iter().map(|degree| degree.sqrt()).collect()).unit();
         let start =
             iter::successors(Some(Self::SEED), |seed: &f64| Some(seed.mul_add(Self::STRIDE, Self::OFFSET).fract()))
-                .take(self.degrees.len());
-        let vector = (0..Self::ROUNDS).fold(Self::deflated(&start.collect::<Vec<f64>>(), &top), |vector, _| {
-            Self::deflated(&self.lazy_step(&vector), &top)
-        });
-        vector.iter().zip(&self.degrees).map(|(value, degree)| value / degree.sqrt()).collect()
+                .take(self.degrees.0.len());
+        let vector = (0..Self::ROUNDS)
+            .fold(Vector(start.collect()).deflated(&top), |vector, _| self.lazy_step(&vector).deflated(&top));
+        Vector(vector.0.iter().zip(&self.degrees.0).map(|(value, degree)| value / degree.sqrt()).collect())
     }
 
-    fn lazy_step(&self, vector: &[f64]) -> Vec<f64> {
-        self.rows
-            .iter()
-            .zip(vector.iter().zip(&self.degrees))
-            .map(|(row, (value, degree))| {
-                let spread: f64 = row
-                    .iter()
-                    .filter_map(|link| {
-                        let other = link.target().index();
-                        Some(
-                            link.weight().crossings() * vector.get(other)? / (degree * self.degrees.get(other)?).sqrt(),
-                        )
-                    })
-                    .sum();
-                value + spread
-            })
-            .collect()
+    fn lazy_step(&self, vector: &Vector) -> Vector {
+        let degrees = &self.degrees.0;
+        Vector(
+            self.rows
+                .iter()
+                .zip(vector.0.iter().zip(degrees))
+                .map(|(row, (value, degree))| {
+                    let spread: f64 = row
+                        .iter()
+                        .filter_map(|link| {
+                            let other = link.target().into_inner();
+                            Some(
+                                link.weight().into_inner() * vector.0.get(other)?
+                                    / (degree * degrees.get(other)?).sqrt(),
+                            )
+                        })
+                        .sum();
+                    value + spread
+                })
+                .collect(),
+        )
+    }
+}
+
+impl Vector {
+    fn deflated(&self, top: &Vector) -> Vector {
+        let along: f64 = self.0.iter().zip(&top.0).map(|(value, unit)| value * unit).sum();
+        Vector(self.0.iter().zip(&top.0).map(|(value, unit)| value - along * unit).collect()).unit()
     }
 
-    fn deflated(vector: &[f64], top: &[f64]) -> Vec<f64> {
-        let along: f64 = vector.iter().zip(top).map(|(value, unit)| value * unit).sum();
-        Self::unit(vector.iter().zip(top).map(|(value, unit)| value - along * unit).collect())
-    }
-
-    fn unit(vector: Vec<f64>) -> Vec<f64> {
-        let length = vector.iter().map(|value| value * value).sum::<f64>().sqrt();
-        vector.into_iter().map(|value| value / length).collect()
+    fn unit(self) -> Vector {
+        let length = self.0.iter().map(|value| value * value).sum::<f64>().sqrt();
+        Vector(self.0.into_iter().map(|value| value / length).collect())
     }
 }
