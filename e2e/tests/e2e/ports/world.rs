@@ -94,35 +94,32 @@ impl World {
         json!({ "workspace_root": self.root, "packages": packages }).to_string()
     }
 
-    fn closure(&self, mut reached: BTreeSet<String>) -> BTreeSet<String> {
-        loop {
-            let grown: BTreeSet<String> = self
-                .members
-                .iter()
-                .filter(|(_, member)| !member.dependencies.is_disjoint(&reached))
-                .map(|(name, _)| name.clone())
-                .chain(reached.iter().cloned())
-                .collect();
-            if grown.len() == reached.len() {
-                return reached;
-            }
-            reached = grown;
-        }
+    fn closure(&self, reached: BTreeSet<String>) -> BTreeSet<String> {
+        let grown: BTreeSet<String> = self
+            .members
+            .iter()
+            .filter(|(_, member)| !member.dependencies.is_disjoint(&reached))
+            .map(|(name, _)| name.clone())
+            .chain(reached.iter().cloned())
+            .collect();
+        if grown.len() == reached.len() { reached } else { self.closure(grown) }
     }
 
     fn directories(root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-        let Some(parent) = pattern.strip_suffix(Self::ALL_BELOW) else {
-            return Ok(vec![PathBuf::from(pattern)]);
-        };
-        let mut found = Vec::new();
-        for entry in fs::read_dir(root.join(parent))? {
-            let name = entry?.file_name();
-            let directory = Path::new(parent).join(name);
-            if root.join(&directory).join(Self::MANIFEST).is_file() {
-                found.push(directory);
+        match pattern.strip_suffix(Self::ALL_BELOW) {
+            None => Ok(vec![PathBuf::from(pattern)]),
+            Some(parent) => {
+                let mut found = Vec::new();
+                for entry in fs::read_dir(root.join(parent))? {
+                    let name = entry?.file_name();
+                    let directory = Path::new(parent).join(name);
+                    if root.join(&directory).join(Self::MANIFEST).is_file() {
+                        found.push(directory);
+                    }
+                }
+                Ok(found)
             }
         }
-        Ok(found)
     }
 
     fn member(root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {

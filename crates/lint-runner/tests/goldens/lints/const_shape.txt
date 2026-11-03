@@ -43,4 +43,6 @@ src/macros.rs:2: format handles text outside a door; parse in FromStr or render 
 src/walks.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 state graph violated:
 src/contexts.rs:4: field b of A is pub; struct fields are private
+a body leaves through its tail value or ?, never through return, break or continue:
+src/loops.rs:4: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 fails
