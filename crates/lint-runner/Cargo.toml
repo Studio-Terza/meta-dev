@@ -44,6 +44,7 @@ lint-no-test-io = { path = "../lint-no-test-io" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-paired-apis = { path = "../lint-paired-apis" }
+lint-port-batching = { path = "../lint-port-batching" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }
 lint-private-fns = { path = "../lint-private-fns" }
 lint-process-starters = { path = "../lint-process-starters" }
