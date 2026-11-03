@@ -1,5 +1,7 @@
 use std::fmt;
 
+use newtype::Newtype;
+
 use crate::cli::command::step::seconds::Seconds;
 
 #[derive(Clone, Copy, Debug)]
@@ -15,8 +17,8 @@ impl Range {
 
     fn widened(self, total: Seconds) -> Range {
         Range {
-            least: if total < self.least { total } else { self.least },
-            most: if total > self.most { total } else { self.most },
+            least: Seconds::new(self.least.into_inner().min(total.into_inner())),
+            most: Seconds::new(self.most.into_inner().max(total.into_inner())),
         }
     }
 

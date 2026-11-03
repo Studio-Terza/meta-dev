@@ -1185,7 +1185,7 @@ fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_wit
 fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<(), Box<dyn Error>> {
     for (today, runs, said) in [
         ("39", "[11, 12]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
-        ("41", "[11, 12]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
+        ("41", "[12, 11]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
         ("45", "[]", "; no run of the previous 14 days to compare with, so no trend issue."),
     ] {
         let scratch = Scratch::new()?;
