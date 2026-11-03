@@ -26,11 +26,11 @@ impl<'file> FunctionShape<'file> {
         path: &'file Path,
         function: &ImplItemFn,
         context: &ImplContext,
-        declarations: &Declarations,
+        declarations: &Declarations<'_>,
     ) -> FunctionShape<'file> {
         let vertex = |ty: &Type| {
-            let name = declarations.resolve(TypeName::from_type(ty).or_self(context.self_type()));
-            declarations.vertex_named(&name).map(|_| name)
+            let written = TypeName::from_type(ty);
+            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).cloned()
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),

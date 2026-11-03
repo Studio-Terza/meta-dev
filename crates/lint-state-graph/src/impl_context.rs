@@ -15,7 +15,7 @@ pub struct ImplContext {
 }
 
 impl ImplContext {
-    pub fn describe(item: &ItemImpl, declarations: &Declarations) -> ImplContext {
+    pub fn describe(item: &ItemImpl, declarations: &Declarations<'_>) -> ImplContext {
         let self_type = declarations.resolve(TypeName::from_type(&item.self_ty));
         let trait_name = item
             .trait_

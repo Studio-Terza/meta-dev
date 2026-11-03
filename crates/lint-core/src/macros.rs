@@ -1,6 +1,7 @@
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
-use syn::parse::Parser;
+use syn::parse::discouraged::Speculative;
+use syn::parse::{ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Block, Expr, Macro, Stmt, Token};
 
@@ -12,10 +13,12 @@ impl Macros {
 
     #[must_use]
     pub fn statements(invocation: &Macro) -> Vec<Stmt> {
+        let tokens = invocation.tokens.clone();
+        let parsed = |tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default();
         if invocation.path.is_ident("macro_rules") {
-            Self::transcribers(&invocation.tokens).into_iter().flat_map(Self::parsed).collect()
+            Self::transcribers(tokens).into_iter().flat_map(parsed).collect()
         } else {
-            Self::parsed(invocation.tokens.clone())
+            parsed(tokens)
         }
     }
 
@@ -41,18 +44,23 @@ impl Macros {
         here.flatten().chain(nested.flat_map(Self::attributes_in)).collect()
     }
 
-    fn parsed(tokens: TokenStream) -> Vec<Stmt> {
-        Block::parse_within.parse2(tokens.clone()).or_else(|_| Self::expressions(tokens)).unwrap_or_default()
+    fn statements_or_expressions(input: ParseStream) -> syn::Result<Vec<Stmt>> {
+        let attempt = input.fork();
+        match Block::parse_within(&attempt) {
+            Ok(statements) => {
+                input.advance_to(&attempt);
+                Ok(statements)
+            }
+            Err(_) => Punctuated::<Expr, Token![,]>::parse_terminated(input).map(Self::expressions),
+        }
     }
 
-    fn expressions(tokens: TokenStream) -> syn::Result<Vec<Stmt>> {
-        Punctuated::<Expr, Token![,]>::parse_terminated
-            .parse2(tokens)
-            .map(|arguments| arguments.into_iter().map(|argument| Stmt::Expr(argument, None)).collect())
+    fn expressions(arguments: Punctuated<Expr, Token![,]>) -> Vec<Stmt> {
+        arguments.into_iter().map(|argument| Stmt::Expr(argument, None)).collect()
     }
 
-    fn transcribers(rules: &TokenStream) -> Vec<TokenStream> {
-        let trees: Vec<TokenTree> = rules.clone().into_iter().collect();
+    fn transcribers(rules: TokenStream) -> Vec<TokenStream> {
+        let trees: Vec<TokenTree> = rules.into_iter().collect();
         trees
             .iter()
             .zip(trees.iter().skip(1))

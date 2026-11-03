@@ -9,6 +9,6 @@ pub struct BuildScript;
 impl BuildScript {
     #[must_use]
     pub fn place(package: PackageRoot) -> Placement {
-        Placement { crate_root: package.root().clone(), package, module: ModulePath::default(), role: Role::Other }
+        Placement { target_root: None, package, module: ModulePath::default(), role: Role::Other }
     }
 }

@@ -19,10 +19,10 @@ use repeated_shape::RepeatedShape;
 
 #[derive(Debug)]
 pub struct ShapeIndex<'file> {
-    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType, Site<'file>>>,
-    inners: Inners,
-    homes: TypeHomes,
-    home: Home,
+    shapes: BTreeMap<MethodShape, BTreeMap<DeclaredType<'file>, Site<'file>>>,
+    inners: Inners<'file>,
+    homes: TypeHomes<'file>,
+    home: Home<'file>,
     file: &'file Path,
 }
 
@@ -65,9 +65,9 @@ impl<'file> ShapeIndex<'file> {
         }
     }
 
-    fn placed(&self, item: &ItemImpl, written: &Name) -> Vec<Placed<'file>> {
-        let self_type = self.homes.resolve(written, &self.home);
-        let erasure = Erasure::around(written, self.inners.inner_of(&self_type));
+    fn placed(&self, item: &ItemImpl, written: Name) -> Vec<Placed<'file>> {
+        let self_type = self.homes.resolve(written, self.home);
+        let erasure = Erasure::around(self_type.as_ref(), self.inners.inner_of(&self_type));
         item.items
             .iter()
             .filter_map(|member| match (member, &item.trait_) {
@@ -96,7 +96,7 @@ impl<'ast> Visit<'ast> for ShapeIndex<'_> {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed = self_type.map(|self_type| self.placed(item, &self_type)).unwrap_or_default();
+        let placed = self_type.map(|self_type| self.placed(item, self_type)).unwrap_or_default();
         placed.into_iter().fold(&mut self.shapes, |shapes, placed| {
             placed.recorded_in(shapes);
             shapes

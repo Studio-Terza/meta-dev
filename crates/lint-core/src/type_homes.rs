@@ -11,44 +11,43 @@ use crate::source_file::SourceFile;
 use crate::walk::Walk;
 
 #[derive(Debug, Default)]
-pub struct TypeHomes {
-    declared: BTreeMap<Name, Vec<DeclaredType>>,
-    reading: Home,
+pub struct TypeHomes<'file> {
+    declared: BTreeMap<Name, Vec<Home<'file>>>,
+    reading: Home<'file>,
 }
 
-impl TypeHomes {
+impl<'file> TypeHomes<'file> {
     #[must_use]
-    pub fn declared_in(files: &[&SourceFile]) -> TypeHomes {
+    pub fn declared_in(files: &[&'file SourceFile]) -> TypeHomes<'file> {
         files.iter().fold(TypeHomes::default(), |homes, file| homes.reading(file))
     }
 
     #[must_use]
-    pub fn resolve(&self, name: &Name, from: &Home) -> DeclaredType {
-        let candidates = self.declared.get(name).map_or(&[][..], Vec::as_slice);
-        candidates
+    pub fn resolve(&self, name: Name, from: Home<'file>) -> DeclaredType<'file> {
+        let candidates = self.declared.get(&name).map_or(&[][..], Vec::as_slice);
+        let home = candidates
             .iter()
-            .find(|declared| declared.home() == from)
-            .or_else(|| candidates.iter().find(|declared| declared.home().in_crate_with(from).is_some()))
+            .find(|home| **home == from)
+            .or_else(|| candidates.iter().find(|home| home.in_crate_with(from).is_some()))
             .or_else(|| candidates.first())
-            .cloned()
-            .unwrap_or_else(|| DeclaredType::new(from.clone(), name.clone()))
+            .map_or(from, |home| *home);
+        DeclaredType::new(home, name)
     }
 
-    fn reading(self, file: &SourceFile) -> TypeHomes {
+    fn reading(self, file: &'file SourceFile) -> TypeHomes<'file> {
         let mut homes = TypeHomes { reading: Home::containing(file), ..self };
         homes.visit_file(file.syntax());
         homes
     }
 
     fn declare(&mut self, name: Name) {
-        let declared = DeclaredType::new(self.reading.clone(), name.clone());
         let known = self.declared.entry(name).or_default();
-        let fresh: Option<DeclaredType> = Some(declared).filter(|declared| !known.contains(declared));
+        let fresh = Some(self.reading).filter(|home| !known.contains(home));
         known.extend(fresh);
     }
 }
 
-impl<'ast> Visit<'ast> for TypeHomes {
+impl<'ast> Visit<'ast> for TypeHomes<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }

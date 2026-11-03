@@ -11,16 +11,16 @@ use lint_core::Walk;
 use lint_layout::Name;
 
 #[derive(Default)]
-pub struct Declarations {
+pub struct Declarations<'file> {
     vertices: BTreeSet<TypeName>,
     aliases: BTreeMap<TypeName, TypeName>,
-    homes: TypeHomes,
-    sum_types: BTreeSet<DeclaredType>,
-    reading: Home,
+    homes: TypeHomes<'file>,
+    sum_types: BTreeSet<DeclaredType<'file>>,
+    reading: Home<'file>,
 }
 
-impl From<&[&SourceFile]> for Declarations {
-    fn from(files: &[&SourceFile]) -> Declarations {
+impl<'file> From<&[&'file SourceFile]> for Declarations<'file> {
+    fn from(files: &[&'file SourceFile]) -> Declarations<'file> {
         let seeded = Declarations { homes: TypeHomes::declared_in(files), ..Declarations::default() };
         let declarations = files.iter().fold(seeded, |declarations, file| {
             let mut declarations = Declarations { reading: Home::containing(file), ..declarations };
@@ -33,17 +33,26 @@ impl From<&[&SourceFile]> for Declarations {
     }
 }
 
-impl Declarations {
+impl<'file> Declarations<'file> {
     pub fn resolve(&self, name: TypeName) -> TypeName {
         self.aliases.get(&name).cloned().unwrap_or(name)
+    }
+
+    pub fn resolved<'name>(&'name self, name: &'name TypeName) -> &'name TypeName {
+        self.aliases.get(name).unwrap_or(name)
     }
 
     pub fn vertex_named(&self, name: &TypeName) -> Option<&TypeName> {
         self.vertices.get(name)
     }
 
-    pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home) -> Option<&DeclaredType> {
-        self.sum_types.get(&self.homes.resolve(enum_name, from)).filter(|declared| declared.home() != from)
+    pub fn foreign_sum_type(&self, enum_name: Name, from: Home<'file>) -> Option<Name> {
+        let declared = self.homes.resolve(enum_name, from);
+        self.sum_types
+            .get(&declared)
+            .filter(|known| known.home() != from)
+            .map(|_| ())
+            .map(|()| declared.into_name())
     }
 
     fn vertex(item: &ItemImpl) -> Option<TypeName> {
@@ -55,7 +64,7 @@ impl Declarations {
     }
 
     fn record_enum(&mut self, item: &ItemEnum) {
-        let declared = DeclaredType::new(self.reading.clone(), Name::from(&item.ident));
+        let declared = DeclaredType::new(self.reading, Name::from(&item.ident));
         self.sum_types.extend(Self::sum_type(item).map(|_| declared));
     }
 
@@ -64,7 +73,7 @@ impl Declarations {
     }
 }
 
-impl<'ast> Visit<'ast> for Declarations {
+impl<'ast> Visit<'ast> for Declarations<'_> {
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         Walk::enter(&item.attrs, || {
             self.vertices.extend(Self::vertex(item));

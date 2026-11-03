@@ -1,9 +1,11 @@
 mod boundary;
+mod located;
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use boundary::Nesting;
+use located::Located;
 use file_ports::Absent;
 use lint_layout::Failure;
 use lint_layout::LineNumber;
@@ -16,7 +18,7 @@ use lint_placement::Role;
 #[derive(Debug)]
 pub struct SourceFile {
     path: PathBuf,
-    located: PathBuf,
+    located: Located,
     placement: Placement,
     crate_file: CrateFile,
     text: SourceText,
@@ -31,30 +33,30 @@ impl SourceFile {
     pub fn parse(path: impl Into<PathBuf>, text: SourceText) -> Result<Self, Failure> {
         let path = path.into();
         let placement = Placement::locate(&Absent, &path);
-        let located = path.clone();
-        Self::parse_at(path, located, placement, text)
+        Self::parsed(path, Located::Shown, placement, text)
     }
 
     pub fn parse_at(path: PathBuf, located: PathBuf, placement: Placement, text: SourceText) -> Result<Self, Failure> {
+        Self::parsed(path, Located::At(located), placement, text)
+    }
+
+    fn parsed(path: PathBuf, located: Located, placement: Placement, text: SourceText) -> Result<Self, Failure> {
         let parsed = Nesting::within_limit(&text)
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), Nesting))
             .and_then(|text| syn::parse_file(text.as_ref()));
-        let syntax = parsed.map_err(|source| Failure::Parse {
-            path: path.clone(),
-            line: LineNumber::from(source.span()),
-            source,
-        })?;
-        let crate_file = placement.crate_file(&path);
-        Ok(Self {
-            path,
-            located,
-            placement,
-            crate_file,
-            text,
-            syntax,
-            test_modules: Vec::new(),
-            manifest: OnceLock::new(),
-        })
+        match parsed {
+            Ok(syntax) => Ok(Self {
+                crate_file: placement.crate_file(&path),
+                path,
+                located,
+                placement,
+                text,
+                syntax,
+                test_modules: Vec::new(),
+                manifest: OnceLock::new(),
+            }),
+            Err(source) => Err(Failure::Parse { path, line: LineNumber::from(source.span()), source }),
+        }
     }
 
     #[must_use]
@@ -84,13 +86,13 @@ impl SourceFile {
 
     #[must_use]
     pub fn switched_off(&self) -> Option<&Path> {
-        self.placement.package().untested().holds(&self.located).map(|_| self.path.as_path())
+        self.placement.package().untested().holds(self.located.within(&self.path)).map(|_| self.path.as_path())
     }
 
     #[must_use]
     pub fn manifest_file(&self) -> &ManifestFile {
         self.manifest.get_or_init(|| {
-            let inside = self.located.strip_prefix(self.placement.package().root().directory()).ok();
+            let inside = self.located.within(&self.path).strip_prefix(self.placement.package().root().directory()).ok();
             let depth = inside.map_or(0, |inside| inside.components().count());
             ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
         })

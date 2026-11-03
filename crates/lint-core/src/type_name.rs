@@ -21,8 +21,8 @@ impl TypeName {
     }
 
     #[must_use]
-    pub fn or_self(self, self_type: &TypeName) -> TypeName {
-        if self.0 == Self::SELF { self_type.clone() } else { self }
+    pub fn or_self<'name>(&'name self, self_type: &'name TypeName) -> &'name TypeName {
+        if self.0 == Self::SELF { self_type } else { self }
     }
 
     fn unwrapped(ty: &Type) -> &Type {

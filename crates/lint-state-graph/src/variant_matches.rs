@@ -19,14 +19,14 @@ use lint_layout::LineNumber;
 use lint_layout::Name;
 
 pub struct VariantMatches<'scan, 'file> {
-    declarations: &'scan Declarations,
+    declarations: &'scan Declarations<'file>,
     path: &'file Path,
-    home: Home,
+    home: Home<'file>,
     violations: Vec<Violation<'file>>,
 }
 
 impl<'scan, 'file> VariantMatches<'scan, 'file> {
-    pub fn violations(file: &'file SourceFile, declarations: &'scan Declarations) -> Vec<Violation<'file>> {
+    pub fn violations(file: &'file SourceFile, declarations: &'scan Declarations<'file>) -> Vec<Violation<'file>> {
         let mut matches =
             VariantMatches { declarations, path: file.path(), home: Home::containing(file), violations: Vec::new() };
         matches.visit_file(file.syntax());
@@ -36,7 +36,7 @@ impl<'scan, 'file> VariantMatches<'scan, 'file> {
     fn foreign_variant(&self, pat: &Pat) -> Option<Name> {
         VariantPaths::in_pat(pat)
             .into_iter()
-            .find_map(|enum_name| self.declarations.foreign_sum_type(&enum_name, &self.home).map(|_| enum_name))
+            .find_map(|enum_name| self.declarations.foreign_sum_type(enum_name, self.home))
     }
 
     fn violation(&self, pat: &Pat, enum_name: &Name) -> Violation<'file> {

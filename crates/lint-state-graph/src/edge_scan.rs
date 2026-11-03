@@ -23,14 +23,14 @@ use lint_core::Walk;
 use lint_layout::{Length, Name};
 
 pub struct EdgeScan<'scan, 'file> {
-    declarations: &'scan Declarations,
+    declarations: &'scan Declarations<'scan>,
     path: &'file Path,
     edges: BTreeMap<Edge, BTreeMap<Name, Site<'file>>>,
     violations: Vec<Violation<'file>>,
 }
 
 impl<'scan, 'file> EdgeScan<'scan, 'file> {
-    pub fn new(declarations: &'scan Declarations) -> Self {
+    pub fn new(declarations: &'scan Declarations<'scan>) -> Self {
         EdgeScan { declarations, path: Path::new(""), edges: BTreeMap::new(), violations: Vec::new() }
     }
 
