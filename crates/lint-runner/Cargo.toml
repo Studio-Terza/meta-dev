@@ -45,6 +45,7 @@ lint-no-ignored-tests = { path = "../lint-no-ignored-tests" }
 lint-no-test-io = { path = "../lint-no-test-io" }
 lint-no-parameter-bags = { path = "../lint-no-parameter-bags" }
 lint-no-test-only-api = { path = "../lint-no-test-only-api" }
+lint-clones = { path = "../lint-clones" }
 lint-paired-apis = { path = "../lint-paired-apis" }
 lint-port-batching = { path = "../lint-port-batching" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }

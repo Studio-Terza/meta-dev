@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
+use lint_clones::Clones;
 use lint_core::{Lint, Readout};
 use lint_paired_apis::PairedApis;
 use lint_reader::SourceFiles;
@@ -68,7 +69,8 @@ impl Cli {
         let files = readout.files();
         match self.mode {
             Mode::Gate => {
-                write!(out, "{}{}", TestBudget::measured(files), PairedApis::report(files)).ok();
+                write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))
+                    .ok();
                 Lints::checked(readout)
             }
             Mode::Report => {
