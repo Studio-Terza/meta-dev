@@ -9,7 +9,7 @@ use std::path::Path;
 
 use lint_core::{Site, SourceFile};
 use lint_item_graph::{ReferencedNames, Scope, Traversal};
-use lint_layout::Name;
+use lint_layout::{Name, UsePath};
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Nature, Transition};
 use type_facts::Dependency;
@@ -113,15 +113,21 @@ impl<'found> Resolver<'found> {
         uses.iter().flat_map(|(owner, used)| self.body(path, krate, owner, used)).collect()
     }
 
-    fn body(&self, file: &Path, krate: &CrateName, owner: &Name, used: &BTreeSet<Name>) -> Vec<Link<'found>> {
+    fn body(&self, file: &Path, krate: &CrateName, owner: &Name, used: &BTreeSet<UsePath>) -> Vec<Link<'found>> {
         let declaring = self.declaring.get(owner).map_or(&[][..], Vec::as_slice);
         let holder = self.target(file, owner, &[], None).and_then(|target| target.declared(declaring));
         let local = |name: &Name| self.members(file, name, &[], None);
         used.iter()
+            .filter_map(|path| path.naming(|name| self.typed(krate, name)))
             .flat_map(local)
             .filter(|member| member.cluster().krate() == Some(krate))
             .filter_map(|end| holder.map(|holder| Link::new(holder, end)))
             .collect()
+    }
+
+    fn typed<'name>(&self, krate: &CrateName, name: &'name Name) -> Option<&'name Name> {
+        let standing = self.stand_ins.standing_for(krate, name).first().map(|_| name);
+        self.declaring.get(name).map(|_| name).or(standing)
     }
 
     pub(crate) fn signature(&self, transition: Transition<'found, '_>) -> Vec<Link<'found>> {

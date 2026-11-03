@@ -54,6 +54,17 @@ impl UsePath {
     pub fn segments(&self) -> &[Name] {
         &self.0
     }
+
+    #[must_use]
+    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> Option<&'path Name> {
+        self.0.iter().find_map(typed).or_else(|| self.0.last())
+    }
+}
+
+impl FromIterator<Name> for UsePath {
+    fn from_iter<Segments: IntoIterator<Item = Name>>(segments: Segments) -> UsePath {
+        UsePath(segments.into_iter().collect())
+    }
 }
 
 impl From<&Path> for UsePath {

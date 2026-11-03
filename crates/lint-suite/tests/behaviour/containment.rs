@@ -379,3 +379,58 @@ fn a_bare_twin_resolves_to_the_one_in_its_own_module() {
         ]
     );
 }
+
+#[test]
+fn an_imported_workspace_type_wins_over_a_local_twin() {
+    let imported = [
+        Clustered::at("crates/x/src/lib.rs", "mod document;\nmod excerpt;\n"),
+        Clustered::at("crates/x/src/document.rs", "mod text;\npub struct Document(text::Text);\n"),
+        Clustered::at("crates/x/src/document/text.rs", "pub struct Text;\n"),
+        Clustered::at("crates/x/src/excerpt.rs", "mod boundary;\npub struct Excerpt;\n"),
+        Clustered::at(
+            "crates/x/src/excerpt/boundary.rs",
+            "use files::Text;\nuse super::Excerpt;\nimpl From<&Text> for Excerpt {\n    fn from(reason: &Text) -> Excerpt {\n        Excerpt::new(reason)\n    }\n}\n",
+        ),
+        Clustered::at("crates/files/src/lib.rs", "mod text;\npub use text::Text;\n"),
+        Clustered::at("crates/files/src/text.rs", "pub struct Text;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&imported, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/files/src/text.rs:1: files::text::Text is used only within x::excerpt; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
+    let variants = [
+        Clustered::at("crates/x/src/lib.rs", "mod caller;\nmod event;\nmod hub;\nmod rule;\n"),
+        Clustered::at(
+            "crates/x/src/caller.rs",
+            "pub struct Caller;\nimpl Caller {\n    fn pull(&self) {\n        crate::hub::pull_request::PullRequest::new();\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/event.rs",
+            "pub enum Event {\n    PullRequest,\n    Other,\n}\nimpl Event {\n    fn other(&self) -> bool {\n        matches!(self, Self::Other)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/hub.rs",
+            "mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
+        ),
+        Clustered::at("crates/x/src/hub/pull_request.rs", "pub struct PullRequest;\n"),
+        Clustered::at("crates/x/src/rule.rs", "pub enum Rule {\n    Linear(u8),\n    Plain { width: u8 },\n}\n"),
+        Clustered::at("crates/x/src/linear.rs", "pub struct Linear;\npub struct Plain;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&variants, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/event.rs:1: x::event::Event is used only within x::hub; move it into the lowest cluster that holds all its users",
+            "crates/x/src/hub/pull_request.rs:1: x::hub::pull_request::PullRequest is used only within x::caller; move it into the lowest cluster that holds all its users",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&variants, |view| view.report::<InterfaceByConsumers>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
