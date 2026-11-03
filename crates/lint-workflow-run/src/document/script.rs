@@ -13,7 +13,7 @@ impl Script {
     pub(crate) fn finding(step: Node<'_, '_>, with: Node<'_, '_>) -> Option<Found> {
         step.entry(Key::Uses)
             .and_then(Node::text)
-            .filter(|used| Text::new(used).after(Text::new(Self::ACTION)).is_some())
+            .filter(|used| used.after(Text::new(Self::ACTION)).is_some())
             .and_then(|_| with.entry(Key::Script))
             .map(|script| Found::new(script.line(), Finding::Script))
     }

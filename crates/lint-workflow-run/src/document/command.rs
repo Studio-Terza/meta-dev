@@ -1,7 +1,9 @@
 use crate::characters::Characters;
 use crate::document::key::Key;
 use crate::document::text::Text;
+use crate::excerpt::Excerpt;
 use crate::finding::Finding;
+use crate::word::Word;
 
 mod inline;
 mod unquoted;
@@ -14,14 +16,23 @@ pub(crate) struct Command<'text>(Text<'text>);
 
 impl<'text> Command<'text> {
     const LIMIT: Characters = Characters::new(120);
-    const SEPARATORS: [&'static str; 5] = ["|", "&", ";", ">", "<"];
-    const SUBSTITUTIONS: [&'static str; 2] = ["`", "$("];
-    const OPENERS: [&'static str; 2] = ["!", "("];
-    const KEYWORDS: [&'static str; 7] = ["if", "for", "while", "until", "case", "[", "[["];
-    const SHELLS: [&'static str; 5] = ["bash", "sh", "pwsh", "powershell", "cmd"];
+    const SEPARATORS: [Word; 5] = [Word::new("|"), Word::new("&"), Word::new(";"), Word::new(">"), Word::new("<")];
+    const SUBSTITUTIONS: [Word; 2] = [Word::new("`"), Word::new("$(")];
+    const OPENERS: [Word; 2] = [Word::new("!"), Word::new("(")];
+    const KEYWORDS: [Word; 7] = [
+        Word::new("if"),
+        Word::new("for"),
+        Word::new("while"),
+        Word::new("until"),
+        Word::new("case"),
+        Word::new("["),
+        Word::new("[["),
+    ];
+    const SHELLS: [Word; 5] =
+        [Word::new("bash"), Word::new("sh"), Word::new("pwsh"), Word::new("powershell"), Word::new("cmd")];
 
-    pub(crate) fn new(text: &'text str) -> Command<'text> {
-        Command(Text::new(text).trimmed())
+    pub(crate) fn new(text: Text<'text>) -> Command<'text> {
+        Command(text.trimmed())
     }
 
     pub(crate) fn finding(self, setting: Key) -> Option<Finding> {
@@ -35,14 +46,14 @@ impl<'text> Command<'text> {
                 (setting == Key::Run)
                     .then(|| Unquoted::new(self.0, Hidden::Quoted).parsed::<Inline>().ok())
                     .flatten()
-                    .and_then(|inline| inline.program())
+                    .and_then(Inline::program)
                     .map(|word| Finding::Inline { word })
             })
             .or_else(|| {
                 (setting == Key::Shell)
                     .then(|| self.foreign_shell())
                     .flatten()
-                    .map(|word| Finding::Interpreter { name: word.rendered() })
+                    .map(|word| Finding::Interpreter { name: Excerpt::from(word) })
             })
     }
 
@@ -54,7 +65,7 @@ impl<'text> Command<'text> {
         self.0.first_word_outside(&Self::SHELLS)
     }
 
-    fn operator_in(command: Command<'_>, setting: Key) -> Option<&'static str> {
+    fn operator_in(command: Command<'_>, setting: Key) -> Option<Word> {
         let separators = if setting == Key::Shell {
             Unquoted::new(command.0, Hidden::Nothing)
         } else {
@@ -63,14 +74,14 @@ impl<'text> Command<'text> {
         separators
             .first_of(&Self::SEPARATORS)
             .or_else(|| Unquoted::new(command.0, Hidden::Singles).first_of(&Self::SUBSTITUTIONS))
-            .or_else(|| command.0.modified_expansion().map(|_| Text::EXPANSION))
+            .or_else(|| command.0.modified_expansion())
     }
 
-    fn keyword_in(text: Text<'_>) -> Option<&'static str> {
+    fn keyword_in(text: Text<'_>) -> Option<Word> {
         Self::OPENERS
             .iter()
             .copied()
-            .find(|word| text.after(Text::new(word)).is_some())
-            .or_else(|| Self::KEYWORDS.iter().copied().find(|word| text.after_word(word).is_some()))
+            .find(|word| text.after(Text::from(*word)).is_some())
+            .or_else(|| Self::KEYWORDS.iter().copied().find(|word| text.after_word(*word).is_some()))
     }
 }

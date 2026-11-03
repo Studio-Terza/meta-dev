@@ -1,16 +1,20 @@
 mod actions;
 mod characters;
 mod document;
+mod excerpt;
 mod finding;
+mod word;
 
 use std::fs;
 use std::path::Path;
 
 use actions::Actions;
 use document::Document;
+use excerpt::Excerpt;
 use finding::Finding;
 use lint_core::{Headline, RepoFile, Report, Site, Violation};
 use lint_layout::LineNumber;
+use saphyr::ScanError;
 
 #[derive(Debug)]
 pub struct WorkflowRun;
@@ -41,17 +45,17 @@ impl WorkflowRun {
 
     fn violations(file: &RepoFile, actions: Actions<'_>) -> Vec<Violation> {
         match fs::read_to_string(file.shown()) {
-            Ok(text) => Self::violations_in(file, &text, actions),
+            Ok(text) => Self::violations_in(file, Document::try_from(text.as_str()), actions),
             Err(source) => vec![Violation::new(Site::of_file(file.shown()), Finding::Unreadable { source })],
         }
     }
 
-    fn violations_in(file: &RepoFile, text: &str, actions: Actions<'_>) -> Vec<Violation> {
-        match Document::parse(text) {
+    fn violations_in(file: &RepoFile, parsed: Result<Document<'_>, ScanError>, actions: Actions<'_>) -> Vec<Violation> {
+        match parsed {
             Ok(document) => document.findings(actions).into_iter().map(|found| found.violation(file.shown())).collect(),
             Err(error) => vec![Violation::new(
                 Site::new(file.shown(), LineNumber::from(error.marker().line())),
-                Finding::Unparsable { reason: error.info().to_owned() },
+                Finding::Unparsable { reason: Excerpt::new(error.info().to_owned()) },
             )],
         }
     }
