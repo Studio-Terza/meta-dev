@@ -6,12 +6,12 @@ use lint_core::SourceFile;
 use lint_layout::Failure;
 use lint_roots::{Fact, Survey};
 
-mod shelved;
+mod store;
 
 use super::located::{Located, Node};
 use super::modules::{Child, Modules};
 use super::scope::Scope;
-use shelved::Shelved;
+use store::Shelved;
 
 #[derive(Debug, Default)]
 pub struct Shelf<'tree> {
@@ -37,7 +37,7 @@ impl<'tree> Shelf<'tree> {
     #[must_use]
     pub fn test_source(&self, scope: &Scope<'tree>, file: &Path) -> Option<SourceFile> {
         let located = Located::new(scope.tree(), scope.package(), file);
-        self.shelved.get(&located).and_then(Shelved::reparsed)
+        self.shelved.get(&located).and_then(Shelved::opened).and_then(|opened| opened.parsed().ok())
     }
 
     fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: &BTreeSet<Node<'tree>>) -> Shelf<'tree> {

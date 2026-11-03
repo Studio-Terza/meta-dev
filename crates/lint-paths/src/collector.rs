@@ -27,7 +27,7 @@ impl<'file> Collector<'file> {
 
     fn imported(&mut self, prefix: UsePath, tree: &UseTree) {
         match tree {
-            UseTree::Path(path) => self.imported(prefix.then(Name::from(&path.ident)), &path.tree),
+            UseTree::Path(path) => self.imported(prefix.joined(&[Name::from(&path.ident)]), &path.tree),
             UseTree::Name(name) => self.bound(prefix, &name.ident, None),
             UseTree::Rename(name) => self.bound(prefix, &name.ident, Some(&name.rename)),
             UseTree::Glob(_) => self.scopes.glob(&self.module, prefix),
@@ -36,7 +36,7 @@ impl<'file> Collector<'file> {
     }
 
     fn bound(&mut self, prefix: UsePath, ident: &Ident, rename: Option<&Ident>) {
-        let target = if ident == Self::SELF { prefix } else { prefix.then(Name::from(ident)) };
+        let target = if ident == Self::SELF { prefix } else { prefix.joined(&[Name::from(ident)]) };
         let local = rename.map(Name::from).or_else(|| target.segments().last().cloned());
         self.scopes.import(&self.module, local, target);
     }

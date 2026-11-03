@@ -23,7 +23,8 @@ impl Tail {
     fn site_of<'file>(&self, used: Use<'file>) -> Option<EffectSite<'file>> {
         let place = used.place();
         let ground = used.ground();
-        used.into_spelling(PathTail::new(self.words))
+        used.spelling(PathTail::new(self.words))
+            .cloned()
             .map(|path| EffectSite::new(place, self.effect, Called::Path(path), ground))
     }
 }

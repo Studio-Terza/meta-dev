@@ -13,23 +13,12 @@ pub struct UsePath(Vec<Name>);
 impl UsePath {
     const SEPARATOR: &'static str = "::";
 
-    #[must_use]
-    pub fn extended(&self, segment: Name) -> UsePath {
-        UsePath(self.0.iter().cloned().chain(Some(segment)).collect())
-    }
-
     pub(crate) fn push(&mut self, segment: Name) {
         self.0.push(segment);
     }
 
     pub(crate) fn pop(&mut self) {
         self.0.pop();
-    }
-
-    #[must_use]
-    pub fn then(mut self, segment: Name) -> UsePath {
-        self.0.push(segment);
-        self
     }
 
     #[must_use]
