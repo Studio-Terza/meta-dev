@@ -28,10 +28,12 @@ impl Layering {
             .filter(|component| component.len() > 1)
             .map(|component| component.into_iter().filter_map(|index| graph.name_at(index).copied()).collect());
         let loops: BTreeSet<Definition<'_>> = links.iter().filter_map(Link::direct_loop).collect();
-        let groups: Vec<BTreeSet<Definition<'_>>> =
-            cycles.chain(loops.into_iter().map(|node| BTreeSet::from([node]))).collect();
-        let tangles =
-            Tangle::ranked(groups.into_iter().map(|members| Tangle::closed(members, links, declared)).collect());
+        let tangles = Tangle::ranked(
+            cycles
+                .chain(loops.into_iter().map(|node| BTreeSet::from([node])))
+                .map(|members| Tangle::closed(members, links, declared))
+                .collect(),
+        );
         let tally = Tally::counted(declared.count(), links, &tangles);
         declared
             .first()
