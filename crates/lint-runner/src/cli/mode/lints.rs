@@ -46,7 +46,7 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::Outcome;
+use crate::cli::Outcome;
 
 #[derive(Debug)]
 pub struct Lints;

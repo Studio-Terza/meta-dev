@@ -56,10 +56,10 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?,
         )
     })?;
-    let listed_by_the_mode = include_str!("../src/mode.rs").matches("::report(files)").count();
-    let listed_by_the_runner = include_str!("../src/lints.rs").matches("::report(files)").count();
+    let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
+    let listed_by_the_runner = include_str!("../src/cli/mode/lints.rs").matches("::report(files)").count();
     assert!(listed_by_the_mode < implemented);
-    let elegance = include_str!("../src/elegance.rs");
+    let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)"]
         .iter()
         .map(|call| elegance.matches(call).count())

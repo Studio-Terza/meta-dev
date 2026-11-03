@@ -1,3 +1,6 @@
+mod elegance;
+mod lints;
+
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
@@ -10,7 +13,9 @@ use lint_test_budget::TestBudget;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
-use crate::{Elegance, Lints, Outcome};
+use super::Outcome;
+use elegance::Elegance;
+use lints::Lints;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
