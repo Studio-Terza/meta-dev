@@ -18,7 +18,7 @@ pub(crate) struct CrateTransitions<'found, 'file> {
     domain: Count,
     interfaces: BTreeSet<&'found End<'found>>,
     boxes: BTreeSet<&'found End<'found>>,
-    pairs: BTreeSet<Hop<'found>>,
+    pairs: Count,
     coverage: Coverage,
 }
 
@@ -35,7 +35,7 @@ impl<'found, 'file> CrateTransitions<'found, 'file> {
             domain: types.declared_in(name),
             interfaces: ends().filter(|end| end.place() == Place::Interface).collect(),
             boxes: ends().filter(|end| end.place() == Place::External).collect(),
-            pairs: edges.iter().filter_map(|edge| edge.ends().hop()).collect(),
+            pairs: Hop::distinct(edges.iter().map(|edge| edge.ends())),
             coverage: Coverage::tallied(edges.iter().copied()),
         }
     }
@@ -54,7 +54,7 @@ impl fmt::Display for CrateTransitions<'_, '_> {
             self.domain,
             self.interfaces.len(),
             self.boxes.len(),
-            self.pairs.len(),
+            self.pairs,
             self.coverage
         )
     }

@@ -15,6 +15,15 @@ pub(crate) enum Role {
     Operation,
 }
 
+impl From<Body> for Role {
+    fn from(body: Body) -> Role {
+        match body {
+            Body::Written => Role::Written,
+            Body::Mapped | Body::Focused | Body::Routed => Role::Lift,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Edge<'found, 'file> {
     transition: Transition<'found, 'file>,
@@ -32,15 +41,10 @@ impl<'found, 'file> Edge<'found, 'file> {
     }
 
     pub(crate) fn role(&self) -> Role {
-        match (
-            *AsRef::<Ground>::as_ref(&self.transition),
-            self.transition.function().mutation(),
-            self.transition.function().body(),
-        ) {
-            (Ground::Store, Mutation::ThroughSelf, _) => Role::Operation,
-            (_, _, Body::Written) => Role::Written,
-            (_, _, Body::Mapped | Body::Focused | Body::Routed) => Role::Lift,
-        }
+        (*AsRef::<Ground>::as_ref(&self.transition) == Ground::Store)
+            .then_some(Role::Operation)
+            .filter(|_| self.transition.function().mutation() == Mutation::ThroughSelf)
+            .unwrap_or_else(|| Role::from(self.transition.function().body()))
     }
 
     pub(crate) fn ends(&self) -> &Ends<'found> {
