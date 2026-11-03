@@ -9,6 +9,15 @@ pub enum Scope {
     Everywhere,
 }
 
+impl Scope {
+    fn admits(self, ground: Ground) -> Option<Ground> {
+        match self {
+            Scope::Everywhere => Some(ground),
+            Scope::OutsidePorts => Some(ground).filter(|ground| *ground == Ground::Open),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CommandPaths;
 
@@ -24,7 +33,7 @@ impl CommandPaths {
     fn among(uses: Vec<Use<'_>>, scope: Scope) -> Vec<Site<'_>> {
         uses.into_iter()
             .filter(|used| used.spelling(PathTail::new(&Self::STARTER)).is_some())
-            .filter(|used| scope == Scope::Everywhere || used.ground() == Ground::Open)
+            .filter(|used| scope.admits(used.ground()).is_some())
             .map(|used| used.place())
             .collect()
     }

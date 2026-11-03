@@ -37,10 +37,14 @@ impl Lint for ThinMain {
 
 impl ThinMain {
     fn mains(items: &[Item]) -> impl Iterator<Item = &ItemFn> {
-        items.iter().filter_map(|item| match item {
-            Item::Fn(main) if Self::thin(item).is_some() => Some(main),
+        items.iter().filter(|item| Self::thin(item).is_some()).filter_map(Self::function)
+    }
+
+    fn function(item: &Item) -> Option<&ItemFn> {
+        match item {
+            Item::Fn(main) => Some(main),
             _ => None,
-        })
+        }
     }
 
     fn keyword(item: &Item) -> Span {
@@ -61,7 +65,7 @@ impl ThinMain {
     fn thin(item: &Item) -> Option<&Item> {
         match item {
             Item::Use(_) => Some(item),
-            Item::Fn(ItemFn { sig, .. }) if sig.ident == "main" => Some(item),
+            Item::Fn(ItemFn { sig, .. }) => (sig.ident == "main").then_some(item),
             _ => None,
         }
     }
