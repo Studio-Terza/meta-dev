@@ -5,10 +5,11 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::context::Context;
-use crate::endpoint::Endpoint;
 use crate::function::Function;
 use crate::ground::Ground;
 use crate::implementer::Implementer;
+use crate::inputs::Inputs;
+use crate::output::Output;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Transition<'found, 'file> {
@@ -21,14 +22,14 @@ impl<'found, 'file> Transition<'found, 'file> {
         Transition { context, function }
     }
 
-    pub fn takes(&self) -> impl Iterator<Item = &'found Endpoint> {
-        let selfish = self.context.selfish();
-        self.function.takes().iter().map(move |taken| taken.resolved_with(selfish))
+    #[must_use]
+    pub fn takes(&self) -> Inputs<'found> {
+        Inputs::new(self.function.takes(), self.context.selfish())
     }
 
     #[must_use]
-    pub fn gives(&self) -> &'found Endpoint {
-        self.function.gives().resolved_with(self.context.selfish())
+    pub fn gives(&self) -> Output<'found> {
+        Output::new(self.function.gives().resolved_with(self.context.selfish()))
     }
 
     #[must_use]

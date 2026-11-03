@@ -26,9 +26,8 @@ impl Finding {
         (self.verdict == Verdict::Block).then_some(self)
     }
 
-    #[must_use]
-    pub fn past_warn(self) -> Option<Finding> {
-        (self.verdict != Verdict::Within).then_some(self)
+    pub(super) fn verdict(&self) -> Verdict {
+        self.verdict
     }
 
     #[must_use]

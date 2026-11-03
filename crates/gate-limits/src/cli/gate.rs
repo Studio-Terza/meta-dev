@@ -19,6 +19,7 @@ use newtype::Newtype;
 use pairing::Pairing;
 pub use record::Record;
 pub(crate) use seconds::Seconds;
+use verdict::Verdict;
 
 #[derive(Debug)]
 pub struct Gate {
@@ -71,7 +72,7 @@ impl Gate {
 
     #[must_use]
     pub fn past_warn(self) -> Vec<Finding> {
-        self.findings.into_iter().filter_map(Finding::past_warn).collect()
+        self.findings.into_iter().filter(|finding| finding.verdict() != Verdict::Within).collect()
     }
 }
 
