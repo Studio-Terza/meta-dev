@@ -44,8 +44,7 @@ impl<'condensed> Frontier<'condensed> {
 
     pub fn admitted_conductance(&self) -> Conductance {
         let rest = self.whole - self.volume;
-        let smaller = if self.volume < rest { self.volume } else { rest };
-        Conductance::new(self.crossing.into_inner() / smaller.into_inner())
+        Conductance::new(self.crossing.into_inner() / self.volume.into_inner().min(rest.into_inner()))
     }
 
     pub fn items(&self) -> ItemCount {

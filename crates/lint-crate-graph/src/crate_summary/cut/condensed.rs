@@ -103,11 +103,8 @@ impl Condensed {
         let origin = |side: &BTreeSet<TangleIndex>| -> BTreeSet<TangleIndex> {
             side.iter().filter_map(|tangle| self.origins.get(tangle.into_inner()).copied()).collect()
         };
-        Split::new(
-            self.conductance(inside),
-            origin(inside),
-            origin(&(0..self.sizes.len()).map(TangleIndex::from).filter(|tangle| !inside.contains(tangle)).collect()),
-        )
+        let every: BTreeSet<TangleIndex> = (0..self.sizes.len()).map(TangleIndex::from).collect();
+        Split::new(self.conductance(inside), origin(inside), origin(&every.difference(inside).copied().collect()))
     }
 
     pub fn sweep(&self, floor: Least) -> Option<Split> {
