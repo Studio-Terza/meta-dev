@@ -12,8 +12,8 @@ pub struct Limit {
 }
 
 impl Limit {
-    pub fn ordered(&self) -> Option<&Limit> {
-        (self.warn <= self.block).then_some(self)
+    pub fn is_ordered(&self) -> bool {
+        self.warn <= self.block
     }
 
     pub fn judge(&self, measured: Seconds) -> Verdict {
