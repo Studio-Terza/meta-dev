@@ -21,7 +21,7 @@ impl<'path> Target<'path> {
         path: &'path UsePath,
         modules: &ModuleIndex<'_>,
     ) -> Option<Target<'path>> {
-        let first = path.first()?;
+        let first = path.segments().first()?;
         let start = if *first == Self::CRATE {
             &[]
         } else if *first == Self::SUPER {

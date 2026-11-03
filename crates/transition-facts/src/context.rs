@@ -31,6 +31,10 @@ impl<'file> Context<'file> {
         &self.selfish
     }
 
+    pub(crate) fn filler(&self) -> &Filler {
+        &self.filler
+    }
+
     pub(crate) fn functions(&self) -> &[Function<'file>] {
         &self.functions
     }

@@ -1,4 +1,5 @@
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::spanned::Spanned;
@@ -53,12 +54,6 @@ impl ManualIteration {
     ];
     const ACCUMULATORS: [Word<'static>; 4] = words!["push", "extend", "insert", "push_str"];
 
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
-        iterations.visit_file(file.syntax());
-        iterations.violations
-    }
-
     fn accumulator(block: &Block) -> Option<&ExprMethodCall> {
         match block.stmts.as_slice() {
             [Stmt::Expr(Expr::If(branch), _)] if branch.else_branch.is_none() => Self::accumulator(&branch.then_branch),
@@ -67,6 +62,14 @@ impl ManualIteration {
             }
             _ => None,
         }
+    }
+}
+
+impl FileLint for ManualIteration {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
+        iterations.visit_file(file.syntax());
+        iterations.violations
     }
 }
 

@@ -8,6 +8,7 @@ use crate::context::Context;
 use crate::endpoint::Endpoint;
 use crate::function::Function;
 use crate::ground::Ground;
+use crate::implementer::Implementer;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Transition<'found, 'file> {
@@ -28,6 +29,11 @@ impl<'found, 'file> Transition<'found, 'file> {
     #[must_use]
     pub fn gives(&self) -> &'found Endpoint {
         self.function.gives().resolved_with(self.context.selfish())
+    }
+
+    #[must_use]
+    pub fn implementer(&self) -> Option<Implementer<'found>> {
+        self.context.filler().implementer(self.context.selfish())
     }
 
     #[must_use]

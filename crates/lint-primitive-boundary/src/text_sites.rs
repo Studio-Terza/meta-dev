@@ -11,6 +11,7 @@ use lint_core::Gate;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_file::FileLint;
 use lint_layout::{Name, Whole, Word, words};
 
 use sighting::Sighting;
@@ -35,12 +36,6 @@ impl TextSites {
         "split_at_checked",
     ];
     const PRODUCING: [Word<'static>; 2] = words!["to_string", "push_str"];
-
-    pub fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut sites = TextSites::default();
-        sites.visit_file(file.syntax());
-        sites.into_violations(file.path())
-    }
 
     fn into_violations(self, path: &Path) -> Vec<Violation<'_>> {
         self.found
@@ -72,6 +67,14 @@ impl TextSites {
             [first, second] if first.ident == "String" && second.ident == "from" => Some(second.ident.clone()),
             _ => None,
         }
+    }
+}
+
+impl FileLint for TextSites {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut sites = TextSites::default();
+        sites.visit_file(file.syntax());
+        sites.into_violations(file.path())
     }
 }
 

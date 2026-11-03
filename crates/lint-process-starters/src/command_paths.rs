@@ -17,11 +17,6 @@ impl CommandPaths {
     const STARTER: [Word<'static>; 3] = words!["process", "Command", "new"];
 
     #[must_use]
-    pub fn found(file: &SourceFile, scope: Scope) -> Vec<Site<'_>> {
-        Self::among(Paths::read([file], &Self::FINALS), scope)
-    }
-
-    #[must_use]
     pub fn across(files: &[SourceFile], scope: Scope) -> Vec<Site<'_>> {
         Self::among(Paths::read(files, &Self::FINALS), scope)
     }

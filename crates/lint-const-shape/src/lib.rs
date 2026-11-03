@@ -1,4 +1,5 @@
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use proc_macro2::Span;
 use std::path::Path;
 use syn::visit::Visit;
@@ -32,7 +33,15 @@ impl Lint for ConstShape {
     }
 }
 
-impl ConstShape {
+impl ConstShape {}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Context {
+    Surface,
+    Const,
+}
+
+impl FileLint for ConstShape {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut contexts = ConstContexts {
             path: file.path(),
@@ -43,12 +52,6 @@ impl ConstShape {
         contexts.visit_file(file.syntax());
         contexts.violations
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Context {
-    Surface,
-    Const,
 }
 
 impl Context {

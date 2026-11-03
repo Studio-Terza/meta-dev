@@ -18,7 +18,7 @@ impl UseAliases {
 
     pub fn resolve(&self, path: &Path) -> UsePath {
         let spelled = UsePath::from(path);
-        match spelled.first().and_then(|first| self.0.get(first)) {
+        match spelled.segments().first().and_then(|first| self.0.get(first)) {
             Some(full) => spelled.rerooted(full),
             None => spelled,
         }
@@ -27,14 +27,14 @@ impl UseAliases {
     fn walk(&mut self, prefix: &UsePath, tree: &UseTree) {
         match tree {
             UseTree::Path(path) => {
-                self.walk(&prefix.extended(Name::from(&path.ident)), &path.tree);
+                self.walk(&prefix.joined(&[Name::from(&path.ident)]), &path.tree);
             }
             UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(prefix, item)),
             UseTree::Name(name) => {
-                self.0.insert(Name::from(&name.ident), prefix.extended(Name::from(&name.ident)));
+                self.0.insert(Name::from(&name.ident), prefix.joined(&[Name::from(&name.ident)]));
             }
             UseTree::Rename(rename) => {
-                self.0.insert(Name::from(&rename.rename), prefix.extended(Name::from(&rename.ident)));
+                self.0.insert(Name::from(&rename.rename), prefix.joined(&[Name::from(&rename.ident)]));
             }
             UseTree::Glob(_) => {}
         }

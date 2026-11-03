@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModuleNesting;
 use finding::Finding;
-use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Target};
+use module_path::{Ancestor, InsideSibling, ModuleIndex, ModulePath, Relation, Target};
 
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -79,10 +79,10 @@ impl<'file> ModuleTree<'file> {
 
     fn home_of(&self, module: &ModulePath<'file>) -> Option<ModulePath<'file>> {
         let outsiders: Vec<&ModulePath<'file>> =
-            self.users.callers_of(module)?.iter().filter(|user| module.relates::<Ancestor>(user).is_none()).collect();
+            self.users.callers_of(module)?.iter().filter(|user| Ancestor::holds(module, user).is_none()).collect();
         outsiders
             .iter()
-            .all(|user| user.relates::<InsideSibling>(module).is_some())
+            .all(|user| InsideSibling::holds(user, module).is_some())
             .then(|| {
                 let homes: BTreeSet<ModulePath<'file>> =
                     outsiders.iter().map(|user| user.truncated_like(module)).collect();

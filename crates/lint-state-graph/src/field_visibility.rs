@@ -9,6 +9,7 @@ use lint_core::Site;
 use lint_core::SourceFile;
 use lint_core::Violation;
 use lint_core::Walk;
+use lint_file::FileLint;
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
@@ -17,8 +18,8 @@ pub struct FieldVisibility<'scan> {
     violations: Vec<Violation<'scan>>,
 }
 
-impl<'scan> FieldVisibility<'scan> {
-    pub fn violations(file: &'scan SourceFile) -> Vec<Violation<'scan>> {
+impl FileLint for FieldVisibility<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut fields = FieldVisibility { path: file.path(), violations: Vec::new() };
         fields.visit_file(file.syntax());
         fields.violations

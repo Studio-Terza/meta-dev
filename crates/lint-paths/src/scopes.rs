@@ -1,20 +1,22 @@
 mod scope;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter;
 
 use crate::module::Module;
 use lint_layout::{Name, UsePath, Word};
+use lint_placement::CrateFile;
 use scope::Scope;
 
 #[derive(Debug, Default)]
 pub(crate) struct Scopes<'file> {
     scopes: BTreeMap<Module<'file>, Scope>,
-    guards: BTreeMap<Module<'file>, BTreeSet<Name>>,
+    guards: BTreeMap<&'file CrateFile, BTreeSet<Name>>,
 }
 
 impl<'file> Scopes<'file> {
     pub(crate) fn declare(&mut self, module: &Module<'file>) {
-        module.ancestry().into_iter().for_each(|ancestor| {
+        iter::successors(Some(module.clone()), Module::parent).for_each(|ancestor| {
             self.scopes.entry(ancestor).or_default();
         });
     }
@@ -32,7 +34,7 @@ impl<'file> Scopes<'file> {
     }
 
     pub(crate) fn guard(&mut self, module: &Module<'file>, name: Option<Name>) {
-        self.guards.entry(module.root()).or_default().extend(name);
+        self.guards.entry(<&CrateFile>::from(module)).or_default().extend(name);
     }
 
     pub(crate) fn scope(&self, module: &Module<'file>) -> Option<&Scope> {
@@ -40,7 +42,7 @@ impl<'file> Scopes<'file> {
     }
 
     pub(crate) fn renames_head(&self, module: &Module<'file>, path: &UsePath) -> Option<&Scope> {
-        let head = path.first()?;
+        let head = path.segments().first()?;
         self.scope(module).filter(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
     }
 
@@ -49,6 +51,6 @@ impl<'file> Scopes<'file> {
     }
 
     pub(crate) fn guarded(&self, module: &Module<'file>, name: &Name) -> Option<&Name> {
-        self.guards.get(&module.root())?.get(name)
+        self.guards.get(<&CrateFile>::from(module))?.get(name)
     }
 }

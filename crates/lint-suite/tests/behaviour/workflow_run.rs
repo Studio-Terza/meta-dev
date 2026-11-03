@@ -1,5 +1,5 @@
 use file_ports::{Bytes, Text};
-use lint_core::{Contents, RepoFile};
+use lint_core::{Contents, Lint, RepoFile};
 use lint_workflow_run::WorkflowRun;
 
 const WORKFLOW: &str = ".github/workflows/ci.yml";

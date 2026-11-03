@@ -21,18 +21,20 @@ impl<'file> From<Vec<ModulePath<'file>>> for ModuleIndex<'file> {
                 found
             },
         );
-        let directories = modules.iter().filter_map(ModulePath::directory_module).fold(
-            HashMap::new(),
-            |mut found: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>, module| {
+        let directories = modules
+            .iter()
+            .filter(|module| module.file.file_name().is_some_and(|name| name == Self::MODULE_FILE))
+            .fold(HashMap::new(), |mut found: HashMap<&'file CrateRoot, HashSet<Vec<&'file Name>>>, module| {
                 found.entry(module.crate_root).or_default().insert(module.segments.iter().collect());
                 found
-            },
-        );
+            });
         ModuleIndex { modules, latest, directories }
     }
 }
 
 impl<'file> ModuleIndex<'file> {
+    const MODULE_FILE: &'static str = "mod.rs";
+
     pub fn modules(&self) -> &[ModulePath<'file>] {
         &self.modules
     }

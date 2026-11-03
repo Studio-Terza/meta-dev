@@ -31,8 +31,14 @@ impl Roots {
         let directories: Vec<Vec<PathBuf>> =
             trees.iter().zip(&below).map(|(tree, below)| Self::searched(tree, below)).collect();
         let read = Regrouped::like(&directories, Manifest::read_many(files, &directories.concat()));
-        let manifests =
-            below.into_iter().zip(read).map(|(below, read)| below.and_then(|_| Self::manifests(read))).collect();
+        let manifests = below
+            .into_iter()
+            .zip(read)
+            .map(|(below, read)| {
+                below.and_then(|_| read.into_iter().collect::<Result<Vec<Option<Manifest>>, Failure>>())
+            })
+            .map(|found| found.map(|found| found.into_iter().flatten().collect()))
+            .collect();
         Packages::targets_of(files, trees, Admission::members_among(files, manifests))
     }
 
@@ -47,10 +53,5 @@ impl Roots {
 
     fn canonical(trees: &[&Tree<'_>]) -> Vec<PathBuf> {
         trees.iter().map(|tree| tree.canonical().to_path_buf()).collect()
-    }
-
-    fn manifests(read: Vec<Result<Option<Manifest>, Failure>>) -> Result<Vec<Manifest>, Failure> {
-        let found = read.into_iter().collect::<Result<Vec<Option<Manifest>>, Failure>>()?;
-        Ok(found.into_iter().flatten().collect())
     }
 }

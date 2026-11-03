@@ -49,7 +49,7 @@ impl<'run> Context<'run> {
         self.judge.port_type(module, generics, ty).map(|_| ()).or_else(|| self.holding(ty).map(|_| ()))
     }
 
-    fn holding(&self, ty: &Type) -> Option<&Name> {
-        Spelling::last(ty).and_then(|owner| self.holders.holder(&self.crate_name, &owner))
+    fn holding(&self, ty: &Type) -> Option<Name> {
+        Spelling::last(ty).filter(|owner| self.holders.fields(&self.crate_name, owner).is_some())
     }
 }

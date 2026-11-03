@@ -1,4 +1,5 @@
 mod boundary;
+mod failed_test;
 mod line;
 mod reading;
 mod test_name;
@@ -6,6 +7,7 @@ mod verdict;
 
 use std::collections::BTreeMap;
 
+pub use failed_test::FailedTest;
 use line::Line;
 use reading::Reading;
 pub use test_name::TestName;
@@ -21,8 +23,12 @@ impl TestLog {
     }
 
     #[must_use]
-    pub fn failed(&self) -> Vec<&TestName> {
-        self.0.iter().filter(|(_, verdict)| **verdict == Verdict::Failed).map(|(name, _)| name).collect()
+    pub fn failed(&self) -> Vec<FailedTest<'_>> {
+        self.0
+            .iter()
+            .filter(|(_, verdict)| **verdict == Verdict::Failed)
+            .map(|(name, _)| FailedTest::from(name))
+            .collect()
     }
 }
 

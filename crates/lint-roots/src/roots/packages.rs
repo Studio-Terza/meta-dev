@@ -28,7 +28,11 @@ impl Packages {
         trees
             .iter()
             .zip(groups)
-            .map(|(tree, group)| group.and_then(|packages| Self::targets_in(&mut survey, tree, packages)))
+            .map(|(tree, group)| {
+                let packages = group?;
+                Self::checked(&mut survey, &packages)?;
+                Ok(packages.into_iter().filter_map(|package| package.into_target(&survey, tree)).collect())
+            })
             .collect()
     }
 
@@ -59,15 +63,12 @@ impl Packages {
         survey.learn(files, Fact::Followed, &mains)
     }
 
-    fn targets_in(survey: &mut Survey, tree: &Tree<'_>, packages: Vec<Package>) -> Result<Vec<Target>, Failure> {
+    fn checked(survey: &mut Survey, packages: &[Package]) -> Result<(), Failure> {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)
             .filter(|directory| survey.kind(directory) == Kind::Directory)
             .collect();
-        survey.failure(&real).map_or_else(
-            || Ok(packages.into_iter().filter_map(|package| package.into_target(survey, tree)).collect()),
-            Err,
-        )
+        survey.failure(&real).map_or(Ok(()), Err)
     }
 }

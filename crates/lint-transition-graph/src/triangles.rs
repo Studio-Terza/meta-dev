@@ -48,7 +48,11 @@ impl CommutingTriangles {
         let start: BTreeSet<&Node> = tuple.iter().collect();
         tuple
             .iter()
-            .flat_map(|node| consuming.led(node))
+            .flat_map(|node| {
+                consuming
+                    .taking(node)
+                    .filter(move |edge| AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*edge)).iter().next() == Some(node))
+            })
             .filter_map(Hyperedge::written)
             .filter_map(|first| first.other(direct))
             .filter(|first| AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*first)).within(&start).is_some())

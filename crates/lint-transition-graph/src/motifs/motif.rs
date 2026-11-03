@@ -32,15 +32,11 @@ impl<'graph, 'file> Occurrence<'graph, 'file> {
         })
     }
 
-    pub(super) fn last(&self) -> Option<&'graph Node<'graph>> {
-        self.reached.last().copied()
-    }
-
     pub(super) fn shape(&self) -> Vec<&'graph Name> {
         self.edges.iter().map(|edge| AsRef::<Name>::as_ref(edge.transition().function())).collect()
     }
 
-    fn nodes(&self) -> impl Iterator<Item = &'graph Node<'graph>> + '_ {
+    pub(super) fn nodes(&self) -> impl Iterator<Item = &'graph Node<'graph>> + '_ {
         self.start.iter().chain(self.reached.iter().copied())
     }
 

@@ -12,6 +12,7 @@ use declared_graphs::DeclaredGraphs;
 use edge_scan::EdgeScan;
 use field_visibility::FieldVisibility;
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use variant_matches::VariantMatches;
 
 use lint_core::Most;

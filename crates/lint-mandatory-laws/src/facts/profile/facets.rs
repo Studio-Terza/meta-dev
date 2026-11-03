@@ -50,13 +50,13 @@ impl<'file> Facets<'file> {
             .count();
         let unwitnessed =
             methods.iter().filter(|pair| roundtrips.iter().find_map(|mentions| pair.witnessed_by(mentions)).is_none());
-        let unspared = self.trait_pairs().into_iter().skip(spare);
+        let unspared = self.trait_needs().into_iter().skip(spare);
         let law = Self::ORDERS.iter().find_map(|order| self.known(*order)).map(|_| Need::Law);
         let unlawed = law.filter(|_| coverage.law_naming(subject).is_none());
         unwitnessed
             .copied()
-            .chain(unspared)
             .map(Need::Roundtrip)
+            .chain(unspared)
             .chain(unlawed)
             .map(|need| Obligation::new(subject, self.site, need))
             .collect()
@@ -66,10 +66,11 @@ impl<'file> Facets<'file> {
         self.facts.get(&Name::from(fact))
     }
 
-    fn trait_pairs(&self) -> Vec<Pair<'_>> {
+    fn trait_needs(&self) -> Vec<Need<'_>> {
         Self::TRAIT_PAIRS
             .iter()
             .filter_map(|[left, right]| Some(Pair::new(self.known(*left)?, self.known(*right)?)))
+            .map(Need::Roundtrip)
             .collect()
     }
 

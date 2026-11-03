@@ -4,6 +4,7 @@ mod signature_sites;
 mod text_sites;
 
 use lint_core::{Headline, Lint};
+use lint_file::FileLint;
 use std::path::PathBuf;
 
 use newtypes::Newtypes;

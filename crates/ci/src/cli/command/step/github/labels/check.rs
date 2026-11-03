@@ -17,10 +17,6 @@ impl Check {
     pub(crate) const GOLDENS: &'static str = "golden-change";
     pub(crate) const SCENARIOS: &'static str = "new-scenario";
 
-    pub(crate) fn flagged(self, changes: &[Change]) -> Vec<&Change> {
-        changes.iter().filter_map(|change| self.flagging(change)).collect()
-    }
-
     pub(crate) fn flagging(self, change: &Change) -> Option<&Change> {
         match self {
             Check::Goldens => change.touching(Place::GOLDENS),

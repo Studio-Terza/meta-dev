@@ -26,6 +26,13 @@ impl Resolved {
         }
     }
 
+    pub(crate) fn map_found(self, located: impl FnOnce(Endpoint) -> Endpoint) -> Resolved {
+        match self {
+            Resolved::Itself => Resolved::Itself,
+            Resolved::Found(found) => Resolved::Found(located(found)),
+        }
+    }
+
     pub(crate) fn or_opaque(self) -> Endpoint {
         match self {
             Resolved::Itself => Endpoint::from(Unnamed::Opaque),

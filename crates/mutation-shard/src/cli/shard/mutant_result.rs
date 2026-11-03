@@ -1,5 +1,5 @@
 use serde::Serialize;
-use test_log::TestName;
+use test_log::FailedTest;
 
 use super::outcomes::Title;
 use super::verdict::Verdict;
@@ -8,11 +8,11 @@ use super::verdict::Verdict;
 pub struct MutantResult<'log> {
     name: Title,
     summary: Verdict,
-    failed: Vec<&'log TestName>,
+    failed: Vec<FailedTest<'log>>,
 }
 
 impl<'log> MutantResult<'log> {
-    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<&'log TestName>) -> MutantResult<'log> {
+    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<FailedTest<'log>>) -> MutantResult<'log> {
         MutantResult { name, summary, failed }
     }
 }

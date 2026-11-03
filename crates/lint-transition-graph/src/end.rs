@@ -26,6 +26,18 @@ impl<'found> Node<'found> {
     }
 }
 
+impl AsRef<CrateName> for Node<'_> {
+    fn as_ref(&self) -> &CrateName {
+        self.krate
+    }
+}
+
+impl AsRef<Name> for Node<'_> {
+    fn as_ref(&self) -> &Name {
+        self.name
+    }
+}
+
 impl fmt::Display for Node<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}::{}", self.krate, self.name)
@@ -38,10 +50,6 @@ pub(crate) struct Tuple<'found>(BTreeSet<Node<'found>>);
 impl<'found> Tuple<'found> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Node<'found>> {
         self.0.iter()
-    }
-
-    pub(crate) fn first(&self) -> Option<&Node<'found>> {
-        self.0.first()
     }
 
     pub(crate) fn within<'tuple>(&'tuple self, available: &BTreeSet<&Node<'_>>) -> Option<&'tuple Tuple<'found>> {
@@ -158,11 +166,16 @@ pub(crate) enum Class {
 pub(crate) struct Ends<'found> {
     takes: Vec<End<'found>>,
     gives: End<'found>,
+    implementer: Option<End<'found>>,
 }
 
 impl<'found> Ends<'found> {
     pub(crate) fn new(takes: Vec<End<'found>>, gives: End<'found>) -> Ends<'found> {
-        Ends { takes, gives }
+        Ends { takes, gives, implementer: None }
+    }
+
+    pub(crate) fn implemented_by(self, implementer: Option<End<'found>>) -> Ends<'found> {
+        Ends { implementer, ..self }
     }
 
     pub(crate) fn all(&self) -> impl Iterator<Item = &End<'found>> {
@@ -195,8 +208,14 @@ impl<'found> Ends<'found> {
 
     pub(crate) fn key(&self) -> Option<Key<'found>> {
         let mut takes: Vec<Node<'found>> = self.takes.iter().map(|taken| taken.node).collect::<Option<Vec<Node>>>()?;
-        takes.sort();
         let gives = self.gives.node?;
+        let selector = self
+            .implementer
+            .as_ref()
+            .and_then(|implementer| implementer.node)
+            .filter(|implementer| *implementer != gives && !takes.contains(implementer));
+        takes.extend(selector);
+        takes.sort();
         (!takes.is_empty()).then_some(Key { takes, gives })
     }
 

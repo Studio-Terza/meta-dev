@@ -27,10 +27,6 @@ impl Holders {
     pub fn fields(&self, crate_name: &CrateName, owner: &Name) -> Option<&BTreeSet<Name>> {
         self.0.get(crate_name)?.get(owner)
     }
-
-    pub fn holder(&self, crate_name: &CrateName, owner: &Name) -> Option<&Name> {
-        self.0.get(crate_name)?.get_key_value(owner).map(|(holder, _)| holder)
-    }
 }
 
 struct Reader<'file, 'run> {

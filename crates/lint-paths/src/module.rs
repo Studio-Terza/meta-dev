@@ -33,19 +33,17 @@ impl<'file> Module<'file> {
         let outer = self.path.len().checked_sub(1)?;
         Some(Module { crate_file: self.crate_file, path: self.path.iter().take(outer).cloned().collect() })
     }
+}
 
-    #[must_use]
-    pub fn root(&self) -> Module<'file> {
-        Module { crate_file: self.crate_file, path: Vec::new() }
+impl<'file> From<&Module<'file>> for &'file CrateFile {
+    fn from(module: &Module<'file>) -> &'file CrateFile {
+        module.crate_file
     }
+}
 
-    pub(crate) fn ancestry(&self) -> Vec<Module<'file>> {
-        (0..=self.path.len())
-            .map(|length| Module {
-                crate_file: self.crate_file,
-                path: self.path.iter().take(length).cloned().collect(),
-            })
-            .collect()
+impl<'file> From<&'file CrateFile> for Module<'file> {
+    fn from(crate_file: &'file CrateFile) -> Module<'file> {
+        Module { crate_file, path: Vec::new() }
     }
 }
 

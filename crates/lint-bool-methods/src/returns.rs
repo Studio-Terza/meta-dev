@@ -2,6 +2,7 @@ use syn::visit::{self, Visit};
 use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
 
 use lint_core::{Site, SourceFile, Violation, Walk};
+use lint_file::FileLint;
 use lint_layout::LineNumber;
 
 use super::Finding;
@@ -12,12 +13,6 @@ pub struct Returns<'file> {
 }
 
 impl<'file> Returns<'file> {
-    pub fn of_file(file: &'file SourceFile) -> Vec<Violation<'file>> {
-        let mut scan = Returns { file, found: Vec::new() };
-        scan.visit_file(file.syntax());
-        scan.found
-    }
-
     fn flagged(&self, signature: &Signature) -> Option<Violation<'file>> {
         match &signature.output {
             ReturnType::Type(_, returned) => match returned.as_ref() {
@@ -34,6 +29,14 @@ impl<'file> Returns<'file> {
     fn record(&mut self, signature: &Signature) {
         let flagged = self.flagged(signature);
         self.found.extend(flagged);
+    }
+}
+
+impl FileLint for Returns<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut scan = Returns { file, found: Vec::new() };
+        scan.visit_file(file.syntax());
+        scan.found
     }
 }
 

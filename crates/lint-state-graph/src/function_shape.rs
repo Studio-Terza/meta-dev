@@ -4,6 +4,7 @@ mod returns;
 pub use body::Body;
 pub use returns::Returns;
 
+use crate::declarations::Vertex;
 use std::path::Path;
 
 use syn::{FnArg, ImplItemFn, Type};
@@ -30,7 +31,7 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
     ) -> FunctionShape<'found, 'file> {
         let vertex = |ty: &Type| {
             let written = TypeName::from_type(ty);
-            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type())))
+            declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).map(Vertex::name)
         };
         FunctionShape {
             site: Site::new(path, LineNumber::from(function.sig.ident.span())),

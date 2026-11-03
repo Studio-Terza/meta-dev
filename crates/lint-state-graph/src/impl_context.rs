@@ -2,6 +2,7 @@ mod impl_kind;
 
 pub use impl_kind::ImplKind;
 
+use crate::declarations::Vertex;
 use syn::{ImplItemFn, ItemImpl, Visibility};
 
 use super::declarations::Declarations;
@@ -16,13 +17,13 @@ pub struct ImplContext<'found> {
 
 impl<'found> ImplContext<'found> {
     pub fn describe(item: &ItemImpl, declarations: &'found Declarations<'_>) -> ImplContext<'found> {
-        let self_type = declarations.resolve(TypeName::from_type(&item.self_ty));
+        let self_type = declarations.resolved(&TypeName::from_type(&item.self_ty)).clone();
         let trait_name = item
             .trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| Name::from(&segment.ident));
-        let kind = match (trait_name, declarations.vertex_named(&self_type)) {
+        let kind = match (trait_name, declarations.vertex_named(&self_type).map(Vertex::name)) {
             (Some(name), Some(vertex)) => ImplKind::TraitOnVertex(name, vertex),
             (Some(name), None) => ImplKind::TraitOnValue(name),
             (None, Some(vertex)) => ImplKind::InherentOnVertex(vertex),

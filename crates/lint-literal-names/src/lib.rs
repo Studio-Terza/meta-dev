@@ -40,11 +40,10 @@ impl LiteralNames {
         "helper", "util", "data", "value", "item", "thing", "execute", "perform", "update", "compute", "manage",
     ];
 
-    fn vague(name: &Name) -> Option<&Name> {
-        match Self::SHORTEST.allows(name.length()) {
-            None => Some(name),
-            Some(_) => name.matches::<Whole>(&Self::VAGUE).map(|_| name),
-        }
+    fn vague(name: &Name) -> Option<Finding<'_>> {
+        Some(Finding::VagueName { name }).filter(|Finding::VagueName { name }| {
+            Self::SHORTEST.allows(name.length()).is_none() || name.matches::<Whole>(&Self::VAGUE).is_some()
+        })
     }
 
     fn vague_names<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
@@ -62,9 +61,7 @@ struct VagueNames<'file> {
 impl VagueNames<'_> {
     fn note(&mut self, ident: &Ident) {
         let site = Site::new(self.path, LineNumber::from(ident.span()));
-        self.found.extend(
-            LiteralNames::vague(&Name::from(ident)).map(|name| Violation::new(site, Finding::VagueName { name })),
-        );
+        self.found.extend(LiteralNames::vague(&Name::from(ident)).map(|finding| Violation::new(site, finding)));
     }
 }
 

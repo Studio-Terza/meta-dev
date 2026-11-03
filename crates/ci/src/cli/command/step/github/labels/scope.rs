@@ -37,8 +37,10 @@ impl<'journal> Scope<'journal> {
         refactor: Option<&PullRequest>,
         changes: &'change [Change],
     ) -> Result<Vec<Owed<'change>>, Failure<'static>> {
-        let asked: Vec<(Check, Vec<&'change Change>)> =
-            checks.iter().map(|check| (*check, check.flagged(changes))).collect();
+        let asked: Vec<(Check, Vec<&'change Change>)> = checks
+            .iter()
+            .map(|check| (*check, changes.iter().filter_map(|change| check.flagging(change)).collect()))
+            .collect();
         let produced: BTreeSet<&Path> = asked
             .iter()
             .filter(|(check, _)| !matches!((check, refactor), (Check::Goldens, Some(_))))

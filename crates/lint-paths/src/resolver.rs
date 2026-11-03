@@ -4,6 +4,7 @@ mod trail;
 use crate::module::Module;
 use crate::scopes::Scopes;
 use lint_layout::UsePath;
+use lint_placement::CrateFile;
 use route::Route;
 use trail::Trail;
 
@@ -25,8 +26,10 @@ impl<'scopes> Resolver<'scopes> {
     }
 
     fn resolved(&self, module: &Module<'scopes>, path: UsePath, trail: &Trail<'_>) -> Vec<UsePath> {
-        match path.first() {
-            Some(head) if *head == Self::CRATE => self.resolved(&module.root(), path.rest(), trail),
+        match path.segments().first() {
+            Some(head) if *head == Self::CRATE => {
+                self.resolved(&Module::from(<&CrateFile>::from(module)), path.rest(), trail)
+            }
             Some(head) if *head == Self::SELF => self.resolved(module, path.rest(), trail),
             Some(head) if *head == Self::SUPER => {
                 module.parent().map_or_else(Vec::new, |parent| self.resolved(&parent, path.rest(), trail))

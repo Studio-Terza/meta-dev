@@ -35,7 +35,7 @@ impl CrateBudget {
         CrateBudget {
             files: Count::new(1),
             lines,
-            starts: Count::new(CommandPaths::found(file, Scope::Everywhere).len()),
+            starts: Count::new(CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len()),
             test_lines: match share {
                 TestShare::InlineModules => scan.test_lines,
                 TestShare::WholeFile => lines,

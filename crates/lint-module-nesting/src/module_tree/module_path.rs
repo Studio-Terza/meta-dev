@@ -25,8 +25,6 @@ pub struct ModulePath<'file> {
 }
 
 impl<'file> ModulePath<'file> {
-    const MODULE_FILE: &'static str = "mod.rs";
-
     pub fn of_file(file: &'file SourceFile) -> ModulePath<'file> {
         ModulePath {
             crate_root: file.placement().crate_root(),
@@ -44,20 +42,12 @@ impl<'file> ModulePath<'file> {
         Some(self.with_segments(parents))
     }
 
-    pub fn relates<'other, R: Relation>(&self, other: &'other ModulePath<'file>) -> Option<&'other ModulePath<'file>> {
-        R::holds(self, other)
-    }
-
     pub fn truncated_like(&self, other: &ModulePath<'file>) -> ModulePath<'file> {
         self.with_segments(self.segments.get(..other.segments.len()).unwrap_or(self.segments))
     }
 
     fn with_segments(&self, segments: &'file [Name]) -> ModulePath<'file> {
         ModulePath { crate_root: self.crate_root, segments, file: Path::new("") }
-    }
-
-    fn directory_module(&self) -> Option<&ModulePath<'file>> {
-        self.file.file_name().filter(|name| *name == Self::MODULE_FILE).map(|_| self)
     }
 }
 

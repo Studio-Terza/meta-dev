@@ -14,12 +14,12 @@ impl Shelved {
         self.parsed.take()
     }
 
-    pub fn parsed(&self) -> Option<&SourceFile> {
-        self.parsed.as_ref()?.as_ref().ok()
+    pub fn opened(&self) -> Option<&Opened> {
+        self.opened.as_ref()
     }
 
-    pub fn reparsed(&self) -> Option<SourceFile> {
-        self.opened.as_ref()?.parsed().ok()
+    pub fn parsed(&self) -> Option<&SourceFile> {
+        self.parsed.as_ref()?.as_ref().ok()
     }
 }
 

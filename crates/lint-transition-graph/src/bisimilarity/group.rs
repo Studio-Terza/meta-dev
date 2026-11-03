@@ -15,6 +15,12 @@ struct Member<'graph, 'file> {
     site: Site<'file>,
 }
 
+impl<'graph, 'file> Member<'graph, 'file> {
+    fn placed(node: &'graph Node<'graph>, graph: &'graph Graph<'_, 'file>) -> Option<Member<'graph, 'file>> {
+        graph.nodes().get(node).map(|site| Member { node, site: *site })
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Group<'graph, 'file> {
     members: Vec<Member<'graph, 'file>>,
@@ -22,27 +28,21 @@ pub(super) struct Group<'graph, 'file> {
 }
 
 impl<'graph, 'file> Group<'graph, 'file> {
-    fn alike(
-        members: Vec<&'graph Node<'graph>>,
-        graph: &'graph Graph<'_, 'file>,
-        behaviour: &'graph Behaviour<'graph>,
-    ) -> Option<Group<'graph, 'file>> {
-        let moves: Vec<&'graph Move<'graph>> =
-            members.first().and_then(|node| behaviour.moves_of(node)).into_iter().flatten().collect();
-        let members: Vec<Member<'graph, 'file>> = members
-            .into_iter()
-            .filter_map(|node| graph.nodes().get(node).map(|site| Member { node, site: *site }))
-            .collect();
-        (members.len() > 1 && moves.len() > 1).then_some(Group { members, moves })
-    }
-
     pub(super) fn ranked(
         grouped: impl IntoIterator<Item = Vec<&'graph Node<'graph>>>,
         graph: &'graph Graph<'_, 'file>,
         behaviour: &'graph Behaviour<'graph>,
     ) -> Vec<Group<'graph, 'file>> {
-        let mut groups: Vec<Group<'graph, 'file>> =
-            grouped.into_iter().filter_map(|members| Self::alike(members, graph, behaviour)).collect();
+        let mut groups: Vec<Group<'graph, 'file>> = grouped
+            .into_iter()
+            .filter_map(|nodes| {
+                let moves: Vec<&'graph Move<'graph>> =
+                    nodes.first().and_then(|node| behaviour.moves_of(node)).into_iter().flatten().collect();
+                let members: Vec<Member<'graph, 'file>> =
+                    nodes.into_iter().filter_map(|node| Member::placed(node, graph)).collect();
+                (members.len() > 1 && moves.len() > 1).then_some(Group { members, moves })
+            })
+            .collect();
         groups.sort_by(|left, right| {
             right.members.len().cmp(&left.members.len()).then_with(|| left.first().cmp(&right.first()))
         });

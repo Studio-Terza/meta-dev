@@ -5,6 +5,7 @@ mod imports;
 mod module;
 mod resolver;
 mod scopes;
+mod test_file;
 mod uses;
 mod walker;
 mod wanted;
@@ -20,6 +21,7 @@ pub use cover::Cover;
 pub use ground::Ground;
 pub use imports::Imports;
 pub use module::Module;
+pub use test_file::TestFile;
 pub use uses::Use;
 
 #[derive(Debug)]
@@ -28,18 +30,18 @@ pub struct Paths;
 impl Paths {
     #[must_use]
     pub fn read<'file>(files: impl IntoIterator<Item = &'file SourceFile>, finals: &[Word<'_>]) -> Vec<Use<'file>> {
-        Self::walked(&files.into_iter().collect::<Vec<_>>(), Some(finals))
+        let files: Vec<&SourceFile> = files.into_iter().collect();
+        let scopes = Collector::collect(&files);
+        let resolver = Resolver::over(&scopes);
+        let wanted = Wanted::among(&scopes, finals);
+        files.iter().flat_map(|file| Walker::walk(file, &scopes, &wanted, &resolver)).collect()
     }
 
     #[must_use]
     pub fn every<'file>(files: impl IntoIterator<Item = &'file SourceFile>) -> Vec<Use<'file>> {
-        Self::walked(&files.into_iter().collect::<Vec<_>>(), None)
-    }
-
-    fn walked<'file>(files: &[&'file SourceFile], finals: Option<&[Word<'_>]>) -> Vec<Use<'file>> {
-        let scopes = Collector::collect(files);
+        let files: Vec<&SourceFile> = files.into_iter().collect();
+        let scopes = Collector::collect(&files);
         let resolver = Resolver::over(&scopes);
-        let wanted = finals.map_or(Wanted::Every, |finals| Wanted::among(&scopes, finals));
-        files.iter().flat_map(|file| Walker::walk(file, &scopes, &wanted, &resolver)).collect()
+        files.iter().flat_map(|file| Walker::walk(file, &scopes, &Wanted::Every, &resolver)).collect()
     }
 }

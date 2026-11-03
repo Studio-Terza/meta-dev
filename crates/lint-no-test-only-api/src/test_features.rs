@@ -44,7 +44,8 @@ impl TestFeatures {
         match Lit::new(value) {
             Lit::Str(feature) => {
                 let name = Name::from(feature.value().as_str());
-                FeatureWord::test_word(&name).map(|_| Flagged::new(line, Finding::Feature(Cow::Owned(name))))
+                name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
+                    .map(|_| Flagged::new(line, Finding::Feature(Cow::Owned(name))))
             }
             _ => None,
         }
