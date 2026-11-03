@@ -36,7 +36,7 @@ impl FactsLint for TypeGraph {
             ),
             Self::grouped(facts.types(), facts.traits())
                 .into_iter()
-                .filter_map(|(name, graph)| graph.violation(name))
+                .filter_map(|(name, graph)| graph.violation(facts, name))
                 .collect(),
         )
     }

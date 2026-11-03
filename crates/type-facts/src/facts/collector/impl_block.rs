@@ -1,35 +1,40 @@
+use std::collections::BTreeMap;
+
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use crate::facts::Members;
 use crate::implementation::Implementation;
 use crate::method::Method;
-use crate::type_fact::TypeFact;
 
-#[derive(Clone, Debug)]
-pub(crate) struct ImplBlock {
-    krate: CrateName,
+#[derive(Debug)]
+pub(crate) struct ImplBlock<'file> {
+    krate: &'file CrateName,
     target: Name,
     implementation: Option<Implementation>,
     methods: Vec<Method>,
 }
 
-impl ImplBlock {
+impl<'file> ImplBlock<'file> {
     pub(crate) fn new(
-        krate: CrateName,
+        krate: &'file CrateName,
         target: Name,
         implementation: Option<Implementation>,
         methods: Vec<Method>,
-    ) -> ImplBlock {
+    ) -> ImplBlock<'file> {
         ImplBlock { krate, target, implementation, methods }
     }
 
-    pub(crate) fn applied_to<'file>(&self, found: TypeFact<'file>) -> TypeFact<'file> {
-        let krate: &CrateName = found.as_ref();
-        let name: &Name = found.as_ref();
-        if *krate == self.krate && *name == self.target {
-            found.with_methods(self.methods.clone()).with_implementation(self.implementation.clone())
-        } else {
-            found
-        }
+    pub(crate) fn added_to(
+        self,
+        mut members: BTreeMap<&'file CrateName, BTreeMap<Name, Members>>,
+    ) -> BTreeMap<&'file CrateName, BTreeMap<Name, Members>> {
+        members
+            .entry(self.krate)
+            .or_default()
+            .entry(self.target)
+            .or_default()
+            .extend(self.implementation, self.methods);
+        members
     }
 }

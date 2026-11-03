@@ -21,7 +21,7 @@ pub struct ReferencedNames {
 impl ReferencedNames {
     const UNNAMED: &str = "_";
 
-    pub fn of_items(items: &[Item], scope: &Scope) -> ReferencedNames {
+    pub fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
@@ -45,7 +45,7 @@ impl ReferencedNames {
         })
     }
 
-    fn with_item(self, item: &Item, scope: &Scope) -> ReferencedNames {
+    fn with_item(self, item: &Item, scope: &Scope<'_>) -> ReferencedNames {
         let (attributes, owner, nested): (&[Attribute], Option<Name>, Cow<'_, [Item]>) = match item {
             Item::Struct(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
             Item::Enum(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
@@ -78,7 +78,7 @@ impl ReferencedNames {
         }
     }
 
-    fn named(owner: Option<Name>, scope: &Scope, item: &impl ToTokens) -> BTreeMap<Name, Vec<Name>> {
+    fn named(owner: Option<Name>, scope: &Scope<'_>, item: &impl ToTokens) -> BTreeMap<Name, Vec<Name>> {
         owner
             .filter(|owner| *owner != Self::UNNAMED)
             .map(|owner| (owner, scope.referenced(item.to_token_stream())))
