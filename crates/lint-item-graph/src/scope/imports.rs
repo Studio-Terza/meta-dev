@@ -17,6 +17,10 @@ impl<'file> Imports<'file> {
         self.0.iter().find_map(|import| import.names(name))
     }
 
+    pub fn path_of<Spelled: PartialEq<Ident>>(&self, name: &Spelled) -> Option<Vec<Name>> {
+        self.0.iter().find_map(|import| import.names(name)).map(Import::spelled_path)
+    }
+
     pub fn local_item<Spelled: PartialEq<Ident>>(
         &self,
         name: &Spelled,

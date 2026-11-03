@@ -31,10 +31,10 @@ where
 
     fn step(&mut self) -> Option<option::IntoIter<Index>> {
         let next = self.path.last_mut()?.next_neighbour();
-        Some(self.stepped(next))
+        Some(self.advanced(next))
     }
 
-    fn stepped(&mut self, next: Option<Index>) -> option::IntoIter<Index> {
+    fn advanced(&mut self, next: Option<Index>) -> option::IntoIter<Index> {
         match next {
             Some(child) => self.descended(child),
             None => self.path.pop().map(|frame| frame.node()).into_iter(),

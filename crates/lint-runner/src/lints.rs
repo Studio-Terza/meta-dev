@@ -11,7 +11,6 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
-use lint_layering::Layering;
 use lint_linear_flow::{LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
@@ -104,7 +103,6 @@ impl Lints {
             PlainConditions::report(files),
             OnGraph::<OneEdge>::report(files),
             UnconsumedTraits::report(files),
-            Layering::report(files),
             RustOnly::report(readout.repo_files()),
             WorkflowRun::report(readout.repo_files()),
         ];

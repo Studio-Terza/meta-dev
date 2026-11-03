@@ -1,15 +1,13 @@
-mod macro_items;
-
 use std::borrow::Cow;
 
 use syn::{Attribute, Item};
 
-use lint_core::{Syntax, Walk};
+use lint_core::Walk;
 use lint_layout::Name;
 
 use super::ReferencedNames;
+use super::macro_items::MacroItems;
 use crate::scope::Scope;
-use macro_items::MacroItems;
 
 #[derive(Debug)]
 pub struct Declared<'item> {
@@ -43,10 +41,14 @@ impl<'item> Declared<'item> {
     fn own(item: &Item, owner: Option<Name>, scope: &Scope<'_>) -> ReferencedNames {
         match item {
             Item::Impl(found) => ReferencedNames {
-                implemented: ReferencedNames::named(Syntax::last_name(&found.self_ty), scope, found),
+                implemented: ReferencedNames::named(Name::of_type(&found.self_ty), scope, found),
                 ..ReferencedNames::default()
             },
-            _ => ReferencedNames { declared: ReferencedNames::named(owner, scope, item), ..ReferencedNames::default() },
+            _ => ReferencedNames {
+                stand_ins: ReferencedNames::standing_in(item).into_iter().collect(),
+                declared: ReferencedNames::named(owner, scope, item),
+                ..ReferencedNames::default()
+            },
         }
     }
 }
@@ -74,7 +76,12 @@ impl<'item> From<&'item Item> for Declared<'item> {
                 None,
                 module.content.as_ref().map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
             ),
-            Item::Macro(call) => Declared::new(item, &call.attrs, None, Cow::Owned(MacroItems::declared_by(call))),
+            Item::Macro(call) => Declared::new(
+                item,
+                &call.attrs,
+                MacroItems::defined_by(call),
+                Cow::Owned(MacroItems::declared_by(call)),
+            ),
             _ => Declared::new(item, &[], None, Cow::Borrowed(&[])),
         }
     }
