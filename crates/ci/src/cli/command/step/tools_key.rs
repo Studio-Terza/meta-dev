@@ -19,11 +19,11 @@ impl ToolsKey {
     const SOURCES: &'static str = "sources";
     const DELIMITER: &'static str = "TOOLS_SOURCES";
 
-    fn listed(&self) -> Result<Text, Failure> {
+    fn listed(&self, ports: &impl Ports) -> Result<Text, Failure> {
         let arguments = [OsString::from(Self::SOURCES), self.metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(InstallTools::PROGRAMS.iter().map(|tool| tool.as_ref().to_owned()));
-        Changed::reach(arguments)
+        Changed::reach(ports, arguments)
     }
 }
 
@@ -39,8 +39,11 @@ impl Step for ToolsKey {
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
         Changed::stored_metadata(ports, &self.metadata)?;
-        let listed = self.listed()?;
-        self.output.append(format_args!("{}<<{}\n{listed}{}\n", Self::SOURCES, Self::DELIMITER, Self::DELIMITER))?;
+        let listed = self.listed(ports)?;
+        self.output.append(
+            ports.files(),
+            format_args!("{}<<{}\n{listed}{}\n", Self::SOURCES, Self::DELIMITER, Self::DELIMITER),
+        )?;
         Ok(Exit::Success)
     }
 }

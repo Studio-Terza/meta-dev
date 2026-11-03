@@ -23,13 +23,13 @@ impl Changed {
             ports,
             &Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
         )?;
-        metadata.replace(&text)
+        metadata.replace(ports.files(), &text)
     }
 
-    pub(crate) fn reach(arguments: impl Iterator<Item = OsString>) -> Result<Text, Failure> {
+    pub(crate) fn reach(ports: &impl Ports, arguments: impl Iterator<Item = OsString>) -> Result<Text, Failure> {
         let mut report = Vec::new();
         let mut refusal = Vec::new();
-        if reach::Cli::answer(arguments, &mut report, &mut refusal) == ExitCode::SUCCESS {
+        if reach::Cli::answer(arguments, ports.files(), &mut report, &mut refusal) == ExitCode::SUCCESS {
             Ok(Text::new(String::from_utf8(report).unwrap_or_default()))
         } else {
             Err(Failure::Reach(Refusal::from(refusal)))
@@ -47,6 +47,6 @@ impl Changed {
         let arguments = [OsString::from(question), metadata.as_ref().as_os_str().to_owned()]
             .into_iter()
             .chain(Lines::from(changed.as_ref()).map(OsString::from));
-        Self::reach(arguments)
+        Self::reach(ports, arguments)
     }
 }

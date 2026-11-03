@@ -1,7 +1,6 @@
 mod boundary;
 
 use std::ffi::OsString;
-use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -9,6 +8,7 @@ use boundary::Finished;
 use text_lines::Lines;
 
 use super::Step;
+use super::journal::Journal;
 use super::measured::Measured;
 use super::seconds::Seconds;
 use super::stage::Stage;
@@ -34,16 +34,15 @@ impl Step for LibtestSeconds {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
-        let text =
-            fs::read_to_string(&self.output).map_err(|source| Failure::Io { path: self.output.clone(), source })?;
+    fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure> {
+        let text = Journal::file(&self.output).read(ports.files())?;
         let results: Vec<Finished> =
-            Lines::from(text.as_str()).filter_map(|line| line.parse::<Finished>().ok()).collect();
+            Lines::from(text.as_ref()).filter_map(|line| line.parse::<Finished>().ok()).collect();
         let total: Seconds = results.iter().copied().map(Finished::seconds).sum();
         (!results.is_empty())
             .then_some(total)
             .ok_or_else(|| Failure::NoTestResult { path: self.output.clone() })
-            .and_then(|total| self.measured.append(&self.stage, total))
+            .and_then(|total| self.measured.append(ports.files(), &self.stage, total))
             .map(|()| Exit::Success)
     }
 }

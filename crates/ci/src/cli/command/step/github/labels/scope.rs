@@ -8,7 +8,7 @@ use super::hub::PullRequest;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::changed::Changed;
 use crate::cli::command::step::journal::Journal;
-use crate::cli::ports::Text;
+use crate::cli::ports::{Ports, Text};
 
 #[derive(Debug)]
 pub struct Scope<'journal> {
@@ -31,6 +31,7 @@ impl<'journal> Scope<'journal> {
 
     pub(crate) fn judged<'change>(
         &self,
+        ports: &impl Ports,
         check: Check,
         refactor: Option<&PullRequest>,
         changes: &'change [Change],
@@ -40,18 +41,22 @@ impl<'journal> Scope<'journal> {
             (Check::Goldens, Some(_)) => Ok(Owed::new(Fault::Refactor, flagged)),
             _ => flagged
                 .into_iter()
-                .map(|change| Ok(self.reaching(change)?.is_none().then_some(change)))
+                .map(|change| Ok(self.reaching(ports, change)?.is_none().then_some(change)))
                 .filter_map(Result::transpose)
                 .collect::<Result<_, Failure>>()
                 .map(|failing| Owed::new(Fault::Beyond(check), failing)),
         }
     }
 
-    fn reaching<'change>(&self, change: &'change Change) -> Result<Option<&'change Change>, Failure> {
+    fn reaching<'change>(
+        &self,
+        ports: &impl Ports,
+        change: &'change Change,
+    ) -> Result<Option<&'change Change>, Failure> {
         let beyond: Vec<Text> = change
             .paths()
             .into_iter()
-            .map(|produced| Changed::reach(self.arguments(produced)))
+            .map(|produced| Changed::reach(ports, self.arguments(produced)))
             .collect::<Result<_, _>>()?;
         Ok(beyond.iter().all(|listed| listed.as_ref().is_empty()).then_some(change))
     }

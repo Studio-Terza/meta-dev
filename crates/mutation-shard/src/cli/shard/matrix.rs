@@ -1,5 +1,7 @@
-use std::fs;
+use std::io;
 use std::path::Path;
+
+use file_ports::{Bytes, Files};
 
 use serde::Serialize;
 use test_log::TestName;
@@ -18,9 +20,10 @@ impl Matrix {
         Matrix { baseline, mutants }
     }
 
-    pub fn write(&self, destination: &Path) -> Result<(), Failure> {
+    pub fn write(&self, files: &impl Files, destination: &Path) -> Result<(), Failure> {
         let failed = |source| Failure::Parse { path: destination.to_path_buf(), source };
-        fs::write(destination, serde_json::to_string(self).map_err(failed)?)
-            .map_err(|source| Failure::Io { path: destination.to_path_buf(), source })
+        files
+            .write(destination, &Bytes::from(serde_json::to_string(self).map_err(failed)?.as_str()))
+            .map_err(|failure| Failure::Io { path: destination.to_path_buf(), source: io::Error::from(failure) })
     }
 }

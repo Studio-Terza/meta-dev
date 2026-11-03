@@ -18,8 +18,8 @@ impl Step for RatchetLower {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let record = self.record.lower()?;
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+        let record = self.record.lower(ports.files())?;
         write!(out, "record lowered to:\n{record}")?;
         Ok(Exit::Success)
     }

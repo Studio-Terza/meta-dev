@@ -1,8 +1,9 @@
 use std::ffi::OsString;
-use std::fs;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+
+use file_ports::Files;
 
 use super::super::journal::Journal;
 use super::Step;
@@ -21,8 +22,10 @@ impl Matrix {
     const MARKDOWN: &'static str = "report.md";
     const JSON: &'static str = "report.json";
 
-    fn written(&self) -> Result<Journal, Failure> {
-        fs::create_dir_all(&self.directory).map_err(|source| Failure::Io { path: self.directory.clone(), source })?;
+    fn written(&self, files: &impl Files) -> Result<Journal, Failure> {
+        files
+            .create_directories(&self.directory)
+            .map_err(|failure| Failure::Io { path: self.directory.clone(), source: io::Error::from(failure) })?;
         let markdown = self.directory.join(Self::MARKDOWN);
         let arguments = [
             self.shards.clone().into_os_string(),
@@ -31,7 +34,7 @@ impl Matrix {
             self.directory.join(Self::JSON).into_os_string(),
         ];
         let mut refusal = Vec::new();
-        match mutation_report::Cli::answer(arguments.into_iter(), &mut refusal) {
+        match mutation_report::Cli::answer(arguments.into_iter(), files, &mut refusal) {
             code if code == ExitCode::SUCCESS => Ok(Journal::file(&markdown)),
             _ => Err(Failure::Matrix(Refusal::from(refusal))),
         }
@@ -51,10 +54,10 @@ impl Step for Matrix {
         }
     }
 
-    fn carry_out(&self, _ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
-        let markdown = self.written()?.read()?;
+    fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
+        let markdown = self.written(ports.files())?.read(ports.files())?;
         write!(out, "{markdown}")?;
-        self.summary.append(&markdown)?;
+        self.summary.append(ports.files(), &markdown)?;
         Ok(Exit::Success)
     }
 }

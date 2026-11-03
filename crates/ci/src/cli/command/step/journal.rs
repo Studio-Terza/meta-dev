@@ -1,7 +1,8 @@
 use std::fmt;
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
+
+use file_ports::{Bytes, FileFailure, Files, Kind};
 
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::Text;
@@ -14,39 +15,40 @@ impl Journal {
         Journal(path.to_path_buf())
     }
 
-    pub(crate) fn append(&self, entry: impl fmt::Display) -> Result<(), Failure> {
-        self.prepared()
-            .and_then(|()| OpenOptions::new().append(true).create(true).open(&self.0))
-            .and_then(|mut file| write!(file, "{entry}"))
-            .map_err(|source| self.failed(source))
+    pub(crate) fn append(&self, files: &impl Files, entry: impl fmt::Display) -> Result<(), Failure> {
+        self.prepared(files)
+            .and_then(|()| files.append(&self.0, &Bytes::from(&entry)))
+            .map_err(|failure| self.failed(failure))
     }
 
-    pub(crate) fn emptied(&self) -> Result<Journal, Failure> {
-        self.replace(&Text::default()).map(|()| self.clone())
+    pub(crate) fn emptied(&self, files: &impl Files) -> Result<Journal, Failure> {
+        self.replace(files, &Text::default()).map(|()| self.clone())
     }
 
-    pub(crate) fn replace(&self, text: &Text) -> Result<(), Failure> {
-        self.prepared().and_then(|()| fs::write(&self.0, text.as_ref())).map_err(|source| self.failed(source))
+    pub(crate) fn replace(&self, files: &impl Files, text: &Text) -> Result<(), Failure> {
+        self.prepared(files)
+            .and_then(|()| files.write(&self.0, &Bytes::from(text.as_ref())))
+            .map_err(|failure| self.failed(failure))
     }
 
-    pub(crate) fn read(&self) -> Result<Text, Failure> {
-        fs::read_to_string(&self.0).map(Text::new).map_err(|source| self.failed(source))
+    pub(crate) fn read(&self, files: &impl Files) -> Result<Text, Failure> {
+        files.read_text(&self.0).map_err(|failure| self.failed(failure))
     }
 
-    pub(crate) fn read_or(&self, absent: Text) -> Result<Text, Failure> {
-        self.existing().map_or_else(|| Ok(absent), Journal::read)
+    pub(crate) fn read_or(&self, files: &impl Files, absent: Text) -> Result<Text, Failure> {
+        self.existing(files).map_or_else(|| Ok(absent), |journal| journal.read(files))
     }
 
-    pub(crate) fn existing(&self) -> Option<&Journal> {
-        self.0.is_file().then_some(self)
+    pub(crate) fn existing(&self, files: &impl Files) -> Option<&Journal> {
+        (files.kind(&self.0) == Kind::File).then_some(self)
     }
 
-    fn prepared(&self) -> io::Result<()> {
-        self.0.parent().map_or(Ok(()), fs::create_dir_all)
+    fn prepared(&self, files: &impl Files) -> Result<(), FileFailure> {
+        self.0.parent().map_or(Ok(()), |parent| files.create_directories(parent))
     }
 
-    fn failed(&self, source: io::Error) -> Failure {
-        Failure::Io { path: self.0.clone(), source }
+    fn failed(&self, failure: FileFailure) -> Failure {
+        Failure::Io { path: self.0.clone(), source: io::Error::from(failure) }
     }
 }
 

@@ -3,11 +3,12 @@ mod rust_files;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
-use std::fs;
+use std::io;
 use std::path::Path;
 use std::str::FromStr;
 
 use boundary::GoldenTest;
+use file_ports::Files;
 use newtype::Newtype;
 use rust_files::RustFiles;
 use text_lines::LossyText;
@@ -23,10 +24,12 @@ impl GoldenTests {
     const TEST: &'static str = "#[test]";
     const ASYNC_TEST: &'static str = "#[tokio::test]";
 
-    pub fn under(sources: &Path) -> Result<GoldenTests, Failure> {
-        RustFiles::below(&sources.join(Self::CRATES))?.iter().try_fold(GoldenTests::default(), |found, file| {
-            let bytes = fs::read(file).map_err(|source| Failure::Io { path: file.clone(), source })?;
-            Ok(found.merged(LossyText::from(bytes.as_slice()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
+    pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure> {
+        RustFiles::below(files, &sources.join(Self::CRATES))?.iter().try_fold(GoldenTests::default(), |found, file| {
+            let bytes = files
+                .read(file)
+                .map_err(|failure| Failure::Io { path: file.clone(), source: io::Error::from(failure) })?;
+            Ok(found.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
         })
     }
 
