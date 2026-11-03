@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_repeated_methods::RepeatedMethods;
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
@@ -145,6 +146,7 @@ fn one_method_shape_on_many_types_is_flagged() {
 #[test]
 fn a_report_names_the_method_and_the_types_that_repeat_it() {
     let constructors =
-        Sources::report::<RepeatedMethods>(&[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTORS))]).to_string();
+        RepeatedMethods::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(CONSTRUCTORS))]))
+            .to_string();
     assert!(constructors.contains("fn new(Inner) -> Self on A, B, C"));
 }

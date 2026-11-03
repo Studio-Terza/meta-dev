@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use file_ports::Files;
+use lint_reader::SourceFiles;
 
 use failure::Failure;
 use workspace::Workspace;
@@ -71,7 +72,8 @@ impl Cli {
             }
             Some(Self::HUBS) => {
                 let repository = arguments.next().ok_or(Failure::Usage).map(PathBuf::from)?;
-                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.hubs(files, &repository)?)?)
+                let readout = SourceFiles::read(files, &repository)?;
+                Ok(write!(out, "{}", Self::workspace(files, &metadata)?.hubs(readout.files(), &repository))?)
             }
             Some(Self::FAN_IN) => Ok(write!(out, "{}", Self::workspace(files, &metadata)?.fan_in())?),
             _ => Err(Failure::Usage),

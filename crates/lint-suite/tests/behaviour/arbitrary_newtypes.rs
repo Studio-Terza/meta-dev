@@ -1,4 +1,5 @@
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 
 const NONE: [&str; 0] = [];
@@ -33,6 +34,6 @@ laws::table!(generated_borrowing_and_plain_types_pass, Sources::flagged::<Arbitr
 #[test]
 fn the_message_names_the_type_and_the_derive_to_add() {
     let report =
-        Sources::report::<ArbitraryNewtypes>(&[Source::new(Located::new("a.rs"), Text::new(COUNT))]).to_string();
+        ArbitraryNewtypes::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(COUNT))])).to_string();
     assert!(report.contains("Count has no generator; add `Arbitrary` to its derives"));
 }

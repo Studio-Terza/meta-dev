@@ -15,7 +15,7 @@ use lint_layout::SourceText;
 pub struct NoComments;
 
 impl Lint for NoComments {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("comments are not allowed in this repository"),
             files

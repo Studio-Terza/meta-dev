@@ -1,7 +1,7 @@
 mod type_key;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::Path;
 
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
@@ -14,28 +14,38 @@ use lint_paths::Module;
 use super::Finding;
 use type_key::TypeKey;
 
-#[derive(Debug, Default)]
-pub struct Guards {
-    path: PathBuf,
+#[derive(Debug)]
+pub struct Guards<'file> {
+    path: &'file Path,
     module: Module,
     declared: BTreeSet<TypeKey>,
-    unmarked: BTreeMap<Site, TypeKey>,
+    unmarked: BTreeMap<Site<'file>, TypeKey>,
     aliases: BTreeMap<TypeKey, Name>,
     dropped: Vec<TypeKey>,
 }
 
-impl Guards {
+impl<'file> Guards<'file> {
     const DROP: &str = "Drop";
     const MUST_USE: &str = "must_use";
     const CONDITIONAL: &str = "cfg_attr";
 
-    pub fn scan(&mut self, file: &SourceFile) {
-        file.path().clone_into(&mut self.path);
-        self.module = Module::of_file(file);
-        self.visit_file(file.syntax());
+    pub fn scanned(files: &[&'file SourceFile]) -> Guards<'file> {
+        let empty = Guards {
+            path: Path::new(""),
+            module: Module::default(),
+            declared: BTreeSet::new(),
+            unmarked: BTreeMap::new(),
+            aliases: BTreeMap::new(),
+            dropped: Vec::new(),
+        };
+        files.iter().fold(empty, |guards, file| {
+            let mut next = Guards { path: file.path(), module: Module::of_file(file), ..guards };
+            next.visit_file(file.syntax());
+            next
+        })
     }
 
-    pub fn violations(self) -> Vec<Violation> {
+    pub fn violations(self) -> Vec<Violation<'file>> {
         let bound: BTreeSet<TypeKey> = self.dropped.iter().flat_map(|key| self.bound(key)).collect();
         self.unmarked
             .into_iter()
@@ -68,7 +78,7 @@ impl Guards {
     }
 
     fn declared(&mut self, attributes: &[Attribute], name: &Ident) {
-        let site = Site::new(&self.path, LineNumber::from(name.span()));
+        let site = Site::new(self.path, LineNumber::from(name.span()));
         let key = TypeKey::new(self.module.clone(), Name::from(name));
         self.declared.insert(key.clone());
         self.unmarked.extend(attributes.iter().find_map(Self::mark).map_or(Some((site, key)), |_| None));
@@ -89,7 +99,7 @@ impl Guards {
     }
 }
 
-impl<'ast> Visit<'ast> for Guards {
+impl<'ast> Visit<'ast> for Guards<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let outer = self.module.clone();
         self.module = outer.within(&Name::from(&module.ident));

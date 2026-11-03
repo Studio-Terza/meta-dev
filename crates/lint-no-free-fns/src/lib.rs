@@ -17,7 +17,7 @@ use lint_layout::LineNumber;
 pub struct NoFreeFns;
 
 impl Lint for NoFreeFns {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("free functions are not allowed; make them associated functions or methods"),
             files.iter().flat_map(|file| Self::free_fns(file.path(), file.syntax())).collect(),
@@ -28,7 +28,7 @@ impl Lint for NoFreeFns {
 impl NoFreeFns {
     const REQUIRED_FREE: [&'static str; 4] = ["test", "proc_macro", "proc_macro_derive", "proc_macro_attribute"];
 
-    fn free_fns(path: &StdPath, file: &syn::File) -> Vec<Violation> {
+    fn free_fns<'file>(path: &'file StdPath, file: &syn::File) -> Vec<Violation<'file>> {
         let mut visitor = FreeFns { path, found: Vec::new() };
         visitor.visit_file(file);
         visitor.found
@@ -51,7 +51,7 @@ impl NoFreeFns {
 
 struct FreeFns<'file> {
     path: &'file StdPath,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl<'ast> Visit<'ast> for FreeFns<'_> {

@@ -20,7 +20,7 @@ use std::path::Path;
 pub struct SignatureIndex(BTreeMap<Shape, Members>);
 
 impl SignatureIndex {
-    pub fn violations(self, path: &Path) -> impl Iterator<Item = Violation> {
+    pub fn violations(self, path: &Path) -> impl Iterator<Item = Violation<'_>> {
         self.0.into_iter().filter(|(_, members)| members.names().len() > 1).map(move |(shape, members)| {
             Violation::new(Site::new(path, members.first()), Finding::new(members.names(), shape))
         })

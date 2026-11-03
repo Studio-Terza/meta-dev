@@ -14,7 +14,7 @@ pub struct EffectSites;
 pub struct EffectsInPorts;
 
 impl Lint for EffectsInPorts {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
                 "effects on files, environment, clock, network, processes, randomness and stdio happen only in ports",
@@ -34,7 +34,7 @@ impl EffectSites {
 }
 
 impl Lint for EffectSites {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
                 "report only, effect sites in shipped code per crate (files, environment, clock, network, processes, randomness, stdio), counted everywhere, listed only outside ports; move each behind a port: a crate whose name ends in ports, or a module named ports",

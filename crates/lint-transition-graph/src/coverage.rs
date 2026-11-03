@@ -20,7 +20,9 @@ pub(crate) struct Coverage {
 }
 
 impl Coverage {
-    pub(crate) fn tallied<'edge, 'found: 'edge>(edges: impl Iterator<Item = &'edge Edge<'found>>) -> Coverage {
+    pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
+        edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
+    ) -> Coverage {
         edges.fold(Coverage::default(), |tally, edge| match (edge.role(), edge.ends().class()) {
             (Role::Written, Class::Covered) => {
                 Coverage { written: tally.written.incremented(), covered: tally.covered.incremented(), ..tally }
@@ -31,8 +33,8 @@ impl Coverage {
         })
     }
 
-    pub(crate) fn violation(self, first: Option<&Site>) -> Option<Violation> {
-        first.map(|site| Violation::new(site.clone(), Workspace(self)))
+    pub(crate) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {
+        first.map(|site| Violation::new(site, Workspace(self)))
     }
 }
 

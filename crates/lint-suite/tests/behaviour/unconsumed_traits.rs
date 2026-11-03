@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_unconsumed_traits::UnconsumedTraits;
 
@@ -84,7 +85,8 @@ fn traits_with_methods_and_no_generic_consumer_are_flagged() {
 
 #[test]
 fn a_finding_names_the_trait_and_the_fixes_in_order() {
-    let text = Sources::report::<UnconsumedTraits>(&[Source::new(Located::new("a.rs"), Text::new(BARE))]).to_string();
+    let text =
+        UnconsumedTraits::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(BARE))])).to_string();
     assert!(text.contains("trait Shape has no generic consumer"), "{text}");
     assert!(text.contains("a standard trait such as From, AsRef or Display, else write the generic over an existing trait, else a derive"), "{text}");
     assert!(!text.contains("helper"));

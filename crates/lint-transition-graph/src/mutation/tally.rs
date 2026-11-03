@@ -17,7 +17,7 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counts<'edge, 'found>(edge: &'edge Edge<'found>) -> Option<&'edge Edge<'found>> {
+    pub(super) fn counts<'edge, 'found, 'file>(edge: &'edge Edge<'found, 'file>) -> Option<&'edge Edge<'found, 'file>> {
         match (edge.role(), *AsRef::<Ground>::as_ref(edge.transition()), edge.transition().mutation()) {
             (Role::Operation, _, _) | (_, Ground::Core, Mutation::ThroughSelf | Mutation::ThroughParameter) => {
                 Some(edge)
@@ -26,7 +26,9 @@ impl Tally {
         }
     }
 
-    pub(super) fn counted<'edge, 'found: 'edge>(edges: impl Iterator<Item = &'edge Edge<'found>>) -> Tally {
+    pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
+        edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
+    ) -> Tally {
         edges.fold(Tally::default(), |tally, edge| {
             let counted = match (edge.role(), edge.transition().mutation()) {
                 (Role::Operation, _) => Tally { operations: tally.operations.incremented(), ..tally },
@@ -42,8 +44,8 @@ impl Tally {
         })
     }
 
-    pub(super) fn violation(self, first: Option<&Site>) -> Option<Violation> {
-        first.map(|site| Violation::new(site.clone(), Workspace(self)))
+    pub(super) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {
+        first.map(|site| Violation::new(site, Workspace(self)))
     }
 }
 

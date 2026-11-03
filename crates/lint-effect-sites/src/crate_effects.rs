@@ -17,30 +17,29 @@ use summary::Summary;
 use vocabulary::Vocabulary;
 
 #[derive(Debug)]
-pub(crate) struct CrateEffects(Vec<EffectSite>);
+pub(crate) struct CrateEffects<'file>(Vec<EffectSite<'file>>);
 
-impl CrateEffects {
-    pub(crate) fn found(files: &[&SourceFile]) -> CrateEffects {
+impl<'file> CrateEffects<'file> {
+    pub(crate) fn found(files: &[&'file SourceFile]) -> CrateEffects<'file> {
         let called = Paths::read(files.iter().copied(), &Vocabulary::FINALS);
-        let scans: Vec<FileScan<'_>> = files.iter().map(|file| FileScan::scanned(file)).collect();
-        let tested: BTreeSet<&Site> = scans.iter().flat_map(FileScan::tested).collect();
-        let mut sites: Vec<EffectSite> = called
+        let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
+        let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();
+        let mut sites: Vec<EffectSite<'file>> = called
             .iter()
             .filter_map(Vocabulary::site_of)
-            .filter(|site| !tested.contains(site.place()))
+            .filter(|site| !tested.contains(&site.place()))
             .chain(scans.iter().flat_map(FileScan::printed).cloned())
             .collect();
-        sites.sort_by(|left, right| left.place().cmp(right.place()));
+        sites.sort_by_key(EffectSite::place);
         CrateEffects(sites)
     }
 
-    pub(crate) fn violations(&self, name: &CrateName) -> Vec<Violation> {
-        let summary =
-            self.0.first().map(|first| Violation::new(first.place().clone(), Summary::counted(name, &self.0)));
+    pub(crate) fn violations(&self, name: &CrateName) -> Vec<Violation<'file>> {
+        let summary = self.0.first().map(|first| Violation::new(first.place(), Summary::counted(name, &self.0)));
         summary.into_iter().chain(self.outside_ports()).collect()
     }
 
-    pub(crate) fn outside_ports(&self) -> Vec<Violation> {
+    pub(crate) fn outside_ports(&self) -> Vec<Violation<'file>> {
         self.0.iter().filter_map(EffectSite::outside_ports).collect()
     }
 }

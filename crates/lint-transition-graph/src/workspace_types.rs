@@ -16,7 +16,7 @@ pub(crate) struct WorkspaceTypes {
 }
 
 impl WorkspaceTypes {
-    pub(crate) fn declared(facts: &Facts) -> WorkspaceTypes {
+    pub(crate) fn declared(facts: &Facts<'_>) -> WorkspaceTypes {
         WorkspaceTypes {
             types: facts.types().iter().fold(
                 BTreeMap::new(),
@@ -36,7 +36,7 @@ impl WorkspaceTypes {
         Count::new(self.types.values().filter(|crates| crates.contains(krate)).count())
     }
 
-    pub(crate) fn edge<'found>(&self, transition: &'found Transition) -> Edge<'found> {
+    pub(crate) fn edge<'found, 'file>(&self, transition: &'found Transition<'file>) -> Edge<'found, 'file> {
         let fixed_by = transition.filler().trait_name().filter(|name| !self.traits.contains(*name));
         let from: &CrateName = transition.as_ref();
         let end = |endpoint: &Endpoint| self.end(from, endpoint, fixed_by);

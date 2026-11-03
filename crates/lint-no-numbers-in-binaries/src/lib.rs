@@ -18,7 +18,7 @@ use lint_named_numbers::NamedNumbers;
 pub struct NoNumbersInBinaries;
 
 impl Lint for NoNumbersInBinaries {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let binaries = BinaryFiles::collect(files);
         Report::new(
             Headline::new("a binary is wiring: a number it needs is a setting in its config file"),

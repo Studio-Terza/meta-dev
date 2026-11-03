@@ -16,7 +16,7 @@ impl Found {
         Found { line, finding }
     }
 
-    pub(crate) fn violation(self, shown: &Path) -> Violation {
+    pub(crate) fn violation(self, shown: &Path) -> Violation<'_> {
         Violation::new(Site::new(shown, self.line), self.finding)
     }
 }

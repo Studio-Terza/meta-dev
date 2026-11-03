@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 use lint_repeated_bodies::RepeatedBodies;
 
@@ -145,7 +146,8 @@ fn bodies_repeated_with_names_and_literals_erased_are_listed_once_per_family() {
 
 #[test]
 fn a_finding_lists_its_size_its_copies_and_the_fixes_in_order() {
-    let text = Sources::report::<RepeatedBodies>(&[Source::new(Located::new("a.rs"), Text::new(THREE))]).to_string();
+    let text =
+        RepeatedBodies::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
     assert!(text.contains("46 tokens in 3 copies, also at a.rs:15, a.rs:29; "), "{text}");
     assert!(text.contains("a standard trait such as From, TryFrom, FromStr or Display, else a generic over an existing trait, else a derive"), "{text}");
     assert!(!text.contains("helper"));
@@ -153,9 +155,10 @@ fn a_finding_lists_its_size_its_copies_and_the_fixes_in_order() {
 
 #[test]
 fn a_nested_family_is_not_listed_beside_its_outer_family() {
-    let report = Sources::report::<RepeatedBodies>(&[
+    let files = Sources::parsed(&[
         Source::new(Located::new("a.rs"), Text::new(NESTED_A)),
         Source::new(Located::new("b.rs"), Text::new(NESTED_B)),
     ]);
+    let report = RepeatedBodies::report(&files);
     assert_eq!(report.violations().len(), 1);
 }

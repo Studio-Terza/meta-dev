@@ -1,6 +1,7 @@
 mod boundary;
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use boundary::Nesting;
 use file_ports::Absent;
@@ -8,6 +9,7 @@ use lint_layout::Failure;
 use lint_layout::LineNumber;
 use lint_layout::SourceText;
 use lint_placement::CrateFile;
+use lint_placement::ManifestFile;
 use lint_placement::Placement;
 use lint_placement::Role;
 
@@ -20,6 +22,7 @@ pub struct SourceFile {
     text: SourceText,
     syntax: syn::File,
     test_modules: Vec<SourceFile>,
+    manifest: OnceLock<ManifestFile>,
 }
 
 impl SourceFile {
@@ -42,7 +45,16 @@ impl SourceFile {
             source,
         })?;
         let crate_file = placement.crate_file(&path);
-        Ok(Self { path, located, placement, crate_file, text, syntax, test_modules: Vec::new() })
+        Ok(Self {
+            path,
+            located,
+            placement,
+            crate_file,
+            text,
+            syntax,
+            test_modules: Vec::new(),
+            manifest: OnceLock::new(),
+        })
     }
 
     #[must_use]
@@ -76,10 +88,12 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn manifest_file(&self) -> PathBuf {
-        let inside = self.located.strip_prefix(self.placement.package().root().directory()).ok();
-        let depth = inside.map_or(0, |inside| inside.components().count());
-        self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST)
+    pub fn manifest_file(&self) -> &ManifestFile {
+        self.manifest.get_or_init(|| {
+            let inside = self.located.strip_prefix(self.placement.package().root().directory()).ok();
+            let depth = inside.map_or(0, |inside| inside.components().count());
+            ManifestFile::from(self.path.ancestors().nth(depth).unwrap_or(&self.path).join(Self::MANIFEST))
+        })
     }
 
     #[must_use]
