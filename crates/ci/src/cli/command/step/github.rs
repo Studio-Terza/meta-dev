@@ -1,3 +1,5 @@
+mod compile_trend;
+mod issue;
 mod labels;
 mod pull_number;
 mod show;
@@ -8,6 +10,7 @@ mod wall_times;
 
 use super::Step;
 
+pub use compile_trend::CompileTrend;
 pub use labels::Labels;
 pub use show::Show;
 pub use spec_line::SpecLine;

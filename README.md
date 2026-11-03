@@ -141,6 +141,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
+    ci compile-trend <cold build> <downloads>                   the trend issue when the cold build is slowest
     ci wall-times <repository> <run> <job>                      wall time per step, from the GitHub API
     ci show <file>...                                           print files, and say which are absent
     ci labels <base branch> <pull request>                      the golden-change and new-scenario checks
@@ -236,6 +237,11 @@ as three parallel jobs, and each times and judges only its own stages (`clippy`;
 so a stage is still judged alone; a named stage with no limit, or a limit with no measurement, fails. A stage with a limit
 but no measurement, or a measurement with no limit, also fails. The levels come from seven cold runs
 on `ubuntu-latest`: block just above the slowest run, warn just above the median.
+Test compile is judged and printed on every pull request and push but never fails a job (`--report-only test-compile`).
+Compile time is tracked by the daily cold build instead: `ci compile-trend` compares its total with each successful cold
+build on main in the previous 14 days, downloaded from their artifacts, and when today is slower than every one of them
+opens, or updates, one issue titled as a compile-time trend. Its body gives the total against the fortnight's range, the
+crates that grew most against their fortnight average, and the pull requests merged into main in the fortnight.
 The Rust toolchain, the CI tools (built in the dev profile, so they reuse the test build's compiled crates) and compiled crates (`sccache`) are cached.
 
 ## Reach

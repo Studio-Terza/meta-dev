@@ -584,6 +584,9 @@ laws::table!(
         ["reach", "metadata.json", "push", "main", "env", "sum", "extra"] => true,
         ["stage-issues"] => true,
         ["stage-issues", "limits.toml"] => true,
+        ["compile-trend"] => true,
+        ["compile-trend", "today"] => true,
+        ["compile-trend", "today", "runs", "extra"] => true,
         ["compile-times"] => true,
         ["compile-times", "page.html"] => true,
         ["compile-times", "page.html", "report.txt", "extra"] => true,
@@ -1051,6 +1054,163 @@ fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported()
     assert_eq!(Answer::to(&failing, &arguments).exit, ExitCode::from(FAILED_WITH.get()));
     let unmeasured = Gh::stage_issues(&scratch, "clippy = 12\n")?;
     assert!(Answer::to(&Fake::new(), &unmeasured).err.contains("the limits cannot be judged"));
+    Ok(())
+}
+
+const TREND_TITLE: &str = "compile-time trend: the cold build is slower than every run of the previous 14 days";
+const TREND_BODY: [&str; 9] = [
+    "The cold build, clippy and test compile from scratch, took 58.00s in all today; the 2 runs of the previous 14 days took 50.00s to 54.00s: slower than every one of them.",
+    "",
+    "Crates that grew most, seconds today against their average over those runs:",
+    "+7.00 lint-core: 12.00 against 5.00",
+    "+1.00 lint-new: 1.00 against 0.00",
+    "",
+    "Pull requests merged into main in the previous 14 days, as context:",
+    "#254 strict boundary",
+    "#250 bool strict",
+];
+
+struct Cold;
+
+impl Cold {
+    fn build(scratch: &Scratch, directory: &str, measured: &str, units: &[String]) -> io::Result<()> {
+        let root = scratch.path().join(directory);
+        Scratch::placed(&root.join("measured.toml"), measured)?;
+        ["clippy", "test-compile"].iter().try_for_each(|stage| {
+            Scratch::placed(
+                &root.join(stage).join("cargo-timings").join("cargo-timing.html"),
+                &Page::with(&units.join(",")),
+            )
+        })
+    }
+
+    fn fortnight(scratch: &Scratch, today: &str) -> io::Result<Vec<String>> {
+        let grown = [
+            Page::unit("lint-core", "6.0"),
+            Page::unit("syn", "4.0"),
+            Page::unit("ci", "1.0"),
+            Page::unit("lint-new", "0.5"),
+        ];
+        Cold::build(scratch, "today", &format!("cold-clippy = 13\ncold-test-compile = {today}\n"), &grown)?;
+        let first = [Page::unit("lint-core", "2.0"), Page::unit("syn", "4.0"), Page::unit("ci", "1.5")];
+        Cold::build(scratch, "runs/11", "cold-clippy = 10\ncold-test-compile = 40\n", &first)?;
+        let second = [Page::unit("lint-core", "3.0"), Page::unit("syn", "4.0")];
+        Cold::build(scratch, "runs/12", "cold-clippy = 12\ncold-test-compile = 42\n", &second)?;
+        Ok(["compile-trend", &scratch.file("today"), &scratch.file("runs")].map(str::to_owned).to_vec())
+    }
+
+    fn answers(runs: &str, issues: &str) -> Vec<Reply> {
+        vec![
+            Reply::to("gh run", runs),
+            Reply::to("gh pr", "#254 strict boundary\n#250 bool strict\n"),
+            Reply::to("gh issue", issues),
+        ]
+    }
+
+    fn runs() -> Invocation {
+        Gh::call(&[
+            "run",
+            "list",
+            "--workflow",
+            "cold-build.yml",
+            "--branch",
+            "main",
+            "--status",
+            "success",
+            "--limit",
+            "100",
+            "--json",
+            "databaseId,createdAt",
+            "--jq",
+            "[.[] | select((.createdAt | fromdate) > now - 14 * 86400) | .databaseId]",
+        ])
+    }
+
+    fn download(scratch: &Scratch, run: &str) -> Invocation {
+        Gh::call(&["run", "download", run, "--name", "cold-build", "--dir", &scratch.file(&format!("runs/{run}"))])
+    }
+
+    fn merged() -> Invocation {
+        Gh::call(&[
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--base",
+            "main",
+            "--search",
+            "sort:updated-desc",
+            "--limit",
+            "100",
+            "--json",
+            "number,title,mergedAt",
+            "--jq",
+            r##".[] | select((.mergedAt | fromdate) > now - 14 * 86400) | "#\(.number) \(.title)""##,
+        ])
+    }
+}
+
+#[test]
+fn a_cold_build_slower_than_every_run_of_the_fortnight_opens_one_trend_issue_with_its_context()
+-> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Cold::fortnight(&scratch, "45")?;
+    let fake = Fake::answering(Cold::answers("[11, 12]", "[]"));
+    let answer = Answer::to(&fake, &arguments);
+    let body = [TREND_BODY.join("\n"), String::from("\n")].concat();
+    assert_eq!(answer.exit, ExitCode::SUCCESS, "{}", answer.err);
+    assert_eq!(
+        Text::lines(&answer.out),
+        [TREND_BODY.to_vec(), vec![&format!("opening an issue: {TREND_TITLE}")]].concat()
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            Cold::runs(),
+            Cold::download(&scratch, "11"),
+            Cold::download(&scratch, "12"),
+            Cold::merged(),
+            Gh::search(TREND_TITLE),
+            Gh::call(&["issue", "create", "--title", TREND_TITLE, "--body", &body]),
+        ]
+    );
+    let listed = format!(r#"[{{"number":3,"title":"compile-time trend"}},{{"number":8,"title":"{TREND_TITLE}"}}]"#);
+    let open = Fake::answering(Cold::answers("[11, 12]", &listed));
+    Answer::to(&open, &arguments);
+    assert_eq!(open.calls.borrow().last(), Some(&Gh::call(&["issue", "edit", "8", "--body", &body])));
+    Ok(())
+}
+
+#[test]
+fn a_cold_build_within_the_fortnight_or_without_one_opens_nothing() -> Result<(), Box<dyn Error>> {
+    for (today, runs, said) in [
+        ("39", "[11, 12]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
+        ("41", "[12, 11]", "; the 2 runs of the previous 14 days took 50.00s to 54.00s, so no trend issue."),
+        ("45", "[]", "; no run of the previous 14 days to compare with, so no trend issue."),
+    ] {
+        let scratch = Scratch::new()?;
+        let fake = Fake::answering(Cold::answers(runs, "[]"));
+        let answer = Answer::to(&fake, &Cold::fortnight(&scratch, today)?);
+        assert_eq!(answer.exit, ExitCode::SUCCESS, "{}", answer.err);
+        assert_eq!(answer.out.matches(&format!("{said}\n")).count(), 1, "{}", answer.out);
+        assert!(fake.calls.borrow().iter().all(|call| call.arguments().first().is_some_and(|first| first == "run")));
+    }
+    Ok(())
+}
+
+#[test]
+fn cold_builds_that_cannot_be_listed_downloaded_or_read_are_reported() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = Cold::fortnight(&scratch, "45")?;
+    let undownloaded = Fake::answering(Cold::answers("[13]", "[]"));
+    assert!(Answer::to(&undownloaded, &arguments).err.contains("cannot use"));
+    let garbled = Fake::answering(Cold::answers("nope", "[]"));
+    assert!(Answer::to(&garbled, &arguments).err.contains("cannot read the list of cold builds"));
+    assert_eq!(Text::lines(&Answer::to(&Fake::refusing("gh"), &arguments).err), ["cannot run gh: boom"]);
+    scratch.write("today/measured.toml", "cold-clippy = soon\n")?;
+    assert!(Answer::to(&Fake::new(), &arguments).err.contains("cannot read the stage times in"));
+    let absent = ["compile-trend", &scratch.file("none"), &scratch.file("runs")];
+    assert!(Answer::to(&Fake::new(), &absent).err.contains("cannot use"));
     Ok(())
 }
 

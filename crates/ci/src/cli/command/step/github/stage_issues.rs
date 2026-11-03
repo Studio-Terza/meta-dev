@@ -1,15 +1,10 @@
-mod number;
-mod search;
-mod ticket;
-
 use std::ffi::OsString;
 use std::io::Write;
 
 use super::Step;
+use super::issue::{Issue, Title};
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Exit, Ports};
-use search::Search;
-use ticket::Ticket;
 
 #[derive(Debug)]
 pub struct StageIssues {
@@ -27,7 +22,9 @@ impl Step for StageIssues {
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure> {
         self.limits.past_warn()?.iter().try_fold(Exit::Success, |exit, finding| {
             exit.followed_by(|| {
-                Ticket::open_for(finding, Search::for_stage(finding.stage()).number_among(ports)?).filed(ports, out)
+                let stage = finding.stage();
+                writeln!(out, "{stage} is past its warn level")?;
+                Issue::titled(Title::new(stage.as_ref()), ports)?.filed(finding, ports, out)
             })
         })
     }
