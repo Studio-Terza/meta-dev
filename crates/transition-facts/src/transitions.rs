@@ -2,11 +2,12 @@ mod collector;
 
 use lint_core::SourceFile;
 
+use crate::context::Context;
 use crate::transition::Transition;
 use collector::Collector;
 
-#[derive(Clone, Debug, Default)]
-pub struct Transitions<'file>(Vec<Transition<'file>>);
+#[derive(Debug, Default)]
+pub struct Transitions<'file>(Vec<Context<'file>>);
 
 impl<'file> Transitions<'file> {
     #[must_use]
@@ -14,8 +15,9 @@ impl<'file> Transitions<'file> {
         Transitions(files.iter().filter_map(SourceFile::shipped).flat_map(Collector::collected).collect())
     }
 
-    #[must_use]
-    pub fn all(&self) -> &[Transition<'file>] {
-        &self.0
+    pub fn all(&self) -> impl Iterator<Item = Transition<'_, 'file>> {
+        self.0
+            .iter()
+            .flat_map(|context| context.functions().iter().map(move |function| Transition::new(context, function)))
     }
 }

@@ -11,24 +11,24 @@ impl Read {
     }
 
     fn signature(found: &Transition) -> String {
-        let takes: Vec<String> = found.takes().iter().map(Self::endpoint).collect();
-        let fixed = found.filler().trait_name().map(ToString::to_string).unwrap_or_default();
+        let takes: Vec<String> = found.takes().map(Self::endpoint).collect();
+        let fixed = found.context().trait_name().map(ToString::to_string).unwrap_or_default();
         format!(
             "{found}({}) -> {} {:?} {:?} {fixed}",
             takes.join(", "),
             Self::endpoint(found.gives()),
-            found.mutation(),
+            found.function().mutation(),
             AsRef::<Ground>::as_ref(found)
         )
     }
 
     fn bodies(found: &Transition) -> String {
-        format!("{} {:?}", AsRef::<Name>::as_ref(found), found.body())
+        format!("{} {:?}", AsRef::<Name>::as_ref(found.function()), found.function().body())
     }
 
     fn files(files: &[Source], shown: fn(&Transition) -> String) -> Vec<String> {
         let parsed: Vec<SourceFile> = files.iter().map(|source| Sources::file(source.path(), source.text())).collect();
-        Transitions::of_files(&parsed).all().iter().map(shown).collect()
+        Transitions::of_files(&parsed).all().map(|found| shown(&found)).collect()
     }
 
     fn signatures(text: &'static str) -> Vec<String> {

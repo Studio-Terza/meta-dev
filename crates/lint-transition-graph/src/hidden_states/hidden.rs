@@ -8,10 +8,10 @@ use transition_facts::Transition;
 use crate::count::Count;
 
 #[derive(Debug)]
-pub(super) struct Hidden<'found, 'file>(&'found Transition<'file>);
+pub(super) struct Hidden<'found, 'file>(&'found Transition<'found, 'file>);
 
 impl<'found, 'file> Hidden<'found, 'file> {
-    pub(super) fn new(found: &'found Transition<'file>) -> Hidden<'found, 'file> {
+    pub(super) fn new(found: &'found Transition<'found, 'file>) -> Hidden<'found, 'file> {
         Hidden(found)
     }
 }
@@ -24,7 +24,7 @@ impl<'file> From<Hidden<'_, 'file>> for Violation<'file> {
 
 impl fmt::Display for Hidden<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let branches = self.0.branches();
+        let branches = self.0.function().branches();
         write!(
             formatter,
             "{} branches {branches} ways, {} unnamed intermediate states",
@@ -50,11 +50,13 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counted(written: &[&Transition<'_>], above: &[&Transition<'_>]) -> Tally {
+    pub(super) fn counted(written: &[&Transition<'_, '_>], above: &[&Transition<'_, '_>]) -> Tally {
         Tally {
             written: Count::new(written.len()),
             above: Count::new(above.len()),
-            states: Count::total(above.iter().map(|found| Count::new(found.branches().count().saturating_sub(1)))),
+            states: Count::total(
+                above.iter().map(|found| Count::new(found.function().branches().count().saturating_sub(1))),
+            ),
         }
     }
 }

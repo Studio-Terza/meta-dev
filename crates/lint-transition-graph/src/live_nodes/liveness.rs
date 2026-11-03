@@ -20,7 +20,7 @@ pub(super) enum Usage {
 
 #[derive(Debug)]
 pub(super) struct Liveness<'found, 'file> {
-    node: &'found Node,
+    node: &'found Node<'found>,
     site: Site<'file>,
     reach: Reach,
     usage: Usage,
@@ -28,7 +28,7 @@ pub(super) struct Liveness<'found, 'file> {
 
 impl<'found, 'file> Liveness<'found, 'file> {
     pub(super) fn judged(
-        node: &'found Node,
+        node: &'found Node<'found>,
         site: Site<'file>,
         reach: Reach,
         usage: Usage,
