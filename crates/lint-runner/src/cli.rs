@@ -6,13 +6,11 @@ use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
-use lint_clones::Clones;
-use lint_core::{Lint, Readout};
-use lint_paired_apis::PairedApis;
+use lint_core::Readout;
+use lint_layout::Failure;
 use lint_reader::SourceFiles;
-use lint_test_budget::TestBudget;
 
-use crate::{Elegance, Lints, Mode, Outcome, StackSize};
+use crate::{Mode, Outcome, StackSize};
 
 #[derive(Debug)]
 pub struct Cli {
@@ -22,10 +20,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn from_args(arguments: impl Iterator<Item = OsString>) -> Cli {
-        let given: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
-        let roots: Vec<PathBuf> =
-            given.iter().filter(|argument| argument.as_os_str() != Mode::REPORT_FLAG).cloned().collect();
-        Cli { roots: if roots.is_empty() { vec![PathBuf::from(".")] } else { roots }, mode: Mode::of_arguments(&given) }
+        let given: Vec<OsString> = arguments.collect();
+        let mode = Mode::of_arguments(&given);
+        let roots = mode.roots(&given);
+        Cli { roots: if roots.is_empty() { vec![PathBuf::from(".")] } else { roots }, mode }
     }
 
     #[must_use]
@@ -52,7 +50,17 @@ impl Cli {
     }
 
     fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match SourceFiles::read_all(files, &self.roots).as_ref().map(|readout| self.outcome_of(readout, out)) {
+        match self.mode.refusal() {
+            Some(refused) => {
+                writeln!(err, "{refused}").ok();
+                ExitCode::FAILURE
+            }
+            None => self.ended(SourceFiles::read_all(files, &self.roots).as_ref(), out, err),
+        }
+    }
+
+    fn ended(&self, read: Result<&Readout, &Failure>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        match read.map(|readout| self.mode.outcome_of(readout, out)) {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
                 write!(err, "{violations}").ok();
@@ -61,21 +69,6 @@ impl Cli {
             Err(failure) => {
                 writeln!(err, "{failure}").ok();
                 ExitCode::FAILURE
-            }
-        }
-    }
-
-    fn outcome_of<'file>(&self, readout: &'file Readout, out: &mut impl Write) -> Outcome<'file> {
-        let files = readout.files();
-        match self.mode {
-            Mode::Gate => {
-                write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))
-                    .ok();
-                Lints::checked(readout)
-            }
-            Mode::Report => {
-                Elegance::reports(files).iter().try_for_each(|report| write!(out, "{report}")).ok();
-                Outcome::Clean
             }
         }
     }

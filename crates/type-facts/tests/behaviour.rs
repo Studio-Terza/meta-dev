@@ -2,7 +2,7 @@ use lint_core::Site;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_placement::CrateName;
-use type_facts::{Dependency, Facts, Shape, TypeFact, Via};
+use type_facts::{Dependency, Facts, GenericImpl, Method, Shape, TypeFact, Via};
 
 struct Described;
 
@@ -173,6 +173,92 @@ fn types_and_traits_inside_inline_modules_are_found() {
     let facts = Facts::of_files(&files);
     assert_eq!(Described::names(&facts), ["A"]);
     assert_eq!(facts.traits().len(), 1);
+}
+
+#[test]
+fn method_shapes_erase_names_but_keep_the_receiver_self_arguments_and_return_shape() {
+    let files = Sources::parsed(&[Described::file(
+        "a.rs",
+        "struct A;\nimpl A {\n    fn one(&self, other: &A, key: Key) -> Option<A> {}\n    fn two(&mut self) -> Vec<B> {}\n    fn three(self) -> Result<Self, E> {}\n    fn four(item: Self) -> impl Iterator<Item = B> {}\n    fn five(&self) -> &[B] {}\n    fn six() -> Self {}\n    fn seven(&self) -> B {}\n    fn eight(&self) -> () {}\n    fn nine(&self) -> (Self) {}\n    fn ten(&self) -> (A, B) {}\n}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let shapes: Vec<String> =
+        facts.methods(Described::only(&facts)).iter().map(|method| method.shape().to_string()).collect();
+    assert_eq!(
+        shapes,
+        [
+            "fn(&self, Self, _) -> Option",
+            "fn(&mut self) -> many",
+            "fn(self) -> Result",
+            "fn(Self) -> many",
+            "fn(&self) -> many",
+            "fn() -> Self",
+            "fn(&self) -> _",
+            "fn(&self)",
+            "fn(&self) -> Self",
+            "fn(&self) -> _",
+        ]
+    );
+}
+
+#[test]
+fn trait_methods_are_kept_with_their_shapes_required_or_provided() {
+    let files = Sources::parsed(&[Described::file(
+        "crates/x/src/lib.rs",
+        "trait Index {\n    fn insert(&mut self, item: Item);\n    fn search(&self, query: &Query) -> Vec<Item> { f() }\n    #[cfg(test)]\n    fn hidden(&self);\n}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let found = facts.traits().first().unwrap_or_else(|| unreachable!("a trait was declared"));
+    let methods: Vec<String> = AsRef::<[Method]>::as_ref(found)
+        .iter()
+        .map(|method| format!("{} {}", AsRef::<Name>::as_ref(method), method.shape()))
+        .collect();
+    assert_eq!(methods, ["insert fn(&mut self, _)", "search fn(&self, _) -> many"]);
+}
+
+#[test]
+fn generic_impls_are_listed_with_their_trait_target_and_site_and_plain_impls_are_not() {
+    let files = Sources::parsed(&[Described::file(
+        "crates/x/src/lib.rs",
+        "struct A;\nimpl A { fn plain(&self) {} }\nimpl<T: Shape> Render for T {\n    fn render(&self) -> Text {}\n}\nimpl<T> Holder<T> {\n    fn get(&self) -> Option<T> {}\n}\n#[cfg(test)]\nimpl<T> Hidden for T {}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let found: Vec<String> = facts
+        .generic_impls()
+        .iter()
+        .map(|each| {
+            let shapes: Vec<String> =
+                AsRef::<[Method]>::as_ref(each).iter().map(|method| method.shape().to_string()).collect();
+            format!(
+                "{each} in {} at {}: {}",
+                AsRef::<CrateName>::as_ref(each),
+                AsRef::<Site>::as_ref(each),
+                shapes.join(", ")
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "Render for T in x at crates/x/src/lib.rs:3: fn(&self) -> _",
+            "Holder in x at crates/x/src/lib.rs:6: fn(&self) -> Option"
+        ]
+    );
+    assert_eq!(
+        facts.generic_impls().first().and_then(GenericImpl::implemented).map(ToString::to_string),
+        Some("Render".to_owned())
+    );
+}
+
+#[test]
+fn implementers_of_a_trait_are_found_across_crates() {
+    let files = Sources::parsed(&[
+        Described::file("crates/x/src/lib.rs", "trait Index {}\nstruct Text;\nimpl Index for Text {}\nstruct Other;\n"),
+        Described::file("crates/y/src/lib.rs", "struct Files;\nimpl x::Index for Files {}\nimpl Clone for Files {}\n"),
+    ]);
+    let facts = Facts::of_files(&files);
+    let found: Vec<String> = facts.implementers(&Name::from("Index")).iter().map(ToString::to_string).collect();
+    assert_eq!(found, ["Text", "Files"]);
 }
 
 #[test]
