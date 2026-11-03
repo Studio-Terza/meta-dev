@@ -37,11 +37,6 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn first(&self) -> Option<&Name> {
-        self.0.first()
-    }
-
-    #[must_use]
     pub fn spells(&self, segments: &[Word<'_>]) -> Option<&UsePath> {
         (self.0.len() == segments.len() && self.0.iter().zip(segments).all(|(segment, spelled)| segment == spelled))
             .then_some(self)

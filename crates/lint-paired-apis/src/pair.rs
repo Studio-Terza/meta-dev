@@ -1,3 +1,8 @@
+use std::collections::BTreeSet;
+
+use crate::Finding;
+use crate::declared::Declared;
+use lint_core::Violation;
 use lint_layout::{Name, Word};
 
 #[derive(Debug)]
@@ -16,7 +21,17 @@ impl Pair {
         Pair { opening: Word::new("begin"), closing: Word::new("end") },
     ];
 
-    pub fn partner(&self, method: &Name) -> Option<Name> {
-        method.without_prefix(self.opening).map(|rest| rest.prefixed(self.closing))
+    pub fn violations<'file>(&self, methods: &[&Declared<'file>]) -> Vec<Violation<'file>> {
+        let names: BTreeSet<&Name> = methods.iter().map(|method| method.method()).collect();
+        methods
+            .iter()
+            .filter_map(|method| {
+                method
+                    .method()
+                    .reprefixed(self.opening, self.closing)
+                    .filter(|partner| names.contains(partner))
+                    .map(|partner| Violation::new(method.location(), Finding::new(method.method().clone(), partner)))
+            })
+            .collect()
     }
 }

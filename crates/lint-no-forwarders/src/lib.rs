@@ -22,7 +22,7 @@ use lint_layout::Name;
 pub struct NoForwarders;
 
 impl Lint for NoForwarders {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let types = WorkspaceTypes::from(shipped.as_slice());
         Report::new(

@@ -12,14 +12,14 @@ use crate::text_mention::TextMention;
 use crate::wrappers::Wrappers;
 use finding::Finding;
 
-pub struct PlainFields<'file> {
+pub struct PlainFields<'scan, 'file> {
     file: &'file SourceFile,
-    wrappers: &'file Wrappers,
-    found: Vec<Violation>,
+    wrappers: &'scan Wrappers,
+    found: Vec<Violation<'file>>,
 }
 
-impl<'file> PlainFields<'file> {
-    pub fn in_file(file: &'file SourceFile, wrappers: &'file Wrappers) -> Vec<Violation> {
+impl<'scan, 'file> PlainFields<'scan, 'file> {
+    pub fn in_file(file: &'file SourceFile, wrappers: &'scan Wrappers) -> Vec<Violation<'file>> {
         let mut scan = PlainFields { file, wrappers, found: Vec::new() };
         scan.visit_file(file.syntax());
         scan.found
@@ -45,7 +45,7 @@ impl<'file> PlainFields<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for PlainFields<'_> {
+impl<'ast> Visit<'ast> for PlainFields<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
     }

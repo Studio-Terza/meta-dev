@@ -2,6 +2,7 @@ use proc_macro2::Span;
 use syn::visit::{self, Visit};
 use syn::{ExprBreak, ExprContinue, ExprReturn, Macro};
 
+use lint_core::FileLint;
 use lint_core::{Macros, Site, SourceFile, Violation};
 use lint_layout::LineNumber;
 
@@ -9,19 +10,21 @@ use super::Finding;
 
 pub struct Exits<'file> {
     file: &'file SourceFile,
-    found: Vec<Violation>,
+    found: Vec<Violation<'file>>,
 }
 
 impl Exits<'_> {
-    pub fn of_file(file: &SourceFile) -> Vec<Violation> {
-        let mut scan = Exits { file, found: Vec::new() };
-        scan.visit_file(file.syntax());
-        scan.found.extend(file.test_modules().iter().flat_map(Exits::of_file));
-        scan.found
-    }
-
     fn record(&mut self, span: Span, finding: Finding) {
         self.found.push(Violation::new(Site::new(self.file.path(), LineNumber::from(span)), finding));
+    }
+}
+
+impl FileLint for Exits<'_> {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut scan = Exits { file, found: Vec::new() };
+        scan.visit_file(file.syntax());
+        scan.found.extend(file.test_modules().iter().flat_map(Exits::violations));
+        scan.found
     }
 }
 

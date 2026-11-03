@@ -18,7 +18,7 @@ impl UseAliases {
 
     pub fn resolve(&self, path: &Path) -> UsePath {
         let spelled = UsePath::from(path);
-        match spelled.first().and_then(|first| self.0.get(first)) {
+        match spelled.segments().first().and_then(|first| self.0.get(first)) {
             Some(full) => spelled.rerooted(full),
             None => spelled,
         }

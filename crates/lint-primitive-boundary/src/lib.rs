@@ -3,6 +3,7 @@ mod newtypes;
 mod signature_sites;
 mod text_sites;
 
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use std::path::PathBuf;
 
@@ -19,7 +20,7 @@ use lint_core::SupportModules;
 pub struct PrimitiveBoundary;
 
 impl Lint for PrimitiveBoundary {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         let newtypes = Newtypes::in_files(files);
         Report::new(

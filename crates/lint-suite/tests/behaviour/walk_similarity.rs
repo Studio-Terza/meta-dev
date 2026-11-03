@@ -1,3 +1,4 @@
+use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_walk_similarity::WalkSimilarity;
 
@@ -10,7 +11,7 @@ impl Candidates {
 
     fn lines(text: String) -> Vec<String> {
         let sources = [Source::new(Located::new("a.rs"), Text::new(Self::leaked(text)))];
-        Sources::report::<WalkSimilarity>(&sources).violations().iter().map(ToString::to_string).collect()
+        WalkSimilarity::report(&Sources::parsed(&sources)).violations().iter().map(ToString::to_string).collect()
     }
 
     fn typed(name: &str, body: &str) -> String {
@@ -103,7 +104,8 @@ fn types_in_different_crates_can_be_candidates_and_test_code_is_left_out() {
             Text::new(Candidates::leaked(format!("#[cfg(test)]\nmod tests {{\n{}}}\n", Candidates::typed("C", FOUR)))),
         ),
     ];
-    let report = Sources::report::<WalkSimilarity>(&sources);
+    let files = Sources::parsed(&sources);
+    let report = WalkSimilarity::report(&files);
     assert_eq!(report.violations().len(), 1);
 }
 

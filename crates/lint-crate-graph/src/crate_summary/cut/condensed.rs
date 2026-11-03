@@ -61,8 +61,8 @@ impl Condensed {
     }
 
     pub fn islands(&self) -> Vec<BTreeSet<TangleIndex>> {
-        let neighbours = |tangle: TangleIndex| self.row(tangle).iter().map(|link| link.target()).collect();
-        Traversal::trees(self.all().into_iter().collect(), neighbours)
+        let neighbours = |tangle: TangleIndex| self.row(tangle).iter().map(|link| link.target());
+        Traversal::trees((0..self.sizes.len()).map(TangleIndex::from), neighbours)
             .into_iter()
             .map(|island| island.into_iter().collect::<BTreeSet<TangleIndex>>())
             .filter(|island| island.iter().any(|tangle| !self.row(*tangle).is_empty()))

@@ -23,7 +23,7 @@ pub struct EnumPredicates {
 }
 
 impl Lint for EnumPredicates {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let predicates = EnumPredicates { declarations: files.iter().flat_map(Declarations::in_file).collect() };
         Report::new(
             Headline::new(
@@ -35,7 +35,7 @@ impl Lint for EnumPredicates {
 }
 
 impl EnumPredicates {
-    fn violations(&self, file: &SourceFile) -> Vec<Violation> {
+    fn violations<'file>(&self, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let mut scan = Predicates::new(self, file);
         scan.visit_file(file.syntax());
         scan.into_violations()

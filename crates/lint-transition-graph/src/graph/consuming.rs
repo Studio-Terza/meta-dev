@@ -13,21 +13,24 @@ pub(crate) enum Moves {
 }
 
 #[derive(Debug)]
-pub(crate) struct Consuming<'graph, 'found> {
-    by: BTreeMap<&'graph Node, Vec<&'graph Hyperedge<'found>>>,
+pub(crate) struct Consuming<'graph, 'file> {
+    by: BTreeMap<&'graph Node, Vec<&'graph Hyperedge<'graph, 'file>>>,
 }
 
-impl<'graph, 'found> Consuming<'graph, 'found> {
-    pub(crate) fn indexed(graph: &'graph Graph<'found>, moves: Moves) -> Consuming<'graph, 'found> {
+impl<'graph, 'file> Consuming<'graph, 'file> {
+    pub(crate) fn indexed(graph: &'graph Graph<'_, 'file>, moves: Moves) -> Consuming<'graph, 'file> {
         let kept = graph.hyperedges().iter().filter(|edge| match moves {
             Moves::All => true,
             Moves::Unlifted => AsRef::<Label>::as_ref(*edge).lifted().is_none(),
         });
-        let by = kept.fold(BTreeMap::new(), |mut by: BTreeMap<&'graph Node, Vec<&'graph Hyperedge<'found>>>, edge| {
-            let hop: &'graph Hop = edge.as_ref();
-            AsRef::<Tuple>::as_ref(hop).iter().for_each(|node| by.entry(node).or_default().push(edge));
-            by
-        });
+        let by = kept.fold(
+            BTreeMap::new(),
+            |mut by: BTreeMap<&'graph Node, Vec<&'graph Hyperedge<'graph, 'file>>>, edge| {
+                let hop: &'graph Hop = edge.as_ref();
+                AsRef::<Tuple>::as_ref(hop).iter().for_each(|node| by.entry(node).or_default().push(edge));
+                by
+            },
+        );
         Consuming { by }
     }
 
@@ -35,14 +38,14 @@ impl<'graph, 'found> Consuming<'graph, 'found> {
         self.by.keys().copied()
     }
 
-    pub(crate) fn taking(&self, node: &Node) -> impl Iterator<Item = &'graph Hyperedge<'found>> + '_ {
+    pub(crate) fn taking(&self, node: &Node) -> impl Iterator<Item = &'graph Hyperedge<'graph, 'file>> + '_ {
         self.by.get(node).into_iter().flatten().copied()
     }
 
     pub(crate) fn led<'query>(
         &'query self,
         node: &'query Node,
-    ) -> impl Iterator<Item = &'graph Hyperedge<'found>> + 'query {
+    ) -> impl Iterator<Item = &'graph Hyperedge<'graph, 'file>> + 'query {
         self.taking(node).filter(move |edge| AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*edge)).first() == Some(node))
     }
 
@@ -50,7 +53,7 @@ impl<'graph, 'found> Consuming<'graph, 'found> {
         &'query self,
         node: &'query Node,
         members: &'query BTreeSet<&'graph Node>,
-    ) -> impl Iterator<Item = &'graph Hyperedge<'found>> + 'query {
+    ) -> impl Iterator<Item = &'graph Hyperedge<'graph, 'file>> + 'query {
         self.taking(node).filter(move |edge| {
             AsRef::<Tuple>::as_ref(AsRef::<Hop>::as_ref(*edge)).iter().find(|taken| members.contains(taken))
                 == Some(node)

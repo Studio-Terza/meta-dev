@@ -1,5 +1,6 @@
 mod fn_body;
 
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use std::collections::BTreeMap;
 
@@ -31,7 +32,7 @@ use lint_layout::Name;
 pub struct ExpressionFlow;
 
 impl Lint for ExpressionFlow {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("control flow is an expression; every branch yields the value the function returns"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -40,12 +41,6 @@ impl Lint for ExpressionFlow {
 }
 
 impl ExpressionFlow {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut flows = Flows { path: file.path(), violations: Vec::new() };
-        flows.visit_file(file.syntax());
-        flows.violations
-    }
-
     fn dropped<'block>(statement: &'block Stmt, last: Option<&Stmt>) -> Option<&'block Stmt> {
         let inner = last.filter(|tail| std::ptr::eq(*tail, statement)).map_or(Some(statement), |_| None);
         match statement {
@@ -85,13 +80,21 @@ impl ExpressionFlow {
     }
 }
 
-struct Flows<'scan> {
-    path: &'scan Path,
-    violations: Vec<Violation>,
+impl FileLint for ExpressionFlow {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut flows = Flows { path: file.path(), violations: Vec::new() };
+        flows.visit_file(file.syntax());
+        flows.violations
+    }
 }
 
-impl Flows<'_> {
-    fn found(path: &Path, span: Span, message: Message) -> Violation {
+struct Flows<'scan> {
+    path: &'scan Path,
+    violations: Vec<Violation<'scan>>,
+}
+
+impl<'scan> Flows<'scan> {
+    fn found(path: &'scan Path, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(path, LineNumber::from(span)), message)
     }
 

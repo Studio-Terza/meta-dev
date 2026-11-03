@@ -90,7 +90,7 @@ impl Spot {
         Spot { line, port }
     }
 
-    pub fn violation(self, path: &Path, within: Within) -> Violation {
+    pub fn violation(self, path: &Path, within: Within) -> Violation<'_> {
         Violation::new(Site::new(path, self.line), Finding::new(self.port, within))
     }
 }

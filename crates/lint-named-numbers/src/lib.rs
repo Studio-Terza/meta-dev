@@ -21,7 +21,7 @@ use lint_layout::{LineNumber, Word, words};
 pub struct NamedNumbers;
 
 impl Lint for NamedNumbers {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let support: Vec<PathBuf> = files.iter().flat_map(SupportModules::paths).collect();
         Report::new(
             Headline::new(

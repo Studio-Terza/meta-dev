@@ -1,4 +1,4 @@
-use lint_core::{Lint, Readout, Report, SourceFile};
+use lint_core::{Lint, Readout};
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
@@ -51,8 +51,9 @@ pub struct Lints;
 
 impl Lints {
     #[must_use]
-    pub fn reports(files: &[SourceFile]) -> Vec<Report> {
-        vec![
+    pub fn checked(readout: &Readout) -> Outcome<'_> {
+        let files = readout.files();
+        let reports = vec![
             NoComments::report(files),
             NoFreeFns::report(files),
             ThinMain::report(files),
@@ -94,15 +95,9 @@ impl Lints {
             BoolMethods::report(files),
             EffectsInPorts::report(files),
             NoEarlyExits::report(files),
-        ]
-    }
-
-    #[must_use]
-    pub fn checked(mut readout: Readout) -> Outcome {
-        let reports = Self::reports(readout.files())
-            .into_iter()
-            .chain([RustOnly::report(readout.repo_files()), WorkflowRun::report(readout.repo_files())])
-            .collect();
-        Outcome::from_reports(reports, readout.take_failures())
+            RustOnly::report(readout.repo_files()),
+            WorkflowRun::report(readout.repo_files()),
+        ];
+        Outcome::from_reports(reports, readout.failures())
     }
 }

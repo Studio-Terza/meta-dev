@@ -16,10 +16,10 @@ pub use held::Held;
 pub use logic::Logic;
 
 #[derive(Debug)]
-pub(crate) struct Crates(BTreeMap<CrateName, Vec<Function>>);
+pub(crate) struct Crates<'file>(BTreeMap<CrateName, Vec<Function<'file>>>);
 
-impl Crates {
-    pub(crate) fn grouped(files: &[SourceFile]) -> Crates {
+impl<'file> Crates<'file> {
+    pub(crate) fn grouped(files: &'file [SourceFile]) -> Crates<'file> {
         Crates(files.iter().filter_map(SourceFile::shipped).fold(BTreeMap::new(), |mut crates, file| {
             let name = CrateName::from(file.placement().package().root());
             crates.entry(name).or_default().extend(Functions::of_file(file));
@@ -27,11 +27,11 @@ impl Crates {
         }))
     }
 
-    pub(crate) fn held(&self) -> Vec<Held> {
+    pub(crate) fn held(&self) -> Vec<Held<'file>> {
         self.0.values().filter_map(|functions| Held::summed(functions)).collect()
     }
 
-    pub(crate) fn violations(&self) -> Vec<Violation> {
+    pub(crate) fn violations(&self) -> Vec<Violation<'file>> {
         self.0
             .iter()
             .filter_map(|(name, functions)| Distribution::listing(name, functions))

@@ -34,7 +34,7 @@ impl TestFeatures {
         match Lit::new(value.clone()) {
             Lit::Str(feature) if key == Self::FEATURE => {
                 let name = Name::from(feature.value().as_str());
-                FeatureWord::test_word(&name)
+                name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
                     .map(|_| Flagged::new(LineNumber::from(key.span()), Finding::Feature(name)))
             }
             _ => None,

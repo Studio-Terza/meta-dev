@@ -23,17 +23,20 @@ struct RepeatKey {
 pub struct NearDuplicateTests;
 
 impl NearDuplicateTests {
-    fn grouped(files: &[SourceFile]) -> BTreeMap<RepeatKey, Vec<TestBody>> {
+    fn grouped(files: &[SourceFile]) -> BTreeMap<RepeatKey, Vec<TestBody<'_>>> {
         files.iter().fold(BTreeMap::new(), |groups, file| {
-            TestBodies::found(file).into_iter().fold(groups, |mut groups: BTreeMap<RepeatKey, Vec<TestBody>>, body| {
-                let key = RepeatKey { package: file.placement().package().clone(), shape: body.shape().clone() };
-                groups.entry(key).or_default().push(body);
-                groups
-            })
+            TestBodies::found(file).into_iter().fold(
+                groups,
+                |mut groups: BTreeMap<RepeatKey, Vec<TestBody<'_>>>, body| {
+                    let key = RepeatKey { package: file.placement().package().clone(), shape: body.shape().clone() };
+                    groups.entry(key).or_default().push(body);
+                    groups
+                },
+            )
         })
     }
 
-    fn repeats(group: &[TestBody]) -> Vec<Violation> {
+    fn repeats<'file>(group: &[TestBody<'file>]) -> Vec<Violation<'file>> {
         group
             .iter()
             .skip(1)
@@ -44,7 +47,7 @@ impl NearDuplicateTests {
 }
 
 impl Lint for NearDuplicateTests {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("tests differ by more than their literals"),
             Self::grouped(files).values().flat_map(|group| Self::repeats(group)).collect(),

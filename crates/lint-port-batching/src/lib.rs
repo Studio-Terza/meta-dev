@@ -15,7 +15,7 @@ use reader::Reader;
 pub struct PortBatching;
 
 impl Lint for PortBatching {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let imports = Imports::across(shipped.iter().copied());
         let ports = PortTraits::declared(files);

@@ -1,16 +1,10 @@
-use std::ffi::OsStr;
-use std::path::Path;
-
-use lint_core::{Gate, SourceFile};
 use lint_layout::{PathTail, UsePath, Word, words};
 use lint_paths::Use;
-use lint_placement::Role;
 
 #[derive(Debug)]
 pub struct EffectPaths;
 
 impl EffectPaths {
-    const TESTS: &str = "tests";
     const EFFECTS: [&[Word<'static>]; 8] = [
         &words!["std", "fs"],
         &words!["std", "net"],
@@ -32,15 +26,7 @@ impl EffectPaths {
     ];
     const VALUES: [&[Word<'static>]; 1] = [&words!["std", "process", "ExitCode"]];
 
-    pub fn tested(file: &SourceFile) -> Option<&SourceFile> {
-        let placement = file.placement();
-        (placement.role() == Role::Target
-            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
-            && Gate::PORTS.owns(placement).is_none())
-        .then_some(file)
-    }
-
-    pub fn effect(used: &Use) -> Option<&UsePath> {
+    pub fn effect<'used>(used: &'used Use<'_>) -> Option<&'used UsePath> {
         Self::EFFECTS
             .iter()
             .find_map(|root| used.under(root))

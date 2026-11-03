@@ -4,29 +4,29 @@ use crate::boundary::Violation;
 use lint_layout::Headline;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Report {
+pub struct Report<'file> {
     headline: Headline,
-    violations: Vec<Violation>,
+    violations: Vec<Violation<'file>>,
 }
 
-impl Report {
+impl<'file> Report<'file> {
     #[must_use]
-    pub fn new(headline: Headline, violations: Vec<Violation>) -> Report {
+    pub fn new(headline: Headline, violations: Vec<Violation<'file>>) -> Report<'file> {
         Report { headline, violations }
     }
 
     #[must_use]
-    pub fn violations(&self) -> &[Violation] {
+    pub fn violations(&self) -> &[Violation<'file>] {
         &self.violations
     }
 
     #[must_use]
-    pub fn dirty(self) -> Option<Report> {
+    pub fn dirty(self) -> Option<Report<'file>> {
         (!self.violations.is_empty()).then_some(self)
     }
 }
 
-impl fmt::Display for Report {
+impl fmt::Display for Report<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "{}:", self.headline)?;
         self.violations.iter().try_for_each(|violation| writeln!(formatter, "{violation}"))

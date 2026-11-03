@@ -1,14 +1,12 @@
-use std::vec::IntoIter;
-
 #[derive(Debug)]
-pub struct Frame<Index> {
+pub struct Frame<Index, Pending> {
     node: Index,
-    pending: IntoIter<Index>,
+    pending: Pending,
 }
 
-impl<Index: Copy> Frame<Index> {
-    pub fn entering(node: Index, neighbours: Vec<Index>) -> Frame<Index> {
-        Frame { node, pending: neighbours.into_iter() }
+impl<Index: Copy, Pending: Iterator<Item = Index>> Frame<Index, Pending> {
+    pub fn entering(node: Index, pending: Pending) -> Frame<Index, Pending> {
+        Frame { node, pending }
     }
 
     pub fn node(&self) -> Index {

@@ -271,6 +271,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-clones"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-complexity"
 version = "0.1.0"
 dependencies = [
@@ -757,6 +766,7 @@ dependencies = [
  "golden",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
+ "lint-clones",
  "lint-complexity",
  "lint-const-shape",
  "lint-core",
@@ -843,6 +853,7 @@ dependencies = [
  "laws",
  "lint-arbitrary-newtypes",
  "lint-bool-methods",
+ "lint-clones",
  "lint-complexity",
  "lint-const-shape",
  "lint-core",

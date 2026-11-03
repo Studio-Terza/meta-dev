@@ -3,7 +3,7 @@ mod port_traits;
 
 use doubles::Doubles;
 pub use doubles::Kind;
-use lint_core::{Headline, Lint, Report, SourceFile};
+use lint_core::{Headline, Lint, Report, SourceFile, TestFile};
 use lint_paths::Imports;
 pub use port_traits::PortTraits;
 
@@ -11,8 +11,8 @@ pub use port_traits::PortTraits;
 pub struct FakesAtPorts;
 
 impl Lint for FakesAtPorts {
-    fn report(files: &[SourceFile]) -> Report {
-        let tested: Vec<&SourceFile> = files.iter().filter_map(Doubles::tested).collect();
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        let tested: Vec<&SourceFile> = files.iter().filter_map(SourceFile::tested).map(TestFile::file).collect();
         let imports = Imports::across(tested.iter().copied());
         let ports = PortTraits::declared(files);
         let doubles = tested.iter().fold(Doubles::default(), |mut doubles, file| {

@@ -1,3 +1,4 @@
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
@@ -24,7 +25,7 @@ use lint_layout::LineNumber;
 pub struct TypeShape;
 
 impl Lint for TypeShape {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("types carry their meaning: no bool fields, no tuples in signatures, no String errors"),
             files.iter().flat_map(Self::violations).collect(),
@@ -33,12 +34,6 @@ impl Lint for TypeShape {
 }
 
 impl TypeShape {
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
-        shapes.visit_file(file.syntax());
-        shapes.violations
-    }
-
     fn findings(ty: &Type) -> Vec<Message> {
         let mut findings = TypeFindings::default();
         findings.visit_type(ty);
@@ -67,18 +62,26 @@ impl TypeShape {
     }
 }
 
-struct TypeShapes<'scan> {
-    path: &'scan Path,
-    violations: Vec<Violation>,
+impl FileLint for TypeShape {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut shapes = TypeShapes { path: file.path(), violations: Vec::new() };
+        shapes.visit_file(file.syntax());
+        shapes.violations
+    }
 }
 
-impl TypeShapes<'_> {
-    fn violation(&self, span: Span, message: Message) -> Violation {
+struct TypeShapes<'scan> {
+    path: &'scan Path,
+    violations: Vec<Violation<'scan>>,
+}
+
+impl<'scan> TypeShapes<'scan> {
+    fn violation(&self, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 
     fn check_type(&mut self, ty: &Type) {
-        let violations: Vec<Violation> =
+        let violations: Vec<Violation<'scan>> =
             TypeShape::findings(ty).into_iter().map(|finding| self.violation(ty.span(), finding)).collect();
         self.violations.extend(violations);
     }
@@ -90,7 +93,7 @@ impl TypeShapes<'_> {
         });
     }
 
-    fn bool_field(&self, field: &Field) -> Option<Violation> {
+    fn bool_field(&self, field: &Field) -> Option<Violation<'scan>> {
         matches!(
             &field.ty,
             Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "bool")

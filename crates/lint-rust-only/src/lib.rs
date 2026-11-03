@@ -4,15 +4,14 @@ mod place;
 
 use finding::Finding;
 use language::Language;
-use lint_core::{Headline, RepoFile, Report, Site, Violation};
+use lint_core::{Headline, Lint, RepoFile, Report, Site, Violation};
 use place::Place;
 
 #[derive(Debug)]
 pub struct RustOnly;
 
-impl RustOnly {
-    #[must_use]
-    pub fn report(files: &[RepoFile]) -> Report {
+impl Lint<RepoFile> for RustOnly {
+    fn report(files: &[RepoFile]) -> Report<'_> {
         Report::new(
             Headline::new("logic is Rust; web assets live under a directory named assets"),
             files

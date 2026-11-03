@@ -16,7 +16,7 @@ impl Agreement {
     const AT_LEAST_PARTS: usize = 4;
     const OUT_OF_PARTS: usize = 5;
 
-    pub(crate) fn between(first: &Walk<'_>, second: &Walk<'_>) -> Agreement {
+    pub(crate) fn between(first: &Walk<'_, '_>, second: &Walk<'_, '_>) -> Agreement {
         Agreement {
             shared: Tally::new(first.steps().intersection(second.steps()).count()),
             all: Tally::new(first.steps().union(second.steps()).count()),

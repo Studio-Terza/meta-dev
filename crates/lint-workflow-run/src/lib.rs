@@ -11,7 +11,7 @@ use actions::Actions;
 use document::Document;
 use excerpt::Excerpt;
 use finding::Finding;
-use lint_core::{Headline, RepoFile, Report, Site, Violation};
+use lint_core::{Headline, Lint, RepoFile, Report, Site, Violation};
 use lint_layout::LineNumber;
 use newtype::Newtype;
 use saphyr::ScanError;
@@ -23,19 +23,6 @@ impl WorkflowRun {
     const WORKFLOWS: &'static str = ".github/workflows";
     const EXTENSIONS: [&'static str; 2] = ["yml", "yaml"];
 
-    #[must_use]
-    pub fn report(files: &[RepoFile]) -> Report {
-        let actions = Actions::among(files);
-        Report::new(
-            Headline::new("a workflow run step is a short command; logic lives in Rust"),
-            files
-                .iter()
-                .filter_map(|file| Self::workflow(file).or_else(|| Actions::manifest(file)))
-                .flat_map(|file| Self::violations(file, actions))
-                .collect(),
-        )
-    }
-
     pub(crate) fn workflow(file: &RepoFile) -> Option<&RepoFile> {
         file.below(Path::new(Self::WORKFLOWS))
             .and(file.shown().extension())
@@ -43,7 +30,7 @@ impl WorkflowRun {
             .map(|_| file)
     }
 
-    fn violations(file: &RepoFile, actions: Actions<'_>) -> Vec<Violation> {
+    fn violations<'file>(file: &'file RepoFile, actions: Actions<'_>) -> Vec<Violation<'file>> {
         let text = file
             .contents()
             .read()
@@ -55,7 +42,11 @@ impl WorkflowRun {
         }
     }
 
-    fn violations_in(file: &RepoFile, parsed: Result<Document<'_>, ScanError>, actions: Actions<'_>) -> Vec<Violation> {
+    fn violations_in<'file>(
+        file: &'file RepoFile,
+        parsed: Result<Document<'_>, ScanError>,
+        actions: Actions<'_>,
+    ) -> Vec<Violation<'file>> {
         match parsed {
             Ok(document) => document.findings(actions).into_iter().map(|found| found.violation(file.shown())).collect(),
             Err(error) => vec![Violation::new(
@@ -63,5 +54,19 @@ impl WorkflowRun {
                 Finding::Unparsable { reason: Excerpt::new(error.info().to_owned()) },
             )],
         }
+    }
+}
+
+impl Lint<RepoFile> for WorkflowRun {
+    fn report(files: &[RepoFile]) -> Report<'_> {
+        let actions = Actions::among(files);
+        Report::new(
+            Headline::new("a workflow run step is a short command; logic lives in Rust"),
+            files
+                .iter()
+                .filter_map(|file| Self::workflow(file).or_else(|| Actions::manifest(file)))
+                .flat_map(|file| Self::violations(file, actions))
+                .collect(),
+        )
     }
 }

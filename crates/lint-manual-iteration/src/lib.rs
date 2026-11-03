@@ -1,3 +1,4 @@
+use lint_core::FileLint;
 use lint_core::{Headline, Lint};
 use proc_macro2::Span;
 use std::path::Path;
@@ -24,7 +25,7 @@ use lint_layout::{Name, Whole, Word, words};
 pub struct ManualIteration;
 
 impl Lint for ManualIteration {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new("iterators are driven by combinators, not by hand"),
             files.iter().filter_map(SourceFile::shipped).flat_map(Self::violations).collect(),
@@ -53,12 +54,6 @@ impl ManualIteration {
     ];
     const ACCUMULATORS: [Word<'static>; 4] = words!["push", "extend", "insert", "push_str"];
 
-    fn violations(file: &SourceFile) -> Vec<Violation> {
-        let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
-        iterations.visit_file(file.syntax());
-        iterations.violations
-    }
-
     fn accumulator(block: &Block) -> Option<&ExprMethodCall> {
         match block.stmts.as_slice() {
             [Stmt::Expr(Expr::If(branch), _)] if branch.else_branch.is_none() => Self::accumulator(&branch.then_branch),
@@ -70,13 +65,21 @@ impl ManualIteration {
     }
 }
 
-struct Iterations<'scan> {
-    path: &'scan Path,
-    violations: Vec<Violation>,
+impl FileLint for ManualIteration {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let mut iterations = Iterations { path: file.path(), violations: Vec::new() };
+        iterations.visit_file(file.syntax());
+        iterations.violations
+    }
 }
 
-impl Iterations<'_> {
-    fn violation(&self, span: Span, message: Message) -> Violation {
+struct Iterations<'scan> {
+    path: &'scan Path,
+    violations: Vec<Violation<'scan>>,
+}
+
+impl<'scan> Iterations<'scan> {
+    fn violation(&self, span: Span, message: Message) -> Violation<'scan> {
         Violation::new(Site::new(self.path, LineNumber::from(span)), message)
     }
 }

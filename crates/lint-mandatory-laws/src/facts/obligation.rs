@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::need::Need;
+use super::need::Need;
 use crate::subject::Subject;
 use lint_core::Finding;
 use lint_core::Fix;
@@ -8,29 +8,31 @@ use lint_core::Site;
 use lint_core::Violation;
 
 #[derive(Debug)]
-pub(crate) struct Obligation {
+pub(crate) struct Obligation<'file> {
     subject: Subject,
-    site: Site,
+    site: Site<'file>,
     need: Need,
 }
 
-impl Obligation {
-    pub(crate) fn new(subject: Subject, site: Site, need: Need) -> Obligation {
+impl<'file> Obligation<'file> {
+    pub(crate) fn new(subject: Subject, site: Site<'file>, need: Need) -> Obligation<'file> {
         Obligation { subject, site, need }
-    }
-
-    pub(crate) fn violation(self) -> Violation {
-        Violation::new(self.site.clone(), self)
     }
 }
 
-impl fmt::Display for Obligation {
+impl<'file> From<Obligation<'file>> for Violation<'file> {
+    fn from(obligation: Obligation<'file>) -> Violation<'file> {
+        Violation::new(obligation.site, obligation)
+    }
+}
+
+impl fmt::Display for Obligation<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "`{}` {}", self.subject.owner(), self.need)
     }
 }
 
-impl Finding for Obligation {
+impl Finding for Obligation<'_> {
     fn fix(&self) -> Fix {
         self.need.fix()
     }

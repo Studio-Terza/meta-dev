@@ -14,6 +14,7 @@ use candidate::Candidate;
 use feature_word::FeatureWord;
 use finding::Finding;
 use gated_items::GatedItems;
+use lint_core::FileLint;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -29,31 +30,33 @@ use test_features::TestFeatures;
 pub struct NoTestOnlyApi;
 
 impl NoTestOnlyApi {
-    fn in_source(file: &SourceFile) -> Vec<Violation> {
-        let shipped =
-            iter::once(file).filter_map(SourceFile::shipped).flat_map(|file| GatedItems::in_file(file.syntax()));
-        shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
-    }
-
     fn mentioned(files: &[SourceFile], ground: Ground) -> BTreeSet<Name> {
         files.iter().flat_map(|file| Mentions::in_file(file, ground)).collect()
     }
 
-    fn in_manifest(package: &PackageRoot, file: &SourceFile) -> Vec<Violation> {
+    fn in_manifest<'file>(package: &PackageRoot, file: &'file SourceFile) -> Vec<Violation<'file>> {
         let manifest = file.manifest_file();
         package
             .features()
             .iter()
             .filter_map(|(name, line)| {
-                FeatureWord::test_word(name)
-                    .map(|_| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
+                name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
+                    .map(|_| Violation::new(Site::new(manifest.as_ref(), *line), Finding::Feature(name.clone())))
             })
             .collect()
     }
 }
 
+impl FileLint for NoTestOnlyApi {
+    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
+        let shipped =
+            iter::once(file).filter_map(SourceFile::shipped).flat_map(|file| GatedItems::in_file(file.syntax()));
+        shipped.chain(TestFeatures::in_file(file.syntax())).map(|flagged| flagged.in_file(file.path())).collect()
+    }
+}
+
 impl Lint for NoTestOnlyApi {
-    fn report(files: &[SourceFile]) -> Report {
+    fn report(files: &[SourceFile]) -> Report<'_> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
         let shipped = Self::mentioned(files, Ground::Shipped);
@@ -67,7 +70,7 @@ impl Lint for NoTestOnlyApi {
             Headline::new("shipped code has no test-only API"),
             files
                 .iter()
-                .flat_map(Self::in_source)
+                .flat_map(Self::violations)
                 .chain(only_tests)
                 .chain(packages.into_iter().flat_map(|(package, file)| Self::in_manifest(package, file)))
                 .collect(),

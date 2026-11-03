@@ -6,10 +6,10 @@ struct Graphs;
 
 impl Graphs {
     fn of<Report: Lint>(text: &str) -> String {
-        Sources::report::<Report>(&[Source::new(
+        Report::report(&Sources::parsed(&[Source::new(
             Located::new("crates/x/src/lib.rs"),
             Text::new(Box::leak(text.to_owned().into_boxed_str())),
-        )])
+        )]))
         .to_string()
     }
 
