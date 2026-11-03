@@ -52,8 +52,9 @@ impl SkipMarks {
                 .iter()
                 .filter_map(|attribute| Self::skip(attribute).map(|_| LineNumber::from(attribute.pound_token.span))),
         );
-        let gated: Vec<LineNumber> = Gate::lines_in(attributes).into_iter().chain(self.gates.clone()).collect();
-        self.lines.extend(gated.into_iter().filter(|_| marked == Marked::Test));
+        self.lines.extend(
+            Gate::lines_in(attributes).into_iter().chain(self.gates.iter().copied()).filter(|_| marked == Marked::Test),
+        );
     }
 }
 

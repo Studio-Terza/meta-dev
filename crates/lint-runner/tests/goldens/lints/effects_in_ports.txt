@@ -1,6 +1,7 @@
 test budget, report only:
 corpus: 0 tests in 2 files, 0 of 22 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 effects on files, environment, clock, network, processes, randomness and stdio happen only in ports:
 src/lib.rs:10: files effect outside ports: calls std::fs::read_to_string; move the effect behind a port in a ports module and call the port from here
 src/lib.rs:11: environment effect outside ports: calls std::env::var_os; move the effect behind a port in a ports module and call the port from here

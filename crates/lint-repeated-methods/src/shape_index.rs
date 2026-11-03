@@ -94,7 +94,7 @@ impl<'ast> Visit<'ast> for ShapeIndex {
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let self_type = Self::self_type(&item.self_ty).filter(|_| Walk::outside_tests(&item.attrs) == Walk::Entered);
-        let placed: Vec<Placed> = self_type.iter().flat_map(|self_type| self.placed(item, self_type)).collect();
+        let placed = self_type.map(|self_type| self.placed(item, &self_type)).unwrap_or_default();
         placed.into_iter().fold(&mut self.shapes, |shapes, placed| {
             placed.recorded_in(shapes);
             shapes

@@ -190,7 +190,7 @@ impl Batches {
         let texts = files.read_text_many(&both).into_iter().collect::<Result<Vec<_>, _>>()?;
         assert_eq!(texts.iter().map(AsRef::as_ref).collect::<Vec<&str>>(), ["a", "a"]);
         assert_eq!(files.kinds(&[a.clone(), absent.clone()]), [Kind::File, Kind::Missing]);
-        let canonical = files.canonical_many(&[a.clone(), absent.clone()]);
+        let canonical = files.canonical_many(&[a, absent.clone()]);
         assert_eq!(canonical.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);
         let listed = files.entries_many(&[root.join("copies"), absent]);
         assert_eq!(listed.iter().map(Result::is_ok).collect::<Vec<bool>>(), [true, false]);

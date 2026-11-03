@@ -1,22 +1,27 @@
 mod frame;
 
 use std::collections::BTreeSet;
-use std::iter;
-use std::vec::IntoIter;
+use std::{iter, option};
 
 use frame::Frame;
 
 #[derive(Debug)]
-pub struct Traversal<Index, Neighbours> {
+pub struct Traversal<Index, Roots, Neighbours, Pending> {
     neighbours: Neighbours,
-    roots: IntoIter<Index>,
+    roots: Roots,
     seen: BTreeSet<Index>,
-    path: Vec<Frame<Index>>,
+    path: Vec<Frame<Index, Pending>>,
 }
 
-impl<Index: Copy + Ord, Neighbours: Fn(Index) -> Vec<Index>> Traversal<Index, Neighbours> {
+impl<Index, Roots, Neighbours, Pending> Traversal<Index, Roots, Neighbours, Pending>
+where
+    Index: Copy + Ord,
+    Roots: Iterator<Item = Index>,
+    Neighbours: Fn(Index) -> Pending,
+    Pending: Iterator<Item = Index>,
+{
     #[must_use]
-    pub fn trees(roots: Vec<Index>, neighbours: Neighbours) -> Vec<Vec<Index>> {
+    pub fn trees(roots: impl IntoIterator<IntoIter = Roots>, neighbours: Neighbours) -> Vec<Vec<Index>> {
         Traversal { neighbours, roots: roots.into_iter(), seen: BTreeSet::new(), path: Vec::new() }.collect()
     }
 
@@ -24,19 +29,25 @@ impl<Index: Copy + Ord, Neighbours: Fn(Index) -> Vec<Index>> Traversal<Index, Ne
         self.path.push(Frame::entering(node, (self.neighbours)(node)));
     }
 
-    fn step(&mut self) -> Option<Vec<Index>> {
+    fn step(&mut self) -> Option<option::IntoIter<Index>> {
         let next = self.path.last_mut()?.next_neighbour();
         Some(match next {
             Some(child) => {
                 Some(child).filter(|child| self.seen.insert(*child)).into_iter().for_each(|child| self.enter(child));
-                Vec::new()
+                None.into_iter()
             }
-            None => self.path.pop().map(|frame| frame.node()).into_iter().collect(),
+            None => self.path.pop().map(|frame| frame.node()).into_iter(),
         })
     }
 }
 
-impl<Index: Copy + Ord, Neighbours: Fn(Index) -> Vec<Index>> Iterator for Traversal<Index, Neighbours> {
+impl<Index, Roots, Neighbours, Pending> Iterator for Traversal<Index, Roots, Neighbours, Pending>
+where
+    Index: Copy + Ord,
+    Roots: Iterator<Item = Index>,
+    Neighbours: Fn(Index) -> Pending,
+    Pending: Iterator<Item = Index>,
+{
     type Item = Vec<Index>;
 
     fn next(&mut self) -> Option<Vec<Index>> {
