@@ -15,9 +15,18 @@ impl Shebang {
         line.chars()
             .collect::<Vec<char>>()
             .chunk_by(|first, second| first.is_whitespace() == second.is_whitespace())
-            .filter(|chunk| chunk.iter().all(|letter| !letter.is_whitespace()))
+            .filter(|chunk| Run::from(*chunk) == Run::Word)
             .map(|chunk| chunk.iter().collect())
             .collect()
+    }
+
+    fn interpreter(words: &[String]) -> Option<&str> {
+        words
+            .iter()
+            .skip(1)
+            .find(|word| Argument::from(word.as_str()) == Argument::Program)
+            .map(String::as_str)
+            .and_then(Self::named)
     }
 }
 
@@ -27,15 +36,38 @@ impl FromStr for Shebang {
     fn from_str(line: &str) -> Result<Shebang, Infallible> {
         let words = Self::words(line);
         let program = words.first().map(String::as_str).and_then(Self::named);
-        let interpreter = match program {
-            Some(Self::LAUNCHER) => words
-                .iter()
-                .skip(1)
-                .find(|word| !matches!(word.chars().next(), Some('-')) && !word.contains('='))
-                .map(String::as_str)
-                .and_then(Self::named),
-            other => other,
-        };
+        let interpreter =
+            program.filter(|program| *program == Self::LAUNCHER).map_or(program, |_| Self::interpreter(&words));
         Ok(Shebang(interpreter.map(str::to_owned)))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Run {
+    Space,
+    Word,
+}
+
+impl From<&[char]> for Run {
+    fn from(chunk: &[char]) -> Run {
+        chunk.first().filter(|letter| letter.is_whitespace()).map_or(Run::Word, |_| Run::Space)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Argument {
+    Flag,
+    Assignment,
+    Program,
+}
+
+impl From<&str> for Argument {
+    fn from(word: &str) -> Argument {
+        word.chars()
+            .next()
+            .filter(|first| *first == '-')
+            .map(|_| Argument::Flag)
+            .or_else(|| word.chars().find(|letter| *letter == '=').map(|_| Argument::Assignment))
+            .unwrap_or(Argument::Program)
     }
 }

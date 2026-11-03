@@ -24,9 +24,9 @@ impl Shebang {
     }
 
     pub(crate) fn foreign(self) -> Option<Shebang> {
-        match self.0.as_deref() {
-            Some(name) if Self::RUST.contains(&name) => None,
-            _ => Some(self),
+        match self.0.as_deref().filter(|name| Self::RUST.contains(name)) {
+            Some(_) => None,
+            None => Some(self),
         }
     }
 }

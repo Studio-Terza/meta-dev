@@ -83,10 +83,9 @@ impl Placement {
     #[must_use]
     pub fn crate_file(&self, file: &Path) -> CrateFile {
         let source = self.crate_root().directory().join(Self::SOURCE_DIRECTORY);
-        CrateFile::from(match self.role {
-            Role::Other if file.starts_with(&source) => source.join(Self::LIBRARY_FILE),
-            Role::Other | Role::LibraryRoot | Role::BinaryRoot | Role::Target => file.to_path_buf(),
-        })
+        let library =
+            (self.role == Role::Other).then(|| source.join(Self::LIBRARY_FILE)).filter(|_| file.starts_with(&source));
+        CrateFile::from(library.unwrap_or_else(|| file.to_path_buf()))
     }
 
     fn named_ancestor<'path>(path: &'path Path, accepted: &[Word<'_>]) -> Option<&'path Path> {
@@ -117,15 +116,48 @@ impl Placement {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let directory = first.as_os_str().to_str()?;
-        if directory == Self::SOURCE_DIRECTORY {
-            Some(SourceDirectory::place(root, rest))
-        } else if directory == Self::BUILD_FILE && rest.as_os_str().is_empty() {
-            Some(BuildScript::place(root))
-        } else {
-            Self::TARGET_DIRECTORIES
-                .contains(&directory)
-                .then(|| TargetDirectory::place(root, &package.join(directory), rest))
-                .flatten()
+        PackageDirectory::from(directory).placed(root, &package.join(directory), rest)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PackageDirectory {
+    Source,
+    Build,
+    Target,
+    Other,
+}
+
+impl PackageDirectory {
+    const NAMED: [(&'static str, PackageDirectory); 2] =
+        [(Placement::SOURCE_DIRECTORY, PackageDirectory::Source), (Placement::BUILD_FILE, PackageDirectory::Build)];
+}
+
+impl From<&str> for PackageDirectory {
+    fn from(directory: &str) -> PackageDirectory {
+        PackageDirectory::NAMED
+            .iter()
+            .find(|(name, _)| *name == directory)
+            .map(|(_, named)| *named)
+            .or_else(|| {
+                Placement::TARGET_DIRECTORIES
+                    .iter()
+                    .find(|target| **target == directory)
+                    .map(|_| PackageDirectory::Target)
+            })
+            .unwrap_or(PackageDirectory::Other)
+    }
+}
+
+impl PackageDirectory {
+    fn placed(self, root: PackageRoot, directory: &Path, rest: &Path) -> Option<Placement> {
+        match self {
+            PackageDirectory::Source => Some(SourceDirectory::place(root, rest)),
+            PackageDirectory::Build => {
+                Some(rest).filter(|rest| rest.as_os_str().is_empty()).map(|_| BuildScript::place(root))
+            }
+            PackageDirectory::Target => TargetDirectory::place(root, directory, rest),
+            PackageDirectory::Other => None,
         }
     }
 }

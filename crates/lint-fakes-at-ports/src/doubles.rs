@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath, Type};
+use syn::{Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path as TraitPath};
 
-use lint_core::{Site, SourceFile, Violation, Walk};
+use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module};
 
@@ -49,13 +49,15 @@ impl<'file> Doubles<'file> {
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
-        let ported = |double: &DoubleKey| {
-            self.implemented.iter().any(|implemented| implemented.double == *double && implemented.kind == Kind::Port)
-        };
         let unported = self
             .declared
             .iter()
-            .filter(|(double, _)| !ported(double))
+            .filter(|(double, _)| {
+                self.implemented
+                    .iter()
+                    .filter(|implemented| implemented.double == **double)
+                    .all(|implemented| implemented.kind != Kind::Port)
+            })
             .map(|(double, site)| Violation::new(*site, Finding::Unported(&double.name)));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
             Violation::new(
@@ -88,11 +90,8 @@ impl<'file> Reader<'file, '_> {
     }
 
     fn double_of(&self, item: &ItemImpl) -> Option<DoubleKey<'file>> {
-        let name = match item.self_ty.as_ref() {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
-            _ => None,
-        };
-        name.filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
+        Syntax::last_name(&item.self_ty)
+            .filter(|name| name.matches::<CamelWord>(&Self::DOUBLES).is_some())
             .map(|name| DoubleKey { target: self.target, name })
     }
 
