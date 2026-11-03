@@ -21,7 +21,7 @@ pub struct MethodShape {
 
 impl MethodShape {
     #[must_use]
-    pub fn described(signature: &Signature, erasure: &Erasure) -> MethodShape {
+    pub fn described(signature: &Signature, erasure: &Erasure<'_>) -> MethodShape {
         let inputs: Vec<String> = signature
             .inputs
             .iter()

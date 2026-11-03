@@ -1,12 +1,12 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use lint_core::SourceFile;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Package(PathBuf);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Package<'file>(&'file Path);
 
-impl Package {
-    pub(crate) fn containing(file: &SourceFile) -> Package {
-        Package(file.placement().package().root().directory().to_path_buf())
+impl<'file> Package<'file> {
+    pub(crate) fn containing(file: &'file SourceFile) -> Package<'file> {
+        Package(file.placement().package().root().directory())
     }
 }

@@ -7,19 +7,19 @@ use crate::package::Package;
 use crate::subject::Subject;
 
 #[derive(Debug)]
-pub(crate) struct Law {
-    package: Package,
+pub(crate) struct Law<'file> {
+    package: Package<'file>,
     kind: Kind,
     mentions: BTreeSet<Name>,
 }
 
-impl Law {
-    pub(crate) fn new(package: Package, kind: Kind, mentions: BTreeSet<Name>) -> Law {
+impl<'file> Law<'file> {
+    pub(crate) fn new(package: Package<'file>, kind: Kind, mentions: BTreeSet<Name>) -> Law<'file> {
         Law { package, kind, mentions }
     }
 
-    pub(crate) fn naming(&self, subject: &Subject) -> Option<&Law> {
-        (self.package == *subject.package() && self.mentions.contains(subject.owner())).then_some(self)
+    pub(crate) fn naming(&self, subject: &Subject<'_>) -> Option<&Law<'file>> {
+        (self.package == subject.package() && self.mentions.contains(subject.owner())).then_some(self)
     }
 
     pub(crate) fn kind(&self) -> Kind {
