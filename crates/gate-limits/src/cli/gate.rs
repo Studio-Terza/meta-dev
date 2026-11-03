@@ -63,8 +63,11 @@ impl Gate {
     }
 
     #[must_use]
-    pub fn blocking(&self) -> Option<&Finding> {
-        self.findings.iter().find_map(Finding::blocks)
+    pub fn blocking(&self, report_only: &[OsString]) -> Option<&Finding> {
+        self.findings
+            .iter()
+            .filter_map(Finding::blocks)
+            .find(|finding| report_only.iter().find_map(|name| Self::names(name, finding.stage())).is_none())
     }
 
     #[must_use]
