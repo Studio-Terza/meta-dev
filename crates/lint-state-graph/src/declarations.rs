@@ -1,3 +1,5 @@
+mod vertex;
+
 use std::collections::{BTreeMap, BTreeSet};
 use syn::visit::Visit;
 use syn::{Fields, ItemEnum, ItemImpl, ItemMod, ItemType};
@@ -8,6 +10,7 @@ use lint_core::TypeHomes;
 use lint_core::TypeName;
 use lint_core::Walk;
 use lint_layout::Name;
+use vertex::Vertex;
 
 #[derive(Default)]
 pub struct Declarations {
@@ -36,8 +39,8 @@ impl Declarations {
         self.aliases.get(&name).cloned().unwrap_or(name)
     }
 
-    pub fn vertex_named(&self, name: &TypeName) -> Option<&TypeName> {
-        self.vertices.get(name)
+    pub fn as_vertex(&self, name: &TypeName) -> Option<Vertex> {
+        self.vertices.get(name).map(|_| Vertex)
     }
 
     pub fn foreign_sum_type(&self, enum_name: &Name, from: &Home) -> Option<&Name> {
