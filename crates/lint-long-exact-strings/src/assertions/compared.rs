@@ -14,8 +14,8 @@ use literal::{Literal, Reading};
 
 #[derive(Debug)]
 pub struct Compared<'run> {
-    constants: &'run Bindings,
-    locals: &'run Bindings,
+    constants: &'run Bindings<'run>,
+    locals: &'run Bindings<'run>,
 }
 
 impl<'run> Compared<'run> {
@@ -25,7 +25,7 @@ impl<'run> Compared<'run> {
     const FORMATS: [Word<'static>; 2] = words!["format", "format_args"];
     const LISTS: [Word<'static>; 2] = words!["concat", "vec"];
 
-    pub fn new(constants: &'run Bindings, locals: &'run Bindings) -> Compared<'run> {
+    pub fn new(constants: &'run Bindings<'run>, locals: &'run Bindings<'run>) -> Compared<'run> {
         Compared { constants, locals }
     }
 
@@ -50,15 +50,15 @@ impl<'run> Compared<'run> {
             Expr::Tuple(tuple) => tuple.elems.iter().find_map(|element| self.traced(element, seen)),
             Expr::Struct(built) => built.fields.iter().find_map(|field| self.traced(&field.expr, seen)),
             Expr::Macro(invocation) => self.built(&invocation.mac, seen),
-            Expr::Path(path) => path.path.get_ident().map(Name::from).and_then(|name| self.bound(&name, seen)),
+            Expr::Path(path) => path.path.get_ident().map(Name::from).and_then(|name| self.bound(name, seen)),
             _ => None,
         }
     }
 
-    fn bound(&self, name: &Name, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
-        let fresh = seen.borrow_mut().insert(name.clone());
-        let value = self.locals.bound(name).or_else(|| self.constants.bound(name)).filter(|_| fresh)?;
-        self.traced(value, seen)
+    fn bound(&self, name: Name, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
+        let value = self.locals.bound(&name).or_else(|| self.constants.bound(&name))?;
+        let unseen = seen.borrow_mut().insert(name).then_some(value);
+        unseen.and_then(|value| self.traced(value, seen))
     }
 
     fn built(&self, invocation: &Macro, seen: &RefCell<BTreeSet<Name>>) -> Option<Pinning> {
