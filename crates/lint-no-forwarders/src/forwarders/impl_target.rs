@@ -1,6 +1,7 @@
-use syn::{ItemImpl, PathSegment, Type};
+use syn::{ItemImpl, PathSegment};
 
 use super::Forwarders;
+use lint_core::Syntax;
 
 pub enum ImplTarget<'ast> {
     Inherent(&'ast PathSegment),
@@ -9,18 +10,15 @@ pub enum ImplTarget<'ast> {
 
 impl<'ast> ImplTarget<'ast> {
     pub fn describe(item: &'ast ItemImpl) -> ImplTarget<'ast> {
-        match (&item.trait_, &*item.self_ty) {
-            (None, Type::Path(path)) => path.path.segments.last().map_or(ImplTarget::Skipped, ImplTarget::Inherent),
-            _ => ImplTarget::Skipped,
-        }
+        Syntax::inherent(item)
+            .and_then(|item| Syntax::type_path(&item.self_ty))
+            .and_then(|path| path.path.segments.last())
+            .map_or(ImplTarget::Skipped, ImplTarget::Inherent)
     }
 
     pub fn walked_by(self, forwarders: &mut Forwarders<'_, 'ast>, item: &'ast ItemImpl) {
         match self {
-            ImplTarget::Inherent(segment) => {
-                forwarders.targeting(segment);
-                syn::visit::visit_item_impl(forwarders, item);
-            }
+            ImplTarget::Inherent(segment) => forwarders.targeted(segment, item),
             ImplTarget::Skipped => {}
         }
     }
