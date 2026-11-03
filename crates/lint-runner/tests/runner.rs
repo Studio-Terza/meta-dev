@@ -723,14 +723,11 @@ mod ports {
         }
 
         pub fn occurrences(path: &Path, needle: &str) -> Result<usize, Box<dyn Error>> {
-            if !path.is_dir() {
-                return Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()));
+            if path.is_dir() {
+                Self::entries(path)?.iter().try_fold(0, |found, entry| Ok(found + Self::occurrences(entry, needle)?))
+            } else {
+                Ok(fs::read_to_string(path).map_or(0, |text| text.matches(needle).count()))
             }
-            let mut found = 0;
-            for entry in Self::entries(path)? {
-                found += Self::occurrences(&entry, needle)?;
-            }
-            Ok(found)
         }
 
         pub fn temporary() -> io::Result<tempfile::TempDir> {
