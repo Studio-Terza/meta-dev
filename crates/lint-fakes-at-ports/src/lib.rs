@@ -1,8 +1,9 @@
 mod doubles;
+mod kind;
 mod port_traits;
 
 use doubles::Doubles;
-pub use doubles::Kind;
+pub use kind::Kind;
 use lint_core::{Headline, Lint, Report, SourceFile, TestFile};
 use lint_paths::Imports;
 pub use port_traits::PortTraits;
