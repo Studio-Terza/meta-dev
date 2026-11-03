@@ -49,7 +49,8 @@ impl WorkspaceTypes {
         let from: &CrateName = transition.as_ref();
         let end = |endpoint: &Endpoint| self.end(from, endpoint, fixed_by);
         let takes = transition.takes().iter().map(end).collect();
-        Edge::new(transition, Ends::new(takes, end(transition.gives())), fixed_by)
+        let implementer = transition.implementer().map(end);
+        Edge::new(transition, Ends::new(takes, end(transition.gives())).implemented_by(implementer), fixed_by)
     }
 
     fn end(&self, from: &CrateName, endpoint: &Endpoint, fixed_by: Option<&Name>) -> End {

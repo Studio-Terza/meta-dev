@@ -155,11 +155,16 @@ pub(crate) enum Class {
 pub(crate) struct Ends {
     takes: Vec<End>,
     gives: End,
+    implementer: Option<End>,
 }
 
 impl Ends {
     pub(crate) fn new(takes: Vec<End>, gives: End) -> Ends {
-        Ends { takes, gives }
+        Ends { takes, gives, implementer: None }
+    }
+
+    pub(crate) fn implemented_by(self, implementer: Option<End>) -> Ends {
+        Ends { implementer, ..self }
     }
 
     pub(crate) fn all(&self) -> impl Iterator<Item = &End> {
@@ -192,8 +197,14 @@ impl Ends {
 
     pub(crate) fn key(&self) -> Option<Key> {
         let mut takes: Vec<Node> = self.takes.iter().map(|taken| taken.node.clone()).collect::<Option<Vec<Node>>>()?;
-        takes.sort();
         let gives = self.gives.node.clone()?;
+        let selector = self
+            .implementer
+            .as_ref()
+            .and_then(|implementer| implementer.node.clone())
+            .filter(|implementer| *implementer != gives && !takes.contains(implementer));
+        takes.extend(selector);
+        takes.sort();
         (!takes.is_empty()).then_some(Key { takes, gives })
     }
 

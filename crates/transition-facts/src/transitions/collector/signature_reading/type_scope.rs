@@ -36,6 +36,10 @@ impl<'file> TypeScope<'file> {
         TypeScope { selfish, generics: BTreeMap::new(), origins }
     }
 
+    pub(super) fn selfish(&self) -> &Endpoint {
+        &self.selfish
+    }
+
     pub(super) fn extended(&self, generics: &Generics) -> TypeScope<'file> {
         let names: Vec<Name> = generics.type_params().map(|parameter| Name::from(&parameter.ident)).collect();
         let unbounded = names.iter().fold(self.clone(), |mut scope, name| {

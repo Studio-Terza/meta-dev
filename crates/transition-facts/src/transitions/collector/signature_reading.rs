@@ -75,6 +75,7 @@ impl<'file> SignatureReading<'file> {
         Transition::new(self.krate.clone(), site, self.owner.clone(), Name::from(&signature.ident))
             .taking(takes, gives, Self::mutation(signature))
             .placed(self.ground, self.filler.clone(), BodyReading::classified(body))
+            .implemented_by(self.filler.implementer(self.scope.selfish()))
             .branching(Branches::scored(body, Propagation::Ambient))
     }
 

@@ -32,7 +32,7 @@ impl GraphLint for DuplicateTransitions {
             keyed.into_iter().filter_map(|(key, found)| Family::repeated(key, found)).collect();
         Report::new(
             Headline::new(
-                "report only, duplicate transitions: input types joined to one output type by more than one written edge (function, method or trait impl) in shipped code, compared only where every type is a domain type; derived lifts and store operations are left out; keep one, a standard conversion (From, TryFrom, FromStr) where it fits, and route the others through it",
+                "report only, duplicate transitions: input types joined to one output type by more than one written edge (function, method or trait impl) in shipped code, compared only where every type is a domain type; a trait impl also takes its implementing type when no input or output carries it, so impls of one trait on different types are different edges; derived lifts and store operations are left out; keep one, a standard conversion (From, TryFrom, FromStr) where it fits, and route the others through it",
             ),
             Comparison::of_families(&edges, &families)
                 .violation(transitions.all())
