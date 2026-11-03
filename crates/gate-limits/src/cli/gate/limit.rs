@@ -3,6 +3,7 @@ use std::fmt;
 use serde::Deserialize;
 
 use crate::cli::failure::Failure;
+use crate::cli::gate::record::Entry;
 use crate::cli::gate::seconds::Seconds;
 use crate::cli::gate::verdict::Verdict;
 use crate::cli::stage::Stage;
@@ -34,13 +35,11 @@ impl Limit {
         }
     }
 
-    pub fn lowered(self, stage: &Stage, measured: Seconds) -> Result<Seconds, Failure> {
+    pub fn lowered(self, stage: Stage, measured: Seconds) -> Result<Entry, Failure<'static>> {
         match self {
-            Limit::Levels { .. } => Err(Failure::Levels { stage: stage.clone() }),
-            Limit::Record(record) if measured > record => {
-                Err(Failure::Above { stage: stage.clone(), measured, record })
-            }
-            Limit::Record(_) => Ok(measured),
+            Limit::Levels { .. } => Err(Failure::Levels { stage }),
+            Limit::Record(record) if measured > record => Err(Failure::Above { stage, measured, record }),
+            Limit::Record(_) => Ok(Entry::new(stage, measured)),
         }
     }
 }

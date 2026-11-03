@@ -128,7 +128,8 @@ fn only_stages_past_their_warn_level_are_listed_by_name_and_text() -> io::Result
     let fixture = Fixture::default();
     let limits = fixture.stored("past-limits.toml", LIMITS)?;
     let measured = fixture.stored("past-measured.toml", "test-run = 4\nclippy = 10")?;
-    let past = Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(io::Error::other)?;
+    let past =
+        Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(|failure| io::Error::other(failure.to_string()))?;
     assert_eq!(past.iter().map(|finding| finding.stage().as_ref()).collect::<Vec<&str>>(), ["test-run"]);
     assert_eq!(
         past.iter().map(ToString::to_string).collect::<Vec<String>>(),
@@ -142,7 +143,8 @@ fn a_blocking_stage_is_past_its_warn_level_too() -> io::Result<()> {
     let fixture = Fixture::default();
     let limits = fixture.stored("block-limits.toml", LIMITS)?;
     let measured = fixture.stored("block-measured.toml", "test-run = 6\nclippy = 10")?;
-    let past = Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(io::Error::other)?;
+    let past =
+        Run::cli(&limits, &measured).past_warn(&fixture.0).map_err(|failure| io::Error::other(failure.to_string()))?;
     assert_eq!(past.iter().map(|finding| finding.blocks().is_some()).collect::<Vec<bool>>(), [true]);
     Ok(())
 }
@@ -227,7 +229,7 @@ fn a_record_is_lowered_to_the_measured_time() -> io::Result<()> {
     let fixture = Fixture::default();
     let record = fixture.stored("lowered-limits.toml", "cold-clippy = 50\n")?;
     let measured = fixture.stored("lowered-measured.toml", "cold-clippy = 40")?;
-    Run::cli(&record, &measured).lower(&fixture.0).map_err(io::Error::other)?;
+    Run::cli(&record, &measured).lower(&fixture.0).map_err(|failure| io::Error::other(failure.to_string()))?;
     assert_eq!(Text::lines(&fixture.text(&record)?), ["cold-clippy = 40"]);
     Ok(())
 }

@@ -54,26 +54,26 @@ impl Cli {
         }
     }
 
-    pub fn past_warn(&self, files: &impl Files) -> Result<Vec<Finding>, Failure> {
+    pub fn past_warn(&self, files: &impl Files) -> Result<Vec<Finding>, Failure<'_>> {
         self.gate(files).map(Gate::past_warn)
     }
 
-    pub fn lower(&self, files: &impl Files) -> Result<Record, Failure> {
+    pub fn lower(&self, files: &impl Files) -> Result<Record, Failure<'_>> {
         let record = self.gate(files)?.lowered()?;
         files
             .write(&self.limits, &Bytes::from(&record))
             .map(|()| record)
-            .map_err(|failure| Failure::Io { path: self.limits.clone(), source: io::Error::from(failure) })
+            .map_err(|failure| Failure::Io { path: &self.limits, source: io::Error::from(failure) })
     }
 
-    fn gate(&self, files: &impl Files) -> Result<Gate, Failure> {
+    fn gate(&self, files: &impl Files) -> Result<Gate, Failure<'_>> {
         Gate::judge(Self::read(files, &self.limits)?, Self::read(files, &self.measured)?, &self.only)
     }
 
-    fn read(files: &impl Files, path: &Path) -> Result<Contents, Failure> {
+    fn read<'cli>(files: &impl Files, path: &'cli Path) -> Result<Contents, Failure<'cli>> {
         files
             .read_text(path)
             .map(|text| Contents::new(text.into_inner()))
-            .map_err(|failure| Failure::Io { path: path.to_path_buf(), source: io::Error::from(failure) })
+            .map_err(|failure| Failure::Io { path, source: io::Error::from(failure) })
     }
 }

@@ -36,8 +36,8 @@ impl Finding {
         &self.stage
     }
 
-    pub fn lowered(self) -> Result<Entry, Failure> {
-        self.limit.lowered(&self.stage, self.measured).map(|seconds| Entry::new(self.stage, seconds))
+    pub fn lowered(self) -> Result<Entry, Failure<'static>> {
+        self.limit.lowered(self.stage, self.measured)
     }
 }
 
