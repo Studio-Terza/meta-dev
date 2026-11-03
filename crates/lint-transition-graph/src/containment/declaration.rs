@@ -10,7 +10,7 @@ pub(crate) struct Declaration<'found, 'file> {
     named: Member<'found>,
     site: Site<'file>,
     dependencies: &'found [Dependency<'file>],
-    implementations: &'found [Implementation],
+    implementations: &'found [Implementation<'file>],
 }
 
 impl<'found, 'file> Declaration<'found, 'file> {
@@ -39,9 +39,7 @@ impl<'found, 'file> Declaration<'found, 'file> {
 
     pub(crate) fn links(&self, placed: Member<'found>, resolver: &Resolver<'found>) -> Vec<Link<'found>> {
         let held = self.dependencies.iter().flat_map(|dependency| resolver.dependency(dependency));
-        let file = self.site.path();
-        let implemented =
-            self.implementations.iter().flat_map(|implemented| resolver.members(file, implemented.as_ref(), &[], None));
+        let implemented = self.implementations.iter().flat_map(|implemented| resolver.implemented(placed, implemented));
         held.chain(implemented).map(|used| Link::new(placed, used)).collect()
     }
 }

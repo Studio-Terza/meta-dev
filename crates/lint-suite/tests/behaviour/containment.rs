@@ -434,3 +434,74 @@ fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_type_parameter_is_not_a_use_of_a_type_with_its_name() {
+    let generic = [
+        Clustered::at("crates/x/src/lib.rs", "mod layer;\npub struct Look;\n"),
+        Clustered::at(
+            "crates/x/src/layer.rs",
+            "pub struct Layer<Look> {\n    features: Vec<Look>,\n}\nimpl<Look: Default> Layer<Look> {\n    fn first(&self) -> Look {\n        Look::default()\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&generic, |view| view.report::<LowestCluster>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_trait_impl_links_the_twin_its_own_file_names() {
+    let twins = [
+        Clustered::at("crates/x/src/lib.rs", "mod check;\nmod readout;\n"),
+        Clustered::at("crates/x/src/check.rs", "mod geometry;\nmod rule;\npub struct Check(geometry::Geometry);\n"),
+        Clustered::at(
+            "crates/x/src/check/geometry.rs",
+            "use super::rule::Rule;\npub struct Geometry;\nimpl Rule for Geometry {}\n",
+        ),
+        Clustered::at("crates/x/src/check/rule.rs", "pub trait Rule {}\n"),
+        Clustered::at("crates/x/src/readout.rs", "mod geometry;\npub struct Readout(geometry::Geometry);\n"),
+        Clustered::at("crates/x/src/readout/geometry.rs", "pub struct Geometry;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&twins, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/check/rule.rs:1: x::check::rule::Rule is used only within x::check::geometry; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_body_use_links_across_crates_through_its_import_or_qualifier() {
+    let imported = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct Mark;\npub struct Touch;\npub struct Loose;\n"),
+        Clustered::at(
+            "crates/y/src/lib.rs",
+            "use x::Mark;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        Mark::new();\n        x::Touch::new();\n        Loose::new();\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&imported, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::Mark is used only within crate y; move it into the lowest cluster that holds all its users",
+            "crates/x/src/lib.rs:2: x::Touch is used only within crate y; move it into the lowest cluster that holds all its users",
+        ]
+    );
+}
+
+#[test]
+fn a_type_named_in_an_interpolated_macro_string_is_used() {
+    let interpolated = [
+        Clustered::at("crates/x/src/lib.rs", "mod view;\npub struct Anchor;\n"),
+        Clustered::at(
+            "crates/x/src/view.rs",
+            "use crate::Anchor;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        rsx! { section { id: \"{Anchor::new(1)} {{plain}}\" } };\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&interpolated, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:2: x::Anchor is used only within x::view; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}

@@ -1,3 +1,4 @@
+mod breadth;
 mod import;
 mod imports;
 mod path_tokens;
@@ -11,6 +12,7 @@ use proc_macro2::{Ident, TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};
 
+pub use breadth::Breadth;
 use import::Import;
 use imports::Imports;
 use path_tokens::PathTokens;
@@ -19,6 +21,7 @@ use path_tokens::PathTokens;
 pub struct Scope<'file> {
     local_roots: BTreeSet<Name>,
     imports: Imports<'file>,
+    breadth: Breadth,
 }
 
 impl<'file> Scope<'file> {
@@ -31,6 +34,11 @@ impl<'file> Scope<'file> {
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
         scope.visit_file(file);
         scope
+    }
+
+    #[must_use]
+    pub fn reading(self, breadth: Breadth) -> Scope<'file> {
+        Scope { breadth, ..self }
     }
 
     #[must_use]
@@ -76,12 +84,14 @@ impl<'file> Scope<'file> {
     }
 
     fn kept(&self, token: &TokenTree, root: Option<&TokenTree>, name: Name) -> Option<Name> {
-        match root {
-            Some(root) if ptr::eq(root, token) => {
+        match (root, self.breadth) {
+            (Some(root), Breadth::Crate) if ptr::eq(root, token) => {
                 self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name))
             }
-            Some(root) => self.local_root(Some(root)).map(|_| name),
-            None => None,
+            (Some(root), Breadth::Workspace) if ptr::eq(root, token) => Some(self.imports.original(name)),
+            (Some(root), Breadth::Crate) => self.local_root(Some(root)).map(|_| name),
+            (Some(_), Breadth::Workspace) => Some(name),
+            (None, _) => None,
         }
     }
 

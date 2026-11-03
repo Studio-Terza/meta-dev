@@ -136,9 +136,15 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             })
             .collect();
         let implemented = found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
+        let site = self.site_at(found.impl_token.span);
         let (implementation, inherent) = match implemented {
             Some(segment) => (
-                Some(Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), methods)),
+                Some(Implementation::new(
+                    Name::from(&segment.ident),
+                    Spelled::first_argument_of(segment),
+                    methods,
+                    site,
+                )),
                 Vec::new(),
             ),
             None => (None, methods),
@@ -146,7 +152,6 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let walk = Walk::outside_tests(&found.attrs);
         let generic =
             found.generics.type_params().next().and(target.clone()).filter(|_| walk == Walk::Entered).map(|spelled| {
-                let site = self.site_at(found.impl_token.span);
                 let implemented = implementation.as_ref().map(|each| AsRef::<Name>::as_ref(each).clone());
                 let methods = implementation.as_ref().map_or(inherent.as_slice(), Implementation::methods).to_vec();
                 GenericImpl::new(self.krate, site, spelled).filled(implemented, methods)

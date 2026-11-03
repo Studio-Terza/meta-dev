@@ -56,8 +56,9 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> Option<&'path Name> {
-        self.0.iter().find_map(typed).or_else(|| self.0.last())
+    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> UsePath {
+        let named = self.0.iter().position(|segment| typed(segment).is_some()).map_or(self.0.len(), |at| at + 1);
+        UsePath(self.0.iter().take(named).cloned().collect())
     }
 }
 

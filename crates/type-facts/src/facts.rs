@@ -21,7 +21,7 @@ pub struct Facts<'file> {
     types: Vec<TypeFact<'file>>,
     traits: Vec<TraitFact<'file>>,
     generic_impls: Vec<GenericImpl<'file>>,
-    members: BTreeMap<&'file CrateName, BTreeMap<Name, Members>>,
+    members: BTreeMap<&'file CrateName, BTreeMap<Name, Members<'file>>>,
 }
 
 impl<'file> Facts<'file> {
@@ -84,11 +84,11 @@ impl<'file> Facts<'file> {
     }
 
     #[must_use]
-    pub fn implementations(&self, found: &TypeFact<'file>) -> &[Implementation] {
+    pub fn implementations(&self, found: &TypeFact<'file>) -> &[Implementation<'file>] {
         self.members_of(found).map_or(&[], Members::implementations)
     }
 
-    fn members_of(&self, found: &TypeFact<'file>) -> Option<&Members> {
+    fn members_of(&self, found: &TypeFact<'file>) -> Option<&Members<'file>> {
         let krate: &CrateName = found.as_ref();
         let name: &Name = found.as_ref();
         self.members.get(krate)?.get(name)
