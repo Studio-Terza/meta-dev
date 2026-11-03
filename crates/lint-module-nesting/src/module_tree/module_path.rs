@@ -38,7 +38,7 @@ impl ModulePath {
     }
 
     pub fn from_use(file: &ModulePath, path: &UsePath, modules: &ModuleIndex) -> Option<ModulePath> {
-        let first = path.first()?;
+        let first = path.segments().first()?;
         let start = if *first == Self::CRATE {
             Vec::new()
         } else if *first == Self::SUPER {

@@ -1,4 +1,6 @@
-mod boundary;
+mod camel_word;
+mod lowered;
+mod prefix;
 
 use std::ffi::OsStr;
 use std::fmt;
@@ -9,12 +11,13 @@ use syn::Ident;
 use crate::casing::Casing;
 use crate::length::Length;
 use crate::matching::Matching;
-use crate::whole::Whole;
 use crate::word::Word;
-use boundary::Letters;
+pub use camel_word::CamelWord;
+pub use lowered::Lowered;
 use newtype::Newtype;
 use newtype::proptest::arbitrary::{Arbitrary, any};
 use newtype::proptest::strategy::{BoxedStrategy, Strategy};
+pub use prefix::Prefix;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(String);
@@ -31,28 +34,18 @@ impl Name {
     }
 
     #[must_use]
-    pub fn lowered(&self) -> Name {
-        Name(self.0.chars().flat_map(char::to_lowercase).collect())
+    pub fn lowered(&self) -> Lowered {
+        self.0.chars().flat_map(char::to_lowercase).collect()
     }
 
     #[must_use]
-    pub fn contains<'word>(&self, word: Word<'word>) -> Option<Word<'word>> {
-        self.0.contains(word.into_inner()).then_some(word)
-    }
-
-    #[must_use]
-    pub fn prefixed(&self, word: Word<'_>) -> Name {
-        Name([word.into_inner(), &self.0].concat())
-    }
-
-    #[must_use]
-    pub fn without_prefix(&self, word: Word<'_>) -> Option<Name> {
-        let spelled = word.into_inner();
+    pub fn reprefixed(&self, opening: Word<'_>, closing: Word<'_>) -> Option<Name> {
+        let spelled = opening.into_inner();
         self.0
             .get(..spelled.len())
             .filter(|head| *head == spelled)
             .and_then(|_| self.0.get(spelled.len()..))
-            .map(Name::from)
+            .map(|rest| Name([closing.into_inner(), rest].concat()))
     }
 
     #[must_use]
@@ -63,14 +56,6 @@ impl Name {
             .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
             .map(|chunk| Name(chunk.iter().collect()))
             .collect()
-    }
-
-    #[must_use]
-    pub fn camel_word<'word>(&self, words: &[Word<'word>]) -> Option<Word<'word>> {
-        self.words()
-            .iter()
-            .flat_map(|chunk| Letters::humps(&chunk.0).into_iter().map(Name))
-            .find_map(|hump| hump.lowered().matches::<Whole>(words))
     }
 
     #[must_use]

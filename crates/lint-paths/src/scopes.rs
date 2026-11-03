@@ -32,7 +32,7 @@ impl Scopes {
     }
 
     pub(crate) fn renames_head(&self, module: &Module, path: &UsePath) -> Option<&Scope> {
-        let head = path.first()?;
+        let head = path.segments().first()?;
         self.scope(module).filter(|scope| scope.imported(head).is_some() || !scope.globs().is_empty())
     }
 

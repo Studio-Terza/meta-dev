@@ -45,7 +45,7 @@ impl NoTestOnlyApi {
             .features()
             .iter()
             .filter_map(|(name, line)| {
-                FeatureWord::test_word(name)
+                name.matches::<FeatureWord>(&FeatureWord::TEST_WORDS)
                     .map(|_| Violation::new(Site::new(&manifest, *line), Finding::Feature(name.clone())))
             })
             .collect()

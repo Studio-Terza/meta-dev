@@ -1,13 +1,14 @@
-use lint_layout::Whole;
-use lint_layout::{Name, Word, words};
+use lint_layout::{Matching, Name, Whole, Word, words};
 
 #[derive(Debug)]
 pub(crate) struct FeatureWord;
 
 impl FeatureWord {
-    const TEST_WORDS: [Word<'static>; 5] = words!["test", "tests", "testing", "mock", "mocks"];
+    pub(crate) const TEST_WORDS: [Word<'static>; 5] = words!["test", "tests", "testing", "mock", "mocks"];
+}
 
-    pub(crate) fn test_word(feature: &Name) -> Option<Word<'static>> {
-        feature.words().iter().find_map(|word| word.matches::<Whole>(&Self::TEST_WORDS))
+impl Matching for FeatureWord {
+    fn holds<'word>(feature: &Name, word: Word<'word>) -> Option<Word<'word>> {
+        feature.words().iter().find_map(|chunk| Whole::holds(chunk, word))
     }
 }
