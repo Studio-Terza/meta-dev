@@ -60,8 +60,10 @@ impl Gate {
     }
 
     #[must_use]
-    pub fn blocks(&self) -> bool {
-        self.findings.iter().any(Finding::blocks)
+    pub fn blocks_outside(&self, report_only: &[OsString]) -> bool {
+        self.findings
+            .iter()
+            .any(|finding| finding.blocks() && !report_only.iter().any(|name| Self::names(name, finding.stage())))
     }
 
     #[must_use]

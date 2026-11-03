@@ -159,6 +159,23 @@ fn named_stages_are_judged_alone_so_a_job_can_judge_the_stages_it_timed() -> io:
 }
 
 #[test]
+fn a_report_only_stage_is_judged_and_printed_but_never_blocks() -> io::Result<()> {
+    let only = ["--report-only", "clippy", "absent"];
+    let run = Run::reported_only("report-only", LIMITS, "test-run = 4\nclippy = 30", &only)?;
+    assert_eq!(
+        Text::lines(&run.out),
+        [
+            "BLOCK: clippy took 30s, warn above 10.5s, block above 20s",
+            "WARN: test-run took 4s, warn above 3s, block above 5s"
+        ]
+    );
+    assert_eq!(run.exit, ExitCode::SUCCESS);
+    let other = Run::reported_only("report-only-other", LIMITS, "test-run = 6\nclippy = 30", &only)?;
+    assert_eq!(other.exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
 fn a_named_stage_that_was_not_measured_or_has_no_limit_fails_closed() -> io::Result<()> {
     let unmeasured = Run::reported_only("named-unmeasured", LIMITS, "", &["test-run"])?;
     assert_eq!(unmeasured.exit, ExitCode::FAILURE);
