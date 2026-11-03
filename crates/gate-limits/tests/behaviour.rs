@@ -160,7 +160,7 @@ fn named_stages_are_judged_alone_so_a_job_can_judge_the_stages_it_timed() -> io:
 
 #[test]
 fn a_report_only_stage_is_judged_and_printed_but_never_blocks() -> io::Result<()> {
-    let only = ["--report-only=clippy", "--report-only=absent"];
+    let only = ["--report-only", "clippy", "--report-only", "absent"];
     let run = Run::reported_only("report-only", LIMITS, "test-run = 4\nclippy = 30", &only)?;
     assert_eq!(
         Text::lines(&run.out),
