@@ -14,7 +14,12 @@ runs:
       shell: bash
       env:
         ARGS: ${{ inputs.stages }} ${{ startsWith(github.base_ref, 'project/') && '--report-only clippy test-run lint' || '--report-only test-compile' }}
-      run: '"$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS'
+      run: |
+        set -- $REACH
+        if [ "$GITHUB_EVENT_NAME" = pull_request ] && [ "${1:-0}" != 0 ] && [ "${1:-}" = "${3:-}" ]; then
+          ARGS="$ARGS test-compile"
+        fi
+        "$TOOLS/ci" logged "$LIMITS" cargo run --locked -q --bin gate-limits -- ci/limits.toml "$MEASURED" $ARGS
     - name: step times
       if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && always()
       shell: bash
