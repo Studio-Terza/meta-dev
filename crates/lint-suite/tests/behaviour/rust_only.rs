@@ -136,23 +136,25 @@ impl Checked {
 
 #[test]
 fn every_listed_extension_names_its_language_and_the_fix() {
-    for (extension, name) in EXTENSIONS {
-        assert_eq!(
-            Checked::one(&format!("tools/run.{extension}")),
-            [format!("tools/run.{extension}:1: {name} source outside assets; {REWRITE}")]
-        );
-    }
-    for (extension, name) in WEB {
-        assert_eq!(
-            Checked::one(&format!("site/app.{extension}")),
-            [format!("site/app.{extension}:1: {name} source outside assets; {MOVE}")]
-        );
-    }
+    let rewritten: Vec<Vec<String>> =
+        EXTENSIONS.iter().map(|(extension, _)| Checked::one(&format!("tools/run.{extension}"))).collect();
+    let rewrites: Vec<Vec<String>> = EXTENSIONS
+        .iter()
+        .map(|(extension, name)| vec![format!("tools/run.{extension}:1: {name} source outside assets; {REWRITE}")])
+        .collect();
+    assert_eq!(rewritten, rewrites);
+    let web: Vec<Vec<String>> =
+        WEB.iter().map(|(extension, _)| Checked::one(&format!("site/app.{extension}"))).collect();
+    let moves: Vec<Vec<String>> = WEB
+        .iter()
+        .map(|(extension, name)| vec![format!("site/app.{extension}:1: {name} source outside assets; {MOVE}")])
+        .collect();
+    assert_eq!(web, moves);
 }
 
 #[test]
 fn rust_and_configuration_files_pass() {
-    for path in [
+    let found: Vec<_> = [
         "src/lib.rs",
         "Cargo.toml",
         "ci/limits.toml",
@@ -163,16 +165,22 @@ fn rust_and_configuration_files_pass() {
         "noextension",
         ".hidden",
         "scripts.py/data.txt",
-    ] {
-        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
-    }
+    ]
+    .into_iter()
+    .map(|path| (path, Checked::one(path)))
+    .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]
 fn a_web_file_below_a_directory_named_assets_passes() {
-    for path in ["assets/app.js", "site/assets/app.js", "site/assets/deep/er/app.css", "assets/page.html"] {
-        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
-    }
+    let found: Vec<_> = ["assets/app.js", "site/assets/app.js", "site/assets/deep/er/app.css", "assets/page.html"]
+        .into_iter()
+        .map(|path| (path, Checked::one(path)))
+        .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]
@@ -189,16 +197,19 @@ fn a_script_below_a_directory_named_assets_still_fails() {
 
 #[test]
 fn only_a_directory_named_exactly_assets_counts() {
-    for path in [
+    let counts: Vec<_> = [
         "my-assets/app.js",
         "assets-old/app.js",
         "assets.js",
         "static/assets_app.js",
         "x/not_assets/run.sh",
         "assets.d/run.sh",
-    ] {
-        assert_eq!(Checked::one(path).len(), 1, "{path}");
-    }
+    ]
+    .into_iter()
+    .map(|path| (path, Checked::one(path).len()))
+    .collect();
+    let ones: Vec<_> = counts.iter().map(|(key, _)| (*key, 1)).collect();
+    assert_eq!(counts, ones);
 }
 
 #[test]
@@ -230,7 +241,7 @@ fn a_report_with_no_findings_is_clean() {
 
 #[test]
 fn an_extensionless_file_with_a_foreign_shebang_fails() {
-    for first in [
+    let cases = [
         "#!/bin/bash",
         "#!/usr/bin/env python3",
         "#!/usr/bin/env -S node --flag",
@@ -238,18 +249,21 @@ fn an_extensionless_file_with_a_foreign_shebang_fails() {
         "#! /bin/sh -e",
         "#!",
         "#!/usr/bin/env",
-    ] {
-        assert_eq!(
-            Checked::holding("deploy", &format!("{first}\nfor i in a b; do echo $i; done\n")),
-            [format!("{ROOT}/deploy:1: interpreted script source outside assets; {REWRITE}")],
-            "{first}"
-        );
-    }
+    ];
+    let found: Vec<_> = cases
+        .iter()
+        .map(|first| (first, Checked::holding("deploy", &format!("{first}\nfor i in a b; do echo $i; done\n"))))
+        .collect();
+    let wanted: Vec<_> = cases
+        .iter()
+        .map(|first| (first, vec![format!("{ROOT}/deploy:1: interpreted script source outside assets; {REWRITE}")]))
+        .collect();
+    assert_eq!(found, wanted);
 }
 
 #[test]
 fn an_extensionless_file_without_a_foreign_shebang_passes() {
-    for text in [
+    let found: Vec<_> = [
         "#!/usr/bin/env rust-script\nfn main() {}\n",
         "#!/usr/bin/env -S cargo +nightly -Zscript\nfn main() {}\n",
         "#!/home/me/.cargo/bin/cargo\n",
@@ -258,9 +272,12 @@ fn an_extensionless_file_without_a_foreign_shebang_passes() {
         "",
         " #!/bin/sh\n",
         "\n#!/bin/sh\n",
-    ] {
-        assert_eq!(Checked::holding("tool", text), Vec::<String>::new(), "{text:?}");
-    }
+    ]
+    .into_iter()
+    .map(|text| (text, Checked::holding("tool", text)))
+    .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]
@@ -297,62 +314,75 @@ fn a_file_merely_named_vendor_still_fails() {
 
 #[test]
 fn a_source_extension_hidden_behind_another_extension_is_still_source() {
-    for (path, name) in [
-        ("ios/Tests.swift.txt", "Swift"),
-        ("tools/run.py.bak", "Python"),
-        ("tools/run.SH.txt", "shell"),
-        ("tools/run.go.orig", "Go"),
-        ("tools/run.js.disabled", "JavaScript"),
-    ] {
-        let fix = if name == "JavaScript" { MOVE } else { REWRITE };
-        assert_eq!(Checked::one(path), [format!("{path}:1: {name} source outside assets; {fix}")], "{path}");
-    }
+    let cases = [
+        ("ios/Tests.swift.txt", "Swift", REWRITE),
+        ("tools/run.py.bak", "Python", REWRITE),
+        ("tools/run.SH.txt", "shell", REWRITE),
+        ("tools/run.go.orig", "Go", REWRITE),
+        ("tools/run.js.disabled", "JavaScript", MOVE),
+    ];
+    let found: Vec<_> = cases.iter().map(|(path, _, _)| (path, Checked::one(path))).collect();
+    let wanted: Vec<_> = cases
+        .iter()
+        .map(|(path, name, fix)| (path, vec![format!("{path}:1: {name} source outside assets; {fix}")]))
+        .collect();
+    assert_eq!(found, wanted);
 }
 
 #[test]
 fn a_double_extension_that_hides_no_source_passes() {
-    for path in ["data.tar.gz", "notes.txt.bak", "report.final.txt", "scripts.py/data.txt", "a.rs.txt", "x.min.json"] {
-        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
-    }
+    let found: Vec<_> =
+        ["data.tar.gz", "notes.txt.bak", "report.final.txt", "scripts.py/data.txt", "a.rs.txt", "x.min.json"]
+            .into_iter()
+            .map(|path| (path, Checked::one(path)))
+            .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]
 fn test_code_of_any_language_passes_below_platform() {
-    for path in [
+    let found: Vec<_> = [
         "platform/tests/Run.swift",
         "ios/platform/UITests/Flow.swift",
         "platform/ios/BashoUITests/Flow.swift",
         "platform/ios/FlowTests.swift",
         "platform/android/test/Flow.kt",
         "platform/tests/helper.py",
-    ] {
-        assert_eq!(Checked::one(path), Vec::<String>::new(), "{path}");
-    }
+    ]
+    .into_iter()
+    .map(|path| (path, Checked::one(path)))
+    .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]
 fn code_below_platform_that_is_not_test_code_fails() {
-    for (path, name) in
-        [("platform/ios/App.swift", "Swift"), ("x/platform/run.sh", "shell"), ("platform/Testing.py", "Python")]
-    {
-        assert_eq!(
-            Checked::one(path),
-            [format!("{path}:1: {name} source below platform is not test code; {REWRITE}")],
-            "{path}"
-        );
-    }
+    let cases =
+        [("platform/ios/App.swift", "Swift"), ("x/platform/run.sh", "shell"), ("platform/Testing.py", "Python")];
+    let found: Vec<_> = cases.iter().map(|(path, _)| (path, Checked::one(path))).collect();
+    let wanted: Vec<_> = cases
+        .iter()
+        .map(|(path, name)| (path, vec![format!("{path}:1: {name} source below platform is not test code; {REWRITE}")]))
+        .collect();
+    assert_eq!(found, wanted);
 }
 
 #[test]
 fn only_a_directory_named_exactly_platform_counts() {
-    for path in ["platforms/tests/Run.swift", "my-platform/tests/run.sh", "platform.d/tests/run.py", "tests/run.py"] {
-        assert_eq!(Checked::one(path).len(), 1, "{path}");
-    }
+    let counts: Vec<_> =
+        ["platforms/tests/Run.swift", "my-platform/tests/run.sh", "platform.d/tests/run.py", "tests/run.py"]
+            .into_iter()
+            .map(|path| (path, Checked::one(path).len()))
+            .collect();
+    let ones: Vec<_> = counts.iter().map(|(key, _)| (*key, 1)).collect();
+    assert_eq!(counts, ones);
 }
 
 #[test]
 fn a_file_whose_content_is_source_fails_whatever_its_name() {
-    for (name, text, language) in [
+    let cases = [
         ("Flow.txt", "import XCTest\n\nfinal class Flow: XCTestCase {}\n", "Swift"),
         ("ui", "import SwiftUI\n", "Swift"),
         ("tool", "import os\nimport sys\n", "Python"),
@@ -362,18 +392,20 @@ fn a_file_whose_content_is_source_fails_whatever_its_name() {
         ("deploy.txt", "if [ -f x ]; then\n  echo hi\nfi\n", "shell"),
         ("deploy.cfg", "for f in a b; do\n  echo $f\ndone\n", "shell"),
         ("main.txt", "#include <stdio.h>\n", "C"),
-    ] {
-        assert_eq!(
-            Checked::holding(name, text),
-            [format!("{ROOT}/{name}:1: {language} source outside assets; {REWRITE}")],
-            "{name}"
-        );
-    }
+    ];
+    let found: Vec<_> = cases.iter().map(|(name, text, _)| (name, Checked::holding(name, text))).collect();
+    let wanted: Vec<_> = cases
+        .iter()
+        .map(|(name, _, language)| {
+            (name, vec![format!("{ROOT}/{name}:1: {language} source outside assets; {REWRITE}")])
+        })
+        .collect();
+    assert_eq!(found, wanted);
 }
 
 #[test]
 fn ordinary_text_and_data_pass() {
-    for (name, text) in [
+    let found: Vec<_> = [
         ("notes.txt", "We must import the data from the old system.\nThen we are done.\n"),
         ("notes.md", "# Title\n\n```python\nimport os\ndef main():\n    pass\n```\n\n```sh\nset -e\n```\n"),
         ("data.json", "{\"def\": \"x(y):\"}\n"),
@@ -383,9 +415,12 @@ fn ordinary_text_and_data_pass() {
         ("blob.bin", "import os\u{0}import sys\n"),
         ("empty.txt", ""),
         ("poem", "Roses are red\nimport this\n"),
-    ] {
-        assert_eq!(Checked::holding(name, text), Vec::<String>::new(), "{name}");
-    }
+    ]
+    .into_iter()
+    .map(|(name, text)| (name, Checked::holding(name, text)))
+    .collect();
+    let clean: Vec<_> = found.iter().map(|(key, _)| (*key, Vec::<String>::new())).collect();
+    assert_eq!(found, clean);
 }
 
 #[test]

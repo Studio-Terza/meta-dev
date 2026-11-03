@@ -23,14 +23,9 @@ impl Items {
     }
 
     fn chain(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> = (0..size)
-            .map(|index| {
-                if index + 1 < size {
-                    format!("pub struct {prefix}{index}({prefix}{});\n", index + 1)
-                } else {
-                    format!("pub struct {prefix}{index};\n")
-                }
-            })
+        let lines: Vec<String> = (1..size)
+            .map(|next| format!("pub struct {prefix}{}({prefix}{next});\n", next - 1))
+            .chain(size.checked_sub(1).map(|last| format!("pub struct {prefix}{last};\n")))
             .collect();
         lines.concat()
     }

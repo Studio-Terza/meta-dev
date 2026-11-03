@@ -379,5 +379,6 @@ fn the_message_names_the_fix() {
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("laws::roundtrip!")));
     assert!(pair.violations().iter().all(|violation| violation.to_string().contains("`encode` and `decode`")));
     assert!(order.violations().iter().all(|violation| violation.to_string().contains("laws::law!")));
-    assert!(pair.dirty().is_some() && order.dirty().is_some());
+    assert!(pair.dirty().is_some());
+    assert!(order.dirty().is_some());
 }

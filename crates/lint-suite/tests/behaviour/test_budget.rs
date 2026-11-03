@@ -92,7 +92,8 @@ fn files_of_a_package_add_up_and_packages_stay_apart() {
 #[test]
 fn the_report_lists_each_crate() {
     let report = TestBudget::measured(&[Sources::file("crates/a/tests/t.rs", Text::new(TESTS))]).to_string();
-    assert!(report.contains("a: ") && report.contains("report only"));
+    assert!(report.contains("a: "));
+    assert!(report.contains("report only"));
 }
 
 #[test]

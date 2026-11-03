@@ -10,13 +10,12 @@ struct Placed {
 
 impl Placed {
     fn of(pair: &[&str]) -> Option<Placed> {
-        match pair {
-            [package, file] => Some(Placed {
+        Some(pair).filter(|pair| pair.len() == 2).and_then(|pair| pair.first().zip(pair.last())).map(
+            |(package, file)| Placed {
                 placement: Placement::within(&Absent, Path::new(package), Path::new(file)),
                 file: PathBuf::from(file),
-            }),
-            _ => None,
-        }
+            },
+        )
     }
 
     fn module(pair: &[&str]) -> Option<String> {
