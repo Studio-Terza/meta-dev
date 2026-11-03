@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use file_ports::Disk;
-use ports::Repository;
+use file_ports::{Bytes, Files, Memory};
 use reach::Cli;
 
 const WORKSPACE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/metadata/workspace.json");
@@ -66,8 +66,12 @@ struct Answer {
 
 impl Answer {
     fn to(arguments: &[&str]) -> Answer {
+        Answer::within(&Repository::metadata(), arguments)
+    }
+
+    fn within(files: &impl Files, arguments: &[&str]) -> Answer {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &Disk, &mut out, &mut err);
+        let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut out, &mut err);
         Answer {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -339,37 +343,36 @@ fn hubs_without_a_repository_is_a_usage_error() {
     assert!(Answer::refused(&["hubs", HUBS]).contains("reach hubs <metadata> <repository>"));
 }
 
-mod ports {
-    use std::error::Error;
-    use std::fs;
+struct Repository {
+    files: Memory,
+    root: PathBuf,
+}
 
-    use tempfile::TempDir;
+impl Repository {
+    fn metadata() -> Memory {
+        golden::fixtures!("tests/metadata").unwrap_or_default()
+    }
 
-    use super::{Answer, WORKSPACE_MANIFEST};
+    fn new() -> Result<Repository, Box<dyn Error>> {
+        let repository = Repository { files: Repository::metadata(), root: PathBuf::from("/repository") };
+        repository.files.create_directories(&repository.root)?;
+        repository.files.write(&repository.root.join("Cargo.toml"), &Bytes::from(WORKSPACE_MANIFEST))?;
+        Ok(repository)
+    }
 
-    pub struct Repository(TempDir);
+    fn with_crate(self, name: &str, source: &str) -> Result<Repository, Box<dyn Error>> {
+        let directory = self.root.join("crates").join(name);
+        self.files.create_directories(&directory.join("src"))?;
+        self.files.write(&directory.join("Cargo.toml"), &Bytes::from(&format!("[package]\nname = \"{name}\"\n")))?;
+        self.files.write(&directory.join("src/lib.rs"), &Bytes::from(source))?;
+        Ok(self)
+    }
 
-    impl Repository {
-        pub fn new() -> Result<Repository, Box<dyn Error>> {
-            let root = TempDir::new()?;
-            fs::write(root.path().join("Cargo.toml"), WORKSPACE_MANIFEST)?;
-            Ok(Repository(root))
-        }
+    fn hubs(&self, metadata: &str) -> Answer {
+        Answer::within(&self.files, &["hubs", metadata, &self.root.display().to_string()])
+    }
 
-        pub fn with_crate(self, name: &str, source: &str) -> Result<Repository, Box<dyn Error>> {
-            let directory = self.0.path().join("crates").join(name);
-            fs::create_dir_all(directory.join("src"))?;
-            fs::write(directory.join("Cargo.toml"), format!("[package]\nname = \"{name}\"\n"))?;
-            fs::write(directory.join("src/lib.rs"), source)?;
-            Ok(self)
-        }
-
-        pub fn hubs(&self, metadata: &str) -> Answer {
-            Answer::to(&["hubs", metadata, &self.0.path().display().to_string()])
-        }
-
-        pub fn site(&self, name: &str) -> String {
-            format!("{}: ", self.0.path().join("crates").join(name).join("src/lib.rs:1").display())
-        }
+    fn site(&self, name: &str) -> String {
+        format!("{}: ", self.root.join("crates").join(name).join("src/lib.rs:1").display())
     }
 }

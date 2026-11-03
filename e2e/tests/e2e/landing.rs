@@ -52,7 +52,7 @@ impl Runs<'_> {
 fn a_project_landed_through_its_branch_against_its_changes_sent_to_main_one_by_one() -> Result<(), Box<dyn Error>> {
     const PROJECT_SIZE: usize = 4;
     let world = World::of_this_repository()?;
-    let runs = Runs { world: &world, metadata: world.metadata(), desk: Desk::new()? };
+    let runs = Runs { world: &world, metadata: world.metadata(), desk: Desk::default() };
     let names: Vec<&String> = world.names().collect();
     let (mut project, mut direct) = (Spend::default(), Spend::default());
     for members in names.chunks(PROJECT_SIZE) {

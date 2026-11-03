@@ -1,10 +1,10 @@
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::Disk;
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use mutation_shard::Cli;
-use ports::Mutants;
 use serde_json::{Value, json};
 
 const BASELINE_LOG: &str = "   Running unittests src/lib.rs (target/debug/deps/foo-1)\ntest a ... ok\ntest b ... ok\n   Doc-tests foo\ntest src/lib.rs - f (line 1) ... ok\n";
@@ -20,9 +20,9 @@ struct Answer {
 }
 
 impl Answer {
-    fn to(arguments: &[&OsStr]) -> Answer {
+    fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
         let mut err = Vec::new();
-        let exit = Cli::answer(arguments.iter().map(OsString::from), &Disk, &mut err);
+        let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
         Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 }
@@ -184,7 +184,7 @@ fn outcomes_that_are_missing_or_broken_are_refused() -> Result<(), Box<dyn Error
 fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
     let mutants = Mutants::new()?;
     mutants.outcomes(&json!([Outcome::baseline()]))?;
-    let answer = Answer::to(&[mutants.path().as_os_str(), "/no/such/dir/matrix.json".as_ref()]);
+    let answer = Answer::to(&mutants.files, &[mutants.path().as_os_str(), "/no/such/dir/matrix.json".as_ref()]);
     assert_eq!(answer.exit, ExitCode::FAILURE);
     assert!(answer.err.contains("cannot use /no/such/dir/matrix.json"));
     Ok(())
@@ -193,7 +193,7 @@ fn a_matrix_that_cannot_be_written_is_refused() -> Result<(), Box<dyn Error>> {
 #[test]
 fn the_wrong_number_of_arguments_is_refused_with_the_usage() {
     for arguments in [&[][..], &["a".as_ref()][..], &["a".as_ref(), "b".as_ref(), "c".as_ref()][..]] {
-        let answer = Answer::to(arguments);
+        let answer = Answer::to(&Memory::default(), arguments);
         assert_eq!(answer.exit, ExitCode::FAILURE);
         assert_eq!(Text::lines(&answer.err), ["usage: mutation-shard <mutants.out> <out.json>"]);
     }
@@ -207,71 +207,65 @@ impl Text {
     }
 }
 
-mod ports {
-    use std::fs;
-    use std::io;
-    use std::path::{Path, PathBuf};
+struct Mutants {
+    files: Memory,
+    root: PathBuf,
+}
 
-    use serde_json::{Value, json};
+impl Mutants {
+    fn new() -> Result<Mutants, FileFailure> {
+        let mutants = Mutants { files: Memory::default(), root: PathBuf::from("/mutants.out") };
+        mutants.files.create_directories(&mutants.root.join("log"))?;
+        Ok(mutants)
+    }
 
-    use super::Answer;
+    fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), FileFailure> {
+        self.files.write(&self.root.join("log").join(name), &Bytes::new(text.as_ref().to_vec()))
+    }
 
-    pub struct Mutants(tempfile::TempDir);
+    fn outcomes(&self, outcomes: &Value) -> Result<(), FileFailure> {
+        self.broken_outcomes(&json!({ "outcomes": outcomes }).to_string())
+    }
 
-    impl Mutants {
-        pub fn new() -> Result<Mutants, io::Error> {
-            let mutants = Mutants(tempfile::tempdir()?);
-            fs::create_dir(mutants.0.path().join("log"))?;
-            Ok(mutants)
-        }
+    fn log_directory(&self, name: &str) -> Result<(), FileFailure> {
+        self.files.create_directories(&self.root.join("log").join(name))
+    }
 
-        pub fn log(&self, name: &str, text: impl AsRef<[u8]>) -> Result<(), io::Error> {
-            fs::write(self.0.path().join("log").join(name), text)
-        }
+    fn broken_outcomes(&self, text: &str) -> Result<(), FileFailure> {
+        self.files.write(&self.root.join("outcomes.json"), &Bytes::from(text))
+    }
 
-        pub fn outcomes(&self, outcomes: &Value) -> Result<(), io::Error> {
-            fs::write(self.0.path().join("outcomes.json"), json!({ "outcomes": outcomes }).to_string())
-        }
+    fn path(&self) -> &Path {
+        &self.root
+    }
 
-        pub fn log_directory(&self, name: &str) -> Result<(), io::Error> {
-            fs::create_dir(self.0.path().join("log").join(name))
-        }
+    fn destination(&self) -> PathBuf {
+        self.root.join("matrix.json")
+    }
 
-        pub fn broken_outcomes(&self, text: &str) -> Result<(), io::Error> {
-            fs::write(self.0.path().join("outcomes.json"), text)
-        }
+    fn shard(&self) -> Answer {
+        Answer::to(&self.files, &[self.path().as_os_str(), self.destination().as_os_str()])
+    }
 
-        pub fn path(&self) -> &Path {
-            self.0.path()
-        }
+    fn mutants_field(&self, name: &str) -> Vec<Value> {
+        self.matrix()
+            .get("mutants")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|mutant| mutant.get(name).cloned().unwrap_or_default())
+            .collect()
+    }
 
-        pub fn destination(&self) -> PathBuf {
-            self.0.path().join("matrix.json")
-        }
+    fn baseline_field(&self) -> Value {
+        self.matrix().get("baseline").cloned().unwrap_or_default()
+    }
 
-        pub fn shard(&self) -> Answer {
-            Answer::to(&[self.path().as_os_str(), self.destination().as_os_str()])
-        }
-
-        pub fn mutants_field(&self, name: &str) -> Vec<Value> {
-            self.matrix()
-                .get("mutants")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .map(|mutant| mutant.get(name).cloned().unwrap_or_default())
-                .collect()
-        }
-
-        pub fn baseline_field(&self) -> Value {
-            self.matrix().get("baseline").cloned().unwrap_or_default()
-        }
-
-        pub fn matrix(&self) -> Value {
-            fs::read_to_string(self.destination())
-                .ok()
-                .and_then(|text| serde_json::from_str(&text).ok())
-                .unwrap_or_default()
-        }
+    fn matrix(&self) -> Value {
+        self.files
+            .read_text(&self.destination())
+            .ok()
+            .and_then(|text| serde_json::from_str(text.as_ref()).ok())
+            .unwrap_or_default()
     }
 }

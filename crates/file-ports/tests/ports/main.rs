@@ -71,6 +71,18 @@ impl<Port: Files> Contract<'_, Port> {
         Self::named(&written.and_then(|()| self.files.read_text(&path).map(|_| ())))
     }
 
+    fn beneath_a_file(&self) -> String {
+        let written = self.files.write(&self.at("blocker"), &Bytes::from(""));
+        Self::named(&written.and_then(|()| self.files.create_directories(&self.at("blocker/inner"))))
+    }
+
+    fn resolved(&self) -> Result<[PathBuf; 2], FileFailure> {
+        let real = self.files.canonical(&self.at("outer/a.txt"))?;
+        let dotted = self.files.canonical(&self.at("outer/./inner/../a.txt"))?;
+        assert_eq!(Self::named(&self.files.read(&self.at("outer")).map(|_| ())), "failed");
+        Ok([real, dotted])
+    }
+
     fn canonical_file(&self) -> Result<PathBuf, FileFailure> {
         let path = self.at("here.txt");
         self.files.write(&path, &Bytes::from("here"))?;
@@ -82,14 +94,18 @@ impl<Port: Files> Contract<'_, Port> {
 struct Checks;
 
 impl Checks {
-    fn on(files: &impl Files, root: &Path) -> Result<(), FileFailure> {
+    fn on(files: &(impl Files + Sync), root: &Path) -> Result<(), FileFailure> {
         let contract = Contract { files, root: root.to_path_buf() };
         assert_eq!(contract.written_then_read()?.as_ref(), "written");
         assert_eq!(contract.appended()?, Text::new("one two".to_owned()));
         assert_eq!(contract.copied()?, Text::new("copied".to_owned()));
         assert_eq!(contract.nested()?, vec![contract.at("outer/a.txt"), contract.at("outer/inner")]);
+        let [real, dotted] = std::thread::scope(|scope| scope.spawn(|| contract.resolved()).join())
+            .unwrap_or_else(|_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::Other))))?;
+        assert_eq!(dotted, real);
         assert_eq!(contract.missing(), ["missing", "missing", "missing", "missing", "missing", "missing", "Missing"]);
         assert_eq!(contract.not_text(), "failed");
+        assert_eq!(contract.beneath_a_file(), "failed");
         assert_eq!(contract.canonical_file()?.file_name(), Some(std::ffi::OsStr::new("here.txt")));
         Ok(())
     }
