@@ -14,13 +14,15 @@ const TRY_FOLD: &str = "fn f() {\n    let total = items.iter().try_fold((0, 0), 
 const ARMS: &str = "fn f(a: u8) {\n    match a {\n        _ => match a {\n            _ => match a {\n                _ => g(),\n            },\n        },\n    }\n}\n";
 const FORS: &str =
     "fn f(a: u8) {\n    for _ in a {\n        for _ in a {\n            for _ in a {}\n        }\n    }\n}\n";
+const ELSE_NESTS: &str = "fn f(a: u8) {\n    if a {\n        g();\n    } else {\n        if a {\n            if a {\n                g();\n            }\n        }\n    }\n}\n";
+const TUPLE_ARGUMENT: &str = "fn f() {\n    items.push((0, 0));\n}\n";
 const WHILES: &str = "fn f(a: u8) {\n    while a {\n        while a {\n            while a {}\n        }\n    }\n}\n";
 const LOOPS: &str = "fn f(a: u8) {\n    loop {\n        loop {\n            loop {}\n        }\n    }\n}\n";
 const CLOSURES: &str = "fn f() {\n    a(|| {\n        a(|| {\n            a(|| g());\n        });\n    });\n}\n";
 const SIBLINGS: &str = "fn f(a: bool) {\n    if a {\n        if a {\n            g();\n        }\n    }\n    if a {\n        if a {\n            g();\n        }\n    }\n}\n";
 const BOOLEANS: &str = "fn f(x: u8) {\n    let a = !b;\n    let c = true;\n    let d = (x > 1);\n    let e = x.is_empty();\n    let h = x.contains(1);\n    let i = x.len();\n    let j = x + 1;\n    let k = -x;\n    let m: u8 = x;\n}\n";
 
-const CASES: [Case; 14] = [
+const CASES: [Case; 16] = [
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -47,6 +49,16 @@ const CASES: [Case; 14] = [
         Title::new("try_fold seed"),
         &[Source::new(Located::new("a.rs"), Text::new(TRY_FOLD))],
         Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("else blocks nest"),
+        &[Source::new(Located::new("a.rs"), Text::new(ELSE_NESTS))],
+        Flagged::new(&["a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a tuple argument outside a fold"),
+        &[Source::new(Located::new("a.rs"), Text::new(TUPLE_ARGUMENT))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("match arms nest"),
