@@ -1,7 +1,7 @@
 use std::fmt;
 
-use law_facts::law_path::Route;
-use law_facts::{Law, LawPath, Property, Side};
+use law_facts::law_path::{LawPath, Side};
+use law_facts::{Law, Property};
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -173,7 +173,7 @@ impl fmt::Display for Shortfall<'_, '_, '_> {
 impl Shortfall<'_, '_, '_> {
     fn described(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.law.on_side(self.side) {
-            Some::<&Route>(route) => write!(formatter, "{route}, not an operation of {}", self.node),
+            Some(route) => write!(formatter, "{route}, not an operation of {}", self.node),
             None => write!(formatter, "{} names no operation of {}", self.side, self.node),
         }
     }

@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use law_facts::{Law, LawPath, Property, Side};
+use law_facts::law_path::{LawPath, Side};
+use law_facts::{Law, Property};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
