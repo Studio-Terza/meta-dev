@@ -3,11 +3,9 @@ use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_transition_graph::{
-    ConnectedClusters, Containment, CoreMutation, DeepClusters, DuplicateTransitions, GraphLint, InterfaceByConsumers,
-    InterfaceByInternals, LowestCluster, TransitionGraph,
+    Clustered, ConnectedClusters, CoreMutation, DeepClusters, DuplicateTransitions, Extraction, InterfaceByConsumers,
+    InterfaceByInternals, LowestCluster, TransitionGraph, TypeSystem,
 };
-use transition_facts::Transitions;
-use type_facts::Facts;
 
 #[derive(Debug)]
 pub struct Elegance;
@@ -15,19 +13,18 @@ pub struct Elegance;
 impl Elegance {
     #[must_use]
     pub fn reports(files: &[SourceFile]) -> Vec<Report<'_>> {
-        let facts = Facts::of_files(files);
-        let transitions = Transitions::of_files(files);
-        let containment = Containment::clustered(files, &facts, &transitions);
+        let extraction = Extraction::of_files(files);
+        let system = TypeSystem::of(files, &extraction);
         vec![
             Complexity::report(files),
-            TransitionGraph::report_graph(&facts, &transitions),
-            DuplicateTransitions::report_graph(&facts, &transitions),
-            CoreMutation::report_graph(&facts, &transitions),
-            containment.report::<ConnectedClusters>(),
-            containment.report::<InterfaceByConsumers>(),
-            containment.report::<InterfaceByInternals>(),
-            containment.report::<LowestCluster>(),
-            containment.report::<DeepClusters>(),
+            system.report::<TransitionGraph>(),
+            system.report::<DuplicateTransitions>(),
+            system.report::<CoreMutation>(),
+            system.report::<Clustered<ConnectedClusters>>(),
+            system.report::<Clustered<InterfaceByConsumers>>(),
+            system.report::<Clustered<InterfaceByInternals>>(),
+            system.report::<Clustered<LowestCluster>>(),
+            system.report::<Clustered<DeepClusters>>(),
             EffectSites::report(files),
             FlowShapes::report(files),
         ]

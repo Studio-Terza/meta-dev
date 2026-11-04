@@ -12,8 +12,7 @@ use lint_clones::Clones;
 use lint_core::{Lint, Readout, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
-use transition_facts::Transitions;
-use type_facts::Facts;
+use lint_transition_graph::Extraction;
 
 use super::boundary::Helpers;
 use super::{Outcome, Sources};
@@ -98,11 +97,10 @@ impl Mode {
     }
 
     fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+        let extraction = Extraction::of_files(files);
         found
             .iter()
-            .try_for_each(|query| {
-                write!(out, "{}", query.matches(&Facts::of_files(files), &Transitions::of_files(files)))
-            })
+            .try_for_each(|query| write!(out, "{}", query.matches(extraction.facts(), extraction.transitions())))
             .ok();
         Outcome::Clean
     }

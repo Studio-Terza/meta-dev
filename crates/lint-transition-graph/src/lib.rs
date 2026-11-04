@@ -9,32 +9,31 @@ mod end;
 mod graph_lint;
 mod key;
 mod mutation;
+mod system;
 mod workspace_types;
 
 use lint_core::{Headline, Report};
-use transition_facts::Transitions;
-use type_facts::Facts;
 
 use coverage::Coverage;
 use crate_transitions::CrateTransitions;
 use edge::Edge;
-use workspace_types::WorkspaceTypes;
 
 pub use containment::{
     AcyclicQuotients, ConnectedClusters, Containment, DeepClusters, InterfaceByConsumers, InterfaceByInternals,
     LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{GraphLint, OnContainment, OnGraph};
+pub use graph_lint::{Clustered, GraphLint, OnGraph};
 pub use mutation::CoreMutation;
+pub use system::{Extraction, TypeSystem};
 
 #[derive(Debug)]
 pub struct TransitionGraph;
 
 impl GraphLint for TransitionGraph {
-    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
-        let types = WorkspaceTypes::declared(facts, transitions);
-        let edges: Vec<Edge<'_, 'file>> = transitions.all().map(|found| types.edge(found)).collect();
+    fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
+        let types = system.types();
+        let edges = system.edges();
         let grouped = Edge::by_crate(edges.iter());
         Report::new(
             Headline::new(
@@ -42,7 +41,7 @@ impl GraphLint for TransitionGraph {
             ),
             grouped
                 .iter()
-                .filter_map(|(name, found)| CrateTransitions::measured(&types, name, found).violation())
+                .filter_map(|(name, found)| CrateTransitions::measured(types, name, found).violation())
                 .chain(Coverage::tallied(edges.iter()).violation(edges.iter().map(Edge::site).min()))
                 .collect(),
         )
