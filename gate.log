@@ -1,0 +1,131 @@
+   Compiling lint-transition-graph v0.1.0 (/private/tmp/claude-501/-Users-jamesnovig-scraps/800f3fae-9070-4428-8bf1-c7b62215cee6/scratchpad/wt/pr2-exports/crates/lint-transition-graph)
+   Compiling graph-query v0.1.0 (/private/tmp/claude-501/-Users-jamesnovig-scraps/800f3fae-9070-4428-8bf1-c7b62215cee6/scratchpad/wt/pr2-exports/crates/graph-query)
+   Compiling lint-runner v0.1.0 (/private/tmp/claude-501/-Users-jamesnovig-scraps/800f3fae-9070-4428-8bf1-c7b62215cee6/scratchpad/wt/pr2-exports/crates/lint-runner)
+   Compiling lint v0.1.0 (/private/tmp/claude-501/-Users-jamesnovig-scraps/800f3fae-9070-4428-8bf1-c7b62215cee6/scratchpad/wt/pr2-exports/crates/lint)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.98s
+     Running `/private/tmp/claude-501/-Users-jamesnovig-scraps/800f3fae-9070-4428-8bf1-c7b62215cee6/scratchpad/target-meta-dev/debug/lint .`
+test budget, report only:
+body_lifts: 0 tests in 9 files, 0 of 288 lines, 0 process starts
+body_shape: 6 tests in 15 files, 126 of 563 lines, 0 process starts
+ci: 68 tests in 88 files, 1749 of 5394 lines, 1 process starts
+console_ports: 3 tests in 5 files, 27 of 79 lines, 0 process starts
+e2e: 3 tests in 12 files, 622 of 691 lines, 0 process starts
+equivalence: 6 tests in 11 files, 129 of 628 lines, 0 process starts
+file_ports: 7 tests in 12 files, 225 of 655 lines, 0 process starts
+fuzz: 6 tests in 10 files, 556 of 646 lines, 0 process starts
+gate_limits: 14 tests in 15 files, 252 of 730 lines, 0 process starts
+golden: 17 tests in 12 files, 277 of 602 lines, 0 process starts
+graph_query: 7 tests in 15 files, 196 of 911 lines, 0 process starts
+law_facts: 0 tests in 16 files, 0 of 1124 lines, 0 process starts
+laws: 22 tests in 2 files, 130 of 273 lines, 0 process starts
+lint: 0 tests in 1 files, 0 of 9 lines, 0 process starts
+lint_arbitrary_newtypes: 0 tests in 5 files, 0 of 142 lines, 0 process starts
+lint_bool_methods: 0 tests in 3 files, 0 of 124 lines, 0 process starts
+lint_clones: 0 tests in 3 files, 0 of 83 lines, 0 process starts
+lint_complexity: 0 tests in 6 files, 0 of 241 lines, 0 process starts
+lint_const_shape: 0 tests in 1 files, 0 of 238 lines, 0 process starts
+lint_core: 0 tests in 35 files, 0 of 1469 lines, 0 process starts
+lint_crate_graph: 0 tests in 3 files, 0 of 94 lines, 0 process starts
+lint_distinct_signatures: 0 tests in 5 files, 0 of 210 lines, 0 process starts
+lint_effect_sites: 0 tests in 8 files, 0 of 477 lines, 0 process starts
+lint_enum_predicates: 0 tests in 7 files, 0 of 281 lines, 0 process starts
+lint_expression_flow: 0 tests in 2 files, 0 of 316 lines, 0 process starts
+lint_fakes_at_ports: 0 tests in 5 files, 0 of 366 lines, 0 process starts
+lint_file: 0 tests in 1 files, 0 of 9 lines, 0 process starts
+lint_fixtures: 2 tests in 10 files, 25 of 199 lines, 0 process starts
+lint_fn_shape: 0 tests in 3 files, 0 of 282 lines, 0 process starts
+lint_guard_must_use: 0 tests in 6 files, 0 of 277 lines, 0 process starts
+lint_item_graph: 0 tests in 15 files, 0 of 892 lines, 0 process starts
+lint_layout: 5 tests in 25 files, 41 of 898 lines, 0 process starts
+lint_linear_flow: 0 tests in 14 files, 0 of 828 lines, 0 process starts
+lint_literal_names: 0 tests in 2 files, 0 of 125 lines, 0 process starts
+lint_long_exact_strings: 0 tests in 9 files, 0 of 505 lines, 0 process starts
+lint_mandatory_laws: 0 tests in 14 files, 0 of 584 lines, 0 process starts
+lint_manual_iteration: 0 tests in 1 files, 0 of 168 lines, 0 process starts
+lint_module_nesting: 0 tests in 10 files, 0 of 468 lines, 0 process starts
+lint_named_lifetimes: 0 tests in 2 files, 0 of 78 lines, 0 process starts
+lint_named_numbers: 0 tests in 1 files, 0 of 111 lines, 0 process starts
+lint_no_comments: 0 tests in 1 files, 0 of 52 lines, 0 process starts
+lint_no_early_exits: 0 tests in 3 files, 0 of 97 lines, 0 process starts
+lint_no_forwarders: 0 tests in 9 files, 0 of 442 lines, 0 process starts
+lint_no_free_fns: 0 tests in 2 files, 0 of 92 lines, 0 process starts
+lint_no_ignored_tests: 0 tests in 3 files, 0 of 174 lines, 0 process starts
+lint_no_numbers_in_binaries: 0 tests in 1 files, 0 of 61 lines, 0 process starts
+lint_no_parameter_bags: 0 tests in 7 files, 0 of 293 lines, 0 process starts
+lint_no_plaintext: 0 tests in 9 files, 0 of 382 lines, 0 process starts
+lint_no_test_io: 0 tests in 3 files, 0 of 95 lines, 0 process starts
+lint_no_test_only_api: 0 tests in 12 files, 0 of 608 lines, 0 process starts
+lint_paired_apis: 0 tests in 7 files, 0 of 212 lines, 0 process starts
+lint_paths: 0 tests in 18 files, 0 of 762 lines, 0 process starts
+lint_placement: 0 tests in 11 files, 0 of 499 lines, 0 process starts
+lint_port_batching: 0 tests in 10 files, 0 of 758 lines, 0 process starts
+lint_primitive_boundary: 0 tests in 10 files, 0 of 525 lines, 0 process starts
+lint_private_fns: 0 tests in 2 files, 0 of 126 lines, 0 process starts
+lint_process_starters: 0 tests in 2 files, 0 of 70 lines, 0 process starts
+lint_public_api_tests: 0 tests in 4 files, 0 of 243 lines, 0 process starts
+lint_public_surface: 0 tests in 5 files, 0 of 308 lines, 0 process starts
+lint_raw_resources: 0 tests in 3 files, 0 of 89 lines, 0 process starts
+lint_reader: 0 tests in 15 files, 0 of 833 lines, 0 process starts
+lint_repeated_methods: 0 tests in 7 files, 0 of 317 lines, 0 process starts
+lint_repeated_shapes: 0 tests in 6 files, 0 of 359 lines, 0 process starts
+lint_roots: 0 tests in 13 files, 0 of 777 lines, 0 process starts
+lint_runner: 57 tests in 14 files, 1225 of 1786 lines, 0 process starts
+lint_rust_only: 0 tests in 18 files, 0 of 924 lines, 0 process starts
+lint_state_graph: 0 tests in 21 files, 0 of 1161 lines, 0 process starts
+lint_suite: 267 tests in 62 files, 9254 of 9254 lines, 0 process starts
+lint_test_budget: 0 tests in 4 files, 0 of 188 lines, 0 process starts
+lint_thin_main: 0 tests in 3 files, 0 of 117 lines, 0 process starts
+lint_transition_graph: 0 tests in 63 files, 0 of 4691 lines, 0 process starts
+lint_type_shape: 0 tests in 1 files, 0 of 169 lines, 0 process starts
+lint_unconsumed_traits: 0 tests in 5 files, 0 of 209 lines, 0 process starts
+lint_vec_out_params: 0 tests in 2 files, 0 of 118 lines, 0 process starts
+lint_workflow_run: 0 tests in 24 files, 0 of 819 lines, 0 process starts
+mutation_report: 11 tests in 18 files, 363 of 995 lines, 0 process starts
+mutation_shard: 9 tests in 13 files, 272 of 597 lines, 0 process starts
+newtype: 18 tests in 4 files, 173 of 218 lines, 0 process starts
+newtype_derive: 0 tests in 6 files, 0 of 397 lines, 0 process starts
+reach: 13 tests in 14 files, 243 of 688 lines, 0 process starts
+states: 2 tests in 2 files, 76 of 127 lines, 0 process starts
+test_log: 4 tests in 11 files, 95 of 365 lines, 0 process starts
+text_lines: 4 tests in 5 files, 85 of 197 lines, 0 process starts
+transition_facts: 0 tests in 25 files, 0 of 1494 lines, 0 process starts
+type_facts: 15 tests in 17 files, 299 of 1314 lines, 0 process starts
+workspace_metadata: 0 tests in 8 files, 0 of 179 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+crates/law-facts/src/law.rs:27: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/law-facts/src/reader/scope.rs:16: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/law-facts/src/reader/scope.rs:24: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/law-facts/src/reader.rs:46: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-core/src/macro_calls.rs:14: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-core/src/macros.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-core/src/macros.rs:35: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/referenced_names/referenced/path_tokens.rs:35: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/referenced_names/referenced.rs:40: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/referenced_names/referenced.rs:62: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/referenced_names/referenced.rs:71: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/referenced_names.rs:152: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-item-graph/src/scope.rs:84: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-long-exact-strings/src/assertions/table_rows.rs:17: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-no-ignored-tests/src/skip_marks.rs:35: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-no-test-only-api/src/gated_items/item_head.rs:74: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-no-test-only-api/src/mentions.rs:65: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-no-test-only-api/src/test_features.rs:76: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-paths/src/collector.rs:35: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-paths/src/resolver/route.rs:27: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-paths/src/scopes.rs:19: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-paths/src/walker.rs:113: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-placement/src/crate_name.rs:20: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files/located.rs:57: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files/opened.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files/opened.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files/opened.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files/opened.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-reader/src/source_files.rs:84: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-roots/src/tree.rs:22: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-state-graph/src/impl_context.rs:20: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/lint-workflow-run/src/lib.rs:28: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/transition-facts/src/transitions/collector/origins.rs:46: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/transition-facts/src/transitions/collector/signature_reading/calls.rs:61: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/type-facts/src/facts/collector.rs:119: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
+crates/type-facts/src/facts/collector.rs:120: clones a value; borrow it, take a slice or &str, name a lifetime, or move it
