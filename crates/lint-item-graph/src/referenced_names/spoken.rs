@@ -9,14 +9,25 @@ impl Spoken {
     pub fn of_item(item: &Item) -> TokenStream {
         match item {
             Item::Struct(found) => {
-                let generics = &found.generics;
-                let spoken = Spoken::default().appended(&found.attrs).appended([generics]);
-                spoken.appended(&generics.where_clause).fields(&found.fields).0
+                Spoken::default()
+                    .appended(&found.attrs)
+                    .appended([&found.generics])
+                    .appended(&found.generics.where_clause)
+                    .fields(&found.fields)
+                    .0
             }
             Item::Enum(found) => {
-                let generics = &found.generics;
-                let spoken = Spoken::default().appended(&found.attrs).appended([generics]);
-                found.variants.iter().fold(spoken.appended(&generics.where_clause), Spoken::variant).0
+                found
+                    .variants
+                    .iter()
+                    .fold(
+                        Spoken::default()
+                            .appended(&found.attrs)
+                            .appended([&found.generics])
+                            .appended(&found.generics.where_clause),
+                        Spoken::variant,
+                    )
+                    .0
             }
             _ => item.to_token_stream(),
         }

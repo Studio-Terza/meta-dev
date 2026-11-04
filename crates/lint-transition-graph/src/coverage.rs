@@ -23,14 +23,17 @@ impl Coverage {
     pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Coverage {
-        edges.fold(Coverage::default(), |tally, edge| match (edge.role(), edge.ends().class()) {
-            (Role::Written, Class::Covered) => {
-                Coverage { written: tally.written.incremented(), covered: tally.covered.incremented(), ..tally }
+        edges.fold(Coverage::default(), |tally, edge| tally.counted(edge.role(), edge.ends().class()))
+    }
+
+    fn counted(self, role: Role, class: Class) -> Coverage {
+        match role {
+            Role::Written => {
+                Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self }
             }
-            (Role::Written, Class::Primitive) => Coverage { written: tally.written.incremented(), ..tally },
-            (Role::Lift, _) => Coverage { lifts: tally.lifts.incremented(), ..tally },
-            (Role::Operation, _) => Coverage { operations: tally.operations.incremented(), ..tally },
-        })
+            Role::Lift => Coverage { lifts: self.lifts.incremented(), ..self },
+            Role::Operation => Coverage { operations: self.operations.incremented(), ..self },
+        }
     }
 
     pub(crate) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {

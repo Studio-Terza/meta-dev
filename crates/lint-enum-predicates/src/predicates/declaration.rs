@@ -35,8 +35,11 @@ impl<'file> Declaration<'file> {
     }
 
     pub fn kinds<'scan>(&'scan self, crate_root: &CrateRoot, name: &'scan Name) -> impl Iterator<Item = Kind> + 'scan {
-        let types = if self.crate_root == crate_root { self.types.as_slice() } else { &[] };
-        types.iter().filter_map(move |declared| declared.named(name))
+        Some(self)
+            .filter(|declaration| declaration.crate_root == crate_root)
+            .into_iter()
+            .flat_map(|declaration| declaration.types.iter())
+            .filter_map(move |declared| declared.named(name))
     }
 
     pub fn in_module(&self, module: &ModulePath) -> Option<&Declaration<'file>> {

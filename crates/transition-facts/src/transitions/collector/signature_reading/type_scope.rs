@@ -1,17 +1,18 @@
 mod bound;
 mod constraint;
+mod naming;
 
 use std::collections::BTreeMap;
 
 use syn::{GenericArgument, Generics, Path, PathArguments, PathSegment, Type, TypeParamBound};
 
-use lint_layout::{Name, Whole, Word, words};
+use lint_layout::{Name, Word};
 
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::resolved::Resolved;
-use crate::spelling::Spelling;
 use bound::Bound;
 use constraint::Constraint;
+use naming::Naming;
 
 #[derive(Debug)]
 pub(super) struct TypeScope<'outer> {
@@ -21,15 +22,6 @@ pub(super) struct TypeScope<'outer> {
 }
 
 impl<'outer> TypeScope<'outer> {
-    const WRAPPERS: [Word<'static>; 14] = words![
-        "Option", "Result", "Vec", "Box", "Rc", "Arc", "Cow", "VecDeque", "BTreeSet", "HashSet", "RefCell", "Cell",
-        "Mutex", "Reverse"
-    ];
-    const PRIMITIVES: [Word<'static>; 18] = words![
-        "bool", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize", "f32", "f64",
-        "char", "str", "String"
-    ];
-    const SELF: [Word<'static>; 1] = words!["Self"];
     const SIZED: Word<'static> = Word::new("Sized");
     const FN: Word<'static> = Word::new("Fn");
 
@@ -65,9 +57,8 @@ impl<'outer> TypeScope<'outer> {
             Type::Ptr(pointer) => self.endpoint(&pointer.elem),
             Type::Slice(slice) => self.endpoint(&slice.elem),
             Type::Array(array) => self.endpoint(&array.elem),
-            Type::Tuple(tuple) if tuple.elems.is_empty() => Resolved::Found(Endpoint::from(Unnamed::Unit)),
             Type::Tuple(tuple) => {
-                Resolved::tupled(tuple.elems.iter().map(|element| self.endpoint(element)), self.selfish)
+                Resolved::tupled(tuple.elems.iter().map(|element| self.endpoint(element)).collect(), self.selfish)
             }
             Type::Path(path) => path
                 .path
@@ -96,18 +87,7 @@ impl<'outer> TypeScope<'outer> {
 
     fn named(&self, path: &Path, segment: &PathSegment) -> Resolved {
         let name = Name::from(&segment.ident);
-        match name {
-            _ if name.matches::<Whole>(&Self::WRAPPERS).is_some() => {
-                self.argument(&segment.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Unit)))
-            }
-            _ if name.matches::<Whole>(&Self::PRIMITIVES).is_some() => {
-                Resolved::Found(Endpoint::new(Nature::Primitive, name))
-            }
-            _ if name.matches::<Whole>(&Self::SELF).is_some() => Resolved::Itself,
-            _ => self.declared(&name).unwrap_or_else(|| {
-                Resolved::Found(Endpoint::new(Nature::Named, name).spelled(Spelling::of_path(path)))
-            }),
-        }
+        Naming::from(&name).resolved(self, path, segment, name)
     }
 
     fn declared(&self, name: &Name) -> Option<Resolved> {

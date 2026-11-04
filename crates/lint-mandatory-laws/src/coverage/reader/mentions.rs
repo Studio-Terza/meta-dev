@@ -13,23 +13,29 @@ impl Mentions {
 
     pub(crate) fn beyond_title(tokens: TokenStream, kind: Kind) -> BTreeSet<Name> {
         match kind {
-            Kind::Roundtrip | Kind::Law => Self::named(
-                tokens
-                    .into_iter()
-                    .skip_while(|tree| !matches!(tree, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
-                    .skip(1),
-            ),
+            Kind::Roundtrip | Kind::Law => {
+                Self::named(tokens.into_iter().skip_while(|tree| Self::separator(tree).is_none()).skip(1))
+            }
             Kind::Proptest | Kind::Other => Self::named(tokens.into_iter()),
         }
     }
 
     fn named(trees: impl Iterator<Item = TokenTree>) -> BTreeSet<Name> {
-        trees
-            .flat_map(|tree| match tree {
-                TokenTree::Ident(ident) => BTreeSet::from([Name::from(&ident)]),
-                TokenTree::Group(group) => Self::named(group.stream().into_iter()),
-                _ => BTreeSet::new(),
-            })
-            .collect()
+        trees.flat_map(Self::tree_names).collect()
+    }
+
+    fn tree_names(tree: TokenTree) -> BTreeSet<Name> {
+        match tree {
+            TokenTree::Ident(ident) => BTreeSet::from([Name::from(&ident)]),
+            TokenTree::Group(group) => Self::named(group.stream().into_iter()),
+            _ => BTreeSet::new(),
+        }
+    }
+
+    fn separator(tree: &TokenTree) -> Option<&TokenTree> {
+        match tree {
+            TokenTree::Punct(punct) => (punct.as_char() == Self::SEPARATOR).then_some(tree),
+            _ => None,
+        }
     }
 }

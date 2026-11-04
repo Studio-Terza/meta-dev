@@ -61,30 +61,28 @@ impl Command {
     const MATRIX: &'static str = "matrix";
 
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
-        let name = arguments.next().and_then(|name| name.into_string().ok());
-        let rest: Vec<OsString> = arguments.collect();
-        match name.as_deref() {
-            Some(Self::TIMED) => Self::parsed(rest, Command::Timed),
-            Some(Self::LIBTEST_SECONDS) => Self::parsed(rest, Command::LibtestSeconds),
-            Some(Self::REACH) => Self::parsed(rest, Command::Reach),
-            Some(Self::HISTORY) => Self::parsed(rest, Command::History),
-            Some(Self::MEASURED_HISTORY) => Self::parsed(rest, Command::MeasuredHistory),
-            Some(Self::RATCHET_LOWER) => Self::parsed(rest, Command::RatchetLower),
-            Some(Self::COMPILE_TIMES) => Self::parsed(rest, Command::CompileTimes),
-            Some(Self::LOGGED) => Self::parsed(rest, Command::Logged),
-            Some(Self::TOOLS) => Self::parsed(rest, Command::Tools),
-            Some(Self::TOOLS_KEY) => Self::parsed(rest, Command::ToolsKey),
-            Some(Self::MUTANTS_SHARD) => Self::parsed(rest, Command::MutantsShard),
-            Some(Self::MUTANTS_CHANGED) => Self::parsed(rest, Command::MutantsChanged),
-            Some(Self::WALL_TIMES) => Self::parsed(rest, Command::WallTimes),
-            Some(Self::SHOW) => Self::parsed(rest, Command::Show),
-            Some(Self::SUMMARIZE) => Self::parsed(rest, Command::Summarize),
-            Some(Self::LABELS) => Self::parsed(rest, Command::Labels),
-            Some(Self::SPEC_LINE) => Self::parsed(rest, Command::SpecLine),
-            Some(Self::STAGE_ISSUES) => Self::parsed(rest, Command::StageIssues),
-            Some(Self::COMPILE_TREND) => Self::parsed(rest, Command::CompileTrend),
-            Some(Self::SHARD_SUMMARY) => Self::parsed(rest, Command::ShardSummary),
-            Some(Self::MATRIX) => Self::parsed(rest, Command::Matrix),
+        match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
+            Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
+            Some(Self::LIBTEST_SECONDS) => Self::parsed(arguments.collect(), Command::LibtestSeconds),
+            Some(Self::REACH) => Self::parsed(arguments.collect(), Command::Reach),
+            Some(Self::HISTORY) => Self::parsed(arguments.collect(), Command::History),
+            Some(Self::MEASURED_HISTORY) => Self::parsed(arguments.collect(), Command::MeasuredHistory),
+            Some(Self::RATCHET_LOWER) => Self::parsed(arguments.collect(), Command::RatchetLower),
+            Some(Self::COMPILE_TIMES) => Self::parsed(arguments.collect(), Command::CompileTimes),
+            Some(Self::LOGGED) => Self::parsed(arguments.collect(), Command::Logged),
+            Some(Self::TOOLS) => Self::parsed(arguments.collect(), Command::Tools),
+            Some(Self::TOOLS_KEY) => Self::parsed(arguments.collect(), Command::ToolsKey),
+            Some(Self::MUTANTS_SHARD) => Self::parsed(arguments.collect(), Command::MutantsShard),
+            Some(Self::MUTANTS_CHANGED) => Self::parsed(arguments.collect(), Command::MutantsChanged),
+            Some(Self::WALL_TIMES) => Self::parsed(arguments.collect(), Command::WallTimes),
+            Some(Self::SHOW) => Self::parsed(arguments.collect(), Command::Show),
+            Some(Self::SUMMARIZE) => Self::parsed(arguments.collect(), Command::Summarize),
+            Some(Self::LABELS) => Self::parsed(arguments.collect(), Command::Labels),
+            Some(Self::SPEC_LINE) => Self::parsed(arguments.collect(), Command::SpecLine),
+            Some(Self::STAGE_ISSUES) => Self::parsed(arguments.collect(), Command::StageIssues),
+            Some(Self::COMPILE_TREND) => Self::parsed(arguments.collect(), Command::CompileTrend),
+            Some(Self::SHARD_SUMMARY) => Self::parsed(arguments.collect(), Command::ShardSummary),
+            Some(Self::MATRIX) => Self::parsed(arguments.collect(), Command::Matrix),
             _ => Err(Failure::Usage),
         }
     }

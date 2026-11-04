@@ -24,6 +24,12 @@ impl<'emitters> TestCode<'emitters> {
         code.lines
     }
 
+    fn entered(&mut self, function: &ItemFn) {
+        let line = LineNumber::from(function.sig.ident.span());
+        self.lines.extend(TestMarks::mark_test(&function.attrs).map(|_| line));
+        visit::visit_item_fn(self, function);
+    }
+
     fn gated(&mut self, attributes: &[Attribute], line: LineNumber) -> Walk {
         let walk = Walk::outside_tests(attributes);
         self.lines.extend((walk == Walk::Skipped).then_some(line));
@@ -54,23 +60,21 @@ impl<'ast> Visit<'ast> for TestCode<'_> {
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
-        let line = LineNumber::from(function.sig.ident.span());
-        match self.gated(&function.attrs, line) {
-            Walk::Entered => {
-                self.lines.extend(TestMarks::mark_test(&function.attrs).map(|_| line));
-                visit::visit_item_fn(self, function);
-            }
+        match self.gated(&function.attrs, LineNumber::from(function.sig.ident.span())) {
+            Walk::Entered => self.entered(function),
             Walk::Skipped => {}
         }
     }
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
-        self.lines.extend(
-            (TestMarks::law(invocation).is_some()
-                || (!invocation.path.is_ident(Self::DEFINITION)
-                    && Macros::attributes(invocation).iter().find_map(TestMarks::test).is_some())
-                || invocation.path.get_ident().is_some_and(|name| self.emitters.contains(&Name::from(name))))
-            .then(|| LineNumber::from(invocation.bang_token.span)),
-        );
+        let line = LineNumber::from(invocation.bang_token.span);
+        let law = TestMarks::law(invocation).map(|_| line);
+        let called = Some(invocation)
+            .filter(|invocation| invocation.path.get_ident().is_none_or(|name| name != Self::DEFINITION));
+        let marked =
+            called.and_then(|invocation| Macros::attributes(invocation).iter().find_map(TestMarks::test).map(|_| line));
+        let emitted =
+            invocation.path.get_ident().filter(|name| self.emitters.contains(&Name::from(*name))).map(|_| line);
+        self.lines.extend(law.or(marked).or(emitted));
     }
 }

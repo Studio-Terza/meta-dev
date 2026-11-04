@@ -7,9 +7,9 @@ use std::borrow::Cow;
 
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Macro, ReturnType, Type, TypePath};
+use syn::{ItemImpl, ItemMod, Macro, Type, TypePath};
 
-use lint_core::{Headline, Lint, Macros, Report, Site, SourceFile, Violation};
+use lint_core::{Headline, Lint, Macros, Report, Site, SourceFile, Syntax, Violation};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
 
@@ -55,21 +55,20 @@ impl EnumPredicates<'_> {
 
     fn kind_named(&self, file: &SourceFile, module: &ModulePath, path: &TypePath, name: &Name) -> Kind {
         let crate_root = file.placement().crate_root();
-        let local = (path.qself.is_none() && path.path.segments.len() == 1)
-            .then(|| {
+        let local = Some(path)
+            .filter(|path| path.qself.is_none())
+            .filter(|path| path.path.segments.len() == 1)
+            .and_then(|_| {
                 self.declarations
                     .iter()
                     .filter_map(|declaration| declaration.in_module(module))
                     .find_map(|declaration| declaration.kinds(crate_root, name).next())
-            })
-            .flatten();
+            });
         let candidates: Vec<Kind> =
             self.declarations.iter().flat_map(|declaration| declaration.kinds(crate_root, name)).collect();
-        match (local, candidates.as_slice()) {
-            (Some(kind), _) => kind,
-            (None, all @ [_, ..]) if all.iter().all(|kind| *kind == Kind::Enum) => Kind::Enum,
-            (None, _) => Kind::Other,
-        }
+        let enums =
+            candidates.first().filter(|_| candidates.iter().all(|kind| *kind == Kind::Enum)).map(|_| Kind::Enum);
+        local.or(enums).unwrap_or(Kind::Other)
     }
 }
 
@@ -93,15 +92,12 @@ impl<'scan, 'file> Predicates<'scan, 'file> {
         block
             .items
             .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) => Some(&function.sig),
-                _ => None,
-            })
-            .filter(|signature| match &signature.output {
-                ReturnType::Type(_, returned) => {
-                    matches!(returned.as_ref(), Type::Path(path) if path.path.is_ident("bool"))
-                }
-                ReturnType::Default => false,
+            .filter_map(Syntax::impl_fn)
+            .map(|function| &function.sig)
+            .filter(|signature| {
+                Syntax::returned(&signature.output)
+                    .and_then(Syntax::type_path)
+                    .is_some_and(|path| path.path.is_ident("bool"))
             })
             .map(|signature| {
                 Violation::new(
@@ -122,10 +118,10 @@ impl<'ast> Visit<'ast> for Predicates<'_, '_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let found = match (&block.trait_, self.known.kind(self.file, &self.module, &block.self_ty)) {
-            (None, Kind::Enum) => self.predicates(block),
-            _ => Vec::new(),
-        };
+        let found = Syntax::inherent(block)
+            .filter(|block| self.known.kind(self.file, &self.module, &block.self_ty) == Kind::Enum)
+            .map(|block| self.predicates(block))
+            .unwrap_or_default();
         self.violations.extend(found);
         syn::visit::visit_item_impl(self, block);
     }

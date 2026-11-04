@@ -26,6 +26,7 @@ pub struct Report<'notice> {
 
 impl<'builds> Notice<'builds> {
     const GROWN_LEN: usize = 5;
+    const TOOK: &'static str = "The cold build, clippy and test compile from scratch, took ";
 
     pub(super) fn new(
         today: &'builds Build,
@@ -56,14 +57,22 @@ impl<'builds> Notice<'builds> {
     }
 
     fn compared(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "The cold build, clippy and test compile from scratch, took {}s in all today",
-            self.today.total()
-        )?;
         match self.range {
-            Some(range) => write!(formatter, "; the {} runs of {} took {range}", self.earlier.len(), self.fortnight),
-            None => write!(formatter, "; no run of {} to compare with", self.fortnight),
+            Some(range) => write!(
+                formatter,
+                "{}{}s in all today; the {} runs of {} took {range}",
+                Self::TOOK,
+                self.today.total(),
+                self.earlier.len(),
+                self.fortnight
+            ),
+            None => write!(
+                formatter,
+                "{}{}s in all today; no run of {} to compare with",
+                Self::TOOK,
+                self.today.total(),
+                self.fortnight
+            ),
         }
     }
 }

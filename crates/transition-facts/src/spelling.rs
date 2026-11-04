@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use syn::Path;
+use syn::{Path, PathSegment};
 
 use lint_layout::Name;
 
@@ -12,10 +12,13 @@ pub(crate) enum Spelling {
 
 impl Spelling {
     pub(crate) fn of_path(path: &Path) -> Option<Spelling> {
-        let first = Name::from(&path.segments.first()?.ident);
-        match path.segments.len() {
-            1 => Some(Spelling::Bare(first)),
-            _ => Some(Spelling::Pathed(first)),
+        path.segments.first().map(|first| Spelling::of_head(Name::from(&first.ident), path.segments.iter().nth(1)))
+    }
+
+    fn of_head(head: Name, second: Option<&PathSegment>) -> Spelling {
+        match second {
+            Some(_) => Spelling::Pathed(head),
+            None => Spelling::Bare(head),
         }
     }
 

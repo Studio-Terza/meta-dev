@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::fmt;
+use std::num::NonZeroUsize;
 
 use lint_core::Site;
 use lint_layout::Name;
@@ -139,10 +140,7 @@ impl fmt::Display for Candidate<'_, '_> {
         write!(formatter, "{} {} in {} at {}", self.kind, self.label, self.krate, self.site)?;
         let shown: Vec<String> = self.related.iter().take(Self::SHOWN).map(ToString::to_string).collect();
         let more = self.related.len().saturating_sub(Self::SHOWN);
-        match (shown.as_slice(), more) {
-            ([], _) => Ok(()),
-            (_, 0) => write!(formatter, "; {} {}", self.kind.relation(), shown.join(", ")),
-            (_, _) => write!(formatter, "; {} {} and {more} more", self.kind.relation(), shown.join(", ")),
-        }
+        shown.first().map_or(Ok(()), |_| write!(formatter, "; {} {}", self.kind.relation(), shown.join(", ")))?;
+        NonZeroUsize::new(more).map_or(Ok(()), |more| write!(formatter, " and {more} more"))
     }
 }

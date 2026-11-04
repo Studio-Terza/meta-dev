@@ -32,10 +32,8 @@ impl<'ast> Visit<'ast> for Emitters {
             definition
                 .ident
                 .iter()
-                .filter(|_| {
-                    definition.mac.path.is_ident(Self::DEFINITION)
-                        && Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some()
-                })
+                .filter(|_| definition.mac.path.is_ident(Self::DEFINITION))
+                .filter(|_| Macros::attributes(&definition.mac).iter().find_map(TestMarks::test).is_some())
                 .map(Name::from),
         );
         visit::visit_item_macro(self, definition);

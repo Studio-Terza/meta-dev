@@ -10,6 +10,7 @@ use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, ItemStruct};
 
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
@@ -30,7 +31,7 @@ impl BagCandidates {
     pub fn candidates(&self) -> impl Iterator<Item = Candidate<'_>> {
         self.structs
             .iter()
-            .filter(|(name, _)| !self.disqualified.contains(*name))
+            .filter(|(name, _)| self.disqualified.iter().all(|disqualified| disqualified != *name))
             .map(|(name, line)| Candidate::new(name, *line))
     }
 
@@ -42,12 +43,7 @@ impl BagCandidates {
     }
 
     fn logic<'member>(member: &'member ImplItem, self_name: &Name) -> Option<&'member ImplItemFn> {
-        match member {
-            ImplItem::Fn(function) if MethodShape::classify(function, self_name) == MethodShape::Logic => {
-                Some(function)
-            }
-            _ => None,
-        }
+        Syntax::impl_fn(member).filter(|function| MethodShape::classify(function, self_name) == MethodShape::Logic)
     }
 }
 

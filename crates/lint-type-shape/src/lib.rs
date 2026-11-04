@@ -6,8 +6,8 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 use syn::{
-    Field, Fields, FnArg, GenericArgument, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro,
-    PathArguments, ReturnType, Signature, Type, TypePath, TypeTuple,
+    Field, Fields, GenericArgument, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, Macro, Signature, Type,
+    TypePath, TypeTuple,
 };
 
 use lint_core::Fix;
@@ -17,6 +17,7 @@ use lint_core::Problem;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
@@ -45,10 +46,8 @@ impl TypeShape {
             .segments
             .last()
             .filter(|segment| segment.ident == "Result")
-            .and_then(|segment| match &segment.arguments {
-                PathArguments::AngleBracketed(arguments) => arguments.args.iter().nth(1),
-                _ => None,
-            })
+            .and_then(|segment| Syntax::angled(&segment.arguments))
+            .and_then(|arguments| arguments.args.iter().nth(1))
             .filter(|argument| {
                 matches!(
                     argument,
@@ -142,15 +141,10 @@ impl<'ast> Visit<'ast> for TypeShapes<'_> {
         signature
             .inputs
             .iter()
-            .filter_map(|argument| match argument {
-                FnArg::Typed(typed) => Some(&*typed.ty),
-                FnArg::Receiver(_) => None,
-            })
+            .filter_map(Syntax::typed)
+            .map(|typed| &*typed.ty)
+            .chain(Syntax::returned(&signature.output))
             .for_each(|ty| self.check_type(ty));
-        match &signature.output {
-            ReturnType::Type(_, ty) => self.check_type(ty),
-            ReturnType::Default => {}
-        }
     }
 }
 
@@ -159,10 +153,12 @@ struct TypeFindings(Vec<Message>);
 
 impl<'ast> Visit<'ast> for TypeFindings {
     fn visit_type_tuple(&mut self, tuple: &'ast TypeTuple) {
-        self.0.extend((!tuple.elems.is_empty()).then_some(Message::new(
-            Problem::new("tuple in a signature or field"),
-            Fix::new("values that travel together are a struct"),
-        )));
+        self.0.extend(tuple.elems.first().map(|_| {
+            Message::new(
+                Problem::new("tuple in a signature or field"),
+                Fix::new("values that travel together are a struct"),
+            )
+        }));
         syn::visit::visit_type_tuple(self, tuple);
     }
 

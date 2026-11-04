@@ -1,8 +1,9 @@
 use std::iter::Sum;
 
-use syn::{Item, UseTree, Visibility};
+use syn::{UseTree, Visibility};
 
 use lint_core::Bound;
+use lint_core::Syntax;
 use lint_layout::Length;
 use newtype::Display;
 
@@ -13,10 +14,9 @@ impl ReexportCount {
     pub fn of_file(file: &syn::File) -> ReexportCount {
         file.items
             .iter()
-            .filter_map(|item| match item {
-                Item::Use(used) if matches!(used.vis, Visibility::Public(_)) => Some(Self::leaves(&used.tree)),
-                _ => None,
-            })
+            .filter_map(Syntax::item_use)
+            .filter(|used| matches!(used.vis, Visibility::Public(_)))
+            .map(|used| Self::leaves(&used.tree))
             .sum()
     }
 

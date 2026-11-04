@@ -7,7 +7,7 @@ use std::path::Path;
 
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, Token};
+use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemType, ItemUnion, Meta, MetaList, Token};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, Word};
@@ -26,8 +26,6 @@ pub struct Guards<'file> {
 
 impl<'file> Guards<'file> {
     const DROP: &str = "Drop";
-    const MUST_USE: &str = "must_use";
-    const CONDITIONAL: &str = "cfg_attr";
 
     pub fn scanned(files: &[&'file SourceFile]) -> Modules<'file> {
         let empty = Guards {
@@ -49,21 +47,32 @@ impl<'file> Guards<'file> {
 
     fn declared(&mut self, attributes: &[Attribute], name: &Ident) {
         let site = Site::new(self.path, LineNumber::from(name.span()));
-        self.members.declare(Name::from(name), attributes.iter().find_map(Self::mark).map_or(Some(site), |_| None));
+        self.members.declare(Name::from(name), attributes.iter().find_map(MustUse::mark).map_or(Some(site), |_| None));
     }
+}
+
+struct MustUse;
+
+impl MustUse {
+    const MUST_USE: &str = "must_use";
+    const CONDITIONAL: &str = "cfg_attr";
 
     fn mark(attribute: &Attribute) -> Option<&Attribute> {
-        match attribute.path() {
-            path if path.is_ident(Self::MUST_USE) => Some(attribute),
-            path if path.is_ident(Self::CONDITIONAL) => attribute
-                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                .ok()?
-                .into_iter()
-                .skip(1)
-                .find(|meta| meta.path().is_ident(Self::MUST_USE))
-                .map(|_| attribute),
-            _ => None,
-        }
+        Some(attribute).filter(|attribute| attribute.path().is_ident(Self::MUST_USE)).or_else(|| {
+            attribute
+                .meta
+                .require_list()
+                .ok()
+                .filter(|list| list.path.is_ident(Self::CONDITIONAL))
+                .and_then(Self::conditional)
+                .map(|_| attribute)
+        })
+    }
+
+    fn conditional(list: &MetaList) -> Option<Meta> {
+        list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+            .ok()
+            .and_then(|nested| nested.into_iter().skip(1).find(|meta| meta.path().is_ident(Self::MUST_USE)))
     }
 }
 

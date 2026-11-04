@@ -1,9 +1,9 @@
 mod finding;
 
 use syn::visit::{self, Visit};
-use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, ReturnType, Signature, TraitItemFn, Type};
+use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
-use lint_core::{Site, SourceFile, Violation, Walk};
+use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_file::FileLint;
 use lint_layout::LineNumber;
 
@@ -16,16 +16,16 @@ pub struct Returns<'file> {
 
 impl<'file> Returns<'file> {
     fn flagged(&self, signature: &Signature) -> Option<Violation<'file>> {
-        match &signature.output {
-            ReturnType::Type(_, returned) => match returned.as_ref() {
-                Type::Path(path) if path.qself.is_none() && path.path.is_ident("bool") => Some(Violation::new(
+        Syntax::returned(&signature.output)
+            .and_then(Syntax::type_path)
+            .filter(|path| path.qself.is_none())
+            .filter(|path| path.path.is_ident("bool"))
+            .map(|_| {
+                Violation::new(
                     Site::new(self.file.path(), LineNumber::from(signature.ident.span())),
                     Finding::from(&signature.ident),
-                )),
-                _ => None,
-            },
-            ReturnType::Default => None,
-        }
+                )
+            })
     }
 
     fn record(&mut self, signature: &Signature) {
@@ -55,9 +55,9 @@ impl<'ast> Visit<'ast> for Returns<'_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        match (Walk::inherent_impls(block), Walk::outside_tests(&block.attrs)) {
-            (Walk::Entered, Walk::Entered) => visit::visit_item_impl(self, block),
-            (Walk::Skipped, _) | (_, Walk::Skipped) => {}
+        match Walk::inherent_impls(block) {
+            Walk::Entered => Walk::enter(&block.attrs, || visit::visit_item_impl(self, block)),
+            Walk::Skipped => {}
         }
     }
 

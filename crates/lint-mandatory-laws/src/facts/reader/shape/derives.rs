@@ -22,36 +22,50 @@ impl Derives {
     }
 
     fn listed(attribute: &Attribute) -> Vec<Path> {
-        if attribute.path().is_ident(Self::DERIVE) {
-            attribute
-                .parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)
-                .ok()
-                .into_iter()
-                .flatten()
-                .collect()
-        } else if attribute.path().is_ident(Self::CONDITIONAL) {
-            attribute
-                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                .ok()
-                .into_iter()
-                .flatten()
-                .skip(1)
-                .flat_map(Self::conditional)
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    fn conditional(meta: Meta) -> Vec<Path> {
-        match meta {
-            Meta::List(list) if list.path.is_ident(Self::DERIVE) => list
+        match Listing::from(attribute.path()) {
+            Listing::Derive => attribute
                 .parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)
                 .ok()
                 .into_iter()
                 .flatten()
                 .collect(),
-            _ => Vec::new(),
+            Listing::Conditional => attribute
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .ok()
+                .into_iter()
+                .flatten()
+                .skip(1)
+                .flat_map(|meta| Self::conditional(&meta))
+                .collect(),
+            Listing::Other => Vec::new(),
         }
+    }
+
+    fn conditional(meta: &Meta) -> Vec<Path> {
+        meta.require_list()
+            .ok()
+            .filter(|list| list.path.is_ident(Self::DERIVE))
+            .and_then(|list| list.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated).ok())
+            .into_iter()
+            .flatten()
+            .collect()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Listing {
+    Derive,
+    Conditional,
+    Other,
+}
+
+impl Listing {
+    const NAMED: [(&'static str, Listing); 2] =
+        [(Derives::DERIVE, Listing::Derive), (Derives::CONDITIONAL, Listing::Conditional)];
+}
+
+impl From<&Path> for Listing {
+    fn from(path: &Path) -> Listing {
+        Listing::NAMED.iter().find(|(name, _)| path.is_ident(name)).map_or(Listing::Other, |(_, listing)| *listing)
     }
 }

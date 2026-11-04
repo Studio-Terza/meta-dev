@@ -43,10 +43,11 @@ impl<'file> Scan<'file> {
     }
 
     fn within(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Self)) {
-        let inner = match (self.kind, Walk::outside_tests(attributes), TestMarks::mark_test(attributes)) {
-            (Kind::Shipped, Walk::Entered, None) => Kind::Shipped,
-            _ => Kind::Tests,
-        };
+        let inner = Some(self.kind)
+            .filter(|kind| *kind == Kind::Shipped)
+            .filter(|_| Walk::outside_tests(attributes) == Walk::Entered)
+            .filter(|_| TestMarks::mark_test(attributes).is_none())
+            .unwrap_or(Kind::Tests);
         let outer = mem::replace(&mut self.kind, inner);
         visit(self);
         self.kind = outer;

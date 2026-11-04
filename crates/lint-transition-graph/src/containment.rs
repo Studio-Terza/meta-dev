@@ -119,6 +119,14 @@ impl<'found, 'file> Containment<'found, 'file> {
         Report::new(Check::HEADLINE, Check::violations(self))
     }
 
+    fn toward(&self, toward: Toward) -> &BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
+        match toward {
+            Toward::Used => &self.uses,
+            Toward::Users => &self.users,
+            Toward::Defined => &self.defines,
+        }
+    }
+
     pub(crate) fn adjacency(
         links: impl Iterator<Item = Link<'found>>,
     ) -> BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
@@ -142,12 +150,7 @@ impl<'found, 'file> Containment<'found, 'file> {
     }
 
     pub(crate) fn adjacent(&self, member: Member<'found>, toward: Toward) -> impl Iterator<Item = Member<'found>> + '_ {
-        let adjacency = match toward {
-            Toward::Used => &self.uses,
-            Toward::Users => &self.users,
-            Toward::Defined => &self.defines,
-        };
-        adjacency.get(&member).into_iter().flatten().copied()
+        self.toward(toward).get(&member).into_iter().flatten().copied()
     }
 
     pub(crate) fn links_within(&self, members: &BTreeSet<Member<'found>>, toward: Toward) -> Vec<Link<'found>> {
@@ -178,7 +181,7 @@ impl<'found, 'file> Containment<'found, 'file> {
     ) -> Vec<Link<'found>> {
         self.reach(export, members)
             .into_iter()
-            .filter(|reached| !exports.contains(reached))
+            .filter_map(|reached| exports.get(&reached).map_or(Some(reached), |_| None))
             .map(|reached| Link::new(reached, export))
             .collect()
     }

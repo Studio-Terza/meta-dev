@@ -8,10 +8,10 @@ impl Shapes {
     }
 
     fn alike(pair: &[&str]) -> bool {
-        match pair {
-            [left, right] => Self::of(left).key() == Self::of(right).key(),
-            _ => false,
-        }
+        pair.first()
+            .zip(pair.last())
+            .filter(|_| pair.len() == 2)
+            .is_some_and(|(left, right)| Self::of(left).key() == Self::of(right).key())
     }
 
     fn size(text: &&str) -> String {

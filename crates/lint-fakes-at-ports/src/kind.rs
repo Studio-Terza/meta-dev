@@ -46,10 +46,12 @@ impl Kind {
 
     #[must_use]
     pub fn written(written: &UsePath) -> Kind {
-        match written.segments() {
-            [only] if only.matches::<Whole>(&Self::PRELUDE).is_some() => Kind::Std,
-            _ => Kind::Other,
-        }
+        written
+            .segments()
+            .split_first()
+            .filter(|(_, rest)| rest.is_empty())
+            .and_then(|(only, _)| only.matches::<Whole>(&Self::PRELUDE))
+            .map_or(Kind::Other, |_| Kind::Std)
     }
 
     #[must_use]
@@ -70,12 +72,12 @@ impl Kind {
     }
 
     fn within(last: &Name, modules: &[Name], ports: &PortTraits) -> Kind {
-        match modules.first() {
-            _ if modules.iter().any(|module| *module == Self::PORTS) => Kind::Port,
-            Some(first) if first.words().last().is_some_and(|word| *word == Self::PORTS) => Kind::Port,
-            Some(first) if ports.declares(first, last).is_some() => Kind::Port,
-            Some(first) if first.matches::<Whole>(&Self::STD).is_some() => Kind::Std,
-            _ => Kind::Other,
-        }
+        let first = modules.first();
+        let named = modules.iter().find(|module| **module == Self::PORTS).map(|_| Kind::Port);
+        let suffixed =
+            first.filter(|first| first.words().last().is_some_and(|word| *word == Self::PORTS)).map(|_| Kind::Port);
+        let declared = first.filter(|first| ports.declares(first, last).is_some()).map(|_| Kind::Port);
+        let standard = first.filter(|first| first.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
+        named.or(suffixed).or(declared).or(standard).unwrap_or(Kind::Other)
     }
 }

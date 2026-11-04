@@ -27,15 +27,21 @@ impl Spelling {
     ];
 
     pub fn read(spelled: &UsePath) -> Option<Spelling> {
-        match spelled.segments() {
-            [single] => single.matches::<Whole>(&Self::PRIMITIVES).map(|_| single.clone()),
-            _ => Self::OWNED
-                .iter()
-                .find_map(|owned| spelled.spells(owned))
-                .and_then(|owned| owned.segments().last().cloned()),
-        }
-        .map(Spelling::Primitive)
-        .or_else(|| Self::WIRE_TYPES.iter().find_map(|wire| spelled.spells(wire)).cloned().map(Spelling::Wire))
+        spelled
+            .segments()
+            .split_first()
+            .filter(|(_, rest)| rest.is_empty())
+            .map_or_else(
+                || {
+                    Self::OWNED
+                        .iter()
+                        .find_map(|owned| spelled.spells(owned))
+                        .and_then(|owned| owned.segments().last().cloned())
+                },
+                |(single, _)| single.matches::<Whole>(&Self::PRIMITIVES).map(|_| single.clone()),
+            )
+            .map(Spelling::Primitive)
+            .or_else(|| Self::WIRE_TYPES.iter().find_map(|wire| spelled.spells(wire)).cloned().map(Spelling::Wire))
     }
 
     pub fn into_finding(self, context: Name) -> Finding {

@@ -61,6 +61,21 @@ impl Context {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum Looping {
+    Counted,
+    Walking,
+}
+
+impl From<&Expr> for Looping {
+    fn from(condition: &Expr) -> Looping {
+        match condition {
+            Expr::Let(_) => Looping::Walking,
+            _ => Looping::Counted,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Zone {
     Boundary,
     Elsewhere,
@@ -95,12 +110,17 @@ impl<'scan> ConstContexts<'scan> {
     }
 
     fn cast_finding(&self, cast: &ExprCast) -> Option<Violation<'scan>> {
-        (self.context == Context::Surface && self.zone == Zone::Elsewhere).then(|| {
-            self.violation(
-                cast.as_token.span,
-                Message::new(Problem::new("as cast outside a const fn"), Fix::new("use From, TryFrom, or an EnumMap")),
-            )
-        })
+        Some(self).filter(|scan| scan.context == Context::Surface).filter(|scan| scan.zone == Zone::Elsewhere).map(
+            |scan| {
+                scan.violation(
+                    cast.as_token.span,
+                    Message::new(
+                        Problem::new("as cast outside a const fn"),
+                        Fix::new("use From, TryFrom, or an EnumMap"),
+                    ),
+                )
+            },
+        )
     }
 
     fn loop_finding(&self, span: Span, message: Message) -> Option<Violation<'scan>> {
@@ -110,15 +130,10 @@ impl<'scan> ConstContexts<'scan> {
 
 impl<'ast> Visit<'ast> for ConstContexts<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        match Walk::outside_tests(&module.attrs) {
-            Walk::Entered => {
-                let outer = self.zone;
-                self.zone = self.zone.entering(module);
-                syn::visit::visit_item_mod(self, module);
-                self.zone = outer;
-            }
-            Walk::Skipped => {}
-        }
+        let outer = self.zone;
+        self.zone = self.zone.entering(module);
+        Walk::enter(&module.attrs, || syn::visit::visit_item_mod(self, module));
+        self.zone = outer;
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
@@ -184,7 +199,7 @@ impl<'ast> Visit<'ast> for ConstContexts<'_> {
     }
 
     fn visit_expr_while(&mut self, expr: &'ast ExprWhile) {
-        let finding = (!matches!(*expr.cond, Expr::Let(_))).then(|| {
+        let finding = Some(Looping::from(&*expr.cond)).filter(|looping| *looping == Looping::Counted).map(|_| {
             self.loop_finding(
                 expr.while_token.span,
                 Message::new(

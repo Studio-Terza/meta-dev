@@ -19,7 +19,7 @@ impl<'file> Law<'file> {
     }
 
     pub(crate) fn naming(&self, subject: &Subject<'_>) -> Option<&Law<'file>> {
-        (self.package == subject.package() && self.mentions.contains(subject.owner())).then_some(self)
+        Some(self).filter(|law| law.package == subject.package()).filter(|law| law.mentions.contains(subject.owner()))
     }
 
     pub(crate) fn kind(&self) -> Kind {

@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
 use super::change::Change;
+use super::fault::Fault;
+use super::hub::PullRequest;
 use super::place::Place;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -16,6 +18,13 @@ impl Check {
     pub(crate) const ALL: [Check; 2] = [Check::Goldens, Check::Scenarios];
     pub(crate) const GOLDENS: &'static str = "golden-change";
     pub(crate) const SCENARIOS: &'static str = "new-scenario";
+
+    pub(crate) fn waived_by(self, refactor: Option<&PullRequest>) -> Option<Fault> {
+        match self {
+            Check::Goldens => refactor.map(|_| Fault::Refactor),
+            Check::Scenarios => None,
+        }
+    }
 
     pub(crate) fn flagging(self, change: &Change) -> Option<&Change> {
         match self {

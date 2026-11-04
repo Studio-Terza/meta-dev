@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use syn::{Field, GenericArgument, GenericParam, Ident, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
+use syn::{Field, GenericArgument, Ident, Index, ItemStruct, Member, PathArguments, PathSegment, Type};
 
+use lint_core::Syntax;
 use lint_layout::Name;
 
 pub struct StructFields<'file> {
@@ -22,10 +23,8 @@ impl<'file> StructFields<'file> {
                 .generics
                 .params
                 .iter()
-                .filter_map(|param| match param {
-                    GenericParam::Type(parameter) => Some(Name::from(&parameter.ident)),
-                    _ => None,
-                })
+                .filter_map(Syntax::type_param)
+                .map(|parameter| Name::from(&parameter.ident))
                 .collect(),
             fields: item
                 .fields
@@ -40,15 +39,11 @@ impl<'file> StructFields<'file> {
     }
 
     pub fn field_type<'name>(&'name self, member: &'file Member, concrete: &'name [Name]) -> Option<&'name Name> {
-        let key = match member {
-            Member::Named(ident) => FieldKey::Named(ident),
-            Member::Unnamed(index) => FieldKey::Unnamed(Index { index: index.index, span: index.span }),
-        };
-        let declared = self.fields.get(&key)?;
-        match self.generics.iter().position(|generic| generic == declared) {
-            Some(position) => concrete.get(position),
-            None => Some(declared),
-        }
+        let declared = self.fields.get(&FieldKey::from(member))?;
+        self.generics
+            .iter()
+            .position(|generic| generic == declared)
+            .map_or(Some(declared), |position| concrete.get(position))
     }
 
     pub fn type_name(ty: &Type) -> Option<Name> {
@@ -75,5 +70,14 @@ impl<'file> StructFields<'file> {
 
     fn key_at(index: Index, field: &'file Field) -> FieldKey<'file> {
         field.ident.as_ref().map_or(FieldKey::Unnamed(index), FieldKey::Named)
+    }
+}
+
+impl<'file> From<&'file Member> for FieldKey<'file> {
+    fn from(member: &'file Member) -> FieldKey<'file> {
+        match member {
+            Member::Named(ident) => FieldKey::Named(ident),
+            Member::Unnamed(index) => FieldKey::Unnamed(Index { index: index.index, span: index.span }),
+        }
     }
 }

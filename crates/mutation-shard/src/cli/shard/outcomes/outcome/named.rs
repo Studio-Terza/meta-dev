@@ -16,6 +16,10 @@ pub struct Named {
 impl Named {
     const UNKNOWN_FILE: &'static str = "?";
 
+    fn given_name(&self) -> Option<&OneLine> {
+        self.name.as_ref().filter(|name| AsRef::<str>::as_ref(name).chars().next().is_some())
+    }
+
     pub fn title(&self) -> Title {
         let mut title = String::new();
         write!(title, "{self}").ok();
@@ -25,7 +29,7 @@ impl Named {
 
 impl fmt::Display for Named {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.name.as_ref().filter(|name| !AsRef::<str>::as_ref(name).is_empty()) {
+        match self.given_name() {
             Some(name) => name.fmt(formatter),
             None => write!(
                 formatter,

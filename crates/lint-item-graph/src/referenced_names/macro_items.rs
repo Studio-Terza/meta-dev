@@ -10,11 +10,10 @@ impl MacroItems {
     const DEFINITION: &str = "macro_rules";
 
     pub fn declared_by(call: &ItemMacro) -> Vec<Item> {
-        if call.mac.path.is_ident(Self::DEFINITION) {
-            Vec::new()
-        } else {
-            Macros::statements(&call.mac).into_iter().filter_map(Self::declared_item).collect()
-        }
+        call.mac.path.get_ident().filter(|ident| *ident == Self::DEFINITION).map_or_else(
+            || Macros::statements(&call.mac).into_iter().filter_map(Self::declared_item).collect(),
+            |_| Vec::new(),
+        )
     }
 
     pub fn defined_by(call: &ItemMacro) -> Option<Name> {

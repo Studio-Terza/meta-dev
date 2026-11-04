@@ -48,13 +48,15 @@ impl<'file> Doubles<'file> {
     }
 
     pub fn violations(self) -> Vec<Violation<'file>> {
-        let ported = |double: &DoubleKey| {
-            self.implemented.iter().any(|implemented| implemented.double == *double && implemented.kind == Kind::Port)
-        };
         let unported = self
             .declared
             .iter()
-            .filter(|(double, _)| !ported(double))
+            .filter(|(double, _)| {
+                self.implemented
+                    .iter()
+                    .filter(|implemented| implemented.double == **double)
+                    .all(|implemented| implemented.kind != Kind::Port)
+            })
             .map(|(double, site)| Violation::new(*site, Finding::Unported(&double.name)));
         let beside = self.implemented.iter().filter(|implemented| implemented.kind == Kind::Other).map(|implemented| {
             Violation::new(

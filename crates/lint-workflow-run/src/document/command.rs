@@ -66,12 +66,7 @@ impl<'text> Command<'text> {
     }
 
     fn operator_in(command: Command<'_>, setting: Key) -> Option<Word> {
-        let separators = if setting == Key::Shell {
-            Unquoted::new(command.0, Hidden::Nothing)
-        } else {
-            Unquoted::new(command.0, Hidden::Quoted)
-        };
-        separators
+        Unquoted::new(command.0, Hidden::from(setting))
             .first_of(&Self::SEPARATORS)
             .or_else(|| Unquoted::new(command.0, Hidden::Singles).first_of(&Self::SUBSTITUTIONS))
             .or_else(|| command.0.modified_expansion())

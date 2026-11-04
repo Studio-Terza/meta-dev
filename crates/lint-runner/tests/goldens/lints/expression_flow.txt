@@ -57,4 +57,14 @@ a body leaves through its tail value or ?, never through return, break or contin
 src/early.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 src/loops.rs:9: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 src/loops.rs:11: continue; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
+linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
+src/dropped.rs:2: match that is not the whole body; extract it into its own function whose whole body is the match, or use combinators on Option, Result and iterators
+src/early.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/lonely.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/loops.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/loops.rs:3: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/loops.rs:4: loop; drive an iterator with combinators (successors, repeat_with, take_while, try_fold)
+src/loops.rs:7: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/loops.rs:8: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/tail.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
 fails

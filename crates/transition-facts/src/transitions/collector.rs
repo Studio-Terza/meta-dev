@@ -2,7 +2,7 @@ mod origins;
 mod signature_reading;
 
 use syn::visit::{self, Visit};
-use syn::{Ident, ImplItem, ItemFn, ItemImpl, ItemMod, ItemTrait, TraitItem};
+use syn::{Ident, ImplItem, ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, TraitItem, TraitItemFn};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::LineNumber;
@@ -34,6 +34,20 @@ impl<'file> Collector<'file> {
     fn site(file: &'file SourceFile, name: &Ident) -> Site<'file> {
         Site::new(file.path(), LineNumber::from(name.span()))
     }
+
+    fn trait_function(item: &TraitItem) -> Option<&TraitItemFn> {
+        match item {
+            TraitItem::Fn(function) => Some(function),
+            _ => None,
+        }
+    }
+
+    fn impl_function(item: &ImplItem) -> Option<&ImplItemFn> {
+        match item {
+            ImplItem::Fn(function) => Some(function),
+            _ => None,
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for Collector<'_> {
@@ -50,10 +64,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let provided: Vec<_> = found
             .items
             .iter()
-            .filter_map(|item| match item {
-                TraitItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => Some(function),
-                _ => None,
-            })
+            .filter_map(Self::trait_function)
+            .filter(|function| Walk::outside_tests(&function.attrs) == Walk::Entered)
             .filter_map(|function| {
                 function
                     .default
@@ -73,12 +85,9 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let functions: Vec<_> = found
             .items
             .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) if Walk::outside_tests(&function.attrs) == Walk::Entered => {
-                    Some(reading.function(Self::site(file, &function.sig.ident), &function.sig, &function.block))
-                }
-                _ => None,
-            })
+            .filter_map(Self::impl_function)
+            .filter(|function| Walk::outside_tests(&function.attrs) == Walk::Entered)
+            .map(|function| reading.function(Self::site(file, &function.sig.ident), &function.sig, &function.block))
             .collect();
         self.contexts.extend(
             (Walk::outside_tests(&found.attrs) == Walk::Entered)

@@ -49,9 +49,20 @@ impl Directory {
         let manifests = Ignored::manifests(level);
         let survey = survey.learn(files, Fact::Followed, &manifests);
         let kept = Kept::new(&survey, ignored);
-        let next: Vec<PathBuf> =
-            level.iter().flat_map(|directory| kept.below(directory)).map(Newtype::into_inner).collect();
-        if next.is_empty() { survey } else { Self::surveyed(files, &next, ignored, survey) }
+        let next: Vec<Directory> = level.iter().flat_map(|directory| kept.below(directory)).collect();
+        Self::descended(files, next, ignored, survey)
+    }
+
+    fn descended(files: &impl Files, next: Vec<Directory>, ignored: &[Ignored], survey: Survey) -> Survey {
+        match next.first() {
+            Some(_) => Self::surveyed(
+                files,
+                &next.into_iter().map(Newtype::into_inner).collect::<Vec<PathBuf>>(),
+                ignored,
+                survey,
+            ),
+            None => survey,
+        }
     }
 }
 

@@ -20,16 +20,17 @@ impl Items {
     }
 
     fn chain(prefix: &str, size: usize) -> String {
-        let lines: Vec<String> = (0..size)
-            .map(|index| {
-                if index + 1 < size {
-                    format!("pub struct {prefix}{index}({prefix}{});\n", index + 1)
-                } else {
-                    format!("pub struct {prefix}{index};\n")
-                }
-            })
+        let lines: Vec<String> = (1..size)
+            .map(|next| format!("pub struct {prefix}{}({prefix}{next});\n", next - 1))
+            .chain(size.checked_sub(1).map(|last| format!("pub struct {prefix}{last};\n")))
             .collect();
         lines.concat()
+    }
+
+    fn ring_with_first_item_in(before: &str, after: &str, size: usize) -> String {
+        let rest: Vec<String> =
+            (1..size).map(|index| format!("pub struct A{index}(A{});\n", (index + 1) % size)).collect();
+        format!("{before}pub struct A0(A1);\n{after}{}", rest.concat())
     }
 
     fn flagged(files: &[SourceFile]) -> Lines {
@@ -78,4 +79,54 @@ fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
     let root = Sources::file(ONE, Text::new(&format!("mod other;\n{}", first.concat())));
     let other = Sources::file("crates/one/src/other.rs", Text::new(&second.concat()));
     assert_eq!(Items::flagged(&[root, other]), FLAGGED);
+}
+
+#[test]
+fn a_cycle_through_a_trait_a_fn_and_a_static_is_flagged() {
+    let open: Vec<String> = (1..BIG_RING).map(|next| format!("pub struct A{}(A{next});\n", next - 1)).collect();
+    let closing = format!(
+        "pub struct A{}(Box<dyn T>);\npub trait T {{\n    fn f(&self) {{\n        g();\n    }}\n}}\npub fn g() {{\n    \
+         let _ = H;\n}}\npub static H: A0 = A0;\n",
+        BIG_RING - 1
+    );
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&format!("{}{closing}", open.concat())))]), FLAGGED);
+}
+
+#[test]
+fn a_cycle_inside_an_inline_module_is_flagged() {
+    let module = format!("pub mod inner {{\n{}}}\n", Items::ring("A", BIG_RING));
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&module))]), FLAGGED);
+}
+
+#[test]
+fn a_link_closed_only_in_a_test_impl_does_not_count() {
+    let open = Items::chain("A", BIG_RING);
+    let closing = format!("#[cfg(test)]\nimpl A{} {{\n    pub fn f() {{\n        A0::f();\n    }}\n}}\n", BIG_RING - 1);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&format!("{open}{closing}")))]), CLEAN);
+}
+
+#[test]
+fn a_cycle_closed_through_a_type_alias_path_is_flagged() {
+    let link = |index: usize| {
+        let next = (index + 1) % BIG_RING;
+        let called = Some(next)
+            .filter(|next| *next != 0)
+            .map_or_else(|| "crate::L".to_owned(), |next| format!("crate::R{next}"));
+        format!("pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        {called}::f();\n    }}\n}}\n")
+    };
+    let links: Vec<String> = (0..BIG_RING).map(link).collect();
+    let source = format!("pub type L = R0;\n{}", links.concat());
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&source))]), FLAGGED);
+}
+
+#[test]
+fn items_declared_inside_a_macro_call_take_part_in_a_cycle() {
+    let wrapped = Items::ring_with_first_item_in("some_macro! {\n", "}\n", BIG_RING);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&wrapped))]), FLAGGED);
+}
+
+#[test]
+fn items_inside_a_macro_rules_definition_are_not_declared() {
+    let defined = Items::ring_with_first_item_in("macro_rules! m {\n    () => {\n", "    };\n}\n", BIG_RING);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&defined))]), CLEAN);
 }

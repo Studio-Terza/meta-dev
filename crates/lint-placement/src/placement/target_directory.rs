@@ -14,7 +14,9 @@ impl TargetDirectory {
     pub fn place(package: PackageRoot, directory: &Path, inside: &Path) -> Option<Placement> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
-        let module = if rest.as_os_str().is_empty() { ModulePath::default() } else { ModulePath::of_file(rest) };
+        let module = Some(rest)
+            .filter(|rest| rest.as_os_str().is_empty())
+            .map_or_else(|| ModulePath::of_file(rest), |_| ModulePath::default());
         Some(Placement {
             package,
             target_root: Some(CrateRoot::new(directory.join(first))),

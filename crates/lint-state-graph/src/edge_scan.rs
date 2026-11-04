@@ -1,8 +1,9 @@
+mod role;
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use syn::visit::Visit;
-use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Receiver};
+use syn::{ImplItemFn, ItemImpl, ItemMod, Receiver};
 
 use super::declarations::Declarations;
 use super::edge::Edge;
@@ -16,6 +17,7 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_core::{Bound, Site};
 use lint_layout::{Length, Name};
+use role::Role;
 
 pub struct EdgeScan<'scan, 'file> {
     declarations: &'scan Declarations<'scan>,
@@ -67,31 +69,7 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
             matches!(shape.returns(), Returns::TupleHoldingVertex)
                 .then(|| Violation::new(shape.site(), Finding::TupleHoldsVertex)),
         );
-        let receiver = function.sig.receiver();
-        let source = shape.vertex_parameters().first();
-        match (receiver, shape.returns().vertex(), source) {
-            (None, Some(target), Some(source)) if context.kind().trait_name().is_some() => {
-                let edge = Edge::new(source, target);
-                self.record_edge(context, function, &shape, edge);
-            }
-            (None, Some(target), Some(_)) => {
-                self.violations.push(Violation::new(shape.site(), Finding::FreeTransition { target }));
-            }
-            (Some(receiver), _, _) if receiver.reference.is_some() => {
-                self.violations.extend(Self::view_fault(context, receiver, &shape));
-            }
-            (Some(_), Some(target), _) => {
-                let edge = context.edge_source(&shape).map(|source| Edge::new(source, target));
-                match edge {
-                    None => self.violations.push(Violation::new(
-                        shape.site(),
-                        Finding::EdgeFromNonVertex { target, owner: context.self_type() },
-                    )),
-                    Some(edge) => self.record_edge(context, function, &shape, edge),
-                }
-            }
-            _ => {}
-        }
+        Role::classified(function.sig.receiver(), context, &shape).checked(self, context, function, &shape);
     }
 
     fn record_edge(
@@ -114,16 +92,19 @@ impl<'scan, 'file> EdgeScan<'scan, 'file> {
         receiver: &Receiver,
         shape: &FunctionShape<'scan, 'file>,
     ) -> Option<Violation<'file>> {
-        if receiver.mutability.is_some() {
-            matches!(context.kind(), ImplKind::InherentOnVertex(_))
-                .then(|| Violation::new(shape.site(), Finding::MutatesVertex { vertex: context.self_type() }))
-        } else {
-            shape
-                .returns()
-                .vertex()
-                .filter(|_| shape.body() != Body::FieldProjection)
-                .map(|target| Violation::new(shape.site(), Finding::ViewReturnsVertex { target }))
-        }
+        receiver.mutability.map_or_else(
+            || {
+                shape
+                    .returns()
+                    .vertex()
+                    .filter(|_| shape.body() != Body::FieldProjection)
+                    .map(|target| Violation::new(shape.site(), Finding::ViewReturnsVertex { target }))
+            },
+            |_| {
+                matches!(context.kind(), ImplKind::InherentOnVertex(_))
+                    .then(|| Violation::new(shape.site(), Finding::MutatesVertex { vertex: context.self_type() }))
+            },
+        )
     }
 }
 
@@ -142,10 +123,7 @@ impl EdgeScan<'_, '_> {
         let context = ImplContext::describe(item, self.declarations);
         item.items
             .iter()
-            .filter_map(|item| match item {
-                ImplItem::Fn(function) => Some(function),
-                _ => None,
-            })
+            .filter_map(FunctionShape::function)
             .for_each(|function| self.check_function(&context, function));
         syn::visit::visit_item_impl(self, item);
     }

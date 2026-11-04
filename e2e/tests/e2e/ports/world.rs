@@ -38,13 +38,13 @@ impl World {
             .and_then(Value::as_array)
             .map(|members| members.iter().filter_map(Value::as_str).map(str::to_owned).collect())
             .unwrap_or_default();
-        let mut members = BTreeMap::new();
-        for pattern in &patterns {
-            for directory in Self::directories(files, &root, pattern)? {
-                let member = Self::member(files, &root, directory)?;
-                members.insert(member.name.clone(), member);
-            }
-        }
+        let directories: Vec<Vec<PathBuf>> =
+            patterns.iter().map(|pattern| Self::directories(files, &root, pattern)).collect::<Result<_, _>>()?;
+        let members: BTreeMap<String, Member> = directories
+            .into_iter()
+            .flatten()
+            .map(|directory| Self::member(files, &root, directory).map(|member| (member.name.clone(), member)))
+            .collect::<Result<_, _>>()?;
         Ok(World { root, members })
     }
 
@@ -72,9 +72,7 @@ impl World {
     pub fn owners(&self, path: &Path) -> BTreeSet<String> {
         self.members
             .iter()
-            .filter(|(_, member)| {
-                path.starts_with(&member.directory) || member.reads.iter().any(|read| path.starts_with(read))
-            })
+            .filter(|(_, member)| member.reads.iter().chain([&member.directory]).any(|read| path.starts_with(read)))
             .map(|(name, _)| name.clone())
             .collect()
     }
@@ -86,7 +84,7 @@ impl World {
             .map(|(name, member)| {
                 let dependencies: Vec<Json> = member.dependencies.iter().map(|name| json!({ "name": name })).collect();
                 let metadata =
-                    if member.reads.is_empty() { Json::Null } else { json!({ "reach": { "reads": member.reads } }) };
+                    member.reads.first().map_or(Json::Null, |_| json!({ "reach": { "reads": member.reads } }));
                 json!({
                     "name": name,
                     "manifest_path": self.root.join(&member.directory).join(Self::MANIFEST),
@@ -102,27 +100,27 @@ impl World {
         let grown: BTreeSet<String> = self
             .members
             .iter()
-            .filter(|(_, member)| !member.dependencies.is_disjoint(&reached))
+            .filter(|(_, member)| member.dependencies.intersection(&reached).next().is_some())
             .map(|(name, _)| name.clone())
             .chain(reached.iter().cloned())
             .collect();
-        if grown.len() == reached.len() { reached } else { self.closure(grown) }
+        Some(grown).filter(|grown| grown.len() != reached.len()).map_or(reached, |grown| self.closure(grown))
     }
 
     fn directories(files: &impl Files, root: &Path, pattern: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
         match pattern.strip_suffix(Self::ALL_BELOW) {
             None => Ok(vec![PathBuf::from(pattern)]),
-            Some(parent) => {
-                let mut found = Vec::new();
-                for entry in files.entries(&root.join(parent))? {
-                    let directory = Path::new(parent).join(entry.file_name().unwrap_or_default());
-                    if files.kind(&root.join(&directory).join(Self::MANIFEST)) == Kind::File {
-                        found.push(directory);
-                    }
-                }
-                Ok(found)
-            }
+            Some(parent) => Self::listed(files, root, parent),
         }
+    }
+
+    fn listed(files: &impl Files, root: &Path, parent: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+        Ok(files
+            .entries(&root.join(parent))?
+            .iter()
+            .map(|entry| Path::new(parent).join(entry.file_name().unwrap_or_default()))
+            .filter(|directory| files.kind(&root.join(directory).join(Self::MANIFEST)) == Kind::File)
+            .collect())
     }
 
     fn member(files: &impl Files, root: &Path, directory: PathBuf) -> Result<Member, Box<dyn Error>> {

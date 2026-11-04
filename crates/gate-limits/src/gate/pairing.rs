@@ -24,10 +24,16 @@ impl Pairing {
     }
 
     pub fn finding(self, stage: Stage) -> Result<Finding, Failure<'static>> {
-        match (self.limit.and_then(Limit::ordered), self.measured) {
-            (None, _) => Err(Failure::Unlimited { stage }),
-            (Some(_), None) => Err(Failure::Unmeasured { stage }),
-            (Some(limit), Some(measured)) => Ok(Finding::new(stage, measured, limit)),
+        match self.limit.and_then(Limit::ordered) {
+            None => Err(Failure::Unlimited { stage }),
+            Some(limit) => self.measured_against(stage, limit),
+        }
+    }
+
+    fn measured_against(self, stage: Stage, limit: Limit) -> Result<Finding, Failure<'static>> {
+        match self.measured {
+            None => Err(Failure::Unmeasured { stage }),
+            Some(measured) => Ok(Finding::new(stage, measured, limit)),
         }
     }
 }

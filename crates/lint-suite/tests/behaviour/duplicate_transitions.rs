@@ -85,7 +85,7 @@ fn a_foreign_import_is_a_black_box_even_when_the_workspace_declares_the_name() {
             "use std::process::Command;\nuse x::Line;\nstruct Run;\nimpl Run {\n    fn first(line: &Line) -> Command {}\n    fn second(line: &Line) -> Command {}\n}\n",
         ),
     ]);
-    assert!(!text.contains("has 2 transitions"), "{text}");
+    assert_eq!(text.matches("has 2 transitions").count(), 0, "{text}");
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn impls_of_one_trait_on_different_types_are_different_edges() {
         "crates/x/src/lib.rs",
         "struct File;\nstruct Report;\nstruct One;\nstruct Two;\nimpl Check for One {\n    fn report(file: &File) -> Report {}\n}\nimpl Check for Two {\n    fn report(file: &File) -> Report {}\n}\n",
     )]);
-    assert!(!text.contains("has 2 transitions"), "{text}");
+    assert_eq!(text.matches("has 2 transitions").count(), 0, "{text}");
 }
 
 #[test]
@@ -126,5 +126,5 @@ fn a_name_declared_twice_in_one_crate_is_a_leaf() {
         Duplicates::at("crates/x/src/one.rs", "struct Tally;\nimpl Tally {\n    fn fix(&self) -> Fix {}\n}\n"),
         Duplicates::at("crates/x/src/two.rs", "struct Tally;\nimpl Tally {\n    fn fix(&self) -> Fix {}\n}\n"),
     ]);
-    assert!(!text.contains("has 2 transitions"), "{text}");
+    assert_eq!(text.matches("has 2 transitions").count(), 0, "{text}");
 }

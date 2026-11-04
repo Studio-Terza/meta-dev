@@ -3,6 +3,7 @@ mod path_tokens;
 use std::collections::BTreeMap;
 use std::ptr;
 
+use lint_core::Syntax;
 use lint_layout::{Name, UsePath};
 use proc_macro2::{TokenStream, TokenTree};
 
@@ -30,9 +31,8 @@ impl Referenced {
             .tokens()
             .iter()
             .zip(path.roots())
-            .filter_map(|(token, root)| match (token, root) {
-                (TokenTree::Ident(ident), Some(root)) => Some((token, root, Name::from(ident))),
-                _ => None,
+            .filter_map(|(token, root)| {
+                Syntax::token_ident(token).zip(root).map(|(ident, root)| (token, root, Name::from(ident)))
             })
             .collect();
         let local: Vec<Segment<'_>> = idents
@@ -45,10 +45,8 @@ impl Referenced {
                 scope.spelled(token, root, name).into_iter().map(move |name| Segment { root, name })
             })
             .collect();
-        let nested = path.tokens().iter().filter_map(|token| match token {
-            TokenTree::Group(group) => Some(Referenced::of_tokens(scope, group.stream())),
-            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
-        });
+        let nested =
+            path.tokens().iter().filter_map(Syntax::group).map(|group| Referenced::of_tokens(scope, group.stream()));
         let own = Referenced { local: Self::paths(&local), across: Self::paths(&across) };
         nested.fold(own, Referenced::merged)
     }

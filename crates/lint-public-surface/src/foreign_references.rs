@@ -3,7 +3,7 @@ mod crate_reach;
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{Ident, ItemUse, Macro, Path, UseTree};
+use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
 use lint_core::BinaryFiles;
@@ -20,14 +20,28 @@ pub struct ForeignReferences {
     crates: BTreeMap<CrateName, CrateReach>,
 }
 
+#[derive(Clone, Copy)]
+enum Leaf<'tree> {
+    Named(&'tree Ident),
+    Glob,
+}
+
+impl Leaf<'_> {
+    fn reached(self, reach: &mut CrateReach) {
+        match self {
+            Leaf::Named(name) => reach.named(Name::from(name)),
+            Leaf::Glob => reach.globbed(),
+        }
+    }
+}
+
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
 
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
-        let own_crate = match binaries.holding(file.path()) {
-            Some(_) => None,
-            None => Some(CrateName::from(file.placement().crate_root())),
-        };
+        let own_crate = binaries
+            .holding(file.path())
+            .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
         let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
         references.visit_file(file.syntax());
         references
@@ -64,43 +78,37 @@ impl ForeignReferences {
 
     fn walk(&mut self, first: Option<&Ident>, tree: &UseTree) {
         match tree {
-            UseTree::Path(path) => {
-                first
-                    .is_none()
-                    .then_some(&path.ident)
-                    .into_iter()
-                    .for_each(|crate_ident| self.record_modules(crate_ident, &path.tree));
-                self.walk(Some(first.unwrap_or(&path.ident)), &path.tree);
-            }
+            UseTree::Path(path) => self.walk_path(first, path),
             UseTree::Group(group) => group.items.iter().for_each(|item| self.walk(first, item)),
-            UseTree::Name(name) => self.record(first, &name.ident),
-            UseTree::Rename(rename) => self.record(first, &rename.ident),
-            UseTree::Glob(_) => self.record_glob(first),
+            UseTree::Name(name) => self.record(first, Leaf::Named(&name.ident)),
+            UseTree::Rename(rename) => self.record(first, Leaf::Named(&rename.ident)),
+            UseTree::Glob(_) => self.record(first, Leaf::Glob),
         }
     }
 
     fn record_modules(&mut self, first: &Ident, tree: &UseTree) {
         match tree {
-            UseTree::Path(path) => self.record(Some(first), &path.ident),
+            UseTree::Path(path) => self.record(Some(first), Leaf::Named(&path.ident)),
             UseTree::Group(group) => group.items.iter().for_each(|item| self.record_modules(first, item)),
             UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => {}
         }
     }
 
-    fn record_glob(&mut self, first: Option<&Ident>) {
+    fn walk_path(&mut self, first: Option<&Ident>, path: &UsePath) {
         first
-            .map(CrateName::from)
-            .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
+            .is_none()
+            .then_some(&path.ident)
             .into_iter()
-            .for_each(|crate_name| self.crates.entry(crate_name).or_default().globbed());
+            .for_each(|crate_ident| self.record_modules(crate_ident, &path.tree));
+        self.walk(Some(first.unwrap_or(&path.ident)), &path.tree);
     }
 
-    fn record(&mut self, first: Option<&Ident>, name: &Ident) {
+    fn record(&mut self, first: Option<&Ident>, leaf: Leaf<'_>) {
         first
             .map(CrateName::from)
             .filter(|crate_name| Some(crate_name) != self.own_crate.as_ref())
             .into_iter()
-            .for_each(|crate_name| self.crates.entry(crate_name).or_default().named(Name::from(name)));
+            .for_each(|crate_name| leaf.reached(self.crates.entry(crate_name).or_default()));
     }
 }
 
@@ -116,7 +124,7 @@ impl<'ast> Visit<'ast> for ForeignReferences {
 
     fn visit_path(&mut self, path: &'ast Path) {
         path.segments.first().zip(path.segments.iter().nth(1)).into_iter().for_each(|(first, second)| {
-            self.record(Some(&first.ident), &second.ident);
+            self.record(Some(&first.ident), Leaf::Named(&second.ident));
         });
         syn::visit::visit_path(self, path);
     }

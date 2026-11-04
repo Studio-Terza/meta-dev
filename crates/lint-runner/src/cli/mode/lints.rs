@@ -17,6 +17,7 @@ use lint_expression_flow::ExpressionFlow;
 use lint_fakes_at_ports::FakesAtPorts;
 use lint_fn_shape::FnShape;
 use lint_guard_must_use::GuardMustUse;
+use lint_linear_flow::{Flows, LinearBodies, PlainConditions, PureRouters};
 use lint_literal_names::LiteralNames;
 use lint_long_exact_strings::LongExactStrings;
 use lint_mandatory_laws::MandatoryLaws;
@@ -61,7 +62,7 @@ pub struct Lints;
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 impl Lints {
-    const CHECKS: [Check; 46] = [
+    const CHECKS: [Check; 47] = [
         |readout| vec![NoComments::report(readout.files())],
         |readout| vec![NoFreeFns::report(readout.files())],
         |readout| vec![ThinMain::report(readout.files())],
@@ -103,6 +104,10 @@ impl Lints {
         |readout| vec![BoolMethods::report(readout.files())],
         |readout| vec![EffectsInPorts::report(readout.files())],
         |readout| vec![NoEarlyExits::report(readout.files())],
+        |readout| {
+            let flows = Flows::from(readout.files());
+            vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
+        },
         |readout| vec![OnGraph::<OneEdge>::report(readout.files())],
         |readout| vec![OnContainment::<AcyclicQuotients>::report(readout.files())],
         |readout| vec![UnconsumedTraits::report(readout.files())],

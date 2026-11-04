@@ -21,16 +21,20 @@ impl<'file> Declared<'file> {
     }
 
     fn methods(block: &ItemTrait) -> impl Iterator<Item = &TraitItemFn> {
-        block.items.iter().filter_map(|item| match item {
+        block.items.iter().filter_map(Self::method)
+    }
+
+    fn method(item: &TraitItem) -> Option<&TraitItemFn> {
+        match item {
             TraitItem::Fn(method) => Some(method),
             _ => None,
-        })
+        }
     }
 
     fn with_methods(block: &ItemTrait) -> Option<&ItemTrait> {
         Self::methods(block)
             .next()
-            .filter(|_| !block.attrs.iter().any(|attribute| attribute.path().is_ident(Self::DISPATCHING)))
+            .filter(|_| block.attrs.iter().find(|attribute| attribute.path().is_ident(Self::DISPATCHING)).is_none())
             .map(|_| block)
     }
 

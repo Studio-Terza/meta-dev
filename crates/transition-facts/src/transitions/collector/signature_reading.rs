@@ -59,18 +59,8 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
 
     pub(super) fn function(&self, site: Site<'file>, signature: &Signature, body: &Block) -> Function<'file> {
         let scope = self.scope.extended(&signature.generics);
-        let takes = signature
-            .inputs
-            .iter()
-            .map(|input| match input {
-                FnArg::Receiver(receiver) => scope.endpoint(&receiver.ty),
-                FnArg::Typed(typed) => self.origins.located(scope.endpoint(&typed.ty)),
-            })
-            .collect();
-        let gives = match &signature.output {
-            ReturnType::Default => Resolved::Found(Endpoint::from(Unnamed::Unit)),
-            ReturnType::Type(_, returned) => self.origins.located(scope.endpoint(returned)),
-        };
+        let takes = signature.inputs.iter().map(|input| self.taken(&scope, input)).collect();
+        let gives = self.given(&scope, &signature.output);
         Function::new(site, Name::from(&signature.ident), takes, gives).shaped(
             Self::mutation(signature),
             BodyReading::classified(body),
@@ -80,6 +70,20 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
 
     pub(super) fn into_context(self) -> Context<'file> {
         self.context
+    }
+
+    fn taken(&self, scope: &TypeScope<'_>, input: &FnArg) -> Resolved {
+        match input {
+            FnArg::Receiver(receiver) => scope.endpoint(&receiver.ty),
+            FnArg::Typed(typed) => self.origins.located(scope.endpoint(&typed.ty)),
+        }
+    }
+
+    fn given(&self, scope: &TypeScope<'_>, output: &ReturnType) -> Resolved {
+        match output {
+            ReturnType::Default => Resolved::Found(Endpoint::from(Unnamed::Unit)),
+            ReturnType::Type(_, returned) => self.origins.located(scope.endpoint(returned)),
+        }
     }
 
     fn mutation(signature: &Signature) -> Mutation {

@@ -26,11 +26,8 @@ impl Staged {
             .zip(repo_files)
             .map(|((tree, targets), repo_files)| {
                 let targets = targets?;
-                if targets.is_empty() {
-                    Err(tree.without_sources())
-                } else {
-                    Ok(Staged { targets, repo_files: repo_files? })
-                }
+                targets.first().ok_or_else(|| tree.without_sources())?;
+                Ok(Staged { targets, repo_files: repo_files? })
             })
             .collect()
     }

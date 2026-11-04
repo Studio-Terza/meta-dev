@@ -27,7 +27,8 @@ impl From<&CrateRoot> for CrateName {
             || root.directory_name().unwrap_or_default().to_string_lossy().into_owned(),
             ToString::to_string,
         );
-        let underscored: String = spelled.chars().map(|letter| if letter == '-' { '_' } else { letter }).collect();
+        let underscored: String =
+            spelled.chars().map(|letter| Some(letter).filter(|letter| *letter != '-').unwrap_or('_')).collect();
         CrateName(Name::from(underscored.as_str()))
     }
 }

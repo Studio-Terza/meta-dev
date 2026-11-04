@@ -12,11 +12,13 @@ impl Gate {
     pub(super) fn lines_in(attributes: &[Attribute]) -> Vec<LineNumber> {
         attributes
             .iter()
+            .filter(|attribute| attribute.path().is_ident(Self::CONDITION))
             .filter(|attribute| {
-                attribute.path().is_ident(Self::CONDITION)
-                    && !attribute
-                        .parse_args::<Meta>()
-                        .is_ok_and(|condition| condition.path().is_ident(Self::TEST_CONDITION))
+                attribute
+                    .parse_args::<Meta>()
+                    .ok()
+                    .and_then(|condition| condition.path().get_ident().cloned())
+                    .is_none_or(|ident| ident != Self::TEST_CONDITION)
             })
             .map(|attribute| LineNumber::from(attribute.pound_token.span))
             .collect()

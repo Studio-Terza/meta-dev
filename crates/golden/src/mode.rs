@@ -23,11 +23,13 @@ impl Mode {
     }
 
     pub fn chosen(record: Option<&OsStr>, ci: Option<&OsStr>) -> Result<Self, Failure> {
-        match (record, ci) {
-            (None, _) => Ok(Self::Check),
-            (Some(value), _) if value != Self::ON => Err(Failure::UnknownValue { value: value.to_owned() }),
-            (Some(_), None) => Ok(Self::Record),
-            (Some(_), Some(_)) => Err(Failure::RecordInCi),
-        }
+        record.map_or(Ok(Self::Check), |value| Self::recording(value, ci))
+    }
+
+    fn recording(value: &OsStr, ci: Option<&OsStr>) -> Result<Self, Failure> {
+        Some(value)
+            .filter(|value| **value == *Self::ON)
+            .ok_or_else(|| Failure::UnknownValue { value: value.to_owned() })
+            .and_then(|_| ci.map_or(Ok(Self::Record), |_| Err(Failure::RecordInCi)))
     }
 }

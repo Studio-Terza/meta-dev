@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
-use syn::{FnArg, ItemMod, ItemTrait, Path as TraitPath, TraitItem, TraitItemFn, Type};
+use syn::{ItemMod, ItemTrait, Path as TraitPath, TraitItemFn};
 
-use lint_core::{Gate, SourceFile, Walk};
+use lint_core::{Gate, SourceFile, Syntax, Walk};
 use lint_layout::{Name, UsePath};
 use lint_paths::{Ground, Imports, Module};
 use lint_placement::CrateName;
@@ -52,11 +52,9 @@ impl PortTraits {
             .sig
             .inputs
             .iter()
-            .filter_map(|input| match input {
-                FnArg::Typed(typed) => Some(typed.ty.as_ref()),
-                FnArg::Receiver(_) => None,
-            })
-            .any(|ty| matches!(ty, Type::Path(path) if path.path.segments.last().is_some_and(|last| last.ident == Self::PACING)))
+            .filter_map(Syntax::typed)
+            .filter_map(|typed| Syntax::type_path(&typed.ty))
+            .any(|path| path.path.segments.last().is_some_and(|last| last.ident == Self::PACING))
             .then(|| Name::from(&method.sig.ident))
     }
 }
@@ -77,10 +75,8 @@ impl<'ast> Visit<'ast> for Reader {
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
         let ported = (self.ground == Ground::Ports).then(|| Name::from(&item.ident));
-        let paced = ported.iter().flat_map(|_| &item.items).filter_map(|member| match member {
-            TraitItem::Fn(method) => PortTraits::paced_by(method),
-            _ => None,
-        });
+        let paced =
+            ported.iter().flat_map(|_| &item.items).filter_map(Syntax::trait_fn).filter_map(PortTraits::paced_by);
         self.found.paced.extend(paced);
         self.traits.extend(ported);
     }

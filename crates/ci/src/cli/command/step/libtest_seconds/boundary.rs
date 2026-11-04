@@ -17,19 +17,19 @@ impl Finished {
         self.0
     }
 
+    fn decimal(letter: char) -> Option<char> {
+        Some(letter)
+            .filter(char::is_ascii_digit)
+            .or_else(|| Some(letter).filter(|letter| *letter == Self::DECIMAL_POINT))
+    }
+
     fn duration_after(words: &[String]) -> Seconds {
         words
             .iter()
             .zip(words.iter().skip(1))
             .filter(|(mark, _)| *mark == Self::MARK)
             .filter_map(|(_, seconds)| {
-                seconds
-                    .chars()
-                    .take_while(|letter| letter.is_ascii_digit() || *letter == Self::DECIMAL_POINT)
-                    .collect::<String>()
-                    .parse()
-                    .ok()
-                    .map(Seconds::new)
+                seconds.chars().map_while(Self::decimal).collect::<String>().parse().ok().map(Seconds::new)
             })
             .sum()
     }
@@ -42,7 +42,7 @@ impl FromStr for Finished {
         let letters: Vec<char> = line.chars().collect();
         let words: Vec<String> = letters
             .chunk_by(|left, right| left.is_whitespace() == right.is_whitespace())
-            .filter(|chunk| chunk.iter().all(|letter| !letter.is_whitespace()))
+            .filter_map(|chunk| chunk.first().filter(|letter| letter.is_whitespace()).map_or(Some(chunk), |_| None))
             .map(|chunk| chunk.iter().collect())
             .collect();
         (line.get(..Self::RESULT.len()) == Some(Self::RESULT))

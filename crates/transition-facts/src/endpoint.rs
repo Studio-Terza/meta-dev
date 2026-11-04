@@ -25,10 +25,19 @@ pub struct Endpoint {
     origin: Option<CrateName>,
 }
 
-impl Endpoint {
+impl Unnamed {
     const UNIT: Word<'static> = Word::new("()");
     const OPAQUE: Word<'static> = Word::new("_");
 
+    fn word(self) -> Word<'static> {
+        match self {
+            Unnamed::Unit => Self::UNIT,
+            Unnamed::Opaque => Self::OPAQUE,
+        }
+    }
+}
+
+impl Endpoint {
     pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
         Endpoint { nature, name, spelling: None, origin: None }
     }
@@ -61,11 +70,7 @@ impl Endpoint {
 
 impl From<Unnamed> for Endpoint {
     fn from(unnamed: Unnamed) -> Endpoint {
-        let name = match unnamed {
-            Unnamed::Unit => Self::UNIT,
-            Unnamed::Opaque => Self::OPAQUE,
-        };
-        Endpoint { nature: Nature::Boxed, name: Name::from(name), spelling: None, origin: None }
+        Endpoint { nature: Nature::Boxed, name: Name::from(unnamed.word()), spelling: None, origin: None }
     }
 }
 

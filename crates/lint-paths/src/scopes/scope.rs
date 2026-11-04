@@ -10,7 +10,8 @@ pub(crate) struct Scope {
 
 impl Scope {
     pub(crate) fn import(&mut self, local: Option<Name>, target: UsePath) {
-        self.imports.extend(local.map(|local| (local, target)).filter(|(_, target)| !target.segments().is_empty()));
+        let named = local.zip(target.segments().first()).map(|(local, _)| local);
+        self.imports.extend(named.map(|local| (local, target)));
     }
 
     pub(crate) fn glob(&mut self, prefix: UsePath) {

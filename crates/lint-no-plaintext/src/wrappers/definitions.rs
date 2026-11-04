@@ -33,25 +33,19 @@ impl<'file> Definitions<'file> {
 
     pub fn plain_among(&self, settled: &Wrappers) -> BTreeSet<Name> {
         self.names
-            .iter()
+            .difference(&self.validated)
             .filter(|name| {
-                !self.validated.contains(*name)
-                    && self
-                        .shapes
-                        .iter()
-                        .filter_map(|shape| shape.answers_to(name))
-                        .all(|shape| shape.holds_text(settled).is_some())
+                self.shapes
+                    .iter()
+                    .filter_map(|shape| shape.answers_to(name))
+                    .all(|shape| shape.holds_text(settled).is_some())
             })
             .cloned()
             .collect()
     }
 
     fn only_field(item: &ItemStruct) -> Option<&Field> {
-        let fields: Vec<&Field> = item.fields.iter().collect();
-        match fields.as_slice() {
-            [only] => Some(*only),
-            _ => None,
-        }
+        Some(&item.fields).filter(|fields| fields.len() == 1).and_then(|fields| fields.iter().next())
     }
 
     fn validated_owner(item: &ItemImpl) -> Option<Name> {

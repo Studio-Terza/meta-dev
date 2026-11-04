@@ -24,11 +24,11 @@ impl fmt::Display for Need<'_> {
 
 impl lint_core::Finding for Need<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
+        match self {
             Need::Roundtrip(_) => {
-                "add a `laws::roundtrip!` in a test of the same package that names the type and the pair"
+                Fix::new("add a `laws::roundtrip!` in a test of the same package that names the type and the pair")
             }
-            Need::Law => "add a `laws::law!` in a test of the same package that names it",
-        })
+            Need::Law => Fix::new("add a `laws::law!` in a test of the same package that names it"),
+        }
     }
 }

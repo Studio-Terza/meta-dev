@@ -262,7 +262,7 @@ fn implementers_of_a_trait_are_found_across_crates() {
 fn fields_variants_and_bounds_are_dependencies() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
-        "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup {}\n",
+        "struct A<T: Into<B>> { b: B, n: Box<Self>, r: &'static C, t: T }\nenum E { X(lint_core::D) }\ntrait Tr: Sup {\n    type Out: Shown;\n    fn made(&self);\n}\n",
     )]);
     let facts = Facts::of_files(&files);
     let described = |dependencies: &[Dependency<'_>]| -> Vec<String> {
@@ -295,5 +295,5 @@ fn fields_variants_and_bounds_are_dependencies() {
         ]
     );
     let traits: Vec<Vec<String>> = facts.traits().iter().map(|found| described(found.as_ref())).collect();
-    assert_eq!(traits, [vec!["Sup:bound:a.rs:3".to_owned()]]);
+    assert_eq!(traits, [vec!["Sup:bound:a.rs:3".to_owned(), "Shown:bound:a.rs:4".to_owned()]]);
 }

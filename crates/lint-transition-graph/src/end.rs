@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use crate::class::Class;
+use crate::count::Count;
+use crate::key::Key;
 use lint_layout::Name;
 use lint_placement::CrateName;
-
-use crate::class::Class;
-use crate::key::Key;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Node<'found> {
@@ -45,25 +45,27 @@ impl fmt::Display for Node<'_> {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Tuple<'found>(BTreeSet<Node<'found>>);
 
-impl fmt::Display for Tuple<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let nodes: Vec<String> = self.0.iter().map(ToString::to_string).collect();
-        match nodes.as_slice() {
-            [single] => write!(formatter, "{single}"),
-            _ => write!(formatter, "({})", nodes.join(", ")),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Hop<'found> {
     takes: Tuple<'found>,
     gives: Node<'found>,
 }
 
-impl fmt::Display for Hop<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}", self.takes, self.gives)
+impl<'found> Hop<'found> {
+    pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
+    where
+        'found: 'ends,
+    {
+        Count::new(ends.filter_map(Option::<Hop>::from).collect::<BTreeSet<Hop<'found>>>().len())
+    }
+}
+
+impl<'found> From<&Ends<'found>> for Option<Hop<'found>> {
+    fn from(ends: &Ends<'found>) -> Option<Hop<'found>> {
+        let takes: BTreeSet<Node<'found>> = ends.taken().copied().collect();
+        let gives = ends.gives.node?;
+        let first = takes.first().copied();
+        first.map(|_| Hop { takes: Tuple(takes), gives })
     }
 }
 
@@ -74,6 +76,15 @@ pub(crate) enum Place {
     Interface,
     External,
     Primitive,
+}
+
+impl Place {
+    fn written(self, name: &Name, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Place::Interface => write!(formatter, "impl {name}"),
+            Place::Domain | Place::Shared | Place::External | Place::Primitive => write!(formatter, "{name}"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -99,10 +110,9 @@ impl<'found> End<'found> {
 
 impl fmt::Display for End<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (&self.node, self.place) {
-            (Some(node), _) => write!(formatter, "{node}"),
-            (None, Place::Interface) => write!(formatter, "impl {}", self.name),
-            (None, _) => write!(formatter, "{}", self.name),
+        match &self.node {
+            Some(node) => write!(formatter, "{node}"),
+            None => self.place.written(self.name, formatter),
         }
     }
 }
@@ -127,12 +137,6 @@ impl<'found> Ends<'found> {
         self.takes.iter().chain([&self.gives])
     }
 
-    pub(crate) fn hop(&self) -> Option<Hop<'found>> {
-        let takes: BTreeSet<Node<'found>> = self.taken().copied().collect();
-        let gives = self.gives.node?;
-        (!takes.is_empty()).then_some(Hop { takes: Tuple(takes), gives })
-    }
-
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
         self.takes.iter().filter_map(|taken| taken.node.as_ref())
     }
@@ -151,10 +155,12 @@ impl<'found> Ends<'found> {
             .implementer
             .as_ref()
             .and_then(|implementer| implementer.node)
-            .filter(|implementer| *implementer != gives && !takes.contains(implementer));
+            .filter(|implementer| *implementer != gives)
+            .filter(|implementer| takes.iter().all(|taken| taken != implementer));
         takes.extend(selector);
         takes.sort();
-        (!takes.is_empty()).then_some(Key::new(takes, gives))
+        let first = takes.first().copied();
+        first.map(|_| Key::new(takes, gives))
     }
 
     pub(crate) fn applied(&self) -> Applied<'_, 'found> {

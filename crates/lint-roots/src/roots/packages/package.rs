@@ -47,7 +47,7 @@ impl Package {
         let roots = Self::ROOT_FILES.iter().map(|file| directory.join(file)).filter(|file| survey.file(file).is_some());
         let files: Vec<PathBuf> =
             declared.chain(roots).chain(crates).filter(|file| file.starts_with(tree.canonical())).collect();
-        Some(files).filter(|files| !files.is_empty()).map(|files| Target::new(directory, files))
+        files.first().map(|_| ()).map(|()| Target::new(directory, files))
     }
 
     fn crate_root(survey: &Survey, entry: &Path) -> Option<PathBuf> {

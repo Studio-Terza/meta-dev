@@ -24,10 +24,12 @@ impl<'file> CrateEffects<'file> {
         let called = Paths::read(files.iter().copied(), &Vocabulary::FINALS);
         let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
         let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();
-        let mut sites: Vec<EffectSite<'file>> = called
-            .iter()
-            .filter_map(Vocabulary::site_of)
-            .filter(|site| !tested.contains(&site.place()))
+        let reached: Vec<EffectSite<'file>> = called.iter().filter_map(Vocabulary::site_of).collect();
+        let placed: BTreeSet<Site<'file>> = reached.iter().map(EffectSite::place).collect();
+        let untested: BTreeSet<&Site<'file>> = placed.difference(&tested).collect();
+        let mut sites: Vec<EffectSite<'file>> = reached
+            .into_iter()
+            .filter(|site| untested.contains(&site.place()))
             .chain(scans.into_iter().flat_map(FileScan::into_printed))
             .collect();
         sites.sort_by_key(EffectSite::place);

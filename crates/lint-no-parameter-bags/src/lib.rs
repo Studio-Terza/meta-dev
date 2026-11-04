@@ -43,13 +43,10 @@ impl NoParameterBags {
     fn one_consumer_besides<'uses>(uses: &'uses [NameUses], own: &NameUses, name: &Name) -> Option<&'uses NameUses> {
         let consumers: Vec<&NameUses> = uses
             .iter()
-            .filter(|file_uses| !std::ptr::eq(*file_uses, own))
+            .filter(|file_uses| std::ptr::from_ref(*file_uses) != std::ptr::from_ref(own))
             .filter_map(|file_uses| file_uses.sharing_crate(own))
             .filter_map(|file_uses| file_uses.mentions(name).map(|_| file_uses))
             .collect();
-        match consumers.as_slice() {
-            [only] => Some(only),
-            _ => None,
-        }
+        Some(consumers).filter(|consumers| consumers.len() == 1).and_then(|consumers| consumers.into_iter().next())
     }
 }

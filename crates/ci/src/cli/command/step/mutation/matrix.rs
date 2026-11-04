@@ -8,6 +8,7 @@ use file_ports::Files;
 use super::super::journal::Journal;
 use super::Step;
 use crate::cli::command::failure::{Failure, Refusal};
+use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports};
 
 #[derive(Debug)]
@@ -28,26 +29,30 @@ impl Matrix {
         files.create_directories(&self.directory).map_err(|failure| Failure::unusable(&self.directory, failure))?;
         let arguments = [&self.shards, &self.sources, self.markdown.as_ref(), &self.json];
         let mut refusal = Vec::new();
-        match mutation_report::Cli::answer(&arguments, files, &mut refusal) {
-            code if code == ExitCode::SUCCESS => Ok(&self.markdown),
-            _ => Err(Failure::Matrix(Refusal::from(refusal))),
-        }
+        let answered = mutation_report::Cli::answer(&arguments, files, &mut refusal);
+        Some(answered)
+            .filter(|answered| *answered == ExitCode::SUCCESS)
+            .map(|_| &self.markdown)
+            .ok_or_else(|| Failure::Matrix(Refusal::from(refusal)))
     }
 }
 
 impl Step for Matrix {
     fn from_arguments(arguments: Vec<OsString>) -> Result<Matrix, Failure<'static>> {
-        match arguments.as_slice() {
-            [shards, sources, directory, summary] => Ok(Matrix {
-                shards: PathBuf::from(shards),
-                sources: PathBuf::from(sources),
-                markdown: Journal::from(Path::new(directory).join(Self::MARKDOWN)),
-                json: Path::new(directory).join(Self::JSON),
-                directory: PathBuf::from(directory),
-                summary: Journal::file(Path::new(summary)),
-            }),
-            _ => Err(Failure::Usage),
-        }
+        let mut arguments = Arguments::from(arguments);
+        let shards = &arguments.taken()?;
+        let sources = &arguments.taken()?;
+        let directory = &arguments.taken()?;
+        let summary = &arguments.taken()?;
+        arguments.ended()?;
+        Ok(Matrix {
+            shards: PathBuf::from(shards),
+            sources: PathBuf::from(sources),
+            markdown: Journal::from(Path::new(directory).join(Self::MARKDOWN)),
+            json: Path::new(directory).join(Self::JSON),
+            directory: PathBuf::from(directory),
+            summary: Journal::file(Path::new(summary)),
+        })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

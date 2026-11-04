@@ -186,7 +186,7 @@ fn a_finding_lists_its_size_and_its_copies_in_order() {
     let text =
         RepeatedShapes::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
     assert!(text.contains("46 tokens in 3 shipped copies, also at a.rs:15, a.rs:29; "), "{text}");
-    assert!(!text.contains("helper"));
+    assert_eq!(text.matches("helper").count(), 0);
 }
 
 #[test]

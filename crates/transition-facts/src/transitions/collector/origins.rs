@@ -40,19 +40,24 @@ impl<'file> Origins<'file> {
     }
 
     fn crate_of(&self, head: &Name) -> CrateName {
-        match (head.matches::<Whole>(&Self::LOCAL), self.modules.contains(head)) {
-            (Some(_), _) | (None, true) => self.own.clone(),
-            (None, false) => CrateName::from(head),
-        }
+        head.matches::<Whole>(&Self::LOCAL)
+            .map(|_| ())
+            .or_else(|| self.modules.get(head).map(|_| ()))
+            .map_or_else(|| CrateName::from(head), |()| self.own.clone())
+    }
+
+    fn headed(head: Option<&Name>, found: Name) -> Name {
+        head.cloned().unwrap_or(found)
     }
 
     fn imports(head: Option<&Name>, tree: &UseTree) -> Vec<Import> {
-        let from = |found: Name| head.cloned().unwrap_or(found);
         match tree {
-            UseTree::Path(path) => Self::imports(Some(&from(Name::from(&path.ident))), &path.tree),
-            UseTree::Name(name) => vec![Import { name: Name::from(&name.ident), head: from(Name::from(&name.ident)) }],
+            UseTree::Path(path) => Self::imports(Some(&Self::headed(head, Name::from(&path.ident))), &path.tree),
+            UseTree::Name(name) => {
+                vec![Import { name: Name::from(&name.ident), head: Self::headed(head, Name::from(&name.ident)) }]
+            }
             UseTree::Rename(rename) => {
-                vec![Import { name: Name::from(&rename.rename), head: from(Name::from(&rename.ident)) }]
+                vec![Import { name: Name::from(&rename.rename), head: Self::headed(head, Name::from(&rename.ident)) }]
             }
             UseTree::Glob(_) => Vec::new(),
             UseTree::Group(group) => group.items.iter().flat_map(|item| Self::imports(head, item)).collect(),

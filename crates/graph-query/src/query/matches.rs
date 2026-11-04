@@ -69,9 +69,9 @@ impl fmt::Display for Ranked<'_, '_> {
 
 impl fmt::Display for Matches<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.as_slice() {
-            [] => writeln!(formatter, "no existing traits, generic impls, ports or stores match"),
-            found => found.iter().try_for_each(|ranked| write!(formatter, "{ranked}")),
+        match self.0.first() {
+            None => writeln!(formatter, "no existing traits, generic impls, ports or stores match"),
+            Some(_) => self.0.iter().try_for_each(|ranked| write!(formatter, "{ranked}")),
         }
     }
 }

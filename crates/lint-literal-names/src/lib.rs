@@ -41,9 +41,11 @@ impl LiteralNames {
     ];
 
     fn vague(name: &Name) -> Option<Finding<'_>> {
-        Some(Finding::VagueName { name }).filter(|Finding::VagueName { name }| {
-            Self::SHORTEST.allows(name.length()).is_none() || name.matches::<Whole>(&Self::VAGUE).is_some()
-        })
+        Self::SHORTEST
+            .allows(name.length())
+            .is_none()
+            .then_some(Finding::VagueName { name })
+            .or_else(|| name.matches::<Whole>(&Self::VAGUE).map(|_| Finding::VagueName { name }))
     }
 
     fn vague_names<'file>(path: &'file Path, file: &syn::File) -> Vec<Violation<'file>> {
@@ -59,6 +61,13 @@ struct VagueNames<'file> {
 }
 
 impl VagueNames<'_> {
+    fn inherent(&mut self, item: &ItemImpl) {
+        match Walk::inherent_impls(item) {
+            Walk::Entered => syn::visit::visit_item_impl(self, item),
+            Walk::Skipped => {}
+        }
+    }
+
     fn note(&mut self, ident: &Ident) {
         let site = Site::new(self.path, LineNumber::from(ident.span()));
         self.found.extend(LiteralNames::vague(&Name::from(ident)).map(|finding| Violation::new(site, finding)));
@@ -75,10 +84,7 @@ impl<'ast> Visit<'ast> for VagueNames<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || match Walk::inherent_impls(item) {
-            Walk::Entered => syn::visit::visit_item_impl(self, item),
-            Walk::Skipped => {}
-        });
+        Walk::enter(&item.attrs, || self.inherent(item));
     }
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {

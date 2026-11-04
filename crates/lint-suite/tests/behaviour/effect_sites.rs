@@ -44,7 +44,7 @@ laws::table!(
 fn a_ports_module_file_counts_its_effects_without_listing_them() {
     let text = Effects::of(&[Effects::at("crates/x/src/ports/run.rs", "fn f() {\n    std::env::var(\"A\");\n}\n")]);
     assert!(text.contains("crate x: 1 effect sites, 1 in ports, 0 outside ports;"), "{text}");
-    assert!(!text.contains("environment effect"), "{text}");
+    assert_eq!(text.matches("environment effect").count(), 0, "{text}");
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn tests_and_examples_are_not_read() {
         Effects::at("crates/x/tests/run.rs", "fn f() {\n    std::env::var(\"A\");\n}\n"),
         Effects::at("crates/x/examples/e.rs", "fn f() {\n    println!(\"a\");\n}\n"),
     ]);
-    assert!(!text.contains("crate x"), "{text}");
+    assert_eq!(text.matches("crate x").count(), 0, "{text}");
 }
 
 #[test]
@@ -61,5 +61,5 @@ fn the_gate_fails_only_the_effects_outside_ports() {
     let text = EffectsInPorts::report(&Sources::parsed(&[Effects::at("crates/x/src/lib.rs", IN_PORTS)])).to_string();
     assert!(text.contains("lib.rs:7: files effect outside ports: calls std::fs::write"), "{text}");
     assert_eq!(text.matches("effect outside ports").count(), 1, "{text}");
-    assert!(!text.contains("crate x"), "{text}");
+    assert_eq!(text.matches("crate x").count(), 0, "{text}");
 }

@@ -59,7 +59,9 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         )
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
-    let listed_by_the_runner = include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count();
+    let runner = include_str!("../src/cli/mode/lints.rs");
+    let listed_by_the_runner =
+        ["::report(readout.files())", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance =
@@ -117,7 +119,7 @@ fn without_the_report_flag_elegance_reports_stay_off() -> Result<(), Box<dyn Err
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     let run = root.flagged(&[]);
-    assert!(!run.out.contains("functions by complexity"), "{}", run.out);
+    assert_eq!(run.out.matches("functions by complexity").count(), 0, "{}", run.out);
     Ok(())
 }
 
@@ -130,7 +132,8 @@ fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
     let run = root.flagged(&[]);
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains("/src/one.rs:3: "), "{}", run.err);
-    assert!(run.err.contains("2 shipped copies, also at ") && run.err.contains("/src/two.rs:3; "), "{}", run.err);
+    assert!(run.err.contains("2 shipped copies, also at "), "{}", run.err);
+    assert!(run.err.contains("/src/two.rs:3; "), "{}", run.err);
     Ok(())
 }
 
@@ -293,7 +296,7 @@ impl Reported {
     const SITE: &'static str = ".rs:";
 
     fn is_clean(&self) -> bool {
-        self.exit == ExitCode::SUCCESS && self.err == "\n"
+        (self.exit, self.err.as_str()) == (ExitCode::SUCCESS, "\n")
     }
 
     fn headlines(&self) -> usize {
@@ -352,7 +355,7 @@ fn test_modules_in_their_own_files_are_not_read() -> Result<(), Box<dyn Error>> 
     root.write("src/tests.rs", "struct S { on: bool }\n")?;
     let run = root.reported();
     assert_eq!(run.violations(), 1);
-    assert!(!run.err.contains("src/tests.rs"));
+    assert_eq!(run.err.matches("src/tests.rs").count(), 0);
     Ok(())
 }
 

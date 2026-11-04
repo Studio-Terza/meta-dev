@@ -25,16 +25,15 @@ impl Kind {
     }
 
     pub fn declaring(self, owner: Option<Name>) -> ReferencedNames {
-        let (stand_in, typed) = match self {
-            Kind::Type => (None, owner),
-            Kind::StandIn => (owner, None),
-            Kind::Alias => (owner.clone(), owner),
-            Kind::Plain => (None, None),
-        };
-        ReferencedNames {
-            stand_ins: stand_in.into_iter().collect(),
-            types: typed.into_iter().collect(),
-            ..ReferencedNames::default()
+        match self {
+            Kind::Type => ReferencedNames { types: owner.into_iter().collect(), ..ReferencedNames::default() },
+            Kind::StandIn => ReferencedNames { stand_ins: owner.into_iter().collect(), ..ReferencedNames::default() },
+            Kind::Alias => ReferencedNames {
+                stand_ins: owner.iter().cloned().collect(),
+                types: owner.into_iter().collect(),
+                ..ReferencedNames::default()
+            },
+            Kind::Plain => ReferencedNames::default(),
         }
     }
 }

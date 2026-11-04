@@ -20,11 +20,15 @@ impl<'sites> Finding<'sites> {
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} tokens in {} {} copies, also at ", self.size, self.others.len() + 1, self.kind)?;
-        self.others.iter().enumerate().try_for_each(|(index, site)| match index {
-            0 => write!(formatter, "{site}"),
-            _ => write!(formatter, ", {site}"),
-        })
+        let others: Vec<String> = self.others.iter().map(ToString::to_string).collect();
+        write!(
+            formatter,
+            "{} tokens in {} {} copies, also at {}",
+            self.size,
+            self.others.len() + 1,
+            self.kind,
+            others.join(", ")
+        )
     }
 }
 

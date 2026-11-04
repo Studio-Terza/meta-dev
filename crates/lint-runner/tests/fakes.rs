@@ -41,11 +41,10 @@ impl Files for FakeUnlistable<'_> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        if directory == self.unlistable {
-            Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied)))
-        } else {
-            self.memory.entries(directory)
-        }
+        Some(directory).filter(|directory| *directory == self.unlistable).map_or_else(
+            || self.memory.entries(directory),
+            |_| Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied))),
+        )
     }
 
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
@@ -69,7 +68,7 @@ impl FakeLinked<'_> {
     }
 
     fn followed<'path>(&'path self, path: &'path Path) -> &'path Path {
-        if path == self.link { &self.target } else { path }
+        Some(path).filter(|path| *path == self.link).map_or(path, |_| &self.target)
     }
 }
 
@@ -109,7 +108,7 @@ impl Files for FakeLinked<'_> {
     }
 
     fn kind(&self, path: &Path) -> Kind {
-        if path == self.link { Kind::Link } else { self.memory.kind(path) }
+        Some(path).filter(|path| *path == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
     }
 }
 
@@ -155,9 +154,7 @@ impl Files for FakeCounted<'_> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        if directory == self.counted {
-            self.listings.fetch_add(1, Ordering::SeqCst);
-        }
+        let _listed = (directory == self.counted).then(|| self.listings.fetch_add(1, Ordering::SeqCst));
         self.memory.entries(directory)
     }
 

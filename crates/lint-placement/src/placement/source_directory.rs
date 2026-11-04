@@ -14,11 +14,17 @@ impl SourceDirectory {
     #[must_use]
     pub fn place(package: PackageRoot, inside: &Path) -> Placement {
         let role = Role::in_source(inside);
-        let module = match role {
-            Role::LibraryRoot => ModulePath::default(),
-            Role::BinaryRoot if inside == Path::new(Self::MAIN_FILE) => ModulePath::default(),
-            Role::BinaryRoot | Role::Other | Role::Target => ModulePath::of_file(inside),
-        };
+        let module = Self::module(role, inside);
         Placement { target_root: None, package, module, role }
+    }
+
+    fn module(role: Role, inside: &Path) -> ModulePath {
+        match role {
+            Role::LibraryRoot => ModulePath::default(),
+            Role::BinaryRoot => Some(inside)
+                .filter(|inside| *inside == Path::new(Self::MAIN_FILE))
+                .map_or_else(|| ModulePath::of_file(inside), |_| ModulePath::default()),
+            Role::Other | Role::Target => ModulePath::of_file(inside),
+        }
     }
 }

@@ -2,6 +2,7 @@ mod interpolated;
 
 use std::collections::BTreeSet;
 
+use lint_core::Syntax;
 use proc_macro2::{TokenStream, TokenTree};
 
 use interpolated::Interpolated;
@@ -22,18 +23,16 @@ impl PathTokens {
             .zip(tokens.iter().skip(1))
             .zip(tokens.iter().skip(Self::SEPARATOR_LENGTH))
             .enumerate()
-            .filter_map(|(at, called)| match called {
-                ((TokenTree::Ident(_), TokenTree::Punct(call)), TokenTree::Group(_))
-                    if call.as_char() == Self::CALL =>
-                {
-                    Some(at + Self::SEPARATOR_LENGTH)
-                }
-                _ => None,
+            .filter_map(|(at, ((name, call), group))| {
+                Syntax::token_ident(name)
+                    .and(Syntax::punct(call))
+                    .filter(|call| call.as_char() == Self::CALL)
+                    .and(Syntax::group(group))
+                    .map(|_| at + Self::SEPARATOR_LENGTH)
             })
             .collect();
-        let read = tokens.into_iter().enumerate().map(|(at, token)| match token {
-            TokenTree::Group(group) if calls.contains(&at) => Interpolated::of_macro(&group),
-            other => other,
+        let read = tokens.into_iter().enumerate().map(|(at, token)| {
+            calls.get(&at).and(Syntax::group(&token)).map_or_else(|| token.clone(), Interpolated::of_macro)
         });
         PathTokens(read.collect())
     }

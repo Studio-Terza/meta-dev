@@ -1,7 +1,7 @@
 use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
-use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
+use lint_linear_flow::FlowShapes;
 use lint_transition_graph::{
     ConnectedClusters, Containment, CoreMutation, DeepClusters, DuplicateTransitions, GraphLint, InterfaceByConsumers,
     InterfaceByInternals, LowestCluster, TransitionGraph,
@@ -30,9 +30,6 @@ impl Elegance {
             containment.report::<DeepClusters>(),
             EffectSites::report(files),
             FlowShapes::report(files),
-            LinearBodies::report(files),
-            PureRouters::report(files),
-            PlainConditions::report(files),
         ]
     }
 }

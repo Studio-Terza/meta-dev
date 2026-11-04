@@ -32,13 +32,15 @@ impl Mode {
     const QUERY_WORD: &'static str = "query";
 
     pub(crate) fn of_arguments(arguments: &[OsString]) -> Mode {
-        match arguments.split_first() {
-            Some((first, rest)) if first.as_os_str() == Self::QUERY_WORD => Mode::Query(Query::try_from(rest)),
-            _ => arguments
-                .iter()
-                .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
-                .map_or(Mode::Gate, |_| Mode::Report),
-        }
+        arguments.split_first().filter(|(first, _)| first.as_os_str() == Self::QUERY_WORD).map_or_else(
+            || {
+                arguments
+                    .iter()
+                    .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
+                    .map_or(Mode::Gate, |_| Mode::Report)
+            },
+            |(_, rest)| Mode::Query(Query::try_from(rest)),
+        )
     }
 
     pub(crate) fn roots(&self, arguments: &[OsString]) -> Vec<PathBuf> {
@@ -80,7 +82,7 @@ impl Mode {
         match self {
             Mode::Gate => Self::gated(readout, helpers, out),
             Mode::Report => Self::reported(readout.files(), out),
-            Mode::Query(found) => Self::queried(found, readout.files(), out),
+            Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
         }
     }
 
@@ -95,7 +97,7 @@ impl Mode {
         Outcome::Clean
     }
 
-    fn queried(found: &Result<Query, QueryFailure>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+    fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
         found
             .iter()
             .try_for_each(|query| {

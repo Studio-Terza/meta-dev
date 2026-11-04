@@ -13,9 +13,9 @@ impl<'file> TestFile<'file> {
     #[must_use]
     pub fn tested(file: &'file SourceFile) -> Option<TestFile<'file>> {
         let placement = file.placement();
-        (placement.role() == Role::Target
-            && placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS)))
-        .then_some(TestFile(file))
+        (placement.role() == Role::Target).then_some(TestFile(file)).filter(|_| {
+            placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
+        })
     }
 
     #[must_use]

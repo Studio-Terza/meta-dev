@@ -227,19 +227,8 @@ fn starting_a_process_is_flagged() {
 
 #[test]
 fn a_crate_whose_name_ends_in_ports_may_start_processes() {
-    let mut wrong = Vec::new();
-    for (name, flagged) in PACKAGES {
-        let manifest = format!("[package]\nname = \"{name}\"\n");
-        let files: Memory = [(PathBuf::from("/r/Cargo.toml"), Bytes::from(manifest.as_str()))].into_iter().collect();
-        let path = PathBuf::from("/r/src/lib.rs");
-        let placement = Placement::locate(&files, &path);
-        let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
-        let found = parsed.map_or(usize::MAX, |file| ProcessStarters::report(&[file]).violations().len());
-        if found != flagged {
-            wrong.push(format!("{name} flagged {found}"));
-        }
-    }
-    assert_eq!(wrong, Vec::<String>::new());
+    let found: Vec<(&str, usize)> = PACKAGES.iter().map(|(name, _)| (*name, Packages::flagged(name))).collect();
+    assert_eq!(found, PACKAGES.to_vec());
 }
 
 #[test]
@@ -252,4 +241,17 @@ fn every_start_is_counted_including_those_behind_ports() {
         .map(|file| CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len())
         .collect();
     assert_eq!(counts, vec![1, 1, 0]);
+}
+
+struct Packages;
+
+impl Packages {
+    fn flagged(name: &str) -> usize {
+        let manifest = format!("[package]\nname = \"{name}\"\n");
+        let files: Memory = [(PathBuf::from("/r/Cargo.toml"), Bytes::from(manifest.as_str()))].into_iter().collect();
+        let path = PathBuf::from("/r/src/lib.rs");
+        let placement = Placement::locate(&files, &path);
+        let parsed = SourceFile::parse_at(path.clone(), path, placement, SourceText::new(IMPORTED.to_owned()));
+        parsed.map_or(usize::MAX, |file| ProcessStarters::report(&[file]).violations().len())
+    }
 }

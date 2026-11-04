@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, File, ItemConst, Local, Pat};
+use syn::{Block, Expr, File, ItemConst, Local};
 
+use lint_core::Syntax;
 use lint_layout::Name;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -43,10 +44,10 @@ impl<'ast> Visit<'ast> for Bindings<'ast> {
     }
 
     fn visit_local(&mut self, local: &'ast Local) {
-        let bound = match (&local.pat, &local.init, self.scope) {
-            (Pat::Ident(name), Some(init), Scope::Body) => Some((Name::from(&name.ident), &*init.expr)),
-            _ => None,
-        };
+        let bound = Syntax::pat_ident(&local.pat)
+            .zip(local.init.as_ref())
+            .filter(|_| self.scope == Scope::Body)
+            .map(|(name, init)| (Name::from(&name.ident), &*init.expr));
         self.bound.extend(bound);
         visit::visit_local(self, local);
     }

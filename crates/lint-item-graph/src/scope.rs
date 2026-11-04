@@ -21,7 +21,6 @@ pub struct Scope<'file> {
 
 impl<'file> Scope<'file> {
     const LOCAL_ROOTS: [&str; 3] = ["crate", "self", "super"];
-    const SELF_IMPORT: &str = "self";
 
     #[must_use]
     pub fn of_file(file: &'file syn::File) -> Scope<'file> {
@@ -52,11 +51,15 @@ impl<'file> Scope<'file> {
 
     pub(crate) fn kept(&self, token: &TokenTree, root: &TokenTree, name: Name) -> Option<Name> {
         match root {
-            TokenTree::Ident(_) if ptr::eq(root, token) => {
-                self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name))
-            }
-            TokenTree::Ident(ident) => self.reaches(ident).map(|_| name),
+            TokenTree::Ident(ident) => self.kept_ident(token, root, ident, name),
             TokenTree::Group(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
+        }
+    }
+
+    fn kept_ident(&self, token: &TokenTree, root: &TokenTree, ident: &Ident, name: Name) -> Option<Name> {
+        match Some(root).filter(|root| ptr::eq(*root, token)) {
+            Some(_) => self.imports.local_item(&name, &self.local_roots).map(|imports| imports.original(name)),
+            None => self.reaches(ident).map(|_| name),
         }
     }
 
@@ -66,15 +69,17 @@ impl<'file> Scope<'file> {
     }
 
     fn reaches<'token>(&self, ident: &'token Ident) -> Option<&'token Ident> {
-        let imported = || self.imports.holds(ident).and(self.imports.local_item(ident, &self.local_roots));
-        (self.local_roots.iter().any(|root| *root == *ident) || imported().is_some()).then_some(ident)
+        self.local_roots
+            .iter()
+            .find(|root| **root == *ident)
+            .map(|_| ident)
+            .or_else(|| self.imports.holds(ident).and(self.imports.local_item(ident, &self.local_roots)).map(|_| ident))
     }
 
     fn import(&mut self, path: Vec<&'file Ident>, tree: &'file UseTree) {
         match tree {
             UseTree::Path(step) => self.import(path.into_iter().chain([&step.ident]).collect(), &step.tree),
-            UseTree::Name(name) if name.ident == Self::SELF_IMPORT => self.imports.add(Import::itself(path)),
-            UseTree::Name(name) => self.imports.add(Some(Import::renamed(path, &name.ident, &name.ident))),
+            UseTree::Name(name) => self.imports.add(Import::named(path, &name.ident)),
             UseTree::Rename(rename) => self.imports.add(Some(Import::renamed(path, &rename.rename, &rename.ident))),
             UseTree::Group(group) => group.items.iter().for_each(|item| self.import(path.clone(), item)),
             UseTree::Glob(_) => {}

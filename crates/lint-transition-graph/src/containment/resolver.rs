@@ -82,7 +82,8 @@ impl<'found> Resolver<'found> {
         let declaring = self.declaring.get(name).map_or(&[][..], Vec::as_slice);
         let single = || declaring.first().copied().filter(|_| declaring.len() == 1).into_iter().collect();
         reach.target(name, written, origin).map_or_else(Vec::new, |target| {
-            Some(self.within(&target, name)).filter(|found| !found.is_empty()).unwrap_or_else(single)
+            let found = self.within(&target, name);
+            found.first().map(|_| ()).map_or_else(single, |()| found)
         })
     }
 

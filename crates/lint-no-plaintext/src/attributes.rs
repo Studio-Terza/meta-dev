@@ -19,10 +19,11 @@ impl Attributes {
     }
 
     pub fn deserialize_derive(&self) -> Option<Path> {
-        self.metas.iter().flat_map(|meta| Self::nested(meta, Self::DERIVE)).find_map(|derived| match derived {
-            Meta::Path(path) if path.segments.last().is_some_and(|last| last.ident == Self::DESERIALIZE) => Some(path),
-            _ => None,
-        })
+        self.metas
+            .iter()
+            .flat_map(|meta| Self::nested(meta, Self::DERIVE))
+            .filter_map(Self::path_of)
+            .find(|path| path.segments.last().is_some_and(|last| last.ident == Self::DESERIALIZE))
     }
 
     pub fn validation(&self) -> Option<Meta> {
@@ -33,17 +34,24 @@ impl Attributes {
     }
 
     fn flattened(meta: &Meta) -> Vec<Meta> {
-        let inner = Self::nested(meta, Self::CONDITIONAL);
-        if inner.is_empty() { vec![meta.clone()] } else { inner.into_iter().skip(1).collect() }
+        Self::nested(meta, Self::CONDITIONAL)
+            .split_first()
+            .map_or_else(|| vec![meta.clone()], |(_, rest)| rest.to_vec())
     }
 
     fn nested(meta: &Meta, name: Word<'_>) -> Vec<Meta> {
+        meta.require_list()
+            .ok()
+            .filter(|list| list.path.get_ident().is_some_and(|ident| Name::from(ident) == name))
+            .and_then(|list| list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok())
+            .map(|parsed| parsed.into_iter().collect())
+            .unwrap_or_default()
+    }
+
+    fn path_of(meta: Meta) -> Option<Path> {
         match meta {
-            Meta::List(list) if list.path.get_ident().is_some_and(|ident| Name::from(ident) == name) => list
-                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                .map(|parsed| parsed.into_iter().collect())
-                .unwrap_or_default(),
-            _ => Vec::new(),
+            Meta::Path(path) => Some(path),
+            Meta::List(_) | Meta::NameValue(_) => None,
         }
     }
 }

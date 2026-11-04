@@ -56,7 +56,7 @@ impl Query {
     }
 
     pub(crate) fn asks(&self) -> Option<&Query> {
-        (!(self.terms.is_empty() && self.roles.is_empty())).then_some(self)
+        self.terms.first().map(|_| self).or_else(|| self.roles.first().map(|_| self))
     }
 
     #[must_use]

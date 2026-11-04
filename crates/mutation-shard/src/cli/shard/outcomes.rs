@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Bytes, Files, Kind};
+use file_ports::{Bytes, FileFailure, Files, Kind, Text};
 
 use outcome::Outcome;
 use serde::Deserialize;
@@ -24,7 +24,11 @@ impl Outcomes {
 
     pub fn read(files: &impl Files, directory: &Path) -> Result<Outcomes, Failure> {
         let path = directory.join(Self::FILE);
-        match files.read_text(&path) {
+        Self::parsed(files.read_text(&path), path)
+    }
+
+    fn parsed(read: Result<Text, FileFailure>, path: PathBuf) -> Result<Outcomes, Failure> {
+        match read {
             Ok(text) => serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path, source }),
             Err(failure) => Err(Failure::Io { path, source: io::Error::from(failure) }),
         }

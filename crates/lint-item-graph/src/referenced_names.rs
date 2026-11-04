@@ -7,8 +7,9 @@ mod spoken;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use proc_macro2::Ident;
 use quote::ToTokens;
-use syn::{Attribute, Item};
+use syn::{Attribute, Item, ItemImpl};
 
 use lint_core::{SourceFile, Walk};
 use lint_layout::{Name, UsePath};
@@ -82,47 +83,83 @@ impl ReferencedNames {
     }
 
     fn with_item(self, item: &Item, scope: &Scope<'_>) -> ReferencedNames {
-        let (attributes, owner, nested): (&[Attribute], Option<Name>, Cow<'_, [Item]>) = match item {
-            Item::Struct(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Enum(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Trait(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Fn(item) => (&item.attrs, Some(Name::from(&item.sig.ident)), Cow::Borrowed(&[])),
-            Item::Type(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Const(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Static(item) => (&item.attrs, Some(Name::from(&item.ident)), Cow::Borrowed(&[])),
-            Item::Impl(item) => (&item.attrs, None, Cow::Borrowed(&[])),
-            Item::Mod(module) => (
-                &module.attrs,
-                None,
-                module.content.as_ref().map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
-            ),
-            Item::Macro(call) => (&call.attrs, MacroItems::defined_by(call), Cow::Owned(MacroItems::declared_by(call))),
-            _ => (&[], None, Cow::Borrowed(&[])),
-        };
-        match Walk::outside_tests(attributes) {
-            Walk::Skipped => self,
-            Walk::Entered => {
-                let parameters = &Parameters::of_item(item);
-                let own = match item {
-                    Item::Impl(item) => {
-                        let read = Self::named(Name::of_type(&item.self_ty), scope, parameters, item);
-                        ReferencedNames { implemented: read.declared, declared: BTreeMap::new(), ..read }
-                    }
-                    _ => Kind::of_item(item).declaring(owner.clone()).merged(Self::named(
-                        owner,
-                        scope,
-                        parameters,
-                        Spoken::of_item(item),
-                    )),
-                };
-                self.merged(own).merged(Self::of_items(&nested, scope))
-            }
-        }
+        let own = Parts::of_item(item).entered().map(|parts| parts.referenced(scope));
+        self.merged(own.unwrap_or_default())
     }
 
     fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
         owner.filter(|owner| *owner != Self::UNNAMED).map_or_else(ReferencedNames::default, |owner| {
             Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
         })
+    }
+}
+
+#[derive(Debug)]
+struct Parts<'item> {
+    item: &'item Item,
+    attributes: &'item [Attribute],
+    owner: Option<Name>,
+    nested: Cow<'item, [Item]>,
+}
+
+impl<'item> Parts<'item> {
+    pub fn of_item(item: &'item Item) -> Parts<'item> {
+        match item {
+            Item::Struct(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Enum(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Trait(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Fn(found) => Parts::named(item, &found.attrs, &found.sig.ident),
+            Item::Type(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Const(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Static(found) => Parts::named(item, &found.attrs, &found.ident),
+            Item::Impl(found) => Parts { item, attributes: &found.attrs, owner: None, nested: Cow::Borrowed(&[]) },
+            Item::Mod(module) => Parts {
+                item,
+                attributes: &module.attrs,
+                owner: None,
+                nested: module
+                    .content
+                    .as_ref()
+                    .map_or(Cow::Borrowed(&[]), |(_, items)| Cow::Borrowed(items.as_slice())),
+            },
+            Item::Macro(call) => Parts {
+                item,
+                attributes: &call.attrs,
+                owner: MacroItems::defined_by(call),
+                nested: Cow::Owned(MacroItems::declared_by(call)),
+            },
+            _ => Parts { item, attributes: &[], owner: None, nested: Cow::Borrowed(&[]) },
+        }
+    }
+
+    pub fn entered(self) -> Option<Parts<'item>> {
+        (Walk::outside_tests(self.attributes) == Walk::Entered).then_some(self)
+    }
+
+    pub fn referenced(self, scope: &Scope<'_>) -> ReferencedNames {
+        let parameters = Parameters::of_item(self.item);
+        let nested = ReferencedNames::of_items(&self.nested, scope);
+        self.own(scope, &parameters).merged(nested)
+    }
+
+    fn named(item: &'item Item, attributes: &'item [Attribute], ident: &Ident) -> Parts<'item> {
+        Parts { item, attributes, owner: Some(Name::from(ident)), nested: Cow::Borrowed(&[]) }
+    }
+
+    fn own(self, scope: &Scope<'_>, parameters: &Parameters) -> ReferencedNames {
+        match self.item {
+            Item::Impl(found) => Self::implementing(found, scope, parameters),
+            _ => Kind::of_item(self.item).declaring(self.owner.clone()).merged(ReferencedNames::named(
+                self.owner,
+                scope,
+                parameters,
+                Spoken::of_item(self.item),
+            )),
+        }
+    }
+
+    fn implementing(found: &ItemImpl, scope: &Scope<'_>, parameters: &Parameters) -> ReferencedNames {
+        let read = ReferencedNames::named(Name::of_type(&found.self_ty), scope, parameters, found);
+        ReferencedNames { implemented: read.declared, declared: BTreeMap::new(), ..read }
     }
 }

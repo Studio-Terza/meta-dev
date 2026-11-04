@@ -68,21 +68,23 @@ impl fmt::Display for Finding<'_> {
 
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
-        Fix::new(match self {
-            Finding::TupleHoldsVertex => "return the vertex",
-            Finding::FreeTransition { .. } => "make it a method on its source",
-            Finding::EdgeFromNonVertex { .. } => "declare the vertex or move the edge",
-            Finding::HiddenEdge { .. } => "edges are pub",
-            Finding::MutatesVertex { .. } => "transitions consume self",
-            Finding::ViewReturnsVertex { .. } => "take self by value or return a reference",
-            Finding::DuplicateEdge { .. } => "keep one of these methods and remove the others",
-            Finding::CrowdedVertex { .. } => "split the state into states with fewer edges each",
-            Finding::ExposedField { .. } => "struct fields are private",
-            Finding::ForeignMatch { .. } => "dispatch through a trait",
-            Finding::UnreadableGraph => "write each state as a start, state or terminal block of its targets",
-            Finding::UnreachableState { .. } => "add an edge to it from a reachable state, or remove it",
-            Finding::NoTerminalAhead { .. } => "add an edge from it toward a terminal state",
-            Finding::TerminalHasEdges { .. } => "remove its edges, or declare it with state instead of terminal",
-        })
+        match self {
+            Finding::TupleHoldsVertex => Fix::new("return the vertex"),
+            Finding::FreeTransition { .. } => Fix::new("make it a method on its source"),
+            Finding::EdgeFromNonVertex { .. } => Fix::new("declare the vertex or move the edge"),
+            Finding::HiddenEdge { .. } => Fix::new("edges are pub"),
+            Finding::MutatesVertex { .. } => Fix::new("transitions consume self"),
+            Finding::ViewReturnsVertex { .. } => Fix::new("take self by value or return a reference"),
+            Finding::DuplicateEdge { .. } => Fix::new("keep one of these methods and remove the others"),
+            Finding::CrowdedVertex { .. } => Fix::new("split the state into states with fewer edges each"),
+            Finding::ExposedField { .. } => Fix::new("struct fields are private"),
+            Finding::ForeignMatch { .. } => Fix::new("dispatch through a trait"),
+            Finding::UnreadableGraph => Fix::new("write each state as a start, state or terminal block of its targets"),
+            Finding::UnreachableState { .. } => Fix::new("add an edge to it from a reachable state, or remove it"),
+            Finding::NoTerminalAhead { .. } => Fix::new("add an edge from it toward a terminal state"),
+            Finding::TerminalHasEdges { .. } => {
+                Fix::new("remove its edges, or declare it with state instead of terminal")
+            }
+        }
     }
 }

@@ -41,7 +41,11 @@ impl<'name> Summary<'name> {
 
 impl fmt::Display for Summary<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let kinds: Vec<String> = self.outside.iter().map(|(effect, count)| format!("{effect} {count}")).collect();
+        let kinds = self
+            .outside
+            .iter()
+            .map(|(effect, count)| format!("{effect} {count}"))
+            .reduce(|kinds, kind| format!("{kinds}, {kind}"));
         write!(
             formatter,
             "crate {}: {} effect sites, {} in ports, {} outside ports",
@@ -50,7 +54,7 @@ impl fmt::Display for Summary<'_> {
             self.in_ports,
             Count::total(self.outside.values().copied())
         )?;
-        if kinds.is_empty() { Ok(()) } else { write!(formatter, " ({})", kinds.join(", ")) }
+        kinds.map_or(Ok(()), |kinds| write!(formatter, " ({kinds})"))
     }
 }
 

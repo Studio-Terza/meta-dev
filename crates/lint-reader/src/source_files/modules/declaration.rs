@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use syn::ItemMod;
+use syn::{Item, ItemMod};
+
+use lint_core::Walk;
 
 use lint_layout::Name;
 
@@ -29,17 +31,45 @@ impl<'items> Declaration<'items> {
 
     #[must_use]
     pub fn choices(&self, file_directory: &Path) -> Vec<Child> {
-        let own = self.own();
-        match self.explicit(file_directory) {
-            Some(file) => {
+        self.explicit(file_directory).map_or_else(
+            || {
+                let own = self.own();
+                vec![
+                    Child::new(own.with_extension(Self::SOURCE_EXTENSION), own.clone()),
+                    Child::new(own.join(Self::MODULE_FILE), own),
+                ]
+            },
+            |file| {
                 let children = file.parent().map(Path::to_path_buf).unwrap_or_default();
                 vec![Child::new(file, children)]
-            }
-            None => vec![
-                Child::new(own.with_extension(Self::SOURCE_EXTENSION), own.clone()),
-                Child::new(own.join(Self::MODULE_FILE), own),
-            ],
+            },
+        )
+    }
+
+    #[must_use]
+    pub fn within(items: &'items [Item], directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+        items.iter().flat_map(|item| Self::of_item(item, directory, wanted)).collect()
+    }
+
+    fn of_item(item: &'items Item, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+        match item {
+            Item::Mod(module) => Self::of_module(module, directory, wanted),
+            _ => Vec::new(),
         }
+    }
+
+    fn of_module(module: &'items ItemMod, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+        let walk = Walk::outside_tests(&module.attrs);
+        let inline = module
+            .content
+            .iter()
+            .filter(|_| walk == Walk::Entered)
+            .flat_map(|(_, inner)| Self::within(inner, &directory.join(Name::from(&module.ident)), wanted));
+        let declared = Some(module)
+            .filter(|module| module.content.is_none())
+            .filter(|_| walk == wanted)
+            .map(|module| Declaration::new(module, directory.to_path_buf()));
+        inline.chain(declared).collect()
     }
 
     #[must_use]

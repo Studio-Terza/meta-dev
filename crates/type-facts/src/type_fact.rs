@@ -36,7 +36,7 @@ impl<'file> TypeFact<'file> {
     }
 
     pub(crate) fn named_like(&self, other: &TypeFact<'_>) -> Option<&TypeFact<'file>> {
-        (self.krate == other.krate && self.name == other.name).then_some(self)
+        (self.krate == other.krate).then_some(self).filter(|_| self.name == other.name)
     }
 
     #[must_use]

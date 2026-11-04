@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use finding::Finding;
 use syn::visit::Visit;
-use syn::{ImplItem, ItemImpl, ItemMod, Macro, Visibility};
+use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro, Visibility};
 
 use lint_core::Bound;
 use lint_core::Macros;
@@ -58,12 +58,27 @@ struct PrivateFnCounter(BTreeMap<TypeName, Vec<Name>>);
 
 impl PrivateFnCounter {
     fn private_names(item: &ItemImpl) -> impl Iterator<Item = Name> {
-        item.items.iter().filter_map(|member| match member {
-            ImplItem::Fn(function) if matches!(function.vis, Visibility::Inherited) => {
-                Some(Name::from(&function.sig.ident))
-            }
+        item.items
+            .iter()
+            .filter_map(Self::function)
+            .filter(|function| matches!(function.vis, Visibility::Inherited))
+            .map(|function| Name::from(&function.sig.ident))
+    }
+
+    fn function(member: &ImplItem) -> Option<&ImplItemFn> {
+        match member {
+            ImplItem::Fn(function) => Some(function),
             _ => None,
-        })
+        }
+    }
+
+    fn inherent(&mut self, item: &ItemImpl) {
+        match Walk::inherent_impls(item) {
+            Walk::Entered => {
+                self.0.entry(TypeName::from_type(&item.self_ty)).or_default().extend(Self::private_names(item));
+            }
+            Walk::Skipped => {}
+        }
     }
 }
 
@@ -77,11 +92,6 @@ impl<'ast> Visit<'ast> for PrivateFnCounter {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        Walk::enter(&item.attrs, || match Walk::inherent_impls(item) {
-            Walk::Entered => {
-                self.0.entry(TypeName::from_type(&item.self_ty)).or_default().extend(Self::private_names(item));
-            }
-            Walk::Skipped => {}
-        });
+        Walk::enter(&item.attrs, || self.inherent(item));
     }
 }

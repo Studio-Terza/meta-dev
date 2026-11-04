@@ -52,13 +52,26 @@ impl ManualIteration {
     const ACCUMULATORS: [Word<'static>; 4] = words!["push", "extend", "insert", "push_str"];
 
     fn accumulator(block: &Block) -> Option<&ExprMethodCall> {
-        match block.stmts.as_slice() {
-            [Stmt::Expr(Expr::If(branch), _)] if branch.else_branch.is_none() => Self::accumulator(&branch.then_branch),
-            [Stmt::Expr(Expr::MethodCall(call), _)] if matches!(*call.receiver, Expr::Path(_) | Expr::Field(_)) => {
-                Name::from(&call.method).matches::<Whole>(&Self::ACCUMULATORS).map(|_| call)
-            }
+        Some(block.stmts.as_slice())
+            .filter(|statements| statements.len() == 1)
+            .and_then(<[Stmt]>::first)
+            .and_then(Self::accumulating)
+    }
+
+    fn accumulating(statement: &Stmt) -> Option<&ExprMethodCall> {
+        match statement {
+            Stmt::Expr(Expr::If(branch), _) => Some(branch)
+                .filter(|branch| branch.else_branch.is_none())
+                .and_then(|branch| Self::accumulator(&branch.then_branch)),
+            Stmt::Expr(Expr::MethodCall(call), _) => Self::accumulated(call),
             _ => None,
         }
+    }
+
+    fn accumulated(call: &ExprMethodCall) -> Option<&ExprMethodCall> {
+        Some(call)
+            .filter(|call| matches!(*call.receiver, Expr::Path(_) | Expr::Field(_)))
+            .and_then(|call| Name::from(&call.method).matches::<Whole>(&Self::ACCUMULATORS).map(|_| call))
     }
 }
 
@@ -107,21 +120,23 @@ impl<'ast> Visit<'ast> for Iterations<'_> {
     }
 
     fn visit_local(&mut self, local: &'ast Local) {
-        let finding = (matches!(&local.pat, Pat::Ident(binding) if binding.mutability.is_some())
-            && local.init.as_ref().is_some_and(|init| {
+        let finding = Some(local)
+            .filter(|local| matches!(&local.pat, Pat::Ident(binding) if binding.mutability.is_some()))
+            .and_then(|local| local.init.as_ref())
+            .filter(|init| {
                 let mut calls = IteratorCalls::default();
                 calls.visit_expr(&init.expr);
                 calls.0 > 0
-            }))
-        .then(|| {
-            self.violation(
-                local.span(),
-                Message::new(
-                    Problem::new("mutable iterator local"),
-                    Fix::new("drive it with combinators such as format, collect, or fold"),
-                ),
-            )
-        });
+            })
+            .map(|_| {
+                self.violation(
+                    local.span(),
+                    Message::new(
+                        Problem::new("mutable iterator local"),
+                        Fix::new("drive it with combinators such as format, collect, or fold"),
+                    ),
+                )
+            });
         self.violations.extend(finding);
         syn::visit::visit_local(self, local);
     }
