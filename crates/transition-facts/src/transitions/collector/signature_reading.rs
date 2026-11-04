@@ -55,7 +55,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
         let declared = TypeScope::declaring(selfish.nature(), None, &found.generics);
         let scope = found.items.iter().filter_map(Self::output).fold(declared, |scope, output| {
             let resolved = scope.endpoint(output);
-            scope.associating(Self::OUTPUT, resolved)
+            scope.associating(resolved)
         });
         let output = found.items.iter().find_map(Self::output).map(Wrapping::peeled);
         SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins, output }

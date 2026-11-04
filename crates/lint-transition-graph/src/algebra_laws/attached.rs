@@ -5,15 +5,16 @@ use lint_core::Site;
 use lint_layout::Name;
 
 use crate::algebra::Operation;
+use crate::count::Count;
 use crate::system::TypeSystem;
 
 #[derive(Debug, Default)]
-pub(crate) struct Attached<'found> {
-    by_operation: BTreeMap<Site<'found>, Vec<Property>>,
+pub(crate) struct Attached {
+    by_operation: BTreeMap<Count, Vec<Property>>,
 }
 
-impl<'found> Attached<'found> {
-    pub(crate) fn declared<'file: 'found>(system: &TypeSystem<'found, 'file>) -> Attached<'found> {
+impl Attached {
+    pub(crate) fn declared<'found, 'file: 'found>(system: &TypeSystem<'found, 'file>) -> Attached {
         let declarations = system.declarations();
         let by_operation = system
             .algebras()
@@ -22,13 +23,16 @@ impl<'found> Attached<'found> {
                 let site = *AsRef::<Site<'file>>::as_ref(operation);
                 let names = [AsRef::<Name>::as_ref(operation.acting().subject()), operation.function()];
                 let properties = declarations.properties_naming(site.path(), &names);
-                (site, properties.into_iter().filter(|property| *property != Property::Preserves).collect())
+                (
+                    operation.ordinal(),
+                    properties.into_iter().filter(|property| *property != Property::Preserves).collect(),
+                )
             })
             .collect();
         Attached { by_operation }
     }
 
-    pub(crate) fn of_operation<'file: 'found>(&self, operation: &Operation<'found, 'file>) -> &[Property] {
-        self.by_operation.get(AsRef::<Site<'file>>::as_ref(operation)).map_or(&[], Vec::as_slice)
+    pub(crate) fn of_operation(&self, operation: &Operation<'_, '_>) -> &[Property] {
+        self.by_operation.get(&operation.ordinal()).map_or(&[], Vec::as_slice)
     }
 }

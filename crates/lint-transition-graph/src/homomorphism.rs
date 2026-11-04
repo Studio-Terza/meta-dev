@@ -63,9 +63,14 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
         AsRef::<Name>::as_ref(self.edge.transition().function())
     }
 
-    fn declared(&self, declarations: &Declarations<'_>) -> Option<Property> {
+    fn declared(&self, declarations: &Declarations<'_>, algebras: &Algebras<'found, 'file>) -> Option<Property> {
         let names = [AsRef::<Name>::as_ref(&self.source), AsRef::<Name>::as_ref(&self.target), self.function()];
-        declarations.properties_naming(self.edge.site().path(), &names).get(&Property::Preserves).copied()
+        declarations
+            .laws_naming(self.edge.site().path(), &names)
+            .into_iter()
+            .filter(|law| law.kind().property() == Some(Property::Preserves))
+            .find(|law| [&self.source, &self.target].into_iter().all(|node| algebras.operating(law, node).is_some()))
+            .and(Some(Property::Preserves))
     }
 }
 
@@ -94,7 +99,7 @@ impl<'edge, 'found, 'file> CrateMorphisms<'edge, 'found, 'file> {
             edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect();
         let in_scope = Count::new(morphisms.len());
         let (declared, undeclared): (Vec<_>, Vec<_>) =
-            morphisms.into_iter().partition(|morphism| morphism.declared(declarations).is_some());
+            morphisms.into_iter().partition(|morphism| morphism.declared(declarations, algebras).is_some());
         CrateMorphisms { name, in_scope, declared: Count::new(declared.len()), undeclared }
     }
 
