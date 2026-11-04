@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use newtype::Newtype;
 
-use crate::text::Text;
+use crate::document::text::Text;
 use crate::word::Word;
 
 pub(super) mod hidden;

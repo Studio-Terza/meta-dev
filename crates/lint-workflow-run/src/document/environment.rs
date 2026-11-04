@@ -1,9 +1,9 @@
 use saphyr::YamlData;
 
 use crate::document::found::Found;
+use crate::document::lines::Lines;
 use crate::document::node::Node;
 use crate::finding::Finding;
-use crate::lines::Lines;
 
 #[derive(Debug)]
 pub(crate) struct Environment;

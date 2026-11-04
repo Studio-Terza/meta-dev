@@ -2,7 +2,7 @@ use lint_layout::LineNumber;
 use saphyr::{MarkedYaml, Scalar, YamlData};
 
 use crate::document::key::Key;
-use crate::text::Text;
+use crate::document::text::Text;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Node<'node, 'input>(&'node MarkedYaml<'input>);

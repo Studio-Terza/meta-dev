@@ -6,8 +6,7 @@ use std::path::Path;
 use newtype::Newtype;
 
 use crate::characters::Characters;
-use crate::excerpt::Excerpt;
-use crate::lines::Lines;
+use crate::document::lines::Lines;
 use crate::word::Word;
 use expansion::Expansion;
 
@@ -75,12 +74,6 @@ impl<'text> Text<'text> {
 impl From<Word> for Text<'static> {
     fn from(word: Word) -> Text<'static> {
         Text(word.into_inner())
-    }
-}
-
-impl From<Text<'_>> for Excerpt {
-    fn from(text: Text<'_>) -> Excerpt {
-        Excerpt::new(text.0.to_owned())
     }
 }
 

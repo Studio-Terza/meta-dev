@@ -1,4 +1,4 @@
-use crate::text::Text;
+use crate::document::text::Text;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Expansion;

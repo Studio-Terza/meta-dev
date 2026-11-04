@@ -1,8 +1,10 @@
+use newtype::Newtype;
+
 use crate::actions::Actions;
 use crate::document::node::Node;
+use crate::document::text::Text;
 use crate::excerpt::Excerpt;
 use crate::finding::Finding;
-use crate::text::Text;
 
 #[derive(Debug)]
 pub(crate) struct Local;
@@ -15,7 +17,7 @@ impl Local {
         let local = target.after(Text::new(Self::PREFIX))?;
         match actions.resolving(local.path()) {
             Some(_) => None,
-            None => Some(Finding::LocalAction { target: Excerpt::from(target) }),
+            None => Some(Finding::LocalAction { target: Excerpt::new(target.into_inner().to_owned()) }),
         }
     }
 }

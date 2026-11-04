@@ -3,6 +3,7 @@ mod candidate;
 mod kind;
 mod matches;
 mod role;
+mod score;
 mod term;
 mod top;
 

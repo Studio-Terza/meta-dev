@@ -4,7 +4,7 @@ use syn::Signature;
 use type_facts::MethodShape;
 
 use crate::boundary::QueryFailure;
-use crate::score::Score;
+use crate::query::score::Score;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Role(MethodShape);

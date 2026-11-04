@@ -1,9 +1,11 @@
+use newtype::Newtype;
+
 use crate::characters::Characters;
 use crate::document::key::Key;
+use crate::document::lines::Lines;
+use crate::document::text::Text;
 use crate::excerpt::Excerpt;
 use crate::finding::Finding;
-use crate::lines::Lines;
-use crate::text::Text;
 use crate::word::Word;
 
 mod inline;
@@ -53,7 +55,7 @@ impl<'text> Command<'text> {
                 (setting == Key::Shell)
                     .then(|| self.foreign_shell())
                     .flatten()
-                    .map(|word| Finding::Interpreter { name: Excerpt::from(word) })
+                    .map(|word| Finding::Interpreter { name: Excerpt::new(word.into_inner().to_owned()) })
             })
     }
 
