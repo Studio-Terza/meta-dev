@@ -71,6 +71,12 @@ impl Spelled {
     }
 }
 
+impl Listed {
+    pub(super) fn more<Item>(self, items: &[Item]) -> Option<NonZeroUsize> {
+        NonZeroUsize::new(items.len().saturating_sub(self.into_inner()))
+    }
+}
+
 impl Names<'_> {
     const SHOWN: usize = 8;
 }

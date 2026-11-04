@@ -105,7 +105,7 @@ fn roots_are_read_from_the_in_flag() {
 fn malformed_arguments_are_refused_with_the_reason() {
     assert_eq!(Asked::query(&[]), Err(QueryFailure::Empty));
     assert_eq!(Asked::query(&["index", "--top"]), Err(QueryFailure::Unfinished));
-    assert_eq!(Asked::query(&["--users"]), Err(QueryFailure::Unfinished));
+    assert_eq!(Asked::query(&["--path", "Ledger"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["index", "--top", "many"]), Err(QueryFailure::Top("many".to_owned())));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
     assert!(refused.is_err_and(|reason| reason.contains("is not a Rust signature")));
@@ -160,6 +160,36 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "cluster of Line:".to_owned(),
         "  shop::till::Line at crates/shop/src/till.rs:2".to_owned(),
         "    in shop::till; its users lie within crate shop; beside Receipt".to_owned(),
+        "definitions of Absent:".to_owned(),
+        "  no type or trait named Absent".to_owned(),
+    ],
+    &["--cluster", "Line", "--exports", "till"][..] => vec![
+        "cluster of Line:".to_owned(),
+        "  shop::till::Line at crates/shop/src/till.rs:2".to_owned(),
+        "    in shop::till; its users lie within crate shop; beside Receipt".to_owned(),
+        "exports of till:".to_owned(),
+        "  shop::till".to_owned(),
+        "    Line at crates/shop/src/till.rs:2; used by Basket".to_owned(),
+    ],
+    &["--exports", "shop", "--top", "0"][..] => vec![
+        "exports of shop:".to_owned(),
+        "  crate shop".to_owned(),
+        "    and 1 more".to_owned(),
+    ],
+    &["--path", "Ledger", "Cents", "--top", "2"][..] => vec![
+        "use path from Ledger to Cents:".to_owned(),
+        "  bank::Ledger at crates/bank/src/lib.rs:1".to_owned(),
+        "  shop::Basket at crates/shop/src/lib.rs:6".to_owned(),
+        "  and 2 more".to_owned(),
+    ],
+    &["--path", "Ledger", "Cents", "--path", "Cents", "Ledger", "--defined", "Absent"][..] => vec![
+        "use path from Ledger to Cents:".to_owned(),
+        "  bank::Ledger at crates/bank/src/lib.rs:1".to_owned(),
+        "  shop::Basket at crates/shop/src/lib.rs:6".to_owned(),
+        "  shop::till::Line at crates/shop/src/till.rs:2".to_owned(),
+        "  shop::Cents at crates/shop/src/lib.rs:5".to_owned(),
+        "use path from Cents to Ledger:".to_owned(),
+        "  none".to_owned(),
         "definitions of Absent:".to_owned(),
         "  no type or trait named Absent".to_owned(),
     ],
