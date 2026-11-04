@@ -1,0 +1,16 @@
+[package]
+name = "equivalence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+
+[lints]
+workspace = true

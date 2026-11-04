@@ -14,21 +14,16 @@ use neighbours::Neighbours;
 use raw_token::RawToken;
 use slots::Slots;
 
-pub use shape_key::ShapeKey;
+use shape_key::ShapeKey;
 pub(crate) use shape_token::ShapeToken;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Shape {
     key: ShapeKey,
     size: TokenCount,
 }
 
 impl Shape {
-    #[must_use]
-    pub fn key(self) -> ShapeKey {
-        self.key
-    }
-
     #[must_use]
     pub fn size(self) -> TokenCount {
         self.size

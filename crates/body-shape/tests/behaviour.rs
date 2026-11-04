@@ -11,7 +11,7 @@ impl Shapes {
         pair.first()
             .zip(pair.last())
             .filter(|_| pair.len() == 2)
-            .is_some_and(|(left, right)| Self::of(left).key() == Self::of(right).key())
+            .is_some_and(|(left, right)| Self::of(left) == Self::of(right))
     }
 
     fn size(text: &&str) -> String {
