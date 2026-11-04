@@ -3,11 +3,12 @@ pub enum Erased {
     Locals,
     Names,
     Literals,
+    TraitLabels,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Laws {
-    Ignored,
+    WhereDeclared,
     Matched,
 }
 
@@ -15,9 +16,14 @@ impl Laws {
     #[must_use]
     pub fn kept<Law>(self, laws: &[Law]) -> &[Law] {
         match self {
-            Laws::Ignored => &[],
+            Laws::WhereDeclared => &[],
             Laws::Matched => laws,
         }
+    }
+
+    #[must_use]
+    pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Laws> {
+        ours.first().zip(theirs.first()).map_or(Some(self), |_| (ours == theirs).then_some(self))
     }
 }
 

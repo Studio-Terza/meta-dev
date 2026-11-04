@@ -22,7 +22,7 @@ pub(crate) struct Scan<'file> {
 
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
-    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::Ignored);
+    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::WhereDeclared);
 
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Occurrence<'file>> {
         let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));

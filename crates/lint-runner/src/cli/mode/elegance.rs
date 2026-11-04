@@ -4,7 +4,8 @@ use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_transition_graph::{
     AlgebraDuplicates, AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction,
-    GraphLint, Homomorphisms, InterfaceByConsumers, LowestCluster, RepeatedRoutes, TransitionGraph, TypeSystem,
+    GraphLint, Homomorphisms, InterfaceByConsumers, LowestCluster, ParallelStructures, RepeatedRoutes, TransitionGraph,
+    TypeSystem,
 };
 
 #[derive(Debug)]
@@ -24,6 +25,7 @@ impl Elegance {
             AlgebraDuplicates::report_graph(&system),
             Homomorphisms::report_graph(&system),
             RepeatedRoutes::report_graph(&system),
+            ParallelStructures::report_graph(&system),
             <Clustered<ConnectedClusters>>::report_graph(&system),
             <Clustered<InterfaceByConsumers>>::report_graph(&system),
             <Clustered<LowestCluster>>::report_graph(&system),

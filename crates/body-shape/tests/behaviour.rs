@@ -4,9 +4,9 @@ use equivalence::{Equivalence, Erased, Laws};
 struct Shapes;
 
 impl Shapes {
-    const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::Ignored);
-    const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals], Laws::Ignored);
-    const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals], Laws::Ignored);
+    const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::WhereDeclared);
+    const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals], Laws::WhereDeclared);
+    const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals], Laws::WhereDeclared);
 
     fn of(text: &str) -> Shape {
         Self::read(text, Self::BODIES).shape()

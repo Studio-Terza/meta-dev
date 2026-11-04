@@ -35,6 +35,7 @@ mod no_plaintext;
 mod no_test_io;
 mod no_test_only_api;
 mod paired_apis;
+mod parallel_structures;
 mod paths;
 mod placement;
 mod port_batching;

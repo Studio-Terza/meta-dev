@@ -74,6 +74,9 @@ impl fmt::Display for Acting<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Effect;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Form<'found> {
     Operation(Acting<'found>),
@@ -129,6 +132,13 @@ impl<'found> Form<'found> {
     #[must_use]
     pub fn written(&self) -> Option<&Form<'found>> {
         self.sorted(Some(self), None, None)
+    }
+
+    pub(crate) fn ported(&self) -> Option<Effect> {
+        match self {
+            Form::Port => Some(Effect),
+            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Lift | Form::Store => None,
+        }
     }
 
     #[must_use]

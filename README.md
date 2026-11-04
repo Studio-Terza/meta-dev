@@ -121,6 +121,8 @@ and `lowest_cluster` (each type and trait sits in the deepest cluster that holds
 
 The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. Calls are resolved by unique name, and the header states these settings and the share of calls not resolved.
 
+The same run prints `parallel_structures`, report only: types and traits whose shape of fields, variants and trait impls is the same up to a consistent renaming, with their locations. Trait labels are erased and algebra laws must match where both sides declare them; ports are kept separate. The header names these settings and that the renaming is checked one hop deep.
+
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
 compile, and each violation prints as `path:line: problem; fix`. A constant message is a `Message` of a `Problem` and a `Fix`. Limits are constants inside each lint, not
