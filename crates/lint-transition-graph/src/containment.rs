@@ -7,6 +7,7 @@ mod interface;
 mod layered;
 mod link;
 mod member;
+mod outsider;
 mod placed;
 mod resolver;
 mod slice;
@@ -19,12 +20,13 @@ use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
-use type_facts::Facts;
+use type_facts::{Facts, Implementation, Outside};
 
 use cluster::Cluster;
 use declaration::Declaration;
 use link::Link;
 use member::Member;
+use outsider::Outsider;
 use resolver::{Resolver, StandIns};
 use slice::Slice;
 
@@ -55,6 +57,7 @@ pub struct Containment<'found, 'file> {
     users: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     defines: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     implementers: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
+    outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>,
     slices: BTreeMap<Cluster<'found>, Slice<'found>>,
 }
 
@@ -99,11 +102,6 @@ impl<'found, 'file> Containment<'found, 'file> {
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
         let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
-        let defined: BTreeSet<Link<'found>> = placed
-            .iter()
-            .flat_map(|(member, declaration)| declaration.links(*member, resolver))
-            .filter_map(Link::apart)
-            .collect();
         let implemented: BTreeSet<Link<'found>> = placed
             .iter()
             .flat_map(|(member, declaration)| {
@@ -111,6 +109,25 @@ impl<'found, 'file> Containment<'found, 'file> {
             })
             .filter_map(Link::apart)
             .collect();
+        let defined: BTreeSet<Link<'found>> = placed
+            .iter()
+            .flat_map(|(member, declaration)| declaration.held(*member, resolver))
+            .filter_map(Link::apart)
+            .chain(implemented.iter().copied())
+            .collect();
+        let outsiders = facts.outside_implementations().fold(
+            BTreeMap::new(),
+            |mut outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>,
+             outside: Outside<'found, 'file>| {
+                let implementation: &Implementation<'file> = outside.implementation();
+                let site: &Site<'file> = implementation.as_ref();
+                let outsider = Outsider::new(outside.name(), *site);
+                resolver.members(site.path(), implementation.as_ref(), &[], None).into_iter().for_each(|implemented| {
+                    outsiders.entry(implemented).or_default().insert(outsider);
+                });
+                outsiders
+            },
+        );
         let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
         let bodies = named.iter().flat_map(|(file, names)| resolver.bodies(file, names));
         let links: BTreeSet<Link<'found>> =
@@ -126,6 +143,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             users,
             defines: Self::adjacency(defined.into_iter()),
             implementers: Self::adjacency(implemented.into_iter().map(Link::reversed)),
+            outsiders,
         }
     }
 
@@ -149,6 +167,17 @@ impl<'found, 'file> Containment<'found, 'file> {
 
     pub(crate) fn users_within(&self, member: Member<'found>) -> Option<Cluster<'found>> {
         self.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::common)
+    }
+
+    pub(crate) fn outside(
+        &self,
+        member: Member<'found>,
+        toward: Toward,
+    ) -> impl Iterator<Item = Outsider<'found, 'file>> + '_ {
+        Some(toward)
+            .filter(|toward| *toward == Toward::Implementers)
+            .into_iter()
+            .flat_map(move |_| self.outsiders.get(&member).into_iter().flatten().copied())
     }
 
     pub(crate) fn site(&self, member: Member<'found>) -> Option<Site<'file>> {

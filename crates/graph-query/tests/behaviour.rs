@@ -17,7 +17,7 @@ const ITEMS: [Source; 3] = [
     Source::new(
         Located::new("crates/shop/src/lib.rs"),
         Text::new(
-            "mod till;\npub trait Priced {\n    fn price(&self) -> Cents;\n}\npub struct Cents;\npub struct Basket(till::Line);\n",
+            "mod till;\npub trait Priced {\n    fn price(&self) -> Cents;\n}\npub struct Cents;\npub struct Basket(till::Line);\nimpl<T: Clone> Priced for Vec<T> {\n    fn price(&self) -> Cents {}\n}\nimpl Priced for u32 {\n    fn price(&self) -> Cents {}\n}\n",
         ),
     ),
     Source::new(
@@ -161,6 +161,8 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "implementers of Priced:".to_owned(),
         "  shop::Priced at crates/shop/src/lib.rs:2".to_owned(),
         "    Line at crates/shop/src/till.rs:2".to_owned(),
+        "    impl for Vec at crates/shop/src/lib.rs:7".to_owned(),
+        "    impl for u32 at crates/shop/src/lib.rs:10".to_owned(),
     ],
     &["--uses", "Line"][..] => vec![
         "what Line uses:".to_owned(),

@@ -221,7 +221,8 @@ The command blocks nothing and exits non-zero only on malformed arguments.
 is defined, what it uses, what uses it, what implements it, and the module and lowest cluster it sits in with its
 siblings. A name shared by several items is answered once under each full path. The answers come from the containment
 view, so a field, a bound, an impl, a signature or a body each count as a use; only types and traits are indexed, not
-functions. The questions combine with each other and with terms and roles.
+functions. `--implementers` also lists generic impls and impls on types outside the index (`impl<T: Clone> Priced for Vec<T>`,
+`impl Priced for u32`) as `impl for <type>` with their site. The questions combine with each other and with terms and roles.
 
 `--exports` takes a crate or module name (crate names with underscores, such as `graph_query`) and lists the types and
 traits used from outside it, each with its outside users. `--path` takes two names and prints the shortest chain of uses

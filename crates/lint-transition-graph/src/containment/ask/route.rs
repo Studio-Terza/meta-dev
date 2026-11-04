@@ -35,27 +35,28 @@ impl<'view, 'found, 'file> Route<'view, 'found, 'file> {
     }
 
     fn found(&self) -> Vec<Member<'found>> {
-        let frontiers = iter::successors(Some(Frontier::from_starts(self.view.named(self.from))), |frontier| {
-            frontier.widened(self.view)
-        });
-        frontiers
-            .skip(1)
-            .find_map(|frontier| {
-                frontier.layer.iter().find(|member| member.name() == self.to).map(|end| frontier.walked(*end))
-            })
-            .unwrap_or_default()
+        self.view.named(self.from).collect::<Frontier<'found>>().reaching(self.view, self.to)
     }
 }
 
-impl<'found> Frontier<'found> {
-    fn from_starts(starts: impl Iterator<Item = Member<'found>>) -> Frontier<'found> {
-        let layer: BTreeSet<Member<'found>> = starts.collect();
+impl<'found> FromIterator<Member<'found>> for Frontier<'found> {
+    fn from_iter<Starts: IntoIterator<Item = Member<'found>>>(starts: Starts) -> Frontier<'found> {
+        let layer: BTreeSet<Member<'found>> = starts.into_iter().collect();
         Frontier { reached: layer.iter().map(|start| (*start, *start)).collect(), layer }
     }
 }
 
 impl<'found> Frontier<'found> {
-    fn widened(&self, view: &Containment<'found, '_>) -> Option<Frontier<'found>> {
+    fn reaching(self, view: &Containment<'found, '_>, to: &Name) -> Vec<Member<'found>> {
+        self.widened(view)
+            .map_or_else(Vec::new, |frontier| frontier.ended(to).unwrap_or_else(|| frontier.reaching(view, to)))
+    }
+
+    fn ended(&self, to: &Name) -> Option<Vec<Member<'found>>> {
+        self.layer.iter().find(|member| member.name() == to).map(|end| self.walked(*end))
+    }
+
+    fn widened(mut self, view: &Containment<'found, '_>) -> Option<Frontier<'found>> {
         let next: BTreeMap<Member<'found>, Member<'found>> = self
             .layer
             .iter()
@@ -63,8 +64,8 @@ impl<'found> Frontier<'found> {
             .filter(|(used, _)| self.reached.contains_key(used).not())
             .collect();
         let layer: BTreeSet<Member<'found>> = next.keys().copied().collect();
-        let reached = self.reached.iter().map(|(used, user)| (*used, *user)).chain(next).collect();
-        Some(Frontier { reached, layer }).filter(|frontier| frontier.layer.first().is_some())
+        self.reached.extend(next);
+        Some(Frontier { reached: self.reached, layer }).filter(|frontier| frontier.layer.first().is_some())
     }
 
     fn walked(&self, end: Member<'found>) -> Vec<Member<'found>> {
