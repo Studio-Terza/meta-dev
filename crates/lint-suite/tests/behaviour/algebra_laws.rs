@@ -170,3 +170,20 @@ fn two_operations_on_one_line_keep_their_own_laws() {
     );
     assert_eq!(both.matches("declare no law").count(), 0, "{both}");
 }
+
+const TWO_JOINS: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\n";
+
+#[test]
+fn a_law_credits_only_the_operation_its_call_routes_to() {
+    [
+        ("laws::associative!(b_join, any::<A>(), B::join);\n", "x::A: join", "x::B: join"),
+        ("laws::associative!(a_join, any::<A>(), A::join);\n", "x::B: join", "x::A: join"),
+    ]
+    .iter()
+    .map(|(law, unlawed, lawed)| {
+        let text = Declared::lawed(TWO_JOINS, law);
+        let listed = format!("crate x: 1 of 2 algebra operations declare no law; {unlawed}");
+        (text.matches(&listed).count(), text.matches(lawed).count())
+    })
+    .for_each(|counts| assert_eq!(counts, (1, 0)));
+}

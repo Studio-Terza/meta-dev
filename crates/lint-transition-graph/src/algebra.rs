@@ -140,6 +140,10 @@ impl<'found, 'file> Operation<'found, 'file> {
     pub(crate) fn function(&self) -> &Name {
         AsRef::<Name>::as_ref(self.transition.function())
     }
+
+    pub(crate) fn routed_by<'law>(&self, law: &'law Law<'_>) -> Option<&'law Name> {
+        law.routed(AsRef::<Name>::as_ref(self.acting.subject()), self.function())
+    }
 }
 
 impl AsRef<CrateName> for Operation<'_, '_> {
@@ -165,8 +169,8 @@ impl<'found, 'file> Algebra<'found, 'file> {
         &self.operations
     }
 
-    pub(crate) fn operating(&self, law: &Law<'_>, owner: &Name) -> Option<&Operation<'found, 'file>> {
-        self.operations.iter().find(|operation| law.routed(owner, operation.function()).is_some())
+    pub(crate) fn operating(&self, law: &Law<'_>) -> Option<&Operation<'found, 'file>> {
+        self.operations.iter().find(|operation| operation.routed_by(law).is_some())
     }
 
     pub fn twins<'op, 'laws>(
@@ -229,7 +233,7 @@ impl<'found, 'file> Algebras<'found, 'file> {
     }
 
     pub(crate) fn operating(&self, law: &Law<'_>, node: &Node<'found>) -> Option<&Operation<'found, 'file>> {
-        self.of_type(node).and_then(|algebra| algebra.operating(law, AsRef::<Name>::as_ref(node)))
+        self.of_type(node).and_then(|algebra| algebra.operating(law))
     }
 
     pub(crate) fn algebras(&self) -> impl Iterator<Item = &Algebra<'found, 'file>> {

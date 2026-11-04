@@ -3,8 +3,6 @@ mod law;
 mod package;
 mod reader;
 
-use std::collections::BTreeSet;
-
 pub use kind::{Kind, Property};
 pub use law::Law;
 pub use package::Package;
@@ -28,11 +26,6 @@ impl<'file> Laws<'file> {
     #[must_use]
     pub fn naming(&self, package: Package<'_>, names: &[&Name]) -> Vec<&Law<'file>> {
         self.laws.iter().filter_map(|law| law.naming(package, names)).collect()
-    }
-
-    #[must_use]
-    pub fn properties_naming(&self, package: Package<'_>, names: &[&Name]) -> BTreeSet<Property> {
-        self.naming(package, names).into_iter().filter_map(|law| law.kind().property()).collect()
     }
 
     fn read(mut self, file: &'file SourceFile) -> Laws<'file> {
