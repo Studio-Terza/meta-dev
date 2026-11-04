@@ -16,14 +16,15 @@ impl Parallel {
     }
 
     fn lawed(laws: &&'static str) -> usize {
+        Self::with_laws(OPERATIONS, laws).matches("alike under one renaming").count()
+    }
+
+    fn with_laws(source: &'static str, laws: &'static str) -> String {
         let sources = [
-            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(OPERATIONS)),
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(source)),
             Source::new(Located::new("crates/x/tests/t.rs"), Text::new(laws)),
         ];
-        OnGraph::<ParallelStructures>::report(&Sources::parsed(&sources))
-            .to_string()
-            .matches("alike under one renaming")
-            .count()
+        OnGraph::<ParallelStructures>::report(&Sources::parsed(&sources)).to_string()
     }
 }
 
@@ -37,6 +38,18 @@ const OPERATIONS: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, othe
 const SAME_LAWS: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::associative!(b, any::<B>(), B::merge);\n";
 const OTHER_LAWS: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::commutative!(b, any::<B>(), B::merge);\n";
 const ONE_SIDE: &str = "laws::associative!(a, any::<A>(), A::join);\n";
+const SAME_SHAPE_TWICE: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn title(self) -> String {}\n    fn after(self) -> M {}\n}\n";
+const PORTED: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\nmod ports {\n    impl A {\n        fn read(self) -> String {}\n    }\n}\nimpl A {\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\n";
+const WITH_INPUT: &str = "struct A;\nstruct B;\nstruct N;\nimpl A {\n    fn name(self, n: N) -> String {}\n    fn label(self) -> String {}\n}\nimpl B {\n    fn name(self) -> String {}\n    fn label(self) -> String {}\n}\n";
+const THREE_WAYS: &str = "struct A;\nstruct B;\nstruct C;\nstruct K;\nstruct L;\nstruct M;\nstruct N;\nimpl A {\n    fn next(self) -> N {}\n    fn prev(self) -> K {}\n}\nimpl B {\n    fn next(self) -> M {}\n    fn prev(self) -> K {}\n}\nimpl C {\n    fn next(self) -> N {}\n    fn prev(self) -> L {}\n}\n";
+const TWO_OPERATIONS: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn meet(self, other: A) -> A {}\n    fn name(self) -> String {}\n}\nimpl B {\n    fn merge(self, other: B) -> B {}\n    fn unite(self, other: B) -> B {}\n    fn label(self) -> String {}\n}\n";
+const BOTH_MATCH: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::commutative!(b, any::<A>(), A::meet);\nlaws::associative!(c, any::<B>(), B::merge);\nlaws::commutative!(d, any::<B>(), B::unite);\n";
+const SECOND_DIFFERS: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::commutative!(b, any::<A>(), A::meet);\nlaws::associative!(c, any::<B>(), B::merge);\nlaws::associative!(d, any::<B>(), B::unite);\n";
+const THREE_OPERATIONS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn name(self) -> String {}\n}\nimpl B {\n    fn merge(self, other: B) -> B {}\n    fn label(self) -> String {}\n}\nimpl C {\n    fn unite(self, other: C) -> C {}\n    fn title(self) -> String {}\n}\n";
+const FIRST_DIFFERS: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::commutative!(b, any::<B>(), B::merge);\nlaws::commutative!(c, any::<C>(), C::unite);\n";
+const SAME_IMPL_BODIES: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nimpl Show for B {\n    fn show(&self) -> String {\n        self.label()\n    }\n}\n";
+const OTHER_IMPL_BODIES: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nimpl Show for B {\n    fn show(&self) -> String {\n        format!(\"{}\", 1)\n    }\n}\n";
+const ONE_SIDE_FILLS: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\n";
 const THROUGH_A_TRAIT: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Named {\n    fn name(&self) -> String;\n}\nimpl Named for A {\n    fn name(&self) -> String {}\n}\nimpl Named for B {\n    fn name(&self) -> String {}\n}\nimpl A {\n    fn next(self) -> N {}\n}\nimpl B {\n    fn after(self) -> M {}\n}\n";
 
 laws::table!(
@@ -48,7 +61,13 @@ laws::table!(
         EXTRA => 0,
         NOT_ONE_TO_ONE => 0,
         ONE_MOVE => 0,
-        THROUGH_A_TRAIT => 1,
+        THROUGH_A_TRAIT => 0,
+        SAME_IMPL_BODIES => 1,
+        OTHER_IMPL_BODIES => 0,
+        ONE_SIDE_FILLS => 1,
+        SAME_SHAPE_TWICE => 0,
+        PORTED => 0,
+        WITH_INPUT => 0,
     ]
 );
 
@@ -56,7 +75,7 @@ laws::table!(
 fn a_structure_names_its_members_and_the_parameters_of_its_template() {
     let text = Parallel::of(&RENAMED);
     assert!(
-        text.contains("crates/x/src/lib.rs:6: 2 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:6, x::B at crates/x/src/lib.rs:10; one generic over 2 type parameters covers them; write the shared structure once"),
+        text.contains("crates/x/src/lib.rs:1: 2 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:1, x::B at crates/x/src/lib.rs:2; one generic over 2 type parameters covers them; write the shared structure once"),
         "{text}"
     );
 }
@@ -86,3 +105,22 @@ laws::table!(
         "" => 1,
     ]
 );
+
+#[test]
+fn every_pair_of_operations_is_held_to_its_laws_not_only_the_first() {
+    assert_eq!(Parallel::with_laws(TWO_OPERATIONS, BOTH_MATCH).matches("alike under one renaming").count(), 1);
+    assert_eq!(Parallel::with_laws(TWO_OPERATIONS, SECOND_DIFFERS).matches("alike under one renaming").count(), 0);
+}
+
+#[test]
+fn a_first_type_whose_laws_differ_does_not_hide_the_others() {
+    let text = Parallel::with_laws(THREE_OPERATIONS, FIRST_DIFFERS);
+    assert!(text.contains("2 types answer 2 moves alike under one renaming: x::B at crates/x/src/lib.rs:2, x::C at crates/x/src/lib.rs:3"), "{text}");
+}
+
+#[test]
+fn the_parameters_count_every_place_where_any_member_differs() {
+    let text = Parallel::of(&THREE_WAYS);
+    assert!(text.contains("3 types answer 2 moves alike under one renaming"), "{text}");
+    assert!(text.contains("one generic over 3 type parameters"), "{text}");
+}

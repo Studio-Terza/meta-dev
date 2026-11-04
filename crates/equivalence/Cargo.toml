@@ -13,5 +13,8 @@ doctest = false
 lint-core = { path = "../lint-core" }
 newtype = { path = "../newtype" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

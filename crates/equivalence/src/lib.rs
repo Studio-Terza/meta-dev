@@ -1,3 +1,4 @@
+mod cluster;
 mod erased;
 mod group;
 mod groups;
@@ -6,10 +7,10 @@ mod member;
 mod refinement;
 mod renaming;
 
+pub use cluster::Cluster;
 pub use erased::{Equivalence, Erased, Laws};
 pub use group::Group;
 pub use groups::Groups;
 pub use holes::Holes;
 pub use member::{Keyed, Nested};
-pub use refinement::{Agreeing, Colour, Move, Refinement};
-pub use renaming::Renaming;
+pub use refinement::{Colour, Move, Refinement};

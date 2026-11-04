@@ -3,11 +3,9 @@ use std::iter;
 
 use newtype::{Arbitrary, Display, Newtype};
 
+use crate::cluster::{Cluster, Placing};
+use crate::erased::Laws;
 use crate::renaming::Renaming;
-
-pub trait Agreeing {
-    fn agrees<'other>(&self, other: &'other Self) -> Option<&'other Self>;
-}
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Colour(usize);
@@ -15,16 +13,23 @@ pub struct Colour(usize);
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 struct Colours(usize);
 
+impl Colours {
+    fn counted<Node>(colours: &BTreeMap<Node, Colour>) -> Colours {
+        Colours::new(colours.values().collect::<BTreeSet<&Colour>>().len())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Move<Node, Label> {
+pub struct Move<Node, Label, Law> {
     label: Label,
     reached: Option<Node>,
     with: BTreeSet<Node>,
+    laws: Vec<Law>,
 }
 
-impl<Node: Ord + Copy, Label: Ord> Move<Node, Label> {
-    pub fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>) -> Move<Node, Label> {
-        Move { label, reached, with }
+impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
+    pub fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>, laws: Vec<Law>) -> Move<Node, Label, Law> {
+        Move { label, reached, with, laws }
     }
 
     fn seen(&self, colours: &BTreeMap<Node, Colour>) -> Seen<'_, Label> {
@@ -34,24 +39,37 @@ impl<Node: Ord + Copy, Label: Ord> Move<Node, Label> {
             with: self.with.iter().map(|node| colours.get(node).copied().unwrap_or_default()).collect(),
         }
     }
-}
 
-impl<Node: Ord + Copy, Label: Ord + Agreeing> Move<Node, Label> {
     fn renamed(
         &self,
-        ours: &Move<Node, Label>,
+        ours: &Move<Node, Label, Law>,
         renaming: Renaming<Node>,
-        colours: &BTreeMap<Node, Colour>,
+        lens: Lens<'_, Node>,
     ) -> Option<Renaming<Node>> {
-        let mut theirs: Vec<Node> = self.with.iter().copied().collect();
-        let mut mine: Vec<Node> = ours.with.iter().copied().collect();
-        theirs.sort_by_key(|node| colours.get(node).copied());
-        mine.sort_by_key(|node| colours.get(node).copied());
-        theirs
+        let agreed = lens.agreeing(&self.laws, &ours.laws).map(|_| renaming);
+        let labelled = agreed.filter(|_| self.label == ours.label)?;
+        lens.ordered(&self.with)
             .into_iter()
-            .zip(mine)
-            .try_fold(renaming.through(self.reached, ours.reached)?, |renaming, (from, to)| renaming.paired(from, to))
-            .filter(|_| self.label.agrees(&ours.label).is_some())
+            .zip(lens.ordered(&ours.with))
+            .try_fold(labelled.through(self.reached, ours.reached)?, |renaming, (from, to)| renaming.paired(from, to))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Lens<'colours, Node> {
+    colours: &'colours BTreeMap<Node, Colour>,
+    laws: Option<Laws>,
+}
+
+impl<Node: Ord + Copy> Lens<'_, Node> {
+    fn agreeing<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Self> {
+        self.laws.map_or(Some(self), |laws| laws.agree(ours, theirs).map(|_| self))
+    }
+
+    fn ordered(self, nodes: &BTreeSet<Node>) -> Vec<Node> {
+        let mut ordered: Vec<Node> = nodes.iter().copied().collect();
+        ordered.sort_by_key(|node| self.colours.get(node).copied());
+        ordered
     }
 }
 
@@ -59,24 +77,25 @@ impl<Node: Ord + Copy, Label: Ord + Agreeing> Move<Node, Label> {
 struct Seen<'moves, Label> {
     label: &'moves Label,
     reached: Option<Colour>,
-    with: BTreeSet<Colour>,
+    with: Vec<Colour>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Class<'moves, Label> {
     colour: Colour,
-    seen: BTreeSet<Seen<'moves, Label>>,
+    seen: Vec<Seen<'moves, Label>>,
 }
 
 #[derive(Debug)]
-pub struct Refinement<Node, Label> {
-    moves: BTreeMap<Node, BTreeSet<Move<Node, Label>>>,
+pub struct Refinement<Node, Label, Law> {
+    moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>,
+    laws: Option<Laws>,
 }
 
-impl<Node: Ord + Copy, Label: Ord> Refinement<Node, Label> {
+impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
     #[must_use]
-    pub fn new(moves: BTreeMap<Node, BTreeSet<Move<Node, Label>>>) -> Refinement<Node, Label> {
-        Refinement { moves }
+    pub fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Refinement<Node, Label, Law> {
+        Refinement { moves, laws }
     }
 
     #[must_use]
@@ -84,15 +103,75 @@ impl<Node: Ord + Copy, Label: Ord> Refinement<Node, Label> {
         let start: BTreeMap<Node, Colour> = self.moves.keys().map(|node| (*node, Colour::default())).collect();
         iter::successors(Some(start), |colours| {
             let next = self.split(colours);
-            (Self::distinct(&next) != Self::distinct(colours)).then_some(next)
+            (Colours::counted(&next) != Colours::counted(colours)).then_some(next)
         })
         .last()
         .unwrap_or_default()
     }
 
     #[must_use]
-    pub fn moves_of(&self, node: &Node) -> Option<&BTreeSet<Move<Node, Label>>> {
-        self.moves.get(node)
+    pub fn moves_of(&self, node: &Node) -> &[Move<Node, Label, Law>] {
+        self.moves.get(node).map_or(&[], Vec::as_slice)
+    }
+
+    #[must_use]
+    pub fn clustered(
+        &self,
+        colours: &BTreeMap<Node, Colour>,
+        alike: impl Fn(Node, Node) -> Option<Node>,
+    ) -> Vec<Cluster<Node>> {
+        let coloured =
+            colours.iter().fold(BTreeMap::new(), |mut found: BTreeMap<Colour, Vec<Node>>, (node, colour)| {
+                found.entry(*colour).or_default().push(*node);
+                found
+            });
+        coloured
+            .values()
+            .flat_map(|nodes| {
+                nodes.iter().fold(Vec::new(), |clusters, node| self.placed(clusters, *node, colours, &alike))
+            })
+            .filter(|cluster| cluster.members().nth(1).is_some())
+            .collect()
+    }
+
+    fn placed(
+        &self,
+        clusters: Vec<Cluster<Node>>,
+        node: Node,
+        colours: &BTreeMap<Node, Colour>,
+        alike: &impl Fn(Node, Node) -> Option<Node>,
+    ) -> Vec<Cluster<Node>> {
+        clusters
+            .into_iter()
+            .fold(Placing::starting_with(node), |placing, cluster| {
+                placing.offered(cluster, |first, pending| self.renaming(first, pending, colours, alike))
+            })
+            .finished()
+    }
+
+    fn renaming(
+        &self,
+        first: Node,
+        other: Node,
+        colours: &BTreeMap<Node, Colour>,
+        alike: &impl Fn(Node, Node) -> Option<Node>,
+    ) -> Option<Renaming<Node>> {
+        alike(first, other)?;
+        let ours = self.aligned(first, colours);
+        let theirs = self.aligned(other, colours);
+        Some(theirs.len()).filter(|count| *count == ours.len()).and_then(|_| {
+            theirs.iter().zip(&ours).try_fold(Renaming::started(other, first), |renaming, (their, our)| {
+                their.renamed(our, renaming, Lens { colours, laws: self.laws })
+            })
+        })
+    }
+
+    fn aligned(&self, node: Node, colours: &BTreeMap<Node, Colour>) -> Vec<&Move<Node, Label, Law>> {
+        let mut moves: Vec<&Move<Node, Label, Law>> = self.moves_of(&node).iter().collect();
+        moves.sort_by(|left, right| {
+            left.seen(colours).cmp(&right.seen(colours)).then_with(|| left.laws.cmp(&right.laws))
+        });
+        moves
     }
 
     fn split(&self, colours: &BTreeMap<Node, Colour>) -> BTreeMap<Node, Colour> {
@@ -101,7 +180,9 @@ impl<Node: Ord + Copy, Label: Ord> Refinement<Node, Label> {
             .iter()
             .map(|(node, moves)| {
                 let colour = colours.get(node).copied().unwrap_or_default();
-                (*node, Class { colour, seen: moves.iter().map(|found| found.seen(colours)).collect() })
+                let mut seen: Vec<Seen<'_, Label>> = moves.iter().map(|found| found.seen(colours)).collect();
+                seen.sort();
+                (*node, Class { colour, seen })
             })
             .collect();
         let numbered: BTreeMap<&Class<'_, Label>, Colour> = classes
@@ -112,28 +193,5 @@ impl<Node: Ord + Copy, Label: Ord> Refinement<Node, Label> {
             .map(|(index, class)| (class, Colour::new(index)))
             .collect();
         classes.iter().map(|(node, class)| (*node, numbered.get(class).copied().unwrap_or_default())).collect()
-    }
-
-    fn distinct(colours: &BTreeMap<Node, Colour>) -> Colours {
-        Colours::new(colours.values().collect::<BTreeSet<&Colour>>().len())
-    }
-}
-
-impl<Node: Ord + Copy, Label: Ord + Agreeing> Refinement<Node, Label> {
-    #[must_use]
-    pub fn renaming(&self, first: Node, other: Node, colours: &BTreeMap<Node, Colour>) -> Option<Renaming<Node>> {
-        let ours = self.aligned(first, colours);
-        let theirs = self.aligned(other, colours);
-        Some(theirs.len()).filter(|count| *count == ours.len()).and_then(|_| {
-            theirs.iter().zip(&ours).try_fold(Renaming::started(other, first), |renaming, (their, our)| {
-                their.renamed(our, renaming, colours)
-            })
-        })
-    }
-
-    fn aligned(&self, node: Node, colours: &BTreeMap<Node, Colour>) -> Vec<&Move<Node, Label>> {
-        let mut moves: Vec<&Move<Node, Label>> = self.moves.get(&node).into_iter().flatten().collect();
-        moves.sort_by_key(|found| found.seen(colours));
-        moves
     }
 }

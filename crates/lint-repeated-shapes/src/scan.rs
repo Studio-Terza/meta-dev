@@ -6,7 +6,7 @@ use syn::visit::{self, Visit};
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
 use body_shape::Reading;
-use equivalence::{Equivalence, Erased, Laws};
+use equivalence::{Equivalence, Erased};
 use lint_core::{Bound, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
@@ -22,7 +22,7 @@ pub(crate) struct Scan<'file> {
 
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
-    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::WhereDeclared);
+    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
 
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Occurrence<'file>> {
         let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));

@@ -1,12 +1,12 @@
 use body_shape::{Reading, Shape};
-use equivalence::{Equivalence, Erased, Laws};
+use equivalence::{Equivalence, Erased};
 
 struct Shapes;
 
 impl Shapes {
-    const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals], Laws::WhereDeclared);
-    const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals], Laws::WhereDeclared);
-    const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals], Laws::WhereDeclared);
+    const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
+    const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals]);
+    const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals]);
 
     fn of(text: &str) -> Shape {
         Self::read(text, Self::BODIES).shape()

@@ -3,7 +3,6 @@ pub enum Erased {
     Locals,
     Names,
     Literals,
-    TraitLabels,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,20 +22,30 @@ impl Laws {
 
     #[must_use]
     pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Laws> {
-        ours.first().zip(theirs.first()).map_or(Some(self), |_| (ours == theirs).then_some(self))
+        match self {
+            Laws::Matched => (ours == theirs).then_some(self),
+            Laws::WhereDeclared => {
+                ours.first().zip(theirs.first()).map_or(Some(self), |_| (ours == theirs).then_some(self))
+            }
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Equivalence {
     erased: &'static [Erased],
-    laws: Laws,
+    laws: Option<Laws>,
 }
 
 impl Equivalence {
     #[must_use]
-    pub const fn erasing(erased: &'static [Erased], laws: Laws) -> Equivalence {
-        Equivalence { erased, laws }
+    pub const fn erasing(erased: &'static [Erased]) -> Equivalence {
+        Equivalence { erased, laws: None }
+    }
+
+    #[must_use]
+    pub const fn comparing(self, laws: Laws) -> Equivalence {
+        Equivalence { laws: Some(laws), ..self }
     }
 
     #[must_use]
@@ -45,7 +54,12 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub fn laws(&self) -> Laws {
+    pub fn kept<'laws, Law>(&self, laws: &'laws [Law]) -> &'laws [Law] {
+        self.laws.map_or(&[], |compared| compared.kept(laws))
+    }
+
+    #[must_use]
+    pub fn laws(&self) -> Option<Laws> {
         self.laws
     }
 }

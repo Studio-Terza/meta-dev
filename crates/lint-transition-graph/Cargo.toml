@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 body-lifts = { path = "../body-lifts" }
+body-shape = { path = "../body-shape" }
 equivalence = { path = "../equivalence" }
 law-facts = { path = "../law-facts" }
 lint-core = { path = "../lint-core" }
@@ -20,6 +21,9 @@ lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 transition-facts = { path = "../transition-facts" }
 type-facts = { path = "../type-facts" }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
 
 [lints]
 workspace = true

@@ -1,15 +1,14 @@
-use std::collections::BTreeMap;
-
-use crate::holes::Holes;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Renaming<Node> {
+pub(crate) struct Renaming<Node> {
+    from: Node,
     pairs: BTreeMap<Node, Node>,
 }
 
 impl<Node: Ord + Copy> Renaming<Node> {
     pub(crate) fn started(from: Node, to: Node) -> Renaming<Node> {
-        Renaming { pairs: BTreeMap::from([(from, to)]) }
+        Renaming { from, pairs: BTreeMap::from([(from, to)]) }
     }
 
     pub(crate) fn through(self, from: Option<Node>, to: Option<Node>) -> Option<Renaming<Node>> {
@@ -26,9 +25,15 @@ impl<Node: Ord + Copy> Renaming<Node> {
         }
     }
 
-    #[must_use]
-    pub fn holes(&self) -> Holes {
-        Holes::new(self.pairs.iter().filter(|(from, to)| from != to).count())
+    pub(crate) fn tallied(&self, sources: BTreeMap<Node, BTreeSet<Node>>) -> BTreeMap<Node, BTreeSet<Node>> {
+        self.pairs.iter().fold(sources, |mut sources, (from, to)| {
+            sources.entry(*to).or_insert_with(|| BTreeSet::from([*to])).insert(*from);
+            sources
+        })
+    }
+
+    pub(crate) fn source(&self) -> Node {
+        self.from
     }
 
     fn unclaimed(self, to: Node) -> Option<Renaming<Node>> {

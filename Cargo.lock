@@ -118,6 +118,7 @@ dependencies = [
 name = "equivalence"
 version = "0.1.0"
 dependencies = [
+ "laws",
  "lint-core",
  "newtype",
 ]
@@ -991,6 +992,7 @@ name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "body-shape",
  "equivalence",
  "law-facts",
  "lint-core",
@@ -998,6 +1000,9 @@ dependencies = [
  "lint-layout",
  "lint-placement",
  "newtype",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
  "transition-facts",
  "type-facts",
 ]
