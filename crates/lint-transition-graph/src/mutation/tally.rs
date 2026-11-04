@@ -7,7 +7,8 @@ use newtype::Counter;
 use transition_facts::{Ground, Mutation};
 
 use crate::count::Count;
-use crate::edge::{Edge, Role};
+use crate::edge::Edge;
+use crate::form::Form;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Tally {
@@ -23,22 +24,20 @@ impl Tally {
             Some(edge).filter(|edge| *AsRef::<Ground>::as_ref(edge.transition()) == Ground::Core).filter(|edge| {
                 matches!(edge.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
             });
-        Some(edge).filter(|edge| edge.role() == Role::Operation).or(mutating)
+        Some(edge).filter(|edge| edge.form().sorted(None, None, Some(())).is_some()).or(mutating)
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Tally {
         edges.fold(Tally::default(), |tally, edge| {
-            tally.by_role(edge.role(), edge.transition().function().mutation()).fixed(edge.role(), edge.fixed_by())
+            tally.by_form(edge.form(), edge.transition().function().mutation()).fixed(edge.form(), edge.fixed_by())
         })
     }
 
-    fn by_role(self, role: Role, mutation: Mutation) -> Tally {
-        match role {
-            Role::Operation => Tally { operations: self.operations.incremented(), ..self },
-            Role::Written | Role::Lift => self.by_mutation(mutation),
-        }
+    fn by_form(self, form: &Form<'_>, mutation: Mutation) -> Tally {
+        let mutating = self.by_mutation(mutation);
+        form.sorted(mutating, mutating, Tally { operations: self.operations.incremented(), ..self })
     }
 
     fn by_mutation(self, mutation: Mutation) -> Tally {
@@ -50,11 +49,9 @@ impl Tally {
         }
     }
 
-    fn fixed(self, role: Role, fixed_by: Option<&Name>) -> Tally {
-        match role {
-            Role::Operation => self,
-            Role::Written | Role::Lift => fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self }),
-        }
+    fn fixed(self, form: &Form<'_>, fixed_by: Option<&Name>) -> Tally {
+        let fixing = fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self });
+        form.sorted(fixing, fixing, self)
     }
 
     pub(super) fn violation(self, first: Option<Site<'_>>) -> Option<Violation<'_>> {

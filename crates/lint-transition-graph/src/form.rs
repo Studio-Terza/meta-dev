@@ -1,0 +1,132 @@
+mod operators;
+
+use body_lifts::Body;
+use lint_layout::Name;
+use transition_facts::{Ground, Mutation};
+
+use crate::algebra::Totality;
+use crate::count::Count;
+use crate::edge::Edge;
+use crate::end::{End, Node};
+use operators::Operators;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Acting<'found> {
+    subject: Node<'found>,
+    held: Count,
+    parameters: Vec<End<'found>>,
+}
+
+impl<'found> Acting<'found> {
+    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
+        let ends = edge.ends();
+        ends.subject(edge.transition().function().mutation())
+            .map(|subject| Acting::about(subject, ends.takes()))
+            .filter(|acting| acting.grounded().is_some())
+            .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
+    }
+
+    fn grounded(&self) -> Option<Count> {
+        self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
+    }
+
+    fn admitted(&self, fixed_by: Option<&Name>) -> Option<&Acting<'found>> {
+        fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
+    }
+
+    fn about(subject: Node<'found>, takes: &[End<'found>]) -> Acting<'found> {
+        let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
+            takes.iter().copied().partition(|taken| taken.node() == Some(&subject));
+        Acting { subject, held: Count::new(held.len()), parameters }
+    }
+
+    #[must_use]
+    pub fn pure(&self) -> Option<&Acting<'found>> {
+        Some(self).filter(|acting| acting.parameters.is_empty())
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> &Node<'found> {
+        &self.subject
+    }
+
+    #[must_use]
+    pub fn held(&self) -> Count {
+        self.held
+    }
+
+    #[must_use]
+    pub fn parameters(&self) -> &[End<'found>] {
+        &self.parameters
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Form<'found> {
+    Operation(Acting<'found>),
+    Partial(Acting<'found>),
+    Transition,
+    Port,
+    Lift,
+    Store,
+}
+
+impl<'found> Form<'found> {
+    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Form<'found> {
+        let transition = edge.transition();
+        let function = transition.function();
+        let ground = *AsRef::<Ground>::as_ref(transition);
+        Form::lifted(function.body())
+            .or_else(|| Form::stored(ground, function.mutation()))
+            .unwrap_or_else(|| Form::acted(edge, ground))
+    }
+
+    fn lifted(body: Body) -> Option<Form<'found>> {
+        match body {
+            Body::Mapped | Body::Focused | Body::Routed => Some(Form::Lift),
+            Body::Written => None,
+        }
+    }
+
+    fn stored(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
+        Some(ground)
+            .filter(|ground| *ground == Ground::Store)
+            .and(Some(mutation).filter(|mutation| *mutation == Mutation::ThroughSelf))
+            .map(|_| Form::Store)
+    }
+
+    fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Form<'found> {
+        Acting::of_edge(edge).map_or_else(
+            || Form::beyond(ground),
+            |acting| Totality::of_wrapping(edge.transition().function().wrapping()).shaping(acting),
+        )
+    }
+
+    fn beyond(ground: Ground) -> Form<'found> {
+        match ground {
+            Ground::Ports => Form::Port,
+            Ground::Core | Ground::Boundary | Ground::Store => Form::Transition,
+        }
+    }
+
+    pub(crate) fn sorted<Sorted>(&self, written: Sorted, lifted: Sorted, stored: Sorted) -> Sorted {
+        match self {
+            Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Port => written,
+            Form::Lift => lifted,
+            Form::Store => stored,
+        }
+    }
+
+    #[must_use]
+    pub fn written(&self) -> Option<&Form<'found>> {
+        self.sorted(Some(self), None, None)
+    }
+
+    #[must_use]
+    pub fn algebraic(&self) -> Option<&Acting<'found>> {
+        match self {
+            Form::Operation(acting) | Form::Partial(acting) => Some(acting),
+            Form::Transition | Form::Port | Form::Lift | Form::Store => None,
+        }
+    }
+}

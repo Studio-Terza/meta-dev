@@ -1,3 +1,4 @@
+mod algebra;
 mod class;
 mod containment;
 mod count;
@@ -6,6 +7,7 @@ mod crate_transitions;
 mod duplicates;
 mod edge;
 mod end;
+mod form;
 mod graph_lint;
 mod key;
 mod mutation;

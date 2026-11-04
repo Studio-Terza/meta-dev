@@ -12,10 +12,6 @@ impl<'found> Key<'found> {
     pub(crate) fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Key<'found> {
         Key { takes, gives }
     }
-
-    pub(crate) fn algebraic(&self) -> Option<&Key<'found>> {
-        self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
-    }
 }
 
 impl fmt::Display for Key<'_> {
