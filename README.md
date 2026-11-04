@@ -199,6 +199,7 @@ Before writing a new trait, port or store, ask what already exists:
 
     lint query <term>... [--role '<fn signature>']... [--top <n>] [--in <path>]...
                [--defined <name>]... [--uses <name>]... [--users <name>]... [--implementers <name>]... [--cluster <name>]...
+               [--exports <crate|module>]... [--path <from> <to>]...
 
 It reads the shipped code under each `--in` path (the current directory by default) through the same extraction the
 transition graph uses (`type-facts` and `transition-facts`, no second parser) and lists the traits, generic impls, ports
@@ -221,6 +222,11 @@ is defined, what it uses, what uses it, what implements it, and the module and l
 siblings. A name shared by several items is answered once under each full path. The answers come from the containment
 view, so a field, a bound, an impl, a signature or a body each count as a use; only types and traits are indexed, not
 functions. The questions combine with each other and with terms and roles.
+
+`--exports` takes a crate or module name (crate names with underscores, such as `graph_query`) and lists the types and
+traits used from outside it, each with its outside users. `--path` takes two names and prints the shortest chain of uses
+between those types or traits, or `none`; it follows uses between types and traits, not function calls. `--top` caps
+the exports and the path steps shown, as it does the other lists.
 
     $ lint query --users Cents --implementers Priced
     users of Cents:

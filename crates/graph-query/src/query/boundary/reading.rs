@@ -14,6 +14,7 @@ enum Item {
     Users,
     Implementers,
     Cluster,
+    Exports,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,6 +24,8 @@ enum Expecting {
     Role,
     Top,
     Item(Item),
+    From,
+    To(Name),
 }
 
 #[derive(Debug)]
@@ -44,7 +47,7 @@ impl TryFrom<&[OsString]> for Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 8] = [
+    const FLAGS: [(&'static str, Expecting); 10] = [
         ("--in", Expecting::Root),
         ("--role", Expecting::Role),
         ("--top", Expecting::Top),
@@ -53,6 +56,8 @@ impl Expecting {
         ("--users", Expecting::Item(Item::Users)),
         ("--implementers", Expecting::Item(Item::Implementers)),
         ("--cluster", Expecting::Item(Item::Cluster)),
+        ("--exports", Expecting::Item(Item::Exports)),
+        ("--path", Expecting::From),
     ];
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -68,6 +73,7 @@ impl Item {
             Item::Users => Ask::Users(name),
             Item::Implementers => Ask::Implementers(name),
             Item::Cluster => Ask::Cluster(name),
+            Item::Exports => Ask::Exports(name),
         }
     }
 }
@@ -84,6 +90,11 @@ impl Reading {
             Expecting::Item(item) => {
                 Ok(Reading { query: self.query.with_ask(item.ask(Name::from(word))), expecting: Expecting::Word })
             }
+            Expecting::From => Ok(Reading { query: self.query, expecting: Expecting::To(Name::from(word)) }),
+            Expecting::To(from) => Ok(Reading {
+                query: self.query.with_ask(Ask::Path(from, Name::from(word))),
+                expecting: Expecting::Word,
+            }),
         }
     }
 
@@ -97,7 +108,12 @@ impl Reading {
     fn done(self) -> Result<Query, QueryFailure> {
         match self.expecting {
             Expecting::Word => Self::asked(self.query),
-            Expecting::Root | Expecting::Role | Expecting::Top | Expecting::Item(_) => Err(QueryFailure::Unfinished),
+            Expecting::Root
+            | Expecting::Role
+            | Expecting::Top
+            | Expecting::Item(_)
+            | Expecting::From
+            | Expecting::To(_) => Err(QueryFailure::Unfinished),
         }
     }
 

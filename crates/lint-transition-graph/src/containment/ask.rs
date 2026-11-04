@@ -1,17 +1,21 @@
+mod exported;
 mod home;
 mod listing;
 mod named;
 mod neighbours;
+mod route;
 
 use std::fmt;
 
 use lint_layout::Name;
 
 use super::{Containment, Toward};
+use exported::Exported;
 use home::Home;
 pub use listing::Listed;
 use named::Named;
 use neighbours::Neighbours;
+use route::Route;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
@@ -20,6 +24,8 @@ pub enum Ask {
     Users(Name),
     Implementers(Name),
     Cluster(Name),
+    Exports(Name),
+    Path(Name, Name),
 }
 
 #[derive(Debug)]
@@ -48,6 +54,8 @@ impl Ask {
                 write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Implementers, listed))
             }
             Ask::Cluster(name) => write!(formatter, "{}", Home::from(Named::new(view, name))),
+            Ask::Exports(name) => write!(formatter, "{}", Exported::new(view, name, listed)),
+            Ask::Path(from, to) => write!(formatter, "{}", Route::new(view, from, to, listed)),
         }
     }
 }
@@ -60,6 +68,8 @@ impl fmt::Display for Ask {
             Ask::Users(name) => write!(formatter, "users of {name}:"),
             Ask::Implementers(name) => write!(formatter, "implementers of {name}:"),
             Ask::Cluster(name) => write!(formatter, "cluster of {name}:"),
+            Ask::Exports(name) => write!(formatter, "exports of {name}:"),
+            Ask::Path(from, to) => write!(formatter, "use path from {from} to {to}:"),
         }
     }
 }

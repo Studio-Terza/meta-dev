@@ -71,6 +71,12 @@ impl Spelled {
     }
 }
 
+impl Listed {
+    pub(super) fn more<Item>(self, items: &[Item]) -> Option<NonZeroUsize> {
+        NonZeroUsize::new(items.len().saturating_sub(self.into_inner()))
+    }
+}
+
 impl Names<'_> {
     const SHOWN: usize = 8;
 }
@@ -89,8 +95,7 @@ impl fmt::Display for Listing<'_, '_, '_> {
             .iter()
             .take(self.listed.into_inner())
             .try_for_each(|member| writeln!(formatter, "    {}", Placed::new(self.view, *member, Spelled::Name)))?;
-        NonZeroUsize::new(self.members.len().saturating_sub(self.listed.into_inner()))
-            .map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
+        self.listed.more(&self.members).map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
     }
 }
 
