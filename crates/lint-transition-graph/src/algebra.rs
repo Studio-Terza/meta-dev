@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use law_facts::{Law, Property};
+use law_facts::{Law, LawPath, Property};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -141,7 +141,7 @@ impl<'found, 'file> Operation<'found, 'file> {
         AsRef::<Name>::as_ref(self.transition.function())
     }
 
-    pub(crate) fn routed_by<'law>(&self, law: &'law Law<'_>) -> Option<&'law Name> {
+    pub(crate) fn routed_by<'law>(&self, law: &'law Law<'_>) -> Option<&'law LawPath> {
         law.routed(AsRef::<Name>::as_ref(self.acting.subject()), self.function())
     }
 }

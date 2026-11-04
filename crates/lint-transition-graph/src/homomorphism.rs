@@ -25,7 +25,7 @@ impl GraphLint for Homomorphisms {
         let grouped = Edge::by_crate(system.edges().iter());
         Report::new(
             Headline::new(
-                "report only, homomorphisms: a transition edge with one domain input and a different domain output, both with algebra operations, preserves the operations or is listed; declare it with laws::preserves! in a test of the same package, naming the input type, the output type and the edge function; listed per crate with the count of such edges and the undeclared ones with their sites",
+                "report only, homomorphisms: a transition edge with one domain input and a different domain output, both with algebra operations, preserves the operations or is listed; declare it with laws::preserves! in a test of the same package, calling an operation of each type and the edge function by path (Type::function) or in a closure; listed per crate with the count of such edges and the undeclared ones with their sites",
             ),
             grouped
                 .iter()
@@ -64,9 +64,8 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
     }
 
     fn declared(&self, declarations: &Declarations<'_>, algebras: &Algebras<'found, 'file>) -> Option<Property> {
-        let names = [AsRef::<Name>::as_ref(&self.source), AsRef::<Name>::as_ref(&self.target), self.function()];
         declarations
-            .laws_naming(self.edge.site().path(), &names)
+            .routing(self.edge.site().path(), AsRef::<Name>::as_ref(&self.source), self.function())
             .into_iter()
             .filter(|law| law.kind().property() == Some(Property::Preserves))
             .find(|law| [&self.source, &self.target].into_iter().all(|node| algebras.operating(law, node).is_some()))
@@ -125,7 +124,7 @@ impl fmt::Display for CrateMorphisms<'_, '_, '_> {
 impl lint_core::Finding for CrateMorphisms<'_, '_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "declare the edge with laws::preserves! in a test of the same package, naming the input type, the output type and the edge function",
+            "declare the edge with laws::preserves! in a test of the same package, calling an operation of each type and the edge function by path (Type::function) or in a closure",
         )
     }
 }

@@ -67,7 +67,7 @@ const BACK: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) 
 fn an_edge_between_algebraic_types_is_listed_with_its_site_and_the_fix() {
     let text = Mapped::of(&[Mapped::at("crates/x/src/lib.rs", EDGE)]);
     assert!(
-        text.contains("crates/x/src/lib.rs:5: crate x: 1 edges between algebraic types, 0 declare preservation, 1 do not; x::A -> x::B: into_b at crates/x/src/lib.rs:5; declare the edge with laws::preserves! in a test of the same package, naming the input type, the output type and the edge function"),
+        text.contains("crates/x/src/lib.rs:5: crate x: 1 edges between algebraic types, 0 declare preservation, 1 do not; x::A -> x::B: into_b at crates/x/src/lib.rs:5; declare the edge with laws::preserves! in a test of the same package, calling an operation of each type and the edge function by path (Type::function) or in a closure"),
         "{text}"
     );
 }

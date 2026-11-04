@@ -21,11 +21,9 @@ impl Attached {
             .operations()
             .map(|operation| {
                 let site = *AsRef::<Site<'file>>::as_ref(operation);
-                let names = [AsRef::<Name>::as_ref(operation.acting().subject()), operation.function()];
                 let properties: BTreeSet<Property> = declarations
-                    .laws_naming(site.path(), &names)
+                    .routing(site.path(), AsRef::<Name>::as_ref(operation.acting().subject()), operation.function())
                     .into_iter()
-                    .filter(|law| operation.routed_by(law).is_some())
                     .filter_map(|law| law.kind().property())
                     .filter(|property| *property != Property::Preserves)
                     .collect();

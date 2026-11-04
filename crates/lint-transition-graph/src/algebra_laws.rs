@@ -1,14 +1,16 @@
 pub(crate) mod attached;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use law_facts::Unresolved;
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::algebra::Operation;
 use crate::count::Count;
+use crate::declarations::Declarations;
 use crate::end::Node;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
@@ -21,6 +23,7 @@ impl GraphLint for AlgebraLaws {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let algebras = system.algebras();
         let attached = Attached::declared(system);
+        let declarations = system.declarations();
         let by_crate = algebras.operations().fold(
             BTreeMap::new(),
             |mut crates: BTreeMap<&CrateName, Vec<&Operation<'_, 'file>>>, operation| {
@@ -30,11 +33,13 @@ impl GraphLint for AlgebraLaws {
         );
         Report::new(
             Headline::new(
-                "report only, algebra laws: every algebra operation (value inputs and output one type, acted on by any external parameter) and partial operation (Option or Result of the type) declares a law, with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package that names the type and the function; operations a foreign trait fixes are left out unless it is a std::ops operator, and every shipped same-type operation counts whatever its visibility; listed per crate and type",
+                "report only, algebra laws: every algebra operation (value inputs and output one type, acted on by any external parameter) and partial operation (Option or Result of the type) declares a law, with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package that calls the operation as Type::function, Trait::function on the generated type, <Type as Trait>::function, Self::function or a use alias, or in a closure that calls it on its parameters; operations a foreign trait fixes are left out unless it is a std::ops operator, and every shipped same-type operation counts whatever its visibility; listed per crate and type",
             ),
             by_crate
                 .iter()
-                .filter_map(|(name, operations)| CrateLaws::measured(name, operations, &attached).reported())
+                .filter_map(|(name, operations)| {
+                    CrateLaws::measured(name, operations, &attached).unresolved(operations, declarations).reported()
+                })
                 .collect(),
         )
     }
@@ -46,6 +51,7 @@ struct CrateLaws<'op, 'file> {
     first: Option<Site<'file>>,
     algebraic: Count,
     unlawed: BTreeMap<&'op Node<'op>, Vec<&'op Name>>,
+    unresolved: BTreeSet<Unresolved<'op>>,
 }
 
 impl<'op, 'file> CrateLaws<'op, 'file> {
@@ -64,7 +70,20 @@ impl<'op, 'file> CrateLaws<'op, 'file> {
                 types.entry(operation.acting().subject()).or_default().push(operation.function());
                 types
             }),
+            unresolved: BTreeSet::new(),
         }
+    }
+
+    fn unresolved(
+        self,
+        operations: &[&Operation<'_, 'file>],
+        declarations: &'op Declarations<'op>,
+    ) -> CrateLaws<'op, 'file> {
+        let unresolved = operations
+            .iter()
+            .flat_map(|operation| declarations.unresolved(AsRef::<Site<'file>>::as_ref(*operation).path()))
+            .collect();
+        CrateLaws { unresolved, ..self }
     }
 
     fn reported(self) -> Option<Violation<'file>> {
@@ -87,14 +106,15 @@ impl fmt::Display for CrateLaws<'_, '_> {
         )?;
         self.unlawed.iter().try_for_each(|(node, functions)| {
             write!(formatter, "; {node}: {}", functions.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))
-        })
+        })?;
+        self.unresolved.iter().try_for_each(|law| write!(formatter, "; {law}"))
     }
 }
 
 impl lint_core::Finding for CrateLaws<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, naming the type and the function",
+            "declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters",
         )
     }
 }
