@@ -24,8 +24,8 @@ pub(crate) use shape_token::ShapeToken;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Shape {
-    key: ShapeKey,
     size: TokenCount,
+    key: ShapeKey,
 }
 
 impl Shape {

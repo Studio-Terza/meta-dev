@@ -1,6 +1,7 @@
 use std::fmt;
 
 use equivalence::{Equivalence, Erased};
+use lint_layout::Name;
 use newtype::{Arbitrary, Display, Newtype};
 
 use super::ShapeToken;
@@ -30,19 +31,34 @@ impl fmt::Display for Sign {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Spoken {
+    Literal(Spelling),
+    Word(Name),
+}
+
+impl fmt::Display for Spoken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Spoken::Literal(spelling) => write!(formatter, "{spelling}"),
+            Spoken::Word(name) => write!(formatter, "{name}"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spelled {
     sign: Sign,
-    spelling: Spelling,
+    spoken: Spoken,
 }
 
 impl Spelled {
-    pub(crate) fn new(sign: Sign, spelling: Spelling) -> Spelled {
-        Spelled { sign, spelling }
+    pub(crate) fn new(sign: Sign, spoken: Spoken) -> Spelled {
+        Spelled { sign, spoken }
     }
 }
 
 impl fmt::Display for Spelled {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}{}", self.sign, self.spelling)
+        write!(formatter, "{}{}", self.sign, self.spoken)
     }
 }
