@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt;
 use std::iter;
 
@@ -47,6 +48,11 @@ impl<'found> Cluster<'found> {
 
     pub(crate) fn common(self, other: Cluster<'found>) -> Cluster<'found> {
         self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Cluster::WORKSPACE)
+    }
+
+    pub(crate) fn named(self, name: &Name) -> Option<Cluster<'found>> {
+        let own = self.segments.last().or_else(|| self.krate.map(Borrow::borrow));
+        own.filter(|own| *own == name).map(|_| self)
     }
 
     pub(crate) fn krate(&self) -> Option<&'found CrateName> {

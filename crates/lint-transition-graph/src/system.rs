@@ -71,6 +71,11 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             .get_or_init(|| Containment::clustered(self.files, self.extraction.facts(), self.extraction.transitions()))
     }
 
+    #[must_use]
+    pub fn extraction(&self) -> &'found Extraction<'file> {
+        self.extraction
+    }
+
     pub(crate) fn algebras(&self) -> &Algebras<'found, 'file> {
         self.algebras.get_or_init(|| Algebras::of_edges(self.edges.iter()))
     }

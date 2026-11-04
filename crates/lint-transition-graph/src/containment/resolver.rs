@@ -115,7 +115,7 @@ impl<'found> Resolver<'found> {
         let own = self.members(site.path(), placed.name(), &[], None);
         own.into_iter()
             .filter(|member| *member == placed)
-            .flat_map(|_| self.members(site.path(), implementation.as_ref(), &[], None))
+            .flat_map(|_| self.members(site.path(), implementation.as_ref(), implementation.written(), None))
             .collect()
     }
 

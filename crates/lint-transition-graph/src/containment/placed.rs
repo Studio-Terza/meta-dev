@@ -5,7 +5,7 @@ use lint_core::{Fix, Headline, Violation};
 
 use super::cluster::Cluster;
 use super::member::Member;
-use super::{ClusterLint, Containment, Toward};
+use super::{ClusterLint, Containment};
 
 #[derive(Debug)]
 pub struct LowestCluster;
@@ -33,7 +33,7 @@ struct Misplaced<'found> {
 
 impl<'found> Misplaced<'found> {
     fn found(view: &Containment<'found, '_>, member: Member<'found>) -> Option<Misplaced<'found>> {
-        let lowest = view.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::common)?;
+        let lowest = view.users_within(member)?;
         let outside = lowest.holding(member.cluster()).map_or(Some(lowest), |_| None)?;
         Some(Misplaced { member, lowest: outside })
     }

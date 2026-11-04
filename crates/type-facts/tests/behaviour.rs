@@ -69,10 +69,13 @@ fn derives_through_paths_and_other_attributes_are_read_by_their_last_name() {
 fn inherent_methods_are_kept_with_their_returned_type() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
-        "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
+        "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    fn five() -> (a::B) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
     let facts = Facts::of_files(&files);
-    assert_eq!(Described::methods(&facts, Described::only(&facts)), ["one->", "two->Vec", "three->B", "four->"]);
+    assert_eq!(
+        Described::methods(&facts, Described::only(&facts)),
+        ["one->", "two->Vec", "three->B", "four->", "five->B"]
+    );
 }
 
 #[test]
@@ -256,6 +259,31 @@ fn implementers_of_a_trait_are_found_across_crates() {
     let facts = Facts::of_files(&files);
     let found: Vec<String> = facts.implementers(&Name::from("Index")).iter().map(ToString::to_string).collect();
     assert_eq!(found, ["Text", "Files"]);
+}
+
+#[test]
+fn an_impl_keeps_the_written_trait_path_and_the_qualifier_of_its_self_type() {
+    let files = Sources::parsed(&[Described::file(
+        "crates/x/src/lib.rs",
+        "impl std::fmt::Display for shop::Cents {}\nimpl a::b::Trait for &(c::D) {}\nimpl Plain for E {}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let spelled: Vec<(String, Vec<String>, Vec<String>)> = facts
+        .outside_implementations()
+        .map(|outside| {
+            let each = outside.implementation();
+            (
+                outside.name().to_string(),
+                each.written().iter().map(ToString::to_string).collect(),
+                AsRef::<[Name]>::as_ref(each.target_path()).iter().map(ToString::to_string).collect(),
+            )
+        })
+        .collect();
+    let owned = |names: &[&str]| names.iter().map(|each| (*each).to_owned()).collect::<Vec<String>>();
+    assert_eq!(spelled.len(), 3);
+    assert!(spelled.contains(&("Cents".to_owned(), owned(&["std", "fmt"]), owned(&["shop"]))));
+    assert!(spelled.contains(&("D".to_owned(), owned(&["a", "b"]), owned(&["c"]))));
+    assert!(spelled.contains(&("E".to_owned(), owned(&[]), owned(&[]))));
 }
 
 #[test]
