@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use law_facts::Property;
 use lint_core::Site;
@@ -22,11 +22,14 @@ impl Attached {
             .map(|operation| {
                 let site = *AsRef::<Site<'file>>::as_ref(operation);
                 let names = [AsRef::<Name>::as_ref(operation.acting().subject()), operation.function()];
-                let properties = declarations.properties_naming(site.path(), &names);
-                (
-                    operation.ordinal(),
-                    properties.into_iter().filter(|property| *property != Property::Preserves).collect(),
-                )
+                let properties: BTreeSet<Property> = declarations
+                    .laws_naming(site.path(), &names)
+                    .into_iter()
+                    .filter(|law| operation.routed_by(law).is_some())
+                    .filter_map(|law| law.kind().property())
+                    .filter(|property| *property != Property::Preserves)
+                    .collect();
+                (operation.ordinal(), properties.into_iter().collect())
             })
             .collect();
         Attached { by_operation }
