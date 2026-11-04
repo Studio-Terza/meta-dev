@@ -16,6 +16,7 @@ mod homomorphism;
 mod key;
 mod listed;
 mod mutation;
+mod routes;
 mod system;
 mod workspace_types;
 
@@ -32,6 +33,7 @@ pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::{Clustered, GraphLint};
 pub use homomorphism::Homomorphisms;
 pub use mutation::CoreMutation;
+pub use routes::RepeatedRoutes;
 pub use system::{Extraction, TypeSystem};
 
 #[derive(Debug)]

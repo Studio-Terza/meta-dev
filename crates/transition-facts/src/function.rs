@@ -17,6 +17,7 @@ pub struct Function<'file> {
     branching: Branching,
     wrapping: Wrapping,
     takings: Vec<Wrapping>,
+    calls: Vec<Name>,
 }
 
 impl<'file> Function<'file> {
@@ -31,6 +32,7 @@ impl<'file> Function<'file> {
             branching: Branching::new(1),
             wrapping: Wrapping::Plain,
             takings: Vec::new(),
+            calls: Vec::new(),
         }
     }
 
@@ -44,6 +46,11 @@ impl<'file> Function<'file> {
     pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Function<'file> {
         self.wrapping = wrapping;
         self.takings = takings;
+        self
+    }
+
+    pub(crate) fn called(mut self, calls: Vec<Name>) -> Function<'file> {
+        self.calls = calls;
         self
     }
 
@@ -73,6 +80,11 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn body(&self) -> Body {
         self.body
+    }
+
+    #[must_use]
+    pub fn calls(&self) -> &[Name] {
+        &self.calls
     }
 
     #[must_use]
