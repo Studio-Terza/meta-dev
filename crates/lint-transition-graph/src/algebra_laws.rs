@@ -52,7 +52,7 @@ impl<'op, 'file> CrateLaws<'op, 'file> {
     fn measured<'found: 'op>(
         name: &'op CrateName,
         operations: &[&'op Operation<'found, 'file>],
-        attached: &Attached<'found>,
+        attached: &Attached,
     ) -> CrateLaws<'op, 'file> {
         let unlawed: Vec<&&'op Operation<'found, 'file>> =
             operations.iter().filter(|operation| attached.of_operation(operation).is_empty()).collect();

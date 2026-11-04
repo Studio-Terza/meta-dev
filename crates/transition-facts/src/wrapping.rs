@@ -1,5 +1,6 @@
 use syn::{FnArg, GenericArgument, PathArguments, PathSegment, ReturnType, Type};
 
+use crate::associated::Associated;
 use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -20,13 +21,11 @@ impl Wrapping {
         Some(inner).filter(|inner| *inner == Wrapping::Many).unwrap_or(self)
     }
 
-    const ASSOCIATED: Word<'static> = Word::new("Output");
-
     pub(crate) fn returned(output: &ReturnType, associated: Option<Wrapping>) -> Wrapping {
         match output {
             ReturnType::Default => Wrapping::Plain,
             ReturnType::Type(_, returned) => {
-                Self::associating(returned).and(associated).unwrap_or_else(|| Self::peeled(returned))
+                Associated::of_type(returned).and(associated).unwrap_or_else(|| Self::peeled(returned))
             }
         }
     }
@@ -35,17 +34,6 @@ impl Wrapping {
         match input {
             FnArg::Receiver(_) => Wrapping::Plain,
             FnArg::Typed(typed) => Self::peeled(&typed.ty),
-        }
-    }
-
-    fn associating(found: &Type) -> Option<&PathSegment> {
-        match found {
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .filter(|segment| Name::from(&segment.ident).matches::<Whole>(&[Self::ASSOCIATED]).is_some()),
-            _ => None,
         }
     }
 

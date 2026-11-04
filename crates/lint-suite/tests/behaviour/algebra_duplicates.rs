@@ -48,7 +48,7 @@ const ELSEWHERE: &str = "struct B;\nimpl B {\n    fn merge(self, other: B) -> B 
 fn two_lawed_operations_with_one_signature_and_law_are_reported() {
     let text = Twinned::lawed(JOINS, JOIN_LAWS);
     assert!(
-        text.contains("crates/x/src/lib.rs:3: crate x: 2 operations in 1 groups share a signature and laws; x::A (x::A, x::A) -> x::A: join, merge (Associative); keep one operation of each group, or give the others a different signature or a law of their own"),
+        text.contains("crates/x/src/lib.rs:3: crate x: 2 operations in 1 group share a signature and laws; x::A (x::A, x::A) -> x::A: join, merge (Associative); keep one operation of each group, or give the others a different signature or a law of their own"),
         "{text}"
     );
 }
@@ -92,7 +92,7 @@ fn unlawed_operations_are_not_compared() {
 #[test]
 fn the_group_lists_every_member_and_counts_them() {
     let text = Twinned::lawed(THREE, THREE_LAWS);
-    assert!(text.contains("3 operations in 1 groups"), "{text}");
+    assert!(text.contains("3 operations in 1 group"), "{text}");
     assert!(text.contains("join, merge, fuse (Associative)"), "{text}");
 }
 
@@ -110,7 +110,7 @@ fn groups_are_counted_per_crate_and_per_type() {
         Twinned::at("crates/y/src/lib.rs", ELSEWHERE),
         Twinned::at("crates/y/tests/t.rs", "laws::associative!(a, any::<B>(), B::merge);\n"),
     ]);
-    assert!(text.contains("crate x: 2 operations in 1 groups"), "{text}");
+    assert!(text.contains("crate x: 2 operations in 1 group"), "{text}");
     assert_eq!(text.matches("crate y").count(), 0, "{text}");
 }
 
@@ -144,4 +144,32 @@ fn several_groups_of_one_crate_are_counted_together() {
         "{text}"
     );
     assert!(text.contains("; x::B (x::B, x::B) -> x::B: fuse, blend (Commutative)"), "{text}");
+}
+
+const ABSORB: &str =
+    "struct A;\nimpl A {\n    fn absorb(&mut self, other: A) {}\n    fn join(self, other: A) -> A {}\n}\n";
+const ABSORB_LAWS: &str =
+    "laws::associative!(a, any::<A>(), A::absorb);\nlaws::associative!(b, any::<A>(), A::join);\n";
+const ABSORBS: &str =
+    "struct A;\nimpl A {\n    fn absorb(&mut self, other: A) {}\n    fn fold(&mut self, other: A) {}\n}\n";
+const ABSORBS_LAWS: &str =
+    "laws::associative!(a, any::<A>(), A::absorb);\nlaws::associative!(b, any::<A>(), A::fold);\n";
+
+#[test]
+fn an_in_place_and_a_returning_operation_are_not_twins() {
+    let text = Twinned::lawed(ABSORB, ABSORB_LAWS);
+    assert_eq!(text.matches("share a signature").count(), 0, "{text}");
+}
+
+#[test]
+fn two_in_place_operations_are_twins() {
+    let text = Twinned::lawed(ABSORBS, ABSORBS_LAWS);
+    assert!(text.contains("x::A (x::A, x::A) -> x::A: absorb, fold (Associative)"), "{text}");
+}
+
+#[test]
+fn a_crate_with_one_group_says_group() {
+    let text = Twinned::lawed(JOINS, JOIN_LAWS);
+    assert!(text.contains("in 1 group share"), "{text}");
+    assert_eq!(text.matches("1 groups").count(), 0, "{text}");
 }

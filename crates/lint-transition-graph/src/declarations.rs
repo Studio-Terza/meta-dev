@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use law_facts::{Laws, Package, Property};
+use law_facts::{Law, Laws, Package, Property};
 use lint_core::SourceFile;
 use lint_layout::Name;
 
@@ -23,5 +23,9 @@ impl<'found> From<&'found [SourceFile]> for Declarations<'found> {
 impl Declarations<'_> {
     pub(crate) fn properties_naming(&self, path: &Path, names: &[&Name]) -> BTreeSet<Property> {
         self.packages.get(path).map(|package| self.laws.properties_naming(*package, names)).unwrap_or_default()
+    }
+
+    pub(crate) fn laws_naming(&self, path: &Path, names: &[&Name]) -> Vec<&Law<'_>> {
+        self.packages.get(path).map(|package| self.laws.naming(*package, names)).unwrap_or_default()
     }
 }

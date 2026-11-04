@@ -157,3 +157,16 @@ fn a_preserves_law_is_not_a_law_of_the_operation() {
     let text = Declared::lawed(ADD, "laws::preserves!(keeps, any::<A>(), A::add, B::add, A::into_b);\n");
     assert!(text.contains("x::A: add"), "{text}");
 }
+
+const ONE_LINE: &str = "struct A;\nimpl A {\n    fn join(self, other: A) -> A {} fn merge(self, other: A) -> A {}\n}\n";
+
+#[test]
+fn two_operations_on_one_line_keep_their_own_laws() {
+    let text = Declared::lawed(ONE_LINE, "laws::associative!(join_regroups, any::<A>(), A::join);\n");
+    assert!(text.contains("crate x: 1 of 2 algebra operations declare no law; x::A: merge"), "{text}");
+    let both = Declared::lawed(
+        ONE_LINE,
+        "laws::associative!(join_regroups, any::<A>(), A::join);\nlaws::associative!(merge_regroups, any::<A>(), A::merge);\n",
+    );
+    assert_eq!(both.matches("declare no law").count(), 0, "{both}");
+}

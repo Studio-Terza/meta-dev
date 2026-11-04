@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -65,15 +66,48 @@ impl<'op, 'found, 'file> CrateTwins<'op, 'found, 'file> {
     }
 }
 
+struct Groups(usize);
+
+enum Noun {
+    Singular,
+    Plural,
+}
+
+impl Groups {
+    const ONE: usize = 1;
+
+    fn noun(&self) -> Noun {
+        match self.0.cmp(&Groups::ONE) {
+            Ordering::Equal => Noun::Singular,
+            Ordering::Less | Ordering::Greater => Noun::Plural,
+        }
+    }
+}
+
+impl fmt::Display for Noun {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Noun::Singular => write!(formatter, "group"),
+            Noun::Plural => write!(formatter, "groups"),
+        }
+    }
+}
+
+impl fmt::Display for Groups {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", Count::new(self.0), self.noun())
+    }
+}
+
 impl fmt::Display for CrateTwins<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let groups = Listed::<_, ';'>::joined(self.groups.iter());
         write!(
             formatter,
-            "crate {}: {} operations in {} groups share a signature and laws; {groups}",
+            "crate {}: {} operations in {} share a signature and laws; {groups}",
             self.name,
             self.members,
-            Count::new(self.groups.len()),
+            Groups(self.groups.len()),
         )
     }
 }

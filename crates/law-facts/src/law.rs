@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lint_layout::Name;
 
@@ -10,11 +10,17 @@ pub struct Law<'file> {
     package: Package<'file>,
     kind: Kind,
     mentions: BTreeSet<Name>,
+    routes: BTreeMap<Name, BTreeSet<Name>>,
 }
 
 impl<'file> Law<'file> {
-    pub(crate) fn new(package: Package<'file>, kind: Kind, mentions: BTreeSet<Name>) -> Law<'file> {
-        Law { package, kind, mentions }
+    pub(crate) fn new(
+        package: Package<'file>,
+        kind: Kind,
+        mentions: BTreeSet<Name>,
+        routes: BTreeMap<Name, BTreeSet<Name>>,
+    ) -> Law<'file> {
+        Law { package, kind, mentions, routes }
     }
 
     #[must_use]
@@ -27,6 +33,11 @@ impl<'file> Law<'file> {
     #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
+    }
+
+    #[must_use]
+    pub fn routed(&self, owner: &Name, member: &Name) -> Option<&Name> {
+        self.routes.get(owner).and_then(|members| members.get(member))
     }
 
     #[must_use]

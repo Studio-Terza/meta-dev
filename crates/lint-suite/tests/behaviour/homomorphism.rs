@@ -40,10 +40,19 @@ const PLAIN_LAW: &str = "laws::law!(keeps, any::<A>(), value, { A::join(B::join(
 const FOREIGN_MACRO: &str = "other::preserves!(keeps, any::<A>(), A::join, B::join, A::into_b);\n";
 const TWO_INPUTS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn combine(&self, other: &C) -> B {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\nimpl C {\n    fn join(self, other: C) -> C {}\n}\n";
 const SAME_INPUT_TWICE: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn pair(&self, other: &A) -> B {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\n";
-const PRIMITIVE_INPUT: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn from_count(count: u8) -> B {}
+const PRIMITIVE_INPUT: &str = "struct A;
+struct B;
+impl A {
+    fn join(self, other: A) -> A {}
+}
+impl B {
+    fn join(self, other: B) -> B {}
+    fn from_count(count: u8) -> B {}
 }
 impl A {
-    fn scaled(&self, count: u8) -> B {}\n}\n";
+    fn scaled(&self, count: u8) -> B {}
+}
+";
 const PRIMITIVE_OUTPUT: &str =
     "struct A;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn count(&self) -> u8 {}\n}\n";
 const SAME_TYPE: &str = "struct A;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn all(&self) -> Vec<A> {}\n}\n";
@@ -167,4 +176,24 @@ fn a_primitive_beside_the_one_domain_input_does_not_change_the_scope() {
 fn a_partial_edge_is_listed() {
     let text = Mapped::of(&[Mapped::at("crates/x/src/lib.rs", PARTIAL_EDGE)]);
     assert!(text.contains("x::A -> x::B: try_b"), "{text}");
+}
+
+const UNRELATED: &str = "laws::preserves!(keeps, any::<A>(), A::zzz, B::yyy, A::into_b);\n";
+const SOURCE_ONLY: &str = "laws::preserves!(keeps, any::<A>(), A::join, B::yyy, A::into_b);\n";
+const TARGET_ONLY: &str = "laws::preserves!(keeps, any::<A>(), A::zzz, B::join, A::into_b);\n";
+const OTHER_OPS: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn meet(self, other: A) -> A {}\n    fn into_b(&self) -> B {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn meet(self, other: B) -> B {}\n}\n";
+const MEETING: &str = "laws::preserves!(keeps, any::<A>(), A::meet, B::meet, A::into_b);\n";
+
+#[test]
+fn a_preserves_law_naming_unrelated_operations_does_not_clear_the_edge() {
+    assert!(
+        [UNRELATED, SOURCE_ONLY, TARGET_ONLY]
+            .iter()
+            .all(|law| Mapped::lawed(EDGE, law).contains("1 do not; x::A -> x::B: into_b"))
+    );
+}
+
+#[test]
+fn a_preserves_law_naming_any_operation_of_each_type_clears_the_edge() {
+    assert_eq!(Mapped::lawed(OTHER_OPS, MEETING).matches("edges between algebraic types").count(), 0);
 }
