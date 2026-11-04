@@ -6,7 +6,7 @@ use syn::visit::{self, Visit};
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
 use body_shape::Reading;
-use equivalence::{Equivalence, Erased};
+use equivalence::Equivalence;
 use lint_core::{Bound, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
@@ -17,26 +17,26 @@ use crate::occurrence::Occurrence;
 pub(crate) struct Scan<'file> {
     file: &'file SourceFile,
     kind: Kind,
+    equivalence: Equivalence,
     occurrences: Vec<Occurrence<'file>>,
 }
 
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
-    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
 
-    pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Occurrence<'file>> {
-        let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));
-        Self::scanned(file, Kind::of_role(file.placement().role())).into_iter().chain(tests).collect()
+    pub(crate) fn of_file(file: &'file SourceFile, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests, equivalence));
+        Self::scanned(file, Kind::of_role(file.placement().role()), equivalence).into_iter().chain(tests).collect()
     }
 
-    fn scanned(file: &'file SourceFile, kind: Kind) -> Vec<Occurrence<'file>> {
-        let mut scan = Scan { file, kind, occurrences: Vec::new() };
+    fn scanned(file: &'file SourceFile, kind: Kind, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let mut scan = Scan { file, kind, equivalence, occurrences: Vec::new() };
         scan.visit_file(file.syntax());
         scan.occurrences
     }
 
     fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
-        let reading = Reading::erasing(node.to_token_stream(), Self::EQUIVALENCE);
+        let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
         let span = node.span();
         let site = Site::new(self.file.path(), LineNumber::from(span));
         let tokens = reading.shape().size();

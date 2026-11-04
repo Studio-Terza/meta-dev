@@ -1,7 +1,7 @@
 use std::fmt;
 
 use body_shape::TokenCount;
-use equivalence::{Group, Holes};
+use equivalence::{Equivalence, Erased, Group, Holes};
 use lint_core::{Fix, Site, Violation};
 
 use crate::kind::Kind;
@@ -10,20 +10,23 @@ use crate::occurrence::Occurrence;
 pub(crate) struct Finding<'sites> {
     size: TokenCount,
     kind: Kind,
-    holes: Holes,
+    template: Template,
     others: &'sites [&'sites Site<'sites>],
 }
 
 impl Finding<'_> {
-    pub(crate) fn violation<'file>(group: &Group<Occurrence<'file>>) -> Option<Violation<'file>> {
+    pub(crate) fn violation<'file>(
+        group: &Group<Occurrence<'file>>,
+        equivalence: Equivalence,
+    ) -> Option<Violation<'file>> {
         let sites = group.sites();
         let kind = group.members().iter().map(Occurrence::kind).reduce(Kind::joined).unwrap_or(Kind::Mixed);
         let spelled: Vec<&[_]> = group.members().iter().map(|member| member.literals().as_ref()).collect();
-        let holes = Holes::between(&spelled);
+        let template = Template { holes: Holes::between(&spelled), naming: Naming::erased_by(equivalence) };
         sites.first().map(|site| {
             Violation::new(
                 **site,
-                Finding { size: group.key().size(), kind, holes, others: sites.get(1..).unwrap_or_default() },
+                Finding { size: group.key().size(), kind, template, others: sites.get(1..).unwrap_or_default() },
             )
         })
     }
@@ -39,7 +42,7 @@ impl fmt::Display for Finding<'_> {
             self.others.len() + 1,
             self.kind,
             others.join(", "),
-            Template(self.holes)
+            self.template
         )
     }
 }
@@ -50,13 +53,38 @@ impl lint_core::Finding for Finding<'_> {
     }
 }
 
-struct Template(Holes);
+#[derive(Clone, Copy, Debug)]
+enum Naming {
+    Local,
+    Every,
+}
+
+impl Naming {
+    fn erased_by(equivalence: Equivalence) -> Naming {
+        equivalence.erases(Erased::Names).map_or(Naming::Local, |_| Naming::Every)
+    }
+}
+
+impl fmt::Display for Naming {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Naming::Local => write!(formatter, "local names"),
+            Naming::Every => write!(formatter, "names"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Template {
+    holes: Holes,
+    naming: Naming,
+}
 
 impl fmt::Display for Template {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.none() {
-            Some(_) => write!(formatter, "identical up to local names"),
-            None => write!(formatter, "differing literals: {}", self.0),
+        match self.holes.none() {
+            Some(_) => write!(formatter, "identical up to {}", self.naming),
+            None => write!(formatter, "differing literals: {}", self.holes),
         }
     }
 }

@@ -2,6 +2,7 @@ use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
+use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
     AlgebraDuplicates, AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction,
     GraphLint, Homomorphisms, InterfaceByConsumers, LowestCluster, ParallelStructures, RepeatedRoutes, TransitionGraph,
@@ -31,6 +32,7 @@ impl Elegance {
             <Clustered<LowestCluster>>::report_graph(&system),
             EffectSites::report(files),
             FlowShapes::report(files),
+            NormalisedShapes::report(files),
         ]
     }
 }
