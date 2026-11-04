@@ -1,5 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
+use law_facts::Property;
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -8,6 +10,7 @@ use transition_facts::{Transition, Wrapping};
 use crate::edge::Edge;
 use crate::end::Node;
 use crate::form::{Acting, Form};
+use crate::listed::Listed;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Totality {
@@ -29,6 +32,63 @@ impl Totality {
             Totality::Partial => Form::Partial(acting),
             Totality::Total => Form::Operation(acting),
         }
+    }
+}
+
+impl fmt::Display for Totality {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Totality::Total => Ok(()),
+            Totality::Partial => write!(formatter, "partial "),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Signature<'op, 'found> {
+    totality: Totality,
+    acting: &'op Acting<'found>,
+}
+
+impl fmt::Display for Signature<'_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} -> {}{}", self.acting, self.totality, self.acting.subject())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Twins<'op, 'found, 'file> {
+    subject: Node<'found>,
+    signature: Signature<'op, 'found>,
+    laws: BTreeSet<Property>,
+    members: Vec<&'op Operation<'found, 'file>>,
+}
+
+struct Named<'law>(&'law Property);
+
+impl fmt::Display for Named<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{:?}", self.0)
+    }
+}
+
+impl fmt::Display for Twins<'_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let functions = Listed::<_, ','>::joined(self.members.iter().map(|member| member.function()));
+        let laws = Listed::<_, ','>::joined(self.laws.iter().map(Named));
+        write!(formatter, "{} {}: {functions} ({laws})", self.subject, self.signature)
+    }
+}
+
+impl<'op, 'found, 'file> Twins<'op, 'found, 'file> {
+    #[must_use]
+    pub fn subject(&self) -> &Node<'found> {
+        &self.subject
+    }
+
+    #[must_use]
+    pub fn members(&self) -> &[&'op Operation<'found, 'file>] {
+        &self.members
     }
 }
 
@@ -54,6 +114,11 @@ impl<'found, 'file> Operation<'found, 'file> {
     #[must_use]
     pub fn partial(&self) -> Totality {
         self.partial
+    }
+
+    #[must_use]
+    pub fn signature(&self) -> Signature<'_, 'found> {
+        Signature { totality: self.partial, acting: &self.acting }
     }
 
     pub(crate) fn acting(&self) -> &Acting<'found> {
@@ -87,6 +152,33 @@ impl<'found, 'file> Algebra<'found, 'file> {
     pub fn operations(&self) -> &[Operation<'found, 'file>] {
         &self.operations
     }
+
+    pub fn twins<'op, 'laws>(
+        &'op self,
+        laws: impl Fn(&Operation<'found, 'file>) -> &'laws [Property],
+    ) -> Vec<Twins<'op, 'found, 'file>> {
+        let grouped = self.operations.iter().fold(
+            BTreeMap::new(),
+            |mut groups: BTreeMap<(Signature<'op, 'found>, BTreeSet<Property>), Vec<&'op Operation<'found, 'file>>>,
+             operation| {
+                let held: BTreeSet<Property> = laws(operation).iter().copied().collect();
+                Some(held).filter(|held| held.first().is_some()).into_iter().for_each(|held| {
+                    groups.entry((operation.signature(), held)).or_default().push(operation);
+                });
+                groups
+            },
+        );
+        grouped
+            .into_iter()
+            .filter(|(_, members)| members.len() > 1)
+            .map(|((signature, laws), members)| Twins {
+                subject: *signature.acting.subject(),
+                signature,
+                laws,
+                members,
+            })
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -113,6 +205,10 @@ impl<'found, 'file> Algebras<'found, 'file> {
     #[must_use]
     pub fn of_type(&self, node: &Node<'found>) -> Option<&Algebra<'found, 'file>> {
         self.by_type.get(node)
+    }
+
+    pub(crate) fn algebras(&self) -> impl Iterator<Item = &Algebra<'found, 'file>> {
+        self.by_type.values()
     }
 
     pub(crate) fn operations(&self) -> impl Iterator<Item = &Operation<'found, 'file>> {

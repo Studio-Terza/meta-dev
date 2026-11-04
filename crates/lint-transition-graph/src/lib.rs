@@ -1,4 +1,5 @@
 mod algebra;
+mod algebra_duplicates;
 mod algebra_laws;
 mod class;
 mod containment;
@@ -11,6 +12,7 @@ mod end;
 mod form;
 mod graph_lint;
 mod key;
+mod listed;
 mod mutation;
 mod system;
 mod workspace_types;
@@ -21,6 +23,7 @@ use coverage::Coverage;
 use crate_transitions::CrateTransitions;
 use edge::Edge;
 
+pub use algebra_duplicates::AlgebraDuplicates;
 pub use algebra_laws::AlgebraLaws;
 pub use containment::{AcyclicQuotients, ConnectedClusters, InterfaceByConsumers, LowestCluster};
 pub use duplicates::{DuplicateTransitions, OneEdge};
