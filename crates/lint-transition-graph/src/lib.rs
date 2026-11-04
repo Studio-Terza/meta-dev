@@ -19,8 +19,7 @@ use crate_transitions::CrateTransitions;
 use edge::Edge;
 
 pub use containment::{
-    AcyclicQuotients, ConnectedClusters, Containment, DeepClusters, InterfaceByConsumers, InterfaceByInternals,
-    LowestCluster,
+    AcyclicQuotients, ConnectedClusters, DeepClusters, InterfaceByConsumers, InterfaceByInternals, LowestCluster,
 };
 pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::{Clustered, GraphLint, OnGraph};

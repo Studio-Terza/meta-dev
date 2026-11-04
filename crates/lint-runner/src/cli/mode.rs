@@ -97,10 +97,12 @@ impl Mode {
     }
 
     fn queried(found: Option<&Query>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        let extraction = Extraction::of_files(files);
         found
             .iter()
-            .try_for_each(|query| write!(out, "{}", query.matches(extraction.facts(), extraction.transitions())))
+            .try_for_each(|query| {
+                let extraction = Extraction::from(files);
+                write!(out, "{}", query.matches(extraction.facts(), extraction.transitions()))
+            })
             .ok();
         Outcome::Clean
     }

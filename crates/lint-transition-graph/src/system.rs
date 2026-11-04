@@ -1,10 +1,9 @@
-use lint_core::{Report, SourceFile};
+use lint_core::SourceFile;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
 use crate::containment::Containment;
 use crate::edge::Edge;
-use crate::graph_lint::GraphLint;
 use crate::workspace_types::WorkspaceTypes;
 
 #[derive(Debug)]
@@ -13,12 +12,13 @@ pub struct Extraction<'file> {
     transitions: Transitions<'file>,
 }
 
-impl<'file> Extraction<'file> {
-    #[must_use]
-    pub fn of_files(files: &'file [SourceFile]) -> Extraction<'file> {
+impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
+    fn from(files: &'file [SourceFile]) -> Extraction<'file> {
         Extraction { facts: Facts::of_files(files), transitions: Transitions::of_files(files) }
     }
+}
 
+impl<'file> Extraction<'file> {
     #[must_use]
     pub fn facts(&self) -> &Facts<'file> {
         &self.facts
@@ -40,7 +40,7 @@ pub struct TypeSystem<'found, 'file> {
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
     #[must_use]
-    pub fn of(files: &'found [SourceFile], extraction: &'found Extraction<'file>) -> TypeSystem<'found, 'file> {
+    pub fn built_from(files: &'found [SourceFile], extraction: &'found Extraction<'file>) -> TypeSystem<'found, 'file> {
         let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
         TypeSystem {
@@ -49,11 +49,6 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             containment: Containment::clustered(files, extraction.facts(), extraction.transitions()),
             transitions: extraction.transitions(),
         }
-    }
-
-    #[must_use]
-    pub fn report<Graph: GraphLint>(&self) -> Report<'file> {
-        Graph::report_graph(self)
     }
 
     #[must_use]

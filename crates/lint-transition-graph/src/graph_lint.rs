@@ -14,8 +14,8 @@ pub struct OnGraph<Graph>(PhantomData<Graph>);
 
 impl<Graph: GraphLint> Lint for OnGraph<Graph> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        let extraction = Extraction::of_files(files);
-        TypeSystem::of(files, &extraction).report::<Graph>()
+        let extraction = Extraction::from(files);
+        Graph::report_graph(&TypeSystem::built_from(files, &extraction))
     }
 }
 
