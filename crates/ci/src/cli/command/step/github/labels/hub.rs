@@ -1,9 +1,7 @@
-mod pull_request;
-
 use super::super::pull_number::PullNumber;
+use super::pull_request::PullRequest;
 use crate::cli::command::failure::Failure;
 use crate::cli::ports::{Invocation, Ports};
-pub use pull_request::PullRequest;
 
 #[derive(Debug)]
 pub struct Hub<'ports, Host: Ports> {
