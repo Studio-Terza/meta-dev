@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use law_facts::law_path::Unresolved;
 use law_facts::{Kind, Law, Laws, Package, Property};
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::Name;
@@ -56,7 +57,9 @@ impl<'found> Declarations<'found> {
             .filter(|law| Checked::reporting(law.kind()) == checked)
             .filter(|law| packages.iter().any(|package| law.of_package(*package).is_some()))
             .filter_map(Law::unresolved)
-            .map(|unresolved| Violation::new(*AsRef::<Site<'found>>::as_ref(&unresolved), &unresolved))
+            .map(|unresolved: Unresolved<'found>| {
+                Violation::new(*AsRef::<Site<'found>>::as_ref(&unresolved), &unresolved)
+            })
             .collect()
     }
 }

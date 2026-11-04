@@ -344,3 +344,15 @@ fn one_passing_law_declares_the_edge_beside_a_failing_one() {
     );
     assert_eq!(text.matches("edges between algebraic types").count(), 0, "{text}");
 }
+
+const IN_AND_OUT_OF_SCOPE: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n    fn into_b(&self) -> B {}\n    fn count(&self) -> u8 {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\n";
+
+#[test]
+fn the_edge_report_and_the_closure_report_agree_on_the_in_scope_edges() {
+    let text = Mapped::lawed(IN_AND_OUT_OF_SCOPE, PRESERVES_CLOSURE);
+    assert_eq!(
+        (text.matches("crate x: 1 edges between algebraic types").count(), text.matches("checks a closure").count()),
+        (1, 1),
+        "{text}"
+    );
+}

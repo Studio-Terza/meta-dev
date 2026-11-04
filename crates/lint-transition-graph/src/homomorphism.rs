@@ -1,5 +1,6 @@
 use std::fmt;
 
+use law_facts::law_path::Route;
 use law_facts::{Law, LawPath, Property, Side};
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
@@ -22,20 +23,53 @@ impl GraphLint for Homomorphisms {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let algebras = system.algebras();
         let declarations = system.declarations();
-        let grouped = Edge::by_crate(system.edges().iter());
+        let in_scope: Vec<InScope<'_, '_, 'file>> = Edge::by_crate(system.edges().iter())
+            .into_iter()
+            .map(|(name, edges)| InScope::of_crate(name, &edges, algebras))
+            .collect();
+        let unresolved = declarations.unresolved(in_scope.iter().flat_map(InScope::sites), Checked::Preservation);
         Report::new(
             Headline::new(
                 "report only, homomorphisms: a transition edge with one domain input and a different domain output, both with algebra operations, preserves the operations or is listed; declare it with laws::preserves! in a test of the same package, calling an operation of each type and the edge function by path (Type::function) or in a closure; listed per crate with the count of such edges and the undeclared ones with their sites",
             ),
-            grouped
-                .iter()
-                .filter_map(|(name, edges)| CrateMorphisms::measured(name, edges, algebras, declarations).reported())
-                .chain(declarations.unresolved(
-                    system.edges().iter().filter(|edge| Morphism::of_edge(edge, algebras).is_some()).map(Edge::site),
-                    Checked::Preservation,
-                ))
+            in_scope
+                .into_iter()
+                .filter_map(|in_scope| in_scope.measured(algebras, declarations).reported())
+                .chain(unresolved)
                 .collect(),
         )
+    }
+}
+
+#[derive(Debug)]
+struct InScope<'edge, 'found, 'file> {
+    name: &'edge CrateName,
+    morphisms: Vec<Morphism<'edge, 'found, 'file>>,
+}
+
+impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
+    fn of_crate(
+        name: &'edge CrateName,
+        edges: &[&'edge Edge<'found, 'file>],
+        algebras: &Algebras<'found, 'file>,
+    ) -> InScope<'edge, 'found, 'file> {
+        InScope { name, morphisms: edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect() }
+    }
+
+    fn sites(&self) -> impl Iterator<Item = Site<'file>> + '_ {
+        self.morphisms.iter().map(|morphism| morphism.edge.site())
+    }
+
+    fn measured(
+        self,
+        algebras: &Algebras<'found, 'file>,
+        declarations: &'edge Declarations<'file>,
+    ) -> CrateMorphisms<'edge, 'found, 'file> {
+        let total = self.morphisms.len();
+        let undeclared: Vec<Morphism<'edge, 'found, 'file>> =
+            self.morphisms.into_iter().filter_map(|morphism| morphism.undeclared(declarations, algebras)).collect();
+        let declared = Count::new(total - undeclared.len());
+        CrateMorphisms { name: self.name, in_scope: Count::new(total), declared, undeclared }
     }
 }
 
@@ -139,7 +173,7 @@ impl fmt::Display for Shortfall<'_, '_, '_> {
 impl Shortfall<'_, '_, '_> {
     fn described(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.law.on_side(self.side) {
-            Some(route) => write!(formatter, "{route}, not an operation of {}", self.node),
+            Some::<&Route>(route) => write!(formatter, "{route}, not an operation of {}", self.node),
             None => write!(formatter, "{} names no operation of {}", self.side, self.node),
         }
     }
@@ -153,22 +187,7 @@ struct CrateMorphisms<'edge, 'found, 'file> {
     undeclared: Vec<Morphism<'edge, 'found, 'file>>,
 }
 
-impl<'edge, 'found, 'file> CrateMorphisms<'edge, 'found, 'file> {
-    fn measured(
-        name: &'edge CrateName,
-        edges: &[&'edge Edge<'found, 'file>],
-        algebras: &Algebras<'found, 'file>,
-        declarations: &'edge Declarations<'file>,
-    ) -> CrateMorphisms<'edge, 'found, 'file> {
-        let morphisms: Vec<Morphism<'edge, 'found, 'file>> =
-            edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect();
-        let total = morphisms.len();
-        let undeclared: Vec<Morphism<'edge, 'found, 'file>> =
-            morphisms.into_iter().filter_map(|morphism| morphism.undeclared(declarations, algebras)).collect();
-        let declared = Count::new(total - undeclared.len());
-        CrateMorphisms { name, in_scope: Count::new(total), declared, undeclared }
-    }
-
+impl<'file> CrateMorphisms<'_, '_, 'file> {
     fn reported(self) -> Option<Violation<'file>> {
         self.undeclared.iter().map(|morphism| morphism.edge.site()).min().map(|site| Violation::new(site, &self))
     }

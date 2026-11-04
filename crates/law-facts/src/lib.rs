@@ -1,6 +1,6 @@
 mod kind;
 mod law;
-mod law_path;
+pub mod law_path;
 mod operators;
 mod package;
 mod reader;
