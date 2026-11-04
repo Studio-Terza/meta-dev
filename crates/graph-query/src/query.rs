@@ -2,6 +2,7 @@ mod boundary;
 mod candidate;
 mod kind;
 mod matches;
+mod reply;
 mod term;
 mod top;
 
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_transition_graph::{Ask, TypeSystem};
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
@@ -17,6 +19,7 @@ use crate::role::Role;
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
+use reply::Reply;
 pub use term::Term;
 use top::Top;
 
@@ -24,13 +27,14 @@ use top::Top;
 pub struct Query {
     terms: Vec<Term>,
     roles: Vec<Role>,
+    asks: Vec<Ask>,
     top: Top,
     roots: Vec<PathBuf>,
 }
 
 impl Default for Query {
     fn default() -> Query {
-        Query { terms: Vec::new(), roles: Vec::new(), top: Top::DEFAULT, roots: Vec::new() }
+        Query { terms: Vec::new(), roles: Vec::new(), asks: Vec::new(), top: Top::DEFAULT, roots: Vec::new() }
     }
 }
 
@@ -45,6 +49,11 @@ impl Query {
         self
     }
 
+    pub(crate) fn with_ask(mut self, ask: Ask) -> Query {
+        self.asks.push(ask);
+        self
+    }
+
     pub(crate) fn with_root(mut self, root: PathBuf) -> Query {
         self.roots.push(root);
         self
@@ -56,7 +65,19 @@ impl Query {
     }
 
     pub(crate) fn asks(&self) -> Option<&Query> {
-        self.terms.first().map(|_| self).or_else(|| self.roles.first().map(|_| self))
+        let searches = self.terms.first().map(|_| self).or_else(|| self.roles.first().map(|_| self));
+        self.asks.first().map(|_| self).or(searches)
+    }
+
+    #[must_use]
+    pub fn reply<'view, 'found, 'file>(
+        &'view self,
+        system: &'view TypeSystem<'found, 'file>,
+    ) -> Reply<'view, 'found, 'file> {
+        let extraction = system.extraction();
+        let searched = self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()));
+        let matches = searched.map(|()| self.matches(extraction.facts(), extraction.transitions()));
+        Reply::new(matches, self.asks.iter().map(|ask| ask.answered(system.containment())).collect())
     }
 
     #[must_use]
