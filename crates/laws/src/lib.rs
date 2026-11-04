@@ -59,3 +59,73 @@ macro_rules! table {
         }
     };
 }
+
+#[macro_export]
+macro_rules! associative {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $operation:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, ($strategy, $strategy, $strategy), triple, {
+            let (first, second, third) = triple;
+            let left = $operation($operation(first.clone(), second.clone()), third.clone());
+            let right = $operation(first, $operation(second, third));
+            $crate::proptest::prop_assert_eq!(left, right, "the associativity law is broken");
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! commutative {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $operation:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, ($strategy, $strategy), pair, {
+            let (first, second) = pair;
+            let forward = $operation(first.clone(), second.clone());
+            let backward = $operation(second, first);
+            $crate::proptest::prop_assert_eq!(forward, backward, "the commutativity law is broken");
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! identity {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $operation:expr, $unit:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, $strategy, value, {
+            let on_right = $operation(value.clone(), $unit);
+            let on_left = $operation($unit, value.clone());
+            $crate::proptest::prop_assert_eq!(&on_right, &value, "the identity law is broken");
+            $crate::proptest::prop_assert_eq!(on_left, value, "the identity law is broken");
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! inverse {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $operation:expr, $invert:expr, $unit:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, $strategy, value, {
+            let cancelled = $operation(value.clone(), $invert(value));
+            $crate::proptest::prop_assert_eq!(cancelled, $unit, "the inverse law is broken");
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! absorbing {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $operation:expr, $zero:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, $strategy, value, {
+            let on_right = $operation(value.clone(), $zero);
+            let on_left = $operation($zero, value);
+            $crate::proptest::prop_assert_eq!(&on_right, &$zero, "the absorbing law is broken");
+            $crate::proptest::prop_assert_eq!(on_left, $zero, "the absorbing law is broken");
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! distributive {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $times:expr, $plus:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, ($strategy, $strategy, $strategy), triple, {
+            let (first, second, third) = triple;
+            let joined = $times(first.clone(), $plus(second.clone(), third.clone()));
+            let separate = $plus($times(first.clone(), second), $times(first, third));
+            $crate::proptest::prop_assert_eq!(joined, separate, "the distributivity law is broken");
+        });
+    };
+}

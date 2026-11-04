@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
 
+use lint_core::Site;
+use lint_layout::Name;
+use lint_placement::CrateName;
 use transition_facts::{Transition, Wrapping};
 
 use crate::edge::Edge;
@@ -52,6 +55,26 @@ impl<'found, 'file> Operation<'found, 'file> {
     pub fn partial(&self) -> Totality {
         self.partial
     }
+
+    pub(crate) fn acting(&self) -> &Acting<'found> {
+        &self.acting
+    }
+
+    pub(crate) fn function(&self) -> &Name {
+        AsRef::<Name>::as_ref(self.transition.function())
+    }
+}
+
+impl AsRef<CrateName> for Operation<'_, '_> {
+    fn as_ref(&self) -> &CrateName {
+        self.transition.as_ref()
+    }
+}
+
+impl<'file> AsRef<Site<'file>> for Operation<'_, 'file> {
+    fn as_ref(&self) -> &Site<'file> {
+        self.transition.as_ref()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -90,6 +113,10 @@ impl<'found, 'file> Algebras<'found, 'file> {
     #[must_use]
     pub fn of_type(&self, node: &Node<'found>) -> Option<&Algebra<'found, 'file>> {
         self.by_type.get(node)
+    }
+
+    pub(crate) fn operations(&self) -> impl Iterator<Item = &Operation<'found, 'file>> {
+        self.by_type.values().flat_map(Algebra::operations)
     }
 
     pub fn types(&self) -> impl Iterator<Item = &Node<'found>> {

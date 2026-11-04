@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use proc_macro2::{TokenStream, TokenTree};
 
-use crate::coverage::kind::Kind;
+use crate::kind::Kind;
 use lint_layout::Name;
 
 #[derive(Debug)]
@@ -12,11 +12,9 @@ impl Mentions {
     const SEPARATOR: char = ',';
 
     pub(crate) fn beyond_title(tokens: TokenStream, kind: Kind) -> BTreeSet<Name> {
-        match kind {
-            Kind::Roundtrip | Kind::Law => {
-                Self::named(tokens.into_iter().skip_while(|tree| Self::separator(tree).is_none()).skip(1))
-            }
-            Kind::Proptest | Kind::Other => Self::named(tokens.into_iter()),
+        match kind.titled() {
+            Some(_) => Self::named(tokens.into_iter().skip_while(|tree| Self::separator(tree).is_none()).skip(1)),
+            None => Self::named(tokens.into_iter()),
         }
     }
 

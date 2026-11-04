@@ -1,7 +1,6 @@
+use law_facts::Package;
 use lint_core::SourceFile;
 use lint_layout::Name;
-
-use crate::package::Package;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Subject<'file> {

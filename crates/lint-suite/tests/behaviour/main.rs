@@ -1,3 +1,4 @@
+mod algebra_laws;
 mod arbitrary_newtypes;
 mod bool_methods;
 mod clones;
