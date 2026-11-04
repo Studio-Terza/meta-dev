@@ -9,10 +9,11 @@ use lint_runner::Cli;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::thread;
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-use crate::fakes::{FakeLinked, FakeUnlistable};
+use crate::fakes::{FakeFlaky, FakeLinked, FakeUnlistable};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -168,6 +169,17 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     assert_eq!(root.reported().exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn a_helper_that_cannot_read_fails_the_run_visibly() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::package()?;
+    scratch.write("src/lib.rs", CLEAN)?;
+    let helpers = thread::available_parallelism().map_or(0, |count| count.get().min(4) - 1);
+    let run = Trees::reported_through(&FakeFlaky::new(&scratch.files), std::slice::from_ref(&scratch.root));
+    assert_eq!(run.exit == ExitCode::FAILURE, helpers > 0);
+    assert_eq!(run.err.contains("cannot read"), helpers > 0, "{}", run.err);
     Ok(())
 }
 

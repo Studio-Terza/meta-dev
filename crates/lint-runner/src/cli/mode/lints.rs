@@ -1,10 +1,9 @@
-use std::io;
 use std::iter;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::{self, Scope};
+use std::thread::Scope;
 
 use file_ports::Files;
 use lint_core::{Lint, Readout, Report};
+use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
@@ -53,7 +52,7 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Rendered, Workers};
+use crate::cli::boundary::{Helper, Helpers, Rendered, Shard, Workers};
 use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
@@ -111,44 +110,36 @@ impl Lints {
         |readout| vec![WorkflowRun::report(readout.repo_files())],
     ];
 
+    pub fn started<'scope, F: Files + Sync>(
+        scope: &'scope Scope<'scope, '_>,
+        sources: &'scope Sources<F>,
+    ) -> Helpers<'scope> {
+        Workers::available()
+            .helper_shards()
+            .map(|shard| Helper::spawned(scope, move || Self::helped(sources, shard)).map_err(|_| shard))
+            .collect()
+    }
+
     #[must_use]
-    pub fn checked<'file>(readout: &'file Readout, sources: &Sources<impl Files + Sync>) -> Outcome<'file> {
-        let next = AtomicUsize::new(0);
-        let mut rendered = Self::shared(readout, sources, &next);
+    pub fn checked<'file>(readout: &'file Readout, helpers: Helpers<'_>) -> Outcome<'file> {
+        let mine = Self::sharded(readout, Shard::lead(helpers.len() + 1));
+        let mut rendered: Vec<Rendered> = iter::once(mine)
+            .chain(helpers.into_iter().map(|helper| {
+                helper.map_or_else(|shard| Self::sharded(readout, shard), |helper| helper.joined(Self::CHECKS.len()))
+            }))
+            .flatten()
+            .collect();
         rendered.sort_by_key(Rendered::slot);
         Outcome::from_rendered(rendered, readout.failures())
     }
 
-    fn shared(readout: &Readout, sources: &Sources<impl Files + Sync>, next: &AtomicUsize) -> Vec<Rendered> {
-        thread::scope(|scope| {
-            let helpers: Vec<Helper<'_>> = Workers::available()
-                .helpers()
-                .map(|()| Self::started(scope, sources, next))
-                .filter_map(Result::ok)
-                .collect();
-            let mine = Self::drained(readout, next);
-            iter::once(mine).chain(helpers.into_iter().map(Helper::joined)).flatten().collect()
-        })
+    fn helped(sources: &Sources<impl Files>, shard: Shard) -> Result<Vec<Rendered>, Failure> {
+        SourceFiles::read_all(sources.files(), sources.roots()).map(|own| Self::sharded(&own, shard))
     }
 
-    fn started<'scope, F: Files + Sync>(
-        scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
-        next: &'scope AtomicUsize,
-    ) -> io::Result<Helper<'scope>> {
-        Helper::spawned(scope, || Self::helped(sources, next))
-    }
-
-    fn helped(sources: &Sources<impl Files>, next: &AtomicUsize) -> Vec<Rendered> {
-        SourceFiles::read_all(sources.files(), sources.roots())
-            .ok()
-            .map(|own| Self::drained(&own, next))
-            .unwrap_or_default()
-    }
-
-    fn drained(readout: &Readout, next: &AtomicUsize) -> Vec<Rendered> {
-        iter::from_fn(|| Some(next.fetch_add(1, Ordering::Relaxed)))
-            .map_while(|index| Self::CHECKS.get(index).map(|check| (index, *check)))
+    fn sharded(readout: &Readout, shard: Shard) -> Vec<Rendered> {
+        shard
+            .picks(&Self::CHECKS)
             .flat_map(|(index, check)| {
                 check(readout).into_iter().filter_map(Report::dirty).map(move |report| Rendered::render(index, &report))
             })
