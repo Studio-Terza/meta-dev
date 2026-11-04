@@ -1,5 +1,7 @@
+mod boundary;
 mod mode;
 mod outcome;
+mod sources;
 mod stack_size;
 
 use std::ffi::OsString;
@@ -10,12 +12,11 @@ use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
-use lint_core::Readout;
-use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
 use mode::Mode;
 use outcome::Outcome;
+use sources::Sources;
 use stack_size::StackSize;
 
 #[derive(Debug)]
@@ -55,18 +56,21 @@ impl Cli {
         }
     }
 
-    fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+    fn reported_to(&self, files: &(impl Files + Sync), out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match self.mode.refusal() {
             Some(refused) => {
                 writeln!(err, "{refused}").ok();
                 ExitCode::FAILURE
             }
-            None => self.ended(SourceFiles::read_all(files, &self.roots).as_ref(), out, err),
+            None => self.ended(&Sources::new(files, &self.roots), out, err),
         }
     }
 
-    fn ended(&self, read: Result<&Readout, &Failure>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match read.map(|readout| self.mode.outcome_of(readout, out)) {
+    fn ended(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        match SourceFiles::read_all(sources.files(), sources.roots())
+            .as_ref()
+            .map(|readout| self.mode.outcome_of(readout, sources, out))
+        {
             Ok(Outcome::Clean) => ExitCode::SUCCESS,
             Ok(violations) => {
                 write!(err, "{violations}").ok();

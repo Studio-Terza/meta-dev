@@ -1,23 +1,32 @@
 use std::fmt;
 
-use lint_core::Report;
 use lint_layout::Failure;
+
+use super::boundary::Rendered;
 
 #[derive(Debug)]
 pub enum Outcome<'file> {
     Clean,
-    Violations { reports: Vec<Report<'file>>, failures: &'file [Failure] },
+    Violations { reports: Vec<Rendered>, failures: &'file [Failure] },
 }
 
 impl<'file> Outcome<'file> {
     #[must_use]
-    pub fn from_reports(reports: Vec<Report<'file>>, failures: &'file [Failure]) -> Outcome<'file> {
-        let dirty: Vec<Report<'file>> = reports.into_iter().filter_map(Report::dirty).collect();
-        if dirty.is_empty() && failures.is_empty() {
-            Outcome::Clean
-        } else {
-            Outcome::Violations { reports: dirty, failures }
-        }
+    pub fn from_rendered(reports: Vec<Rendered>, failures: &'file [Failure]) -> Outcome<'file> {
+        reports
+            .is_empty()
+            .then_some(failures)
+            .filter(|failures| failures.is_empty())
+            .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
+    }
+}
+
+impl Outcome<'_> {
+    fn written(formatter: &mut fmt::Formatter<'_>, reports: &[Rendered], failures: &[Failure]) -> fmt::Result {
+        reports
+            .iter()
+            .try_for_each(|report| write!(formatter, "{report}"))
+            .and_then(|()| failures.iter().try_for_each(|failure| writeln!(formatter, "{failure}")))
     }
 }
 
@@ -25,10 +34,7 @@ impl fmt::Display for Outcome<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Outcome::Clean => formatter.write_str("all lints pass"),
-            Outcome::Violations { reports, failures } => {
-                reports.iter().try_for_each(|report| write!(formatter, "{report}"))?;
-                failures.iter().try_for_each(|failure| writeln!(formatter, "{failure}"))
-            }
+            Outcome::Violations { reports, failures } => Self::written(formatter, reports, failures),
         }
     }
 }

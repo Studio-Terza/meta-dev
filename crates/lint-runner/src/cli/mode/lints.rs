@@ -1,4 +1,11 @@
-use lint_core::{Lint, Readout};
+use std::io;
+use std::iter;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread::{self, Scope};
+
+use file_ports::Files;
+use lint_core::{Lint, Readout, Report};
+use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
@@ -46,63 +53,105 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::Outcome;
+use crate::cli::boundary::{Helper, Rendered, Workers};
+use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
 pub struct Lints;
 
+type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
+
 impl Lints {
+    const CHECKS: [Check; 46] = [
+        |readout| vec![NoComments::report(readout.files())],
+        |readout| vec![NoFreeFns::report(readout.files())],
+        |readout| vec![ThinMain::report(readout.files())],
+        |readout| vec![VecOutParams::report(readout.files())],
+        |readout| vec![NamedLifetimes::report(readout.files())],
+        |readout| vec![EnumPredicates::report(readout.files())],
+        |readout| vec![ConstShape::report(readout.files())],
+        |readout| vec![TypeShape::report(readout.files())],
+        |readout| vec![DistinctSignatures::report(readout.files())],
+        |readout| vec![ExpressionFlow::report(readout.files())],
+        |readout| vec![FnShape::report(readout.files())],
+        |readout| vec![LiteralNames::report(readout.files())],
+        |readout| vec![ManualIteration::report(readout.files())],
+        |readout| vec![ModuleNesting::report(readout.files())],
+        |readout| vec![NamedNumbers::report(readout.files())],
+        |readout| vec![NoForwarders::report(readout.files())],
+        |readout| vec![NoNumbersInBinaries::report(readout.files())],
+        |readout| vec![NoParameterBags::report(readout.files())],
+        |readout| vec![NoPlaintext::report(readout.files())],
+        |readout| vec![PrimitiveBoundary::report(readout.files())],
+        |readout| vec![PrivateFns::report(readout.files())],
+        |readout| vec![ProcessStarters::report(readout.files())],
+        |readout| vec![RawResources::report(readout.files())],
+        |readout| vec![PublicSurface::report(readout.files())],
+        |readout| vec![RepeatedMethods::report(readout.files())],
+        |readout| vec![StateGraph::report(readout.files())],
+        |readout| vec![GuardMustUse::report(readout.files())],
+        |readout| vec![CrateGraph::report(readout.files())],
+        |readout| vec![PublicApiTests::report(readout.files())],
+        |readout| vec![NoTestOnlyApi::report(readout.files())],
+        |readout| vec![NoIgnoredTests::report(readout.files())],
+        |readout| vec![NoTestIo::report(readout.files())],
+        |readout| vec![FakesAtPorts::report(readout.files())],
+        |readout| vec![PortBatching::report(readout.files())],
+        |readout| vec![LongExactStrings::report(readout.files())],
+        |readout| vec![RepeatedShapes::report(readout.files())],
+        |readout| vec![MandatoryLaws::report(readout.files())],
+        |readout| vec![ArbitraryNewtypes::report(readout.files())],
+        |readout| vec![BoolMethods::report(readout.files())],
+        |readout| vec![EffectsInPorts::report(readout.files())],
+        |readout| vec![NoEarlyExits::report(readout.files())],
+        |readout| vec![OnGraph::<OneEdge>::report(readout.files())],
+        |readout| vec![OnContainment::<AcyclicQuotients>::report(readout.files())],
+        |readout| vec![UnconsumedTraits::report(readout.files())],
+        |readout| vec![RustOnly::report(readout.repo_files())],
+        |readout| vec![WorkflowRun::report(readout.repo_files())],
+    ];
+
     #[must_use]
-    pub fn checked(readout: &Readout) -> Outcome<'_> {
-        let files = readout.files();
-        let reports = vec![
-            NoComments::report(files),
-            NoFreeFns::report(files),
-            ThinMain::report(files),
-            VecOutParams::report(files),
-            NamedLifetimes::report(files),
-            EnumPredicates::report(files),
-            ConstShape::report(files),
-            TypeShape::report(files),
-            DistinctSignatures::report(files),
-            ExpressionFlow::report(files),
-            FnShape::report(files),
-            LiteralNames::report(files),
-            ManualIteration::report(files),
-            ModuleNesting::report(files),
-            NamedNumbers::report(files),
-            NoForwarders::report(files),
-            NoNumbersInBinaries::report(files),
-            NoParameterBags::report(files),
-            NoPlaintext::report(files),
-            PrimitiveBoundary::report(files),
-            PrivateFns::report(files),
-            ProcessStarters::report(files),
-            RawResources::report(files),
-            PublicSurface::report(files),
-            RepeatedMethods::report(files),
-            StateGraph::report(files),
-            GuardMustUse::report(files),
-            CrateGraph::report(files),
-            PublicApiTests::report(files),
-            NoTestOnlyApi::report(files),
-            NoIgnoredTests::report(files),
-            NoTestIo::report(files),
-            FakesAtPorts::report(files),
-            PortBatching::report(files),
-            LongExactStrings::report(files),
-            RepeatedShapes::report(files),
-            MandatoryLaws::report(files),
-            ArbitraryNewtypes::report(files),
-            BoolMethods::report(files),
-            EffectsInPorts::report(files),
-            NoEarlyExits::report(files),
-            OnGraph::<OneEdge>::report(files),
-            OnContainment::<AcyclicQuotients>::report(files),
-            UnconsumedTraits::report(files),
-            RustOnly::report(readout.repo_files()),
-            WorkflowRun::report(readout.repo_files()),
-        ];
-        Outcome::from_reports(reports, readout.failures())
+    pub fn checked<'file>(readout: &'file Readout, sources: &Sources<impl Files + Sync>) -> Outcome<'file> {
+        let next = AtomicUsize::new(0);
+        let mut rendered = Self::shared(readout, sources, &next);
+        rendered.sort_by_key(Rendered::slot);
+        Outcome::from_rendered(rendered, readout.failures())
+    }
+
+    fn shared(readout: &Readout, sources: &Sources<impl Files + Sync>, next: &AtomicUsize) -> Vec<Rendered> {
+        thread::scope(|scope| {
+            let helpers: Vec<Helper<'_>> = Workers::available()
+                .helpers()
+                .map(|()| Self::started(scope, sources, next))
+                .filter_map(Result::ok)
+                .collect();
+            let mine = Self::drained(readout, next);
+            iter::once(mine).chain(helpers.into_iter().map(Helper::joined)).flatten().collect()
+        })
+    }
+
+    fn started<'scope, F: Files + Sync>(
+        scope: &'scope Scope<'scope, '_>,
+        sources: &'scope Sources<F>,
+        next: &'scope AtomicUsize,
+    ) -> io::Result<Helper<'scope>> {
+        Helper::spawned(scope, || Self::helped(sources, next))
+    }
+
+    fn helped(sources: &Sources<impl Files>, next: &AtomicUsize) -> Vec<Rendered> {
+        SourceFiles::read_all(sources.files(), sources.roots())
+            .ok()
+            .map(|own| Self::drained(&own, next))
+            .unwrap_or_default()
+    }
+
+    fn drained(readout: &Readout, next: &AtomicUsize) -> Vec<Rendered> {
+        iter::from_fn(|| Some(next.fetch_add(1, Ordering::Relaxed)))
+            .map_while(|index| Self::CHECKS.get(index).map(|check| (index, *check)))
+            .flat_map(|(index, check)| {
+                check(readout).into_iter().filter_map(Report::dirty).map(move |report| Rendered::render(index, &report))
+            })
+            .collect()
     }
 }
