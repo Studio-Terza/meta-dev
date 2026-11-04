@@ -5,8 +5,6 @@ use law_facts::{Kind, Law, Laws, Package, Property};
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::Name;
 
-use crate::algebra::Algebras;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Checked {
     Operations,
@@ -46,12 +44,13 @@ impl<'found> Declarations<'found> {
         self.packages.get(path).map(|package| self.laws.of_package(*package)).unwrap_or_default()
     }
 
-    pub(crate) fn unresolved(&self, algebras: &Algebras<'_, '_>, checked: Checked) -> Vec<Violation<'found>> {
-        let packages: BTreeSet<Package<'found>> = algebras
-            .operations()
-            .filter_map(|operation| self.packages.get(AsRef::<Site<'_>>::as_ref(operation).path()))
-            .copied()
-            .collect();
+    pub(crate) fn unresolved<'site>(
+        &self,
+        sites: impl Iterator<Item = Site<'site>>,
+        checked: Checked,
+    ) -> Vec<Violation<'found>> {
+        let packages: BTreeSet<Package<'found>> =
+            sites.filter_map(|site| self.packages.get(site.path())).copied().collect();
         self.laws
             .all()
             .filter(|law| Checked::reporting(law.kind()) == checked)
