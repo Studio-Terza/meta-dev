@@ -19,11 +19,12 @@ pub struct InstallTools {
 
 impl InstallTools {
     pub(crate) const PROGRAMS: [Tool; 3] = [Tool::REACH, Tool::LINT, Tool::CI];
+    const PROFILE: &'static str = "tools";
 
     fn build_invocation() -> Invocation {
         Invocation::new(
             "cargo",
-            ["build", "--locked", "-q"]
+            ["build", "--locked", "-q", "--profile", Self::PROFILE]
                 .into_iter()
                 .map(OsStr::new)
                 .chain(Self::PROGRAMS.iter().flat_map(|tool| [OsStr::new("--bin"), tool.as_ref()])),

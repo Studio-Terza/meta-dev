@@ -1,5 +1,5 @@
 name: tools
-description: Build the CI tools in the dev profile, cached by their sources, and work out the reach of the change
+description: Build the CI tools with optimised dependencies, cached by their sources, and work out the reach of the change
 
 runs:
   using: composite
@@ -16,7 +16,7 @@ runs:
     - name: tools
       if: steps.tools.outputs.cache-hit != 'true'
       shell: bash
-      run: cargo run --locked -q --bin ci -- tools target/debug "$TOOLS"
+      run: cargo run --locked -q --bin ci -- tools target/tools "$TOOLS"
     - name: reach
       shell: bash
       run: '"$TOOLS/ci" reach "$METADATA" "$GITHUB_EVENT_NAME" "$GITHUB_BASE_REF" "$GITHUB_ENV" "$GITHUB_STEP_SUMMARY"'

@@ -225,7 +225,7 @@ The CI helpers are Rust too, and workflows only call them. `ci` has these comman
     ci logged <log> <program> [<argument>...]                   run a program, copy its output to the log
     ci libtest-seconds <measured> <stage> <test output>         add up the libtest seconds
     ci reach <metadata> <event> <environment> <summary>         write the scope, say which scopes are empty
-    ci tools <built directory> <tools directory>                build (dev profile) and copy reach, lint and ci
+    ci tools <built directory> <tools directory>                build (tools profile) and copy reach, lint and ci
     ci mutants-changed <diff> <output> [<scope>...]             mutants on the changed lines, or say it skipped
     ci mutants-shard <shard> <output>                           one weekly shard of all mutants
     ci stage-issues <limits> <measured> [<stage>...]            one issue per stage past its warn level
@@ -330,7 +330,7 @@ Compile time is tracked by the daily cold build instead: `ci compile-trend` comp
 build on main in the previous 14 days, downloaded from their artifacts, and when today is slower than every one of them
 opens, or updates, one issue titled as a compile-time trend. Its body gives the total against the fortnight's range, the
 crates that grew most against their fortnight average, and the pull requests merged into main in the fortnight.
-The Rust toolchain, the CI tools (built in the dev profile, so they reuse the test build's compiled crates) and compiled crates (`sccache`) are cached.
+The Rust toolchain, the CI tools (built in the tools profile, the dev profile with optimised dependencies, so the lint step runs fast) and compiled crates (`sccache`) are cached.
 
 ## Reach
 
