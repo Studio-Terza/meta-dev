@@ -27,6 +27,12 @@ impl Items {
         lines.concat()
     }
 
+    fn ring_with_first_item_in(before: &str, after: &str, size: usize) -> String {
+        let rest: Vec<String> =
+            (1..size).map(|index| format!("pub struct A{index}(A{});\n", (index + 1) % size)).collect();
+        format!("{before}pub struct A0(A1);\n{after}{}", rest.concat())
+    }
+
     fn flagged(files: &[SourceFile]) -> Lines {
         Sources::lines(&CrateGraph::report(files))
     }
@@ -111,4 +117,16 @@ fn a_cycle_closed_through_a_type_alias_path_is_flagged() {
     let links: Vec<String> = (0..BIG_RING).map(link).collect();
     let source = format!("pub type L = R0;\n{}", links.concat());
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&source))]), FLAGGED);
+}
+
+#[test]
+fn items_declared_inside_a_macro_call_take_part_in_a_cycle() {
+    let wrapped = Items::ring_with_first_item_in("some_macro! {\n", "}\n", BIG_RING);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&wrapped))]), FLAGGED);
+}
+
+#[test]
+fn items_inside_a_macro_rules_definition_are_not_declared() {
+    let defined = Items::ring_with_first_item_in("macro_rules! m {\n    () => {\n", "    };\n}\n", BIG_RING);
+    assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&defined))]), CLEAN);
 }
