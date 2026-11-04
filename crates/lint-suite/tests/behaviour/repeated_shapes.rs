@@ -6,6 +6,8 @@ const BODY: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    fo
 const LOCALS_ONLY: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const CALLEE_A: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if keeps(*item) {\n            total += double(*item);\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const CALLEE_B: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if admits(*row) {\n            sum += twice(*row);\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
+const FLAG_ON: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if keeps(*item, true) {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
+const FLAG_OFF: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if keeps(*row, false) {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const RENAMED: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 10;\n    for row in rows {\n        if *row > 7 {\n            sum += row * 5;\n        } else {\n            sum += 9;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const OTHER_CALL: &str = "fn c(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if keeps(*item) {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const SHORT_A: &str = "fn a() {\n    f(1);\n}\n";
@@ -224,4 +226,14 @@ fn bodies_that_differ_only_in_callee_names_are_reported_once_names_are_normalise
     assert_eq!(RepeatedShapes::report(&files).violations().len(), 0);
     let text = NormalisedShapes::report(&files).to_string();
     assert!(text.contains("a.rs:1: 49 tokens in 2 shipped copies, also at b.rs:1, identical up to names; "), "{text}");
+}
+
+#[test]
+fn copies_that_differ_in_true_and_false_count_it_as_a_differing_literal() {
+    let text = RepeatedShapes::report(&Sources::parsed(&[
+        Source::new(Located::new("a.rs"), Text::new(FLAG_ON)),
+        Source::new(Located::new("b.rs"), Text::new(FLAG_OFF)),
+    ]))
+    .to_string();
+    assert!(text.contains("also at b.rs:1, differing literals: 1; "), "{text}");
 }

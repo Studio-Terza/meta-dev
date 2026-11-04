@@ -25,10 +25,14 @@ impl<'raw> Slots<'raw> {
         position: Position,
         equivalence: Equivalence,
     ) -> ShapeToken<'raw> {
-        name.matches::<Whole>(&Self::LITERAL_WORDS)
+        Self::literal(name)
             .map(|_| Self::literal_word(name, equivalence))
             .or_else(|| name.matches::<Whole>(&Self::KEYWORDS).map(|_| ShapeToken::Word(name)))
             .unwrap_or_else(|| self.renamed(name, Renaming::chosen(name, position, equivalence)))
+    }
+
+    pub(crate) fn literal(name: &Name) -> Option<&Name> {
+        name.matches::<Whole>(&Self::LITERAL_WORDS).map(|_| name)
     }
 
     fn literal_word(name: &'raw Name, equivalence: Equivalence) -> ShapeToken<'raw> {

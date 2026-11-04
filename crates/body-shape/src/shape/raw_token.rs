@@ -1,13 +1,13 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-use equivalence::Equivalence;
+use equivalence::{Equivalence, Erased};
 use lint_layout::Name;
 
 use super::ShapeToken;
 use super::mark::Mark;
 use super::position::Position;
 use super::slots::Slots;
-use super::spelling::{Sign, Spelled, Spelling};
+use super::spelling::{Sign, Spelled, Spelling, Spoken};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RawToken {
@@ -29,15 +29,16 @@ impl RawToken {
     ) -> Option<ShapeToken<'raw>> {
         match self {
             RawToken::Literal(spelling) => Some(spelling.shaped(equivalence)),
-            RawToken::Mark(mark) => Self::marked(*mark, position),
+            RawToken::Mark(mark) => Self::marked(*mark, position, equivalence),
             RawToken::Word(name) => Some(slots.classified(name, position, equivalence)),
         }
     }
 
     pub(crate) fn spelled(self, sign: Sign) -> Option<Spelled> {
         match self {
-            RawToken::Literal(spelling) => Some(Spelled::new(sign, spelling)),
-            RawToken::Word(_) | RawToken::Mark(_) => None,
+            RawToken::Literal(spelling) => Some(Spelled::new(sign, Spoken::Literal(spelling))),
+            RawToken::Word(name) => Slots::literal(&name).is_some().then(|| Spelled::new(sign, Spoken::Word(name))),
+            RawToken::Mark(_) => None,
         }
     }
 
@@ -59,10 +60,11 @@ impl RawToken {
         }
     }
 
-    fn marked<'raw>(mark: Mark, position: Position) -> Option<ShapeToken<'raw>> {
+    fn marked<'raw>(mark: Mark, position: Position, equivalence: Equivalence) -> Option<ShapeToken<'raw>> {
         Some(mark)
             .filter(|mark| *mark == Mark::MINUS)
             .filter(|_| position == Position::BeforeLiteral)
+            .filter(|_| equivalence.erases(Erased::Literals).is_some())
             .map_or(Some(ShapeToken::Mark(mark)), |_| None)
     }
 

@@ -7,12 +7,9 @@ impl Holes {
     #[must_use]
     pub fn between<Item: PartialEq>(sequences: &[&[Item]]) -> Holes {
         let first = sequences.first().copied().unwrap_or_default();
+        let longest = sequences.iter().map(|sequence| sequence.len()).max().unwrap_or_default();
         Holes::new(
-            first
-                .iter()
-                .enumerate()
-                .filter(|(at, item)| sequences.iter().any(|sequence| sequence.get(*at) != Some(*item)))
-                .count(),
+            (0..longest).filter(|at| sequences.iter().any(|sequence| sequence.get(*at) != first.get(*at))).count(),
         )
     }
 

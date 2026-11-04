@@ -32,7 +32,7 @@ impl Lint for RepeatedShapes {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "a body of 40 tokens or more repeats across the workspace with its names and literals erased; each group says whether its copies are tests, shipped code or both",
+                "a body of 40 tokens or more repeats across the workspace with its local names and literals erased; each group says whether its copies are tests, shipped code or both",
             ),
             Self::found(files, Self::EQUIVALENCE),
         )
