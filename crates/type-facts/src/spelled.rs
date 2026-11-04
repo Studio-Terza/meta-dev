@@ -27,7 +27,6 @@ impl Spelled {
             Type::Path(path) => Self::qualifier(&path.path),
             Type::Reference(reference) => Self::qualifier_of(&reference.elem),
             Type::Paren(paren) => Self::qualifier_of(&paren.elem),
-            Type::Group(group) => Self::qualifier_of(&group.elem),
             _ => Vec::new(),
         }
     }

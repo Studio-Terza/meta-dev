@@ -69,10 +69,13 @@ fn derives_through_paths_and_other_attributes_are_read_by_their_last_name() {
 fn inherent_methods_are_kept_with_their_returned_type() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
-        "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    const C: u8 = 1;\n}\n",
+        "struct A;\nimpl A {\n    fn one(&self) {}\n    fn two(&self, x: u8) -> Vec<B> { f() }\n    fn three(self) -> &B { f() }\n    fn four() -> (u8, u8) { f() }\n    fn five() -> (a::B) { f() }\n    const C: u8 = 1;\n}\n",
     )]);
     let facts = Facts::of_files(&files);
-    assert_eq!(Described::methods(&facts, Described::only(&facts)), ["one->", "two->Vec", "three->B", "four->"]);
+    assert_eq!(
+        Described::methods(&facts, Described::only(&facts)),
+        ["one->", "two->Vec", "three->B", "four->", "five->B"]
+    );
 }
 
 #[test]
