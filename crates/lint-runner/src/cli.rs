@@ -1,5 +1,7 @@
+mod boundary;
 mod mode;
 mod outcome;
+mod sources;
 mod stack_size;
 
 use std::ffi::OsString;
@@ -11,12 +13,11 @@ use std::process::ExitCode;
 use std::thread::{self, ScopedJoinHandle};
 
 use file_ports::Files;
-use lint_core::Readout;
-use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
 use mode::Mode;
 use outcome::Outcome;
+use sources::Sources;
 use stack_size::StackSize;
 
 #[derive(Debug)]
@@ -53,18 +54,23 @@ impl Cli {
         )
     }
 
-    fn reported_to(&self, files: &impl Files, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+    fn reported_to(&self, files: &(impl Files + Sync), out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match self.mode.refusal() {
             Some(refused) => Self::refused(refused, err),
-            None => self.ended(SourceFiles::read_all(files, &self.roots).as_ref(), out, err),
+            None => self.ended(&Sources::new(files, &self.roots), out, err),
         }
     }
 
-    fn ended(&self, read: Result<&Readout, &Failure>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        match read.map(|readout| self.mode.outcome_of(readout, out)) {
-            Ok(outcome) => outcome.violations().map_or(ExitCode::SUCCESS, |violations| Self::written(violations, err)),
-            Err(failure) => Self::refused(failure, err),
-        }
+    fn ended(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        thread::scope(|scope| {
+            let helpers = self.mode.helpers(scope, sources);
+            let read = SourceFiles::read_all(sources.files(), sources.roots());
+            let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, out));
+            let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
+            let written =
+                outcome.ok().as_ref().and_then(Outcome::violations).map(|violations| Self::written(violations, err));
+            refusal.or(written).unwrap_or(ExitCode::SUCCESS)
+        })
     }
 
     fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {

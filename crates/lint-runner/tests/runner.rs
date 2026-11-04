@@ -7,12 +7,14 @@ use lint_reader::SourceFiles;
 use lint_runner::Cli;
 
 use std::ffi::OsString;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::thread;
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-use crate::fakes::{FakeLinked, FakeUnlistable};
+use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -59,7 +61,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
     let listed_by_the_runner =
-        ["::report(files)", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
+        ["::report(readout.files())", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance =
@@ -171,6 +173,21 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
     assert_eq!(root.reported().exit, ExitCode::FAILURE);
+    Ok(())
+}
+
+#[test]
+fn the_gate_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
+    const MOST_READERS: usize = 4;
+    let scratch = Scratch::package()?;
+    scratch.write("src/lib.rs", CLEAN)?;
+    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
+    let reading = FakeCounted::new(&scratch.files, scratch.root.clone());
+    Trees::flagged(&reading, &scratch.root, &["--report"]);
+    let gating = FakeCounted::new(&scratch.files, scratch.root.clone());
+    let gate = Trees::flagged(&gating, &scratch.root, &[]);
+    assert_eq!(gate.exit, ExitCode::SUCCESS);
+    assert_eq!(gating.listings(), reading.listings() * workers);
     Ok(())
 }
 

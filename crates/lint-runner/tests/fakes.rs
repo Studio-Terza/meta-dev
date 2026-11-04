@@ -1,5 +1,6 @@
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Text};
 
@@ -108,5 +109,60 @@ impl Files for FakeLinked<'_> {
 
     fn kind(&self, path: &Path) -> Kind {
         Some(path).filter(|path| *path == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
+    }
+}
+
+pub struct FakeCounted<'memory> {
+    memory: &'memory Memory,
+    counted: PathBuf,
+    listings: AtomicUsize,
+}
+
+impl FakeCounted<'_> {
+    pub fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
+        FakeCounted { memory, counted, listings: AtomicUsize::new(0) }
+    }
+
+    pub fn listings(&self) -> usize {
+        self.listings.load(Ordering::SeqCst)
+    }
+}
+
+impl Files for FakeCounted<'_> {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.memory.read(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.memory.read_text(path)
+    }
+
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        self.memory.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        self.memory.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        self.memory.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        self.memory.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        let _listed = (directory == self.counted).then(|| self.listings.fetch_add(1, Ordering::SeqCst));
+        self.memory.entries(directory)
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        self.memory.canonical(path)
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        self.memory.kind(path)
     }
 }
