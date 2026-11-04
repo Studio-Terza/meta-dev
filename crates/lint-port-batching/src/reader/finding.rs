@@ -1,8 +1,9 @@
 use std::fmt;
 use std::path::Path;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::{Fix, LineNumber, Name, Word};
+use lint_layout::{LineNumber, Name, Word};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Port {
@@ -71,7 +72,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_layout::Finding for Finding {
+impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         Fix::new(
             "add a batch method to the port, such as fetch_many or write_all, and call it once outside the per-element code; consuming a stream from a port is fine, and deliberate pacing is a Pacing parameter on the port method",

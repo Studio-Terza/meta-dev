@@ -1,3 +1,4 @@
+mod origins;
 mod signature_reading;
 
 use syn::visit::{self, Visit};
@@ -8,7 +9,7 @@ use lint_layout::LineNumber;
 
 use crate::context::Context;
 use crate::ground::Ground;
-use crate::origins::Origins;
+use origins::Origins;
 use signature_reading::SignatureReading;
 
 pub(super) struct Collector<'file> {

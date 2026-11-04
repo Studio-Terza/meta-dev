@@ -1,10 +1,12 @@
+mod finding;
+
 use std::path::Path;
 
 use lint_core::{Site, Violation};
 use lint_layout::LineNumber;
 use lint_layout::Name;
 
-use crate::Finding;
+use finding::Finding;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Candidate<'name> {

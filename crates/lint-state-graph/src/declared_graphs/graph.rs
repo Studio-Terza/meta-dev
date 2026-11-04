@@ -11,7 +11,7 @@ use syn::{Attribute, Ident, Macro, Token, Visibility, braced};
 use lint_core::{Site, TypeName, Violation};
 use lint_layout::LineNumber;
 
-use crate::edge_scan::Edge;
+use crate::edge::Edge;
 use crate::finding::Finding;
 use block::Block;
 use kind::Kind;

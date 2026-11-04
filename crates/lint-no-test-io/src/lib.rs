@@ -3,8 +3,8 @@ mod finding;
 
 use effect_paths::EffectPaths;
 use finding::Finding;
-use lint_core::{Gate, Headline, Lint, Report, SourceFile, Violation};
-use lint_paths::{Paths, TestFile};
+use lint_core::{Gate, Headline, Lint, Report, SourceFile, TestFile, Violation};
+use lint_paths::Paths;
 
 #[derive(Debug)]
 pub struct NoTestIo;

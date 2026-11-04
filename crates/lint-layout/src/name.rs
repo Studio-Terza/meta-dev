@@ -1,4 +1,6 @@
 mod camel_word;
+mod casing;
+mod length;
 mod lowered;
 mod prefix;
 
@@ -8,11 +10,11 @@ use std::path::Path;
 
 use syn::{Ident, ItemImpl, Type};
 
-use crate::casing::Casing;
-use crate::length::Length;
 use crate::matching::Matching;
 use crate::word::Word;
 pub use camel_word::CamelWord;
+pub use casing::Casing;
+pub use length::Length;
 pub use lowered::Lowered;
 use newtype::Newtype;
 use newtype::proptest::arbitrary::{Arbitrary, any};

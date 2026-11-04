@@ -1,8 +1,10 @@
+mod finding;
+
 use lint_core::Violation;
 use lint_layout::{PathTail, UsePath, Word, words};
 use lint_paths::{Cover, Ground, Use};
 
-use super::Finding;
+use finding::Finding;
 
 #[derive(Debug)]
 pub struct RawPaths;

@@ -1,3 +1,5 @@
+mod finding;
+
 use proc_macro2::Span;
 use syn::visit::{self, Visit};
 use syn::{ExprBreak, ExprContinue, ExprReturn, Macro};
@@ -6,7 +8,7 @@ use lint_core::{Macros, Site, SourceFile, Violation};
 use lint_file::FileLint;
 use lint_layout::LineNumber;
 
-use super::Finding;
+use finding::Finding;
 
 pub struct Exits<'file> {
     file: &'file SourceFile,

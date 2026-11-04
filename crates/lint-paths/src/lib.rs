@@ -6,7 +6,6 @@ mod module;
 mod nested;
 mod resolver;
 mod scopes;
-mod test_file;
 mod uses;
 mod walker;
 mod wanted;
@@ -23,7 +22,6 @@ pub use ground::Ground;
 pub use imports::Imports;
 pub use module::Module;
 pub use nested::Nested;
-pub use test_file::TestFile;
 pub use uses::Use;
 
 #[derive(Debug)]

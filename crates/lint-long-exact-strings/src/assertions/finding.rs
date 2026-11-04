@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lint_layout::Fix;
+use lint_core::Fix;
 
 use super::pinning::Pinning;
 
@@ -22,7 +22,7 @@ impl fmt::Display for Finding {
     }
 }
 
-impl lint_layout::Finding for Finding {
+impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         Fix::new("compare a golden with golden!, or assert on the parts")
     }

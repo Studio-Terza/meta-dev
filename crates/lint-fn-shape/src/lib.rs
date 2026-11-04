@@ -14,8 +14,8 @@ use syn::{
     ItemImpl, ItemMod, ItemTrait, Lit, Local, Macro, Pat, Signature, UnOp,
 };
 
+use lint_core::Bound;
 use lint_core::Macros;
-use lint_core::Most;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -42,8 +42,8 @@ impl Lint for FnShape {
 impl FnShape {
     const BOOLEAN_METHODS: &[Word<'static>] = &words!["contains", "all", "any", "starts_with", "ends_with", "eq", "ne"];
     const BOOLEAN_PREFIXES: [Word<'static>; 2] = words!["is_", "has_"];
-    const NESTING: Most = Most::new(2);
-    const PARAMETERS: Most = Most::new(4);
+    const NESTING: Bound = Bound::Most(2);
+    const PARAMETERS: Bound = Bound::Most(4);
     const FOLDS: [&'static str; 2] = ["fold", "try_fold"];
 
     fn boolean(expr: &Expr) -> Option<&Expr> {

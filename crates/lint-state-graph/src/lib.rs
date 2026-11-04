@@ -1,5 +1,7 @@
 mod declarations;
 mod declared_graphs;
+mod edge;
+mod edge_count;
 mod edge_scan;
 mod field_visibility;
 mod finding;
@@ -15,7 +17,6 @@ use lint_core::{Headline, Lint};
 use lint_file::FileLint;
 use variant_matches::VariantMatches;
 
-use lint_core::Most;
 use lint_core::Report;
 use lint_core::SourceFile;
 
@@ -44,8 +45,4 @@ impl Lint for StateGraph {
                 .collect(),
         )
     }
-}
-
-impl StateGraph {
-    const EDGES_PER_VERTEX: Most = Most::new(4);
 }

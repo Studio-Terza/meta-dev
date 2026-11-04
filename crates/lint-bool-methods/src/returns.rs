@@ -1,3 +1,5 @@
+mod finding;
+
 use syn::visit::{self, Visit};
 use syn::{ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Signature, TraitItemFn};
 
@@ -5,7 +7,7 @@ use lint_core::{Site, SourceFile, Syntax, Violation, Walk};
 use lint_file::FileLint;
 use lint_layout::LineNumber;
 
-use super::Finding;
+use finding::Finding;
 
 pub struct Returns<'file> {
     file: &'file SourceFile,

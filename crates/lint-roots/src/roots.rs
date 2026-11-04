@@ -1,18 +1,19 @@
 mod admission;
 mod directory;
 mod packages;
+mod regrouped;
 mod target;
 
 use admission::Admission;
 use directory::Directory;
 use packages::Packages;
+pub use regrouped::Regrouped;
 
 pub use target::Target;
 
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use crate::regrouped::Regrouped;
 use crate::tree::Tree;
 use file_ports::Files;
 use lint_layout::Failure;

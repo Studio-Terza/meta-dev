@@ -2,6 +2,7 @@ mod failure;
 mod matrix;
 mod mutant_result;
 mod outcomes;
+mod title;
 mod verdict;
 
 use std::ffi::OsString;

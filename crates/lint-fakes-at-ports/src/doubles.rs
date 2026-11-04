@@ -1,5 +1,4 @@
 mod finding;
-mod kind;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -11,9 +10,9 @@ use lint_core::{Site, SourceFile, Violation, Walk};
 use lint_layout::{CamelWord, LineNumber, Name, UsePath, Word, words};
 use lint_paths::{Imports, Module, Nested};
 
+use crate::kind::Kind;
 use crate::port_traits::PortTraits;
 use finding::Finding;
-pub use kind::Kind;
 
 #[derive(Debug, Default)]
 pub struct Doubles<'file> {

@@ -6,7 +6,7 @@ use syn::visit::{self, Visit};
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
 use body_shape::Shape;
-use lint_core::{Least, Site, SourceFile, Walk};
+use lint_core::{Bound, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
 use crate::extent::Extent;
@@ -21,7 +21,7 @@ pub(crate) struct Scan<'file> {
 }
 
 impl<'file> Scan<'file> {
-    const FLOOR: Least = Least::new(40);
+    const FLOOR: Bound = Bound::Least(40);
 
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Node<'file>> {
         let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));

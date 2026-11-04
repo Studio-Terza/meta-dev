@@ -1,7 +1,8 @@
 use std::fmt;
 
+use lint_core::Fix;
 use lint_core::{Site, Violation};
-use lint_layout::{Fix, Name};
+use lint_layout::Name;
 use newtype::Counter;
 use transition_facts::{Ground, Mutation};
 
@@ -86,7 +87,7 @@ impl fmt::Display for Workspace {
     }
 }
 
-impl lint_layout::Finding for Workspace {
+impl lint_core::Finding for Workspace {
     fn fix(&self) -> Fix {
         Fix::new(
             "move each mutation into a store operation, a &mut self method in a store module, or return a new value",

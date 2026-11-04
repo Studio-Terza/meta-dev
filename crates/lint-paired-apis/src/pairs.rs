@@ -1,9 +1,11 @@
+mod pair;
+
 use std::collections::BTreeMap;
 
-use crate::Pair;
 use crate::declared::Declared;
 use crate::owner::Owner;
 use lint_core::Violation;
+use pair::Pair;
 
 #[derive(Debug)]
 pub struct Pairs;

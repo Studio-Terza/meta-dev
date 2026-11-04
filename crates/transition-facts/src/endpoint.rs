@@ -1,7 +1,7 @@
 use lint_layout::{Name, Word};
 use lint_placement::CrateName;
 
-use crate::origins::Spelling;
+use crate::spelling::Spelling;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Nature {

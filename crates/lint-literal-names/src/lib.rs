@@ -7,7 +7,7 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{Ident, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro};
 
-use lint_core::Least;
+use lint_core::Bound;
 use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
@@ -34,7 +34,7 @@ impl Lint for LiteralNames {
 }
 
 impl LiteralNames {
-    const SHORTEST: Least = Least::new(3);
+    const SHORTEST: Bound = Bound::Least(3);
     const VAGUE: [Word<'static>; 24] = words![
         "with", "from", "into", "for", "get", "set", "make", "check", "build", "create", "init", "process", "handle",
         "helper", "util", "data", "value", "item", "thing", "execute", "perform", "update", "compute", "manage",

@@ -1,7 +1,4 @@
 mod exposure;
-mod need;
-mod obligation;
-mod pair;
 mod profile;
 mod reader;
 
@@ -10,8 +7,7 @@ use std::collections::BTreeMap;
 use crate::coverage::Coverage;
 use crate::subject::Subject;
 use exposure::Exposure;
-use lint_core::SourceFile;
-use obligation::Obligation;
+use lint_core::{SourceFile, Violation};
 use profile::{Facets, Profile};
 use reader::Reader;
 
@@ -25,7 +21,7 @@ impl<'file> Facts<'file> {
         files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Facts::read)
     }
 
-    pub(crate) fn unmet(&self, coverage: &Coverage<'_>) -> Vec<Obligation<'_, 'file>> {
+    pub(crate) fn unmet(&self, coverage: &Coverage<'_>) -> Vec<Violation<'file>> {
         self.profiles
             .iter()
             .filter(|(_, facets)| facets.exposure() == Exposure::Public)
