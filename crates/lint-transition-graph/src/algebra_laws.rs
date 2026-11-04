@@ -37,7 +37,10 @@ impl GraphLint for AlgebraLaws {
             by_crate
                 .iter()
                 .filter_map(|(name, operations)| CrateLaws::measured(name, operations, &attached).reported())
-                .chain(declarations.unresolved(algebras, Checked::Operations))
+                .chain(declarations.unresolved(
+                    algebras.operations().map(|operation| *AsRef::<Site<'file>>::as_ref(operation)),
+                    Checked::Operations,
+                ))
                 .collect(),
         )
     }

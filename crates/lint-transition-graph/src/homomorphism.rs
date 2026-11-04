@@ -30,7 +30,10 @@ impl GraphLint for Homomorphisms {
             grouped
                 .iter()
                 .filter_map(|(name, edges)| CrateMorphisms::measured(name, edges, algebras, declarations).reported())
-                .chain(declarations.unresolved(algebras, Checked::Preservation))
+                .chain(declarations.unresolved(
+                    system.edges().iter().filter(|edge| Morphism::of_edge(edge, algebras).is_some()).map(Edge::site),
+                    Checked::Preservation,
+                ))
                 .collect(),
         )
     }

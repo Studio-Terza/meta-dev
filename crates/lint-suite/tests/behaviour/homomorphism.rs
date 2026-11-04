@@ -243,10 +243,8 @@ fn a_preserves_law_that_misses_a_side_says_which_side_and_why() {
 
 #[test]
 fn an_unreadable_closure_in_a_preserves_law_is_reported_on_its_own() {
-    let text = Mapped::lawed(
-        OPERATION_ONLY,
-        "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n",
-    );
+    let text =
+        Mapped::lawed(EDGE, "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n");
     assert!(
         text.contains("crates/x/tests/t.rs:1: law preserves! checks a closure the lint cannot resolve to an operation; pass the operation path"),
         "{text}"
@@ -294,19 +292,33 @@ fn a_foreign_trait_path_on_the_edge_stays_a_type() {
 const NO_OPS_EDGE: &str = "struct A;\nstruct B;\nimpl A {\n    fn into_b(&self) -> B {}\n}\n";
 const PRESERVES_CLOSURE: &str =
     "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n";
+const OPERATIONS_ELSEWHERE: &str = "pub struct A;\npub struct B;\nimpl A {\n    pub fn join(self, other: A) -> A {}\n}\nimpl B {\n    pub fn join(self, other: B) -> B {}\n}\n";
+const FOREIGN_EDGE: &str = "use ops::{A, B};\npub fn into_b(a: A) -> B {}\n";
+const NEITHER: &str = "pub struct C;\n";
 
 #[test]
-fn only_unresolved_preserves_closures_in_packages_with_operations_are_reported() {
+fn only_unresolved_preserves_closures_in_packages_with_in_scope_edges_are_reported() {
     let counts: Vec<usize> = [
         (EDGE, "laws::roundtrip!(rt, any::<A>(), |a: &A| encode(a), |b| decode(b));\n"),
         (EDGE, "laws::associative!(a, any::<A>(), |a: A, b: A| combine(a, b));\n"),
         (NO_OPS_EDGE, PRESERVES_CLOSURE),
         (EDGE, PRESERVES_CLOSURE),
+        (OPERATION_ONLY, PRESERVES_CLOSURE),
+        (FOREIGN_EDGE, PRESERVES_CLOSURE),
+        (NEITHER, PRESERVES_CLOSURE),
     ]
     .iter()
-    .map(|&(source, law)| Mapped::lawed(source, law).matches("checks a closure").count())
+    .map(|&(source, law)| {
+        Mapped::of(&[
+            Mapped::at("crates/ops/src/lib.rs", OPERATIONS_ELSEWHERE),
+            Mapped::at("crates/x/src/lib.rs", source),
+            Mapped::at("crates/x/tests/t.rs", law),
+        ])
+        .matches("checks a closure")
+        .count()
+    })
     .collect();
-    assert_eq!(counts, [0, 0, 0, 1]);
+    assert_eq!(counts, [0, 0, 0, 1, 0, 1, 0]);
 }
 
 const SWAPPED: &str = "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\n";
