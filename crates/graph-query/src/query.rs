@@ -2,6 +2,7 @@ mod boundary;
 mod candidate;
 mod kind;
 mod matches;
+mod role;
 mod term;
 mod top;
 
@@ -13,10 +14,10 @@ use lint_placement::CrateName;
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
-use crate::role::Role;
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
+pub use role::Role;
 pub use term::Term;
 use top::Top;
 
