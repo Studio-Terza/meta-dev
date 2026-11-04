@@ -1,3 +1,4 @@
+mod boundary;
 mod camel_word;
 mod casing;
 mod length;
@@ -12,6 +13,7 @@ use syn::{Ident, ItemImpl, Type};
 
 use crate::matching::Matching;
 use crate::word::Word;
+use boundary::Letters;
 pub use camel_word::CamelWord;
 pub use casing::Casing;
 pub use length::Length;
@@ -23,6 +25,12 @@ pub use prefix::Prefix;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(String);
+
+impl Name {
+    pub fn humps(&self) -> impl Iterator<Item = Name> {
+        self.words().into_iter().flat_map(|chunk| Letters::humps(&chunk.0)).map(|hump| Name::from(Name(hump).lowered()))
+    }
+}
 
 impl Name {
     #[must_use]

@@ -1,6 +1,4 @@
-mod plain;
-
-pub use plain::Newtype;
+use crate::plain::Newtype;
 
 pub trait Counter: Newtype<Inner = usize> + Copy {
     #[must_use]
