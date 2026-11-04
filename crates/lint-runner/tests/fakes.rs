@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Text};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 
 pub struct FakeUnlistable<'memory> {
     memory: &'memory Memory,
@@ -53,6 +53,10 @@ impl Files for FakeUnlistable<'_> {
 
     fn kind(&self, path: &Path) -> Kind {
         self.memory.kind(path)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.memory.size(path)
     }
 }
 
@@ -110,6 +114,10 @@ impl Files for FakeLinked<'_> {
     fn kind(&self, path: &Path) -> Kind {
         Some(path).filter(|path| *path == self.link).map_or_else(|| self.memory.kind(path), |_| Kind::Link)
     }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.memory.size(path)
+    }
 }
 
 pub struct FakeCounted<'memory> {
@@ -164,5 +172,9 @@ impl Files for FakeCounted<'_> {
 
     fn kind(&self, path: &Path) -> Kind {
         self.memory.kind(path)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.memory.size(path)
     }
 }

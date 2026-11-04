@@ -93,8 +93,7 @@ jobs:
           key: history-cold-${{ github.run_id }}
       - name: cold size
         if: success()
-        run: |
-          du -sk "$COLD" | awk '{printf "{\"kilobytes\": %d}\n", $1}' > "$COLD/cold-size.json"
+        run: '"$TOOLS/ci" cold-size "$COLD" "$COLD/cold-size.json"'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
