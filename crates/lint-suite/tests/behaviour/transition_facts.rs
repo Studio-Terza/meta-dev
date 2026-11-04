@@ -217,10 +217,18 @@ fn a_body_records_the_names_it_calls_by_plain_call_and_by_method_in_the_order_th
 #[test]
 fn an_iterator_taken_or_given_reads_as_many_like_a_collection() {
     let found = Read::wrapped(
-        "struct A;\nimpl A {\n    fn many(&self, items: impl IntoIterator<Item = A>) -> impl Iterator<Item = A> {}\n    fn boxed(&self) -> Box<dyn Iterator<Item = A>> {}\n    fn listed(&self) -> Vec<A> {}\n    fn shown(&self, shape: &dyn Shape) -> impl Display {}\n}\n",
+        "struct A;\nimpl A {\n    fn many(&self, items: impl IntoIterator<Item = A>) -> impl Iterator<Item = A> {}\n    fn boxed(&self) -> Box<dyn Iterator<Item = A>> {}\n    fn listed(&self) -> Vec<A> {}\n    fn shown(&self, shape: &dyn Shape) -> impl Display {}\n    fn bound<I: IntoIterator<Item = A>>(&self, items: I) {}\n    fn clause<I>(&self, items: &I) where I: Iterator<Item = A> {}\n    fn plain<T: Clone>(&self, item: T) {}\n}\n",
     );
     assert_eq!(
         found,
-        ["many [Plain, Many] Many", "boxed [Plain] Many", "listed [Plain] Many", "shown [Plain, Plain] Plain"]
+        [
+            "many [Plain, Many] Many",
+            "boxed [Plain] Many",
+            "listed [Plain] Many",
+            "shown [Plain, Plain] Plain",
+            "bound [Plain, Many] Plain",
+            "clause [Plain, Many] Plain",
+            "plain [Plain, Plain] Plain"
+        ]
     );
 }

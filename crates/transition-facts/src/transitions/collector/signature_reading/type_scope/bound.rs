@@ -1,11 +1,11 @@
 use syn::{PathSegment, TraitBoundModifier, TypeParamBound};
 
-use lint_layout::{Name, Whole};
+use lint_layout::Name;
 
 use super::TypeScope;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::resolved::Resolved;
-use crate::wrapping::Wrapping;
+use crate::wrapping::Bounds;
 
 #[derive(Debug)]
 pub(super) struct Bound<'bound>(&'bound TypeParamBound);
@@ -17,8 +17,7 @@ impl<'bound> Bound<'bound> {
 
     pub(super) fn endpoint(&self, scope: &TypeScope<'_>) -> Option<Resolved> {
         let traited = self.traited();
-        let iterated = traited.filter(|last| Name::from(&last.ident).matches::<Whole>(&Wrapping::ITERATORS).is_some());
-        iterated
+        Bounds::iterating(self.0)
             .map(|last| {
                 scope.argument(&last.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))
             })

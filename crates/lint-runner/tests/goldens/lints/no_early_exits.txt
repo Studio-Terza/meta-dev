@@ -4,8 +4,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 casts live in const fns or boundary modules, and const loops walk slices:
 src/lib.rs:11: open loop in const context; walk a slice with while let or recurse
-two functions on one type with the same signature hide a missing type or type parameter:
-src/lib.rs:10: stop, skip share the signature Walker::(&self); distinguish the types they take or return
 control flow is an expression; every branch yields the value the function returns:
 src/lib.rs:16: while loop; drive an iterator with combinators, const fns excepted
 tests go through public APIs:
@@ -18,4 +16,6 @@ src/lib.rs:25: return; yield the value from an if or match expression, drive the
 tests/leaves.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
 src/lib.rs:16: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
+src/lib.rs:10: corpus::Walker: stop at src/lib.rs:10, skip at src/lib.rs:15 share the signature (corpus::Walker) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

@@ -1,22 +1,16 @@
-mod twins;
-
 use std::collections::BTreeMap;
-use std::fmt;
 
-use equivalence::Equivalence;
+use law_facts::Law;
 use law_facts::law_path::{LawPath, Side};
-use law_facts::{Law, Property};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use transition_facts::{Mutation, Transition, Wrapping};
+use transition_facts::{Transition, Wrapping};
 
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::Node;
 use crate::form::{Acting, Form};
-use twins::Lawed;
-pub use twins::Twins;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Totality {
@@ -38,28 +32,6 @@ impl Totality {
             Totality::Partial => Form::Partial(acting),
             Totality::Total => Form::Operation(acting),
         }
-    }
-}
-
-impl fmt::Display for Totality {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Totality::Total => Ok(()),
-            Totality::Partial => write!(formatter, "partial "),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Signature<'op, 'found> {
-    totality: Totality,
-    mutation: Mutation,
-    acting: &'op Acting<'found>,
-}
-
-impl fmt::Display for Signature<'_, '_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}{}", self.acting, self.totality, self.acting.subject())
     }
 }
 
@@ -91,11 +63,6 @@ impl<'found, 'file> Operation<'found, 'file> {
     #[must_use]
     pub fn partial(&self) -> Totality {
         self.partial
-    }
-
-    #[must_use]
-    pub fn signature(&self) -> Signature<'_, 'found> {
-        Signature { totality: self.partial, mutation: self.transition.function().mutation(), acting: &self.acting }
     }
 
     pub(crate) fn ordinal(&self) -> Count {
@@ -141,14 +108,6 @@ impl<'found, 'file> Algebra<'found, 'file> {
     pub(crate) fn operating(&self, law: &Law<'_>, side: Side) -> Option<&Operation<'found, 'file>> {
         self.operations.iter().find(|operation| operation.routed_by(law, side).is_some())
     }
-
-    pub fn twins<'op>(
-        &'op self,
-        laws: impl Fn(&Operation<'found, 'file>) -> &'op [Property],
-        equivalence: Equivalence,
-    ) -> Vec<Twins<'op, 'found, 'file>> {
-        Twins::grouped(self.operations.iter().map(|operation| Lawed::new(operation, laws(operation), equivalence)))
-    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -184,10 +143,6 @@ impl<'found, 'file> Algebras<'found, 'file> {
         node: &Node<'found>,
     ) -> Option<&Operation<'found, 'file>> {
         self.of_type(node).and_then(|algebra| algebra.operating(law, side))
-    }
-
-    pub(crate) fn algebras(&self) -> impl Iterator<Item = &Algebra<'found, 'file>> {
-        self.by_type.values()
     }
 
     pub(crate) fn operations(&self) -> impl Iterator<Item = &Operation<'found, 'file>> {

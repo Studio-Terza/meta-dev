@@ -5,10 +5,10 @@ report only, a clone in the core allocates where a borrow could share; take a re
 free functions are not allowed; make them associated functions or methods:
 src/said.rs:1: fn parse_header; make it an associated function or a method
 src/vague.rs:1: fn get; make it an associated function or a method
-two functions on one type with the same signature hide a missing type or type parameter:
-src/vague.rs:4: handle, go share the signature A::(&self); distinguish the types they take or return
 function names say what the function does:
 src/vague.rs:1: fn get names nothing; say what it does
 src/vague.rs:4: fn handle names nothing; say what it does
 src/vague.rs:5: fn go names nothing; say what it does
+two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
+src/vague.rs:4: corpus::A: handle at src/vague.rs:4, go at src/vague.rs:5 share the signature (A) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

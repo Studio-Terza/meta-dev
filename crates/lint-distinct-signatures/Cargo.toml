@@ -10,11 +10,9 @@ test = false
 doctest = false
 
 [dependencies]
+equivalence = { path = "../equivalence" }
 lint-core = { path = "../lint-core" }
-lint-file = { path = "../lint-file" }
-lint-layout = { path = "../lint-layout" }
-quote.workspace = true
-syn.workspace = true
+lint-transition-graph = { path = "../lint-transition-graph" }
 
 [lints]
 workspace = true

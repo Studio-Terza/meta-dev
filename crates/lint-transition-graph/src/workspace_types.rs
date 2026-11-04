@@ -67,6 +67,12 @@ impl<'found> WorkspaceTypes<'found> {
         Edge::new(transition, ends, fixed_by)
     }
 
+    pub(crate) fn owner(&self, transition: &Transition<'found, '_>) -> Option<End<'found>> {
+        let context = transition.context();
+        let from: &CrateName = transition.as_ref();
+        context.trait_name().map_or(context.subject(), |_| None).map(|subject| self.end(from, subject, None))
+    }
+
     fn end(&self, from: &CrateName, endpoint: &'found Endpoint, fixed_by: Option<&'found Name>) -> End<'found> {
         match endpoint.nature() {
             Nature::Named => self.named(endpoint.origin().unwrap_or(from), endpoint.as_ref()),

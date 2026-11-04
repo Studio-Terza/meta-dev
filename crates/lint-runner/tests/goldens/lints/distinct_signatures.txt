@@ -2,8 +2,6 @@ test budget, report only:
 corpus: 0 tests in 3 files, 0 of 12 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-two functions on one type with the same signature hide a missing type or type parameter:
-src/same.rs:3: left, right share the signature A::(&self) -> u8; distinguish the types they take or return
 a number has a name: outside tests and boundary modules, a literal other than 0 and 1 sits in a const item:
 src/different.rs:4: numeric literal outside a const item; name it as a const so it can be found and tuned
 src/same.rs:4: numeric literal outside a const item; name it as a const so it can be found and tuned
@@ -12,4 +10,6 @@ src/different.rs:3: bare u8 in left; take and return a domain type (a newtype, a
 src/different.rs:4: bare u16 in right; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/same.rs:3: bare u8 in left; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/same.rs:4: bare u8 in right; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
+src/same.rs:3: corpus::A: left at src/same.rs:3, right at src/same.rs:4 share the signature (A) -> u8; distinguish the types they take or return, or keep one method and route the other through it
 fails

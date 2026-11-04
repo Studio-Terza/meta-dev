@@ -3,7 +3,7 @@ mod bounds;
 use syn::{FnArg, GenericArgument, PathArguments, PathSegment, ReturnType, Type};
 
 use crate::associated::Associated;
-use bounds::Bounds;
+pub(crate) use bounds::Bounds;
 use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

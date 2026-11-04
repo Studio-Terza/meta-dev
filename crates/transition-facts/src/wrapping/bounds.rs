@@ -1,13 +1,13 @@
 use syn::punctuated::Punctuated;
 use syn::token::Plus;
-use syn::{PathSegment, TypeParamBound};
+use syn::{PathSegment, TraitBoundModifier, TypeParamBound};
 
 use lint_layout::{Name, Whole};
 
 use super::Wrapping;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Bounds<'bound>(&'bound Punctuated<TypeParamBound, Plus>);
+pub(crate) struct Bounds<'bound>(&'bound Punctuated<TypeParamBound, Plus>);
 
 impl<'bound> Bounds<'bound> {
     pub(super) fn new(bounds: &'bound Punctuated<TypeParamBound, Plus>) -> Bounds<'bound> {
@@ -15,16 +15,19 @@ impl<'bound> Bounds<'bound> {
     }
 
     pub(super) fn wrapping(self) -> Wrapping {
-        self.0
-            .iter()
-            .filter_map(Self::traited)
-            .find(|last| Name::from(&last.ident).matches::<Whole>(&Wrapping::ITERATORS).is_some())
-            .map_or(Wrapping::Plain, |_| Wrapping::Many)
+        Self::wrapping_of(self.0.iter())
     }
 
-    fn traited(bound: &TypeParamBound) -> Option<&PathSegment> {
+    pub(crate) fn wrapping_of<'found>(mut bounds: impl Iterator<Item = &'found TypeParamBound>) -> Wrapping {
+        bounds.find_map(Self::iterating).map_or(Wrapping::Plain, |_| Wrapping::Many)
+    }
+
+    pub(crate) fn iterating(bound: &TypeParamBound) -> Option<&PathSegment> {
         match bound {
-            TypeParamBound::Trait(found) => found.path.segments.last(),
+            TypeParamBound::Trait(found) => Some(found)
+                .filter(|found| matches!(found.modifier, TraitBoundModifier::None))
+                .and_then(|found| found.path.segments.last())
+                .filter(|last| Name::from(&last.ident).matches::<Whole>(&Wrapping::ITERATORS).is_some()),
             _ => None,
         }
     }

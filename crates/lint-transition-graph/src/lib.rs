@@ -1,5 +1,4 @@
 mod algebra;
-mod algebra_duplicates;
 mod algebra_laws;
 mod class;
 mod containment;
@@ -18,6 +17,7 @@ mod listed;
 mod mutation;
 mod parallel;
 mod routes;
+mod signatures;
 mod system;
 mod workspace_types;
 
@@ -27,7 +27,6 @@ use coverage::Coverage;
 use crate_transitions::CrateTransitions;
 use edge::Edge;
 
-pub use algebra_duplicates::AlgebraDuplicates;
 pub use algebra_laws::AlgebraLaws;
 pub use containment::{AcyclicQuotients, ConnectedClusters, InterfaceByConsumers, LowestCluster};
 pub use duplicates::{DuplicateTransitions, OneEdge};
@@ -36,6 +35,7 @@ pub use homomorphism::Homomorphisms;
 pub use mutation::CoreMutation;
 pub use parallel::ParallelStructures;
 pub use routes::RepeatedRoutes;
+pub use signatures::Alike;
 pub use system::{Extraction, TypeSystem};
 
 #[derive(Debug)]
