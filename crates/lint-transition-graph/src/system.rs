@@ -4,6 +4,7 @@ use lint_core::SourceFile;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
+use crate::algebra::Algebras;
 use crate::containment::Containment;
 use crate::edge::Edge;
 use crate::workspace_types::WorkspaceTypes;
@@ -39,6 +40,7 @@ pub struct TypeSystem<'found, 'file> {
     files: &'found [SourceFile],
     extraction: &'found Extraction<'file>,
     containment: OnceCell<Containment<'found, 'file>>,
+    algebras: OnceCell<Algebras<'found, 'file>>,
     transitions: &'found Transitions<'file>,
 }
 
@@ -53,6 +55,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             files,
             extraction,
             containment: OnceCell::new(),
+            algebras: OnceCell::new(),
             transitions: extraction.transitions(),
         }
     }
@@ -61,6 +64,10 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
     pub fn containment(&self) -> &Containment<'found, 'file> {
         self.containment
             .get_or_init(|| Containment::clustered(self.files, self.extraction.facts(), self.extraction.transitions()))
+    }
+
+    pub(crate) fn algebras(&self) -> &Algebras<'found, 'file> {
+        self.algebras.get_or_init(|| Algebras::of_edges(self.edges.iter()))
     }
 
     pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {

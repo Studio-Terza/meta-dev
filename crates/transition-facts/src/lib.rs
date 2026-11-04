@@ -9,6 +9,7 @@ mod resolved;
 mod spelling;
 mod transition;
 mod transitions;
+mod wrapping;
 
 pub use endpoint::{Endpoint, Nature};
 pub use ground::Ground;
@@ -16,3 +17,4 @@ pub use implementer::Implementer;
 pub use mutation::Mutation;
 pub use transition::{Inputs, Output, Transition};
 pub use transitions::Transitions;
+pub use wrapping::Wrapping;

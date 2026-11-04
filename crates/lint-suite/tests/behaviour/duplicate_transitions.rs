@@ -29,6 +29,12 @@ const NO_CONVERSION: &str = "struct Raw;\nstruct Policy;\nimpl Raw {\n    fn pol
 const DIFFERENT_INPUTS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn c(&self) -> C {}\n    fn c_with(&self, b: &B) -> C {}\n    fn b_and_a(b: B, a: A) -> C {}\n}\n";
 const PRIMITIVE_PAIRS: &str = "struct A;\nimpl A {\n    fn ready(&self) -> bool {}\n    fn done(&self) -> bool {}\n    fn label(&self) -> PathBuf {}\n}\n";
 const ALGEBRA: &str = "struct Weight;\nimpl Weight {\n    fn plus(self, other: Weight) -> Weight {}\n    fn least(self, other: Weight) -> Weight {}\n}\n";
+const ACTED_PAIR: &str = "struct A;\nstruct Factor;\nimpl A {\n    fn scale(&self, factor: Factor) -> A {}\n    fn scaled(&self, factor: Factor) -> A {}\n}\n";
+const PURE_PAIR: &str = "struct A;\nimpl A {\n    fn plus(&self, other: &A) -> A {}\n    fn least(&self, other: &A) -> A {}\n    fn bump(&mut self) {}\n}\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
+const CHILDREN: &str = "struct A;\nimpl A {\n    fn children(&self) -> Vec<A> {}\n    fn kids(&self) -> Vec<A> {}\n}\n";
+const FROM_PARTS: &str =
+    "struct A;\nimpl A {\n    fn from_parts(parts: Vec<A>) -> A {}\n    fn merge_all(parts: Vec<A>) -> A {}\n}\n";
+const FOREIGN_ORD: &str = "struct A;\nimpl Ord for A {\n    fn max(self, other: Self) -> Self {}\n    fn min(self, other: Self) -> Self {}\n}\n";
 const SELF_LOOP: &str =
     "struct A;\nstruct B;\nimpl A {\n    fn with(&self, b: &B) -> A {}\n    fn without(&self, b: &B) -> A {}\n}\n";
 const LIFTED: &str = "struct A;\nstruct B;\nimpl A {\n    fn b(&self) -> &B { &self.b }\n    fn made(&self) -> B {}\n}\nmod store {\n    impl A {\n        fn b_mut(&mut self) -> B {}\n    }\n}\n";
@@ -48,6 +54,12 @@ laws::table!(
         ["struct A;\n", "workspace:"] => false,
         [ALGEBRA, "has 2 transitions"] => false,
         [SELF_LOOP, "x::A, x::B -> x::A has 2 transitions"] => true,
+        [ACTED_PAIR, "x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5"] => true,
+        [PURE_PAIR, "has 2 transitions"] => false,
+        [PURE_PAIR, "has 3 transitions"] => false,
+        [CHILDREN, "x::A -> x::A has 2 transitions"] => true,
+        [FROM_PARTS, "x::A -> x::A has 2 transitions"] => true,
+        [FOREIGN_ORD, "has 2 transitions"] => false,
     ]
 );
 

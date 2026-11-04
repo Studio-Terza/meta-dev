@@ -13,7 +13,7 @@ impl<'found> Key<'found> {
         Key { takes, gives }
     }
 
-    pub(crate) fn algebraic(&self) -> Option<&Key<'found>> {
+    pub(crate) fn fixed(&self) -> Option<&Key<'found>> {
         self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
     }
 }

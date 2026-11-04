@@ -1,14 +1,18 @@
 mod share;
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::Fix;
 use lint_core::{Site, Violation};
 use newtype::Counter;
 
+use crate::algebra::{Algebra, Algebras, Totality};
 use crate::class::Class;
 use crate::count::Count;
-use crate::edge::{Edge, Role};
+use crate::edge::Edge;
+use crate::form::Form;
+use crate::system::TypeSystem;
 use share::Share;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -17,22 +21,42 @@ pub(crate) struct Coverage {
     covered: Count,
     lifts: Count,
     operations: Count,
+    algebraic: Count,
+    partial: Count,
 }
 
 impl Coverage {
     pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
+        system: &TypeSystem<'found, 'file>,
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Coverage {
-        edges.fold(Coverage::default(), |tally, edge| tally.counted(edge.role(), edge.ends().class()))
+        let edges: Vec<&Edge<'found, 'file>> = edges.collect();
+        let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
+        edges
+            .iter()
+            .fold(Coverage::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
+            .algebraic(system.algebras(), &sites)
     }
 
-    fn counted(self, role: Role, class: Class) -> Coverage {
-        match role {
-            Role::Written => {
-                Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self }
-            }
-            Role::Lift => Coverage { lifts: self.lifts.incremented(), ..self },
-            Role::Operation => Coverage { operations: self.operations.incremented(), ..self },
+    fn counted(self, form: &Form<'_>, class: Class) -> Coverage {
+        form.sorted(
+            Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self },
+            Coverage { lifts: self.lifts.incremented(), ..self },
+            Coverage { operations: self.operations.incremented(), ..self },
+        )
+    }
+
+    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
+        let operations: Vec<_> = algebras
+            .types()
+            .filter_map(|node| algebras.of_type(node))
+            .flat_map(Algebra::operations)
+            .filter(|operation| sites.contains(AsRef::<Site<'file>>::as_ref(operation.transition())))
+            .collect();
+        Coverage {
+            algebraic: Count::new(operations.len()),
+            partial: Count::new(operations.iter().filter(|operation| operation.partial() == Totality::Partial).count()),
+            ..self
         }
     }
 
@@ -45,12 +69,14 @@ impl fmt::Display for Coverage {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{} written edges, coverage {} of {}, share {}, {} touch a bare primitive; not written: {} derived lifts, {} store operations",
+            "{} written edges, coverage {} of {}, share {}, {} touch a bare primitive; of which {} algebra operations, {} partial; not written: {} derived lifts, {} store operations",
             self.written,
             self.covered,
             self.written,
             Share::between(self.covered, self.written),
             Count::new(self.written.count().saturating_sub(self.covered.count())),
+            self.algebraic,
+            self.partial,
             self.lifts,
             self.operations
         )

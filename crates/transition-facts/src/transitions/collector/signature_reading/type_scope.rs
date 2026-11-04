@@ -46,6 +46,11 @@ impl<'outer> TypeScope<'outer> {
         scope
     }
 
+    pub(super) fn associating(mut self, name: Word<'static>, resolved: Resolved) -> TypeScope<'outer> {
+        self.generics.insert(Name::from(name), resolved);
+        self
+    }
+
     pub(super) fn extended(&self, generics: &Generics) -> TypeScope<'_> {
         TypeScope::declaring(self.selfish, Some(self), generics)
     }
