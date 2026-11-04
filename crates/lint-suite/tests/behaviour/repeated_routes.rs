@@ -22,6 +22,11 @@ const JOINED: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstr
 const SHORT: &str = "struct A;\nstruct B;\nstruct C;\nstruct E;\nstruct F;\nimpl A {\n    fn to_b(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl E {\n    fn first(self, a: A) -> C {\n        a.to_b().to_c()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> C {\n        a.to_b().to_c()\n    }\n}\n";
 const ONCE: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nimpl A {\n    fn to_b(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl E {\n    fn first(self, a: A) -> D {\n        a.to_b().to_c().to_d()\n    }\n}\n";
 const SHARED_NAME: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nstruct G;\nimpl A {\n    fn step(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl G {\n    fn step(self) -> A {}\n}\nimpl E {\n    fn first(self, a: A) -> D {\n        a.step().to_c().to_d()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> D {\n        a.step().to_c().to_d()\n    }\n}\n";
+const STD_RECEIVER: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nimpl A {\n    fn push(self) -> B {}\n}\nimpl B {\n    fn extend(self) -> C {}\n}\nimpl C {\n    fn clear(self) -> D {}\n}\nimpl E {\n    fn first(self, v: Vec<u8>) {\n        v.push();\n        v.extend();\n        v.clear();\n    }\n}\nimpl F {\n    fn second(self, v: Vec<u8>) {\n        v.push();\n        v.extend();\n        v.clear();\n    }\n}\n";
+const OTHER_RECEIVER: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nstruct X;\nimpl A {\n    fn to_b(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl E {\n    fn first(self, x: X) -> D {\n        x.to_b().to_c().to_d()\n    }\n}\nimpl F {\n    fn second(self, x: X) -> D {\n        x.to_b().to_c().to_d()\n    }\n}\n";
+const THROUGH_SELF_AND_PATHS: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct F;\nimpl A {\n    fn to_b(self) -> B {}\n    fn first(self) -> D {\n        C::to_d(B::to_c(self.to_b()))\n    }\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl F {\n    fn second(self, a: A) -> D {\n        C::to_d(B::to_c(A::to_b(a)))\n    }\n}\n";
+const MODULE_PATHS: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nmod steps {\n    pub fn to_b(a: A) -> B {}\n    pub fn to_c(b: B) -> C {}\n    pub fn to_d(c: C) -> D {}\n}\nimpl E {\n    fn first(self, a: A) -> D {\n        steps::to_d(steps::to_c(steps::to_b(a)))\n    }\n}\nimpl F {\n    fn second(self, a: A) -> D {\n        steps::to_d(steps::to_c(steps::to_b(a)))\n    }\n}\n";
+const BORROWED_PARAMETER: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nimpl A {\n    fn to_b(&self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl E {\n    fn first(self, a: &A) -> D {\n        a.to_b().to_c().to_d()\n    }\n}\nimpl F {\n    fn second(self, a: &A) -> D {\n        a.to_b().to_c().to_d()\n    }\n}\n";
 const LONGER: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct H;\nstruct E;\nstruct F;\nimpl A {\n    fn to_b(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl D {\n    fn to_h(self) -> H {}\n}\nimpl E {\n    fn first(self, a: A) -> H {\n        a.to_b().to_c().to_d().to_h()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> H {\n        a.to_b().to_c().to_d().to_h()\n    }\n}\n";
 
 const LOOPING: &str = "struct A;\nstruct E;\nstruct F;\nimpl A {\n    fn step(self) -> A {}\n}\nimpl E {\n    fn first(self, a: A) -> A {\n        a.step().step().step()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> A {\n        a.step().step().step()\n    }\n}\n";
@@ -34,7 +39,12 @@ laws::table!(
         TWICE => 1,
         SHORT => 0,
         ONCE => 0,
-        SHARED_NAME => 0,
+        SHARED_NAME => 1,
+        STD_RECEIVER => 0,
+        OTHER_RECEIVER => 0,
+        THROUGH_SELF_AND_PATHS => 1,
+        MODULE_PATHS => 1,
+        BORROWED_PARAMETER => 1,
         LONGER => 1,
         LOOPING => 0,
     ]

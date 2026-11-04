@@ -2,6 +2,7 @@ use body_lifts::{Body, Branching};
 use lint_core::Site;
 use lint_layout::Name;
 
+use crate::callee::Callee;
 use crate::mutation::Mutation;
 use crate::resolved::Resolved;
 use crate::wrapping::Wrapping;
@@ -17,7 +18,7 @@ pub struct Function<'file> {
     branching: Branching,
     wrapping: Wrapping,
     takings: Vec<Wrapping>,
-    calls: Vec<Name>,
+    calls: Vec<Callee>,
 }
 
 impl<'file> Function<'file> {
@@ -49,7 +50,7 @@ impl<'file> Function<'file> {
         self
     }
 
-    pub(crate) fn called(mut self, calls: Vec<Name>) -> Function<'file> {
+    pub(crate) fn called(mut self, calls: Vec<Callee>) -> Function<'file> {
         self.calls = calls;
         self
     }
@@ -83,7 +84,7 @@ impl<'file> Function<'file> {
     }
 
     #[must_use]
-    pub fn calls(&self) -> &[Name] {
+    pub fn calls(&self) -> &[Callee] {
         &self.calls
     }
 

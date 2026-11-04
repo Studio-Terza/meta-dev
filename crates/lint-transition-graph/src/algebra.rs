@@ -3,6 +3,7 @@ mod twins;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use equivalence::Equivalence;
 use law_facts::law_path::{LawPath, Side};
 use law_facts::{Law, Property};
 use lint_core::Site;
@@ -144,8 +145,9 @@ impl<'found, 'file> Algebra<'found, 'file> {
     pub fn twins<'op>(
         &'op self,
         laws: impl Fn(&Operation<'found, 'file>) -> &'op [Property],
+        equivalence: Equivalence,
     ) -> Vec<Twins<'op, 'found, 'file>> {
-        Twins::grouped(self.operations.iter().map(|operation| Lawed::new(operation, laws(operation))))
+        Twins::grouped(self.operations.iter().map(|operation| Lawed::new(operation, laws(operation), equivalence)))
     }
 }
 

@@ -124,6 +124,12 @@ impl<'found> End<'found> {
     }
 }
 
+impl AsRef<Name> for End<'_> {
+    fn as_ref(&self) -> &Name {
+        self.name
+    }
+}
+
 impl fmt::Display for End<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.node {
