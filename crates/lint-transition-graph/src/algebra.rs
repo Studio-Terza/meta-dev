@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use law_facts::{Law, LawPath, Property};
+use law_facts::{Law, LawPath, Property, Side};
 use lint_core::Site;
 use lint_layout::Name;
 use lint_placement::CrateName;
@@ -141,8 +141,8 @@ impl<'found, 'file> Operation<'found, 'file> {
         AsRef::<Name>::as_ref(self.transition.function())
     }
 
-    pub(crate) fn routed_by<'law>(&self, law: &'law Law<'_>) -> Option<&'law LawPath> {
-        law.routed(AsRef::<Name>::as_ref(self.acting.subject()), self.function())
+    pub(crate) fn routed_by<'law>(&self, law: &'law Law<'_>, side: Side) -> Option<&'law LawPath> {
+        law.routed_on(side, AsRef::<Name>::as_ref(self.acting.subject()), self.function())
     }
 }
 
@@ -169,8 +169,8 @@ impl<'found, 'file> Algebra<'found, 'file> {
         &self.operations
     }
 
-    pub(crate) fn operating(&self, law: &Law<'_>) -> Option<&Operation<'found, 'file>> {
-        self.operations.iter().find(|operation| operation.routed_by(law).is_some())
+    pub(crate) fn operating(&self, law: &Law<'_>, side: Side) -> Option<&Operation<'found, 'file>> {
+        self.operations.iter().find(|operation| operation.routed_by(law, side).is_some())
     }
 
     pub fn twins<'op, 'laws>(
@@ -232,8 +232,13 @@ impl<'found, 'file> Algebras<'found, 'file> {
         self.by_type.get(node)
     }
 
-    pub(crate) fn operating(&self, law: &Law<'_>, node: &Node<'found>) -> Option<&Operation<'found, 'file>> {
-        self.of_type(node).and_then(|algebra| algebra.operating(law))
+    pub(crate) fn operating(
+        &self,
+        law: &Law<'_>,
+        side: Side,
+        node: &Node<'found>,
+    ) -> Option<&Operation<'found, 'file>> {
+        self.of_type(node).and_then(|algebra| algebra.operating(law, side))
     }
 
     pub(crate) fn algebras(&self) -> impl Iterator<Item = &Algebra<'found, 'file>> {

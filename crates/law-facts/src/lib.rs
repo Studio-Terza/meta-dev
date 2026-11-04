@@ -5,10 +5,11 @@ mod operators;
 mod package;
 mod reader;
 mod traits;
+mod uses;
 
 pub use kind::{Kind, Property};
 pub use law::Law;
-pub use law_path::{LawPath, Unresolved};
+pub use law_path::{LawPath, Side};
 pub use operators::Operators;
 pub use package::Package;
 
@@ -45,11 +46,15 @@ impl<'file> Laws<'file> {
     }
 
     #[must_use]
-    pub fn unresolved(&self, package: Package<'_>) -> Vec<Unresolved<'file>> {
-        self.laws.iter().filter_map(|law| law.of_package(package)).filter_map(Law::unresolved).collect()
+    pub fn of_package(&self, package: Package<'_>) -> Vec<&Law<'file>> {
+        self.laws.iter().filter_map(|law| law.of_package(package)).collect()
     }
 
-    fn read(mut self, file: &'file SourceFile, traits: &Traits) -> Laws<'file> {
+    pub fn all(&self) -> impl Iterator<Item = &Law<'file>> {
+        self.laws.iter()
+    }
+
+    fn read(mut self, file: &'file SourceFile, traits: &Traits<'file>) -> Laws<'file> {
         self.laws.extend(Reader::read(file, traits));
         file.test_modules().iter().fold(self, |laws, module| laws.read(module, traits))
     }

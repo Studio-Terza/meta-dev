@@ -197,3 +197,138 @@ fn a_preserves_law_naming_unrelated_operations_does_not_clear_the_edge() {
 fn a_preserves_law_naming_any_operation_of_each_type_clears_the_edge() {
     assert_eq!(Mapped::lawed(OTHER_OPS, MEETING).matches("edges between algebraic types").count(), 0);
 }
+
+const FROM_IMPL: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\nimpl From<A> for B {\n    fn from(a: A) -> B {}\n}\n";
+const CONSTRUCTOR: &str = "struct A;\nstruct B;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn of(a: A) -> B {}\n}\n";
+
+#[test]
+fn a_preserves_law_clears_an_edge_whose_function_belongs_to_the_output_type() {
+    let cleared: Vec<String> = [
+        (FROM_IMPL, "laws::preserves!(keeps, any::<A>(), A::join, B::join, B::from);\n"),
+        (FROM_IMPL, "laws::preserves!(keeps, any::<A>(), A::join, B::join, <B as From<A>>::from);\n"),
+        (FROM_IMPL, "laws::preserves!(keeps, any::<A>(), A::join, B::join, |a: A| B::from(a));\n"),
+        (CONSTRUCTOR, "laws::preserves!(keeps, any::<A>(), A::join, B::join, B::of);\n"),
+    ]
+    .iter()
+    .map(|&(source, law)| Mapped::lawed(source, law))
+    .filter(|text| text.contains("edges between algebraic types"))
+    .collect();
+    assert!(cleared.is_empty(), "{cleared:?}");
+}
+
+const ADDED: &str = "struct A;\nstruct B;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\nimpl A {\n    fn into_b(&self) -> B {}\n}\n";
+
+#[test]
+fn an_output_side_trait_path_or_untyped_closure_resolves_to_the_output_type() {
+    let listed: Vec<String> = [
+        "laws::preserves!(keeps, any::<A>(), A::add, Add::add, A::into_b);\n",
+        "laws::preserves!(keeps, any::<A>(), A::add, |b| Add::add(b, b), A::into_b);\n",
+        "laws::preserves!(keeps, any::<A>(), Add::add, |a, b| a.add(b), A::into_b);\n",
+    ]
+    .iter()
+    .map(|law| Mapped::lawed(ADDED, law))
+    .filter(|text| text.contains("edges between algebraic types"))
+    .collect();
+    assert!(listed.is_empty(), "{listed:?}");
+}
+
+#[test]
+fn a_preserves_law_that_misses_a_side_says_which_side_and_why() {
+    let text = Mapped::lawed(EDGE, "laws::preserves!(keeps, any::<A>(), A::join, A::join, A::into_b);\n");
+    assert!(
+        text.contains("x::A -> x::B: into_b at crates/x/src/lib.rs:5 (law preserves! at crates/x/tests/t.rs:1: output side resolves to A::join, not an operation of x::B)"),
+        "{text}"
+    );
+}
+
+#[test]
+fn an_unreadable_closure_in_a_preserves_law_is_reported_on_its_own() {
+    let text = Mapped::lawed(
+        OPERATION_ONLY,
+        "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n",
+    );
+    assert!(
+        text.contains("crates/x/tests/t.rs:1: law preserves! checks a closure the lint cannot resolve to an operation; pass the operation path"),
+        "{text}"
+    );
+}
+
+const TWO_FROMS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\nimpl C {\n    fn join(self, other: C) -> C {}\n}\nimpl From<A> for B {\n    fn from(a: A) -> B {}\n}\nimpl From<C> for B {\n    fn from(c: C) -> B {}\n}\n";
+
+#[test]
+fn a_conversion_trait_path_on_the_edge_resolves_to_the_generated_type() {
+    let listed: Vec<(&str, String)> = [
+        ("B1", "laws::preserves!(keeps, any::<A>(), A::join, B::join, From::from);\n"),
+        ("B2", "laws::preserves!(keeps, any::<A>(), A::join, B::join, std::convert::From::from);\n"),
+        ("B3", "laws::preserves!(keeps, any::<A>(), A::join, B::join, |a| From::from(a));\n"),
+    ]
+    .iter()
+    .map(|&(id, law)| (id, Mapped::lawed(FROM_IMPL, law)))
+    .filter(|(_, text)| text.contains("edges between algebraic types"))
+    .collect();
+    assert!(listed.is_empty(), "{listed:#?}");
+}
+
+#[test]
+fn a_conversion_trait_path_with_a_primitive_generator_reaches_no_edge() {
+    let text = Mapped::lawed(FROM_IMPL, "laws::preserves!(keeps, any::<u8>(), A::join, B::join, From::from);\n");
+    assert!(text.contains("1 do not; x::A -> x::B: from"), "{text}");
+}
+
+#[test]
+fn a_conversion_trait_path_reaches_only_the_edge_from_the_generated_type() {
+    let text = Mapped::lawed(TWO_FROMS, "laws::preserves!(keeps, any::<A>(), A::join, B::join, From::from);\n");
+    assert!(
+        text.contains("2 edges between algebraic types, 1 declare preservation, 1 do not; x::C -> x::B: from at crates/x/src/lib.rs:"),
+        "{text}"
+    );
+    assert_eq!(text.matches("(law preserves!").count(), 0, "{text}");
+}
+
+#[test]
+fn a_foreign_trait_path_on_the_edge_stays_a_type() {
+    let text = Mapped::lawed(EDGE, "laws::preserves!(keeps, any::<A>(), A::join, B::join, Other::into_b);\n");
+    assert!(text.contains("1 do not; x::A -> x::B: into_b"), "{text}");
+}
+
+const NO_OPS_EDGE: &str = "struct A;\nstruct B;\nimpl A {\n    fn into_b(&self) -> B {}\n}\n";
+const PRESERVES_CLOSURE: &str =
+    "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n";
+
+#[test]
+fn only_unresolved_preserves_closures_in_packages_with_operations_are_reported() {
+    let counts: Vec<usize> = [
+        (EDGE, "laws::roundtrip!(rt, any::<A>(), |a: &A| encode(a), |b| decode(b));\n"),
+        (EDGE, "laws::associative!(a, any::<A>(), |a: A, b: A| combine(a, b));\n"),
+        (NO_OPS_EDGE, PRESERVES_CLOSURE),
+        (EDGE, PRESERVES_CLOSURE),
+    ]
+    .iter()
+    .map(|&(source, law)| Mapped::lawed(source, law).matches("checks a closure").count())
+    .collect();
+    assert_eq!(counts, [0, 0, 0, 1]);
+}
+
+const SWAPPED: &str = "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\n";
+const SWAPPED_SIDES: &str = " (law preserves! at crates/x/tests/t.rs:1: input side resolves to B::join, not an operation of x::A) (law preserves! at crates/x/tests/t.rs:1: output side resolves to A::join, not an operation of x::B)";
+const SWAPPED_SIDES_SECOND: &str = " (law preserves! at crates/x/tests/t.rs:2: input side resolves to B::join, not an operation of x::A) (law preserves! at crates/x/tests/t.rs:2: output side resolves to A::join, not an operation of x::B)";
+
+#[test]
+fn every_failing_side_of_every_reaching_law_is_named() {
+    let one = Mapped::lawed(EDGE, SWAPPED);
+    assert!(one.contains(&format!("x::A -> x::B: into_b at crates/x/src/lib.rs:5{SWAPPED_SIDES}")), "{one}");
+    let two = Mapped::lawed(
+        EDGE,
+        "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\nlaws::preserves!(keeps_too, any::<A>(), B::join, A::join, A::into_b);\n",
+    );
+    assert!(two.contains(&format!("{SWAPPED_SIDES}{SWAPPED_SIDES_SECOND}")), "{two}");
+}
+
+#[test]
+fn one_passing_law_declares_the_edge_beside_a_failing_one() {
+    let text = Mapped::lawed(
+        EDGE,
+        "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\nlaws::preserves!(into_b_keeps_join, any::<A>(), A::join, B::join, A::into_b);\n",
+    );
+    assert_eq!(text.matches("edges between algebraic types").count(), 0, "{text}");
+}

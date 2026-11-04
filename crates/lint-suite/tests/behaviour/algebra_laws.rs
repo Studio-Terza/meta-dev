@@ -189,13 +189,14 @@ fn a_law_credits_only_the_operation_its_call_routes_to() {
 }
 
 const BOTH_ADDS: &str = "struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\nstruct B;\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\n";
-const B_ADD_FORMS: [&str; 6] = [
+const B_ADD_FORMS: [&str; 7] = [
     "laws::associative!(add_regroups, any::<A>(), B::add);\n",
     "laws::associative!(add_regroups, any::<B>(), Add::add);\n",
     "laws::associative!(add_regroups, any::<A>(), <B as Add>::add);\n",
     "impl B {\n    fn regroups() {\n        laws::associative!(add_regroups, any::<A>(), Self::add);\n    }\n}\n",
     "use x::B as Sum;\nlaws::associative!(add_regroups, any::<A>(), Sum::add);\n",
     "use std::ops::Add as Plus;\nlaws::associative!(add_regroups, any::<B>(), Plus::add);\n",
+    "fn regroups() {\n    use x::B as Sum;\n    laws::associative!(add_regroups, any::<A>(), Sum::add);\n}\n",
 ];
 
 #[test]
@@ -231,9 +232,36 @@ fn a_closure_attaches_to_the_method_it_calls_on_its_parameters() {
 fn a_closure_the_lint_cannot_resolve_is_named_with_its_site() {
     let text = Declared::lawed(PRIVATE, "laws::associative!(a_join, any::<A>(), |a: A, b: A| combine(a, b));\n");
     assert!(
-        text.contains("x::A: join; law associative! at crates/x/tests/t.rs:1 checks a closure the lint cannot resolve to an operation; pass the operation path"),
+        text.contains("crates/x/tests/t.rs:1: law associative! checks a closure the lint cannot resolve to an operation; pass the operation path (Type::function), or a closure that calls it on its parameters"),
         "{text}"
     );
+}
+
+#[test]
+fn an_unreadable_closure_is_reported_when_every_operation_has_a_law_and_a_preserves_closure_is_not() {
+    let lawed = "laws::associative!(a_join, any::<A>(), A::join);\nlaws::commutative!(a_swap, any::<A>(), |a: A, b: A| combine(a, b));\nlaws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n";
+    let text = Declared::lawed(PRIVATE, lawed);
+    assert_eq!(
+        (text.matches("law commutative! checks a closure").count(), text.matches("law preserves!").count()),
+        (1, 0),
+        "{text}"
+    );
+}
+
+const JOINS_BESIDE_A_TRAIT: [(&str, &str); 2] = [
+    (
+        "crates/x/src/lib.rs",
+        "struct A;\nstruct Join;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl Join {\n    fn join(self, other: Join) -> Join {}\n}\n",
+    ),
+    ("crates/y/src/lib.rs", "trait Join {}\n"),
+];
+
+#[test]
+fn a_trait_of_another_crate_does_not_capture_a_type_of_the_same_name() {
+    let mut sources: Vec<Source> = JOINS_BESIDE_A_TRAIT.iter().map(|&(path, text)| Declared::at(path, text)).collect();
+    sources.push(Declared::at("crates/x/tests/t.rs", "laws::associative!(join_regroups, any::<A>(), Join::join);\n"));
+    let text = Declared::of(&sources);
+    assert!(text.contains("crate x: 1 of 2 algebra operations declare no law; x::A: join"), "{text}");
 }
 
 #[test]
@@ -271,5 +299,238 @@ fn a_wrapped_operation_operand_or_parameter_attaches_to_the_type_it_resolves_to(
     assert!(
         listed.iter().all(|text| text.contains("crate x: 1 of 3 algebra operations declare no law; x::A: join")),
         "{listed:?}"
+    );
+}
+
+const ONE_JOIN: &str = PRIVATE;
+const Y_TRAIT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub trait Join {}\n" };
+const Y_STRUCT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub struct Join;\n" };
+const W_EMPTY: Extra = Extra { path: "crates/w/src/lib.rs", text: "pub struct Other;\n" };
+const Z_REEXPORT: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join;\n" };
+const Z_RENAMED: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join as Merge;\n" };
+const Z_GLOB: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::*;\n" };
+const Z_PRIVATE: Extra = Extra { path: "crates/z/src/lib.rs", text: "use y::Join;\n" };
+const V_TWO_HOP: Extra = Extra { path: "crates/v/src/lib.rs", text: "pub use z::Join;\n" };
+const X_TRAIT: Extra = Extra { path: "crates/x/src/ops.rs", text: "pub trait Join {}\n" };
+const X_IMPORTS_Y: Extra = Extra { path: "crates/x/src/imports.rs", text: "use y::Join;\n" };
+const P_GLOB: Extra = Extra { path: "crates/p/src/lib.rs", text: "pub use q::*;\n" };
+const Q_GLOB: Extra = Extra { path: "crates/q/src/lib.rs", text: "pub use p::*;\n" };
+const X_IMPORTS_W: Extra = Extra { path: "crates/x/src/imports.rs", text: "use w::Join;\n" };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Expect {
+    Credited,
+    Listed,
+}
+
+impl Expect {
+    const LISTED: &str = "crate x: 1 of 1 algebra operations declare no law; x::A: join";
+
+    fn listings(self) -> usize {
+        match self {
+            Expect::Credited => 0,
+            Expect::Listed => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Extra {
+    path: &'static str,
+    text: &'static str,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Row {
+    id: &'static str,
+    extras: &'static [Extra],
+    law: &'static str,
+    expect: Expect,
+}
+
+impl Row {
+    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Row {
+        Row { id, extras, law, expect }
+    }
+
+    fn failure(&self) -> Option<String> {
+        let sources: Vec<Source> = std::iter::once(Declared::at("crates/x/src/lib.rs", ONE_JOIN))
+            .chain(self.extras.iter().map(|extra| Declared::at(extra.path, extra.text)))
+            .chain(std::iter::once(Declared::at("crates/x/tests/t.rs", self.law)))
+            .collect();
+        let text = Declared::of(&sources);
+        Some(text.matches(Expect::LISTED).count())
+            .filter(|listings| *listings != self.expect.listings())
+            .map(|_| format!("{} expected {:?}: {text}", self.id, self.expect))
+    }
+}
+
+const TRAIT_PATH_FORMS: [Row; 38] = [
+    Row::new("A1", &[Y_TRAIT], "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new(
+        "A2",
+        &[Y_TRAIT],
+        "use y::Join as Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A3",
+        &[Y_TRAIT],
+        "use y::{Join, Other};\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A4", &[Y_TRAIT], "use y::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A5", &[Y_TRAIT], "use y::ops::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A6", &[Y_TRAIT], "laws::associative!(r, any::<A>(), y::Join::join);\n", Expect::Credited),
+    Row::new("A7", &[Y_TRAIT], "use y::ops;\nlaws::associative!(r, any::<A>(), ops::Join::join);\n", Expect::Credited),
+    Row::new(
+        "A8",
+        &[Y_TRAIT],
+        "use y as why;\nlaws::associative!(r, any::<A>(), why::Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A9",
+        &[Y_TRAIT],
+        "fn regroups() {\n    use y::*;\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A10",
+        &[Y_TRAIT],
+        "use y::*;\nimpl A {\n    fn regroups() {\n        laws::associative!(r, any::<A>(), Join::join);\n    }\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A11",
+        &[Y_TRAIT],
+        "use y::*;\nmod inner {\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A12",
+        &[Y_TRAIT, Z_REEXPORT],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A13", &[Y_TRAIT, Z_REEXPORT], "laws::associative!(r, any::<A>(), z::Join::join);\n", Expect::Credited),
+    Row::new(
+        "A14",
+        &[Y_TRAIT, Z_RENAMED],
+        "use z::Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A15",
+        &[Y_TRAIT, Z_GLOB],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A16",
+        &[V_TWO_HOP, Z_REEXPORT, Y_TRAIT],
+        "use v::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A17", &[X_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A18", &[X_TRAIT], "use self::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A19", &[X_TRAIT], "use super::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A20", &[X_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Credited),
+    Row::new("A21", &[X_TRAIT], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A22", &[X_TRAIT], "use x::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new(
+        "A23",
+        &[X_TRAIT],
+        "use Join as Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A24", &[Y_TRAIT, X_IMPORTS_Y], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A25", &[], "laws::associative!(r, any::<A>(), From::from);\n", Expect::Listed),
+    Row::new(
+        "A26",
+        &[P_GLOB, Q_GLOB],
+        "use p::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N1", &[Y_TRAIT], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new("N2", &[Y_STRUCT], "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new(
+        "N3",
+        &[Y_TRAIT, W_EMPTY],
+        "use w::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N4", &[Y_TRAIT, W_EMPTY], "laws::associative!(r, any::<A>(), w::Join::join);\n", Expect::Listed),
+    Row::new("N5", &[Y_TRAIT, W_EMPTY], "use w::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new(
+        "N6",
+        &[Y_TRAIT, W_EMPTY],
+        "use y::*;\nuse w::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new(
+        "N7",
+        &[Y_TRAIT, Z_PRIVATE],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N8", &[Y_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new("N9", &[Y_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Listed),
+    Row::new(
+        "N10",
+        &[X_TRAIT, Y_STRUCT],
+        "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N11", &[], "laws::associative!(r, any::<A>(), Other::join);\n", Expect::Listed),
+    Row::new(
+        "N12",
+        &[Y_TRAIT, W_EMPTY, X_IMPORTS_W],
+        "laws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+];
+
+#[test]
+fn a_trait_path_resolves_through_imports_globs_qualified_paths_and_re_exports() {
+    let failing: Vec<String> = TRAIT_PATH_FORMS.iter().filter_map(Row::failure).collect();
+    assert_eq!(failing, Vec::<String>::new());
+}
+
+const ROUNDTRIP_CLOSURE: &str = "laws::roundtrip!(rt, any::<A>(), |a: &A| encode(a), |b| decode(b));\n";
+const PLAIN_LAW_CLOSURE: &str = "laws::law!(holds, any::<A>(), |a: A| check(a));\n";
+const SWAP_CLOSURE: &str = "laws::commutative!(s, any::<A>(), |a: A, b: A| combine(a, b));\n";
+
+#[test]
+fn an_unresolved_closure_of_every_kind_but_preserves_is_reported() {
+    let reported: Vec<usize> = [("roundtrip", ROUNDTRIP_CLOSURE), ("law", PLAIN_LAW_CLOSURE)]
+        .iter()
+        .map(|&(kind, law)| {
+            Declared::lawed(PRIVATE, law)
+                .matches(&format!(
+                    "crates/x/tests/t.rs:1: law {kind}! checks a closure the lint cannot resolve to an operation"
+                ))
+                .count()
+        })
+        .collect();
+    assert_eq!(reported, [1, 1]);
+}
+
+#[test]
+fn an_unresolved_closure_outside_a_package_with_operations_is_not_reported() {
+    let in_transitions = Declared::lawed(TRANSITION, "laws::idempotent!(settles, any::<A>(), |a: A| normalise(a));\n");
+    let in_other_package = Declared::of(&[
+        Declared::at("crates/x/src/lib.rs", PRIVATE),
+        Declared::at("crates/y/tests/t.rs", SWAP_CLOSURE),
+    ]);
+    let in_both = Declared::of(&[
+        Declared::at("crates/x/src/lib.rs", PRIVATE),
+        Declared::at("crates/x/tests/t.rs", SWAP_CLOSURE),
+        Declared::at("crates/y/tests/t.rs", SWAP_CLOSURE),
+    ]);
+    assert_eq!(
+        [&in_transitions, &in_other_package, &in_both].map(|text| text.matches("checks a closure").count()),
+        [0, 0, 1],
+        "{in_transitions}{in_other_package}{in_both}"
     );
 }

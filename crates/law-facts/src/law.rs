@@ -4,7 +4,7 @@ use lint_core::Site;
 use lint_layout::Name;
 
 use crate::kind::Kind;
-use crate::law_path::{LawPath, Route, Unresolved};
+use crate::law_path::{LawPath, Route, Side, Unresolved};
 use crate::package::Package;
 
 #[derive(Debug)]
@@ -62,6 +62,16 @@ impl<'file> Law<'file> {
     }
 
     #[must_use]
+    pub fn routed_on(&self, side: Side, owner: &Name, member: &Name) -> Option<&LawPath> {
+        self.routes.iter().filter_map(|route| route.of_side(side)).find_map(|route| route.reaching(owner, member))
+    }
+
+    #[must_use]
+    pub fn on_side(&self, side: Side) -> Option<&Route> {
+        self.routes.iter().find_map(|route| route.of_side(side))
+    }
+
+    #[must_use]
     pub fn unresolved(&self) -> Option<Unresolved<'file>> {
         self.routes.iter().find_map(Route::closure).map(|_| self.origin.unresolved())
     }
@@ -69,5 +79,11 @@ impl<'file> Law<'file> {
     #[must_use]
     pub fn mentions(&self) -> &BTreeSet<Name> {
         &self.mentions
+    }
+}
+
+impl<'file> AsRef<Site<'file>> for Law<'file> {
+    fn as_ref(&self) -> &Site<'file> {
+        &self.origin.site
     }
 }

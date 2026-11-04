@@ -38,17 +38,17 @@ impl<'file> Extraction<'file> {
 pub struct TypeSystem<'found, 'file> {
     types: WorkspaceTypes<'found>,
     edges: Vec<Edge<'found, 'file>>,
-    files: &'found [SourceFile],
+    files: &'file [SourceFile],
     extraction: &'found Extraction<'file>,
     containment: OnceCell<Containment<'found, 'file>>,
     algebras: OnceCell<Algebras<'found, 'file>>,
-    declarations: OnceCell<Declarations<'found>>,
+    declarations: OnceCell<Declarations<'file>>,
     transitions: &'found Transitions<'file>,
 }
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
     #[must_use]
-    pub fn built_from(files: &'found [SourceFile], extraction: &'found Extraction<'file>) -> TypeSystem<'found, 'file> {
+    pub fn built_from(files: &'file [SourceFile], extraction: &'found Extraction<'file>) -> TypeSystem<'found, 'file> {
         let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
         TypeSystem {
@@ -73,7 +73,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         self.algebras.get_or_init(|| Algebras::of_edges(self.edges.iter()))
     }
 
-    pub(crate) fn declarations(&self) -> &Declarations<'found> {
+    pub(crate) fn declarations(&self) -> &Declarations<'file> {
         self.declarations.get_or_init(|| Declarations::from(self.files))
     }
 
