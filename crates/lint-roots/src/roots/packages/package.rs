@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use crate::roots::directory::Directory;
 use crate::roots::target::Target;
 use crate::survey::Survey;
 use crate::tree::Tree;
@@ -30,8 +31,8 @@ impl Package {
     }
 
     #[must_use]
-    pub fn target_directories(&self) -> Vec<PathBuf> {
-        Self::TARGET_DIRECTORIES.iter().map(|directory| self.directory.join(directory)).collect()
+    pub fn target_directories(&self) -> Vec<Directory> {
+        Self::TARGET_DIRECTORIES.iter().map(|directory| Directory::new(self.directory.join(directory))).collect()
     }
 
     #[must_use]
@@ -39,7 +40,7 @@ impl Package {
         let crates: Vec<PathBuf> = self
             .target_directories()
             .iter()
-            .flat_map(|directory| survey.entries(directory))
+            .flat_map(|directory| survey.entries(directory.as_ref()))
             .filter_map(|entry| Self::crate_root(survey, entry))
             .collect();
         let Package { directory, declared } = self;

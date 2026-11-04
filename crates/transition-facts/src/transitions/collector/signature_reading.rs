@@ -59,7 +59,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
             let resolved = scope.endpoint(output);
             scope.associating(resolved)
         });
-        let output = found.items.iter().find_map(Self::output).map(Wrapping::peeled);
+        let output = found.items.iter().find_map(Self::output).map(|found| Wrapping::peeled(found, &|_| None));
         SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins, output }
     }
 
@@ -89,8 +89,8 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 Branches::scored(body, Propagation::Ambient),
             )
             .wrapped(
-                Wrapping::returned(&signature.output, self.output),
-                signature.inputs.iter().map(Wrapping::taken).collect(),
+                Wrapping::returned(&signature.output, self.output, &|name| scope.generic_wrapping(name)),
+                signature.inputs.iter().map(|input| scope.taken(input)).collect(),
             )
             .called(Calls::made(signature, body))
     }

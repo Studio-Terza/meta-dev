@@ -1,4 +1,3 @@
-mod algebra_duplicates;
 mod algebra_laws;
 mod arbitrary_newtypes;
 mod bool_methods;

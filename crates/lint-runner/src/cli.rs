@@ -7,10 +7,9 @@ mod stack_size;
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
-use std::panic::resume_unwind;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::thread::{self, ScopedJoinHandle};
+use std::thread;
 
 use file_ports::Files;
 use lint_reader::SourceFiles;
@@ -42,26 +41,15 @@ impl Cli {
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
-        let spawned = thread::scope(|scope| {
-            StackSize::LINT
-                .builder()
-                .spawn_scoped(scope, || self.reported_to(files, out, err))
-                .map(ScopedJoinHandle::join)
-        });
-        spawned.map_or_else(
-            |failure| Self::refused(&failure, err),
-            |joined| joined.unwrap_or_else(|payload| resume_unwind(payload)),
-        )
-    }
-
-    fn reported_to(&self, files: &(impl Files + Sync), out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         match self.mode.refusal() {
             Some(refused) => Self::refused(refused, err),
-            None => self.ended(&Sources::new(files, &self.roots), out, err),
+            None => StackSize::LINT
+                .ran(|| self.linted(&Sources::new(files, &self.roots), out, err))
+                .unwrap_or_else(|failure| Self::refused(&failure, err)),
         }
     }
 
-    fn ended(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+    fn linted(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
         thread::scope(|scope| {
             let helpers = self.mode.helpers(scope, sources);
             let read = SourceFiles::read_all(sources.files(), sources.roots());

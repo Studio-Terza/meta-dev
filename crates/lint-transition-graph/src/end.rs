@@ -110,10 +110,6 @@ impl<'found> End<'found> {
         End { place: Place::Domain, name: node.name, node: Some(node) }
     }
 
-    pub(crate) fn place(&self) -> Place {
-        self.place
-    }
-
     #[must_use]
     pub fn node(&self) -> Option<&Node<'found>> {
         self.node.as_ref()
@@ -155,8 +151,8 @@ impl<'found> Ends<'found> {
         Ends { implementer, ..self }
     }
 
-    pub(crate) fn all(&self) -> impl Iterator<Item = &End<'found>> {
-        self.takes.iter().chain([&self.gives])
+    pub(crate) fn placed(&self, place: Place) -> impl Iterator<Item = &End<'found>> {
+        self.takes.iter().chain([&self.gives]).filter(move |end| end.place == place)
     }
 
     pub(crate) fn takes(&self) -> &[End<'found>] {
@@ -177,7 +173,7 @@ impl<'found> Ends<'found> {
     }
 
     pub(crate) fn class(&self) -> Class {
-        match self.all().find(|end| end.place == Place::Primitive) {
+        match self.placed(Place::Primitive).next() {
             Some(_) => Class::Primitive,
             None => Class::Covered,
         }

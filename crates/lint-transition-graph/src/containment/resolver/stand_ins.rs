@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lint_item_graph::{ItemGraph, NodeIndex};
+use lint_item_graph::ItemGraph;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
@@ -9,14 +9,11 @@ pub(crate) struct StandIns<'found>(BTreeMap<&'found CrateName, BTreeMap<Name, Ve
 
 impl<'found> StandIns<'found> {
     pub(crate) fn with_graph(self, krate: &'found CrateName, graph: &ItemGraph) -> StandIns<'found> {
-        graph.stand_ins().iter().fold(self, |stand_ins, index| stand_ins.standing(krate, graph, *index))
+        graph.stand_ins().into_iter().fold(self, |stand_ins, (name, used)| stand_ins.standing(krate, name, &used))
     }
 
-    fn standing(mut self, krate: &'found CrateName, graph: &ItemGraph, index: NodeIndex) -> StandIns<'found> {
-        let used = graph.links().get(index.into_inner()).into_iter().flatten();
-        let named: Vec<Name> = used.filter_map(|used| graph.name_at(*used).cloned()).collect();
-        let standing = graph.name_at(index).cloned().map(|name| BTreeMap::from([(name, named)]));
-        self.0.entry(krate).or_default().extend(standing.unwrap_or_default());
+    fn standing(mut self, krate: &'found CrateName, name: &Name, used: &[&Name]) -> StandIns<'found> {
+        self.0.entry(krate).or_default().insert(name.clone(), used.iter().copied().cloned().collect());
         self
     }
 

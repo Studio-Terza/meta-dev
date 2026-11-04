@@ -62,7 +62,7 @@ pub struct Lints;
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 impl Lints {
-    const CHECKS: [Check; 46] = [
+    const CHECKS: [Check; 45] = [
         |readout| vec![NoComments::report(readout.files())],
         |readout| vec![NoFreeFns::report(readout.files())],
         |readout| vec![ThinMain::report(readout.files())],
@@ -71,7 +71,6 @@ impl Lints {
         |readout| vec![EnumPredicates::report(readout.files())],
         |readout| vec![ConstShape::report(readout.files())],
         |readout| vec![TypeShape::report(readout.files())],
-        |readout| vec![DistinctSignatures::report(readout.files())],
         |readout| vec![ExpressionFlow::report(readout.files())],
         |readout| vec![FnShape::report(readout.files())],
         |readout| vec![LiteralNames::report(readout.files())],
@@ -111,7 +110,10 @@ impl Lints {
         |readout| {
             let extraction = Extraction::from(readout.files());
             let system = TypeSystem::built_from(readout.files(), &extraction);
-            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system)].into_iter().flatten().collect()
+            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
+                .into_iter()
+                .flatten()
+                .collect()
         },
         |readout| vec![UnconsumedTraits::report(readout.files())],
         |readout| vec![RustOnly::report(readout.repo_files())],

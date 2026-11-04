@@ -2,10 +2,10 @@ test budget, report only:
 corpus: 0 tests in 4 files, 0 of 26 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-two functions on one type with the same signature hide a missing type or type parameter:
-src/crowded.rs:3: one, two, three, four, five share the signature A::(&self); distinguish the types they take or return
-src/enough.rs:3: one, two, three, four share the signature A::(&self); distinguish the types they take or return
-src/public.rs:3: one, two, three, four, five share the signature A::(&self); distinguish the types they take or return
 too many private fns; a type's logic belongs in its interface or in more types:
 src/crowded.rs:1: A has 5 private fns, at most 4 allowed: one, two, three, four, five; move the logic into its public interface or into more types
+two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
+src/crowded.rs:3: A: one at src/crowded.rs:3, two at src/crowded.rs:4, three at src/crowded.rs:5, four at src/crowded.rs:6, five at src/crowded.rs:7 share the signature (A) -> (); distinguish the types they take or return, or keep one method and route the other through it
+src/enough.rs:3: A: one at src/enough.rs:3, two at src/enough.rs:4, three at src/enough.rs:5, four at src/enough.rs:6 share the signature (A) -> (); distinguish the types they take or return, or keep one method and route the other through it
+src/public.rs:3: A: one at src/public.rs:3, two at src/public.rs:4, three at src/public.rs:5, four at src/public.rs:6, five at src/public.rs:7 share the signature (A) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

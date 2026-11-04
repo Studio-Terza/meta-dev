@@ -1,5 +1,7 @@
 mod boundary;
 
+use newtype::{Arbitrary, Display, Newtype};
+
 use crate::matching::Matching;
 use crate::name::Name;
 use crate::word::Word;
@@ -8,14 +10,26 @@ use boundary::Letters;
 #[derive(Debug)]
 pub struct CamelWord;
 
+#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Hump(Name);
+
 impl Name {
-    pub fn humps(&self) -> impl Iterator<Item = Name> {
-        self.words().into_iter().flat_map(|chunk| Letters::humps(&chunk.0)).map(|hump| Name::from(Name(hump).lowered()))
+    pub fn humps(&self) -> impl Iterator<Item = Hump> {
+        self.words()
+            .into_iter()
+            .flat_map(|chunk| Letters::humps(&chunk.0))
+            .map(|hump| Hump(Name::from(Name(hump).lowered())))
+    }
+}
+
+impl AsRef<Name> for Hump {
+    fn as_ref(&self) -> &Name {
+        &self.0
     }
 }
 
 impl Matching for CamelWord {
     fn holds<'word>(name: &Name, word: Word<'word>) -> Option<Word<'word>> {
-        name.humps().find_map(|hump| (hump == word).then_some(word))
+        name.humps().find_map(|hump| (*hump.as_ref() == word).then_some(word))
     }
 }
