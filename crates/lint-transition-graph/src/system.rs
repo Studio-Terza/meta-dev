@@ -44,6 +44,7 @@ pub struct TypeSystem<'found, 'file> {
     algebras: OnceCell<Algebras<'found, 'file>>,
     declarations: OnceCell<Declarations<'file>>,
     transitions: &'found Transitions<'file>,
+    facts: &'found Facts<'file>,
 }
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
@@ -60,6 +61,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             algebras: OnceCell::new(),
             declarations: OnceCell::new(),
             transitions: extraction.transitions(),
+            facts: extraction.facts(),
         }
     }
 
@@ -83,6 +85,14 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     pub(crate) fn edges(&self) -> &[Edge<'found, 'file>] {
         &self.edges
+    }
+
+    pub(crate) fn files(&self) -> &'file [SourceFile] {
+        self.files
+    }
+
+    pub(crate) fn facts(&self) -> &'found Facts<'file> {
+        self.facts
     }
 
     pub(crate) fn transitions(&self) -> &'found Transitions<'file> {
