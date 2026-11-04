@@ -12,7 +12,7 @@ use lint_clones::Clones;
 use lint_core::{Lint, Readout, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
-use lint_transition_graph::Extraction;
+use lint_transition_graph::{Extraction, TypeSystem};
 
 use super::boundary::Helpers;
 use super::{Outcome, Sources};
@@ -101,7 +101,7 @@ impl Mode {
             .iter()
             .try_for_each(|query| {
                 let extraction = Extraction::from(files);
-                write!(out, "{}", query.matches(extraction.facts(), extraction.transitions()))
+                write!(out, "{}", query.reply(&TypeSystem::built_from(files, &extraction)))
             })
             .ok();
         Outcome::Clean

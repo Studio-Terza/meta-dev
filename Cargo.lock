@@ -215,6 +215,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-transition-graph",
  "newtype",
  "syn 2.0.119",
  "text-lines",

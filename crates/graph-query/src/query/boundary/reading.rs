@@ -1,15 +1,28 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use lint_layout::Name;
+use lint_transition_graph::Ask;
+
 use crate::boundary::QueryFailure;
 use crate::query::Query;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Item {
+    Defined,
+    Uses,
+    Users,
+    Implementers,
+    Cluster,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Expecting {
     Word,
     Root,
     Role,
     Top,
+    Item(Item),
 }
 
 #[derive(Debug)]
@@ -31,11 +44,31 @@ impl TryFrom<&[OsString]> for Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 3] =
-        [("--in", Expecting::Root), ("--role", Expecting::Role), ("--top", Expecting::Top)];
+    const FLAGS: [(&'static str, Expecting); 8] = [
+        ("--in", Expecting::Root),
+        ("--role", Expecting::Role),
+        ("--top", Expecting::Top),
+        ("--defined", Expecting::Item(Item::Defined)),
+        ("--uses", Expecting::Item(Item::Uses)),
+        ("--users", Expecting::Item(Item::Users)),
+        ("--implementers", Expecting::Item(Item::Implementers)),
+        ("--cluster", Expecting::Item(Item::Cluster)),
+    ];
 
     fn flag(word: &str) -> Option<Expecting> {
         Self::FLAGS.into_iter().find(|(flag, _)| *flag == word).map(|(_, expecting)| expecting)
+    }
+}
+
+impl Item {
+    fn ask(self, name: Name) -> Ask {
+        match self {
+            Item::Defined => Ask::Defined(name),
+            Item::Uses => Ask::Uses(name),
+            Item::Users => Ask::Users(name),
+            Item::Implementers => Ask::Implementers(name),
+            Item::Cluster => Ask::Cluster(name),
+        }
     }
 }
 
@@ -48,6 +81,9 @@ impl Reading {
             }
             Expecting::Role => Ok(Reading { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
             Expecting::Top => Ok(Reading { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
+            Expecting::Item(item) => {
+                Ok(Reading { query: self.query.with_ask(item.ask(Name::from(word))), expecting: Expecting::Word })
+            }
         }
     }
 
@@ -61,7 +97,7 @@ impl Reading {
     fn done(self) -> Result<Query, QueryFailure> {
         match self.expecting {
             Expecting::Word => Self::asked(self.query),
-            Expecting::Root | Expecting::Role | Expecting::Top => Err(QueryFailure::Unfinished),
+            Expecting::Root | Expecting::Role | Expecting::Top | Expecting::Item(_) => Err(QueryFailure::Unfinished),
         }
     }
 

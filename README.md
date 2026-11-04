@@ -198,6 +198,7 @@ stay split by lint because `crate_graph` flags a crate whose cycle spans more th
 Before writing a new trait, port or store, ask what already exists:
 
     lint query <term>... [--role '<fn signature>']... [--top <n>] [--in <path>]...
+               [--defined <name>]... [--uses <name>]... [--users <name>]... [--implementers <name>]... [--cluster <name>]...
 
 It reads the shipped code under each `--in` path (the current directory by default) through the same extraction the
 transition graph uses (`type-facts` and `transition-facts`, no second parser) and lists the traits, generic impls, ports
@@ -214,6 +215,21 @@ The command blocks nothing and exits non-zero only on malformed arguments.
         search fn(&self, _) -> many fits fn(&self, _) -> many
     score 2: generic impl Lookup for T in search at crates/search/src/lib.rs:14
         find fn(&self, _) -> many fits fn(&self, _) -> many
+
+`--defined`, `--uses`, `--users`, `--implementers` and `--cluster` ask about one type or trait by its bare name: where it
+is defined, what it uses, what uses it, what implements it, and the module and lowest cluster it sits in with its
+siblings. A name shared by several items is answered once under each full path. The answers come from the containment
+view, so a field, a bound, an impl, a signature or a body each count as a use; only types and traits are indexed, not
+functions. The questions combine with each other and with terms and roles.
+
+    $ lint query --users Cents --implementers Priced
+    users of Cents:
+      shop::Cents at crates/shop/src/lib.rs:5
+        Line at crates/shop/src/till.rs:2
+        Priced at crates/shop/src/lib.rs:2
+    implementers of Priced:
+      shop::Priced at crates/shop/src/lib.rs:2
+        Line at crates/shop/src/till.rs:2
 
 ## Rust only
 
