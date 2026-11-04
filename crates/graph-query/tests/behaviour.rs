@@ -17,7 +17,7 @@ const ITEMS: [Source; 3] = [
     Source::new(
         Located::new("crates/shop/src/lib.rs"),
         Text::new(
-            "mod till;\npub trait Priced {\n    fn price(&self) -> Cents;\n}\npub struct Cents;\npub struct Basket(till::Line);\n",
+            "mod till;\npub trait Priced {\n    fn price(&self) -> Cents;\n}\npub struct Cents;\npub struct Basket(till::Line);\nimpl<T: Clone> Priced for Vec<T> {\n    fn price(&self) -> Cents {}\n}\nimpl Priced for u32 {\n    fn price(&self) -> Cents {}\n}\n",
         ),
     ),
     Source::new(
@@ -38,6 +38,22 @@ const CHAINS: [Source; 3] = [
     Source::new(Located::new("crates/zeta/src/lib.rs"), Text::new("pub struct Start(shop::Cents);\n")),
 ];
 
+const AUDIT: [Source; 3] = [
+    Source::new(
+        Located::new("crates/shop/src/lib.rs"),
+        Text::new(
+            "pub struct Cents;\npub trait Display {}\npub trait Priced {}\nimpl Priced for [u8] {}\nimpl Priced for (Cents, u8) {}\nimpl Priced for dyn Display {}\nimpl Priced for fn(u8) -> u8 {}\nimpl Priced for u32 {}\n",
+        ),
+    ),
+    Source::new(
+        Located::new("crates/bank/src/lib.rs"),
+        Text::new(
+            "pub trait Audited {}\npub struct Ledger;\nimpl Audited for shop::Cents {}\nimpl Audited for Ledger {}\nimpl std::fmt::Display for Box<Ledger> {}\n",
+        ),
+    ),
+    Source::new(Located::new("crates/bank/src/other.rs"), Text::new("pub struct Other;\n")),
+];
+
 struct Asked;
 
 impl Asked {
@@ -54,6 +70,10 @@ impl Asked {
 
     fn answered(words: &&[&str]) -> Vec<String> {
         Self::answered_in(&ITEMS, words)
+    }
+
+    fn audited(words: &&[&str]) -> Vec<String> {
+        Self::answered_in(&AUDIT, words)
     }
 
     fn chained(words: &&[&str]) -> Vec<String> {
@@ -148,6 +168,36 @@ fn a_role_agrees_on_receiver_arity_self_arguments_and_return_shape() {
     );
 }
 
+laws::table!(impls_in_another_crate_resolve_to_the_indexed_type_keep_the_trait_path_and_spell_every_self_type, Asked::audited, [
+    &["--implementers", "Audited", "--uses", "Cents", "--users", "Audited"][..] => vec![
+        "implementers of Audited:".to_owned(),
+        "  bank::Audited at crates/bank/src/lib.rs:1".to_owned(),
+        "    Cents at crates/shop/src/lib.rs:1".to_owned(),
+        "    Ledger at crates/bank/src/lib.rs:2".to_owned(),
+        "what Cents uses:".to_owned(),
+        "  shop::Cents at crates/shop/src/lib.rs:1".to_owned(),
+        "    Audited at crates/bank/src/lib.rs:1".to_owned(),
+        "users of Audited:".to_owned(),
+        "  bank::Audited at crates/bank/src/lib.rs:1".to_owned(),
+        "    Cents at crates/shop/src/lib.rs:1".to_owned(),
+        "    Ledger at crates/bank/src/lib.rs:2".to_owned(),
+    ],
+    &["--implementers", "Display"][..] => vec![
+        "implementers of Display:".to_owned(),
+        "  shop::Display at crates/shop/src/lib.rs:2".to_owned(),
+        "    none".to_owned(),
+    ],
+    &["--implementers", "Priced"][..] => vec![
+        "implementers of Priced:".to_owned(),
+        "  shop::Priced at crates/shop/src/lib.rs:3".to_owned(),
+        "    impl for (Cents, u8) at crates/shop/src/lib.rs:5".to_owned(),
+        "    impl for [u8] at crates/shop/src/lib.rs:4".to_owned(),
+        "    impl for dyn Display at crates/shop/src/lib.rs:6".to_owned(),
+        "    impl for fn(u8) -> u8 at crates/shop/src/lib.rs:7".to_owned(),
+        "    impl for u32 at crates/shop/src/lib.rs:8".to_owned(),
+    ],
+]);
+
 laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
     &["--defined", "Line"][..] => vec![
         "definitions of Line:".to_owned(),
@@ -161,6 +211,8 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "implementers of Priced:".to_owned(),
         "  shop::Priced at crates/shop/src/lib.rs:2".to_owned(),
         "    Line at crates/shop/src/till.rs:2".to_owned(),
+        "    impl for Vec at crates/shop/src/lib.rs:7".to_owned(),
+        "    impl for u32 at crates/shop/src/lib.rs:10".to_owned(),
     ],
     &["--uses", "Line"][..] => vec![
         "what Line uses:".to_owned(),

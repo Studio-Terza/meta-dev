@@ -1,3 +1,4 @@
+mod described;
 mod impl_block;
 mod referenced;
 
@@ -19,6 +20,7 @@ use crate::spelled::Spelled;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
 use crate::via::Via;
+use described::Described;
 pub(crate) use impl_block::ImplBlock;
 use referenced::Referenced;
 
@@ -101,18 +103,20 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_impl(&mut self, found: &'ast ItemImpl) {
-        let target = Spelled::last_of(&found.self_ty);
+        let target = Described::name(&found.self_ty);
         let methods = found.items.iter().filter_map(|item| Method::of_impl_item(item, target.as_ref()));
-        let implemented = found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
+        let trait_path = found.trait_.as_ref().map(|(_, path, _)| path);
+        let implemented = trait_path.and_then(|path| path.segments.last());
         let site = self.site_at(found.impl_token.span);
         let (implemented_methods, inherent): (Vec<Method>, Vec<Method>) = methods.partition(|_| implemented.is_some());
-        let implementation = implemented.map(|segment| {
+        let implementation = implemented.zip(trait_path).map(|(segment, path)| {
             Implementation::new(
                 Name::from(&segment.ident),
                 Spelled::first_argument_of(segment),
                 implemented_methods,
                 site,
             )
+            .qualified(Spelled::qualifier(path), Spelled::qualifier_of(&found.self_ty))
         });
         let walk = Walk::outside_tests(&found.attrs);
         let generic =

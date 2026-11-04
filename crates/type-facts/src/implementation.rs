@@ -3,10 +3,21 @@ use lint_layout::Name;
 
 use crate::method::Method;
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TargetPath(Vec<Name>);
+
+impl AsRef<[Name]> for TargetPath {
+    fn as_ref(&self) -> &[Name] {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Implementation<'file> {
     implemented: Name,
     argument: Option<Name>,
+    written: Vec<Name>,
+    target_path: TargetPath,
     methods: Vec<Method>,
     site: Site<'file>,
 }
@@ -18,7 +29,30 @@ impl<'file> Implementation<'file> {
         methods: Vec<Method>,
         site: Site<'file>,
     ) -> Implementation<'file> {
-        Implementation { implemented, argument, methods, site }
+        Implementation {
+            implemented,
+            argument,
+            written: Vec::new(),
+            target_path: TargetPath(Vec::new()),
+            methods,
+            site,
+        }
+    }
+
+    pub(crate) fn qualified(mut self, written: Vec<Name>, target_path: Vec<Name>) -> Implementation<'file> {
+        self.written = written;
+        self.target_path = TargetPath(target_path);
+        self
+    }
+
+    #[must_use]
+    pub fn written(&self) -> &[Name] {
+        &self.written
+    }
+
+    #[must_use]
+    pub fn target_path(&self) -> &TargetPath {
+        &self.target_path
     }
 
     #[must_use]

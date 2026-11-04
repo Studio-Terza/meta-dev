@@ -25,7 +25,11 @@ impl fmt::Display for Neighbours<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let view = self.named.view();
         self.named.each(formatter, |formatter, member| {
-            write!(formatter, "{}", Listing::new(view, view.adjacent(member, self.toward), self.listed))
+            write!(
+                formatter,
+                "{}",
+                Listing::new(view, view.adjacent(member, self.toward), view.outside(member, self.toward), self.listed)
+            )
         })
     }
 }
