@@ -379,3 +379,226 @@ fn a_bare_twin_resolves_to_the_one_in_its_own_module() {
         ]
     );
 }
+
+#[test]
+fn an_imported_workspace_type_wins_over_a_local_twin() {
+    let imported = [
+        Clustered::at("crates/x/src/lib.rs", "mod document;\nmod excerpt;\n"),
+        Clustered::at("crates/x/src/document.rs", "mod text;\npub struct Document(text::Text);\n"),
+        Clustered::at("crates/x/src/document/text.rs", "pub struct Text;\n"),
+        Clustered::at("crates/x/src/excerpt.rs", "mod boundary;\npub struct Excerpt;\n"),
+        Clustered::at(
+            "crates/x/src/excerpt/boundary.rs",
+            "use files::Text;\nuse super::Excerpt;\nimpl From<&Text> for Excerpt {\n    fn from(reason: &Text) -> Excerpt {\n        Excerpt::new(reason)\n    }\n}\n",
+        ),
+        Clustered::at("crates/files/src/lib.rs", "mod text;\npub use text::Text;\n"),
+        Clustered::at("crates/files/src/text.rs", "pub struct Text;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&imported, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/files/src/text.rs:1: files::text::Text is used only within x::excerpt; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
+    let variants = [
+        Clustered::at("crates/x/src/lib.rs", "mod caller;\nmod event;\nmod hub;\nmod rule;\n"),
+        Clustered::at(
+            "crates/x/src/caller.rs",
+            "pub struct Caller;\nimpl Caller {\n    fn pull(&self) {\n        crate::hub::pull_request::PullRequest::new();\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/event.rs",
+            "pub enum Event {\n    PullRequest,\n    Other,\n}\nimpl Event {\n    fn other(&self) -> bool {\n        matches!(self, Self::Other)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/hub.rs",
+            "mod pull_request;\nuse crate::event::Event;\npub struct Hub;\nimpl Hub {\n    fn pulled(&self) {\n        Event::PullRequest;\n    }\n}\n",
+        ),
+        Clustered::at("crates/x/src/hub/pull_request.rs", "pub struct PullRequest;\n"),
+        Clustered::at("crates/x/src/rule.rs", "pub enum Rule {\n    Linear(u8),\n    Plain { width: u8 },\n}\n"),
+        Clustered::at("crates/x/src/linear.rs", "pub struct Linear;\npub struct Plain;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&variants, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/event.rs:1: x::event::Event is used only within x::hub; move it into the lowest cluster that holds all its users",
+            "crates/x/src/hub/pull_request.rs:1: x::hub::pull_request::PullRequest is used only within x::caller; move it into the lowest cluster that holds all its users",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&variants, |view| view.report::<InterfaceByConsumers>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_type_parameter_is_not_a_use_of_a_type_with_its_name() {
+    let generic = [
+        Clustered::at("crates/x/src/lib.rs", "mod layer;\npub struct Look;\n"),
+        Clustered::at(
+            "crates/x/src/layer.rs",
+            "pub struct Layer<Look> {\n    features: Vec<Look>,\n}\nimpl<Look: Default> Layer<Look> {\n    fn first(&self) -> Look {\n        Look::default()\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&generic, |view| view.report::<LowestCluster>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_trait_impl_links_the_twin_its_own_file_names() {
+    let twins = [
+        Clustered::at("crates/x/src/lib.rs", "mod check;\nmod readout;\n"),
+        Clustered::at("crates/x/src/check.rs", "mod geometry;\nmod rule;\npub struct Check(geometry::Geometry);\n"),
+        Clustered::at(
+            "crates/x/src/check/geometry.rs",
+            "use super::rule::Rule;\npub struct Geometry;\nimpl Rule for Geometry {}\n",
+        ),
+        Clustered::at("crates/x/src/check/rule.rs", "pub trait Rule {}\n"),
+        Clustered::at("crates/x/src/readout.rs", "mod geometry;\npub struct Readout(geometry::Geometry);\n"),
+        Clustered::at("crates/x/src/readout/geometry.rs", "pub struct Geometry;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&twins, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/check/rule.rs:1: x::check::rule::Rule is used only within x::check::geometry; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_body_use_links_across_crates_through_its_import_or_qualifier() {
+    let imported = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct Mark;\npub struct Touch;\npub struct Loose;\n"),
+        Clustered::at(
+            "crates/y/src/lib.rs",
+            "use x::Mark;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        Mark::new();\n        x::Touch::new();\n        Loose::new();\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&imported, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::Mark is used only within crate y; move it into the lowest cluster that holds all its users",
+            "crates/x/src/lib.rs:2: x::Touch is used only within crate y; move it into the lowest cluster that holds all its users",
+        ]
+    );
+}
+
+#[test]
+fn a_type_named_in_an_interpolated_macro_string_is_used() {
+    let interpolated = [
+        Clustered::at("crates/x/src/lib.rs", "mod view;\npub struct Anchor;\n"),
+        Clustered::at(
+            "crates/x/src/view.rs",
+            "use crate::Anchor;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        rsx! { section { id: \"{Anchor::new(1)} {{plain}}\" } };\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&interpolated, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:2: x::Anchor is used only within x::view; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_const_standing_for_a_variant_stands_for_its_enum() {
+    let constant = [
+        Clustered::at("crates/x/src/lib.rs", "mod fast;\nmod mode;\nmod user;\n"),
+        Clustered::at("crates/x/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at("crates/x/src/mode.rs", "pub enum Mode {\n    Fast,\n}\n"),
+        Clustered::at(
+            "crates/x/src/user.rs",
+            "use crate::mode::Mode;\nconst DEFAULT: Mode = Mode::Fast;\npub struct User;\nimpl User {\n    fn mode(&self) {\n        DEFAULT;\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&constant, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/mode.rs:1: x::mode::Mode is used only within x::user; move it into the lowest cluster that holds all its users"
+        ]
+    );
+}
+
+#[test]
+fn a_const_through_a_foreign_enum_stands_for_no_local_variant_twin() {
+    let foreign = [
+        Clustered::at("crates/x/src/lib.rs", "mod fast;\nmod user;\n"),
+        Clustered::at("crates/x/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at(
+            "crates/x/src/user.rs",
+            "use y::Mode;\nconst DEFAULT: Mode = Mode::Fast;\npub struct User;\nimpl User {\n    fn mode(&self) {\n        DEFAULT;\n    }\n}\n",
+        ),
+        Clustered::at("crates/y/src/lib.rs", "pub enum Mode {\n    Fast,\n}\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&foreign, |view| view.report::<LowestCluster>().violations().to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_body_path_reads_through_a_renamed_import_and_keeps_its_module_qualifier() {
+    let renamed = [
+        Clustered::at("crates/x/src/lib.rs", "pub struct Mark;\n"),
+        Clustered::at("crates/y/src/lib.rs", "mod fast;\nmod view;\n"),
+        Clustered::at("crates/y/src/fast.rs", "pub struct Fast;\n"),
+        Clustered::at(
+            "crates/y/src/view.rs",
+            "mod inner;\nuse x::Mark as Badge;\nuse crate::fast::Fast;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        Badge::new();\n        inner::Fast::new();\n    }\n}\n",
+        ),
+        Clustered::at("crates/y/src/view/inner.rs", "pub struct Fast;\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&renamed, |view| view.report::<LowestCluster>().violations().to_vec()),
+        [
+            "crates/x/src/lib.rs:1: x::Mark is used only within y::view; move it into the lowest cluster that holds all its users"
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&renamed, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/y/src/fast.rs:1: crate y falls into 2 groups: [Fast] [Fast View] with no link between them; split it along the groups, or link them through a type they share"
+        ]
+    );
+}
+
+#[test]
+fn field_and_variant_names_are_not_references_but_their_values_are() {
+    let declared = [
+        Clustered::at(
+            "crates/x/src/lib.rs",
+            "mod a;\npub struct B;\nimpl B {\n    const VALUE: isize = 1;\n}\nconst LIMIT: isize = B::VALUE;\nmacro_rules! made {\n    () => {\n        B\n    };\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "pub struct S {\n    made: u8,\n}\npub enum E {\n    V = crate::LIMIT,\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&declared, |view| view.report::<ConnectedClusters>().violations().to_vec()),
+        [
+            "crates/x/src/a.rs:1: crate x falls into 2 groups: [B E] [S] with no link between them; split it along the groups, or link them through a type they share"
+        ]
+    );
+}
+
+#[test]
+fn a_cycle_closed_through_a_trait_impl_is_reported() {
+    let implemented = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct A;\nimpl crate::b::Tr for A {}\n"),
+        Clustered::at("crates/x/src/b.rs", "pub trait Tr {}\npub struct B(crate::a::A);\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&implemented, |view| view.report::<AcyclicQuotients>().violations().to_vec()),
+        [
+            "crates/x/src/a.rs:1: in crate x, the parts x::a, x::b use one another in a cycle, through x::a::A -> x::b::Tr, x::b::B -> x::a::A; move the shared types into one part that the others use, so the parts form layers"
+        ]
+    );
+}
