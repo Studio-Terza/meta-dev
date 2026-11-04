@@ -27,22 +27,15 @@ pub enum Callee {
 }
 
 impl Callee {
-    const OWN_TYPE: Word<'static> = Word::new("Self");
-
     #[must_use]
     pub fn owner<'name>(&'name self, caller: Option<&'name Name>, earlier: &[Option<&'name Name>]) -> Owner<'name> {
         match self {
             Callee::Method { receiver, .. } => receiver.owner(caller, earlier),
-            Callee::Path { owner, .. } => Self::named(owner.as_ref(), caller),
+            Callee::Path { owner, .. } => owner
+                .as_ref()
+                .filter(|owner| owner.casing() != Casing::Lower)
+                .map_or(Owner::Free, |owner| Owner::typed(owner, caller)),
         }
-    }
-
-    fn named<'name>(owner: Option<&'name Name>, caller: Option<&'name Name>) -> Owner<'name> {
-        owner.filter(|owner| owner.casing() != Casing::Lower).map_or(Owner::Free, |owner| {
-            owner
-                .matches::<Whole>(&[Self::OWN_TYPE])
-                .map_or(Owner::Type(owner), |_| caller.map_or(Owner::Unknown, Owner::Type))
-        })
     }
 }
 
@@ -54,6 +47,14 @@ pub enum Owner<'name> {
 }
 
 impl<'name> Owner<'name> {
+    const OWN_TYPE: Word<'static> = Word::new("Self");
+
+    fn typed(owner: &'name Name, caller: Option<&'name Name>) -> Owner<'name> {
+        owner
+            .matches::<Whole>(&[Self::OWN_TYPE])
+            .map_or(Owner::Type(owner), |_| caller.map_or(Owner::Unknown, Owner::Type))
+    }
+
     #[must_use]
     pub fn admits(self, subject: Option<&Name>) -> Option<Owner<'name>> {
         match self {
@@ -68,7 +69,7 @@ impl Receiver {
     fn owner<'name>(&'name self, caller: Option<&'name Name>, earlier: &[Option<&'name Name>]) -> Owner<'name> {
         match self {
             Receiver::Owner => caller.map_or(Owner::Unknown, Owner::Type),
-            Receiver::Bound(name) => Owner::Type(name),
+            Receiver::Bound(name) => Owner::typed(name, caller),
             Receiver::Call(order) => order.typed_in(earlier).map_or(Owner::Unknown, Owner::Type),
             Receiver::Unknown => Owner::Unknown,
         }
