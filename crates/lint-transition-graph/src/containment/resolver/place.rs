@@ -20,6 +20,10 @@ impl<'found> Place<'found> {
         Target::new(self.krate, module, Some(self.module))
     }
 
+    pub(crate) fn within(&self, base: &[Name], tail: &[Name]) -> Target<'found> {
+        self.target(Some(base.iter().chain(tail).cloned().collect()))
+    }
+
     pub(crate) fn krate(&self) -> &'found CrateName {
         self.krate
     }

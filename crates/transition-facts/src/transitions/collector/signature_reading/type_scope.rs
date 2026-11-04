@@ -4,10 +4,11 @@ mod naming;
 
 use std::collections::BTreeMap;
 
-use syn::{GenericArgument, Generics, Path, PathArguments, PathSegment, Type, TypeParamBound};
+use syn::{GenericArgument, Generics, PathArguments, Type, TypeParamBound, TypePath};
 
 use lint_layout::{Name, Word};
 
+use crate::associated::Associated;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::resolved::Resolved;
 use bound::Bound;
@@ -24,6 +25,7 @@ pub(super) struct TypeScope<'outer> {
 impl<'outer> TypeScope<'outer> {
     const SIZED: Word<'static> = Word::new("Sized");
     const FN: Word<'static> = Word::new("Fn");
+    const ASSOCIATED: Word<'static> = Word::new("Self::Output");
 
     pub(super) fn root(selfish: Nature) -> TypeScope<'outer> {
         TypeScope { selfish, outer: None, generics: BTreeMap::new() }
@@ -46,6 +48,11 @@ impl<'outer> TypeScope<'outer> {
         scope
     }
 
+    pub(super) fn associating(mut self, resolved: Resolved) -> TypeScope<'outer> {
+        self.generics.insert(Name::from(Self::ASSOCIATED), resolved);
+        self
+    }
+
     pub(super) fn extended(&self, generics: &Generics) -> TypeScope<'_> {
         TypeScope::declaring(self.selfish, Some(self), generics)
     }
@@ -60,11 +67,7 @@ impl<'outer> TypeScope<'outer> {
             Type::Tuple(tuple) => {
                 Resolved::tupled(tuple.elems.iter().map(|element| self.endpoint(element)).collect(), self.selfish)
             }
-            Type::Path(path) => path
-                .path
-                .segments
-                .last()
-                .map_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)), |last| self.named(&path.path, last)),
+            Type::Path(path) => self.named(path),
             Type::ImplTrait(found) => self.bounded(found.bounds.iter()),
             Type::TraitObject(found) => self.bounded(found.bounds.iter()),
             Type::BareFn(_) => Resolved::interface(Self::FN),
@@ -85,9 +88,11 @@ impl<'outer> TypeScope<'outer> {
         bounds.find_map(|bound| Bound::new(bound).endpoint(self)).unwrap_or_else(|| Resolved::interface(Self::SIZED))
     }
 
-    fn named(&self, path: &Path, segment: &PathSegment) -> Resolved {
-        let name = Name::from(&segment.ident);
-        Naming::from(&name).resolved(self, path, segment, name)
+    fn named(&self, path: &TypePath) -> Resolved {
+        Associated::of_path(path)
+            .and_then(|_| self.declared(&Name::from(Self::ASSOCIATED)))
+            .or_else(|| path.path.segments.last().map(|last| Naming::spelled(self, &path.path, last)))
+            .unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))
     }
 
     fn declared(&self, name: &Name) -> Option<Resolved> {

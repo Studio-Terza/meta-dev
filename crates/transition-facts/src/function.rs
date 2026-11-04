@@ -4,6 +4,7 @@ use lint_layout::Name;
 
 use crate::mutation::Mutation;
 use crate::resolved::Resolved;
+use crate::wrapping::Wrapping;
 
 #[derive(Debug)]
 pub struct Function<'file> {
@@ -14,6 +15,8 @@ pub struct Function<'file> {
     mutation: Mutation,
     body: Body,
     branching: Branching,
+    wrapping: Wrapping,
+    takings: Vec<Wrapping>,
 }
 
 impl<'file> Function<'file> {
@@ -26,6 +29,8 @@ impl<'file> Function<'file> {
             mutation: Mutation::Absent,
             body: Body::Written,
             branching: Branching::new(1),
+            wrapping: Wrapping::Plain,
+            takings: Vec::new(),
         }
     }
 
@@ -33,6 +38,12 @@ impl<'file> Function<'file> {
         self.mutation = mutation;
         self.body = body;
         self.branching = branching;
+        self
+    }
+
+    pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Function<'file> {
+        self.wrapping = wrapping;
+        self.takings = takings;
         self
     }
 
@@ -47,6 +58,16 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn mutation(&self) -> Mutation {
         self.mutation
+    }
+
+    #[must_use]
+    pub fn wrapping(&self) -> Wrapping {
+        self.wrapping
+    }
+
+    #[must_use]
+    pub fn takings(&self) -> &[Wrapping] {
+        &self.takings
     }
 
     #[must_use]

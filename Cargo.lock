@@ -247,6 +247,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "law-facts"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "laws"
 version = "0.1.0"
 dependencies = [
@@ -498,9 +509,9 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
+ "law-facts",
  "lint-core",
  "lint-layout",
- "proc-macro2",
  "syn 2.0.119",
 ]
 
@@ -854,8 +865,6 @@ dependencies = [
  "lint-vec-out-params",
  "lint-workflow-run",
  "text-lines",
- "transition-facts",
- "type-facts",
 ]
 
 [[package]]
@@ -973,6 +982,7 @@ name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "law-facts",
  "lint-core",
  "lint-item-graph",
  "lint-layout",

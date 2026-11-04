@@ -24,9 +24,9 @@ impl<'found> Head<'found> {
     pub(super) fn target(self, place: &Place<'found>, path: &[Name]) -> Option<Target<'found>> {
         match self {
             Head::Root => path.split_first().map(|(_, rest)| place.target(Some(rest.to_vec()))),
-            Head::Itself => path.split_first().map(|(_, rest)| place.target(Some(Self::joined(place.module(), rest)))),
+            Head::Itself => path.split_first().map(|(_, rest)| place.within(place.module(), rest)),
             Head::Parent => Some(Self::parented(place, path)),
-            Head::Local => Some(place.target(Some(Self::joined(place.module(), path)))),
+            Head::Local => Some(place.within(place.module(), path)),
             Head::Krate(krate) => path.split_first().map(|(_, rest)| Target::new(krate, Some(rest.to_vec()), None)),
             Head::Own => Some(place.target(None)),
             Head::External | Head::Unknown => None,
@@ -37,10 +37,6 @@ impl<'found> Head<'found> {
         let here = place.module();
         let parents = path.iter().take_while(|step| **step == Self::PARENT).count();
         let base = here.get(..here.len().saturating_sub(parents)).unwrap_or_default();
-        place.target(Some(Self::joined(base, path.get(parents..).unwrap_or_default())))
-    }
-
-    fn joined(base: &[Name], tail: &[Name]) -> Vec<Name> {
-        base.iter().chain(tail).cloned().collect()
+        place.within(base, path.get(parents..).unwrap_or_default())
     }
 }

@@ -1,7 +1,9 @@
 use std::string::FromUtf8Error;
 
 use laws::proptest;
-use laws::{idempotent, roundtrip, table};
+use laws::{
+    absorbing, associative, commutative, distributive, idempotent, identity, inverse, preserves, roundtrip, table,
+};
 use proptest::collection::vec;
 use proptest::prelude::any;
 
@@ -24,6 +26,11 @@ impl Sample {
         let mut sorted = numbers.to_owned();
         sorted.sort_unstable();
         sorted
+    }
+
+    fn joined(mut first: Vec<u8>, second: Vec<u8>) -> Vec<u8> {
+        first.extend(second);
+        first
     }
 
     fn extended(numbers: &[u8]) -> Vec<u8> {
@@ -55,4 +62,69 @@ table!(
     a_wrong_row_fails_and_is_named,
     Sample::bytes,
     ["a" => [97], "b" => [0]]
+);
+
+associative!(wrapping_addition_regroups, any::<u8>(), u8::wrapping_add);
+commutative!(wrapping_addition_reorders, any::<u8>(), u8::wrapping_add);
+identity!(zero_is_the_unit_of_wrapping_addition, any::<u8>(), u8::wrapping_add, 0);
+inverse!(negation_cancels_wrapping_addition, any::<u8>(), u8::wrapping_add, u8::wrapping_neg, 0);
+absorbing!(zero_absorbs_wrapping_multiplication, any::<u8>(), u8::wrapping_mul, 0);
+distributive!(multiplication_spreads_over_addition, any::<u8>(), u8::wrapping_mul, u8::wrapping_add);
+
+associative!(
+    #[should_panic(expected = "the associativity law is broken")]
+    subtraction_does_not_regroup,
+    any::<u8>(),
+    u8::wrapping_sub
+);
+commutative!(
+    #[should_panic(expected = "the commutativity law is broken")]
+    subtraction_does_not_reorder,
+    any::<u8>(),
+    u8::wrapping_sub
+);
+identity!(
+    #[should_panic(expected = "the identity law is broken")]
+    one_is_not_the_unit_of_addition,
+    any::<u8>(),
+    u8::wrapping_add,
+    1
+);
+inverse!(
+    #[should_panic(expected = "the inverse law is broken")]
+    keeping_the_value_does_not_cancel,
+    any::<u8>(),
+    u8::wrapping_add,
+    |value: u8| value,
+    0
+);
+absorbing!(
+    #[should_panic(expected = "the absorbing law is broken")]
+    zero_does_not_absorb_addition,
+    any::<u8>(),
+    u8::wrapping_add,
+    0
+);
+distributive!(
+    #[should_panic(expected = "the distributivity law is broken")]
+    addition_does_not_spread_over_multiplication,
+    any::<u8>(),
+    u8::wrapping_add,
+    u8::wrapping_mul
+);
+
+preserves!(
+    length_turns_joining_into_addition,
+    vec(any::<u8>(), 0..8),
+    Sample::joined,
+    usize::wrapping_add,
+    |numbers: Vec<u8>| numbers.len()
+);
+preserves!(
+    #[should_panic(expected = "the preservation law is broken")]
+    length_does_not_turn_joining_into_multiplication,
+    vec(any::<u8>(), 0..8),
+    Sample::joined,
+    usize::wrapping_mul,
+    |numbers: Vec<u8>| numbers.len()
 );

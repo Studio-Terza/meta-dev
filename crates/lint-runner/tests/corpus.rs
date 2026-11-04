@@ -75,6 +75,7 @@ impl Corpus {
         [
             include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count(),
             include_str!("../src/cli/mode/lints.rs").matches("flows.report::<").count(),
+            include_str!("../src/cli/mode/lints.rs").matches("::dirty(&system)").count(),
             include_str!("../src/cli/mode.rs").matches("::report(files)").count(),
         ]
         .iter()

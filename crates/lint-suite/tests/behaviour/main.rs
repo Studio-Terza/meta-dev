@@ -1,3 +1,5 @@
+mod algebra_duplicates;
+mod algebra_laws;
 mod arbitrary_newtypes;
 mod bool_methods;
 mod clones;
@@ -14,6 +16,7 @@ mod expression_flow;
 mod fakes_at_ports;
 mod fn_shape;
 mod guard_must_use;
+mod homomorphism;
 mod linear_flow;
 mod literal_names;
 mod long_exact_strings;

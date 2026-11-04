@@ -169,3 +169,18 @@ fn a_match_that_only_routes_each_variant_to_an_existing_transition_is_a_derived_
         ["a Routed", "b Routed", "c Routed", "d Routed", "e Written", "f Written", "g Written", "h Written"]
     );
 }
+
+#[test]
+fn a_domain_type_named_output_is_not_the_associated_type() {
+    let found = Read::signatures(
+        "struct A;\nstruct Output;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> Self::Output {}\n    fn make(self) -> Output {}\n    fn viewed(self) -> <A as Add>::Output {}\n}\n",
+    );
+    assert_eq!(
+        found,
+        [
+            "x::A::add(Named:A, Named:A) -> Named:A Absent Core Add",
+            "x::A::make(Named:A) -> Named:Output Absent Core Add",
+            "x::A::viewed(Named:A) -> Named:A Absent Core Add",
+        ]
+    );
+}

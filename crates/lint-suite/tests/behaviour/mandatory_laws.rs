@@ -55,7 +55,7 @@ const CRATE_ORDER: &str = "pub(crate) struct A;\nimpl Ord for A {}\n";
 const PRIVATE_TYPE_PUBLIC_IMPL: &str = "struct A;\nimpl A {\n    pub fn encode(&self) {}\n    pub fn decode() {}\n}\n";
 const OTHER_ATTRIBUTE_LIST: &str = "#[cfg_attr(feature = \"x\", other(Serialize, Deserialize))]\npub struct A;\n";
 
-const CASES: [Case; 48] = [
+const CASES: [Case; 50] = [
     Case::new(
         Title::new("equality by pointer method"),
         &[Source::new(Located::new("src/a.rs"), Text::new(POINTER_METHOD))],
@@ -354,8 +354,26 @@ const CASES: [Case; 48] = [
         ],
         Flagged::new(&["src/a.rs:1"]),
     ),
+    Case::new(
+        Title::new("an algebra law stands in for an order law"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(ASSOCIATIVE)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an algebra law title is not a mention"),
+        &[
+            Source::new(Located::new("src/a.rs"), Text::new(ORDER)),
+            Source::new(Located::new("tests/a.rs"), Text::new(ASSOCIATIVE_TITLE)),
+        ],
+        Flagged::new(&["src/a.rs:1"]),
+    ),
 ];
 
+const ASSOCIATIVE: &str = "laws::associative!(regroups, any::<A>(), A::merge);\n";
+const ASSOCIATIVE_TITLE: &str = "laws::associative!(A, any::<u8>(), merge);\n";
 const LAW_FOR_PAIR: &str = "laws::law!(a, any::<A>(), value, { check(value) });\n";
 
 #[test]

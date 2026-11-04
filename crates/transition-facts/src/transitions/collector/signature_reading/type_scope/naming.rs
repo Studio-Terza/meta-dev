@@ -26,6 +26,11 @@ impl Naming {
     ];
     const SELF: [Word<'static>; 1] = words!["Self"];
 
+    pub(super) fn spelled(scope: &TypeScope<'_>, path: &Path, segment: &PathSegment) -> Resolved {
+        let name = Name::from(&segment.ident);
+        Naming::from(&name).resolved(scope, path, segment, name)
+    }
+
     pub(super) fn resolved(self, scope: &TypeScope<'_>, path: &Path, segment: &PathSegment, name: Name) -> Resolved {
         match self {
             Naming::Wrapper => {
