@@ -1,6 +1,6 @@
 mod kind;
 mod law;
-mod law_path;
+pub mod law_path;
 mod operators;
 mod package;
 mod reader;
@@ -9,7 +9,6 @@ mod uses;
 
 pub use kind::{Kind, Property};
 pub use law::Law;
-pub use law_path::{LawPath, Side};
 pub use operators::Operators;
 pub use package::Package;
 
