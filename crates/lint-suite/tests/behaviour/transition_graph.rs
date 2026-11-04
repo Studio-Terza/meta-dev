@@ -30,6 +30,12 @@ const FOREIGN: &str = "struct A;\nimpl Clone for A {\n    fn clone(&self) -> A {
 const LOCAL_TRAIT: &str = "struct A;\ntrait Combine {\n    fn merge(self, other: A) -> A;\n}\nimpl Combine for A {\n    fn merge(self, other: A) -> A {}\n}\n";
 const COLLECTED: &str =
     "struct A;\nimpl A {\n    fn children(&self) -> Vec<A> {}\n    fn others(&self) -> Option<Vec<A>> {}\n}\n";
+const OUTPUT_MANY: &str =
+    "struct A;\nimpl Add for A {\n    type Output = Vec<A>;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
+const OUTPUT_OPTIONAL: &str =
+    "struct A;\nimpl Add for A {\n    type Output = Option<A>;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
+const INPUT_MANY: &str =
+    "struct A;\nimpl A {\n    fn from_parts(parts: Vec<A>) -> A {}\n    fn from_maybe(part: Option<A>) -> A {}\n}\n";
 const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n        fn f(&self) -> bool {}\n    }\n}\nimpl A {\n    #[cfg(test)]\n    fn g(&self) -> bool {}\n}\n";
 
 laws::table!(
@@ -51,6 +57,9 @@ laws::table!(
         [LOCAL_TRAIT, "of which 1 algebra operations, 0 partial"] => true,
         [COLLECTED, "2 written edges"] => true,
         [COLLECTED, "of which 0 algebra operations, 0 partial"] => true,
+        [OUTPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
+        [OUTPUT_OPTIONAL, "of which 1 algebra operations, 1 partial"] => true,
+        [INPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
         [TESTED, "crate x"] => false,
         [TESTED, "workspace:"] => false,
         ["struct A;\n", "crate x"] => false,

@@ -26,7 +26,11 @@ impl<'found, 'file> Family<'found, 'file> {
             .filter_map(|edge| edge.form().written().map(|_| edge))
             .filter(|edge| edge.form().algebraic().and_then(Acting::pure).is_none())
             .fold(BTreeMap::new(), |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
-                edge.ends().key().into_iter().for_each(|key| keys.entry(key).or_default().push(edge.transition()));
+                edge.ends()
+                    .key()
+                    .filter(|key| edge.fixed_by().and(key.fixed()).is_none())
+                    .into_iter()
+                    .for_each(|key| keys.entry(key).or_default().push(edge.transition()));
                 keys
             });
         keyed

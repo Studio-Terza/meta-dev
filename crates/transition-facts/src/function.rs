@@ -16,6 +16,7 @@ pub struct Function<'file> {
     body: Body,
     branching: Branching,
     wrapping: Wrapping,
+    taking: Wrapping,
 }
 
 impl<'file> Function<'file> {
@@ -29,6 +30,7 @@ impl<'file> Function<'file> {
             body: Body::Written,
             branching: Branching::new(1),
             wrapping: Wrapping::Plain,
+            taking: Wrapping::Plain,
         }
     }
 
@@ -39,8 +41,9 @@ impl<'file> Function<'file> {
         self
     }
 
-    pub(crate) fn wrapped(mut self, wrapping: Wrapping) -> Function<'file> {
+    pub(crate) fn wrapped(mut self, wrapping: Wrapping, taking: Wrapping) -> Function<'file> {
         self.wrapping = wrapping;
+        self.taking = taking;
         self
     }
 
@@ -60,6 +63,11 @@ impl<'file> Function<'file> {
     #[must_use]
     pub fn wrapping(&self) -> Wrapping {
         self.wrapping
+    }
+
+    #[must_use]
+    pub fn plain_inputs(&self) -> Option<&Function<'file>> {
+        Some(self).filter(|function| function.taking == Wrapping::Plain)
     }
 
     #[must_use]

@@ -22,6 +22,7 @@ pub(super) struct SignatureReading<'origins, 'file> {
     context: Context<'file>,
     scope: TypeScope<'static>,
     origins: &'origins Origins<'file>,
+    output: Option<Wrapping>,
 }
 
 impl<'origins, 'file> SignatureReading<'origins, 'file> {
@@ -30,7 +31,12 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
     pub(super) fn free(origins: &'origins Origins<'file>, ground: Ground) -> SignatureReading<'origins, 'file> {
         let selfish = Endpoint::from(Unnamed::Opaque);
         let scope = TypeScope::root(selfish.nature());
-        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Free), scope, origins }
+        SignatureReading {
+            context: Context::new(origins.own(), selfish, ground, Filler::Free),
+            scope,
+            origins,
+            output: None,
+        }
     }
 
     pub(super) fn of_impl(
@@ -51,7 +57,8 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
             let resolved = scope.endpoint(output);
             scope.associating(Self::OUTPUT, resolved)
         });
-        SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins }
+        let output = found.items.iter().find_map(Self::output).map(Wrapping::peeled);
+        SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins, output }
     }
 
     pub(super) fn of_trait(
@@ -61,7 +68,12 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
     ) -> SignatureReading<'origins, 'file> {
         let selfish = Endpoint::new(Nature::Interface, Name::from(&found.ident));
         let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
-        SignatureReading { context: Context::new(origins.own(), selfish, ground, Filler::Provided), scope, origins }
+        SignatureReading {
+            context: Context::new(origins.own(), selfish, ground, Filler::Provided),
+            scope,
+            origins,
+            output: None,
+        }
     }
 
     pub(super) fn function(&self, site: Site<'file>, signature: &Signature, body: &Block) -> Function<'file> {
@@ -74,7 +86,10 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 BodyReading::classified(body),
                 Branches::scored(body, Propagation::Ambient),
             )
-            .wrapped(Wrapping::returned(&signature.output))
+            .wrapped(
+                Wrapping::returned(&signature.output, self.output),
+                signature.inputs.iter().map(Wrapping::taken).max().unwrap_or(Wrapping::Plain),
+            )
     }
 
     pub(super) fn into_context(self) -> Context<'file> {

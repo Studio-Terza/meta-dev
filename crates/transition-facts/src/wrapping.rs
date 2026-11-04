@@ -1,4 +1,4 @@
-use syn::{GenericArgument, PathArguments, PathSegment, ReturnType, Type};
+use syn::{FnArg, GenericArgument, PathArguments, PathSegment, ReturnType, Type};
 
 use lint_layout::{Name, Whole, Word, words};
 
@@ -20,14 +20,36 @@ impl Wrapping {
         Some(inner).filter(|inner| *inner == Wrapping::Many).unwrap_or(self)
     }
 
-    pub(crate) fn returned(output: &ReturnType) -> Wrapping {
+    const ASSOCIATED: Word<'static> = Word::new("Output");
+
+    pub(crate) fn returned(output: &ReturnType, associated: Option<Wrapping>) -> Wrapping {
         match output {
             ReturnType::Default => Wrapping::Plain,
-            ReturnType::Type(_, returned) => Self::peeled(returned),
+            ReturnType::Type(_, returned) => {
+                Self::associating(returned).and(associated).unwrap_or_else(|| Self::peeled(returned))
+            }
         }
     }
 
-    fn peeled(found: &Type) -> Wrapping {
+    pub(crate) fn taken(input: &FnArg) -> Wrapping {
+        match input {
+            FnArg::Receiver(_) => Wrapping::Plain,
+            FnArg::Typed(typed) => Self::peeled(&typed.ty),
+        }
+    }
+
+    fn associating(found: &Type) -> Option<&PathSegment> {
+        match found {
+            Type::Path(path) => path
+                .path
+                .segments
+                .last()
+                .filter(|segment| Name::from(&segment.ident).matches::<Whole>(&[Self::ASSOCIATED]).is_some()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn peeled(found: &Type) -> Wrapping {
         match found {
             Type::Reference(reference) => Self::peeled(&reference.elem),
             Type::Paren(paren) => Self::peeled(&paren.elem),

@@ -22,6 +22,7 @@ impl<'found> Acting<'found> {
         let ends = edge.ends();
         ends.subject(edge.transition().function().mutation())
             .map(|subject| Acting::about(subject, ends.takes()))
+            .filter(|_| edge.transition().function().plain_inputs().is_some())
             .filter(|acting| acting.grounded().is_some())
             .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
     }

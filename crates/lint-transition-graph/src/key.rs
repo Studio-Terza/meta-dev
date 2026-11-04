@@ -14,6 +14,12 @@ impl<'found> Key<'found> {
     }
 }
 
+impl<'found> Key<'found> {
+    pub(crate) fn fixed(&self) -> Option<&Key<'found>> {
+        self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
+    }
+}
+
 impl fmt::Display for Key<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let takes: Vec<String> = self.takes.iter().map(ToString::to_string).collect();
