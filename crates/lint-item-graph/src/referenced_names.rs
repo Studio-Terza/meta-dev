@@ -14,7 +14,7 @@ use crate::scope::Scope;
 use declared::Declared;
 use macro_items::MacroItems;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ReferencedNames {
     declared: BTreeMap<Name, Vec<Name>>,
     implemented: BTreeMap<Name, Vec<Name>>,
@@ -30,16 +30,19 @@ impl ReferencedNames {
     }
 
     #[must_use]
-    pub fn into_uses(self) -> BTreeMap<Name, BTreeSet<Name>> {
-        let all = Self::united(self.declared, self.implemented);
-        all.into_iter().map(|(owner, uses)| (owner, uses.into_iter().collect())).collect()
+    pub fn uses(&self) -> BTreeMap<&Name, BTreeSet<&Name>> {
+        self.declared.iter().chain(&self.implemented).fold(BTreeMap::new(), |mut all, (owner, uses)| {
+            all.entry(owner).or_insert_with(BTreeSet::new).extend(uses);
+            all
+        })
     }
 
     pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
         items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
     }
 
-    pub(crate) fn merged(self, other: ReferencedNames) -> ReferencedNames {
+    #[must_use]
+    pub fn merged(self, other: ReferencedNames) -> ReferencedNames {
         ReferencedNames {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
@@ -47,7 +50,8 @@ impl ReferencedNames {
         }
     }
 
-    pub(crate) fn into_graph(self) -> ItemGraph {
+    #[must_use]
+    pub fn into_graph(self) -> ItemGraph {
         let ReferencedNames { declared, implemented, stand_ins } = self;
         let foreign = implemented.into_iter().filter(|(owner, _)| declared.contains_key(owner)).collect();
         ItemGraph::of_references(Self::united(declared, foreign)).standing_in(&stand_ins)

@@ -4,7 +4,7 @@ mod stand_ins;
 mod target;
 
 use std::borrow::Borrow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use lint_core::{Site, SourceFile};
@@ -25,7 +25,7 @@ use target::Target;
 pub(crate) struct Resolver<'found> {
     declaring: BTreeMap<&'found Name, Vec<Member<'found>>>,
     modules: BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    places: BTreeMap<&'found Path, Place<'found>>,
+    places: HashMap<&'found Path, Place<'found>>,
     stand_ins: StandIns<'found>,
 }
 
@@ -60,11 +60,6 @@ impl<'found> Resolver<'found> {
         }
     }
 
-    fn target(&self, file: &Path, name: &Name, written: &[Name], origin: Option<&Name>) -> Option<Target<'found>> {
-        let place = self.places.get(file)?;
-        Reach::new(place, &self.modules).target(name, written, origin)
-    }
-
     pub(crate) fn members(
         &self,
         file: &Path,
@@ -72,9 +67,21 @@ impl<'found> Resolver<'found> {
         written: &[Name],
         origin: Option<&Name>,
     ) -> Vec<Member<'found>> {
+        self.places
+            .get(file)
+            .map_or_else(Vec::new, |place| self.reached(&Reach::new(place, &self.modules), name, written, origin))
+    }
+
+    fn reached(
+        &self,
+        reach: &Reach<'_, 'found>,
+        name: &Name,
+        written: &[Name],
+        origin: Option<&Name>,
+    ) -> Vec<Member<'found>> {
         let declaring = self.declaring.get(name).map_or(&[][..], Vec::as_slice);
         let single = || declaring.first().copied().filter(|_| declaring.len() == 1).into_iter().collect();
-        self.target(file, name, written, origin).map_or_else(Vec::new, |target| {
+        reach.target(name, written, origin).map_or_else(Vec::new, |target| {
             let found = self.within(&target, name);
             found.first().map(|_| ()).map_or_else(single, |()| found)
         })
@@ -107,21 +114,36 @@ impl<'found> Resolver<'found> {
         }
     }
 
-    pub(crate) fn bodies(&self, file: &SourceFile) -> Vec<Link<'found>> {
-        let path = file.path();
+    pub(crate) fn bodies(&self, file: &SourceFile, names: &ReferencedNames) -> Vec<Link<'found>> {
         let krate = file.placement().package().crate_name();
-        let uses = ReferencedNames::of_file(file).into_uses();
-        uses.iter().flat_map(|(owner, used)| self.body(path, krate, owner, used)).collect()
+        self.places
+            .get(file.path())
+            .map_or_else(Vec::new, |place| self.bodies_reached(&Reach::new(place, &self.modules), krate, names))
     }
 
-    fn body(&self, file: &Path, krate: &CrateName, owner: &Name, used: &BTreeSet<Name>) -> Vec<Link<'found>> {
-        let declaring = self.declaring.get(owner).map_or(&[][..], Vec::as_slice);
-        let holder = self.target(file, owner, &[], None).and_then(|target| target.declared(declaring));
-        let local = |name: &Name| self.members(file, name, &[], None);
-        used.iter()
-            .flat_map(local)
-            .filter(|member| member.cluster().krate() == Some(krate))
-            .filter_map(|end| holder.map(|holder| Link::new(holder, end)))
+    fn bodies_reached(
+        &self,
+        reach: &Reach<'_, 'found>,
+        krate: &CrateName,
+        names: &ReferencedNames,
+    ) -> Vec<Link<'found>> {
+        let uses = names.uses();
+        let local: BTreeMap<&Name, Vec<Member<'found>>> = uses
+            .values()
+            .flatten()
+            .map(|name| {
+                let found = self.reached(reach, name, &[], None).into_iter();
+                (*name, found.filter(|member| member.cluster().krate() == Some(krate)).collect())
+            })
+            .collect();
+        uses.iter()
+            .filter_map(|(owner, used)| {
+                let declaring = self.declaring.get(*owner).map_or(&[][..], Vec::as_slice);
+                let holder = reach.target(owner, &[], None).and_then(|target| target.declared(declaring))?;
+                let ends = used.iter().flat_map(|name| local.get(name).into_iter().flatten());
+                Some(ends.map(move |end| Link::new(holder, *end)))
+            })
+            .flatten()
             .collect()
     }
 
