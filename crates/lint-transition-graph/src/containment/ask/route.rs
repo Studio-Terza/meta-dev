@@ -34,17 +34,23 @@ impl<'view, 'found, 'file> Route<'view, 'found, 'file> {
         Route { view, from, to, listed }
     }
 
-    fn found(&self, start: Member<'found>) -> Option<Vec<Member<'found>>> {
-        let frontiers = iter::successors(Some(Frontier::from(start)), |frontier| frontier.widened(self.view));
-        frontiers.filter(|frontier| frontier.layer.first().is_some_and(|first| *first != start)).find_map(|frontier| {
-            frontier.layer.iter().find(|member| member.name() == self.to).map(|end| frontier.walked(*end))
-        })
+    fn found(&self) -> Vec<Member<'found>> {
+        let frontiers = iter::successors(Some(Frontier::from_starts(self.view.named(self.from))), |frontier| {
+            frontier.widened(self.view)
+        });
+        frontiers
+            .skip(1)
+            .find_map(|frontier| {
+                frontier.layer.iter().find(|member| member.name() == self.to).map(|end| frontier.walked(*end))
+            })
+            .unwrap_or_default()
     }
 }
 
-impl<'found> From<Member<'found>> for Frontier<'found> {
-    fn from(start: Member<'found>) -> Frontier<'found> {
-        Frontier { reached: BTreeMap::from([(start, start)]), layer: BTreeSet::from([start]) }
+impl<'found> Frontier<'found> {
+    fn from_starts(starts: impl Iterator<Item = Member<'found>>) -> Frontier<'found> {
+        let layer: BTreeSet<Member<'found>> = starts.collect();
+        Frontier { reached: layer.iter().map(|start| (*start, *start)).collect(), layer }
     }
 }
 
@@ -72,7 +78,7 @@ impl<'found> Frontier<'found> {
 
 impl fmt::Display for Route<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let route = self.view.named(self.from).find_map(|start| self.found(start)).unwrap_or_default();
+        let route = self.found();
         route.first().map_or_else(|| writeln!(formatter, "  none"), |_| Ok(()))?;
         route
             .iter()

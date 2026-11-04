@@ -20,8 +20,14 @@ impl fmt::Display for QueryFailure {
             ),
             QueryFailure::Top(text) => write!(formatter, "--top takes a whole number, not `{text}`"),
             QueryFailure::Unreadable => formatter.write_str("an argument is not valid UTF-8"),
-            QueryFailure::Unfinished => formatter.write_str("--in, --role, --top, --defined, --uses, --users, --implementers, --cluster and --exports each take a value, and --path takes two"),
-            QueryFailure::Empty => formatter.write_str("give search terms, a --role signature, or an item question such as --defined <Name>"),
+            QueryFailure::Unfinished => formatter.write_str(concat!(
+                "--in, --role, --top, --defined, --uses, --users, --implementers, --cluster and --exports ",
+                "each take a value, and --path takes two"
+            )),
+            QueryFailure::Empty => formatter.write_str(concat!(
+                "give search terms, a --role signature, ",
+                "or an item question such as --defined <Name>"
+            )),
         }
     }
 }

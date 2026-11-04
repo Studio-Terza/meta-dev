@@ -29,6 +29,15 @@ const ITEMS: [Source; 3] = [
     Source::new(Located::new("crates/bank/src/lib.rs"), Text::new("pub struct Ledger(shop::Basket);\n")),
 ];
 
+const CHAINS: [Source; 3] = [
+    Source::new(Located::new("crates/shop/src/lib.rs"), Text::new("pub struct Cents;\n")),
+    Source::new(
+        Located::new("crates/alpha/src/lib.rs"),
+        Text::new("pub struct Start(Mid);\npub struct Mid(Mid2);\npub struct Mid2(shop::Cents);\n"),
+    ),
+    Source::new(Located::new("crates/zeta/src/lib.rs"), Text::new("pub struct Start(shop::Cents);\n")),
+];
+
 struct Asked;
 
 impl Asked {
@@ -44,7 +53,15 @@ impl Asked {
     }
 
     fn answered(words: &&[&str]) -> Vec<String> {
-        let files = Sources::parsed(&ITEMS);
+        Self::answered_in(&ITEMS, words)
+    }
+
+    fn chained(words: &&[&str]) -> Vec<String> {
+        Self::answered_in(&CHAINS, words)
+    }
+
+    fn answered_in(sources: &[Source], words: &&[&str]) -> Vec<String> {
+        let files = Sources::parsed(sources);
         let extraction = Extraction::from(files.as_slice());
         let system = TypeSystem::built_from(&files, &extraction);
         let query = Self::query(words).unwrap_or_else(|failure| unreachable!("the query reads: {failure}"));
@@ -105,6 +122,7 @@ fn roots_are_read_from_the_in_flag() {
 fn malformed_arguments_are_refused_with_the_reason() {
     assert_eq!(Asked::query(&[]), Err(QueryFailure::Empty));
     assert_eq!(Asked::query(&["index", "--top"]), Err(QueryFailure::Unfinished));
+    assert_eq!(Asked::query(&["--users"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["--path", "Ledger"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["index", "--top", "many"]), Err(QueryFailure::Top("many".to_owned())));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
@@ -171,6 +189,11 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "  shop::till".to_owned(),
         "    Line at crates/shop/src/till.rs:2; used by Basket".to_owned(),
     ],
+    &["--exports", "bank"][..] => vec![
+        "exports of bank:".to_owned(),
+        "  crate bank".to_owned(),
+        "    none".to_owned(),
+    ],
     &["--exports", "shop", "--top", "0"][..] => vec![
         "exports of shop:".to_owned(),
         "  crate shop".to_owned(),
@@ -192,5 +215,13 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "  none".to_owned(),
         "definitions of Absent:".to_owned(),
         "  no type or trait named Absent".to_owned(),
+    ],
+]);
+
+laws::table!(a_path_is_the_shortest_from_any_type_of_the_starting_name, Asked::chained, [
+    &["--path", "Start", "Cents"][..] => vec![
+        "use path from Start to Cents:".to_owned(),
+        "  zeta::Start at crates/zeta/src/lib.rs:1".to_owned(),
+        "  shop::Cents at crates/shop/src/lib.rs:1".to_owned(),
     ],
 ]);
