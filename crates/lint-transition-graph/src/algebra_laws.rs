@@ -20,7 +20,7 @@ pub struct AlgebraLaws;
 impl GraphLint for AlgebraLaws {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let algebras = system.algebras();
-        let attached = Attached::declared(system.files(), algebras);
+        let attached = Attached::declared(system);
         let by_crate = algebras.operations().fold(
             BTreeMap::new(),
             |mut crates: BTreeMap<&CrateName, Vec<&Operation<'_, 'file>>>, operation| {

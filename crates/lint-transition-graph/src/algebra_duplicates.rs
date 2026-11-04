@@ -17,7 +17,7 @@ pub struct AlgebraDuplicates;
 impl GraphLint for AlgebraDuplicates {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let algebras = system.algebras();
-        let attached = Attached::declared(system.files(), algebras);
+        let attached = Attached::declared(system);
         let twins: Vec<Twins<'_, '_, 'file>> = algebras
             .algebras()
             .flat_map(|algebra| algebra.twins(|operation| attached.of_operation(operation)))

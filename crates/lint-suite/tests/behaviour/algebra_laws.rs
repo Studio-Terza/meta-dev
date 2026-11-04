@@ -151,3 +151,9 @@ fn visibility_does_not_exempt_an_operation() {
             .all(|source| Declared::of(&[Declared::at("crates/x/src/lib.rs", source)]).contains("x::A: join"))
     );
 }
+
+#[test]
+fn a_preserves_law_is_not_a_law_of_the_operation() {
+    let text = Declared::lawed(ADD, "laws::preserves!(keeps, any::<A>(), A::add, B::add, A::into_b);\n");
+    assert!(text.contains("x::A: add"), "{text}");
+}

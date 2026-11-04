@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
-use std::path::Path;
 
-use law_facts::{Laws, Package, Property};
-use lint_core::{Site, SourceFile};
+use law_facts::Property;
+use lint_core::Site;
 use lint_layout::Name;
 
-use crate::algebra::{Algebras, Operation};
+use crate::algebra::Operation;
+use crate::system::TypeSystem;
 
 #[derive(Debug, Default)]
 pub(crate) struct Attached<'found> {
@@ -13,21 +13,16 @@ pub(crate) struct Attached<'found> {
 }
 
 impl<'found> Attached<'found> {
-    pub(crate) fn declared<'file: 'found>(
-        files: &'found [SourceFile],
-        algebras: &Algebras<'found, 'file>,
-    ) -> Attached<'found> {
-        let laws = Laws::from(files);
-        let packages: BTreeMap<&Path, Package<'found>> =
-            files.iter().map(|file| (file.path(), Package::containing(file))).collect();
-        let by_operation = algebras
+    pub(crate) fn declared<'file: 'found>(system: &TypeSystem<'found, 'file>) -> Attached<'found> {
+        let declarations = system.declarations();
+        let by_operation = system
+            .algebras()
             .operations()
-            .filter_map(|operation| {
+            .map(|operation| {
                 let site = *AsRef::<Site<'file>>::as_ref(operation);
-                packages.get(site.path()).map(|package| {
-                    let names = [AsRef::<Name>::as_ref(operation.acting().subject()), operation.function()];
-                    (site, laws.properties_naming(*package, &names).into_iter().collect())
-                })
+                let names = [AsRef::<Name>::as_ref(operation.acting().subject()), operation.function()];
+                let properties = declarations.properties_naming(site.path(), &names);
+                (site, properties.into_iter().filter(|property| *property != Property::Preserves).collect())
             })
             .collect();
         Attached { by_operation }
