@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprCall, ExprMethodCall, FnArg, Item, Signature, Type};
+use syn::{Block, Expr, ExprCall, ExprMethodCall, FnArg, Item, PatIdent, Signature, Type};
 
 use lint_core::Syntax;
 use lint_layout::{Name, Whole, Word};
@@ -18,10 +18,16 @@ impl Calls {
     const OWNER: Word<'static> = Word::new("self");
 
     pub(super) fn made(signature: &Signature, body: &Block) -> Vec<Callee> {
-        let bound = signature.inputs.iter().filter_map(Self::binding).fold(BTreeMap::new(), |mut bound, binding| {
-            bound.insert(binding.name, binding.type_name);
-            bound
-        });
+        let rebound = Rebound::bindings_in(body);
+        let bound = signature
+            .inputs
+            .iter()
+            .filter_map(Self::binding)
+            .filter_map(|binding| rebound.get(&binding.name).map_or(Some(binding), |_| None))
+            .fold(BTreeMap::new(), |mut bound, binding| {
+                bound.insert(binding.name, binding.type_name);
+                bound
+            });
         let mut scan = Calls { bound, made: Vec::new() };
         scan.visit_block(body);
         scan.made
@@ -44,7 +50,8 @@ impl Calls {
     fn receiver(&self, found: &Expr, called: Option<Order>) -> Receiver {
         match found {
             Expr::Path(path) => path.path.get_ident().map_or(Receiver::Unknown, |ident| self.named(&Name::from(ident))),
-            Expr::MethodCall(_) | Expr::Call(_) => called.map_or(Receiver::Unknown, Receiver::Call),
+            Expr::MethodCall(_) => called.map_or(Receiver::Unknown, Receiver::Call),
+            Expr::Call(call) => Syntax::expr_path(&call.func).and(called).map_or(Receiver::Unknown, Receiver::Call),
             _ => Receiver::Unknown,
         }
     }
@@ -80,5 +87,25 @@ impl<'ast> Visit<'ast> for Calls {
             .unwrap_or_default();
         let owner = segments.iter().rev().nth(1).cloned();
         self.made.extend(segments.last().cloned().map(|name| Callee::Path { owner, name }));
+    }
+}
+
+#[derive(Debug, Default)]
+struct Rebound(BTreeSet<Name>);
+
+impl Rebound {
+    fn bindings_in(body: &Block) -> BTreeSet<Name> {
+        let mut scan = Rebound::default();
+        scan.visit_block(body);
+        scan.0
+    }
+}
+
+impl<'ast> Visit<'ast> for Rebound {
+    fn visit_item(&mut self, _nested: &'ast Item) {}
+
+    fn visit_pat_ident(&mut self, found: &'ast PatIdent) {
+        self.0.insert(Name::from(&found.ident));
+        visit::visit_pat_ident(self, found);
     }
 }

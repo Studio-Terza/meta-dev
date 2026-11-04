@@ -6,7 +6,7 @@ use newtype::{Arbitrary, Newtype};
 use super::walk::Walk;
 use crate::edge::Edge;
 use crate::end::{End, Hop};
-use transition_facts::Owner;
+use transition_facts::{Owner, Wrapping};
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Stop(usize);
@@ -43,7 +43,7 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
             let earlier: Vec<Option<&Name>> = resolved
                 .iter()
                 .copied()
-                .map(|found: Option<&'graph Edge<'found, 'file>>| found.map(Self::output))
+                .map(|found: Option<&'graph Edge<'found, 'file>>| found.and_then(Self::output))
                 .collect();
             let owner = callee.owner(walker, &earlier);
             resolved.push(self.resolved(callee.as_ref(), owner));
@@ -64,8 +64,9 @@ impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
         ends.and_then(|(from, to)| self.joins.iter().copied().find(|edge| Self::closes(edge, &from, &to).is_some()))
     }
 
-    fn output(edge: &'graph Edge<'found, 'file>) -> &'graph Name {
-        AsRef::<End<'found>>::as_ref(edge.ends()).as_ref()
+    fn output(edge: &'graph Edge<'found, 'file>) -> Option<&'graph Name> {
+        (edge.transition().function().wrapping() == Wrapping::Plain)
+            .then(|| AsRef::<End<'found>>::as_ref(edge.ends()).as_ref())
     }
 
     fn closes(edge: &Edge<'found, 'file>, from: &Hop<'found>, to: &Hop<'found>) -> Option<Hop<'found>> {
