@@ -290,3 +290,21 @@ fn a_foreign_trait_path_on_the_edge_stays_a_type() {
     let text = Mapped::lawed(EDGE, "laws::preserves!(keeps, any::<A>(), A::join, B::join, Other::into_b);\n");
     assert!(text.contains("1 do not; x::A -> x::B: into_b"), "{text}");
 }
+
+const NO_OPS_EDGE: &str = "struct A;\nstruct B;\nimpl A {\n    fn into_b(&self) -> B {}\n}\n";
+const PRESERVES_CLOSURE: &str =
+    "laws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n";
+
+#[test]
+fn only_unresolved_preserves_closures_in_packages_with_operations_are_reported() {
+    let counts: Vec<usize> = [
+        (EDGE, "laws::roundtrip!(rt, any::<A>(), |a: &A| encode(a), |b| decode(b));\n"),
+        (EDGE, "laws::associative!(a, any::<A>(), |a: A, b: A| combine(a, b));\n"),
+        (NO_OPS_EDGE, PRESERVES_CLOSURE),
+        (EDGE, PRESERVES_CLOSURE),
+    ]
+    .iter()
+    .map(|&(source, law)| Mapped::lawed(source, law).matches("checks a closure").count())
+    .collect();
+    assert_eq!(counts, [0, 0, 0, 1]);
+}

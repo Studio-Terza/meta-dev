@@ -3,13 +3,13 @@ pub(crate) mod attached;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use law_facts::{Law, Property};
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::algebra::Operation;
 use crate::count::Count;
+use crate::declarations::Checked;
 use crate::end::Node;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
@@ -37,13 +37,7 @@ impl GraphLint for AlgebraLaws {
             by_crate
                 .iter()
                 .filter_map(|(name, operations)| CrateLaws::measured(name, operations, &attached).reported())
-                .chain(
-                    declarations
-                        .unresolved()
-                        .filter(|law| law.kind().property().is_some_and(|property| property != Property::Preserves))
-                        .filter_map(Law::unresolved)
-                        .map(|unresolved| Violation::new(*AsRef::<Site<'file>>::as_ref(&unresolved), &unresolved)),
-                )
+                .chain(declarations.unresolved(algebras, Checked::Operations))
                 .collect(),
         )
     }

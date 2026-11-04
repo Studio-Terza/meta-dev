@@ -7,7 +7,7 @@ use lint_placement::CrateName;
 
 use crate::algebra::Algebras;
 use crate::count::Count;
-use crate::declarations::Declarations;
+use crate::declarations::{Checked, Declarations};
 use crate::edge::Edge;
 use crate::end::{End, Node};
 use crate::form::Form;
@@ -30,13 +30,7 @@ impl GraphLint for Homomorphisms {
             grouped
                 .iter()
                 .filter_map(|(name, edges)| CrateMorphisms::measured(name, edges, algebras, declarations).reported())
-                .chain(
-                    declarations
-                        .unresolved()
-                        .filter(|law| law.kind().property() == Some(Property::Preserves))
-                        .filter_map(Law::unresolved)
-                        .map(|unresolved| Violation::new(*AsRef::<Site<'file>>::as_ref(&unresolved), &unresolved)),
-                )
+                .chain(declarations.unresolved(algebras, Checked::Preservation))
                 .collect(),
         )
     }

@@ -496,3 +496,41 @@ fn a_trait_path_resolves_through_imports_globs_qualified_paths_and_re_exports() 
     let failing: Vec<String> = TRAIT_PATH_FORMS.iter().filter_map(Row::failure).collect();
     assert_eq!(failing, Vec::<String>::new());
 }
+
+const ROUNDTRIP_CLOSURE: &str = "laws::roundtrip!(rt, any::<A>(), |a: &A| encode(a), |b| decode(b));\n";
+const PLAIN_LAW_CLOSURE: &str = "laws::law!(holds, any::<A>(), |a: A| check(a));\n";
+const SWAP_CLOSURE: &str = "laws::commutative!(s, any::<A>(), |a: A, b: A| combine(a, b));\n";
+
+#[test]
+fn an_unresolved_closure_of_every_kind_but_preserves_is_reported() {
+    let reported: Vec<usize> = [("roundtrip", ROUNDTRIP_CLOSURE), ("law", PLAIN_LAW_CLOSURE)]
+        .iter()
+        .map(|&(kind, law)| {
+            Declared::lawed(PRIVATE, law)
+                .matches(&format!(
+                    "crates/x/tests/t.rs:1: law {kind}! checks a closure the lint cannot resolve to an operation"
+                ))
+                .count()
+        })
+        .collect();
+    assert_eq!(reported, [1, 1]);
+}
+
+#[test]
+fn an_unresolved_closure_outside_a_package_with_operations_is_not_reported() {
+    let in_transitions = Declared::lawed(TRANSITION, "laws::idempotent!(settles, any::<A>(), |a: A| normalise(a));\n");
+    let in_other_package = Declared::of(&[
+        Declared::at("crates/x/src/lib.rs", PRIVATE),
+        Declared::at("crates/y/tests/t.rs", SWAP_CLOSURE),
+    ]);
+    let in_both = Declared::of(&[
+        Declared::at("crates/x/src/lib.rs", PRIVATE),
+        Declared::at("crates/x/tests/t.rs", SWAP_CLOSURE),
+        Declared::at("crates/y/tests/t.rs", SWAP_CLOSURE),
+    ]);
+    assert_eq!(
+        [&in_transitions, &in_other_package, &in_both].map(|text| text.matches("checks a closure").count()),
+        [0, 0, 1],
+        "{in_transitions}{in_other_package}{in_both}"
+    );
+}
