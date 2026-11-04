@@ -84,21 +84,8 @@ impl<'outer> TypeScope<'outer> {
 
     pub(super) fn taken(&self, input: &FnArg) -> Wrapping {
         match input {
-            FnArg::Typed(typed) => self.wrapping(&typed.ty),
-            receiver @ FnArg::Receiver(_) => Wrapping::taken(receiver),
-        }
-    }
-
-    pub(super) fn wrapping(&self, found: &Type) -> Wrapping {
-        match found {
-            Type::Reference(reference) => self.wrapping(&reference.elem),
-            Type::Paren(paren) => self.wrapping(&paren.elem),
-            Type::Path(path) => path
-                .path
-                .get_ident()
-                .and_then(|ident| self.generic_wrapping(&Name::from(ident)))
-                .unwrap_or_else(|| Wrapping::peeled(found)),
-            _ => Wrapping::peeled(found),
+            FnArg::Typed(typed) => Wrapping::peeled(&typed.ty, &|name| self.generic_wrapping(name)),
+            FnArg::Receiver(_) => Wrapping::Plain,
         }
     }
 

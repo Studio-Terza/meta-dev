@@ -26,6 +26,9 @@ const MUTATING: &str = "struct A;\nimpl A {\n    fn left(&self) -> u8 { 1 }\n   
 const OPERATIONS: &str =
     "struct A;\nimpl A {\n    fn join(self, other: A) -> A { self }\n    fn merge(&self, other: &A) -> A { A }\n}\n";
 
+const MUTATING_BOTH: &str =
+    "struct A;\nimpl A {\n    fn left(&mut self) -> u8 { 1 }\n    fn right(&mut self) -> u8 { 2 }\n}\n";
+const PLATFORMS_AND_OTHER: &str = "struct A;\nimpl A {\n    #[cfg(unix)]\n    fn read(&self) -> u8 { 1 }\n    #[cfg(windows)]\n    fn read(&self) -> u8 { 1 }\n    fn other(&self) -> u8 { 2 }\n}\n";
 const CASES: [Case; 15] = [
     Case::new(
         Title::new("same signature"),
@@ -129,4 +132,24 @@ fn two_operations_of_one_type_that_read_alike_through_references_are_flagged() {
         text.contains("crates/x/src/lib.rs:3: x::A: join at crates/x/src/lib.rs:3, merge at crates/x/src/lib.rs:4 share the signature (x::A, x::A) -> x::A; "),
         "{text}"
     );
+}
+
+#[test]
+fn two_methods_that_both_mutate_say_so_in_the_message() {
+    let text = OnGraph::<DistinctSignatures>::report(&Sources::parsed(&[Source::new(
+        Located::new("crates/x/src/lib.rs"),
+        Text::new(MUTATING_BOTH),
+    )]))
+    .to_string();
+    assert!(text.contains("share the signature (x::A) -> u8, mutating self; "), "{text}");
+}
+
+#[test]
+fn a_method_written_once_per_platform_is_listed_once_in_the_message() {
+    let text = OnGraph::<DistinctSignatures>::report(&Sources::parsed(&[Source::new(
+        Located::new("crates/x/src/lib.rs"),
+        Text::new(PLATFORMS_AND_OTHER),
+    )]))
+    .to_string();
+    assert!(text.contains("x::A: read at crates/x/src/lib.rs:4, other at crates/x/src/lib.rs:7 share"), "{text}");
 }

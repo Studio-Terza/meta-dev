@@ -38,7 +38,9 @@ impl<'system, 'found, 'file> Alike<'system, 'found, 'file> {
 
 impl fmt::Display for Alike<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let members = Listed::<_, ','>::joined(self.0.members().iter().map(Method::located));
+        let mut seen = BTreeSet::new();
+        let named = self.0.members().iter().filter(|method| seen.insert(AsRef::<Name>::as_ref(*method)));
+        let members = Listed::<_, ','>::joined(named.map(Method::located));
         let first = self.0.members().first();
         first.map_or(Ok(()), |method| {
             write!(formatter, "{}: {members} share the signature {}", method.owner(), self.0.key())
