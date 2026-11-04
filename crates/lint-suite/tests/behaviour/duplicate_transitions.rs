@@ -31,6 +31,7 @@ const PRIMITIVE_PAIRS: &str = "struct A;\nimpl A {\n    fn ready(&self) -> bool 
 const ALGEBRA: &str = "struct Weight;\nimpl Weight {\n    fn plus(self, other: Weight) -> Weight {}\n    fn least(self, other: Weight) -> Weight {}\n}\n";
 const ACTED_PAIR: &str = "struct A;\nstruct Factor;\nimpl A {\n    fn scale(&self, factor: Factor) -> A {}\n    fn scaled(&self, factor: Factor) -> A {}\n}\n";
 const PURE_PAIR: &str = "struct A;\nimpl A {\n    fn plus(&self, other: &A) -> A {}\n    fn least(&self, other: &A) -> A {}\n    fn bump(&mut self) {}\n}\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
+const CHILDREN: &str = "struct A;\nimpl A {\n    fn children(&self) -> Vec<A> {}\n    fn kids(&self) -> Vec<A> {}\n}\n";
 const SELF_LOOP: &str =
     "struct A;\nstruct B;\nimpl A {\n    fn with(&self, b: &B) -> A {}\n    fn without(&self, b: &B) -> A {}\n}\n";
 const LIFTED: &str = "struct A;\nstruct B;\nimpl A {\n    fn b(&self) -> &B { &self.b }\n    fn made(&self) -> B {}\n}\nmod store {\n    impl A {\n        fn b_mut(&mut self) -> B {}\n    }\n}\n";
@@ -53,6 +54,7 @@ laws::table!(
         [ACTED_PAIR, "x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5"] => true,
         [PURE_PAIR, "has 2 transitions"] => false,
         [PURE_PAIR, "has 3 transitions"] => false,
+        [CHILDREN, "x::A -> x::A has 2 transitions"] => true,
     ]
 );
 

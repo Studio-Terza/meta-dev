@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
 
-use transition_facts::{Mutation, Transition, Wrapping};
+use transition_facts::{Transition, Wrapping};
 
-use crate::count::Count;
 use crate::edge::Edge;
-use crate::end::{End, Node};
+use crate::end::Node;
 use crate::form::{Acting, Form};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -14,10 +13,11 @@ pub enum Totality {
 }
 
 impl Totality {
-    pub(crate) fn of_wrapping(wrapping: Wrapping) -> Totality {
+    pub(crate) fn of_wrapping(wrapping: Wrapping) -> Option<Totality> {
         match wrapping {
-            Wrapping::Optional | Wrapping::Fallible => Totality::Partial,
-            Wrapping::Plain | Wrapping::Many => Totality::Total,
+            Wrapping::Optional | Wrapping::Fallible => Some(Totality::Partial),
+            Wrapping::Plain => Some(Totality::Total),
+            Wrapping::Many => None,
         }
     }
 
@@ -29,70 +29,18 @@ impl Totality {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Signature<'found> {
-    subject: Node<'found>,
-    held: Count,
-    parameters: Vec<End<'found>>,
-    partial: Totality,
-    mutation: Mutation,
-}
-
-impl<'found> Signature<'found> {
-    pub(crate) fn describing(acting: &Acting<'found>, partial: Totality, mutation: Mutation) -> Signature<'found> {
-        Signature {
-            subject: *acting.subject(),
-            held: acting.held(),
-            parameters: acting.parameters().to_vec(),
-            partial,
-            mutation,
-        }
-    }
-
-    #[must_use]
-    pub fn subject(&self) -> &Node<'found> {
-        &self.subject
-    }
-
-    #[must_use]
-    pub fn held(&self) -> Count {
-        self.held
-    }
-
-    #[must_use]
-    pub fn parameters(&self) -> &[End<'found>] {
-        &self.parameters
-    }
-
-    #[must_use]
-    pub fn partial(&self) -> Totality {
-        self.partial
-    }
-
-    #[must_use]
-    pub fn mutation(&self) -> Mutation {
-        self.mutation
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Operation<'found, 'file> {
     transition: Transition<'found, 'file>,
     acting: Acting<'found>,
     partial: Totality,
-    signature: Signature<'found>,
 }
 
 impl<'found, 'file> Operation<'found, 'file> {
     fn of_edge(edge: &Edge<'found, 'file>) -> Option<Operation<'found, 'file>> {
         let transition = *edge.transition();
-        let partial = Totality::of_wrapping(transition.function().wrapping());
-        edge.form().algebraic().map(|acting| Operation {
-            transition,
-            acting: acting.clone(),
-            partial,
-            signature: Signature::describing(acting, partial, transition.function().mutation()),
-        })
+        let partial = Totality::of_wrapping(transition.function().wrapping())?;
+        edge.form().algebraic().and(Acting::of_edge(edge)).map(|acting| Operation { transition, acting, partial })
     }
 
     #[must_use]
@@ -101,18 +49,8 @@ impl<'found, 'file> Operation<'found, 'file> {
     }
 
     #[must_use]
-    pub fn acting(&self) -> &Acting<'found> {
-        &self.acting
-    }
-
-    #[must_use]
     pub fn partial(&self) -> Totality {
         self.partial
-    }
-
-    #[must_use]
-    pub fn signature(&self) -> &Signature<'found> {
-        &self.signature
     }
 }
 

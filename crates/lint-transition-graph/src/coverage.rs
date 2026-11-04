@@ -1,5 +1,6 @@
 mod share;
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::Fix;
@@ -11,6 +12,7 @@ use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::form::Form;
+use crate::system::TypeSystem;
 use share::Share;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -25,14 +27,15 @@ pub(crate) struct Coverage {
 
 impl Coverage {
     pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
+        system: &TypeSystem<'found, 'file>,
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
     ) -> Coverage {
         let edges: Vec<&Edge<'found, 'file>> = edges.collect();
-        let algebras = Algebras::of_edges(edges.iter().copied());
+        let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
         edges
             .iter()
             .fold(Coverage::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
-            .algebraic(&algebras)
+            .algebraic(system.algebras(), &sites)
     }
 
     fn counted(self, form: &Form<'_>, class: Class) -> Coverage {
@@ -43,9 +46,13 @@ impl Coverage {
         )
     }
 
-    fn algebraic(self, algebras: &Algebras<'_, '_>) -> Coverage {
-        let operations: Vec<_> =
-            algebras.types().filter_map(|node| algebras.of_type(node)).flat_map(Algebra::operations).collect();
+    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
+        let operations: Vec<_> = algebras
+            .types()
+            .filter_map(|node| algebras.of_type(node))
+            .flat_map(Algebra::operations)
+            .filter(|operation| sites.contains(AsRef::<Site<'file>>::as_ref(operation.transition())))
+            .collect();
         Coverage {
             algebraic: Count::new(operations.len()),
             partial: Count::new(operations.iter().filter(|operation| operation.partial() == Totality::Partial).count()),

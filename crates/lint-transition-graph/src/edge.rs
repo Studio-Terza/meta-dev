@@ -30,6 +30,10 @@ impl<'found, 'file> Edge<'found, 'file> {
         &self.form
     }
 
+    pub(crate) fn stored(&self) -> Option<&Edge<'found, 'file>> {
+        Some(self).filter(|edge| matches!(edge.form, Form::Store))
+    }
+
     pub(crate) fn ends(&self) -> &Ends<'found> {
         &self.ends
     }

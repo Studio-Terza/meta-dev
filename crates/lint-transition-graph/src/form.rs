@@ -49,16 +49,6 @@ impl<'found> Acting<'found> {
     pub fn subject(&self) -> &Node<'found> {
         &self.subject
     }
-
-    #[must_use]
-    pub fn held(&self) -> Count {
-        self.held
-    }
-
-    #[must_use]
-    pub fn parameters(&self) -> &[End<'found>] {
-        &self.parameters
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -77,7 +67,7 @@ impl<'found> Form<'found> {
         let function = transition.function();
         let ground = *AsRef::<Ground>::as_ref(transition);
         Form::lifted(function.body())
-            .or_else(|| Form::stored(ground, function.mutation()))
+            .or_else(|| Form::through_store(ground, function.mutation()))
             .unwrap_or_else(|| Form::acted(edge, ground))
     }
 
@@ -88,18 +78,14 @@ impl<'found> Form<'found> {
         }
     }
 
-    fn stored(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
-        Some(ground)
-            .filter(|ground| *ground == Ground::Store)
-            .and(Some(mutation).filter(|mutation| *mutation == Mutation::ThroughSelf))
-            .map(|_| Form::Store)
+    fn through_store(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
+        matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf)).then_some(Form::Store)
     }
 
     fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Form<'found> {
-        Acting::of_edge(edge).map_or_else(
-            || Form::beyond(ground),
-            |acting| Totality::of_wrapping(edge.transition().function().wrapping()).shaping(acting),
-        )
+        Totality::of_wrapping(edge.transition().function().wrapping())
+            .zip(Acting::of_edge(edge))
+            .map_or_else(|| Form::beyond(ground), |(totality, acting)| totality.shaping(acting))
     }
 
     fn beyond(ground: Ground) -> Form<'found> {

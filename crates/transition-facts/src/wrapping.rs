@@ -16,6 +16,10 @@ impl Wrapping {
     const OPTION: [Word<'static>; 1] = words!["Option"];
     const RESULT: [Word<'static>; 1] = words!["Result"];
 
+    pub(crate) fn around(self, inner: Wrapping) -> Wrapping {
+        Some(inner).filter(|inner| *inner == Wrapping::Many).unwrap_or(self)
+    }
+
     pub(crate) fn returned(output: &ReturnType) -> Wrapping {
         match output {
             ReturnType::Default => Wrapping::Plain,
@@ -39,7 +43,7 @@ impl Wrapping {
         [(&Self::OPTION[..], Wrapping::Optional), (&Self::RESULT[..], Wrapping::Fallible)]
             .into_iter()
             .find(|(words, _)| is(words))
-            .map(|(_, wrapping)| wrapping)
+            .map(|(_, wrapping)| wrapping.around(Self::inside(&segment.arguments)))
             .or_else(|| is(&Self::COLLECTIONS).then_some(Wrapping::Many))
             .or_else(|| is(&Self::TRANSPARENT).then(|| Self::inside(&segment.arguments)))
             .unwrap_or(Wrapping::Plain)

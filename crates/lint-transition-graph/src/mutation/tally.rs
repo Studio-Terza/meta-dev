@@ -24,7 +24,7 @@ impl Tally {
             Some(edge).filter(|edge| *AsRef::<Ground>::as_ref(edge.transition()) == Ground::Core).filter(|edge| {
                 matches!(edge.transition().function().mutation(), Mutation::ThroughSelf | Mutation::ThroughParameter)
             });
-        Some(edge).filter(|edge| edge.form().sorted(None, None, Some(())).is_some()).or(mutating)
+        edge.stored().or(mutating)
     }
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(

@@ -27,6 +27,9 @@ const LIFTED_ALGEBRA: &str = "struct A;\nimpl A {\n    fn all(&self) -> Vec<A> {
 const OUTPUT: &str =
     "struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
 const FOREIGN: &str = "struct A;\nimpl Clone for A {\n    fn clone(&self) -> A {}\n}\nimpl Mul<f64> for A {\n    type Output = A;\n    fn mul(self, rhs: f64) -> A {}\n}\n";
+const LOCAL_TRAIT: &str = "struct A;\ntrait Combine {\n    fn merge(self, other: A) -> A;\n}\nimpl Combine for A {\n    fn merge(self, other: A) -> A {}\n}\n";
+const COLLECTED: &str =
+    "struct A;\nimpl A {\n    fn children(&self) -> Vec<A> {}\n    fn others(&self) -> Option<Vec<A>> {}\n}\n";
 const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n        fn f(&self) -> bool {}\n    }\n}\nimpl A {\n    #[cfg(test)]\n    fn g(&self) -> bool {}\n}\n";
 
 laws::table!(
@@ -45,6 +48,9 @@ laws::table!(
         [OUTPUT, "1 written edges, coverage 1 of 1, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial"] => true,
         [FOREIGN, "2 written edges"] => true,
         [FOREIGN, "of which 0 algebra operations, 0 partial"] => true,
+        [LOCAL_TRAIT, "of which 1 algebra operations, 0 partial"] => true,
+        [COLLECTED, "2 written edges"] => true,
+        [COLLECTED, "of which 0 algebra operations, 0 partial"] => true,
         [TESTED, "crate x"] => false,
         [TESTED, "workspace:"] => false,
         ["struct A;\n", "crate x"] => false,
