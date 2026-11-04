@@ -4,16 +4,19 @@ mod lints;
 use std::ffi::OsString;
 use std::io::Write;
 use std::path::PathBuf;
+use std::thread::Scope;
 
+use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
-use lint_core::{Lint, Readout};
+use lint_core::{Lint, Readout, SourceFile};
 use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
-use super::Outcome;
+use super::boundary::Helpers;
+use super::{Outcome, Sources};
 use elegance::Elegance;
 use lints::Lints;
 
@@ -57,27 +60,48 @@ impl Mode {
         }
     }
 
-    pub(crate) fn outcome_of<'file>(&self, readout: &'file Readout, out: &mut impl Write) -> Outcome<'file> {
-        let files = readout.files();
+    pub(crate) fn helpers<'scope, F: Files + Sync>(
+        &self,
+        scope: &'scope Scope<'scope, '_>,
+        sources: &'scope Sources<F>,
+    ) -> Helpers<'scope> {
         match self {
-            Mode::Gate => {
-                write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files))
-                    .ok();
-                Lints::checked(readout)
-            }
-            Mode::Report => {
-                Elegance::reports(files).iter().try_for_each(|report| write!(out, "{report}")).ok();
-                Outcome::Clean
-            }
-            Mode::Query(found) => {
-                found
-                    .iter()
-                    .try_for_each(|query| {
-                        write!(out, "{}", query.matches(&Facts::of_files(files), &Transitions::of_files(files)))
-                    })
-                    .ok();
-                Outcome::Clean
-            }
+            Mode::Gate => Lints::started(scope, sources),
+            Mode::Report | Mode::Query(_) => Vec::new(),
         }
+    }
+
+    pub(crate) fn outcome_of<'file>(
+        &self,
+        readout: &'file Readout,
+        helpers: Helpers<'_>,
+        out: &mut impl Write,
+    ) -> Outcome<'file> {
+        match self {
+            Mode::Gate => Self::gated(readout, helpers, out),
+            Mode::Report => Self::reported(readout.files(), out),
+            Mode::Query(found) => Self::queried(found, readout.files(), out),
+        }
+    }
+
+    fn gated<'file>(readout: &'file Readout, helpers: Helpers<'_>, out: &mut impl Write) -> Outcome<'file> {
+        let files = readout.files();
+        write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
+        Lints::checked(readout, helpers)
+    }
+
+    fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+        Elegance::reports(files).iter().try_for_each(|report| write!(out, "{report}")).ok();
+        Outcome::Clean
+    }
+
+    fn queried(found: &Result<Query, QueryFailure>, files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
+        found
+            .iter()
+            .try_for_each(|query| {
+                write!(out, "{}", query.matches(&Facts::of_files(files), &Transitions::of_files(files)))
+            })
+            .ok();
+        Outcome::Clean
     }
 }

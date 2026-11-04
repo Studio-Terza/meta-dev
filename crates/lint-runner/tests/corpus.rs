@@ -72,10 +72,12 @@ impl Corpus {
     }
 
     fn lints() -> usize {
-        [include_str!("../src/cli/mode/lints.rs"), include_str!("../src/cli/mode.rs")]
-            .iter()
-            .map(|source| source.matches("::report(files)").count())
-            .sum()
+        [
+            include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count(),
+            include_str!("../src/cli/mode.rs").matches("::report(files)").count(),
+        ]
+        .iter()
+        .sum()
     }
 
     fn is_violation(line: &str) -> bool {
