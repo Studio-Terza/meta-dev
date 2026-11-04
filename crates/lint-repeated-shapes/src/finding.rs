@@ -1,20 +1,28 @@
 use std::fmt;
 
 use body_shape::TokenCount;
-use lint_core::Fix;
-use lint_core::Site;
+use equivalence::Group;
+use lint_core::{Fix, Site, Violation};
 
 use crate::kind::Kind;
+use crate::occurrence::Occurrence;
 
-pub(super) struct Finding<'sites> {
+pub(crate) struct Finding<'sites> {
     size: TokenCount,
     kind: Kind,
     others: &'sites [&'sites Site<'sites>],
 }
 
-impl<'sites> Finding<'sites> {
-    pub(super) fn new(size: TokenCount, kind: Kind, others: &'sites [&'sites Site<'sites>]) -> Finding<'sites> {
-        Finding { size, kind, others }
+impl Finding<'_> {
+    pub(crate) fn violation<'file>(group: &Group<Occurrence<'file>>) -> Option<Violation<'file>> {
+        let sites = group.sites();
+        let kind = group.members().iter().map(Occurrence::kind).reduce(Kind::joined).unwrap_or(Kind::Mixed);
+        sites.first().map(|site| {
+            Violation::new(
+                **site,
+                Finding { size: group.key().size(), kind, others: sites.get(1..).unwrap_or_default() },
+            )
+        })
     }
 }
 

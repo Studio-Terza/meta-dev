@@ -114,6 +114,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "equivalence"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -785,10 +792,10 @@ name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
  "body-shape",
+ "equivalence",
  "lint-core",
  "lint-layout",
  "lint-placement",
- "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

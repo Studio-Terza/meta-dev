@@ -1,3 +1,5 @@
+use body_shape::Shape;
+use equivalence::{Keyed, Nested};
 use lint_core::Site;
 
 use crate::extent::Extent;
@@ -5,21 +7,32 @@ use crate::kind::Kind;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Occurrence<'file> {
+    shape: Shape,
     site: Site<'file>,
     extent: Extent,
     kind: Kind,
 }
 
 impl<'file> Occurrence<'file> {
-    pub(crate) fn new(site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
-        Occurrence { site, extent, kind }
+    pub(crate) fn new(shape: Shape, site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
+        Occurrence { shape, site, extent, kind }
     }
 
     pub(crate) fn kind(&self) -> Kind {
         self.kind
     }
+}
 
-    pub(crate) fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
+impl Keyed for Occurrence<'_> {
+    type Key = Shape;
+
+    fn key(&self) -> Shape {
+        self.shape
+    }
+}
+
+impl<'file> Nested for Occurrence<'file> {
+    fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
         Some(outer)
             .filter(|outer| self.site.path() == outer.site.path())
             .and_then(|outer| outer.extent.holds(&self.extent).map(|_| outer))
