@@ -12,7 +12,7 @@ impl Term {
 
     #[must_use]
     pub fn found_in(&self, name: &Name) -> Option<&Term> {
-        name.humps().map(|hump| Term::from(&hump)).find(|hump| hump == self).map(|_| self)
+        name.humps().map(|hump| Term::from(hump.as_ref())).find(|hump| hump == self).map(|_| self)
     }
 }
 

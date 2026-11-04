@@ -1,19 +1,17 @@
 mod crate_count;
 mod history;
 mod reached;
-mod readers;
 mod sources;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use workspace_metadata::{CrateName, Metadata};
+use workspace_metadata::{CrateName, Metadata, Readers};
 
 use crate_count::CrateCount;
 use history::History;
 use reached::Reached;
-use readers::Readers;
 use sources::Sources;
 
 #[derive(Debug)]
@@ -27,7 +25,7 @@ impl<'meta> From<&'meta Metadata> for Workspace<'meta> {
     fn from(metadata: &'meta Metadata) -> Workspace<'meta> {
         let directories = metadata.directories();
         let dependents = metadata.dependents(&directories);
-        Workspace { directories, dependents, readers: Readers::new(metadata.readers()) }
+        Workspace { directories, dependents, readers: metadata.readers() }
     }
 }
 
@@ -71,17 +69,6 @@ impl<'meta> Workspace<'meta> {
     }
 
     fn touched(&self, path: &Path) -> BTreeSet<&'meta CrateName> {
-        path.file_name().filter(|name| *name == Self::MANIFEST).map_or_else(
-            || self.owned(path).into_iter().chain(self.readers.reached_by(path)).collect(),
-            |_| self.everything(),
-        )
-    }
-
-    fn everything(&self) -> BTreeSet<&'meta CrateName> {
-        self.directories.keys().copied().collect()
-    }
-
-    fn owned(&self, path: &Path) -> Vec<&'meta CrateName> {
         let owners: Vec<&CrateName> = self
             .directories
             .iter()
@@ -90,11 +77,15 @@ impl<'meta> Workspace<'meta> {
             .map(|(name, _)| *name)
             .collect();
         let inert = Self::INERT.iter().find(|inert| path.starts_with(inert));
-        owners
-            .first()
-            .map(|_| ())
-            .or(inert.map(|_| ()))
-            .map_or_else(|| self.everything().into_iter().collect(), |()| owners)
+        let owned = owners.first().map(|_| ()).or(inert.map(|_| ()));
+        let manifest = path.file_name().filter(|name| *name == Self::MANIFEST);
+        owned
+            .filter(|()| manifest.is_none())
+            .map_or_else(|| self.everything(), |()| owners.into_iter().chain(self.readers.reached_by(path)).collect())
+    }
+
+    fn everything(&self) -> BTreeSet<&'meta CrateName> {
+        self.directories.keys().copied().collect()
     }
 
     fn closure(&self, crates: BTreeSet<&'meta CrateName>) -> BTreeSet<&'meta CrateName> {

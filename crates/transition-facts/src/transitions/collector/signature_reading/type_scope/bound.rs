@@ -1,25 +1,23 @@
 use syn::{PathSegment, TraitBoundModifier, TypeParamBound};
 
-use lint_layout::{Name, Whole, Word, words};
+use lint_layout::{Name, Whole};
 
 use super::TypeScope;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::resolved::Resolved;
+use crate::wrapping::Wrapping;
 
 #[derive(Debug)]
 pub(super) struct Bound<'bound>(&'bound TypeParamBound);
 
 impl<'bound> Bound<'bound> {
-    const ITERATORS: [Word<'static>; 4] =
-        words!["Iterator", "IntoIterator", "DoubleEndedIterator", "ExactSizeIterator"];
-
     pub(super) fn new(bound: &'bound TypeParamBound) -> Bound<'bound> {
         Bound(bound)
     }
 
     pub(super) fn endpoint(&self, scope: &TypeScope<'_>) -> Option<Resolved> {
         let traited = self.traited();
-        let iterated = traited.filter(|last| Name::from(&last.ident).matches::<Whole>(&Self::ITERATORS).is_some());
+        let iterated = traited.filter(|last| Name::from(&last.ident).matches::<Whole>(&Wrapping::ITERATORS).is_some());
         iterated
             .map(|last| {
                 scope.argument(&last.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Opaque)))

@@ -40,6 +40,12 @@ impl Modules {
     }
 
     #[must_use]
+    pub fn nested_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Vec<Child> {
+        let declared = Self::declared_in(survey, file, children_directory, items);
+        declared.children.into_iter().chain(declared.tests).collect()
+    }
+
+    #[must_use]
     pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
         let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
         let entered = Declaration::within(items, children_directory, Walk::Entered);
@@ -57,11 +63,6 @@ impl Modules {
 
     pub fn take_children(&mut self, survey: &Survey) -> Vec<Child> {
         std::mem::take(&mut self.children).into_iter().map(|child| child.canonical(survey)).collect()
-    }
-
-    #[must_use]
-    pub fn nested(self) -> Vec<Child> {
-        self.children.into_iter().chain(self.tests).collect()
     }
 
     #[must_use]

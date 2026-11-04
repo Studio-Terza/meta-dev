@@ -13,6 +13,7 @@ use toml::{Table, Value};
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::name::Name;
+use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
 use crate::word::Word;
@@ -108,6 +109,7 @@ impl Manifest {
     pub fn named_paths(&self) -> Vec<PathBuf> {
         let named = |path: &Path| Some(path.to_path_buf());
         self.path_dependencies(named)
+            .into_inner()
             .into_iter()
             .chain(self.declared_roots(named))
             .chain(self.untested_targets(named).into_inner())
@@ -115,17 +117,19 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn path_dependencies(&self, canonical: impl Fn(&Path) -> Option<PathBuf>) -> Vec<PathBuf> {
+    pub fn path_dependencies(&self, canonical: impl Fn(&Path) -> Option<PathBuf>) -> PathDependencies {
         let workspace = self.table.get(Self::WORKSPACE).and_then(|value| value.get("dependencies"));
-        Self::DEPENDENCIES
-            .iter()
-            .filter_map(|name| self.table.get(*name))
-            .chain(workspace)
-            .filter_map(Value::as_table)
-            .flat_map(Table::values)
-            .filter_map(|dependency| dependency.get(Self::PATH)?.as_str())
-            .filter_map(|path| canonical(&self.directory.join(path)))
-            .collect()
+        PathDependencies::new(
+            Self::DEPENDENCIES
+                .iter()
+                .filter_map(|name| self.table.get(*name))
+                .chain(workspace)
+                .filter_map(Value::as_table)
+                .flat_map(Table::values)
+                .filter_map(|dependency| dependency.get(Self::PATH)?.as_str())
+                .filter_map(|path| canonical(&self.directory.join(path)))
+                .collect(),
+        )
     }
 
     #[must_use]

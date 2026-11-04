@@ -16,11 +16,8 @@ impl<'file> CrateSummary<'file> {
     const TANGLE_ITEMS: Bound = Bound::Most(40);
 
     pub fn of_graph(crate_file: &'file CrateFile, graph: &ItemGraph) -> CrateSummary<'file> {
-        let members = graph.tangles();
-        let tangles = members
-            .iter()
-            .map(|members| Tangle::new(members.iter().filter_map(|member| graph.name_at(*member)).cloned().collect()))
-            .collect();
+        let tangles =
+            graph.tangles().into_iter().map(|members| Tangle::new(members.into_iter().cloned().collect())).collect();
         CrateSummary { site: Site::of_file(crate_file.as_ref()), tangles }
     }
 

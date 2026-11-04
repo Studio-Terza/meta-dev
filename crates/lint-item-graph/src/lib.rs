@@ -3,10 +3,11 @@ mod referenced_names;
 mod scope;
 mod traversal;
 
-pub use node_index::NodeIndex;
 pub use referenced_names::ReferencedNames;
 pub use scope::Scope;
 pub use traversal::Traversal;
+
+use node_index::NodeIndex;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -36,13 +37,15 @@ impl ItemGraph {
     }
 
     #[must_use]
-    pub fn links(&self) -> &[Vec<NodeIndex>] {
-        &self.links
+    pub fn stand_ins(&self) -> BTreeMap<&Name, Vec<&Name>> {
+        self.stand_ins
+            .iter()
+            .filter_map(|index| self.name_at(*index).map(|name| (name, self.used_by(*index))))
+            .collect()
     }
 
-    #[must_use]
-    pub fn stand_ins(&self) -> &BTreeSet<NodeIndex> {
-        &self.stand_ins
+    fn used_by(&self, index: NodeIndex) -> Vec<&Name> {
+        self.links.get(index.into_inner()).into_iter().flatten().filter_map(|used| self.name_at(*used)).collect()
     }
 }
 
@@ -68,13 +71,12 @@ impl<Node: Ord> ItemGraph<Node> {
         ItemGraph { names: references.into_keys().collect(), links, stand_ins: BTreeSet::new() }
     }
 
-    #[must_use]
-    pub fn name_at(&self, node: NodeIndex) -> Option<&Node> {
+    fn name_at(&self, node: NodeIndex) -> Option<&Node> {
         self.names.get(node.into_inner())
     }
 
     #[must_use]
-    pub fn tangles(&self) -> Vec<Vec<NodeIndex>> {
+    pub fn tangles(&self) -> Vec<Vec<&Node>> {
         let everyone = (0..self.names.len()).map(NodeIndex::from);
         let forward = |node: NodeIndex| self.links.get(node.into_inner()).into_iter().flatten().copied();
         let finished = Traversal::trees(everyone, forward).into_iter().flatten().rev();
@@ -87,7 +89,7 @@ impl<Node: Ord> ItemGraph<Node> {
         .collect();
         let mut tangles: Vec<Vec<NodeIndex>> = tangles.into_iter().collect();
         tangles.sort_by_key(|tangle| std::cmp::Reverse(tangle.len()));
-        tangles
+        tangles.into_iter().map(|tangle| tangle.into_iter().filter_map(|index| self.name_at(index)).collect()).collect()
     }
 
     fn reversed(links: &[Vec<NodeIndex>]) -> Vec<Vec<NodeIndex>> {

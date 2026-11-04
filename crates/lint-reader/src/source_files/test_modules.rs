@@ -50,8 +50,7 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
         children_directory: &Path,
         source: SourceFile,
     ) -> TestModules<'shelf, 'tree> {
-        let nested =
-            Modules::declared_in(self.shelf.survey(), file, children_directory, &source.syntax().items).nested();
+        let nested = Modules::nested_in(self.shelf.survey(), file, children_directory, &source.syntax().items);
         nested
             .into_iter()
             .fold(TestModules { files: self.files.into_iter().chain([source]).collect(), ..self }, |reading, child| {
