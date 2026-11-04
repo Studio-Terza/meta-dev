@@ -2,8 +2,6 @@ mod mentions;
 mod routes;
 mod scope;
 
-pub(crate) use scope::Import;
-
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Block, ItemImpl, ItemMod, Macro};

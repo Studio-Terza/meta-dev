@@ -25,10 +25,11 @@ impl<'scope> Within<'scope> {
         Within { scope, traits, home }
     }
 
-    fn owner(&self, written: &Name, operand: Option<&Owner>) -> Option<Owner> {
-        self.scope.named(written).and_then(|named| {
+    fn owner(&self, written: &[Name], operand: Option<&Owner>) -> Option<Owner> {
+        let places = self.scope.places(written);
+        written.last().and_then(|last| self.scope.named(last)).and_then(|named| {
             Some(named)
-                .filter(|named| self.traits.declaring(named, self.scope.import(written), self.home).is_none())
+                .filter(|named| self.traits.declaring(&places, named, self.home).is_none())
                 .map(Owner::Named)
                 .or_else(|| operand.cloned())
         })
@@ -37,7 +38,8 @@ impl<'scope> Within<'scope> {
     fn operand(side: Side, generated: Option<&Name>) -> Option<Owner> {
         match side {
             Side::Input => generated.cloned().map(Owner::Named),
-            Side::Output | Side::Edge => Some(Owner::Operand),
+            Side::Output => Some(Owner::Operand),
+            Side::Edge => Some(generated.cloned().map_or(Owner::Operand, Owner::Named)),
         }
     }
 }
@@ -102,10 +104,7 @@ impl<'scope> Routes<'scope> {
     }
 
     fn owner_segment(&self, path: &Path) -> Option<Owner> {
-        path.segments
-            .iter()
-            .rev()
-            .nth(1)
-            .and_then(|written| self.within.owner(&Name::from(&written.ident), self.operand.as_ref()))
+        let written: Vec<Name> = path.segments.iter().map(|segment| Name::from(&segment.ident)).collect();
+        written.split_last().and_then(|(_, before)| self.within.owner(before, self.operand.as_ref()))
     }
 }

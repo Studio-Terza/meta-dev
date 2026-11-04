@@ -5,6 +5,7 @@ mod operators;
 mod package;
 mod reader;
 mod traits;
+mod uses;
 
 pub use kind::{Kind, Property};
 pub use law::Law;

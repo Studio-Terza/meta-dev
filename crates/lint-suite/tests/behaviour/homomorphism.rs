@@ -252,3 +252,41 @@ fn an_unreadable_closure_in_a_preserves_law_is_reported_on_its_own() {
         "{text}"
     );
 }
+
+const TWO_FROMS: &str = "struct A;\nstruct B;\nstruct C;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n}\nimpl C {\n    fn join(self, other: C) -> C {}\n}\nimpl From<A> for B {\n    fn from(a: A) -> B {}\n}\nimpl From<C> for B {\n    fn from(c: C) -> B {}\n}\n";
+
+#[test]
+fn a_conversion_trait_path_on_the_edge_resolves_to_the_generated_type() {
+    let listed: Vec<(&str, String)> = [
+        ("B1", "laws::preserves!(keeps, any::<A>(), A::join, B::join, From::from);\n"),
+        ("B2", "laws::preserves!(keeps, any::<A>(), A::join, B::join, std::convert::From::from);\n"),
+        ("B3", "laws::preserves!(keeps, any::<A>(), A::join, B::join, |a| From::from(a));\n"),
+    ]
+    .iter()
+    .map(|&(id, law)| (id, Mapped::lawed(FROM_IMPL, law)))
+    .filter(|(_, text)| text.contains("edges between algebraic types"))
+    .collect();
+    assert!(listed.is_empty(), "{listed:#?}");
+}
+
+#[test]
+fn a_conversion_trait_path_with_a_primitive_generator_reaches_no_edge() {
+    let text = Mapped::lawed(FROM_IMPL, "laws::preserves!(keeps, any::<u8>(), A::join, B::join, From::from);\n");
+    assert!(text.contains("1 do not; x::A -> x::B: from"), "{text}");
+}
+
+#[test]
+fn a_conversion_trait_path_reaches_only_the_edge_from_the_generated_type() {
+    let text = Mapped::lawed(TWO_FROMS, "laws::preserves!(keeps, any::<A>(), A::join, B::join, From::from);\n");
+    assert!(
+        text.contains("2 edges between algebraic types, 1 declare preservation, 1 do not; x::C -> x::B: from at crates/x/src/lib.rs:"),
+        "{text}"
+    );
+    assert_eq!(text.matches("(law preserves!").count(), 0, "{text}");
+}
+
+#[test]
+fn a_foreign_trait_path_on_the_edge_stays_a_type() {
+    let text = Mapped::lawed(EDGE, "laws::preserves!(keeps, any::<A>(), A::join, B::join, Other::into_b);\n");
+    assert!(text.contains("1 do not; x::A -> x::B: into_b"), "{text}");
+}

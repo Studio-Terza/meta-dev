@@ -301,3 +301,198 @@ fn a_wrapped_operation_operand_or_parameter_attaches_to_the_type_it_resolves_to(
         "{listed:?}"
     );
 }
+
+const ONE_JOIN: &str = PRIVATE;
+const Y_TRAIT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub trait Join {}\n" };
+const Y_STRUCT: Extra = Extra { path: "crates/y/src/lib.rs", text: "pub struct Join;\n" };
+const W_EMPTY: Extra = Extra { path: "crates/w/src/lib.rs", text: "pub struct Other;\n" };
+const Z_REEXPORT: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join;\n" };
+const Z_RENAMED: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::Join as Merge;\n" };
+const Z_GLOB: Extra = Extra { path: "crates/z/src/lib.rs", text: "pub use y::*;\n" };
+const Z_PRIVATE: Extra = Extra { path: "crates/z/src/lib.rs", text: "use y::Join;\n" };
+const V_TWO_HOP: Extra = Extra { path: "crates/v/src/lib.rs", text: "pub use z::Join;\n" };
+const X_TRAIT: Extra = Extra { path: "crates/x/src/ops.rs", text: "pub trait Join {}\n" };
+const X_IMPORTS_Y: Extra = Extra { path: "crates/x/src/imports.rs", text: "use y::Join;\n" };
+const P_GLOB: Extra = Extra { path: "crates/p/src/lib.rs", text: "pub use q::*;\n" };
+const Q_GLOB: Extra = Extra { path: "crates/q/src/lib.rs", text: "pub use p::*;\n" };
+const X_IMPORTS_W: Extra = Extra { path: "crates/x/src/imports.rs", text: "use w::Join;\n" };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Expect {
+    Credited,
+    Listed,
+}
+
+impl Expect {
+    const LISTED: &str = "crate x: 1 of 1 algebra operations declare no law; x::A: join";
+
+    fn listings(self) -> usize {
+        match self {
+            Expect::Credited => 0,
+            Expect::Listed => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Extra {
+    path: &'static str,
+    text: &'static str,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Row {
+    id: &'static str,
+    extras: &'static [Extra],
+    law: &'static str,
+    expect: Expect,
+}
+
+impl Row {
+    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Row {
+        Row { id, extras, law, expect }
+    }
+
+    fn failure(&self) -> Option<String> {
+        let sources: Vec<Source> = std::iter::once(Declared::at("crates/x/src/lib.rs", ONE_JOIN))
+            .chain(self.extras.iter().map(|extra| Declared::at(extra.path, extra.text)))
+            .chain(std::iter::once(Declared::at("crates/x/tests/t.rs", self.law)))
+            .collect();
+        let text = Declared::of(&sources);
+        Some(text.matches(Expect::LISTED).count())
+            .filter(|listings| *listings != self.expect.listings())
+            .map(|_| format!("{} expected {:?}: {text}", self.id, self.expect))
+    }
+}
+
+const TRAIT_PATH_FORMS: [Row; 38] = [
+    Row::new("A1", &[Y_TRAIT], "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new(
+        "A2",
+        &[Y_TRAIT],
+        "use y::Join as Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A3",
+        &[Y_TRAIT],
+        "use y::{Join, Other};\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A4", &[Y_TRAIT], "use y::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A5", &[Y_TRAIT], "use y::ops::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A6", &[Y_TRAIT], "laws::associative!(r, any::<A>(), y::Join::join);\n", Expect::Credited),
+    Row::new("A7", &[Y_TRAIT], "use y::ops;\nlaws::associative!(r, any::<A>(), ops::Join::join);\n", Expect::Credited),
+    Row::new(
+        "A8",
+        &[Y_TRAIT],
+        "use y as why;\nlaws::associative!(r, any::<A>(), why::Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A9",
+        &[Y_TRAIT],
+        "fn regroups() {\n    use y::*;\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A10",
+        &[Y_TRAIT],
+        "use y::*;\nimpl A {\n    fn regroups() {\n        laws::associative!(r, any::<A>(), Join::join);\n    }\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A11",
+        &[Y_TRAIT],
+        "use y::*;\nmod inner {\n    laws::associative!(r, any::<A>(), Join::join);\n}\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A12",
+        &[Y_TRAIT, Z_REEXPORT],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A13", &[Y_TRAIT, Z_REEXPORT], "laws::associative!(r, any::<A>(), z::Join::join);\n", Expect::Credited),
+    Row::new(
+        "A14",
+        &[Y_TRAIT, Z_RENAMED],
+        "use z::Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A15",
+        &[Y_TRAIT, Z_GLOB],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new(
+        "A16",
+        &[V_TWO_HOP, Z_REEXPORT, Y_TRAIT],
+        "use v::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A17", &[X_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A18", &[X_TRAIT], "use self::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A19", &[X_TRAIT], "use super::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A20", &[X_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Credited),
+    Row::new("A21", &[X_TRAIT], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A22", &[X_TRAIT], "use x::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new(
+        "A23",
+        &[X_TRAIT],
+        "use Join as Merge;\nlaws::associative!(r, any::<A>(), Merge::join);\n",
+        Expect::Credited,
+    ),
+    Row::new("A24", &[Y_TRAIT, X_IMPORTS_Y], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Credited),
+    Row::new("A25", &[], "laws::associative!(r, any::<A>(), From::from);\n", Expect::Listed),
+    Row::new(
+        "A26",
+        &[P_GLOB, Q_GLOB],
+        "use p::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N1", &[Y_TRAIT], "laws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new("N2", &[Y_STRUCT], "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new(
+        "N3",
+        &[Y_TRAIT, W_EMPTY],
+        "use w::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N4", &[Y_TRAIT, W_EMPTY], "laws::associative!(r, any::<A>(), w::Join::join);\n", Expect::Listed),
+    Row::new("N5", &[Y_TRAIT, W_EMPTY], "use w::*;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new(
+        "N6",
+        &[Y_TRAIT, W_EMPTY],
+        "use y::*;\nuse w::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new(
+        "N7",
+        &[Y_TRAIT, Z_PRIVATE],
+        "use z::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N8", &[Y_TRAIT], "use crate::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n", Expect::Listed),
+    Row::new("N9", &[Y_TRAIT], "laws::associative!(r, any::<A>(), crate::Join::join);\n", Expect::Listed),
+    Row::new(
+        "N10",
+        &[X_TRAIT, Y_STRUCT],
+        "use y::Join;\nlaws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+    Row::new("N11", &[], "laws::associative!(r, any::<A>(), Other::join);\n", Expect::Listed),
+    Row::new(
+        "N12",
+        &[Y_TRAIT, W_EMPTY, X_IMPORTS_W],
+        "laws::associative!(r, any::<A>(), Join::join);\n",
+        Expect::Listed,
+    ),
+];
+
+#[test]
+fn a_trait_path_resolves_through_imports_globs_qualified_paths_and_re_exports() {
+    let failing: Vec<String> = TRAIT_PATH_FORMS.iter().filter_map(Row::failure).collect();
+    assert_eq!(failing, Vec::<String>::new());
+}
