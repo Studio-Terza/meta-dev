@@ -4,6 +4,7 @@ mod fault;
 mod git;
 mod hub;
 mod place;
+mod pull_request;
 mod scope;
 
 use std::ffi::OsString;

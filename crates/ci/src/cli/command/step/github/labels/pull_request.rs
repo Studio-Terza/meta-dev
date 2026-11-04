@@ -1,6 +1,6 @@
 use text_lines::Lines;
 
-use super::super::check::Check;
+use super::check::Check;
 use crate::cli::ports::Text;
 
 #[derive(Debug)]

@@ -5,11 +5,11 @@ use lint_layout::Name;
 use newtype::Newtype;
 use type_facts::{Method, MethodShape};
 
+use crate::query::Role;
 use crate::query::candidate::Candidate;
+use crate::query::score::Score;
 use crate::query::term::Term;
 use crate::query::top::Top;
-use crate::role::Role;
-use crate::score::Score;
 
 #[derive(Clone, Copy, Debug)]
 struct Fit<'facts> {

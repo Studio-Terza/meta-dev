@@ -5,7 +5,7 @@ use std::path::Path;
 use super::change::Change;
 use super::check::Check;
 use super::fault::{Fault, Owed};
-use super::hub::PullRequest;
+use super::pull_request::PullRequest;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::changed::Changed;
 use crate::cli::command::step::journal::Journal;
