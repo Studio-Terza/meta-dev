@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
-use lint_item_graph::{ItemGraph, ReferencedNames, Traversal};
+use lint_item_graph::{ItemGraph, Reading, ReferencedNames, Traversal};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
@@ -76,7 +76,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             .collect();
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let named: Vec<(&SourceFile, ReferencedNames)> =
-            shipped.iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
+            shipped.iter().map(|file| (*file, ReferencedNames::read(file, Reading::Bodies))).collect();
         let crates = named.iter().fold(
             BTreeMap::new(),
             |mut crates: BTreeMap<&CrateName, Vec<&ReferencedNames>>, (file, names)| {

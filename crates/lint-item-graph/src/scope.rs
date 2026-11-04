@@ -1,5 +1,6 @@
 mod import;
 mod imports;
+mod reading;
 
 use std::collections::BTreeSet;
 use std::ptr;
@@ -12,11 +13,13 @@ use syn::{ItemFn, ItemImpl, ItemMod, ItemUse, UseTree};
 
 use import::Import;
 use imports::Imports;
+pub use reading::Reading;
 
 #[derive(Debug, Default)]
 pub struct Scope<'file> {
     local_roots: BTreeSet<Name>,
     imports: Imports<'file>,
+    reading: Reading,
 }
 
 impl<'file> Scope<'file> {
@@ -29,6 +32,14 @@ impl<'file> Scope<'file> {
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
         scope.visit_file(file);
         scope
+    }
+
+    pub(crate) fn reading(self, reading: Reading) -> Scope<'file> {
+        Scope { reading, ..self }
+    }
+
+    pub(crate) fn reads(&self) -> Reading {
+        self.reading
     }
 
     #[must_use]
