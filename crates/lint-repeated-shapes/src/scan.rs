@@ -5,7 +5,8 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
-use body_shape::Shape;
+use body_shape::Reading;
+use equivalence::{Equivalence, Erased};
 use lint_core::{Bound, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
@@ -21,6 +22,7 @@ pub(crate) struct Scan<'file> {
 
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
+    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
 
     pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Occurrence<'file>> {
         let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));
@@ -34,11 +36,12 @@ impl<'file> Scan<'file> {
     }
 
     fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
-        let shape = Shape::from(node.to_token_stream());
+        let reading = Reading::erasing(node.to_token_stream(), Self::EQUIVALENCE);
         let span = node.span();
         let site = Site::new(self.file.path(), LineNumber::from(span));
-        let occurrence = Occurrence::new(shape, site, Extent::from(span), self.kind);
-        self.occurrences.extend(Self::FLOOR.allows(shape.size()).map(|_| occurrence));
+        let tokens = reading.shape().size();
+        let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
+        self.occurrences.extend(Self::FLOOR.allows(tokens).map(|_| occurrence));
     }
 
     fn within(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Self)) {

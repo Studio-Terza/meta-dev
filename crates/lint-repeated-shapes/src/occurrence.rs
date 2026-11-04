@@ -1,4 +1,4 @@
-use body_shape::Shape;
+use body_shape::{Literals, Reading, Shape};
 use equivalence::{Keyed, Nested};
 use lint_core::Site;
 
@@ -8,14 +8,19 @@ use crate::kind::Kind;
 #[derive(Clone, Debug)]
 pub(crate) struct Occurrence<'file> {
     shape: Shape,
+    literals: Literals,
     site: Site<'file>,
     extent: Extent,
     kind: Kind,
 }
 
 impl<'file> Occurrence<'file> {
-    pub(crate) fn new(shape: Shape, site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
-        Occurrence { shape, site, extent, kind }
+    pub(crate) fn new(reading: Reading, site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
+        Occurrence { shape: reading.shape(), literals: reading.into_literals(), site, extent, kind }
+    }
+
+    pub(crate) fn literals(&self) -> &Literals {
+        &self.literals
     }
 
     pub(crate) fn kind(&self) -> Kind {

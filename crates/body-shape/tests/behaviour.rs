@@ -1,10 +1,36 @@
-use body_shape::Shape;
+use body_shape::{Reading, Shape};
+use equivalence::{Equivalence, Erased};
 
 struct Shapes;
 
 impl Shapes {
+    const BODIES: Equivalence = Equivalence::erasing(&[Erased::Locals, Erased::Literals]);
+    const NAMES: Equivalence = Equivalence::erasing(&[Erased::Names, Erased::Literals]);
+    const SPELLED: Equivalence = Equivalence::erasing(&[Erased::Locals]);
+
     fn of(text: &str) -> Shape {
-        Shape::from(text.parse::<proc_macro2::TokenStream>().unwrap_or_default())
+        Self::read(text, Self::BODIES).shape()
+    }
+
+    fn read(text: &str, equivalence: Equivalence) -> Reading {
+        Reading::erasing(text.parse::<proc_macro2::TokenStream>().unwrap_or_default(), equivalence)
+    }
+
+    fn alike_with_names_erased(pair: &[&str]) -> bool {
+        pair.first().zip(pair.last()).filter(|_| pair.len() == 2).is_some_and(|(left, right)| {
+            Self::read(left, Self::NAMES).shape() == Self::read(right, Self::NAMES).shape()
+        })
+    }
+
+    fn alike_with_literals_kept(pair: &[&str]) -> bool {
+        pair.first().zip(pair.last()).filter(|_| pair.len() == 2).is_some_and(|(left, right)| {
+            Self::read(left, Self::SPELLED).shape() == Self::read(right, Self::SPELLED).shape()
+        })
+    }
+
+    fn literals(text: &&str) -> String {
+        let literals = Self::read(text, Self::BODIES).into_literals();
+        literals.as_ref().iter().map(ToString::to_string).collect::<Vec<String>>().join(" ")
     }
 
     fn alike(pair: &[&str]) -> bool {
@@ -59,5 +85,39 @@ laws::table!(
         "{ f(x) }" => "6",
         "{ f(-1) }" => "6",
         "{ a - b }" => "5",
+    ]
+);
+
+laws::table!(
+    with_names_erased_callees_paths_and_types_are_holes_too,
+    Shapes::alike_with_names_erased,
+    [
+        ["{ f(x) }", "{ g(x) }"] => true,
+        ["{ x.f() }", "{ x.g() }"] => true,
+        ["{ let x = A; }", "{ let x = B; }"] => true,
+        ["{ f(x, y) }", "{ g(x, x) }"] => false,
+        ["{ if x { y } }", "{ while x { y } }"] => false,
+    ]
+);
+
+laws::table!(
+    with_literals_kept_a_differing_literal_tells_bodies_apart,
+    Shapes::alike_with_literals_kept,
+    [
+        ["{ f(1) }", "{ f(1) }"] => true,
+        ["{ f(1) }", "{ f(2) }"] => false,
+        ["{ f(true) }", "{ f(false) }"] => false,
+        ["{ a + b }", "{ q + r }"] => true,
+    ]
+);
+
+laws::table!(
+    a_reading_spells_its_literals_in_order_with_their_sign,
+    Shapes::literals,
+    [
+        "{ f(1, \"a\") }" => "1 \"a\"",
+        "{ f(-1) }" => "-1",
+        "{ f(x) }" => "",
+        "{ a - 2 }" => "-2",
     ]
 );

@@ -1,16 +1,18 @@
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
+use equivalence::Equivalence;
 use lint_layout::Name;
 
 use super::ShapeToken;
 use super::mark::Mark;
 use super::position::Position;
 use super::slots::Slots;
+use super::spelling::{Sign, Spelled, Spelling};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RawToken {
     Word(Name),
-    Literal,
+    Literal(Spelling),
     Mark(Mark),
 }
 
@@ -19,17 +21,29 @@ impl RawToken {
         tokens.into_iter().flat_map(Self::of_tree).collect()
     }
 
-    pub(crate) fn shaped<'raw>(&'raw self, position: Position, slots: &mut Slots<'raw>) -> Option<ShapeToken<'raw>> {
+    pub(crate) fn shaped<'raw>(
+        &'raw self,
+        position: Position,
+        slots: &mut Slots<'raw>,
+        equivalence: Equivalence,
+    ) -> Option<ShapeToken<'raw>> {
         match self {
-            RawToken::Literal => Some(ShapeToken::Literal),
+            RawToken::Literal(spelling) => Some(spelling.shaped(equivalence)),
             RawToken::Mark(mark) => Self::marked(*mark, position),
-            RawToken::Word(name) => Some(slots.classified(name, position)),
+            RawToken::Word(name) => Some(slots.classified(name, position, equivalence)),
+        }
+    }
+
+    pub(crate) fn spelled(self, sign: Sign) -> Option<Spelled> {
+        match self {
+            RawToken::Literal(spelling) => Some(Spelled::new(sign, spelling)),
+            RawToken::Word(_) | RawToken::Mark(_) => None,
         }
     }
 
     fn of_tree(tree: TokenTree) -> Vec<RawToken> {
         match tree {
-            TokenTree::Literal(_) => vec![RawToken::Literal],
+            TokenTree::Literal(literal) => vec![RawToken::Literal(Spelling::new(literal.to_string()))],
             TokenTree::Punct(punct) => vec![RawToken::Mark(Mark::new(punct.as_char()))],
             TokenTree::Ident(ident) => vec![RawToken::Word(Name::from(&ident))],
             TokenTree::Group(group) => Self::delimited(group.delimiter(), Self::flattened(group.stream())),

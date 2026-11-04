@@ -3,6 +3,7 @@ use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title}
 use lint_repeated_shapes::RepeatedShapes;
 
 const BODY: &str = "fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
+const LOCALS_ONLY: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const RENAMED: &str = "fn b(rows: &[u32]) -> u32 {\n    let mut sum = 10;\n    for row in rows {\n        if *row > 7 {\n            sum += row * 5;\n        } else {\n            sum += 9;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n";
 const OTHER_CALL: &str = "fn c(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if keeps(*item) {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n";
 const SHORT_A: &str = "fn a() {\n    f(1);\n}\n";
@@ -175,9 +176,9 @@ laws::table!(
     a_finding_names_where_its_copies_live_and_the_fix_for_that_place,
     Findings::of,
     [
-        SHIPPED => "a.rs:1: 46 tokens in 2 shipped copies, also at b.rs:1; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
-        TESTS => "tests/a.rs:1: 46 tokens in 2 test copies, also at tests/b.rs:1; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",
-        MIXED => "a.rs:1: 46 tokens in 2 test and shipped copies, also at tests/b.rs:1; the test re-implements shipped logic; test through the shipped code instead of copying it",
+        SHIPPED => "a.rs:1: 46 tokens in 2 shipped copies, also at b.rs:1, differing literals: 4; extract the shape once, as a standard trait such as From, TryFrom, FromStr or Display or one shared method, else a generic over an existing trait, else a derive",
+        TESTS => "tests/a.rs:1: 46 tokens in 2 test copies, also at tests/b.rs:1, differing literals: 4; make the copies rows of one laws::table!, or state the property they share with a law macro such as laws::roundtrip! or laws::idempotent!",
+        MIXED => "a.rs:1: 46 tokens in 2 test and shipped copies, also at tests/b.rs:1, differing literals: 4; the test re-implements shipped logic; test through the shipped code instead of copying it",
     ]
 );
 
@@ -185,7 +186,10 @@ laws::table!(
 fn a_finding_lists_its_size_and_its_copies_in_order() {
     let text =
         RepeatedShapes::report(&Sources::parsed(&[Source::new(Located::new("a.rs"), Text::new(THREE))])).to_string();
-    assert!(text.contains("46 tokens in 3 shipped copies, also at a.rs:15, a.rs:29; "), "{text}");
+    assert!(
+        text.contains("46 tokens in 3 shipped copies, also at a.rs:15, a.rs:29, differing literals: 3; "),
+        "{text}"
+    );
     assert_eq!(text.matches("helper").count(), 0);
 }
 
@@ -197,4 +201,14 @@ fn a_nested_family_is_not_listed_beside_its_outer_family() {
     ]);
     let report = RepeatedShapes::report(&files);
     assert_eq!(report.violations().len(), 1);
+}
+
+#[test]
+fn copies_that_differ_only_in_local_names_say_so() {
+    let text = RepeatedShapes::report(&Sources::parsed(&[
+        Source::new(Located::new("a.rs"), Text::new(BODY)),
+        Source::new(Located::new("b.rs"), Text::new(LOCALS_ONLY)),
+    ]))
+    .to_string();
+    assert!(text.contains("46 tokens in 2 shipped copies, also at b.rs:1, identical up to local names; "), "{text}");
 }

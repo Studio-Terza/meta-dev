@@ -1,6 +1,7 @@
 use super::mark::Mark;
 use super::position::Position;
 use super::raw_token::RawToken;
+use super::spelling::Sign;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Neighbours<'tokens> {
@@ -28,8 +29,14 @@ impl<'tokens> Neighbours<'tokens> {
     pub(crate) fn position(self) -> Position {
         self.named()
             .map(|_| Position::Named)
-            .or_else(|| self.after.filter(|after| **after == RawToken::Literal).map(|_| Position::BeforeLiteral))
+            .or_else(|| {
+                self.after.filter(|after| matches!(after, RawToken::Literal(_))).map(|_| Position::BeforeLiteral)
+            })
             .unwrap_or(Position::Plain)
+    }
+
+    pub(crate) fn sign(self) -> Sign {
+        self.before.filter(|before| **before == RawToken::Mark(Mark::MINUS)).map_or(Sign::Plus, |_| Sign::Minus)
     }
 
     fn named(self) -> Option<&'tokens RawToken> {

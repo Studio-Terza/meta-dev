@@ -134,7 +134,7 @@ fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains("/src/one.rs:3: "), "{}", run.err);
     assert!(run.err.contains("2 shipped copies, also at "), "{}", run.err);
-    assert!(run.err.contains("/src/two.rs:3; "), "{}", run.err);
+    assert!(run.err.contains("/src/two.rs:3, "), "{}", run.err);
     Ok(())
 }
 
