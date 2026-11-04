@@ -28,7 +28,7 @@ impl Referenced {
     pub fn of_tokens(scope: &Scope<'_>, tokens: TokenStream) -> Referenced {
         let path = PathTokens::new(tokens);
         let idents: Vec<(&TokenTree, &TokenTree, Name)> = path
-            .tokens()
+            .as_ref()
             .iter()
             .zip(path.roots())
             .filter_map(|(token, root)| {
@@ -46,7 +46,7 @@ impl Referenced {
             })
             .collect();
         let nested =
-            path.tokens().iter().filter_map(Syntax::group).map(|group| Referenced::of_tokens(scope, group.stream()));
+            path.as_ref().iter().filter_map(Syntax::group).map(|group| Referenced::of_tokens(scope, group.stream()));
         let own = Referenced { local: Self::paths(&local), across: Self::paths(&across) };
         nested.fold(own, Referenced::merged)
     }

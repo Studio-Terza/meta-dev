@@ -7,7 +7,7 @@ use crate::roots::regrouped::Regrouped;
 use crate::survey::{Fact, Survey};
 use file_ports::Files;
 use lint_layout::Failure;
-use lint_layout::Manifest;
+use lint_layout::{Manifest, PathDependencies};
 
 #[derive(Debug)]
 pub struct Workspace {
@@ -90,7 +90,7 @@ impl Workspace {
     fn with_path_dependencies<'manifests>(
         members: BTreeSet<&'manifests Path>,
         manifests: &'manifests BTreeMap<PathBuf, Manifest>,
-        dependencies: &BTreeMap<&Path, Vec<PathBuf>>,
+        dependencies: &BTreeMap<&Path, PathDependencies>,
         root: &Path,
     ) -> BTreeSet<&'manifests Path> {
         iter::successors(Some(members), |members| {
@@ -99,10 +99,7 @@ impl Workspace {
                 .copied()
                 .chain([root])
                 .filter_map(|directory| dependencies.get(directory))
-                .flatten()
-                .filter_map(|path| manifests.get_key_value(path))
-                .filter(|(_, manifest)| manifest.package().is_some())
-                .map(|(path, _)| path.as_path())
+                .flat_map(|found| found.packaged(manifests))
                 .collect();
             let reached: Vec<&'manifests Path> = packaged.difference(members).copied().collect();
             reached.first().map(|_| members.iter().copied().chain(reached.iter().copied()).collect())

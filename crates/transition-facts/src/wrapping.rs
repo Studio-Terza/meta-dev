@@ -1,6 +1,9 @@
+mod bounds;
+
 use syn::{FnArg, GenericArgument, PathArguments, PathSegment, ReturnType, Type};
 
 use crate::associated::Associated;
+use bounds::Bounds;
 use lint_layout::{Name, Whole, Word, words};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -14,6 +17,8 @@ pub enum Wrapping {
 impl Wrapping {
     const TRANSPARENT: [Word<'static>; 8] = words!["Box", "Rc", "Arc", "Cow", "RefCell", "Cell", "Mutex", "Reverse"];
     const COLLECTIONS: [Word<'static>; 4] = words!["Vec", "VecDeque", "BTreeSet", "HashSet"];
+    pub(crate) const ITERATORS: [Word<'static>; 4] =
+        words!["Iterator", "IntoIterator", "DoubleEndedIterator", "ExactSizeIterator"];
     const OPTION: [Word<'static>; 1] = words!["Option"];
     const RESULT: [Word<'static>; 1] = words!["Result"];
 
@@ -43,6 +48,8 @@ impl Wrapping {
             Type::Paren(paren) => Self::peeled(&paren.elem),
             Type::Array(_) | Type::Slice(_) => Wrapping::Many,
             Type::Path(path) => path.path.segments.last().map_or(Wrapping::Plain, Self::named),
+            Type::ImplTrait(found) => Bounds::new(&found.bounds).wrapping(),
+            Type::TraitObject(found) => Bounds::new(&found.bounds).wrapping(),
             _ => Wrapping::Plain,
         }
     }

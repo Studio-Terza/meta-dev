@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::fmt;
-use std::mem;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, FileFailure, Files, Kind};
@@ -44,37 +43,6 @@ impl Journal {
         (files.kind(&self.0) == Kind::File).then_some(self)
     }
 
-    pub(crate) fn read_all<'path, Held>(files: &impl Files, journals: Vec<Held>) -> Vec<Result<Text, Failure<'path>>>
-    where
-        Held: AsRef<Path> + Into<Cow<'path, Path>>,
-    {
-        let read = files.read_text_many(&journals);
-        journals
-            .into_iter()
-            .zip(read)
-            .map(|(journal, text)| text.map_err(|failure| Failure::unusable(journal, failure)))
-            .collect()
-    }
-
-    pub(crate) fn read_groups<'path, Held>(
-        files: &impl Files,
-        groups: Vec<Vec<Held>>,
-    ) -> Vec<Vec<Result<Text, Failure<'path>>>>
-    where
-        Held: AsRef<Path> + Into<Cow<'path, Path>>,
-    {
-        let (sizes, groups): (Vec<usize>, Vec<Vec<Held>>) =
-            groups.into_iter().map(|group| (group.len(), group)).unzip();
-        let read = Self::read_all(files, groups.into_iter().flatten().collect());
-        sizes
-            .into_iter()
-            .scan(read, |rest, size| {
-                let later = rest.split_off(size);
-                Some(mem::replace(rest, later))
-            })
-            .collect()
-    }
-
     pub(crate) fn read_present<'path, Held>(
         files: &impl Files,
         journals: Vec<Held>,
@@ -83,12 +51,21 @@ impl Journal {
         Held: AsRef<Path> + Into<Cow<'path, Path>>,
     {
         let kinds = files.kinds(&journals);
-        let groups: Vec<Vec<Held>> = journals
+        let present: Vec<Held> = journals
             .into_iter()
-            .zip(kinds)
-            .map(|(journal, kind)| Some(kind).filter(|kind| *kind == Kind::File).map(|_| journal).into_iter().collect())
+            .zip(&kinds)
+            .filter(|(_, kind)| **kind == Kind::File)
+            .map(|(journal, _)| journal)
             .collect();
-        Self::read_groups(files, groups).into_iter().map(|group| group.into_iter().next()).collect()
+        let read = files.read_text_many(&present);
+        let texts = present
+            .into_iter()
+            .zip(read)
+            .map(|(journal, text)| text.map_err(|failure| Failure::unusable(journal, failure)));
+        kinds
+            .into_iter()
+            .scan(texts, |texts, kind| Some(Some(kind).filter(|kind| *kind == Kind::File).and_then(|_| texts.next())))
+            .collect()
     }
 
     fn prepared(&self, files: &impl Files) -> Result<(), FileFailure> {

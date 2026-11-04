@@ -31,13 +31,6 @@ impl<'found> Cluster<'found> {
         }
     }
 
-    pub(crate) fn bounded(self) -> Option<Cluster<'found>> {
-        match self.level() {
-            Level::Crate | Level::Module => Some(self),
-            Level::Workspace => None,
-        }
-    }
-
     pub(crate) fn parent(&self) -> Option<Cluster<'found>> {
         self.krate.map(|krate| {
             self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(krate, outer))

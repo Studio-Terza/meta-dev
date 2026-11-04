@@ -37,10 +37,6 @@ impl PathTokens {
         PathTokens(read.collect())
     }
 
-    pub fn tokens(&self) -> &[TokenTree] {
-        &self.0
-    }
-
     pub fn roots(&self) -> Vec<Option<&TokenTree>> {
         self.0.iter().fold(Vec::new(), |mut found, _| {
             let root = self.next_root(&found);
@@ -64,5 +60,11 @@ impl PathTokens {
 
     fn separator(token: &TokenTree) -> Option<&TokenTree> {
         Some(token).filter(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == Self::SEPARATOR))
+    }
+}
+
+impl AsRef<[TokenTree]> for PathTokens {
+    fn as_ref(&self) -> &[TokenTree] {
+        &self.0
     }
 }

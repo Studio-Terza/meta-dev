@@ -59,14 +59,7 @@ pub(crate) struct Quotient<'found> {
 impl<'found> Quotient<'found> {
     pub(crate) fn cycles<Found>(self, close: impl Fn(BTreeSet<Part<'found>>, &[Link<'found>]) -> Found) -> Vec<Found> {
         let graph = ItemGraph::of_references(self.parts);
-        graph
-            .tangles()
-            .into_iter()
-            .map(|tangle| {
-                let parts = tangle.into_iter().filter_map(|index| graph.name_at(index).copied()).collect();
-                close(parts, &self.crossing)
-            })
-            .collect()
+        graph.tangles().into_iter().map(|tangle| close(tangle.into_iter().copied().collect(), &self.crossing)).collect()
     }
 }
 

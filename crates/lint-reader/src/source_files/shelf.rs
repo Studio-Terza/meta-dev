@@ -83,8 +83,7 @@ impl<'tree> Shelf<'tree> {
             .and_then(Shelved::parsed)
             .into_iter()
             .flat_map(|parsed| {
-                Modules::declared_in(&self.survey, node.located().file(), node.children(), &parsed.syntax().items)
-                    .nested()
+                Modules::nested_in(&self.survey, node.located().file(), node.children(), &parsed.syntax().items)
             })
             .collect()
     }
