@@ -21,7 +21,7 @@ impl fmt::Display for Owner<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Owner::Typed(node) => write!(formatter, "{node}"),
-            Owner::Leaf(krate, end, _) => write!(formatter, "{krate}::{end}"),
+            Owner::Leaf(_, end, _) => write!(formatter, "{end}"),
         }
     }
 }
