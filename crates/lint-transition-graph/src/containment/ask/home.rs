@@ -1,7 +1,5 @@
 use std::fmt;
 
-use super::super::Toward;
-use super::super::cluster::Cluster;
 use super::super::member::Member;
 use super::super::slice::Slice;
 use super::listing::Names;
@@ -22,7 +20,7 @@ impl<'found> Home<'_, 'found, '_> {
     fn located(&self, formatter: &mut fmt::Formatter<'_>, member: Member<'found>) -> fmt::Result {
         let view = self.named.view();
         let home = member.cluster();
-        let users = view.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::common);
+        let users = view.users_within(member);
         let beside: Names<'found> = view
             .slice(home)
             .into_iter()

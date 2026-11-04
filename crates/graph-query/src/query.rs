@@ -10,8 +10,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lint_layout::Name;
+use newtype::Newtype;
 use lint_placement::CrateName;
-use lint_transition_graph::{Ask, TypeSystem};
+use lint_transition_graph::{Ask, Listed, TypeSystem};
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
@@ -23,19 +24,13 @@ use reply::Reply;
 pub use term::Term;
 use top::Top;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Query {
     terms: Vec<Term>,
     roles: Vec<Role>,
-    asks: Vec<Ask>,
-    top: Top,
+    questions: Vec<Ask>,
+    top: Option<Top>,
     roots: Vec<PathBuf>,
-}
-
-impl Default for Query {
-    fn default() -> Query {
-        Query { terms: Vec::new(), roles: Vec::new(), asks: Vec::new(), top: Top::DEFAULT, roots: Vec::new() }
-    }
 }
 
 impl Query {
@@ -50,7 +45,7 @@ impl Query {
     }
 
     pub(crate) fn with_ask(mut self, ask: Ask) -> Query {
-        self.asks.push(ask);
+        self.questions.push(ask);
         self
     }
 
@@ -60,13 +55,16 @@ impl Query {
     }
 
     pub(crate) fn with_top(mut self, top: Top) -> Query {
-        self.top = top;
+        self.top = Some(top);
         self
     }
 
+    fn searches(&self) -> Option<()> {
+        self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()))
+    }
+
     pub(crate) fn asks(&self) -> Option<&Query> {
-        let searches = self.terms.first().map(|_| self).or_else(|| self.roles.first().map(|_| self));
-        self.asks.first().map(|_| self).or(searches)
+        self.questions.first().map(|_| self).or_else(|| self.searches().map(|()| self))
     }
 
     #[must_use]
@@ -75,9 +73,9 @@ impl Query {
         system: &'view TypeSystem<'found, 'file>,
     ) -> Reply<'view, 'found, 'file> {
         let extraction = system.extraction();
-        let searched = self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()));
-        let matches = searched.map(|()| self.matches(extraction.facts(), extraction.transitions()));
-        Reply::new(matches, self.asks.iter().map(|ask| ask.answered(system.containment())).collect())
+        let matches = self.searches().map(|()| self.matches(extraction.facts(), extraction.transitions()));
+        let listed = self.top.map(|top| Listed::new(top.into_inner()));
+        Reply::new(matches, self.questions.iter().map(|ask| ask.answered(system.containment(), listed)).collect())
     }
 
     #[must_use]
@@ -109,6 +107,6 @@ impl Query {
                 .implementer()
                 .map(|kind| Candidate::of_type(found, kind, facts))
         });
-        Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top)
+        Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top.unwrap_or(Top::DEFAULT))
     }
 }

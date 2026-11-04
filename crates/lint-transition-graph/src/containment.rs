@@ -28,7 +28,7 @@ use member::Member;
 use resolver::{Resolver, StandIns};
 use slice::Slice;
 
-pub use ask::{Answer, Ask};
+pub use ask::{Answer, Ask, Listed};
 pub use connected::ConnectedClusters;
 pub use interface::InterfaceByConsumers;
 pub use layered::AcyclicQuotients;
@@ -145,6 +145,10 @@ impl<'found, 'file> Containment<'found, 'file> {
 
     pub(crate) fn named<'view>(&'view self, name: &'view Name) -> impl Iterator<Item = Member<'found>> + 'view {
         self.all().filter(move |member| member.name() == name)
+    }
+
+    pub(crate) fn users_within(&self, member: Member<'found>) -> Option<Cluster<'found>> {
+        self.adjacent(member, Toward::Users).map(|user| user.cluster()).reduce(Cluster::common)
     }
 
     pub(crate) fn site(&self, member: Member<'found>) -> Option<Site<'file>> {

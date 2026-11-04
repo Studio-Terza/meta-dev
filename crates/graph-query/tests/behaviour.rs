@@ -144,6 +144,18 @@ laws::table!(item_questions_answer_from_the_containment_view, Asked::answered, [
         "  shop::Priced at crates/shop/src/lib.rs:2".to_owned(),
         "    Line at crates/shop/src/till.rs:2".to_owned(),
     ],
+    &["--uses", "Line"][..] => vec![
+        "what Line uses:".to_owned(),
+        "  shop::till::Line at crates/shop/src/till.rs:2".to_owned(),
+        "    Cents at crates/shop/src/lib.rs:5".to_owned(),
+        "    Priced at crates/shop/src/lib.rs:2".to_owned(),
+    ],
+    &["--users", "Cents", "--top", "1"][..] => vec![
+        "users of Cents:".to_owned(),
+        "  shop::Cents at crates/shop/src/lib.rs:5".to_owned(),
+        "    Line at crates/shop/src/till.rs:2".to_owned(),
+        "    and 1 more".to_owned(),
+    ],
     &["--cluster", "Line", "--defined", "Absent"][..] => vec![
         "cluster of Line:".to_owned(),
         "  shop::till::Line at crates/shop/src/till.rs:2".to_owned(),

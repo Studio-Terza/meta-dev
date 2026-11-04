@@ -1,8 +1,17 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
+use newtype::{Arbitrary, Newtype};
+
 use super::super::Containment;
 use super::super::member::Member;
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Listed(usize);
+
+impl Listed {
+    pub const DEFAULT: Listed = Listed(20);
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Spelled {
@@ -21,6 +30,7 @@ pub(super) struct Placed<'view, 'found, 'file> {
 pub(super) struct Listing<'view, 'found, 'file> {
     view: &'view Containment<'found, 'file>,
     members: Vec<Member<'found>>,
+    listed: Listed,
 }
 
 #[derive(Debug)]
@@ -37,13 +47,12 @@ impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Listing<'view, 'found, 'file> {
-    const LISTED: usize = 20;
-
     pub(super) fn new(
         view: &'view Containment<'found, 'file>,
         members: impl Iterator<Item = Member<'found>>,
+        listed: Listed,
     ) -> Listing<'view, 'found, 'file> {
-        Listing { view, members: members.collect() }
+        Listing { view, members: members.collect(), listed }
     }
 }
 
@@ -78,9 +87,9 @@ impl fmt::Display for Listing<'_, '_, '_> {
         self.members.first().map_or_else(|| writeln!(formatter, "    none"), |_| Ok(()))?;
         self.members
             .iter()
-            .take(Self::LISTED)
+            .take(self.listed.into_inner())
             .try_for_each(|member| writeln!(formatter, "    {}", Placed::new(self.view, *member, Spelled::Name)))?;
-        NonZeroUsize::new(self.members.len().saturating_sub(Self::LISTED))
+        NonZeroUsize::new(self.members.len().saturating_sub(self.listed.into_inner()))
             .map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
     }
 }

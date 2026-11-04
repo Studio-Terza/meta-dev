@@ -9,6 +9,7 @@ use lint_layout::Name;
 
 use super::{Containment, Toward};
 use home::Home;
+pub use listing::Listed;
 use named::Named;
 use neighbours::Neighbours;
 
@@ -25,6 +26,7 @@ pub enum Ask {
 pub struct Answer<'view, 'found, 'file> {
     view: &'view Containment<'found, 'file>,
     ask: &'view Ask,
+    listed: Listed,
 }
 
 impl Ask {
@@ -32,17 +34,18 @@ impl Ask {
     pub fn answered<'view, 'found, 'file>(
         &'view self,
         view: &'view Containment<'found, 'file>,
+        listed: Option<Listed>,
     ) -> Answer<'view, 'found, 'file> {
-        Answer { view, ask: self }
+        Answer { view, ask: self, listed: listed.unwrap_or(Listed::DEFAULT) }
     }
 
-    fn written(&self, view: &Containment<'_, '_>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn written(&self, view: &Containment<'_, '_>, listed: Listed, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Ask::Defined(name) => write!(formatter, "{}", Named::new(view, name)),
-            Ask::Uses(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Used)),
-            Ask::Users(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Users)),
+            Ask::Uses(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Used, listed)),
+            Ask::Users(name) => write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Users, listed)),
             Ask::Implementers(name) => {
-                write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Implementers))
+                write!(formatter, "{}", Neighbours::new(Named::new(view, name), Toward::Implementers, listed))
             }
             Ask::Cluster(name) => write!(formatter, "{}", Home::from(Named::new(view, name))),
         }
@@ -64,6 +67,6 @@ impl fmt::Display for Ask {
 impl fmt::Display for Answer<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "{}", self.ask)?;
-        self.ask.written(self.view, formatter)
+        self.ask.written(self.view, self.listed, formatter)
     }
 }
