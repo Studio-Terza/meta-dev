@@ -35,7 +35,9 @@ effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workfl
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
-and literals (`true` and `false` included) are erased; callees, paths, fields and types stay. A group nested inside a
+and literals (`true` and `false` included) are erased; callees, paths, field accesses and capitalised types stay, while
+struct-literal and pattern fields and lower-case primitive types other than `u8`, `usize`, `bool`, `str` and `char` are
+erased like locals. A group nested inside a
 larger group is not listed again. Each group counts the literal positions at which its copies do not all agree, or says
 that they are identical up to local names. The message names the fix by where the
 copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,

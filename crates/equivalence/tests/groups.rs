@@ -1,4 +1,4 @@
-use equivalence::{Groups, Holes, Keyed};
+use equivalence::{Groups, Holes, Keyed, Nested};
 
 #[derive(Clone, Copy, Debug)]
 struct Item(u8);
@@ -11,11 +11,38 @@ impl Keyed for Item {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Span {
+    length: u8,
+    from: u8,
+}
+
+impl Keyed for Span {
+    type Key = u8;
+
+    fn key(&self) -> u8 {
+        self.length
+    }
+}
+
+impl Nested for Span {
+    fn lies_within<'outer>(&self, outer: &'outer Span) -> Option<&'outer Span> {
+        Some(outer)
+            .filter(|outer| outer.from <= self.from)
+            .filter(|outer| self.from + self.length <= outer.from + outer.length)
+    }
+}
+
 struct Grouping;
 
 impl Grouping {
     fn sizes(keys: &[u8]) -> Vec<usize> {
         Groups::grouped(keys.iter().copied().map(Item)).listed().iter().map(|group| group.members().len()).collect()
+    }
+
+    fn outermost(spans: &[u8]) -> Vec<u8> {
+        let found = spans.as_chunks::<2>().0.iter().map(|[length, from]| Span { length: *length, from: *from });
+        Groups::grouped(found).outermost(|length| *length).listed().iter().map(|group| *group.key()).collect()
     }
 
     fn holes(sequences: &[&[u8]]) -> String {
@@ -41,5 +68,14 @@ laws::table!(
         [&[1, 2][..], &[1, 2, 3][..]] => "1",
         [&[][..], &[1][..]] => "1",
         [&[1][..], &[1][..]] => "0",
+    ]
+);
+
+laws::table!(
+    a_group_inside_a_larger_group_is_dropped_whatever_order_the_keys_come_in,
+    Grouping::outermost,
+    [
+        [3, 1, 3, 21, 10, 0, 10, 20] => vec![10],
+        [3, 1, 3, 21, 10, 40, 10, 60] => vec![10, 3],
     ]
 );
