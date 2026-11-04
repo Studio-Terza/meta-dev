@@ -7,8 +7,6 @@ use syn::{
     TypePath,
 };
 
-use lint_layout::Name;
-
 #[derive(Debug)]
 pub struct Syntax;
 
@@ -67,11 +65,6 @@ impl Syntax {
             GenericArgument::Type(ty) => Some(ty),
             _ => None,
         }
-    }
-
-    #[must_use]
-    pub fn last_name(ty: &Type) -> Option<Name> {
-        Self::type_path(ty).and_then(|path| path.path.segments.last()).map(|last| Name::from(&last.ident))
     }
 
     #[must_use]
