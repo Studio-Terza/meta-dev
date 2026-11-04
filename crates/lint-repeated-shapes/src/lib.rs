@@ -19,8 +19,7 @@ impl RepeatedShapes {
     fn found(files: &[SourceFile], equivalence: Equivalence) -> Vec<Violation<'_>> {
         let occurrences = files.iter().flat_map(|file| Scan::of_file(file, equivalence));
         Groups::grouped(occurrences)
-            .ranked(|shape| shape.size())
-            .maximal()
+            .outermost(|shape| shape.size())
             .listed()
             .iter()
             .filter_map(|group| Finding::violation(group, equivalence))
