@@ -47,7 +47,7 @@ use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, OnGraph, OneEdge};
+use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
@@ -62,7 +62,7 @@ pub struct Lints;
 type Check = for<'file> fn(&'file Readout) -> Vec<Report<'file>>;
 
 impl Lints {
-    const CHECKS: [Check; 47] = [
+    const CHECKS: [Check; 46] = [
         |readout| vec![NoComments::report(readout.files())],
         |readout| vec![NoFreeFns::report(readout.files())],
         |readout| vec![ThinMain::report(readout.files())],
@@ -108,8 +108,11 @@ impl Lints {
             let flows = Flows::from(readout.files());
             vec![flows.report::<LinearBodies>(), flows.report::<PureRouters>(), flows.report::<PlainConditions>()]
         },
-        |readout| vec![OnGraph::<OneEdge>::report(readout.files())],
-        |readout| vec![OnGraph::<Clustered<AcyclicQuotients>>::report(readout.files())],
+        |readout| {
+            let extraction = Extraction::from(readout.files());
+            let system = TypeSystem::built_from(readout.files(), &extraction);
+            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system)].into_iter().flatten().collect()
+        },
         |readout| vec![UnconsumedTraits::report(readout.files())],
         |readout| vec![RustOnly::report(readout.repo_files())],
         |readout| vec![WorkflowRun::report(readout.repo_files())],

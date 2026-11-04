@@ -1,3 +1,5 @@
+use std::cell::OnceCell;
+
 use lint_core::SourceFile;
 use transition_facts::Transitions;
 use type_facts::Facts;
@@ -34,7 +36,9 @@ impl<'file> Extraction<'file> {
 pub struct TypeSystem<'found, 'file> {
     types: WorkspaceTypes<'found>,
     edges: Vec<Edge<'found, 'file>>,
-    containment: Containment<'found, 'file>,
+    files: &'found [SourceFile],
+    extraction: &'found Extraction<'file>,
+    containment: OnceCell<Containment<'found, 'file>>,
     transitions: &'found Transitions<'file>,
 }
 
@@ -46,14 +50,17 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         TypeSystem {
             types,
             edges,
-            containment: Containment::clustered(files, extraction.facts(), extraction.transitions()),
+            files,
+            extraction,
+            containment: OnceCell::new(),
             transitions: extraction.transitions(),
         }
     }
 
     #[must_use]
     pub fn containment(&self) -> &Containment<'found, 'file> {
-        &self.containment
+        self.containment
+            .get_or_init(|| Containment::clustered(self.files, self.extraction.facts(), self.extraction.transitions()))
     }
 
     pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {

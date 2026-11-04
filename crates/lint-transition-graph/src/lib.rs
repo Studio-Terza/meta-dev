@@ -18,11 +18,9 @@ use coverage::Coverage;
 use crate_transitions::CrateTransitions;
 use edge::Edge;
 
-pub use containment::{
-    AcyclicQuotients, ConnectedClusters, DeepClusters, InterfaceByConsumers, InterfaceByInternals, LowestCluster,
-};
+pub use containment::{AcyclicQuotients, ConnectedClusters, InterfaceByConsumers, LowestCluster};
 pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{Clustered, GraphLint, OnGraph};
+pub use graph_lint::{Clustered, GraphLint};
 pub use mutation::CoreMutation;
 pub use system::{Extraction, TypeSystem};
 

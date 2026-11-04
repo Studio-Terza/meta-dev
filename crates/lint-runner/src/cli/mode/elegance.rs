@@ -3,8 +3,8 @@ use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_transition_graph::{
-    Clustered, ConnectedClusters, CoreMutation, DeepClusters, DuplicateTransitions, Extraction, GraphLint,
-    InterfaceByConsumers, InterfaceByInternals, LowestCluster, TransitionGraph, TypeSystem,
+    Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint, InterfaceByConsumers,
+    LowestCluster, TransitionGraph, TypeSystem,
 };
 
 #[derive(Debug)]
@@ -22,9 +22,7 @@ impl Elegance {
             CoreMutation::report_graph(&system),
             <Clustered<ConnectedClusters>>::report_graph(&system),
             <Clustered<InterfaceByConsumers>>::report_graph(&system),
-            <Clustered<InterfaceByInternals>>::report_graph(&system),
             <Clustered<LowestCluster>>::report_graph(&system),
-            <Clustered<DeepClusters>>::report_graph(&system),
             EffectSites::report(files),
             FlowShapes::report(files),
         ]
