@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use syn::punctuated::Punctuated;
 use syn::{Expr, ExprPath, Pat, PatType, Token};
 
+use crate::law_path::Owner;
 use crate::reader::scope::Scope;
 use lint_layout::Name;
 
@@ -32,14 +33,14 @@ impl Parameter {
 #[derive(Debug)]
 pub(crate) struct Parameters<'operand> {
     by_name: BTreeMap<Name, Option<Name>>,
-    operand: Option<&'operand Name>,
+    operand: Option<&'operand Owner>,
 }
 
 impl<'operand> Parameters<'operand> {
     pub(crate) fn declared(
         scope: &Scope,
         inputs: &Punctuated<Pat, Token![,]>,
-        operand: Option<&'operand Name>,
+        operand: Option<&'operand Owner>,
     ) -> Parameters<'operand> {
         let by_name = inputs
             .iter()
@@ -49,7 +50,7 @@ impl<'operand> Parameters<'operand> {
         Parameters { by_name, operand }
     }
 
-    pub(crate) fn typed(&self, receiver: &Expr) -> Option<Name> {
+    pub(crate) fn typed(&self, receiver: &Expr) -> Option<Owner> {
         match receiver {
             Expr::Path(found) => self.named(found),
             Expr::Paren(inner) => self.typed(&inner.expr),
@@ -59,7 +60,7 @@ impl<'operand> Parameters<'operand> {
         }
     }
 
-    fn named(&self, found: &ExprPath) -> Option<Name> {
+    fn named(&self, found: &ExprPath) -> Option<Owner> {
         found
             .path
             .get_ident()
@@ -67,7 +68,7 @@ impl<'operand> Parameters<'operand> {
             .and_then(|typed| self.or_operand(typed.as_ref()))
     }
 
-    fn or_operand(&self, typed: Option<&Name>) -> Option<Name> {
-        typed.or(self.operand).cloned()
+    fn or_operand(&self, typed: Option<&Name>) -> Option<Owner> {
+        typed.cloned().map(Owner::Named).or_else(|| self.operand.cloned())
     }
 }

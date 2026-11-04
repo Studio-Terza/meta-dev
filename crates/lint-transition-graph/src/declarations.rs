@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use law_facts::{Law, Laws, Package, Unresolved};
+use law_facts::{Law, Laws, Package};
 use lint_core::SourceFile;
 use lint_layout::Name;
 
@@ -25,7 +25,11 @@ impl<'found> Declarations<'found> {
         self.packages.get(path).map(|package| self.laws.routing(*package, owner, member)).unwrap_or_default()
     }
 
-    pub(crate) fn unresolved(&self, path: &Path) -> Vec<Unresolved<'found>> {
-        self.packages.get(path).map(|package| self.laws.unresolved(*package)).unwrap_or_default()
+    pub(crate) fn of_package(&self, path: &Path) -> Vec<&Law<'found>> {
+        self.packages.get(path).map(|package| self.laws.of_package(*package)).unwrap_or_default()
+    }
+
+    pub(crate) fn unresolved(&self) -> impl Iterator<Item = &Law<'found>> {
+        self.laws.all().filter(|law| law.unresolved().is_some())
     }
 }

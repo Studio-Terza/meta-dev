@@ -189,13 +189,14 @@ fn a_law_credits_only_the_operation_its_call_routes_to() {
 }
 
 const BOTH_ADDS: &str = "struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\nstruct B;\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\n";
-const B_ADD_FORMS: [&str; 6] = [
+const B_ADD_FORMS: [&str; 7] = [
     "laws::associative!(add_regroups, any::<A>(), B::add);\n",
     "laws::associative!(add_regroups, any::<B>(), Add::add);\n",
     "laws::associative!(add_regroups, any::<A>(), <B as Add>::add);\n",
     "impl B {\n    fn regroups() {\n        laws::associative!(add_regroups, any::<A>(), Self::add);\n    }\n}\n",
     "use x::B as Sum;\nlaws::associative!(add_regroups, any::<A>(), Sum::add);\n",
     "use std::ops::Add as Plus;\nlaws::associative!(add_regroups, any::<B>(), Plus::add);\n",
+    "fn regroups() {\n    use x::B as Sum;\n    laws::associative!(add_regroups, any::<A>(), Sum::add);\n}\n",
 ];
 
 #[test]
@@ -231,9 +232,36 @@ fn a_closure_attaches_to_the_method_it_calls_on_its_parameters() {
 fn a_closure_the_lint_cannot_resolve_is_named_with_its_site() {
     let text = Declared::lawed(PRIVATE, "laws::associative!(a_join, any::<A>(), |a: A, b: A| combine(a, b));\n");
     assert!(
-        text.contains("x::A: join; law associative! at crates/x/tests/t.rs:1 checks a closure the lint cannot resolve to an operation; pass the operation path"),
+        text.contains("crates/x/tests/t.rs:1: law associative! checks a closure the lint cannot resolve to an operation; pass the operation path (Type::function), or a closure that calls it on its parameters"),
         "{text}"
     );
+}
+
+#[test]
+fn an_unreadable_closure_is_reported_when_every_operation_has_a_law_and_a_preserves_closure_is_not() {
+    let lawed = "laws::associative!(a_join, any::<A>(), A::join);\nlaws::commutative!(a_swap, any::<A>(), |a: A, b: A| combine(a, b));\nlaws::preserves!(keeps, any::<A>(), A::join, |a: B, b: B| combine(a, b), A::into_b);\n";
+    let text = Declared::lawed(PRIVATE, lawed);
+    assert_eq!(
+        (text.matches("law commutative! checks a closure").count(), text.matches("law preserves!").count()),
+        (1, 0),
+        "{text}"
+    );
+}
+
+const JOINS_BESIDE_A_TRAIT: [(&str, &str); 2] = [
+    (
+        "crates/x/src/lib.rs",
+        "struct A;\nstruct Join;\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl Join {\n    fn join(self, other: Join) -> Join {}\n}\n",
+    ),
+    ("crates/y/src/lib.rs", "trait Join {}\n"),
+];
+
+#[test]
+fn a_trait_of_another_crate_does_not_capture_a_type_of_the_same_name() {
+    let mut sources: Vec<Source> = JOINS_BESIDE_A_TRAIT.iter().map(|&(path, text)| Declared::at(path, text)).collect();
+    sources.push(Declared::at("crates/x/tests/t.rs", "laws::associative!(join_regroups, any::<A>(), Join::join);\n"));
+    let text = Declared::of(&sources);
+    assert!(text.contains("crate x: 1 of 2 algebra operations declare no law; x::A: join"), "{text}");
 }
 
 #[test]

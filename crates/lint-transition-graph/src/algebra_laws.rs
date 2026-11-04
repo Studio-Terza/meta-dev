@@ -1,16 +1,15 @@
 pub(crate) mod attached;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 
-use law_facts::Unresolved;
+use law_facts::{Law, Property};
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::algebra::Operation;
 use crate::count::Count;
-use crate::declarations::Declarations;
 use crate::end::Node;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
@@ -37,9 +36,14 @@ impl GraphLint for AlgebraLaws {
             ),
             by_crate
                 .iter()
-                .filter_map(|(name, operations)| {
-                    CrateLaws::measured(name, operations, &attached).unresolved(operations, declarations).reported()
-                })
+                .filter_map(|(name, operations)| CrateLaws::measured(name, operations, &attached).reported())
+                .chain(
+                    declarations
+                        .unresolved()
+                        .filter(|law| law.kind().property().is_some_and(|property| property != Property::Preserves))
+                        .filter_map(Law::unresolved)
+                        .map(|unresolved| Violation::new(*AsRef::<Site<'file>>::as_ref(&unresolved), &unresolved)),
+                )
                 .collect(),
         )
     }
@@ -51,7 +55,6 @@ struct CrateLaws<'op, 'file> {
     first: Option<Site<'file>>,
     algebraic: Count,
     unlawed: BTreeMap<&'op Node<'op>, Vec<&'op Name>>,
-    unresolved: BTreeSet<Unresolved<'op>>,
 }
 
 impl<'op, 'file> CrateLaws<'op, 'file> {
@@ -70,20 +73,7 @@ impl<'op, 'file> CrateLaws<'op, 'file> {
                 types.entry(operation.acting().subject()).or_default().push(operation.function());
                 types
             }),
-            unresolved: BTreeSet::new(),
         }
-    }
-
-    fn unresolved(
-        self,
-        operations: &[&Operation<'_, 'file>],
-        declarations: &'op Declarations<'op>,
-    ) -> CrateLaws<'op, 'file> {
-        let unresolved = operations
-            .iter()
-            .flat_map(|operation| declarations.unresolved(AsRef::<Site<'file>>::as_ref(*operation).path()))
-            .collect();
-        CrateLaws { unresolved, ..self }
     }
 
     fn reported(self) -> Option<Violation<'file>> {
@@ -106,8 +96,7 @@ impl fmt::Display for CrateLaws<'_, '_> {
         )?;
         self.unlawed.iter().try_for_each(|(node, functions)| {
             write!(formatter, "; {node}: {}", functions.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))
-        })?;
-        self.unresolved.iter().try_for_each(|law| write!(formatter, "; {law}"))
+        })
     }
 }
 

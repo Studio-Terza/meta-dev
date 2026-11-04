@@ -1,7 +1,7 @@
 use std::fmt;
 
-use law_facts::Property;
-use lint_core::{Fix, Headline, Report, Violation};
+use law_facts::{Law, LawPath, Property, Side};
+use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_layout::Name;
 use lint_placement::CrateName;
 
@@ -30,6 +30,13 @@ impl GraphLint for Homomorphisms {
             grouped
                 .iter()
                 .filter_map(|(name, edges)| CrateMorphisms::measured(name, edges, algebras, declarations).reported())
+                .chain(
+                    declarations
+                        .unresolved()
+                        .filter(|law| law.kind().property() == Some(Property::Preserves))
+                        .filter_map(Law::unresolved)
+                        .map(|unresolved| Violation::new(*AsRef::<Site<'file>>::as_ref(&unresolved), &unresolved)),
+                )
                 .collect(),
         )
     }
@@ -40,6 +47,7 @@ struct Morphism<'edge, 'found, 'file> {
     edge: &'edge Edge<'found, 'file>,
     source: Node<'found>,
     target: Node<'found>,
+    shortfall: Option<Shortfall<'edge, 'found, 'file>>,
 }
 
 impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
@@ -52,7 +60,7 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
         let target = AsRef::<End<'found>>::as_ref(edge.ends()).node().copied()?;
         inputs
             .next()
-            .map_or(Some(Morphism { edge, source, target }), |_| None)
+            .map_or(Some(Morphism { edge, source, target, shortfall: None }), |_| None)
             .filter(|_| matches!(edge.form(), Form::Transition))
             .filter(|morphism| morphism.source != morphism.target)
             .filter(|morphism| algebras.of_type(&morphism.source).is_some())
@@ -63,19 +71,69 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
         AsRef::<Name>::as_ref(self.edge.transition().function())
     }
 
-    fn declared(&self, declarations: &Declarations<'_>, algebras: &Algebras<'found, 'file>) -> Option<Property> {
-        declarations
-            .routing(self.edge.site().path(), AsRef::<Name>::as_ref(&self.source), self.function())
+    fn reached_by<'law>(&self, law: &'law Law<'_>) -> Option<&'law LawPath> {
+        let function = self.function();
+        law.routed_on(Side::Edge, AsRef::<Name>::as_ref(&self.source), function)
+            .or_else(|| law.routed_on(Side::Edge, AsRef::<Name>::as_ref(&self.target), function))
+    }
+
+    fn undeclared(
+        self,
+        declarations: &'edge Declarations<'file>,
+        algebras: &Algebras<'found, 'file>,
+    ) -> Option<Morphism<'edge, 'found, 'file>> {
+        let shortfalls: Option<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
+            .of_package(self.edge.site().path())
             .into_iter()
             .filter(|law| law.kind().property() == Some(Property::Preserves))
-            .find(|law| [&self.source, &self.target].into_iter().all(|node| algebras.operating(law, node).is_some()))
-            .and(Some(Property::Preserves))
+            .filter(|law| self.reached_by(law).is_some())
+            .map(|law| {
+                Shortfall::facing(law, Side::Input, self.source, algebras)
+                    .or_else(|| Shortfall::facing(law, Side::Output, self.target, algebras))
+            })
+            .collect();
+        shortfalls.map(|found| Morphism { shortfall: found.into_iter().next(), ..self })
     }
 }
 
 impl fmt::Display for Morphism<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} -> {}: {} at {}", self.source, self.target, self.function(), self.edge.site())
+        write!(formatter, "{} -> {}: {} at {}", self.source, self.target, self.function(), self.edge.site())?;
+        self.shortfall.iter().try_for_each(|shortfall| write!(formatter, " ({shortfall})"))
+    }
+}
+
+#[derive(Debug)]
+struct Shortfall<'law, 'found, 'file> {
+    law: &'law Law<'file>,
+    side: Side,
+    node: Node<'found>,
+}
+
+impl<'law, 'found, 'file> Shortfall<'law, 'found, 'file> {
+    fn facing(
+        law: &'law Law<'file>,
+        side: Side,
+        node: Node<'found>,
+        algebras: &Algebras<'found, 'file>,
+    ) -> Option<Shortfall<'law, 'found, 'file>> {
+        algebras.operating(law, side, &node).map_or(Some(Shortfall { law, side, node }), |_| None)
+    }
+}
+
+impl fmt::Display for Shortfall<'_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "law preserves! at {}: ", AsRef::<Site<'_>>::as_ref(self.law))?;
+        self.described(formatter)
+    }
+}
+
+impl Shortfall<'_, '_, '_> {
+    fn described(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.law.on_side(self.side) {
+            Some(route) => write!(formatter, "{route}, not an operation of {}", self.node),
+            None => write!(formatter, "{} names no operation of {}", self.side, self.node),
+        }
     }
 }
 
@@ -92,14 +150,15 @@ impl<'edge, 'found, 'file> CrateMorphisms<'edge, 'found, 'file> {
         name: &'edge CrateName,
         edges: &[&'edge Edge<'found, 'file>],
         algebras: &Algebras<'found, 'file>,
-        declarations: &Declarations<'_>,
+        declarations: &'edge Declarations<'file>,
     ) -> CrateMorphisms<'edge, 'found, 'file> {
         let morphisms: Vec<Morphism<'edge, 'found, 'file>> =
             edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect();
-        let in_scope = Count::new(morphisms.len());
-        let (declared, undeclared): (Vec<_>, Vec<_>) =
-            morphisms.into_iter().partition(|morphism| morphism.declared(declarations, algebras).is_some());
-        CrateMorphisms { name, in_scope, declared: Count::new(declared.len()), undeclared }
+        let total = morphisms.len();
+        let undeclared: Vec<Morphism<'edge, 'found, 'file>> =
+            morphisms.into_iter().filter_map(|morphism| morphism.undeclared(declarations, algebras)).collect();
+        let declared = Count::new(total - undeclared.len());
+        CrateMorphisms { name, in_scope: Count::new(total), declared, undeclared }
     }
 
     fn reported(self) -> Option<Violation<'file>> {
