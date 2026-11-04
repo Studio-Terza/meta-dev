@@ -6,6 +6,7 @@ mod groups;
 mod interface;
 mod layered;
 mod link;
+mod located;
 mod member;
 mod outsider;
 mod placed;
@@ -20,11 +21,12 @@ use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
-use type_facts::{Facts, Implementation, Outside};
+use type_facts::Facts;
 
 use cluster::Cluster;
 use declaration::Declaration;
 use link::Link;
+use located::Located;
 use member::Member;
 use outsider::Outsider;
 use resolver::{Resolver, StandIns};
@@ -102,11 +104,14 @@ impl<'found, 'file> Containment<'found, 'file> {
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
         let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
+        let located: Vec<Located<'found, 'file>> =
+            facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
         let implemented: BTreeSet<Link<'found>> = placed
             .iter()
             .flat_map(|(member, declaration)| {
                 declaration.implemented(*member, resolver).into_iter().map(|used| Link::new(*member, used))
             })
+            .chain(located.iter().flat_map(Located::links))
             .filter_map(Link::apart)
             .collect();
         let defined: BTreeSet<Link<'found>> = placed
@@ -115,16 +120,10 @@ impl<'found, 'file> Containment<'found, 'file> {
             .filter_map(Link::apart)
             .chain(implemented.iter().copied())
             .collect();
-        let outsiders = facts.outside_implementations().fold(
+        let outsiders = located.iter().flat_map(Located::outsiders).fold(
             BTreeMap::new(),
-            |mut outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>,
-             outside: Outside<'found, 'file>| {
-                let implementation: &Implementation<'file> = outside.implementation();
-                let site: &Site<'file> = implementation.as_ref();
-                let outsider = Outsider::new(outside.name(), *site);
-                resolver.members(site.path(), implementation.as_ref(), &[], None).into_iter().for_each(|implemented| {
-                    outsiders.entry(implemented).or_default().insert(outsider);
-                });
+            |mut outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>, outsider| {
+                outsiders.entry(outsider.holder()).or_default().insert(outsider);
                 outsiders
             },
         );
