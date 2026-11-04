@@ -41,7 +41,7 @@ struct Morphism<'edge, 'found, 'file> {
     edge: &'edge Edge<'found, 'file>,
     source: Node<'found>,
     target: Node<'found>,
-    shortfall: Option<Shortfall<'edge, 'found, 'file>>,
+    shortfalls: Vec<Shortfall<'edge, 'found, 'file>>,
 }
 
 impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
@@ -54,7 +54,7 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
         let target = AsRef::<End<'found>>::as_ref(edge.ends()).node().copied()?;
         inputs
             .next()
-            .map_or(Some(Morphism { edge, source, target, shortfall: None }), |_| None)
+            .map_or(Some(Morphism { edge, source, target, shortfalls: Vec::new() }), |_| None)
             .filter(|_| matches!(edge.form(), Form::Transition))
             .filter(|morphism| morphism.source != morphism.target)
             .filter(|morphism| algebras.of_type(&morphism.source).is_some())
@@ -76,24 +76,23 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
         declarations: &'edge Declarations<'file>,
         algebras: &Algebras<'found, 'file>,
     ) -> Option<Morphism<'edge, 'found, 'file>> {
-        let shortfalls: Option<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
+        let verdicts: Vec<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
             .of_package(self.edge.site().path())
             .into_iter()
             .filter(|law| law.kind().property() == Some(Property::Preserves))
             .filter(|law| self.reached_by(law).is_some())
-            .map(|law| {
-                Shortfall::facing(law, Side::Input, self.source, algebras)
-                    .or_else(|| Shortfall::facing(law, Side::Output, self.target, algebras))
-            })
+            .map(|law| Shortfall::of_law(law, self.source, self.target, algebras))
             .collect();
-        shortfalls.map(|found| Morphism { shortfall: found.into_iter().next(), ..self })
+        let passing_law = verdicts.iter().position(Vec::is_empty);
+        passing_law
+            .map_or_else(|| Some(Morphism { shortfalls: verdicts.into_iter().flatten().collect(), ..self }), |_| None)
     }
 }
 
 impl fmt::Display for Morphism<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} -> {}: {} at {}", self.source, self.target, self.function(), self.edge.site())?;
-        self.shortfall.iter().try_for_each(|shortfall| write!(formatter, " ({shortfall})"))
+        self.shortfalls.iter().try_for_each(|shortfall| write!(formatter, " ({shortfall})"))
     }
 }
 
@@ -105,6 +104,18 @@ struct Shortfall<'law, 'found, 'file> {
 }
 
 impl<'law, 'found, 'file> Shortfall<'law, 'found, 'file> {
+    fn of_law(
+        law: &'law Law<'file>,
+        source: Node<'found>,
+        target: Node<'found>,
+        algebras: &Algebras<'found, 'file>,
+    ) -> Vec<Shortfall<'law, 'found, 'file>> {
+        [(Side::Input, source), (Side::Output, target)]
+            .into_iter()
+            .filter_map(|(side, node)| Shortfall::facing(law, side, node, algebras))
+            .collect()
+    }
+
     fn facing(
         law: &'law Law<'file>,
         side: Side,

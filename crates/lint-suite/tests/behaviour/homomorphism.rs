@@ -308,3 +308,27 @@ fn only_unresolved_preserves_closures_in_packages_with_operations_are_reported()
     .collect();
     assert_eq!(counts, [0, 0, 0, 1]);
 }
+
+const SWAPPED: &str = "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\n";
+const SWAPPED_SIDES: &str = " (law preserves! at crates/x/tests/t.rs:1: input side resolves to B::join, not an operation of x::A) (law preserves! at crates/x/tests/t.rs:1: output side resolves to A::join, not an operation of x::B)";
+const SWAPPED_SIDES_SECOND: &str = " (law preserves! at crates/x/tests/t.rs:2: input side resolves to B::join, not an operation of x::A) (law preserves! at crates/x/tests/t.rs:2: output side resolves to A::join, not an operation of x::B)";
+
+#[test]
+fn every_failing_side_of_every_reaching_law_is_named() {
+    let one = Mapped::lawed(EDGE, SWAPPED);
+    assert!(one.contains(&format!("x::A -> x::B: into_b at crates/x/src/lib.rs:5{SWAPPED_SIDES}")), "{one}");
+    let two = Mapped::lawed(
+        EDGE,
+        "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\nlaws::preserves!(keeps_too, any::<A>(), B::join, A::join, A::into_b);\n",
+    );
+    assert!(two.contains(&format!("{SWAPPED_SIDES}{SWAPPED_SIDES_SECOND}")), "{two}");
+}
+
+#[test]
+fn one_passing_law_declares_the_edge_beside_a_failing_one() {
+    let text = Mapped::lawed(
+        EDGE,
+        "laws::preserves!(keeps, any::<A>(), B::join, A::join, A::into_b);\nlaws::preserves!(into_b_keeps_join, any::<A>(), A::join, B::join, A::into_b);\n",
+    );
+    assert_eq!(text.matches("edges between algebraic types").count(), 0, "{text}");
+}
