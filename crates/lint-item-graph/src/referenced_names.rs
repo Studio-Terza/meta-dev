@@ -14,7 +14,7 @@ use lint_core::{SourceFile, Walk};
 use lint_layout::{Name, UsePath};
 
 use crate::ItemGraph;
-use crate::scope::Scope;
+use crate::scope::{Reading, Scope};
 use kind::Kind;
 use macro_items::MacroItems;
 use parameters::Parameters;
@@ -34,8 +34,8 @@ impl ReferencedNames {
     const UNNAMED: &str = "_";
 
     #[must_use]
-    pub fn of_file(file: &SourceFile) -> ReferencedNames {
-        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
+    pub fn read(file: &SourceFile, reading: Reading) -> ReferencedNames {
+        Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()).reading(reading))
     }
 
     #[must_use]

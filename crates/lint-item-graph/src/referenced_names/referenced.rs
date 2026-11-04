@@ -8,7 +8,7 @@ use proc_macro2::{TokenStream, TokenTree};
 
 use super::ReferencedNames;
 use super::parameters::Parameters;
-use crate::scope::Scope;
+use crate::scope::{Reading, Scope};
 use path_tokens::PathTokens;
 
 #[derive(Debug)]
@@ -26,31 +26,45 @@ pub struct Referenced {
 impl Referenced {
     pub fn of_tokens(scope: &Scope<'_>, tokens: TokenStream) -> Referenced {
         let path = PathTokens::new(tokens);
-        let idents: Vec<(&TokenTree, &TokenTree, Name)> = path
-            .tokens()
-            .iter()
-            .zip(path.roots())
-            .filter_map(|(token, root)| match (token, root) {
-                (TokenTree::Ident(ident), Some(root)) => Some((token, root, Name::from(ident))),
-                _ => None,
-            })
-            .collect();
-        let local: Vec<Segment<'_>> = idents
-            .iter()
-            .filter_map(|(token, root, name)| scope.kept(token, root, name.clone()).map(|name| Segment { root, name }))
-            .collect();
-        let across: Vec<Segment<'_>> = idents
-            .into_iter()
-            .flat_map(|(token, root, name)| {
-                scope.spelled(token, root, name).into_iter().map(move |name| Segment { root, name })
-            })
-            .collect();
+        let local: Vec<Segment<'_>> =
+            path.tokens().iter().zip(path.roots()).filter_map(|(token, root)| Self::kept(scope, token, root)).collect();
+        let across = match scope.reads() {
+            Reading::Declarations => Vec::new(),
+            Reading::Bodies => Self::spelled(scope, &path),
+        };
         let nested = path.tokens().iter().filter_map(|token| match token {
             TokenTree::Group(group) => Some(Referenced::of_tokens(scope, group.stream())),
             TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
         });
         let own = Referenced { local: Self::paths(&local), across: Self::paths(&across) };
         nested.fold(own, Referenced::merged)
+    }
+
+    fn kept<'token>(
+        scope: &Scope<'_>,
+        token: &'token TokenTree,
+        root: Option<&'token TokenTree>,
+    ) -> Option<Segment<'token>> {
+        match (token, root) {
+            (TokenTree::Ident(ident), Some(root)) => {
+                scope.kept(token, root, Name::from(ident)).map(|name| Segment { root, name })
+            }
+            _ => None,
+        }
+    }
+
+    fn spelled<'token>(scope: &Scope<'_>, path: &'token PathTokens) -> Vec<Segment<'token>> {
+        path.tokens()
+            .iter()
+            .zip(path.roots())
+            .filter_map(|(token, root)| match (token, root) {
+                (TokenTree::Ident(ident), Some(root)) => Some((token, root, Name::from(ident))),
+                _ => None,
+            })
+            .flat_map(|(token, root, name)| {
+                scope.spelled(token, root, name).into_iter().map(move |name| Segment { root, name })
+            })
+            .collect()
     }
 
     fn merged(mut self, other: Referenced) -> Referenced {
