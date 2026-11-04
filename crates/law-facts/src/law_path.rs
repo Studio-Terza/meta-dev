@@ -20,12 +20,6 @@ impl LawPath {
     }
 }
 
-impl fmt::Display for LawPath {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}::{}", self.owner, self.member)
-    }
-}
-
 #[derive(Debug)]
 pub(crate) enum Route {
     Path(LawPath),

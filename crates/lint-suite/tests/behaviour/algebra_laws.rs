@@ -248,3 +248,28 @@ fn a_law_counts_only_when_its_path_attaches() {
     .map(|law| Declared::lawed(PRIVATE, law))
     .for_each(|text| assert!(text.contains("crate x: 1 of 1 algebra operations declare no law; x::A: join"), "{text}"));
 }
+
+const WRAPPED: &str = "struct A;\nstruct B;\ntrait Join {}\nimpl A {\n    fn join(self, other: A) -> A {}\n}\nimpl B {\n    fn join(self, other: B) -> B {}\n    fn zero() -> B {}\n}\n";
+const WRAPPED_FORMS: [&str; 12] = [
+    "laws::identity!(b_unit, any::<A>(), &B::join, B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), (B::join), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: &B, b: &B| a.join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: (B), b: B| a.join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: B, b: B| (a.join(b)), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: B, b: B| (a).join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: B, b: B| (&a).join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<A>(), |a: B, b: B| (*a).join(b), B::zero());\n",
+    "laws::identity!(b_unit, (any::<B>()), |a, b| a.join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<B>().prop_map(|b| b), |a, b| a.join(b), B::zero());\n",
+    "laws::identity!(b_unit, any::<B>(), Join::join, B::zero());\n",
+    "impl B {\n    fn unit() {\n        laws::identity!(b_unit, any::<A>(), |a: Self, b: Self| a.join(b), Self::zero());\n    }\n}\n",
+];
+
+#[test]
+fn a_wrapped_operation_operand_or_parameter_attaches_to_the_type_it_resolves_to() {
+    let listed: Vec<String> = WRAPPED_FORMS.iter().map(|law| Declared::lawed(WRAPPED, law)).collect();
+    assert!(
+        listed.iter().all(|text| text.contains("crate x: 1 of 3 algebra operations declare no law; x::A: join")),
+        "{listed:?}"
+    );
+}

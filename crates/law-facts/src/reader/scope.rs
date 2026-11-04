@@ -35,7 +35,6 @@ impl Scope {
         match found {
             Type::Reference(reference) => self.type_named(&reference.elem),
             Type::Paren(inner) => self.type_named(&inner.elem),
-            Type::Group(inner) => self.type_named(&inner.elem),
             Type::Path(_) => Name::of_type(found).and_then(|written| self.named(written)),
             _ => None,
         }
