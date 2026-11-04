@@ -92,7 +92,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 Wrapping::returned(&signature.output, self.output),
                 signature.inputs.iter().map(Wrapping::taken).collect(),
             )
-            .called(Calls::made(body))
+            .called(Calls::made(signature, body))
     }
 
     pub(super) fn into_context(self) -> Context<'file> {

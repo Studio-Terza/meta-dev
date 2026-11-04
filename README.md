@@ -121,7 +121,7 @@ to single nodes of the definition graph of fields, variants and bounds, form no 
 traits used from outside it, form one group when linked by a shared outside user),
 and `lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users). There are no thresholds.
 
-The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. Calls are resolved by unique name, and the header states these settings and the share of calls not resolved.
+The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. A call is resolved by the type that owns it: `self`, a typed parameter, the output of an earlier resolved call, a type path or `Self`; a bare or module path call goes to a free function. It resolves only when exactly one workspace function of that name has that owner; method calls on any other receiver, and calls into std, are left out. The header states these settings and the share of calls not resolved.
 
 The same run prints `parallel_structures`, report only: domain types whose moves (written, operation, port, lift and
 store edges, with names erased) are the same up to one consistent renaming of the types they reach, checked one hop

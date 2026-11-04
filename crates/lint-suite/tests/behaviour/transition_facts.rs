@@ -199,5 +199,8 @@ fn a_body_records_the_names_it_calls_by_plain_call_and_by_method_in_the_order_th
     let found = Read::calls(
         "struct A;\nimpl A {\n    fn plain(self) -> A { helper(self) }\n    fn pathed(self) -> A { module::helper(self) }\n    fn nested(self) -> A { outer(inner(self)) }\n    fn method(self) -> A { self.helper() }\n    fn mixed(self) -> A { first(self).second() }\n}\n",
     );
-    assert_eq!(found, ["plain helper", "pathed helper", "nested inner,outer", "method helper", "mixed first,second"]);
+    assert_eq!(
+        found,
+        ["plain helper", "pathed module::helper", "nested inner,outer", "method self.helper", "mixed first,#0.second"]
+    );
 }

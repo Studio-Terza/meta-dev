@@ -26,7 +26,7 @@ impl GraphLint for AlgebraDuplicates {
         let attached = Attached::declared(system);
         let twins: Vec<Twins<'_, '_, 'file>> = algebras
             .algebras()
-            .flat_map(|algebra| algebra.twins(|operation| Self::EQUIVALENCE.kept(attached.of_operation(operation))))
+            .flat_map(|algebra| algebra.twins(|operation| attached.of_operation(operation), Self::EQUIVALENCE))
             .collect();
         let by_crate = twins.iter().fold(
             BTreeMap::new(),

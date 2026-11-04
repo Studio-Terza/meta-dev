@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use equivalence::{Group, Groups, Keyed};
+use equivalence::{Equivalence, Erased, Group, Groups, Keyed};
 use law_facts::Property;
 use lint_core::Site;
+use lint_layout::Name;
 
 use super::{Operation, Signature};
 use crate::end::Node;
@@ -13,11 +14,16 @@ use crate::listed::Listed;
 pub struct Lawed<'op, 'found, 'file> {
     operation: &'op Operation<'found, 'file>,
     laws: &'op [Property],
+    equivalence: Equivalence,
 }
 
 impl<'op, 'found, 'file> Lawed<'op, 'found, 'file> {
-    pub(super) fn new(operation: &'op Operation<'found, 'file>, laws: &'op [Property]) -> Lawed<'op, 'found, 'file> {
-        Lawed { operation, laws }
+    pub(super) fn new(
+        operation: &'op Operation<'found, 'file>,
+        laws: &'op [Property],
+        equivalence: Equivalence,
+    ) -> Lawed<'op, 'found, 'file> {
+        Lawed { operation, laws, equivalence }
     }
 
     fn declared(self) -> Option<Lawed<'op, 'found, 'file>> {
@@ -29,13 +35,18 @@ impl<'op, 'found, 'file> Lawed<'op, 'found, 'file> {
 pub struct Twinning<'op, 'found> {
     signature: Signature<'op, 'found>,
     laws: BTreeSet<Property>,
+    name: Option<&'op Name>,
 }
 
 impl<'op, 'found> Keyed for Lawed<'op, 'found, '_> {
     type Key = Twinning<'op, 'found>;
 
     fn key(&self) -> Twinning<'op, 'found> {
-        Twinning { signature: self.operation.signature(), laws: self.laws.iter().copied().collect() }
+        Twinning {
+            signature: self.operation.signature(),
+            laws: self.equivalence.kept(self.laws).iter().copied().collect(),
+            name: self.equivalence.erases(Erased::Names).map_or(Some(self.operation.function()), |_| None),
+        }
     }
 }
 
