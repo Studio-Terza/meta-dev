@@ -10,9 +10,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lint_layout::Name;
-use newtype::Newtype;
 use lint_placement::CrateName;
 use lint_transition_graph::{Ask, Listed, TypeSystem};
+use newtype::Newtype;
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
