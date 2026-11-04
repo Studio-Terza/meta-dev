@@ -119,6 +119,8 @@ to single nodes of the definition graph of fields, variants and bounds, form no 
 traits used from outside it, form one group when linked by a shared outside user),
 and `lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users). There are no thresholds.
 
+The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. Calls are resolved by unique name, and the header states these settings and the share of calls not resolved.
+
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
 compile, and each violation prints as `path:line: problem; fix`. A constant message is a `Message` of a `Problem` and a `Fix`. Limits are constants inside each lint, not

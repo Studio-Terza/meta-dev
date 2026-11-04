@@ -1,3 +1,4 @@
+mod calls;
 mod type_scope;
 
 use syn::{Block, FnArg, ImplItem, ItemImpl, ItemTrait, ReturnType, Signature, Type};
@@ -15,6 +16,7 @@ use crate::ground::Ground;
 use crate::mutation::Mutation;
 use crate::resolved::Resolved;
 use crate::wrapping::Wrapping;
+use calls::Calls;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
@@ -90,6 +92,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 Wrapping::returned(&signature.output, self.output),
                 signature.inputs.iter().map(Wrapping::taken).collect(),
             )
+            .called(Calls::made(body))
     }
 
     pub(super) fn into_context(self) -> Context<'file> {

@@ -53,6 +53,10 @@ pub(crate) struct Hop<'found> {
 }
 
 impl<'found> Hop<'found> {
+    pub(crate) fn joins(&self, first: &Hop<'found>, last: &Hop<'found>) -> Option<&Hop<'found>> {
+        Some(self).filter(|hop| hop.takes == first.takes).filter(|hop| hop.gives == last.gives)
+    }
+
     pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
     where
         'found: 'ends,

@@ -45,6 +45,7 @@ mod public_api_tests;
 mod public_surface;
 mod raw_resources;
 mod repeated_methods;
+mod repeated_routes;
 mod repeated_shapes;
 mod rust_only;
 mod shown;
