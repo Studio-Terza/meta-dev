@@ -16,7 +16,7 @@ pub enum Property {
 }
 
 impl Property {
-    const NAMED: [(&'static str, Property); 7] = [
+    const NAMED: [(&'static str, Property); 8] = [
         ("associative", Property::Associative),
         ("commutative", Property::Commutative),
         ("identity", Property::Identity),
@@ -24,6 +24,7 @@ impl Property {
         ("idempotent", Property::Idempotent),
         ("absorbing", Property::Absorbing),
         ("distributive", Property::Distributive),
+        ("preserves", Property::Preserves),
     ];
 
     fn declared_by(name: &Name) -> Option<Property> {

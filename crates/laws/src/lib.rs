@@ -129,3 +129,15 @@ macro_rules! distributive {
         });
     };
 }
+
+#[macro_export]
+macro_rules! preserves {
+    ($(#[$meta:meta])* $name:ident, $strategy:expr, $source:expr, $target:expr, $edge:expr $(,)?) => {
+        $crate::law!($(#[$meta])* $name, ($strategy, $strategy), pair, {
+            let (first, second) = pair;
+            let mapped = $edge($source(first.clone(), second.clone()));
+            let combined = $target($edge(first), $edge(second));
+            $crate::proptest::prop_assert_eq!(mapped, combined, "the preservation law is broken");
+        });
+    };
+}

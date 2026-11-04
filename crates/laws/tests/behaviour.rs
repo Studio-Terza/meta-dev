@@ -1,7 +1,9 @@
 use std::string::FromUtf8Error;
 
 use laws::proptest;
-use laws::{absorbing, associative, commutative, distributive, idempotent, identity, inverse, roundtrip, table};
+use laws::{
+    absorbing, associative, commutative, distributive, idempotent, identity, inverse, preserves, roundtrip, table,
+};
 use proptest::collection::vec;
 use proptest::prelude::any;
 
@@ -24,6 +26,11 @@ impl Sample {
         let mut sorted = numbers.to_owned();
         sorted.sort_unstable();
         sorted
+    }
+
+    fn joined(mut first: Vec<u8>, second: Vec<u8>) -> Vec<u8> {
+        first.extend(second);
+        first
     }
 
     fn extended(numbers: &[u8]) -> Vec<u8> {
@@ -104,4 +111,20 @@ distributive!(
     any::<u8>(),
     u8::wrapping_add,
     u8::wrapping_mul
+);
+
+preserves!(
+    length_turns_joining_into_addition,
+    vec(any::<u8>(), 0..8),
+    Sample::joined,
+    usize::wrapping_add,
+    |numbers: Vec<u8>| numbers.len()
+);
+preserves!(
+    #[should_panic(expected = "the preservation law is broken")]
+    length_does_not_turn_joining_into_multiplication,
+    vec(any::<u8>(), 0..8),
+    Sample::joined,
+    usize::wrapping_mul,
+    |numbers: Vec<u8>| numbers.len()
 );

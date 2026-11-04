@@ -6,6 +6,7 @@ use type_facts::Facts;
 
 use crate::algebra::Algebras;
 use crate::containment::Containment;
+use crate::declarations::Declarations;
 use crate::edge::Edge;
 use crate::workspace_types::WorkspaceTypes;
 
@@ -41,6 +42,7 @@ pub struct TypeSystem<'found, 'file> {
     extraction: &'found Extraction<'file>,
     containment: OnceCell<Containment<'found, 'file>>,
     algebras: OnceCell<Algebras<'found, 'file>>,
+    declarations: OnceCell<Declarations<'found>>,
     transitions: &'found Transitions<'file>,
 }
 
@@ -56,6 +58,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             extraction,
             containment: OnceCell::new(),
             algebras: OnceCell::new(),
+            declarations: OnceCell::new(),
             transitions: extraction.transitions(),
         }
     }
@@ -70,8 +73,8 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         self.algebras.get_or_init(|| Algebras::of_edges(self.edges.iter()))
     }
 
-    pub(crate) fn files(&self) -> &'found [SourceFile] {
-        self.files
+    pub(crate) fn declarations(&self) -> &Declarations<'found> {
+        self.declarations.get_or_init(|| Declarations::from(self.files))
     }
 
     pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {
