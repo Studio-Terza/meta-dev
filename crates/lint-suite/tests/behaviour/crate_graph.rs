@@ -58,3 +58,19 @@ fn a_cycle_in_test_code_does_not_count() {
 fn a_long_chain_is_judged_without_exhausting_the_stack() {
     assert_eq!(Items::flagged(&[Sources::file(ONE, Text::new(&Items::chain("A", LONG_CHAIN)))]), CLEAN);
 }
+
+#[test]
+fn a_cycle_closed_through_impl_bodies_across_files_is_flagged() {
+    let link = |index: usize| {
+        format!(
+            "pub struct R{index};\nimpl R{index} {{\n    pub fn f() {{\n        R{}::f();\n    }}\n}}\n",
+            (index + 1) % BIG_RING
+        )
+    };
+    let half = BIG_RING / 2;
+    let first: Vec<String> = (0..half).map(link).collect();
+    let second: Vec<String> = (half..BIG_RING).map(link).collect();
+    let root = Sources::file(ONE, Text::new(&format!("mod other;\n{}", first.concat())));
+    let other = Sources::file("crates/one/src/other.rs", Text::new(&second.concat()));
+    assert_eq!(Items::flagged(&[root, other]), FLAGGED);
+}

@@ -9,10 +9,10 @@ use std::path::Path;
 
 use lint_core::{Site, SourceFile};
 use lint_item_graph::{ReferencedNames, Scope, Traversal};
-use lint_layout::Name;
+use lint_layout::{Name, UsePath};
 use lint_placement::CrateName;
 use transition_facts::{Endpoint, Nature, Transition};
-use type_facts::Dependency;
+use type_facts::{Dependency, Implementation};
 
 use super::link::Link;
 use super::member::Member;
@@ -106,6 +106,19 @@ impl<'found> Resolver<'found> {
         self.members(site.path(), dependency.as_ref(), dependency.written(), None)
     }
 
+    pub(crate) fn implemented(
+        &self,
+        placed: Member<'found>,
+        implementation: &Implementation<'_>,
+    ) -> Vec<Member<'found>> {
+        let site: &Site<'_> = implementation.as_ref();
+        let own = self.members(site.path(), placed.name(), &[], None);
+        own.into_iter()
+            .filter(|member| *member == placed)
+            .flat_map(|_| self.members(site.path(), implementation.as_ref(), &[], None))
+            .collect()
+    }
+
     pub(crate) fn endpoint(&self, file: &Path, endpoint: &Endpoint) -> Vec<Member<'found>> {
         match endpoint.nature() {
             Nature::Named => self.members(file, endpoint.as_ref(), &[], endpoint.origin().map(Borrow::borrow)),
@@ -128,23 +141,29 @@ impl<'found> Resolver<'found> {
         names: &ReferencedNames,
     ) -> Vec<Link<'found>> {
         let uses = names.uses();
-        let local: BTreeMap<&Name, Vec<Member<'found>>> = uses
-            .values()
-            .flatten()
-            .map(|name| {
-                let found = self.reached(reach, name, &[], None).into_iter();
-                (*name, found.filter(|member| member.cluster().krate() == Some(krate)).collect())
-            })
-            .collect();
+        let found: BTreeMap<&UsePath, Vec<Member<'found>>> =
+            uses.values().flatten().map(|path| (*path, self.used(reach, krate, path))).collect();
         uses.iter()
             .filter_map(|(owner, used)| {
                 let declaring = self.declaring.get(*owner).map_or(&[][..], Vec::as_slice);
                 let holder = reach.target(owner, &[], None).and_then(|target| target.declared(declaring))?;
-                let ends = used.iter().flat_map(|name| local.get(name).into_iter().flatten());
+                let ends = used.iter().flat_map(|path| found.get(path).into_iter().flatten());
                 Some(ends.map(move |end| Link::new(holder, *end)))
             })
             .flatten()
             .collect()
+    }
+
+    fn used(&self, reach: &Reach<'_, 'found>, krate: &CrateName, path: &UsePath) -> Vec<Member<'found>> {
+        let named = path.naming(|name| {
+            let standing = self.stand_ins.standing_for(krate, name).first().and(Some(name));
+            self.declaring.get(name).and(Some(name)).or(standing)
+        });
+        let found = named
+            .segments()
+            .split_last()
+            .and_then(|(name, written)| reach.target(name, written, None).map(|target| self.within(&target, name)));
+        found.unwrap_or_default()
     }
 
     pub(crate) fn signature(&self, transition: Transition<'found, '_>) -> Vec<Link<'found>> {

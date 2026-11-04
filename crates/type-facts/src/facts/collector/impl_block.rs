@@ -11,7 +11,7 @@ use crate::method::Method;
 pub(crate) struct ImplBlock<'file> {
     krate: &'file CrateName,
     target: Name,
-    implementation: Option<Implementation>,
+    implementation: Option<Implementation<'file>>,
     methods: Vec<Method>,
 }
 
@@ -19,7 +19,7 @@ impl<'file> ImplBlock<'file> {
     pub(crate) fn new(
         krate: &'file CrateName,
         target: Name,
-        implementation: Option<Implementation>,
+        implementation: Option<Implementation<'file>>,
         methods: Vec<Method>,
     ) -> ImplBlock<'file> {
         ImplBlock { krate, target, implementation, methods }
@@ -27,8 +27,8 @@ impl<'file> ImplBlock<'file> {
 
     pub(crate) fn added_to(
         self,
-        mut members: BTreeMap<&'file CrateName, BTreeMap<Name, Members>>,
-    ) -> BTreeMap<&'file CrateName, BTreeMap<Name, Members>> {
+        mut members: BTreeMap<&'file CrateName, BTreeMap<Name, Members<'file>>>,
+    ) -> BTreeMap<&'file CrateName, BTreeMap<Name, Members<'file>>> {
         members
             .entry(self.krate)
             .or_default()
