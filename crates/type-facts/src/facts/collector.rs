@@ -104,14 +104,19 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         let target = Spelled::last_of(&found.self_ty);
         let methods = found.items.iter().filter_map(|item| Method::of_impl_item(item, target.as_ref()));
         let implemented = found.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
+        let site = self.site_at(found.impl_token.span);
         let (implemented_methods, inherent): (Vec<Method>, Vec<Method>) = methods.partition(|_| implemented.is_some());
         let implementation = implemented.map(|segment| {
-            Implementation::new(Name::from(&segment.ident), Spelled::first_argument_of(segment), implemented_methods)
+            Implementation::new(
+                Name::from(&segment.ident),
+                Spelled::first_argument_of(segment),
+                implemented_methods,
+                site,
+            )
         });
         let walk = Walk::outside_tests(&found.attrs);
         let generic =
             found.generics.type_params().next().and(target.clone()).filter(|_| walk == Walk::Entered).map(|spelled| {
-                let site = self.site_at(found.impl_token.span);
                 let implemented = implementation.as_ref().map(|each| AsRef::<Name>::as_ref(each).clone());
                 let methods = implementation.as_ref().map_or(inherent.as_slice(), Implementation::methods).to_vec();
                 GenericImpl::new(self.krate, site, spelled).filled(implemented, methods)

@@ -1,4 +1,11 @@
+mod interpolated;
+
+use std::collections::BTreeSet;
+
+use lint_core::Syntax;
 use proc_macro2::{TokenStream, TokenTree};
+
+use interpolated::Interpolated;
 
 #[derive(Debug)]
 pub struct PathTokens(Vec<TokenTree>);
@@ -7,9 +14,27 @@ impl PathTokens {
     const SEPARATOR: char = ':';
     const SEPARATOR_LENGTH: usize = 2;
     const SEGMENT_LENGTH: usize = 3;
+    const CALL: char = '!';
 
     pub fn new(tokens: TokenStream) -> PathTokens {
-        PathTokens(tokens.into_iter().collect())
+        let tokens: Vec<TokenTree> = tokens.into_iter().collect();
+        let calls: BTreeSet<usize> = tokens
+            .iter()
+            .zip(tokens.iter().skip(1))
+            .zip(tokens.iter().skip(Self::SEPARATOR_LENGTH))
+            .enumerate()
+            .filter_map(|(at, ((name, call), group))| {
+                Syntax::token_ident(name)
+                    .and(Syntax::punct(call))
+                    .filter(|call| call.as_char() == Self::CALL)
+                    .and(Syntax::group(group))
+                    .map(|_| at + Self::SEPARATOR_LENGTH)
+            })
+            .collect();
+        let read = tokens.into_iter().enumerate().map(|(at, token)| {
+            calls.get(&at).and(Syntax::group(&token)).map_or_else(|| token.clone(), Interpolated::of_macro)
+        });
+        PathTokens(read.collect())
     }
 
     pub fn tokens(&self) -> &[TokenTree] {
