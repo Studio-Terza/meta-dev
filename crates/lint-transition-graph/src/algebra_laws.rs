@@ -1,4 +1,4 @@
-mod attached;
+pub(crate) mod attached;
 
 use std::collections::BTreeMap;
 use std::fmt;
