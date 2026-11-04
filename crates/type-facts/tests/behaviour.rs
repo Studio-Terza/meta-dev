@@ -259,6 +259,31 @@ fn implementers_of_a_trait_are_found_across_crates() {
 }
 
 #[test]
+fn an_impl_keeps_the_written_trait_path_and_the_qualifier_of_its_self_type() {
+    let files = Sources::parsed(&[Described::file(
+        "crates/x/src/lib.rs",
+        "impl std::fmt::Display for shop::Cents {}\nimpl a::b::Trait for &(c::D) {}\nimpl Plain for E {}\n",
+    )]);
+    let facts = Facts::of_files(&files);
+    let spelled: Vec<(String, Vec<String>, Vec<String>)> = facts
+        .outside_implementations()
+        .map(|outside| {
+            let each = outside.implementation();
+            (
+                outside.name().to_string(),
+                each.written().iter().map(ToString::to_string).collect(),
+                AsRef::<[Name]>::as_ref(each.target_path()).iter().map(ToString::to_string).collect(),
+            )
+        })
+        .collect();
+    let owned = |names: &[&str]| names.iter().map(|each| (*each).to_owned()).collect::<Vec<String>>();
+    assert_eq!(spelled.len(), 3);
+    assert!(spelled.contains(&("Cents".to_owned(), owned(&["std", "fmt"]), owned(&["shop"]))));
+    assert!(spelled.contains(&("D".to_owned(), owned(&["a", "b"]), owned(&["c"]))));
+    assert!(spelled.contains(&("E".to_owned(), owned(&[]), owned(&[]))));
+}
+
+#[test]
 fn fields_variants_and_bounds_are_dependencies() {
     let files = Sources::parsed(&[Described::file(
         "a.rs",
