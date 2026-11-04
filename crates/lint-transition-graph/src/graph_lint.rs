@@ -1,14 +1,12 @@
 use std::marker::PhantomData;
 
 use lint_core::{Lint, Report, SourceFile};
-use transition_facts::Transitions;
-use type_facts::Facts;
 
-use crate::Containment;
 use crate::containment::ClusterLint;
+use crate::system::{Extraction, TypeSystem};
 
 pub trait GraphLint {
-    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file>;
+    fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file>;
 }
 
 #[derive(Debug)]
@@ -16,17 +14,16 @@ pub struct OnGraph<Graph>(PhantomData<Graph>);
 
 impl<Graph: GraphLint> Lint for OnGraph<Graph> {
     fn report(files: &[SourceFile]) -> Report<'_> {
-        Graph::report_graph(&Facts::of_files(files), &Transitions::of_files(files))
+        let extraction = Extraction::from(files);
+        Graph::report_graph(&TypeSystem::built_from(files, &extraction))
     }
 }
 
 #[derive(Debug)]
-pub struct OnContainment<Check>(PhantomData<Check>);
+pub struct Clustered<Check>(PhantomData<Check>);
 
-impl<Check: ClusterLint> Lint for OnContainment<Check> {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let facts = Facts::of_files(files);
-        let transitions = Transitions::of_files(files);
-        Containment::clustered(files, &facts, &transitions).report::<Check>()
+impl<Check: ClusterLint> GraphLint for Clustered<Check> {
+    fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
+        system.containment().report::<Check>()
     }
 }

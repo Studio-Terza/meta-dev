@@ -1,23 +1,19 @@
 mod crate_mutation;
 mod tally;
 
-use lint_core::{Headline, Report};
-use transition_facts::Transitions;
-use type_facts::Facts;
-
 use crate::GraphLint;
 use crate::edge::Edge;
-use crate::workspace_types::WorkspaceTypes;
+use crate::system::TypeSystem;
 use crate_mutation::CrateMutation;
+use lint_core::{Headline, Report};
 use tally::Tally;
 
 #[derive(Debug)]
 pub struct CoreMutation;
 
 impl GraphLint for CoreMutation {
-    fn report_graph<'file>(facts: &Facts<'file>, transitions: &Transitions<'file>) -> Report<'file> {
-        let types = WorkspaceTypes::declared(facts, transitions);
-        let edges: Vec<Edge<'_, 'file>> = transitions.all().map(|found| types.edge(found)).collect();
+    fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
+        let edges = system.edges();
         let counted: Vec<&Edge<'_, 'file>> = edges.iter().filter_map(Tally::counts).collect();
         let grouped = Edge::by_crate(counted.iter().copied());
         Report::new(
