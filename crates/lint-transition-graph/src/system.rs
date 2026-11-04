@@ -70,6 +70,10 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
         self.algebras.get_or_init(|| Algebras::of_edges(self.edges.iter()))
     }
 
+    pub(crate) fn files(&self) -> &'found [SourceFile] {
+        self.files
+    }
+
     pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {
         &self.types
     }

@@ -63,7 +63,7 @@ impl<'file> Facets<'file> {
             methods.iter().filter(|pair| roundtrips.iter().find_map(|mentions| pair.witnessed_by(mentions)).is_none());
         let unspared = self.trait_needs().into_iter().skip(spare);
         let law = Self::ORDERS.iter().find_map(|order| self.known(*order)).map(|_| Need::Law);
-        let unlawed = law.filter(|_| coverage.law_naming(subject).is_none());
+        let unlawed = law.filter(|_| coverage.naming(subject).is_empty());
         unwitnessed
             .copied()
             .map(Need::Roundtrip)

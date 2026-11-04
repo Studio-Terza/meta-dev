@@ -2,12 +2,11 @@ use std::collections::BTreeSet;
 
 use lint_layout::Name;
 
-use super::kind::Kind;
+use crate::kind::Kind;
 use crate::package::Package;
-use crate::subject::Subject;
 
 #[derive(Debug)]
-pub(crate) struct Law<'file> {
+pub struct Law<'file> {
     package: Package<'file>,
     kind: Kind,
     mentions: BTreeSet<Name>,
@@ -18,15 +17,20 @@ impl<'file> Law<'file> {
         Law { package, kind, mentions }
     }
 
-    pub(crate) fn naming(&self, subject: &Subject<'_>) -> Option<&Law<'file>> {
-        Some(self).filter(|law| law.package == subject.package()).filter(|law| law.mentions.contains(subject.owner()))
+    #[must_use]
+    pub fn naming(&self, package: Package<'_>, names: &[&Name]) -> Option<&Law<'file>> {
+        Some(self)
+            .filter(|law| law.package == package)
+            .filter(|law| names.iter().all(|name| law.mentions.contains(*name)))
     }
 
-    pub(crate) fn kind(&self) -> Kind {
+    #[must_use]
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
-    pub(crate) fn mentions(&self) -> &BTreeSet<Name> {
+    #[must_use]
+    pub fn mentions(&self) -> &BTreeSet<Name> {
         &self.mentions
     }
 }

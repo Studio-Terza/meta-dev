@@ -1,10 +1,10 @@
+mod mentions;
+
 use syn::Macro;
 use syn::visit::{self, Visit};
 
-mod mentions;
-
-use super::kind::Kind;
-use super::law::Law;
+use crate::kind::Kind;
+use crate::law::Law;
 use crate::package::Package;
 use lint_core::SourceFile;
 use mentions::Mentions;

@@ -1,6 +1,5 @@
 mod coverage;
 mod facts;
-mod package;
 mod subject;
 
 use coverage::Coverage;

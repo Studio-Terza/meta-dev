@@ -1,4 +1,5 @@
 mod algebra;
+mod algebra_laws;
 mod class;
 mod containment;
 mod count;
@@ -20,6 +21,7 @@ use coverage::Coverage;
 use crate_transitions::CrateTransitions;
 use edge::Edge;
 
+pub use algebra_laws::AlgebraLaws;
 pub use containment::{AcyclicQuotients, ConnectedClusters, InterfaceByConsumers, LowestCluster};
 pub use duplicates::{DuplicateTransitions, OneEdge};
 pub use graph_lint::{Clustered, GraphLint};
