@@ -23,6 +23,7 @@ impl Lint for RepeatedShapes {
             Groups::grouped(occurrences)
                 .ranked(|shape| shape.size())
                 .maximal()
+                .listed()
                 .iter()
                 .filter_map(Finding::violation)
                 .collect(),
