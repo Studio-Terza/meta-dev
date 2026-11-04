@@ -79,6 +79,14 @@ compared, nor are derived lifts (a map, field focus or match routing) and store 
 keep the standard conversion, or one transition, and route the others through it; delete a hand-written copy of a map,
 filter or fold over the element transition; where the transitions mean different things, give each its own output type.
 
+`distinct_signatures` keeps the methods of one type apart. Every inherent method of a type, in any file of its crate, is
+read on the type graph: its inputs (the receiver first) and its output as the domain types, interfaces, primitives and
+black boxes they name, read through references, generic arguments and tuples, with whether each is optional, fallible or
+many (a collection, a slice or an `impl Iterator`), and whether the method mutates self or a parameter. Two methods of one
+type that read alike hide a missing type or type parameter. Trait impls are fixed by their trait and are not compared, a
+method written once per `cfg` counts once, and a type name declared twice in one crate is compared within its own file.
+The message names the fix: distinguish the types they take or return, or keep one method and route the other through it.
+
 `effects_in_ports` keeps effects in ports. In shipped code, a call into files, the environment, the clock, the network,
 processes, randomness or stdio (`std::fs`, `std::env`, `SystemTime::now`, `Instant::now`, `thread::sleep`, `std::net`,
 `process::Command::new`, `process::exit`, `rand`, `io::stdout` and the like, and `println!`, `eprintln!` and `dbg!`) is

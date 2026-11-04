@@ -368,11 +368,9 @@ dependencies = [
 name = "lint-distinct-signatures"
 version = "0.1.0"
 dependencies = [
+ "equivalence",
  "lint-core",
- "lint-file",
- "lint-layout",
- "quote",
- "syn 2.0.119",
+ "lint-transition-graph",
 ]
 
 [[package]]

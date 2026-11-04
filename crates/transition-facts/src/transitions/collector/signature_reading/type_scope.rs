@@ -4,13 +4,14 @@ mod naming;
 
 use std::collections::BTreeMap;
 
-use syn::{GenericArgument, Generics, PathArguments, Type, TypeParamBound, TypePath};
+use syn::{FnArg, GenericArgument, Generics, PathArguments, Type, TypeParamBound, TypePath};
 
 use lint_layout::{Name, Word};
 
 use crate::associated::Associated;
 use crate::endpoint::{Endpoint, Nature, Unnamed};
 use crate::resolved::Resolved;
+use crate::wrapping::{Bounds, Wrapping};
 use bound::Bound;
 use constraint::Constraint;
 use naming::Naming;
@@ -20,6 +21,7 @@ pub(super) struct TypeScope<'outer> {
     selfish: Nature,
     outer: Option<&'outer TypeScope<'outer>>,
     generics: BTreeMap<Name, Resolved>,
+    wrappings: BTreeMap<Name, Wrapping>,
 }
 
 impl<'outer> TypeScope<'outer> {
@@ -28,7 +30,7 @@ impl<'outer> TypeScope<'outer> {
     const ASSOCIATED: Word<'static> = Word::new("Self::Output");
 
     pub(super) fn root(selfish: Nature) -> TypeScope<'outer> {
-        TypeScope { selfish, outer: None, generics: BTreeMap::new() }
+        TypeScope { selfish, outer: None, generics: BTreeMap::new(), wrappings: BTreeMap::new() }
     }
 
     pub(super) fn declaring(
@@ -40,8 +42,13 @@ impl<'outer> TypeScope<'outer> {
             .type_params()
             .map(|parameter| (Name::from(&parameter.ident), Resolved::interface(Self::SIZED)))
             .collect();
-        let mut scope = TypeScope { selfish, outer, generics: unbounded };
         let constraints = Constraint::declared(generics);
+        let wrappings = generics
+            .type_params()
+            .map(|parameter| Name::from(&parameter.ident))
+            .map(|name| (name.clone(), Bounds::wrapping_of(Constraint::bounds(&constraints, &name))))
+            .collect();
+        let mut scope = TypeScope { selfish, outer, generics: unbounded, wrappings };
         let bounded: Vec<Resolved> =
             scope.generics.keys().map(|name| scope.bounded(Constraint::bounds(&constraints, name))).collect();
         scope.generics.values_mut().zip(bounded).for_each(|(slot, bound)| *slot = bound);
@@ -73,6 +80,17 @@ impl<'outer> TypeScope<'outer> {
             Type::BareFn(_) => Resolved::interface(Self::FN),
             _ => Resolved::Found(Endpoint::from(Unnamed::Opaque)),
         }
+    }
+
+    pub(super) fn taken(&self, input: &FnArg) -> Wrapping {
+        match input {
+            FnArg::Typed(typed) => Wrapping::peeled(&typed.ty, &|name| self.generic_wrapping(name)),
+            FnArg::Receiver(_) => Wrapping::Plain,
+        }
+    }
+
+    pub(super) fn generic_wrapping(&self, name: &Name) -> Option<Wrapping> {
+        std::iter::successors(Some(self), |scope| scope.outer).find_map(|scope| scope.wrappings.get(name).copied())
     }
 
     pub(super) fn argument(&self, arguments: &PathArguments) -> Option<Resolved> {

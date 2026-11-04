@@ -1,29 +1,43 @@
-mod signature_index;
+use std::fmt;
 
-use signature_index::SignatureIndex;
-
-use syn::visit::Visit;
-
-use lint_core::Lint;
-use lint_core::{Headline, Report, SourceFile, Violation};
-use lint_file::FileLint;
+use equivalence::{Equivalence, Erased};
+use lint_core::{Fix, Headline, Report, Violation};
+use lint_transition_graph::{Alike, GraphLint, TypeSystem};
 
 #[derive(Debug)]
 pub struct DistinctSignatures;
 
-impl Lint for DistinctSignatures {
-    fn report(files: &[SourceFile]) -> Report<'_> {
+impl DistinctSignatures {
+    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Names]);
+}
+
+impl GraphLint for DistinctSignatures {
+    fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         Report::new(
-            Headline::new("two functions on one type with the same signature hide a missing type or type parameter"),
-            Self::in_shipped(files),
+            Headline::new(
+                "two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared",
+            ),
+            Alike::grouped(system, Self::EQUIVALENCE).iter().filter_map(Shared::violation).collect(),
         )
     }
 }
 
-impl FileLint for DistinctSignatures {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut index = SignatureIndex::default();
-        index.visit_file(file.syntax());
-        index.violations(file.path()).collect()
+struct Shared<'alike, 'system, 'found, 'file>(&'alike Alike<'system, 'found, 'file>);
+
+impl<'file> Shared<'_, '_, '_, 'file> {
+    fn violation(alike: &Alike<'_, '_, 'file>) -> Option<Violation<'file>> {
+        alike.site().map(|site| Violation::new(site, Shared(alike)))
+    }
+}
+
+impl fmt::Display for Shared<'_, '_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.0)
+    }
+}
+
+impl lint_core::Finding for Shared<'_, '_, '_, '_> {
+    fn fix(&self) -> Fix {
+        Fix::new("distinguish the types they take or return, or keep one method and route the other through it")
     }
 }
