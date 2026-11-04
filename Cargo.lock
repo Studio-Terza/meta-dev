@@ -991,6 +991,7 @@ name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "equivalence",
  "law-facts",
  "lint-core",
  "lint-item-graph",

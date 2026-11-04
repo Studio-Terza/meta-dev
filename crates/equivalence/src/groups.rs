@@ -23,6 +23,11 @@ impl<Member: Keyed> Groups<Member> {
     }
 
     #[must_use]
+    pub fn listed(self) -> Vec<Group<Member>> {
+        self.0
+    }
+
+    #[must_use]
     pub fn ranked<Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Groups<Member> {
         self.0.sort_by_key(|group| Reverse(rank(group.key())));
         self
@@ -31,8 +36,8 @@ impl<Member: Keyed> Groups<Member> {
 
 impl<Member: Keyed + Nested> Groups<Member> {
     #[must_use]
-    pub fn maximal(self) -> Vec<Group<Member>> {
-        self.0.into_iter().fold(Vec::new(), Self::admitted)
+    pub fn maximal(self) -> Groups<Member> {
+        Groups(self.0.into_iter().fold(Vec::new(), Self::admitted))
     }
 
     fn admitted(mut kept: Vec<Group<Member>>, group: Group<Member>) -> Vec<Group<Member>> {

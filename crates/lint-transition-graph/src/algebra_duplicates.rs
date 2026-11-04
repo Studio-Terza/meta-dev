@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use equivalence::{Equivalence, Erased, Laws};
 use lint_core::{Fix, Headline, Report, Site, Violation};
 use lint_placement::CrateName;
 
@@ -15,13 +16,19 @@ use crate::system::TypeSystem;
 #[derive(Debug)]
 pub struct AlgebraDuplicates;
 
+impl AlgebraDuplicates {
+    const EQUIVALENCE: Equivalence = Equivalence::erasing(&[Erased::Names], Laws::Matched);
+}
+
 impl GraphLint for AlgebraDuplicates {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file> {
         let algebras = system.algebras();
         let attached = Attached::declared(system);
         let twins: Vec<Twins<'_, '_, 'file>> = algebras
             .algebras()
-            .flat_map(|algebra| algebra.twins(|operation| attached.of_operation(operation)))
+            .flat_map(|algebra| {
+                algebra.twins(|operation| Self::EQUIVALENCE.laws().kept(attached.of_operation(operation)))
+            })
             .collect();
         let by_crate = twins.iter().fold(
             BTreeMap::new(),
@@ -51,13 +58,9 @@ impl<'op, 'found, 'file> CrateTwins<'op, 'found, 'file> {
     fn measured(name: &'op CrateName, groups: &[&'op Twins<'op, 'found, 'file>]) -> CrateTwins<'op, 'found, 'file> {
         CrateTwins {
             name,
-            first: groups
-                .iter()
-                .flat_map(|group| group.members())
-                .map(|member| *AsRef::<Site<'file>>::as_ref(*member))
-                .min(),
+            first: groups.iter().flat_map(|twins| twins.group().sites()).min().copied(),
             groups: groups.to_vec(),
-            members: Count::new(groups.iter().map(|group| group.members().len()).sum()),
+            members: Count::new(groups.iter().map(|twins| twins.group().members().len()).sum()),
         }
     }
 
