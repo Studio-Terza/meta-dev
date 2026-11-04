@@ -2,13 +2,17 @@ use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::ParallelStructures;
 
-use crate::shown::OnGraph;
+use crate::shown::{OnGraph, Shown};
 
 struct Parallel;
 
 impl Parallel {
     fn of(text: &&str) -> String {
         OnGraph::<ParallelStructures>::report(&[Sources::file("crates/x/src/lib.rs", Text::new(text))]).to_string()
+    }
+
+    fn shown(pair: &[&str]) -> bool {
+        Shown::by(pair, |files| OnGraph::<ParallelStructures>::report(files).to_string())
     }
 
     fn structures(text: &&str) -> usize {
@@ -50,6 +54,9 @@ const FIRST_DIFFERS: &str = "laws::associative!(a, any::<A>(), A::join);\nlaws::
 const SAME_IMPL_BODIES: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nimpl Show for B {\n    fn show(&self) -> String {\n        self.label()\n    }\n}\n";
 const OTHER_IMPL_BODIES: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nimpl Show for B {\n    fn show(&self) -> String {\n        format!(\"{}\", 1)\n    }\n}\n";
 const ONE_SIDE_FILLS: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\n";
+const OTHER_IMPL_BODIES_AND_A_THIRD_FILLER: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nimpl Show for B {\n    fn show(&self) -> String {\n        format!(\"{}\", 1)\n    }\n}\nstruct Z;\nimpl Show for Z {\n    fn show(&self) -> String {\n        String::new()\n    }\n}\n";
+const OTHER_IMPL_BODY_IN_A_MODULE: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Show {\n    fn show(&self) -> String;\n}\nimpl A {\n    fn name(self) -> String {}\n    fn next(self) -> N {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn after(self) -> M {}\n}\nimpl Show for A {\n    fn show(&self) -> String {\n        self.name()\n    }\n}\nmod inner {\n    impl Show for super::B {\n        fn show(&self) -> String {\n            format!(\"{}\", 1)\n        }\n    }\n}\n";
+const RENAMED_INPUTS: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\nimpl A {\n    fn name(self) -> String {}\n    fn with(self, n: N) -> String {}\n}\nimpl B {\n    fn label(self) -> String {}\n    fn with(self, m: M) -> String {}\n}\n";
 const THROUGH_A_TRAIT: &str = "struct A;\nstruct B;\nstruct N;\nstruct M;\ntrait Named {\n    fn name(&self) -> String;\n}\nimpl Named for A {\n    fn name(&self) -> String {}\n}\nimpl Named for B {\n    fn name(&self) -> String {}\n}\nimpl A {\n    fn next(self) -> N {}\n}\nimpl B {\n    fn after(self) -> M {}\n}\n";
 
 laws::table!(
@@ -64,6 +71,8 @@ laws::table!(
         THROUGH_A_TRAIT => 0,
         SAME_IMPL_BODIES => 1,
         OTHER_IMPL_BODIES => 0,
+        OTHER_IMPL_BODIES_AND_A_THIRD_FILLER => 0,
+        OTHER_IMPL_BODY_IN_A_MODULE => 0,
         ONE_SIDE_FILLS => 1,
         SAME_SHAPE_TWICE => 0,
         PORTED => 0,
@@ -118,9 +127,13 @@ fn a_first_type_whose_laws_differ_does_not_hide_the_others() {
     assert!(text.contains("2 types answer 2 moves alike under one renaming: x::B at crates/x/src/lib.rs:2, x::C at crates/x/src/lib.rs:3"), "{text}");
 }
 
-#[test]
-fn the_parameters_count_every_place_where_any_member_differs() {
-    let text = Parallel::of(&THREE_WAYS);
-    assert!(text.contains("3 types answer 2 moves alike under one renaming"), "{text}");
-    assert!(text.contains("one generic over 3 type parameters"), "{text}");
-}
+laws::table!(
+    the_parameters_count_every_place_where_any_member_differs_other_inputs_included,
+    Parallel::shown,
+    [
+        [THREE_WAYS, "3 types answer 2 moves alike under one renaming"] => true,
+        [THREE_WAYS, "one generic over 3 type parameters"] => true,
+        [RENAMED_INPUTS, "2 types answer 2 moves alike under one renaming"] => true,
+        [RENAMED_INPUTS, "one generic over 2 type parameters"] => true,
+    ]
+);
