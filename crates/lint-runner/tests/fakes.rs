@@ -113,18 +113,23 @@ impl Files for FakeLinked<'_> {
     }
 }
 
-pub struct FakeFlaky<'memory> {
+pub struct FakeCounted<'memory> {
     memory: &'memory Memory,
+    counted: PathBuf,
     listings: AtomicUsize,
 }
 
-impl FakeFlaky<'_> {
-    pub fn new(memory: &Memory) -> FakeFlaky<'_> {
-        FakeFlaky { memory, listings: AtomicUsize::new(0) }
+impl FakeCounted<'_> {
+    pub fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
+        FakeCounted { memory, counted, listings: AtomicUsize::new(0) }
+    }
+
+    pub fn listings(&self) -> usize {
+        self.listings.load(Ordering::SeqCst)
     }
 }
 
-impl Files for FakeFlaky<'_> {
+impl Files for FakeCounted<'_> {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
         self.memory.read(path)
     }
@@ -150,12 +155,10 @@ impl Files for FakeFlaky<'_> {
     }
 
     fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
-        let earlier = self.listings.fetch_add(1, Ordering::SeqCst);
-        if earlier == 0 {
-            self.memory.entries(directory)
-        } else {
-            Err(FileFailure::Failed(io::Error::from(io::ErrorKind::PermissionDenied)))
+        if directory == self.counted {
+            self.listings.fetch_add(1, Ordering::SeqCst);
         }
+        self.memory.entries(directory)
     }
 
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {

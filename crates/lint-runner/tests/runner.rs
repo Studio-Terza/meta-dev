@@ -7,13 +7,14 @@ use lint_reader::SourceFiles;
 use lint_runner::Cli;
 
 use std::ffi::OsString;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-use crate::fakes::{FakeFlaky, FakeLinked, FakeUnlistable};
+use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -173,13 +174,17 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn a_helper_that_cannot_read_fails_the_run_visibly() -> Result<(), Box<dyn Error>> {
+fn the_gate_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
+    const MOST_READERS: usize = 4;
     let scratch = Scratch::package()?;
     scratch.write("src/lib.rs", CLEAN)?;
-    let helpers = thread::available_parallelism().map_or(0, |count| count.get().min(4) - 1);
-    let run = Trees::reported_through(&FakeFlaky::new(&scratch.files), std::slice::from_ref(&scratch.root));
-    assert_eq!(run.exit == ExitCode::FAILURE, helpers > 0);
-    assert_eq!(run.err.contains("cannot read"), helpers > 0, "{}", run.err);
+    let workers = thread::available_parallelism().map_or(1, NonZeroUsize::get).min(MOST_READERS);
+    let reading = FakeCounted::new(&scratch.files, scratch.root.clone());
+    Trees::flagged(&reading, &scratch.root, &["--report"]);
+    let gating = FakeCounted::new(&scratch.files, scratch.root.clone());
+    let gate = Trees::flagged(&gating, &scratch.root, &[]);
+    assert_eq!(gate.exit, ExitCode::SUCCESS);
+    assert_eq!(gating.listings(), reading.listings() * workers);
     Ok(())
 }
 
