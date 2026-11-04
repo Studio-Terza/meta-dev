@@ -2,7 +2,6 @@ use text_lines::Lines;
 
 use super::change::Change;
 use crate::cli::command::failure::Failure;
-use crate::cli::command::step::branch::Branch;
 use crate::cli::command::step::revision::Revision;
 use crate::cli::ports::{Invocation, Ports, Text};
 
@@ -12,7 +11,9 @@ pub struct Git<'ports, Host: Ports> {
 }
 
 impl<'ports, Host: Ports> Git<'ports, Host> {
-    const REMOTE: &'static str = "origin/";
+    const MAIN: &'static str = "main";
+    const REMOTE: &'static str = "origin";
+    const TRACKED: &'static str = "refs/remotes/origin/main";
     const HEAD: &'static str = "HEAD";
     const LITERAL_PATHS: &'static str = "core.quotePath=false";
 
@@ -20,8 +21,8 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         Git { ports }
     }
 
-    pub(crate) fn changes_since_fork(&self, base: &Branch) -> Result<Vec<Change>, Failure<'static>> {
-        let fork = self.fork_point(base)?;
+    pub(crate) fn changes_since_fork(&self) -> Result<Vec<Change>, Failure<'static>> {
+        let fork = self.fork_point()?;
         let listed = self.asked(&Invocation::new(
             "git",
             [
@@ -38,10 +39,15 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
         Ok(Lines::from(listed.as_ref()).filter_map(|line| line.parse::<Change>().ok()).collect())
     }
 
-    fn fork_point(&self, base: &Branch) -> Result<Revision, Failure<'static>> {
-        let remote = [Self::REMOTE, base.as_ref()].concat();
-        let found = self.asked(&Invocation::new("git", ["merge-base", remote.as_str(), Self::HEAD]))?;
+    fn fork_point(&self) -> Result<Revision, Failure<'static>> {
+        self.main_fetched()?;
+        let found = self.asked(&Invocation::new("git", ["merge-base", Self::TRACKED, Self::HEAD]))?;
         Ok(Revision::new(Lines::from(found.as_ref()).next().unwrap_or_default().to_owned()))
+    }
+
+    fn main_fetched(&self) -> Result<Text, Failure<'static>> {
+        let refspec = [Self::MAIN, ":", Self::TRACKED].concat();
+        self.asked(&Invocation::new("git", ["fetch", "--no-tags", Self::REMOTE, refspec.as_str()]))
     }
 
     fn asked(&self, invocation: &Invocation) -> Result<Text, Failure<'static>> {

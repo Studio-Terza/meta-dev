@@ -642,9 +642,8 @@ laws::table!(
         ["summarize", "report.txt"] => true,
         ["summarize", "report.txt", "summary.md", "extra"] => true,
         ["labels"] => true,
-        ["labels", "main"] => true,
-        ["labels", "main", "1"] => true,
-        ["labels", "main", "1", "metadata.json", "extra"] => true,
+        ["labels", "1"] => true,
+        ["labels", "1", "metadata.json", "extra"] => true,
         ["spec-line"] => true,
         ["spec-line", "1", "extra"] => true,
         ["shard-summary"] => true,
@@ -1316,7 +1315,7 @@ impl Labelled {
             Reply::to("gh pr", &[case.kind, "\n", case.labels].concat()),
         ]);
         let scratch = Scratch::fresh();
-        let answer = scratch.answer(&fake, &["labels", "main", "121", &scratch.file("metadata.json")]);
+        let answer = scratch.answer(&fake, &["labels", "121", &scratch.file("metadata.json")]);
         Verdict { exit: answer.exit, out: answer.out.get(Self::HEADER.len()..).unwrap_or_default().to_owned() }
     }
 
@@ -1405,17 +1404,23 @@ laws::table!(
 );
 
 #[test]
-fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
-    let fake = Script::answering(vec![Reply::to("git merge-base", "abc123\n")]);
+fn a_branch_of_a_stale_project_branch_is_checked_against_the_merge_base_with_main() {
+    let fake = Script::answering(vec![
+        Reply::to("git merge-base", "main0fork\n"),
+        Reply::to("git -c", "M\tsrc/lib.rs\n"),
+        Reply::to("gh pr", "change\n"),
+    ]);
     let scratch = Scratch::fresh();
     let metadata = scratch.file("metadata.json");
-    let answer = scratch.answer(&fake, &["labels", "release", "7", &metadata]);
-    assert_eq!(Text::lines(&answer.out), ["labels of pull request 7 against the merge base with release"]);
+    let answer = scratch.answer(&fake, &["labels", "7", &metadata]);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&answer.out), ["labels of pull request 7 against the merge base with main"]);
     assert_eq!(scratch.read("metadata.json"), METADATA);
     assert_eq!(
         *fake.calls.borrow(),
         [
-            Invocation::new("git", ["merge-base", "origin/release", "HEAD"]),
+            Invocation::new("git", ["fetch", "--no-tags", "origin", "main:refs/remotes/origin/main"]),
+            Invocation::new("git", ["merge-base", "refs/remotes/origin/main", "HEAD"]),
             Invocation::new(
                 "git",
                 [
@@ -1425,7 +1430,7 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
                     "--name-status",
                     "--find-renames",
                     "--find-copies",
-                    "abc123",
+                    "main0fork",
                     "HEAD"
                 ],
             ),
@@ -1438,22 +1443,28 @@ fn labels_are_checked_against_the_merge_base_with_the_base_branch() {
                     "--json",
                     "title,labels",
                     "--jq",
-                    r#"if (.title | startswith("refactor:")) then "refactor" else "change" end, .labels[].name"#
-                ]
+                    r#"if (.title | startswith("refactor:")) then "refactor" else "change" end, .labels[].name"#,
+                ],
             ),
             Invocation::new("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]),
         ]
     );
+}
+
+#[test]
+fn labels_report_the_tools_they_cannot_run() {
+    let scratch = Scratch::fresh();
+    let metadata = scratch.file("metadata.json");
     assert_eq!(
-        Text::lines(&scratch.answer(&Script::refusing("git"), &["labels", "main", "1", &metadata]).err),
+        Text::lines(&scratch.answer(&Script::refusing("git"), &["labels", "1", &metadata]).err),
         ["cannot run git: boom"]
     );
     assert_eq!(
-        Text::lines(&scratch.answer(&Script::refusing("gh"), &["labels", "main", "1", &metadata]).err),
+        Text::lines(&scratch.answer(&Script::refusing("gh"), &["labels", "1", &metadata]).err),
         ["cannot run gh: boom"]
     );
     assert_eq!(
-        Text::lines(&scratch.answer(&Script::refusing("cargo"), &["labels", "main", "1", &metadata]).err),
+        Text::lines(&scratch.answer(&Script::refusing("cargo"), &["labels", "1", &metadata]).err),
         ["cannot run cargo: boom"]
     );
 }

@@ -1,3 +1,4 @@
+mod branch;
 mod event;
 mod skipped;
 
@@ -8,12 +9,12 @@ use std::path::Path;
 use file_ports::Files;
 
 use super::Step;
-use super::branch::Branch;
 use super::changed::{Changed, Question};
 use super::journal::Journal;
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::Arguments;
 use crate::cli::ports::{Exit, Ports, Text};
+use branch::Branch;
 use event::Event;
 use skipped::Skips;
 
