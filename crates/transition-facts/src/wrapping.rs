@@ -54,6 +54,7 @@ impl Wrapping {
             Type::Reference(reference) => Self::peeled(&reference.elem),
             Type::Paren(paren) => Self::peeled(&paren.elem),
             Type::Group(group) => Self::peeled(&group.elem),
+            Type::Array(_) | Type::Slice(_) => Wrapping::Many,
             Type::Path(path) => path.path.segments.last().map_or(Wrapping::Plain, Self::named),
             _ => Wrapping::Plain,
         }

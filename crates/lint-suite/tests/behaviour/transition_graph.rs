@@ -36,6 +36,9 @@ const OUTPUT_OPTIONAL: &str =
     "struct A;\nimpl Add for A {\n    type Output = Option<A>;\n    fn add(self, other: A) -> Self::Output {}\n}\n";
 const INPUT_MANY: &str =
     "struct A;\nimpl A {\n    fn from_parts(parts: Vec<A>) -> A {}\n    fn from_maybe(part: Option<A>) -> A {}\n}\n";
+const ARRAYED: &str = "struct A;\nimpl A {\n    fn pair(self) -> [A; 2] {}\n    fn sum(items: &[A]) -> A {}\n}\n";
+const ACTED_WRAPPED: &str = "struct A;\nstruct F;\nimpl A {\n    fn with(self, f: Option<F>) -> A {}\n}\n";
+const TRIED: &str = "struct A;\nstruct E;\nimpl A {\n    fn try_bump(&mut self) -> Result<(), E> {}\n}\n";
 const TESTED: &str = "struct A;\n#[cfg(test)]\nmod tests {\n    impl A {\n        fn f(&self) -> bool {}\n    }\n}\nimpl A {\n    #[cfg(test)]\n    fn g(&self) -> bool {}\n}\n";
 
 laws::table!(
@@ -60,6 +63,9 @@ laws::table!(
         [OUTPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
         [OUTPUT_OPTIONAL, "of which 1 algebra operations, 1 partial"] => true,
         [INPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
+        [ARRAYED, "of which 0 algebra operations, 0 partial"] => true,
+        [ACTED_WRAPPED, "of which 1 algebra operations, 0 partial"] => true,
+        [TRIED, "of which 0 algebra operations, 0 partial"] => true,
         [TESTED, "crate x"] => false,
         [TESTED, "workspace:"] => false,
         ["struct A;\n", "crate x"] => false,

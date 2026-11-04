@@ -88,7 +88,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
             )
             .wrapped(
                 Wrapping::returned(&signature.output, self.output),
-                signature.inputs.iter().map(Wrapping::taken).max().unwrap_or(Wrapping::Plain),
+                signature.inputs.iter().map(Wrapping::taken).collect(),
             )
     }
 

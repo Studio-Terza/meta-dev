@@ -6,7 +6,7 @@ use crate::count::Count;
 use crate::key::Key;
 use lint_layout::{Name, Whole, Word};
 use lint_placement::CrateName;
-use transition_facts::Mutation;
+use transition_facts::{Mutation, Wrapping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node<'found> {
@@ -153,9 +153,10 @@ impl<'found> Ends<'found> {
         &self.takes
     }
 
-    pub(crate) fn subject(&self, mutation: Mutation) -> Option<Node<'found>> {
+    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
         let receiver = Some(mutation)
             .filter(|mutation| *mutation == Mutation::ThroughSelf)
+            .filter(|_| wrapping == Wrapping::Plain)
             .and_then(|_| self.gives.unit())
             .and_then(|_| self.takes.first().or(self.implementer.as_ref()));
         self.gives.node.or_else(|| receiver.and_then(|end| end.node))

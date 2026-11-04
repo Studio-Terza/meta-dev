@@ -16,7 +16,7 @@ pub struct Function<'file> {
     body: Body,
     branching: Branching,
     wrapping: Wrapping,
-    taking: Wrapping,
+    takings: Vec<Wrapping>,
 }
 
 impl<'file> Function<'file> {
@@ -30,7 +30,7 @@ impl<'file> Function<'file> {
             body: Body::Written,
             branching: Branching::new(1),
             wrapping: Wrapping::Plain,
-            taking: Wrapping::Plain,
+            takings: Vec::new(),
         }
     }
 
@@ -41,9 +41,9 @@ impl<'file> Function<'file> {
         self
     }
 
-    pub(crate) fn wrapped(mut self, wrapping: Wrapping, taking: Wrapping) -> Function<'file> {
+    pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Function<'file> {
         self.wrapping = wrapping;
-        self.taking = taking;
+        self.takings = takings;
         self
     }
 
@@ -66,8 +66,8 @@ impl<'file> Function<'file> {
     }
 
     #[must_use]
-    pub fn plain_inputs(&self) -> Option<&Function<'file>> {
-        Some(self).filter(|function| function.taking == Wrapping::Plain)
+    pub fn takings(&self) -> &[Wrapping] {
+        &self.takings
     }
 
     #[must_use]

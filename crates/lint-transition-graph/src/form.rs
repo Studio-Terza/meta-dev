@@ -2,7 +2,7 @@ mod operators;
 
 use body_lifts::Body;
 use lint_layout::Name;
-use transition_facts::{Ground, Mutation};
+use transition_facts::{Ground, Mutation, Wrapping};
 
 use crate::algebra::Totality;
 use crate::count::Count;
@@ -20,11 +20,21 @@ pub struct Acting<'found> {
 impl<'found> Acting<'found> {
     pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
         let ends = edge.ends();
-        ends.subject(edge.transition().function().mutation())
+        let function = edge.transition().function();
+        ends.subject(function.mutation(), function.wrapping())
+            .and_then(|subject| Acting::unwrapped(subject, ends.takes(), function.takings()))
             .map(|subject| Acting::about(subject, ends.takes()))
-            .filter(|_| edge.transition().function().plain_inputs().is_some())
             .filter(|acting| acting.grounded().is_some())
             .filter(|acting| acting.admitted(edge.fixed_by()).is_some())
+    }
+
+    fn unwrapped(subject: Node<'found>, takes: &[End<'found>], takings: &[Wrapping]) -> Option<Node<'found>> {
+        let wrapped = takes
+            .iter()
+            .zip(takings)
+            .filter(|(_, taking)| **taking != Wrapping::Plain)
+            .find(|(taken, _)| taken.node() == Some(&subject));
+        wrapped.map_or(Some(subject), |_| None)
     }
 
     fn grounded(&self) -> Option<Count> {
