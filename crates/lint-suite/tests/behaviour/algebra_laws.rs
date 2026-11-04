@@ -50,7 +50,7 @@ const OTHER_ADD: &str = "struct B;\nimpl Add for B {\n    type Output = B;\n    
 fn an_unlawed_add_is_listed_with_its_type_and_the_fix() {
     let text = Declared::of(&[Declared::at("crates/x/src/lib.rs", ADD)]);
     assert!(
-        text.contains("crates/x/src/lib.rs:4: crate x: 1 of 1 algebra operations declare no law; x::A: add; declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, naming the type and the function"),
+        text.contains("crates/x/src/lib.rs:4: crate x: 1 of 1 algebra operations declare no law; x::A: add; declare the law with laws::associative!, commutative!, identity!, inverse!, idempotent!, absorbing! or distributive! in a test of the same package, calling the operation as Type::function, <Type as Trait>::function or a closure that calls it on its parameters"),
         "{text}"
     );
 }
@@ -186,4 +186,65 @@ fn a_law_credits_only_the_operation_its_call_routes_to() {
         (text.matches(&listed).count(), text.matches(lawed).count())
     })
     .for_each(|counts| assert_eq!(counts, (1, 0)));
+}
+
+const BOTH_ADDS: &str = "struct A;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> A {}\n}\nstruct B;\nimpl Add for B {\n    type Output = B;\n    fn add(self, other: B) -> B {}\n}\n";
+const B_ADD_FORMS: [&str; 6] = [
+    "laws::associative!(add_regroups, any::<A>(), B::add);\n",
+    "laws::associative!(add_regroups, any::<B>(), Add::add);\n",
+    "laws::associative!(add_regroups, any::<A>(), <B as Add>::add);\n",
+    "impl B {\n    fn regroups() {\n        laws::associative!(add_regroups, any::<A>(), Self::add);\n    }\n}\n",
+    "use x::B as Sum;\nlaws::associative!(add_regroups, any::<A>(), Sum::add);\n",
+    "use std::ops::Add as Plus;\nlaws::associative!(add_regroups, any::<B>(), Plus::add);\n",
+];
+
+#[test]
+fn every_path_form_attaches_to_the_type_it_resolves_to() {
+    let listed: Vec<String> = B_ADD_FORMS.iter().map(|law| Declared::lawed(BOTH_ADDS, law)).collect();
+    assert!(
+        listed.iter().all(|text| text.contains("crate x: 1 of 2 algebra operations declare no law; x::A: add")),
+        "{listed:?}"
+    );
+}
+
+#[test]
+fn a_trait_path_a_foreign_trait_names_does_not_attach() {
+    let text = Declared::lawed(BOTH_ADDS, "laws::associative!(add_regroups, any::<B>(), Other::add);\n");
+    assert!(text.contains("crate x: 2 of 2 algebra operations declare no law"), "{text}");
+}
+
+#[test]
+fn a_closure_attaches_to_the_method_it_calls_on_its_parameters() {
+    [
+        "laws::associative!(a_join, any::<B>(), |a: A, b: A| a.join(b));\n",
+        "laws::associative!(a_join, any::<A>(), |a, b| a.join(b));\n",
+        "laws::associative!(a_join, any::<B>(), |a: A, b: A| { A::join(a, b) });\n",
+    ]
+    .iter()
+    .map(|law| Declared::lawed(TWO_JOINS, law))
+    .for_each(|text| {
+        assert!(text.contains("crate x: 1 of 2 algebra operations declare no law; x::B: join"), "{text}");
+    });
+}
+
+#[test]
+fn a_closure_the_lint_cannot_resolve_is_named_with_its_site() {
+    let text = Declared::lawed(PRIVATE, "laws::associative!(a_join, any::<A>(), |a: A, b: A| combine(a, b));\n");
+    assert!(
+        text.contains("x::A: join; law associative! at crates/x/tests/t.rs:1 checks a closure the lint cannot resolve to an operation; pass the operation path"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_law_counts_only_when_its_path_attaches() {
+    [
+        "laws::associative!(a_join, any::<A>(), Self::join);\n",
+        "laws::associative!(A_join, any::<A>(), join);\n",
+        "laws::associative!(a_join, any::<A>(), |a: A, b: A| b.join(a).join(a));\n",
+        "laws::law!(a_join, any::<A>(), a, { A::join(a, a) });\n",
+    ]
+    .iter()
+    .map(|law| Declared::lawed(PRIVATE, law))
+    .for_each(|text| assert!(text.contains("crate x: 1 of 1 algebra operations declare no law; x::A: join"), "{text}"));
 }

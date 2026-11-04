@@ -1,15 +1,21 @@
 mod kind;
 mod law;
+mod law_path;
+mod operators;
 mod package;
 mod reader;
+mod traits;
 
 pub use kind::{Kind, Property};
 pub use law::Law;
+pub use law_path::{LawPath, Unresolved};
+pub use operators::Operators;
 pub use package::Package;
 
 use lint_core::SourceFile;
 use lint_layout::Name;
 use reader::Reader;
+use traits::Traits;
 
 #[derive(Debug, Default)]
 pub struct Laws<'file> {
@@ -18,7 +24,8 @@ pub struct Laws<'file> {
 
 impl<'file> From<&'file [SourceFile]> for Laws<'file> {
     fn from(files: &'file [SourceFile]) -> Laws<'file> {
-        files.iter().fold(Laws::default(), Laws::read)
+        let traits = Traits::declared(files);
+        files.iter().fold(Laws::default(), |laws, file| laws.read(file, &traits))
     }
 }
 
@@ -28,8 +35,22 @@ impl<'file> Laws<'file> {
         self.laws.iter().filter_map(|law| law.naming(package, names)).collect()
     }
 
-    fn read(mut self, file: &'file SourceFile) -> Laws<'file> {
-        self.laws.extend(Reader::read(file));
-        file.test_modules().iter().fold(self, Laws::read)
+    #[must_use]
+    pub fn routing(&self, package: Package<'_>, owner: &Name, member: &Name) -> Vec<&Law<'file>> {
+        self.laws
+            .iter()
+            .filter_map(|law| law.of_package(package))
+            .filter(|law| law.routed(owner, member).is_some())
+            .collect()
+    }
+
+    #[must_use]
+    pub fn unresolved(&self, package: Package<'_>) -> Vec<Unresolved<'file>> {
+        self.laws.iter().filter_map(|law| law.of_package(package)).filter_map(Law::unresolved).collect()
+    }
+
+    fn read(mut self, file: &'file SourceFile, traits: &Traits) -> Laws<'file> {
+        self.laws.extend(Reader::read(file, traits));
+        file.test_modules().iter().fold(self, |laws, module| laws.read(module, traits))
     }
 }
