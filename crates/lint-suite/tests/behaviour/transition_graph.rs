@@ -1,8 +1,8 @@
 use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::{OnGraph, TransitionGraph};
+use lint_transition_graph::TransitionGraph;
 
-use crate::shown::Shown;
+use crate::shown::{OnGraph, Shown};
 
 struct Graphed;
 

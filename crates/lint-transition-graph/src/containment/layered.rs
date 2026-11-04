@@ -1,12 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use lint_core::{Fix, Headline, Violation};
-use lint_item_graph::ItemGraph;
 
 use super::cluster::{Cluster, Level, Part};
 use super::link::Link;
 use super::member::Member;
+use super::slice::Slice;
 use super::{ClusterLint, Containment, Toward};
 
 #[derive(Debug)]
@@ -18,10 +18,9 @@ impl ClusterLint for AcyclicQuotients {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.clusters()
-            .into_iter()
-            .filter(|cluster| cluster.level() != Level::Workspace)
-            .flat_map(|cluster| Cycle::all(view, cluster))
+        view.slices()
+            .filter(|slice| slice.cluster().level() != Level::Workspace)
+            .flat_map(|slice| Cycle::all(view, slice))
             .filter_map(|cycle| view.first_site(&cycle.members).map(|site| Violation::new(site, &cycle)))
             .collect()
     }
@@ -36,40 +35,9 @@ struct Cycle<'found> {
 }
 
 impl<'found> Cycle<'found> {
-    fn all(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Vec<Cycle<'found>> {
-        let members = view.members(cluster);
-        let part = |member: Member<'found>| Part::toward(cluster, member.cluster());
-        let parts = |link: &Link<'found>| link.ends().map(part);
-        let crossing: Vec<Link<'found>> = view
-            .links_within(&members, Toward::Defined)
-            .into_iter()
-            .filter(|link| {
-                let [from, to] = parts(link);
-                from != to
-            })
-            .collect();
-        let quotient =
-            members.iter().map(|member| (part(*member), BTreeSet::new())).chain(crossing.iter().map(|link| {
-                let [from, to] = parts(link);
-                (from, BTreeSet::from([to]))
-            }));
-        let references = quotient.fold(
-            BTreeMap::new(),
-            |mut references: BTreeMap<Part<'found>, BTreeSet<Part<'found>>>, (from, to)| {
-                references.entry(from).or_default().extend(to);
-                references
-            },
-        );
-        let graph = ItemGraph::of_references(references);
-        graph
-            .tangles()
-            .into_iter()
-            .map(|tangle| {
-                let parts: BTreeSet<Part<'found>> =
-                    tangle.into_iter().filter_map(|index| graph.name_at(index).copied()).collect();
-                Cycle::closed(cluster, parts, &crossing)
-            })
-            .collect()
+    fn all(view: &Containment<'found, '_>, slice: &Slice<'found>) -> Vec<Cycle<'found>> {
+        let cluster = slice.cluster();
+        slice.quotient(view, Toward::Defined).cycles(|parts, crossing| Cycle::closed(cluster, parts, crossing))
     }
 }
 

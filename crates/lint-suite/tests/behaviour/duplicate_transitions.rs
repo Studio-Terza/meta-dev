@@ -1,8 +1,8 @@
 use lint_core::{Lint, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
-use lint_transition_graph::{DuplicateTransitions, OnGraph, OneEdge};
+use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
-use crate::shown::Shown;
+use crate::shown::{OnGraph, Shown};
 
 struct Duplicates;
 

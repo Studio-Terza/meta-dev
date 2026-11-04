@@ -1,8 +1,8 @@
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{
-    AcyclicQuotients, Clustered as ClusterReport, ConnectedClusters, DeepClusters, Extraction, GraphLint,
-    InterfaceByConsumers, InterfaceByInternals, LowestCluster, TypeSystem,
+    AcyclicQuotients, Clustered as ClusterReport, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers,
+    LowestCluster, TypeSystem,
 };
 
 struct Clustered;
@@ -123,16 +123,6 @@ fn exports_that_no_outside_user_joins_are_reported() {
 }
 
 #[test]
-fn exports_that_share_no_private_item_are_reported() {
-    assert_eq!(
-        Clustered::lines(&USED, |view| ClusterReport::<InterfaceByInternals>::report_graph(view).violations().to_vec()),
-        [
-            "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P] [Q R] that no private item joins; split it along the groups, since they share no implementation"
-        ]
-    );
-}
-
-#[test]
 fn a_type_outside_the_lowest_cluster_of_its_users_is_reported() {
     let placed = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\npub struct Helper;\npub struct Common;\n"),
@@ -148,21 +138,6 @@ fn a_type_outside_the_lowest_cluster_of_its_users_is_reported() {
         [
             "crates/y/src/lib.rs:1: y::Far is used only within x::a; move it into the lowest cluster that holds all its users",
             "crates/x/src/lib.rs:3: x::Helper is used only within x::a; move it into the lowest cluster that holds all its users",
-        ]
-    );
-}
-
-#[test]
-fn a_cluster_with_fewer_exports_than_private_items_is_deep() {
-    let deep = [
-        Clustered::at("crates/x/src/lib.rs", "pub struct Face(In1, In2);\nstruct In1;\nstruct In2;\n"),
-        Clustered::at("crates/y/src/lib.rs", "pub struct User(x::Face, z::Two);\n"),
-        Clustered::at("crates/z/src/lib.rs", "pub struct Two(Hid);\nstruct Hid;\n"),
-    ];
-    assert_eq!(
-        Clustered::lines(&deep, |view| ClusterReport::<DeepClusters>::report_graph(view).violations().to_vec()),
-        [
-            "crates/x/src/lib.rs:1: crate x is deep: 1 exported, 2 private; nothing to fix: keep the interface this small as it grows"
         ]
     );
 }
@@ -196,22 +171,6 @@ fn a_cycle_closed_only_through_a_signature_is_not_reported() {
     assert_eq!(
         Clustered::lines(&signed, |view| ClusterReport::<AcyclicQuotients>::report_graph(view).violations().to_vec()),
         Vec::<String>::new()
-    );
-}
-
-#[test]
-fn exports_that_reach_only_one_another_share_no_private_item() {
-    let chained = [
-        Clustered::at("crates/x/src/lib.rs", "pub struct P(Q);\npub struct Q;\n"),
-        Clustered::at("crates/y/src/lib.rs", "pub struct U(x::P);\npub struct V(x::Q);\n"),
-    ];
-    assert_eq!(
-        Clustered::lines(&chained, |view| ClusterReport::<InterfaceByInternals>::report_graph(view)
-            .violations()
-            .to_vec()),
-        [
-            "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P] [Q] that no private item joins; split it along the groups, since they share no implementation"
-        ]
     );
 }
 

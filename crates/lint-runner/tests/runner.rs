@@ -60,7 +60,7 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner = ["::report(readout.files())", "flows.report::<", "::report_graph(&system)"]
+    let listed_by_the_runner = ["::report(readout.files())", "flows.report::<", "::dirty(&system)"]
         .iter()
         .map(|call| runner.matches(call).count())
         .sum::<usize>();

@@ -1,21 +1,15 @@
 use std::marker::PhantomData;
 
-use lint_core::{Lint, Report, SourceFile};
+use lint_core::Report;
 
 use crate::containment::ClusterLint;
-use crate::system::{Extraction, TypeSystem};
+use crate::system::TypeSystem;
 
 pub trait GraphLint {
     fn report_graph<'file>(system: &TypeSystem<'_, 'file>) -> Report<'file>;
-}
 
-#[derive(Debug)]
-pub struct OnGraph<Graph>(PhantomData<Graph>);
-
-impl<Graph: GraphLint> Lint for OnGraph<Graph> {
-    fn report(files: &[SourceFile]) -> Report<'_> {
-        let extraction = Extraction::from(files);
-        Graph::report_graph(&TypeSystem::built_from(files, &extraction))
+    fn dirty<'file>(system: &TypeSystem<'_, 'file>) -> Option<Report<'file>> {
+        Self::report_graph(system).dirty()
     }
 }
 
