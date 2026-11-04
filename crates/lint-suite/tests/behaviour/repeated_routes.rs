@@ -24,6 +24,8 @@ const ONCE: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nimpl 
 const SHARED_NAME: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct E;\nstruct F;\nstruct G;\nimpl A {\n    fn step(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl G {\n    fn step(self) -> A {}\n}\nimpl E {\n    fn first(self, a: A) -> D {\n        a.step().to_c().to_d()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> D {\n        a.step().to_c().to_d()\n    }\n}\n";
 const LONGER: &str = "struct A;\nstruct B;\nstruct C;\nstruct D;\nstruct H;\nstruct E;\nstruct F;\nimpl A {\n    fn to_b(self) -> B {}\n}\nimpl B {\n    fn to_c(self) -> C {}\n}\nimpl C {\n    fn to_d(self) -> D {}\n}\nimpl D {\n    fn to_h(self) -> H {}\n}\nimpl E {\n    fn first(self, a: A) -> H {\n        a.to_b().to_c().to_d().to_h()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> H {\n        a.to_b().to_c().to_d().to_h()\n    }\n}\n";
 
+const LOOPING: &str = "struct A;\nstruct E;\nstruct F;\nimpl A {\n    fn step(self) -> A {}\n}\nimpl E {\n    fn first(self, a: A) -> A {\n        a.step().step().step()\n    }\n}\nimpl F {\n    fn second(self, a: A) -> A {\n        a.step().step().step()\n    }\n}\n";
+
 laws::table!(
     a_route_is_reported_once_it_has_three_hops_in_two_places_each_resolved_to_one_edge,
     Routes::walked,
@@ -34,6 +36,7 @@ laws::table!(
         ONCE => 0,
         SHARED_NAME => 0,
         LONGER => 1,
+        LOOPING => 0,
     ]
 );
 

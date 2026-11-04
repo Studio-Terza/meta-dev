@@ -31,6 +31,15 @@ impl Read {
         Transitions::of_files(&parsed).all().map(|found| shown(&found)).collect()
     }
 
+    fn called(found: &Transition) -> String {
+        let calls: Vec<String> = found.function().calls().iter().map(ToString::to_string).collect();
+        format!("{} {}", AsRef::<Name>::as_ref(found.function()), calls.join(","))
+    }
+
+    fn calls(text: &'static str) -> Vec<String> {
+        Self::files(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))], Self::called)
+    }
+
     fn signatures(text: &'static str) -> Vec<String> {
         Self::files(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))], Self::signature)
     }
@@ -183,4 +192,12 @@ fn a_domain_type_named_output_is_not_the_associated_type() {
             "x::A::viewed(Named:A) -> Named:A Absent Core Add",
         ]
     );
+}
+
+#[test]
+fn a_body_records_the_names_it_calls_by_plain_call_and_by_method_in_the_order_they_run() {
+    let found = Read::calls(
+        "struct A;\nimpl A {\n    fn plain(self) -> A { helper(self) }\n    fn pathed(self) -> A { module::helper(self) }\n    fn nested(self) -> A { outer(inner(self)) }\n    fn method(self) -> A { self.helper() }\n    fn mixed(self) -> A { first(self).second() }\n}\n",
+    );
+    assert_eq!(found, ["plain helper", "pathed helper", "nested inner,outer", "method helper", "mixed first,second"]);
 }
