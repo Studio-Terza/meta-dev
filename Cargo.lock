@@ -33,6 +33,7 @@ dependencies = [
 name = "body-shape"
 version = "0.1.0"
 dependencies = [
+ "equivalence",
  "laws",
  "lint-layout",
  "newtype",
@@ -111,6 +112,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "equivalence"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "newtype",
 ]
 
 [[package]]
@@ -785,10 +795,10 @@ name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
  "body-shape",
+ "equivalence",
  "lint-core",
  "lint-layout",
  "lint-placement",
- "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -982,12 +992,17 @@ name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "body-shape",
+ "equivalence",
  "law-facts",
  "lint-core",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
  "newtype",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
  "transition-facts",
  "type-facts",
 ]
@@ -1429,6 +1444,7 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-placement",
+ "newtype",
  "syn 2.0.119",
 ]
 

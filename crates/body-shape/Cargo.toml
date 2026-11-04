@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+equivalence = { path = "../equivalence" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }
 proc-macro2.workspace = true

@@ -5,7 +5,7 @@ use newtype::{Arbitrary, Newtype};
 use super::ShapeToken;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ShapeKey(u64);
+pub(crate) struct ShapeKey(u64);
 
 impl From<&[ShapeToken<'_>]> for ShapeKey {
     fn from(tokens: &[ShapeToken<'_>]) -> ShapeKey {

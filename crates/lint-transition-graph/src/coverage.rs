@@ -13,7 +13,7 @@ use crate::count::Count;
 use crate::edge::Edge;
 use crate::form::Form;
 use crate::system::TypeSystem;
-use share::Share;
+pub(crate) use share::Share;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Coverage {

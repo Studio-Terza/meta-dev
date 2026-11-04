@@ -1,4 +1,5 @@
 mod associated;
+mod callee;
 mod context;
 mod endpoint;
 mod filler;
@@ -12,6 +13,7 @@ mod transition;
 mod transitions;
 mod wrapping;
 
+pub use callee::Owner;
 pub use endpoint::{Endpoint, Nature};
 pub use ground::Ground;
 pub use implementer::Implementer;

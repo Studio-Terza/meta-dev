@@ -4,3 +4,12 @@ pub(crate) enum Position {
     BeforeLiteral,
     Plain,
 }
+
+impl Position {
+    pub(crate) fn plain(self) -> Option<Position> {
+        match self {
+            Position::Named => None,
+            Position::BeforeLiteral | Position::Plain => Some(self),
+        }
+    }
+}

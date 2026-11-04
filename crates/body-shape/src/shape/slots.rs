@@ -1,8 +1,12 @@
-use lint_layout::{Casing, Name, Whole, Word, words};
+mod renaming;
+
+use equivalence::{Equivalence, Erased};
+use lint_layout::{Name, Whole, Word, words};
 
 use super::ShapeToken;
 use super::position::Position;
 use super::slot::Slot;
+use renaming::Renaming;
 
 #[derive(Debug, Default)]
 pub(crate) struct Slots<'raw>(Vec<&'raw Name>);
@@ -15,24 +19,30 @@ impl<'raw> Slots<'raw> {
         "struct", "super", "trait", "type", "unsafe", "use", "where", "while", "bool", "str", "char", "u8", "usize"
     ];
 
-    pub(crate) fn classified(&mut self, name: &'raw Name, position: Position) -> ShapeToken<'raw> {
-        name.matches::<Whole>(&Self::LITERAL_WORDS)
-            .map(|_| ShapeToken::Literal)
+    pub(crate) fn classified(
+        &mut self,
+        name: &'raw Name,
+        position: Position,
+        equivalence: Equivalence,
+    ) -> ShapeToken<'raw> {
+        Self::literal(name)
+            .map(|_| Self::literal_word(name, equivalence))
             .or_else(|| name.matches::<Whole>(&Self::KEYWORDS).map(|_| ShapeToken::Word(name)))
-            .unwrap_or_else(|| self.cased(name, name.casing(), position))
+            .unwrap_or_else(|| self.renamed(name, Renaming::chosen(name, position, equivalence)))
     }
 
-    fn cased(&mut self, name: &'raw Name, casing: Casing, position: Position) -> ShapeToken<'raw> {
-        match casing {
-            Casing::Lower => self.lowered(name, position).map_or(ShapeToken::Word(name), ShapeToken::Local),
-            Casing::Camel | Casing::Shouting | Casing::Other => ShapeToken::Word(name),
-        }
+    pub(crate) fn literal(name: &Name) -> Option<&Name> {
+        name.matches::<Whole>(&Self::LITERAL_WORDS).map(|_| name)
     }
 
-    fn lowered(&mut self, name: &'raw Name, position: Position) -> Option<Slot> {
-        match position {
-            Position::Named => None,
-            Position::BeforeLiteral | Position::Plain => Some(self.numbered(name)),
+    fn literal_word(name: &'raw Name, equivalence: Equivalence) -> ShapeToken<'raw> {
+        equivalence.erases(Erased::Literals).map_or(ShapeToken::Word(name), |_| ShapeToken::Literal)
+    }
+
+    fn renamed(&mut self, name: &'raw Name, renaming: Renaming) -> ShapeToken<'raw> {
+        match renaming {
+            Renaming::Slotted => ShapeToken::Local(self.numbered(name)),
+            Renaming::Kept => ShapeToken::Word(name),
         }
     }
 

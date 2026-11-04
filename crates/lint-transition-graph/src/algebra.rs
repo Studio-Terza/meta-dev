@@ -1,6 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+mod twins;
+
+use std::collections::BTreeMap;
 use std::fmt;
 
+use equivalence::Equivalence;
 use law_facts::law_path::{LawPath, Side};
 use law_facts::{Law, Property};
 use lint_core::Site;
@@ -12,7 +15,8 @@ use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::Node;
 use crate::form::{Acting, Form};
-use crate::listed::Listed;
+use twins::Lawed;
+pub use twins::Twins;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Totality {
@@ -56,42 +60,6 @@ pub struct Signature<'op, 'found> {
 impl fmt::Display for Signature<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} -> {}{}", self.acting, self.totality, self.acting.subject())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Twins<'op, 'found, 'file> {
-    subject: Node<'found>,
-    signature: Signature<'op, 'found>,
-    laws: BTreeSet<Property>,
-    members: Vec<&'op Operation<'found, 'file>>,
-}
-
-struct Named<'law>(&'law Property);
-
-impl fmt::Display for Named<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{:?}", self.0)
-    }
-}
-
-impl fmt::Display for Twins<'_, '_, '_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let functions = Listed::<_, ','>::joined(self.members.iter().map(|member| member.function()));
-        let laws = Listed::<_, ','>::joined(self.laws.iter().map(Named));
-        write!(formatter, "{} {}: {functions} ({laws})", self.subject, self.signature)
-    }
-}
-
-impl<'op, 'found, 'file> Twins<'op, 'found, 'file> {
-    #[must_use]
-    pub fn subject(&self) -> &Node<'found> {
-        &self.subject
-    }
-
-    #[must_use]
-    pub fn members(&self) -> &[&'op Operation<'found, 'file>] {
-        &self.members
     }
 }
 
@@ -174,36 +142,12 @@ impl<'found, 'file> Algebra<'found, 'file> {
         self.operations.iter().find(|operation| operation.routed_by(law, side).is_some())
     }
 
-    pub fn twins<'op, 'laws>(
+    pub fn twins<'op>(
         &'op self,
-        laws: impl Fn(&Operation<'found, 'file>) -> &'laws [Property],
+        laws: impl Fn(&Operation<'found, 'file>) -> &'op [Property],
+        equivalence: Equivalence,
     ) -> Vec<Twins<'op, 'found, 'file>> {
-        let grouped = self
-            .operations
-            .iter()
-            .map(|operation| (operation, laws(operation).iter().copied().collect::<BTreeSet<Property>>()))
-            .filter(|(_, held)| held.first().is_some())
-            .fold(
-                BTreeMap::new(),
-                |mut groups: BTreeMap<
-                    (Signature<'op, 'found>, BTreeSet<Property>),
-                    Vec<&'op Operation<'found, 'file>>,
-                >,
-                 (operation, held)| {
-                    groups.entry((operation.signature(), held)).or_default().push(operation);
-                    groups
-                },
-            );
-        grouped
-            .into_iter()
-            .filter(|(_, members)| members.len() > 1)
-            .map(|((signature, laws), members)| Twins {
-                subject: *signature.acting.subject(),
-                signature,
-                laws,
-                members,
-            })
-            .collect()
+        Twins::grouped(self.operations.iter().map(|operation| Lawed::new(operation, laws(operation), equivalence)))
     }
 }
 

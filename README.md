@@ -34,8 +34,12 @@ no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
-tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
-literals are erased; a group nested inside a larger group is not listed again. The message names the fix by where the
+tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
+and literals (`true` and `false` included) are erased; callees, paths, field accesses and capitalised types stay, while
+struct-literal and pattern fields and lower-case primitive types other than `u8`, `usize`, `bool`, `str` and `char` are
+erased like locals. A group nested inside a
+larger group is not listed again. Each group counts the literal positions at which its copies do not all agree, or says
+that they are identical up to local names. The message names the fix by where the
 copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,
 extract the shape once, write it generic over an existing trait, or derive it; in both, the test re-implements shipped
 logic and should test through it.
@@ -118,6 +122,19 @@ crate and the module level: `connected_clusters` (each crate and each directory 
 to single nodes of the definition graph of fields, variants and bounds, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` (a cluster's exports, the types and
 traits used from outside it, form one group when linked by a shared outside user),
 and `lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users). There are no thresholds.
+
+The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. A call is resolved by the type that owns it: `self`, a typed parameter, the output of an earlier resolved call, a type path or `Self`; a bare or module path call goes to a free function. It resolves only when exactly one workspace function of that name has that owner; method calls on any other receiver, and calls into std, are left out. The header states these settings and the share of calls not resolved.
+
+The same run prints `parallel_structures`, report only: domain types whose moves (written, operation, port, lift and
+store edges, with names erased) are the same up to one consistent renaming of the types they reach, checked one hop
+deep, with each type located at its declaration. Trait impls are the shared interface of their fillers and are set
+aside as evidence; where two types fill one interface, their impls of it must have the same bodies with names and
+literals erased. Algebra laws must match where both sides declare them. The header names these settings.
+
+The same run prints `normalised_shapes`, report only: the `repeated_shapes` check with every name erased (callees,
+paths, fields and types as well as locals) and literals erased, floor 40 tokens, nested groups dropped. Groups that
+`repeated_shapes` already blocks are listed again. It is the detector for normalisation before comparison, and the
+owner decides whether it is promoted.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
