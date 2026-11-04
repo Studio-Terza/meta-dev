@@ -33,6 +33,7 @@ dependencies = [
 name = "body-shape"
 version = "0.1.0"
 dependencies = [
+ "equivalence",
  "laws",
  "lint-layout",
  "newtype",
@@ -118,6 +119,7 @@ name = "equivalence"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "newtype",
 ]
 
 [[package]]

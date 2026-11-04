@@ -35,7 +35,7 @@ effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workfl
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
-literals are erased; a group nested inside a larger group is not listed again. The message names the fix by where the
+literals are erased; a group nested inside a larger group is not listed again. Each group says how many literals differ between its copies, or that they are identical up to local names. The message names the fix by where the
 copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,
 extract the shape once, write it generic over an existing trait, or derive it; in both, the test re-implements shipped
 logic and should test through it.
