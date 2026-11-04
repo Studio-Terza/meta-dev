@@ -4,6 +4,8 @@ mod document;
 mod excerpt;
 mod finding;
 mod judged;
+mod lines;
+mod text;
 mod word;
 
 use actions::Actions;

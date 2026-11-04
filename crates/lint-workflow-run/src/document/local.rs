@@ -1,8 +1,8 @@
 use crate::actions::Actions;
 use crate::document::node::Node;
-use crate::document::text::Text;
 use crate::excerpt::Excerpt;
 use crate::finding::Finding;
+use crate::text::Text;
 
 #[derive(Debug)]
 pub(crate) struct Local;

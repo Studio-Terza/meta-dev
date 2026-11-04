@@ -6,8 +6,8 @@ use std::path::Path;
 use newtype::Newtype;
 
 use crate::characters::Characters;
-use crate::document::lines::Lines;
 use crate::excerpt::Excerpt;
+use crate::lines::Lines;
 use crate::word::Word;
 use expansion::Expansion;
 

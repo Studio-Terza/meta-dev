@@ -2,11 +2,9 @@ mod command;
 mod environment;
 mod found;
 mod key;
-mod lines;
 mod local;
 mod node;
 mod script;
-mod text;
 
 use saphyr::{LoadableYamlNode, MarkedYaml, ScanError, YamlData};
 

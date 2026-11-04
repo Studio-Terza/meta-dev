@@ -1,6 +1,6 @@
 use crate::document::key::Key;
 use crate::document::node::Node;
-use crate::document::text::Text;
+use crate::text::Text;
 
 #[derive(Debug)]
 pub(crate) struct Script;
