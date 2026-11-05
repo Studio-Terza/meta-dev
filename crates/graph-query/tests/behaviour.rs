@@ -164,7 +164,7 @@ fn malformed_arguments_are_refused_with_the_reason() {
         numbers.map(|number| Asked::query(&["Ledger", "--top", number]).map_err(|failure| failure.to_string())),
         numbers.map(|number| Err(format!("--top takes a whole number, not `{number}`")))
     );
-    let words = ["--1", "-", "-1.5.2", "-e5", "-1x"];
+    let words = ["--1", "-", "-1.5.2", "-e5", "-1x", "-NaN", "-nan", "-inf", "-infinity", "-Inf"];
     assert_eq!(
         words.map(|word| Asked::query(&["Ledger", "--top", word])),
         words.map(|word| Err(QueryFailure::Flag(word.to_owned())))

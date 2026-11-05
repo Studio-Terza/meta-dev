@@ -100,7 +100,7 @@ ports and outside.
 
 `bool_methods` blocks any function in shipped code that returns `bool`, whatever its name or visibility, including trait
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
-like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
+like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `newtype::Filled`.
 
 `no_early_exits` blocks the `return`, `break` and `continue` keywords in shipped and test code alike: function bodies,
 const fns, trait impls, closures, labeled blocks, `#[cfg(test)]` modules, files under `tests` and macro bodies. A body
@@ -117,7 +117,7 @@ form is a pure router: a function whose whole body is one `match` or `if let`. `
 `Result` (no literal, range, tuple or slice, nested or not), and each arm a single call or value (a call or method chain,
 path, literal, constructor, macro, reference, field, index, cast, closure, `?` or `.await`, or a block holding one of
 these). `plain_conditions` lists every `&&`, `||` and `!`, inside conditions and out. There are no thresholds. The
-fixes: change the code into a pure router, which may match a named outcome enum; a filter, any, all or position predicate must read its element (D34, `independent_selections`, report only); extract an arm's logic into its own linear function; name the
+fixes: change the code into a pure router (one `match` or `if let` as the whole body); give the outcome a name, as an enum of its own; a filter, any, all or position predicate must read its element (D34, `independent_selections`, report only); extract an arm's logic into its own linear function; name the
 condition as an enum or a predicate type. Shared routers over syn and token shapes live in `lint_core::Syntax`. The
 `--report` run keeps `flow_shapes`, which counts per crate the functions that are a pipeline, a pure router, or
 neither.

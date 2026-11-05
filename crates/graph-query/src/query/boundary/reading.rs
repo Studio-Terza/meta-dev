@@ -60,7 +60,14 @@ impl Expecting {
     const FLAG_MARK: char = '-';
 
     fn dashed(word: &str) -> Option<Spelling> {
-        word.chars().next().filter(|first| *first == Self::FLAG_MARK).map(|_| Spelling::from(word.parse::<f64>()))
+        word.chars().next().filter(|first| *first == Self::FLAG_MARK).map(|_| Self::numeric(word))
+    }
+
+    fn numeric(word: &str) -> Spelling {
+        match word.chars().nth(1) {
+            Some('0'..='9' | '.') => Spelling::from(word.parse::<f64>()),
+            _ => Spelling::Unknown,
+        }
     }
 
     fn flag(word: &str) -> Option<Expecting> {
