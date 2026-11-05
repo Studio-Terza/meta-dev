@@ -69,7 +69,11 @@ const FROM_BOOL_LOWER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) 
 const FROM_BOOL_SAME: &str =
     "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::On }\n    }\n}\n";
 
-const LINEAR: [Case; 36] = [
+const FROM_BOOL_SIDE: &str =
+    "impl From<bool> for Side {\n    fn from(b: bool) -> Side {\n        if b { Side::A } else { Side::B }\n    }\n}\n";
+const FROM_BOOL_FOREIGN: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Other::On } else { Other::Off }\n    }\n}\n";
+
+const LINEAR: [Case; 39] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -232,6 +236,21 @@ const LINEAR: [Case; 36] = [
     Case::new(
         Title::new("from bool with identical branches"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SAME))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing single letter variants"),
+        &[Source::new(Located::new("crates/x/src/boundary/side.rs"), Text::new(FROM_BOOL_SIDE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a ports module file"),
+        &[Source::new(Located::new("crates/x/src/ports/lit.rs"), Text::new(FROM_BOOL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool choosing variants of another type"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_FOREIGN))],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
 ];

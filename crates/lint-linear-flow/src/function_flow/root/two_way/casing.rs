@@ -17,7 +17,7 @@ impl FromStr for Casing {
             .chars()
             .next()
             .filter(|first| first.is_uppercase())
-            .and_then(|_| text.chars().find(|letter| letter.is_lowercase()))
+            .filter(|_| text.chars().nth(1).is_none_or(|_| text.chars().any(char::is_lowercase)))
             .map_or(Casing::Other, |_| Casing::Variant))
     }
 }

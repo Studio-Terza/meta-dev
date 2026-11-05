@@ -10,14 +10,14 @@ pub enum Zone {
 
 impl Zone {
     pub fn of_file(file: &SourceFile) -> Zone {
-        match Gate::BOUNDARY.admits(file) {
+        match Gate::BOUNDARY.admits(file).or_else(|| Gate::PORTS.admits(file)) {
             Some(_) => Zone::Boundary,
             None => Zone::Elsewhere,
         }
     }
 
     pub fn entering(self, module: &ItemMod) -> Zone {
-        match Gate::BOUNDARY.names(module) {
+        match Gate::BOUNDARY.names(module).or_else(|| Gate::PORTS.names(module)) {
             Some(_) => Zone::Boundary,
             None => self,
         }

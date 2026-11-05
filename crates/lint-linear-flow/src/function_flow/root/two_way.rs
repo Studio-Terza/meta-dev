@@ -1,8 +1,8 @@
-mod boundary;
+mod casing;
 
 use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Path, Stmt};
 
-use boundary::Casing;
+use casing::Casing;
 use lint_core::Syntax;
 
 #[derive(Debug)]
