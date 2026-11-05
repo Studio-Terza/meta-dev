@@ -16,6 +16,9 @@ const PROVIDED_PATH: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area(
 const PROVIDED_ONLY_IN_TESTS: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\n#[cfg(test)]\nmod tests {\n    fn total(item: &u8) -> u32 { item.area() }\n}\n";
 const PROVIDED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { width: item.area(), \"wide\" } }\n}\n";
 const PROVIDED_NESTED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { p { width: item.area(), } } }\n}\n";
+const TURBOFISH_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { width: item.area::<u8>() } }\n}\n";
+const RANGE_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { for i in 0..area(3) { p {} } }\n}\n";
+const INTERPOLATED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { class: \"w {item.area()}\" } }\n}\n";
 const FIELD_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &Plan) -> Node {\n    rsx! { div { width: item.area } }\n}\n";
 const DISPATCHED: &str = "#[enum_dispatch]\ntrait Shape {\n    fn area(&self) -> u32;\n}\n";
 const MARKER: &str = "trait Shape {}\n";
@@ -30,7 +33,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 22] = [
+const CASES: [Case; 25] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -74,6 +77,21 @@ const CASES: [Case; 22] = [
         Title::new("a field of the provided method's name in markup is no call"),
         &[Source::new(Located::new("a.rs"), Text::new(FIELD_IN_MARKUP))],
         Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("turbofish method call in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(TURBOFISH_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a free function after a range in markup is no method call"),
+        &[Source::new(Located::new("a.rs"), Text::new(RANGE_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("method call inside an interpolated markup string"),
+        &[Source::new(Located::new("a.rs"), Text::new(INTERPOLATED_IN_MARKUP))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("enum dispatch"),
