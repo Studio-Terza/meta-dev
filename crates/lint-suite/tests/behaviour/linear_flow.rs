@@ -104,7 +104,13 @@ const FROM_BOOL_ONOFF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) 
 const FROM_BOOL_DELAY: &str = "impl From<bool> for Delay {\n    fn from(slow: bool) -> Delay {\n        if slow { Delay::LONG } else { Delay::SHORT }\n    }\n}\n";
 const FROM_BOOL_GONE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Gone }\n    }\n}\n";
 
-const LINEAR: [Case; 49] = [
+const MACRO_LIT: Source = Source::new(
+    Located::new("crates/x/src/made.rs"),
+    Text::new("macro_rules! make {\n    () => {\n        pub enum Lit { On, Off }\n    };\n}\nmake!();\n"),
+);
+const FROM_BOOL_IN_TESTS: &str = "#[cfg(test)]\nmod tests {\n    enum Lit { On, Off }\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+
+const LINEAR: [Case; 51] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -327,6 +333,16 @@ const LINEAR: [Case; 49] = [
     Case::new(
         Title::new("from bool into an enum twin lacking a chosen variant"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, PARTIAL_TWIN_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum declared in a test module"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_IN_TESTS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum made by a macro is flagged, as macro expansion is not read"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), MACRO_LIT],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(

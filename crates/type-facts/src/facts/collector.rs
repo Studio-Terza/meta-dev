@@ -1,6 +1,7 @@
 mod described;
 mod impl_block;
 mod referenced;
+mod tested;
 
 use proc_macro2::Span;
 use syn::visit::{self, Visit};
@@ -22,6 +23,7 @@ use crate::via::Via;
 use described::Described;
 pub(crate) use impl_block::ImplBlock;
 use referenced::Referenced;
+use tested::Tested;
 
 pub(crate) struct Collector<'file> {
     file: &'file SourceFile,
@@ -33,6 +35,7 @@ impl<'file> Collector<'file> {
     pub(crate) fn collected(facts: Facts<'file>, file: &'file SourceFile) -> Facts<'file> {
         let mut scan = Collector { file, krate: file.placement().package().crate_name(), facts };
         scan.visit_file(file.syntax());
+        scan.facts.add_tested(Tested::enums_in(file));
         scan.facts
     }
 
