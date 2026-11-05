@@ -1,18 +1,36 @@
+use std::ops::Not;
+
 use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Path, Stmt};
 
 use lint_core::Syntax;
 use lint_layout::Name;
-use type_facts::TypeFact;
+use lint_placement::CrateName;
+use type_facts::Facts;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Target<'ast> {
     name: &'ast Ident,
-    declared: &'ast TypeFact<'ast>,
+    facts: &'ast Facts<'ast>,
+    krate: &'ast CrateName,
 }
 
 impl<'ast> Target<'ast> {
-    pub fn new(name: &'ast Ident, declared: &'ast TypeFact<'ast>) -> Target<'ast> {
-        Target { name, declared }
+    pub fn new(name: &'ast Ident, facts: &'ast Facts<'ast>, krate: &'ast CrateName) -> Target<'ast> {
+        Target { name, facts, krate }
+    }
+
+    pub fn enum_only(self) -> Option<Target<'ast>> {
+        Some(self).filter(|target| target.facts.enums_named(target.krate, &Name::from(target.name)).is_empty().not())
+    }
+
+    fn declared(&self, variant: &Name) -> Option<&'ast Name> {
+        let found: Option<Vec<&'ast Name>> = self
+            .facts
+            .enums_named(self.krate, &Name::from(self.name))
+            .into_iter()
+            .map(|each| each.variant(variant))
+            .collect();
+        found.and_then(|all| all.first().copied())
     }
 }
 
@@ -68,7 +86,7 @@ impl Variants {
             .filter(|qualifier| accepted.iter().any(|name| qualifier.ident == **name))
             .and(path.segments.last())
             .map(|segment| &segment.ident)
-            .filter(|variant| target.declared.variant(&Name::from(*variant)).is_some())
+            .filter(|variant| target.declared(&Name::from(*variant)).is_some())
     }
 
     fn unit(branch: &Block) -> Option<&Path> {

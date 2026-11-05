@@ -86,6 +86,14 @@ const STRUCT_LIT: Source = Source::new(
     ),
 );
 const TWIN_LIT: Source = Source::new(Located::new("crates/x/src/twin.rs"), Text::new("pub enum Lit { On, Off }\n"));
+const STRUCT_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/wire.rs"), Text::new("pub struct Lit(pub u8);\n"));
+const PARTIAL_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/partial.rs"), Text::new("pub enum Lit { On }\n"));
+const CFG_TWIN_LIT: Source = Source::new(
+    Located::new("crates/x/src/types.rs"),
+    Text::new("#[cfg(unix)]\npub enum Lit { On, Off }\n#[cfg(not(unix))]\npub enum Lit { On, Off }\n"),
+);
 const STRUCT_DELAY: Source = Source::new(
     Located::new("crates/x/src/struct_delay.rs"),
     Text::new(
@@ -96,7 +104,7 @@ const FROM_BOOL_ONOFF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) 
 const FROM_BOOL_DELAY: &str = "impl From<bool> for Delay {\n    fn from(slow: bool) -> Delay {\n        if slow { Delay::LONG } else { Delay::SHORT }\n    }\n}\n";
 const FROM_BOOL_GONE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Gone }\n    }\n}\n";
 
-const LINEAR: [Case; 46] = [
+const LINEAR: [Case; 49] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -307,9 +315,24 @@ const LINEAR: [Case; 46] = [
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
-        Title::new("from bool into a name the crate declares twice"),
+        Title::new("from bool into an enum declared twice, both declaring the chosen variants"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum sharing its name with a struct"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, STRUCT_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum twin lacking a chosen variant"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, PARTIAL_TWIN_LIT],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum split by cfg"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), CFG_TWIN_LIT],
+        Flagged::new(&[]),
     ),
 ];
 
