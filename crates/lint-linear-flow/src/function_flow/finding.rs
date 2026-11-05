@@ -4,12 +4,7 @@ use syn::{BinOp, Expr, UnOp};
 
 use lint_core::Fix;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Rule {
-    LinearBodies,
-    PureRouters,
-    PlainConditions,
-}
+use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Finding {

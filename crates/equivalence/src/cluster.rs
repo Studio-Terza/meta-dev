@@ -33,30 +33,3 @@ impl<Node: Ord + Copy> Cluster<Node> {
         Holes::new(sources.values().filter(|found: &&BTreeSet<Node>| found.len() > 1).count())
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct Placing<Node> {
-    clusters: Vec<Cluster<Node>>,
-    pending: Option<Node>,
-}
-
-impl<Node: Ord + Copy> Placing<Node> {
-    pub(crate) fn starting_with(node: Node) -> Placing<Node> {
-        Placing { clusters: Vec::new(), pending: Some(node) }
-    }
-
-    pub(crate) fn offered(
-        self,
-        cluster: Cluster<Node>,
-        rename: impl Fn(Node, Node) -> Option<Renaming<Node>>,
-    ) -> Placing<Node> {
-        let renaming = self.pending.and_then(|node| rename(cluster.first(), node));
-        let pending = self.pending.filter(|_| renaming.is_none());
-        let cluster = renaming.into_iter().fold(cluster, Cluster::joined);
-        Placing { clusters: self.clusters.into_iter().chain([cluster]).collect(), pending }
-    }
-
-    pub(crate) fn finished(self) -> Vec<Cluster<Node>> {
-        self.clusters.into_iter().chain(self.pending.map(Cluster::started)).collect()
-    }
-}

@@ -3,6 +3,8 @@ mod candidate;
 mod kind;
 mod matches;
 mod reply;
+mod role;
+mod score;
 mod term;
 mod top;
 
@@ -16,11 +18,11 @@ use newtype::Newtype;
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
-use crate::role::Role;
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
 use reply::Reply;
+pub use role::Role;
 pub use term::Term;
 use top::Top;
 

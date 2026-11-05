@@ -1,5 +1,6 @@
 mod algebra;
 mod algebra_laws;
+mod attached;
 mod class;
 mod containment;
 mod count;
@@ -17,6 +18,7 @@ mod listed;
 mod mutation;
 mod parallel;
 mod routes;
+mod share;
 mod signatures;
 mod system;
 mod workspace_types;

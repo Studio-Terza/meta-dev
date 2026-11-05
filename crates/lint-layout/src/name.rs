@@ -1,5 +1,6 @@
 mod camel_word;
 mod casing;
+mod hump;
 mod length;
 mod lowered;
 mod prefix;

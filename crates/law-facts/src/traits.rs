@@ -1,13 +1,15 @@
+mod operators;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
 use syn::{ItemTrait, ItemUse, Visibility};
 
-use crate::operators::Operators;
 use crate::uses::{Place, Uses};
 use lint_core::SourceFile;
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
+pub use operators::Operators;
 
 #[derive(Clone, Copy, Debug)]
 struct Hops(usize);

@@ -1,11 +1,14 @@
+mod placing;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
 use newtype::{Arbitrary, Display, Newtype};
 
-use crate::cluster::{Cluster, Placing};
+use crate::cluster::Cluster;
 use crate::erased::Laws;
 use crate::renaming::Renaming;
+use placing::Placing;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Colour(usize);

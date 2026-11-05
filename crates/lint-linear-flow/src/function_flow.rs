@@ -1,3 +1,4 @@
+mod finding;
 mod found;
 mod root;
 mod scan;
@@ -10,8 +11,9 @@ use syn::Block;
 use lint_core::{Site, Violation};
 use lint_layout::LineNumber;
 
-use crate::finding::Rule;
+use crate::rule::Rule;
 use crate::verdict::Verdict;
+use finding::Finding;
 use found::Found;
 use root::Root;
 use scan::Scan;
