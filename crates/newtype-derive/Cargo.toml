@@ -13,6 +13,7 @@ doctest = false
 [dependencies]
 proc-macro2.workspace = true
 quote.workspace = true
+reserved-names = { path = "../reserved-names" }
 syn.workspace = true
 
 [lints]
