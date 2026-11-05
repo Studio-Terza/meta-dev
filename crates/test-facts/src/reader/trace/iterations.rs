@@ -1,27 +1,21 @@
-use syn::visit::{self, Visit};
-use syn::{Expr, ExprForLoop, ExprMethodCall, Path};
+use syn::{Expr, ExprForLoop, Path};
 
 use lint_core::Macros;
-use lint_layout::{Casing, Name};
+use lint_layout::{Casing, Name, Whole, Word, words};
 use newtype::Counter;
 
-use super::{Leaves, Trace};
+use super::{Constants, Leaves, Trace};
 use crate::check::{Cases, Domain, Rows, Values};
 
 pub(crate) struct Iterations<'trace, 'body, 'file> {
     trace: &'trace Trace<'body, 'file>,
-    domain: Domain,
 }
 
 impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
-    pub(crate) fn within(trace: &'trace Trace<'body, 'file>, expression: &Expr) -> Domain {
-        let mut iterations = Iterations { trace, domain: Domain::SINGLE };
-        iterations.visit_expr(expression);
-        iterations.domain
-    }
+    const ADAPTERS: [Word<'static>; 6] = words!["iter", "into_iter", "copied", "cloned", "enumerate", "rev"];
 
     pub(crate) fn looped(trace: &'trace Trace<'body, 'file>, looped: &ExprForLoop) -> Domain {
-        Iterations { trace, domain: Domain::SINGLE }.root(&looped.expr)
+        Iterations { trace }.root(&looped.expr)
     }
 
     fn root(&self, expression: &Expr) -> Domain {
@@ -30,9 +24,13 @@ impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
             Expr::Reference(reference) => self.root(&reference.expr),
             Expr::Paren(inner) => self.root(&inner.expr),
             Expr::Macro(invocation) => self.listed(&Macros::arguments(&invocation.mac).iter().collect::<Vec<&Expr>>()),
-            Expr::Path(path) => {
-                self.trace.bound(expression).map_or_else(|| Self::enumerated(&path.path), |bound| self.root(bound))
-            }
+            Expr::Path(path) => self
+                .trace
+                .bound(expression, Constants::Followed)
+                .map_or_else(|| Self::enumerated(&path.path), |bound| self.root(bound)),
+            Expr::MethodCall(call) => Name::from(&call.method)
+                .matches::<Whole>(&Self::ADAPTERS)
+                .map_or(Domain::SINGLE, |_| self.root(&call.receiver)),
             _ => Domain::SINGLE,
         }
     }
@@ -52,12 +50,5 @@ impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
             .and(names.last())
             .filter(|member| member.casing() == Casing::Shouting)
             .map_or(Domain::SINGLE, |_| Domain::ENUMERATED)
-    }
-}
-
-impl<'ast> Visit<'ast> for Iterations<'_, '_, '_> {
-    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
-        self.domain = self.domain.max_with(self.root(&call.receiver));
-        visit::visit_expr_method_call(self, call);
     }
 }

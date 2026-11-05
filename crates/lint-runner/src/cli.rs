@@ -61,7 +61,7 @@ impl Cli {
         })
     }
 
-    fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {
+    fn refused(failure: &(impl fmt::Display + ?Sized), err: &mut impl Write) -> ExitCode {
         writeln!(err, "{failure}").ok();
         ExitCode::FAILURE
     }

@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fmt;
 use std::path::PathBuf;
 
 use file_ports::Files;
@@ -16,17 +17,28 @@ pub(crate) struct Revisions {
     after: PathBuf,
 }
 
-impl From<&[OsString]> for Revisions {
-    fn from(arguments: &[OsString]) -> Revisions {
-        Revisions {
-            before: arguments.first().map(PathBuf::from).unwrap_or_default(),
-            after: arguments.get(1).map(PathBuf::from).unwrap_or_default(),
-        }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Usage;
+
+impl fmt::Display for Usage {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("lint strength takes exactly two roots: lint strength <before-root> <after-root>")
+    }
+}
+
+impl TryFrom<&[OsString]> for Revisions {
+    type Error = Usage;
+
+    fn try_from(arguments: &[OsString]) -> Result<Revisions, Usage> {
+        <&[OsString; Self::ROOTS]>::try_from(arguments)
+            .map(|[before, after]| Revisions { before: PathBuf::from(before), after: PathBuf::from(after) })
+            .map_err(|_| Usage)
     }
 }
 
 impl Revisions {
     const SLOT: usize = usize::MIN;
+    const ROOTS: usize = 2;
 
     pub(crate) fn roots(&self) -> Vec<PathBuf> {
         vec![self.after.clone()]

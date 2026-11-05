@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::mem;
 
 use newtype::Counter;
 use syn::visit::{self, Visit};
@@ -7,18 +8,24 @@ use syn::{Expr, ExprPath, Lit, Macro};
 use lint_core::Macros;
 use lint_layout::{Casing, Name};
 
-use super::{Locals, Trace};
+use super::{Constants, Locals, Trace};
 use crate::check::Values;
 
 pub(crate) struct Leaves<'trace, 'body, 'file> {
     trace: &'trace Trace<'body, 'file>,
     followed: BTreeSet<Name>,
     count: Values,
+    constants: Constants,
 }
 
 impl<'trace, 'body, 'file> Leaves<'trace, 'body, 'file> {
     pub(crate) fn counted(trace: &'trace Trace<'body, 'file>, expression: &Expr) -> Values {
-        let mut leaves = Leaves { trace, followed: BTreeSet::new(), count: Values::zero() };
+        let mut leaves = Leaves {
+            trace,
+            followed: BTreeSet::new(),
+            count: Values::zero(),
+            constants: Constants::followed_in(expression),
+        };
         leaves.visit_expr(expression);
         leaves.count
     }
@@ -29,9 +36,15 @@ impl<'trace, 'body, 'file> Leaves<'trace, 'body, 'file> {
         self.count = named.map_or(self.count, |_| self.count.incremented());
     }
 
+    fn entered(&mut self, bound: &'file Expr) {
+        let outer = mem::replace(&mut self.constants, Constants::followed_in(bound));
+        self.visit_expr(bound);
+        self.constants = outer;
+    }
+
     fn followed(&mut self, fresh: Option<&'file Expr>, path: &ExprPath) {
         match fresh {
-            Some(bound) => self.visit_expr(bound),
+            Some(bound) => self.entered(bound),
             None => self.named(path),
         }
     }
@@ -50,7 +63,7 @@ impl<'ast> Visit<'ast> for Leaves<'_, '_, '_> {
     fn visit_expr_path(&mut self, path: &'ast ExprPath) {
         let expression = Expr::Path(path.clone());
         let name = Locals::named(&expression).filter(|name| self.followed.insert(name.clone()));
-        let fresh = name.and_then(|_| self.trace.bound(&expression));
+        let fresh = name.and_then(|_| self.trace.bound(&expression, self.constants));
         self.followed(fresh, path);
     }
 }

@@ -69,6 +69,19 @@ const OK_PINNED: &str = "#[test]\nfn parses() {\n    assert_eq!(parse(1).is_ok()
 const OK_BARE: &str = "#[test]\nfn parses() {\n    assert!(parse(1).is_ok());\n}\n";
 const POSITIVE_THEN_VALUE: &str = "#[test]\nfn mixed() {\n    assert!(f(9) > 0);\n    assert_eq!(f(1), 1);\n}\n";
 const VALUE_THEN_POSITIVE: &str = "#[test]\nfn mixed() {\n    assert_eq!(f(1), 1);\n    assert!(f(9) > 0);\n}\n";
+const ARRAY_MESSAGED: &str = "#[test]\nfn lists() {\n    assert_eq!(all(), [1], \"x\");\n}\n";
+const SAME_SIDES: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), f(1), \"same\");\n}\n";
+const LOOPED_FIRST: &str = "const ROWS: [(u8, u8); 3] = [(1, 2), (2, 3), (3, 4)];\n#[test]\nfn adds() {\n    for (input, want) in ROWS.iter().take(1) {\n        assert_eq!(f(*input), *want);\n    }\n}\n";
+const LOOPED_ITER: &str = "const ROWS: [(u8, u8); 3] = [(1, 2), (2, 3), (3, 4)];\n#[test]\nfn adds() {\n    for (input, want) in ROWS.iter() {\n        assert_eq!(f(*input), *want);\n    }\n}\n";
+const ROW_AS_RECEIVER: &str = "const ROWS: [(u8, u8); 3] = [(1, 2), (2, 3), (3, 4)];\n#[test]\nfn adds() {\n    assert_eq!(f(1), ROWS.iter().next().unwrap().1);\n}\n";
+const UNRELATED_LEN: &str =
+    "fn len(_: u8) {\n    assert_eq!(f(1), 2);\n}\n#[test]\nfn adds() {\n    let _ = vec![1].len();\n}\n";
+const UNRELATED_METHOD: &str = "struct S;\nimpl S {\n    fn expect(&self) {\n        assert_eq!(f(1), 2);\n    }\n}\n#[test]\nfn adds() {\n    S.expect();\n}\n";
+const ASSOCIATED: &str = "struct S;\nimpl S {\n    fn expect(value: u8, want: u8) {\n        assert_eq!(f(value), want);\n    }\n}\n#[test]\nfn adds() {\n    S::expect(1, 2);\n}\n";
+const PROPTESTED: &str =
+    "proptest! {\n    #[test]\n    fn holds(x in 0..9u8) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const PROPTEST_EMPTIED: &str =
+    "proptest! {\n    #[test]\n    fn holds(x in 0..9u8) {\n        let _ = f(x);\n    }\n}\n";
 
 laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::in_one_module, [
     [EQUALS, EQUALS] => false,
@@ -90,6 +103,16 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [TWICE, ONCE] => true,
     [OK_PINNED, OK_BARE] => false,
     [POSITIVE_THEN_VALUE, VALUE_THEN_POSITIVE] => false,
+    [ARRAY_SHORT, ARRAY_MESSAGED] => true,
+    [EQUALS, SAME_SIDES] => true,
+    [LOOPED, LOOPED_FIRST] => true,
+    [LOOPED, LOOPED_ITER] => false,
+    [LOOPED, ROW_AS_RECEIVER] => true,
+    [EQUALS, UNRELATED_LEN] => true,
+    [EQUALS, UNRELATED_METHOD] => true,
+    [INLINE, ASSOCIATED] => false,
+    [PROPTESTED, PROPTESTED] => false,
+    [PROPTESTED, PROPTEST_EMPTIED] => true,
 ]);
 
 #[test]
@@ -109,4 +132,18 @@ fn a_test_moved_to_another_file_of_its_package_is_not_flagged() {
         ),
         0
     );
+}
+
+#[test]
+fn an_assertion_moved_into_a_helper_in_another_file_is_flagged() {
+    assert!(Weakened::between(
+        &[Weakened::placed("crates/x/src/lib.rs", EQUALS)],
+        &[
+            Weakened::placed("crates/x/src/lib.rs", "#[test]\nfn adds() {\n    expect(1, 2);\n}\n"),
+            Weakened::at(
+                "crates/x/src/support.rs",
+                "pub fn expect(value: u8, want: u8) {\n    assert_eq!(f(value), want);\n}\n"
+            ),
+        ],
+    ));
 }

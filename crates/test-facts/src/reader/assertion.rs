@@ -46,12 +46,8 @@ impl Assertion {
 
     pub(crate) fn checks(self, invocation: &Macro, trace: &Trace<'_, '_>, domain: Domain) -> Vec<Check> {
         match self {
-            Assertion::Equality | Assertion::Golden => {
-                trace.compared(Relation::Equal, &Macros::arguments(invocation).iter().collect::<Vec<_>>(), domain)
-            }
-            Assertion::Inequality => {
-                trace.compared(Relation::Differs, &Macros::arguments(invocation).iter().collect::<Vec<_>>(), domain)
-            }
+            Assertion::Equality | Assertion::Golden => trace.operands(Relation::Equal, invocation, domain),
+            Assertion::Inequality => trace.operands(Relation::Differs, invocation, domain),
             Assertion::Condition => Self::condition(invocation, trace, domain),
             Assertion::Table | Assertion::Other => Vec::new(),
         }

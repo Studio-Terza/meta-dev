@@ -1,5 +1,6 @@
 mod assertion;
 mod body;
+mod properties;
 mod scope;
 mod trace;
 
@@ -17,6 +18,7 @@ use crate::check::{Check, Domain};
 use crate::test::{Test, TestId};
 use assertion::Assertion;
 use body::Body;
+use properties::{Properties, Property};
 use scope::Scope;
 
 pub(crate) struct Reader<'file> {
@@ -61,6 +63,12 @@ impl<'file> Reader<'file> {
         self.tested(Name::from(&item.sig.ident), &item.sig.ident, checks);
     }
 
+    fn proven(&mut self, found: &[Property]) {
+        let measured: Vec<Vec<Check>> =
+            found.iter().map(|property| property.checks(&self.scope, &self.tables)).collect();
+        found.iter().zip(measured).for_each(|(one, checks)| self.tested(Name::from(one.site()), one.site(), checks));
+    }
+
     fn law(&mut self, invocation: &Macro) {
         let name = Assertion::titled(invocation).unwrap_or_default();
         let checks = Assertion::named(invocation, &self.tables).law_checks(invocation, &self.scope, &self.tables);
@@ -86,7 +94,7 @@ impl<'file> Visit<'file> for Reader<'file> {
     fn visit_macro(&mut self, invocation: &'file Macro) {
         match TestMarks::law(invocation) {
             Some(law) => self.law(law),
-            None => visit::visit_macro(self, invocation),
+            None => self.proven(&Properties::declared(invocation)),
         }
     }
 }

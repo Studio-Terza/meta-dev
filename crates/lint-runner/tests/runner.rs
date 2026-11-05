@@ -170,6 +170,20 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_strength_command_refuses_a_single_root() {
+    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["strength"]);
+    assert_eq!((run.exit, run.out.as_str()), (ExitCode::FAILURE, ""));
+    assert!(run.err.contains("exactly two"), "{}", run.err);
+}
+
+#[test]
+fn the_strength_command_refuses_a_third_root() {
+    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["strength", "/a", "/b"]);
+    assert_eq!((run.exit, run.out.as_str()), (ExitCode::FAILURE, ""));
+    assert!(run.err.contains("exactly two"), "{}", run.err);
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;

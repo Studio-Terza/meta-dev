@@ -2,13 +2,13 @@ use std::collections::BTreeSet;
 use std::mem;
 
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprCall, ExprForLoop, ExprMethodCall, Local, Macro};
+use syn::{Block, Expr, ExprCall, ExprForLoop, Local, Macro, Path};
 
 use lint_core::{MacroAliases, Syntax};
 use lint_layout::Name;
 
 use super::assertion::Assertion;
-use super::scope::Scope;
+use super::scope::{Helper, Scope, Target};
 use super::trace::{Iterations, Locals, Trace};
 use crate::check::{Check, Domain};
 
@@ -17,7 +17,8 @@ pub(crate) struct Body<'scope, 'file> {
     tables: &'scope MacroAliases,
     locals: Locals<'file>,
     domain: Domain,
-    open: BTreeSet<Name>,
+    open: BTreeSet<Target>,
+    owner: Option<Name>,
     checks: Vec<Check>,
 }
 
@@ -28,8 +29,15 @@ impl<'scope, 'file> Body<'scope, 'file> {
         block: &'file Block,
         domain: Domain,
     ) -> Vec<Check> {
-        let mut body =
-            Body { scope, tables, locals: Locals::default(), domain, open: BTreeSet::new(), checks: Vec::new() };
+        let mut body = Body {
+            scope,
+            tables,
+            locals: Locals::default(),
+            domain,
+            open: BTreeSet::new(),
+            owner: None,
+            checks: Vec::new(),
+        };
         body.visit_block(block);
         body.checks
     }
@@ -41,24 +49,29 @@ impl<'scope, 'file> Body<'scope, 'file> {
         assertion.nested(invocation).iter().for_each(|inner| self.met(inner));
     }
 
-    fn called(&mut self, callee: Option<Name>, arguments: &[&'file Expr]) {
-        self.fresh(callee).iter().for_each(|name| self.entered(name, arguments));
-    }
-
-    fn fresh(&self, callee: Option<Name>) -> Vec<Name> {
-        callee.into_iter().collect::<BTreeSet<Name>>().difference(&self.open).cloned().collect()
-    }
-
-    fn entered(&mut self, name: &Name, arguments: &[&'file Expr]) {
-        self.open.insert(name.clone());
+    fn called(&mut self, callee: Option<&Path>, arguments: &[&'file Expr]) {
         let scope = self.scope;
-        scope.helpers(name).iter().for_each(|helper| {
-            let inner = helper.called(arguments, &self.locals);
-            let outer = mem::replace(&mut self.locals, inner);
-            helper.visited(self);
-            self.locals = outer;
-        });
-        self.open.remove(name);
+        let owner = self.owner.clone();
+        callee
+            .map(|path| scope.helpers(path, owner.as_ref(), arguments))
+            .unwrap_or_default()
+            .iter()
+            .for_each(|helper| self.entered(helper, arguments));
+    }
+
+    fn entered(&mut self, helper: &Helper<'file>, arguments: &[&'file Expr]) {
+        let key = helper.target().clone();
+        self.open.insert(key.clone()).then(|| self.expanded(helper, arguments, &key));
+    }
+
+    fn expanded(&mut self, helper: &Helper<'file>, arguments: &[&'file Expr], key: &Target) {
+        let inner = helper.called(arguments, &self.locals);
+        let outer = mem::replace(&mut self.locals, inner);
+        let owner = mem::replace(&mut self.owner, helper.owner());
+        helper.visited(self);
+        self.owner = owner;
+        self.locals = outer;
+        self.open.remove(key);
     }
 }
 
@@ -80,17 +93,7 @@ impl<'file> Visit<'file> for Body<'_, 'file> {
     }
 
     fn visit_expr_call(&mut self, call: &'file ExprCall) {
-        self.called(
-            Syntax::expr_path(&call.func)
-                .and_then(|path| path.path.segments.last())
-                .map(|last| Name::from(&last.ident)),
-            &call.args.iter().collect::<Vec<&Expr>>(),
-        );
+        self.called(Syntax::expr_path(&call.func).map(|path| &path.path), &call.args.iter().collect::<Vec<&Expr>>());
         visit::visit_expr_call(self, call);
-    }
-
-    fn visit_expr_method_call(&mut self, call: &'file ExprMethodCall) {
-        self.called(Some(Name::from(&call.method)), &call.args.iter().collect::<Vec<&Expr>>());
-        visit::visit_expr_method_call(self, call);
     }
 }

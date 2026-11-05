@@ -256,9 +256,16 @@ Each test is read as a set of checks, each a relation (an equality above a patte
 above a bare condition, a law only by its own kind), the values it pins and the cases it ranges over (generated above
 enumerated by shipped code above listed rows). Every check before the change must be matched, one to one, by a check at
 least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change added to the
-same package. An assertion moved into a helper, a renamed test, and `assert!(a == b)` written for `assert_eq!(a, b)` are
-not flagged; a lost row, a hand-written list in place of `T::ALL`, or an equality turned into a bare condition is. The
-command reports only; it exits non-zero on malformed arguments.
+same package. Pinned values are counted only on the compared sides, the first two arguments of `assert_eq!` and
+`assert_ne!` and the condition of `assert!`, never in a message, and a side repeated verbatim counts once. A loop widens
+the cases only over its own iterable (a list, a constant, an associated const, or those through `iter`, `into_iter`,
+`copied`, `cloned`, `enumerate` or `rev`), and a constant pins values only when it is itself the compared side. Tests in
+`proptest!` blocks are read as generated laws. An assertion moved into a helper defined in the same file and called by
+plain path (`expect(..)`, `Self::expect(..)`, `Type::expect(..)`) with as many arguments as the helper takes, a renamed
+test, and `assert!(a == b)` written for `assert_eq!(a, b)` are not flagged; a lost row, a hand-written list in place of
+`T::ALL`, or an equality turned into a bare condition is. Method calls and helpers in another file are not followed, so
+an assertion moved into another file's helper is flagged. The command exits 1 when a check was lost and prints each one;
+it refuses, also with exit 1, any arguments other than exactly two roots.
 
 ## Rust only
 
