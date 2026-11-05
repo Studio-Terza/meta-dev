@@ -160,21 +160,25 @@ fn malformed_arguments_are_refused_with_the_reason() {
         Err("--top takes a whole number, not `-1`".to_owned())
     );
     assert_eq!(Asked::query(&["Ledger", "--top", "-x"]), Err(QueryFailure::Flag("-x".to_owned())));
-    [
+    let joined = [
         ("--top=3", "--top"),
         ("--defined=Shelf", "--defined"),
         ("--path=A B", "--path"),
         ("--role=fn f(&self) -> Self", "--role"),
         ("--role=it's", "--role"),
         ("--top=", "--top"),
-    ]
-    .into_iter()
-    .for_each(|(spelled, flag)| {
-        assert_eq!(
-            Asked::query(&["Ledger", spelled]).map_err(|failure| failure.to_string()),
+    ];
+    let refused: Vec<Result<(), String>> = joined
+        .iter()
+        .map(|(spelled, _)| Asked::query(&["Ledger", spelled]).map(|_| ()).map_err(|failure| failure.to_string()))
+        .collect();
+    let expected: Vec<Result<(), String>> = joined
+        .iter()
+        .map(|(_, flag)| {
             Err(format!("`{flag}=value` is not a flag: write the flag and its value as separate arguments"))
-        );
-    });
+        })
+        .collect();
+    assert_eq!(refused, expected);
     assert_eq!(Asked::query(&["-1"]), Err(QueryFailure::Flag("-1".to_owned())));
     assert_eq!(Asked::query(&["Ledger", "-3"]), Err(QueryFailure::Flag("-3".to_owned())));
     assert_eq!(Asked::query(&["--in", "-1", "Ledger"]), Err(QueryFailure::Flag("-1".to_owned())));
@@ -202,13 +206,15 @@ fn a_joined_flag_failure_names_no_value() {
         "--exports",
         "--path",
     ];
-    flags.into_iter().for_each(|flag| {
-        let refused = Asked::query(&[&format!("{flag}=SECRET")]).map_err(|failure| failure.to_string());
-        assert_eq!(
-            refused,
-            Err(format!("`{flag}=value` is not a flag: write the flag and its value as separate arguments"))
-        );
-    });
+    let refused: Vec<Result<(), String>> = flags
+        .iter()
+        .map(|flag| Asked::query(&[&format!("{flag}=SECRET")]).map(|_| ()).map_err(|failure| failure.to_string()))
+        .collect();
+    let expected: Vec<Result<(), String>> = flags
+        .iter()
+        .map(|flag| Err(format!("`{flag}=value` is not a flag: write the flag and its value as separate arguments")))
+        .collect();
+    assert_eq!(refused, expected);
 }
 
 #[test]
