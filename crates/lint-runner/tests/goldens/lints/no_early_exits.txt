@@ -5,7 +5,7 @@ report only, a clone in the core allocates where a borrow could share; take a re
 casts live in const fns or boundary modules, and const loops walk slices:
 src/lib.rs:11: open loop in const context; walk a slice with while let or recurse
 control flow is an expression; every branch yields the value the function returns:
-src/lib.rs:16: while loop; drive an iterator with combinators, const fns excepted
+src/lib.rs:16: while loop; drive an iterator with combinators (map, fold, try_fold, take_while), const fns excepted
 tests go through public APIs:
 src/lib.rs:22: test code in src; move it to the package's tests directory and call the public API from there
 a body leaves through its tail value or ?, never through return, break or continue:
@@ -15,7 +15,7 @@ src/lib.rs:17: continue; yield the value from an if or match expression, drive t
 src/lib.rs:25: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 tests/leaves.rs:3: return; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/lib.rs:16: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/lib.rs:16: while loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)
 two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
 src/lib.rs:10: corpus::Walker: stop at src/lib.rs:10, skip at src/lib.rs:15 share the signature (corpus::Walker) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

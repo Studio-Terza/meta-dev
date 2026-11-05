@@ -202,8 +202,8 @@ fn each_crate_counts_its_pipelines_routers_and_the_rest() {
     assert_eq!(
         shown,
         [
-            "crates/x/src/lib.rs:3: workspace: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
-            "crates/x/src/lib.rs:3: crate x: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
+            "crates/x/src/lib.rs:3: workspace: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pure router (one match on an enum, Option or Result), or give its decisions a named outcome (an enum a pure router matches)",
+            "crates/x/src/lib.rs:3: crate x: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pure router (one match on an enum, Option or Result), or give its decisions a named outcome (an enum a pure router matches)",
         ]
     );
 }
@@ -213,13 +213,53 @@ fn messages_name_the_branch_and_its_fix() {
     let files = Sources::parsed(&[
         Source::new(Located::new("a.rs"), Text::new(IF)),
         Source::new(Located::new("b.rs"), Text::new(IF_LET_INSIDE)),
+        Source::new(Located::new("c.rs"), Text::new(MATCH_AFTER_LET)),
+        Source::new(Located::new("d.rs"), Text::new(LET_ELSE)),
     ]);
     let shown: Vec<String> = LinearBodies::report(&files).violations().iter().map(ToString::to_string).collect();
     assert_eq!(
         shown,
         [
-            "a.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result",
-            "b.rs:3: if let that is not the whole body; use combinators on Option and Result (map, and_then, map_or), or extract it into its own function whose whole body is the if let",
+            "a.rs:2: if; turn the whole body into a pure router (one match on an enum, Option or Result), or give the decision a named outcome (an enum a pure router matches)",
+            "b.rs:3: if let that is not the whole body; extract the if let into a pure router (a function whose whole body is that if let), or give the decision a named outcome (an enum a pure router matches)",
+            "c.rs:3: match that is not the whole body; extract the match into a pure router (a function whose whole body is that match), or give the decision a named outcome (an enum a pure router matches)",
+            "d.rs:2: let-else; extract a pure router (a function whose whole body is one match on the Option or Result), or give the decision a named outcome (an enum a pure router matches)",
+        ]
+    );
+}
+
+#[test]
+fn loops_routers_and_conditions_pin_their_fix_text() {
+    let files = Sources::parsed(&[
+        Source::new(Located::new("e.rs"), Text::new(LOOPS)),
+        Source::new(Located::new("f.rs"), Text::new(GUARD)),
+        Source::new(Located::new("g.rs"), Text::new(LITERAL)),
+        Source::new(Located::new("h.rs"), Text::new(ARMS)),
+        Source::new(Located::new("i.rs"), Text::new(OPERATORS)),
+    ]);
+    let shown: Vec<String> = LinearBodies::report(&files)
+        .violations()
+        .iter()
+        .chain(PureRouters::report(&files).violations().iter())
+        .chain(PlainConditions::report(&files).violations().iter())
+        .map(ToString::to_string)
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            "e.rs:2: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:3: while loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:4: while loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:5: loop; drive an iterator with combinators (successors, repeat_with, take_while, try_fold)",
+            "f.rs:3: match guard in a router; name the condition as an enum or a predicate type and match on it",
+            "g.rs:3: router arm matches a literal, range, tuple or slice; match on an enum, Option or Result that names the cases",
+            "g.rs:4: router arm matches a literal, range, tuple or slice; match on an enum, Option or Result that names the cases",
+            "h.rs:3: router arm is not a single call or value; extract the arm's logic into its own linear function and call it",
+            "h.rs:7: router arm is not a single call or value; extract the arm's logic into its own linear function and call it",
+            "i.rs:2: boolean operator &&; name the condition as an enum or a predicate type",
+            "i.rs:3: boolean operator ||; name the condition as an enum or a predicate type",
+            "i.rs:3: boolean operator !; name the condition as an enum or a predicate type",
+            "i.rs:4: boolean operator &&; name the condition as an enum or a predicate type",
         ]
     );
 }
