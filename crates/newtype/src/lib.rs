@@ -1,10 +1,10 @@
-#![doc = include_str!("named.md")]
-
 mod boundary;
 mod extent;
 
 pub use boundary::{Counter, Exit, Newtype, Unnamed};
 pub use extent::{Extent, Filled, Measured};
-pub use newtype_derive::{Arbitrary, Display, Named, Newtype};
+#[doc = include_str!("named.md")]
+pub use newtype_derive::Named;
+pub use newtype_derive::{Arbitrary, Display, Newtype};
 
 pub use proptest;
