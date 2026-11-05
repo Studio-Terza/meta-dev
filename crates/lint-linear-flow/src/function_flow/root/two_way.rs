@@ -4,30 +4,32 @@ use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Path, Stmt};
 
 use lint_core::Syntax;
 use lint_layout::Name;
-use type_facts::{Facts, TypeFact, Vantage};
+use lint_placement::CrateName;
+use type_facts::Facts;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Target<'ast> {
     name: &'ast Ident,
     facts: &'ast Facts<'ast>,
-    vantage: &'ast Vantage<'ast>,
+    krate: &'ast CrateName,
 }
 
 impl<'ast> Target<'ast> {
-    pub fn new(name: &'ast Ident, facts: &'ast Facts<'ast>, vantage: &'ast Vantage<'ast>) -> Target<'ast> {
-        Target { name, facts, vantage }
+    pub fn new(name: &'ast Ident, facts: &'ast Facts<'ast>, krate: &'ast CrateName) -> Target<'ast> {
+        Target { name, facts, krate }
     }
 
     pub fn enum_only(self) -> Option<Target<'ast>> {
-        Some(self).filter(|target| target.enums().is_empty().not())
-    }
-
-    fn enums(&self) -> Vec<&'ast TypeFact<'ast>> {
-        self.facts.enums_named(self.vantage, &Name::from(self.name))
+        Some(self).filter(|target| target.facts.enums_named(target.krate, &Name::from(target.name)).is_empty().not())
     }
 
     fn declared(&self, variant: &Name) -> Option<&'ast Name> {
-        let found: Option<Vec<&'ast Name>> = self.enums().into_iter().map(|each| each.variant(variant)).collect();
+        let found: Option<Vec<&'ast Name>> = self
+            .facts
+            .enums_named(self.krate, &Name::from(self.name))
+            .into_iter()
+            .map(|each| each.variant(variant))
+            .collect();
         found.and_then(|all| all.first().copied())
     }
 }

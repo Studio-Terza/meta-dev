@@ -9,9 +9,8 @@ use syn::visit::{self, Visit};
 use syn::{Block, ImplItem, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, Signature, TraitItemFn};
 
 use lint_core::{Macros, SourceFile};
-use lint_layout::Name;
-use lint_placement::{CrateName, ModulePath};
-use type_facts::{Facts, Gating, Vantage};
+use lint_placement::CrateName;
+use type_facts::Facts;
 
 use crate::function_flow::FunctionFlow;
 use declaring::Declaring;
@@ -23,24 +22,14 @@ pub struct Collector<'file, 'facts> {
     zone: Zone,
     facts: &'facts Facts<'file>,
     krate: &'file CrateName,
-    module: ModulePath,
-    gating: Gating,
     functions: Vec<FunctionFlow<'file>>,
 }
 
 impl<'file, 'facts> Collector<'file, 'facts> {
-    pub fn collected(file: &'file SourceFile, facts: &'facts Facts<'file>, gating: Gating) -> Vec<FunctionFlow<'file>> {
+    pub fn collected(file: &'file SourceFile, facts: &'facts Facts<'file>) -> Vec<FunctionFlow<'file>> {
         let krate = file.placement().package().crate_name();
-        let module = file.placement().module().clone();
-        let mut collector = Collector {
-            path: file.path(),
-            zone: Zone::of_file(file),
-            facts,
-            krate,
-            module,
-            gating,
-            functions: Vec::new(),
-        };
+        let mut collector =
+            Collector { path: file.path(), zone: Zone::of_file(file), facts, krate, functions: Vec::new() };
         collector.visit_file(file.syntax());
         collector.functions
     }
@@ -77,19 +66,12 @@ impl<'ast> Visit<'ast> for Collector<'_, '_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
         let entered = self.zone.entering(module);
         let outer = mem::replace(&mut self.zone, entered);
-        let inside = self.module.child(Name::from(&module.ident));
-        let outside = mem::replace(&mut self.module, inside);
-        let entered_gating = self.gating.within(&module.attrs);
-        let outer_gating = mem::replace(&mut self.gating, entered_gating);
         visit::visit_item_mod(self, module);
-        self.gating = outer_gating;
-        self.module = outside;
         self.zone = outer;
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        let vantage = Vantage::new(self.krate, self.module.clone(), self.gating);
-        let permit = Permit::within(self.zone, item, self.facts, &vantage);
+        let permit = Permit::within(self.zone, item, self.facts, self.krate);
         self.visit_generics(&item.generics);
         self.visit_type(&item.self_ty);
         item.items.iter().for_each(|member| self.visit_member(member, permit));

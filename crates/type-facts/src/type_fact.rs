@@ -1,6 +1,6 @@
 use lint_core::Site;
 use lint_layout::Name;
-use lint_placement::{CrateName, ModulePath};
+use lint_placement::CrateName;
 
 use crate::dependency::Dependency;
 use crate::shape::Shape;
@@ -8,7 +8,6 @@ use crate::shape::Shape;
 #[derive(Clone, Debug)]
 pub struct TypeFact<'file> {
     krate: &'file CrateName,
-    module: ModulePath,
     name: Name,
     site: Site<'file>,
     derives: Vec<Name>,
@@ -24,16 +23,7 @@ impl<'file> TypeFact<'file> {
         site: Site<'file>,
         derives: Vec<Name>,
     ) -> TypeFact<'file> {
-        TypeFact {
-            krate,
-            module: ModulePath::ROOT,
-            name,
-            site,
-            derives,
-            variants: None,
-            shape: Shape::Other,
-            dependencies: Vec::new(),
-        }
+        TypeFact { krate, name, site, derives, variants: None, shape: Shape::Other, dependencies: Vec::new() }
     }
 
     pub(crate) fn depending_on(mut self, dependencies: Vec<Dependency<'file>>) -> TypeFact<'file> {
@@ -53,11 +43,6 @@ impl<'file> TypeFact<'file> {
 
     pub(crate) fn named_like(&self, other: &TypeFact<'_>) -> Option<&TypeFact<'file>> {
         (self.krate == other.krate).then_some(self).filter(|_| self.name == other.name)
-    }
-
-    pub(crate) fn housed(mut self, module: ModulePath) -> TypeFact<'file> {
-        self.module = module;
-        self
     }
 
     #[must_use]
@@ -89,12 +74,6 @@ impl<'file> AsRef<[Dependency<'file>]> for TypeFact<'file> {
 impl AsRef<CrateName> for TypeFact<'_> {
     fn as_ref(&self) -> &CrateName {
         self.krate
-    }
-}
-
-impl AsRef<ModulePath> for TypeFact<'_> {
-    fn as_ref(&self) -> &ModulePath {
-        &self.module
     }
 }
 

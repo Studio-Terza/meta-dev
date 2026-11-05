@@ -1,7 +1,8 @@
 use syn::{Block, Ident, ItemImpl, Signature, TypePath};
 
 use lint_core::Syntax;
-use type_facts::{Facts, Vantage};
+use lint_placement::CrateName;
+use type_facts::Facts;
 
 use super::zone::Zone;
 use crate::function_flow::{Root, Target};
@@ -16,15 +17,10 @@ impl<'ast> Permit<'ast> {
     const FROM: &'static str = "From";
     const BOOL: &'static str = "bool";
 
-    pub fn within(
-        zone: Zone,
-        item: &'ast ItemImpl,
-        facts: &'ast Facts<'ast>,
-        vantage: &'ast Vantage<'ast>,
-    ) -> Permit<'ast> {
+    pub fn within(zone: Zone, item: &'ast ItemImpl, facts: &'ast Facts<'ast>, krate: &'ast CrateName) -> Permit<'ast> {
         match zone {
             Zone::Boundary => Self::bool_source(item)
-                .and_then(|_| Self::target(item, facts, vantage))
+                .and_then(|_| Self::target(item, facts, krate))
                 .map_or(Permit::Plain, Permit::BoolConversion),
             Zone::Elsewhere => Permit::Plain,
         }
@@ -48,11 +44,11 @@ impl<'ast> Permit<'ast> {
             .map(|binding| &binding.ident)
     }
 
-    fn target(item: &'ast ItemImpl, facts: &'ast Facts<'ast>, vantage: &'ast Vantage<'ast>) -> Option<Target<'ast>> {
+    fn target(item: &'ast ItemImpl, facts: &'ast Facts<'ast>, krate: &'ast CrateName) -> Option<Target<'ast>> {
         Syntax::type_path(&item.self_ty)
             .and_then(|target| target.path.segments.last())
             .map(|segment| &segment.ident)
-            .map(|name| Target::new(name, facts, vantage))
+            .map(|name| Target::new(name, facts, krate))
             .and_then(Target::enum_only)
     }
 

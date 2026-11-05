@@ -32,11 +32,6 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub fn parent(&self) -> ModulePath {
-        ModulePath(self.0.iter().take(self.0.len().saturating_sub(1)).cloned().collect())
-    }
-
-    #[must_use]
     pub fn child(&self, name: Name) -> ModulePath {
         ModulePath(self.0.iter().cloned().chain(Some(name)).collect())
     }

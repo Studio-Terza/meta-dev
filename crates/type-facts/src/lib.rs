@@ -1,6 +1,5 @@
 mod dependency;
 mod facts;
-mod gating;
 mod generic_impl;
 mod implementation;
 mod method;
@@ -10,12 +9,10 @@ mod shape;
 mod spelled;
 mod trait_fact;
 mod type_fact;
-mod vantage;
 mod via;
 
 pub use dependency::Dependency;
 pub use facts::Facts;
-pub use gating::Gating;
 pub use generic_impl::GenericImpl;
 pub use implementation::Implementation;
 pub use method::Method;
@@ -24,5 +21,4 @@ pub use outside::Outside;
 pub use shape::Shape;
 pub use trait_fact::TraitFact;
 pub use type_fact::TypeFact;
-pub use vantage::Vantage;
 pub use via::Via;

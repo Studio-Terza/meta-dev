@@ -114,18 +114,18 @@ const TEST_ONLY_LIT: Source = Source::new(
     Located::new("crates/x/src/other.rs"),
     Text::new("#[cfg(test)]\nmod tests {\n    enum Lit { Dim }\n}\n"),
 );
-const LIGHT_LIT: Source =
-    Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off, Dim }\n"));
+const LIGHT_LIT: Source = Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off }\n"));
 const FUSE_LIT: Source = Source::new(Located::new("crates/x/src/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
 const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const NEAR_LIGHT_LIT: Source =
-    Source::new(Located::new("crates/x/src/boundary/light.rs"), Text::new("pub enum Lit { On, Off, Dim }\n"));
-const NEAR_FUSE_LIT: Source =
-    Source::new(Located::new("crates/x/src/boundary/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
-const FROM_BOOL_USING_NEAR_LIGHT: &str = "use super::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_USING_FUSE: &str = "use crate::fuse::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_RENAMED: &str = "use crate::light::Lit as Lamp;\nimpl From<bool> for Lamp {\n    fn from(on: bool) -> Lamp {\n        if on { Lamp::On } else { Lamp::Off }\n    }\n}\n";
+const FROM_BOOL_BY_PATH: &str = "impl From<bool> for crate::light::Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_INLINE_MOD: &str = "mod inner {\n    use crate::light::Lit;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const TESTED_LIT_AND_IMPL: &str = "#[cfg(test)]\nenum Lit { On, Off }\n#[cfg(test)]\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod tests {\n    use super::*;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const REEXPORTED_LIT: Source =
+    Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod light;\npub use light::Lit;\n"));
 
-const LINEAR: [Case; 55] = [
+const LINEAR: [Case; 59] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -363,34 +363,57 @@ const LINEAR: [Case; 55] = [
     Case::new(
         Title::new("from bool into an enum while a test-only enum of the name lacks the variants"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TEST_ONLY_LIT],
-        Flagged::new(&[]),
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
-        Title::new("from bool into the enum its module imports while another module declares an enum of the name"),
+        Title::new(
+            "from bool into an imported enum is flagged while another module declares a twin lacking the variants",
+        ),
         &[
             Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
             LIGHT_LIT,
             FUSE_LIT,
         ],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool into a renamed import of an enum is flagged because the alias names no enum"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_RENAMED)), LIGHT_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool into a path-qualified enum is flagged while a twin lacks the variants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_BY_PATH)), LIGHT_LIT, FUSE_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum imported inside an inline module is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_INLINE_MOD)), LIGHT_LIT],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool into the enum a super path imports while a sibling module declares an enum of the name"),
+        Title::new("from bool into an enum imported through a re-export is flagged while a twin lacks the variants"),
         &[
-            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_NEAR_LIGHT)),
-            NEAR_LIGHT_LIT,
-            NEAR_FUSE_LIT,
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("from bool into the imported enum lacking a chosen variant is flagged beside a complete twin"),
-        &[
-            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_FUSE)),
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
+            REEXPORTED_LIT,
             LIGHT_LIT,
             FUSE_LIT,
         ],
         Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool in a cfg(test) impl beside a cfg(test) enum is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(TESTED_LIT_AND_IMPL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a test module over a use super glob finds the shipped enum"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_IN_TESTS_USING_SUPER)),
+            REEXPORTED_LIT,
+            LIGHT_LIT,
+        ],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool into an enum split by cfg"),
