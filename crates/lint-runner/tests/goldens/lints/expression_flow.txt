@@ -15,9 +15,9 @@ src/tail.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
 src/dropped.rs:2: if or match whose value is dropped; let it produce the value the function returns
 src/early.rs:2: if or match whose value is dropped; let it produce the value the function returns
-src/early.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/early.rs:2: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
 src/lonely.rs:2: if or match whose value is dropped; let it produce the value the function returns
-src/lonely.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/lonely.rs:2: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
 src/loops.rs:2: for loop; drive the iterator with combinators, const fns excepted
 src/loops.rs:3: while loop; drive an iterator with combinators, const fns excepted
 src/loops.rs:4: loop; drive an iterator with combinators, const fns excepted
@@ -58,13 +58,13 @@ src/early.rs:3: return; yield the value from an if or match expression, drive th
 src/loops.rs:9: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 src/loops.rs:11: continue; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/dropped.rs:2: match that is not the whole body; extract it into its own function whose whole body is the match, or use combinators on Option, Result and iterators
-src/early.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/lonely.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/dropped.rs:2: match that is not the whole body; extract it into a pure router, a function whose whole body is the match, or give the decision a named outcome, an enum a pure router matches
+src/early.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/lonely.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
 src/loops.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 src/loops.rs:3: while loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 src/loops.rs:4: loop; drive an iterator with combinators (successors, repeat_with, take_while, try_fold)
 src/loops.rs:7: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/loops.rs:8: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/tail.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/loops.rs:8: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/tail.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
 fails

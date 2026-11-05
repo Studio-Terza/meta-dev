@@ -93,19 +93,21 @@ impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         match self {
             Finding::If => Fix::new(
-                "use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result",
+                "make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches",
             ),
             Finding::IfLet => Fix::new(
-                "use combinators on Option and Result (map, and_then, map_or), or extract it into its own function whose whole body is the if let",
+                "extract it into a pure router, a function whose whole body is the if let, or give the decision a named outcome, an enum a pure router matches",
             ),
             Finding::Match => Fix::new(
-                "extract it into its own function whose whole body is the match, or use combinators on Option, Result and iterators",
+                "extract it into a pure router, a function whose whole body is the match, or give the decision a named outcome, an enum a pure router matches",
             ),
             Finding::While | Finding::For => Fix::new(Self::COMBINATORS),
             Finding::Loop => {
                 Fix::new("drive an iterator with combinators (successors, repeat_with, take_while, try_fold)")
             }
-            Finding::LetElse => Fix::new("use combinators on Option and Result, or ? after ok_or"),
+            Finding::LetElse => Fix::new(
+                "propagate with ? after ok_or, or extract a pure router, a function whose whole body is one match on the Option or Result",
+            ),
             Finding::Guard => Fix::new("name the condition as an enum or a predicate type and match on it"),
             Finding::ValuePattern => Fix::new("match on an enum, Option or Result that names the cases"),
             Finding::ArmLogic => Fix::new("extract the arm's logic into its own linear function and call it"),

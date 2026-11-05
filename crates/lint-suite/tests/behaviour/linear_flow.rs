@@ -213,13 +213,17 @@ fn messages_name_the_branch_and_its_fix() {
     let files = Sources::parsed(&[
         Source::new(Located::new("a.rs"), Text::new(IF)),
         Source::new(Located::new("b.rs"), Text::new(IF_LET_INSIDE)),
+        Source::new(Located::new("c.rs"), Text::new(MATCH_AFTER_LET)),
+        Source::new(Located::new("d.rs"), Text::new(LET_ELSE)),
     ]);
     let shown: Vec<String> = LinearBodies::report(&files).violations().iter().map(ToString::to_string).collect();
     assert_eq!(
         shown,
         [
-            "a.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result",
-            "b.rs:3: if let that is not the whole body; use combinators on Option and Result (map, and_then, map_or), or extract it into its own function whose whole body is the if let",
+            "a.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches",
+            "b.rs:3: if let that is not the whole body; extract it into a pure router, a function whose whole body is the if let, or give the decision a named outcome, an enum a pure router matches",
+            "c.rs:3: match that is not the whole body; extract it into a pure router, a function whose whole body is the match, or give the decision a named outcome, an enum a pure router matches",
+            "d.rs:2: let-else; propagate with ? after ok_or, or extract a pure router, a function whose whole body is one match on the Option or Result",
         ]
     );
 }

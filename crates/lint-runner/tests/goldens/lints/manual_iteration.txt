@@ -15,7 +15,7 @@ control flow is an expression; every branch yields the value the function return
 src/accumulating.rs:2: for loop; drive the iterator with combinators, const fns excepted
 src/counter.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
 src/filtered.rs:2: for loop; drive the iterator with combinators, const fns excepted
-src/filtered.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/filtered.rs:3: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
 src/working.rs:2: for loop; drive the iterator with combinators, const fns excepted
 function names say what the function does:
 src/accumulating.rs:1: fn f names nothing; say what it does
@@ -38,6 +38,6 @@ src/working.rs:1: bare u8 in f; take and return a domain type (a newtype, an enu
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
 src/accumulating.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 src/filtered.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/filtered.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/filtered.rs:3: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
 src/working.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
 fails

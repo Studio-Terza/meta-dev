@@ -10,11 +10,11 @@ src/narrow.rs:1: fn f; make it an associated function or a method
 src/shallow.rs:1: fn f; make it an associated function or a method
 src/wide.rs:1: fn f; make it an associated function or a method
 control flow is an expression; every branch yields the value the function returns:
-src/deep.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-src/deep.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-src/deep.rs:4: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-src/shallow.rs:2: if without else yields nothing; use then_some, filter, or an else branch that produces the value
-src/shallow.rs:3: if without else yields nothing; use then_some, filter, or an else branch that produces the value
+src/deep.rs:2: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
+src/deep.rs:3: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
+src/deep.rs:4: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
+src/shallow.rs:2: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
+src/shallow.rs:3: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
 hairy control flow; booleans and tuples become types, nesting becomes methods:
 src/deep.rs:4: control flow nested deeper than 2 levels; lift the inner part into a method
 src/locals.rs:2: boolean local; inline a one-use condition or make a mode a type
@@ -48,9 +48,9 @@ src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum o
 src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/wide.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/deep.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/deep.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/deep.rs:4: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/shallow.rs:2: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
-src/shallow.rs:3: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/deep.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/deep.rs:3: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/deep.rs:4: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/shallow.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
+src/shallow.rs:3: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
 fails

@@ -175,7 +175,9 @@ impl<'ast> Visit<'ast> for Flows<'_> {
             Self::lonely_if(expr),
             Message::new(
                 Problem::new("if without else yields nothing"),
-                Fix::new("use then_some, filter, or an else branch that produces the value"),
+                Fix::new(
+                    "give the decision a named outcome, an enum a pure router matches, so each case produces a value",
+                ),
             ),
         );
         syn::visit::visit_expr_if(self, expr);
