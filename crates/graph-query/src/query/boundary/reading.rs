@@ -1,6 +1,5 @@
 use std::ffi::OsString;
 use std::iter;
-use std::num::ParseFloatError;
 use std::path::PathBuf;
 
 use lint_layout::Name;
@@ -38,6 +37,18 @@ enum Spelling {
     Term,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Presence {
+    Present,
+    Absent,
+}
+
+impl From<bool> for Presence {
+    fn from(found: bool) -> Presence {
+        if found { Presence::Present } else { Presence::Absent }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Reading {
     query: Query,
@@ -59,15 +70,22 @@ impl TryFrom<&[OsString]> for Query {
 impl Expecting {
     const FLAG_MARK: char = '-';
 
-    fn dashed(word: &str) -> Option<Spelling> {
-        word.chars().next().filter(|first| *first == Self::FLAG_MARK).map(|_| Self::numeric(word))
+    fn numeric(word: &str) -> Spelling {
+        match Presence::from(word.chars().any(|symbol| symbol.is_ascii_digit())) {
+            Presence::Present => Spelling::from(Self::parses(word)),
+            Presence::Absent => Spelling::Unknown,
+        }
     }
 
-    fn numeric(word: &str) -> Spelling {
-        Some(word)
-            .filter(|text| text.chars().any(|symbol| symbol.is_ascii_digit()))
-            .and_then(|text| text.parse::<f64>().ok())
-            .map_or(Spelling::Unknown, |_| Spelling::Number)
+    fn parses(word: &str) -> Presence {
+        Presence::from(word.parse::<f64>().is_ok())
+    }
+
+    fn dashed(word: &str) -> Option<Spelling> {
+        match Presence::from(word.chars().take(1).eq(iter::once(Self::FLAG_MARK))) {
+            Presence::Present => Some(Self::numeric(word)),
+            Presence::Absent => None,
+        }
     }
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -104,11 +122,16 @@ impl Flag {
 
     const JOIN: char = '=';
 
+    fn joint(&self, word: &str) -> Presence {
+        let joint = self.spelling.chars().chain(iter::once(Self::JOIN));
+        Presence::from(word.chars().take(self.spelling.chars().count() + 1).eq(joint))
+    }
+
     fn joined(&self, word: &str) -> Option<QueryFailure> {
-        word.chars()
-            .take(self.spelling.chars().count() + 1)
-            .eq(self.spelling.chars().chain(iter::once(Self::JOIN)))
-            .then(|| QueryFailure::Joined(self.spelling.to_owned()))
+        match self.joint(word) {
+            Presence::Present => Some(QueryFailure::Joined(self.spelling.to_owned())),
+            Presence::Absent => None,
+        }
     }
 
     pub(crate) fn spelling(&self) -> &'static str {
@@ -120,18 +143,18 @@ impl Flag {
     }
 }
 
-impl From<&str> for Spelling {
-    fn from(word: &str) -> Spelling {
-        Expecting::flag(word).map(Spelling::Flag).or_else(|| Expecting::dashed(word)).unwrap_or(Spelling::Term)
+impl From<Presence> for Spelling {
+    fn from(parsed: Presence) -> Spelling {
+        match parsed {
+            Presence::Present => Spelling::Number,
+            Presence::Absent => Spelling::Unknown,
+        }
     }
 }
 
-impl From<Result<f64, ParseFloatError>> for Spelling {
-    fn from(parsed: Result<f64, ParseFloatError>) -> Spelling {
-        match parsed {
-            Ok(_) => Spelling::Number,
-            Err(_) => Spelling::Unknown,
-        }
+impl From<&str> for Spelling {
+    fn from(word: &str) -> Spelling {
+        Expecting::flag(word).map(Spelling::Flag).or_else(|| Expecting::dashed(word)).unwrap_or(Spelling::Term)
     }
 }
 

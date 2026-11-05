@@ -1,7 +1,6 @@
 use std::iter;
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, TokenStream, TokenTree};
-use quote::ToTokens;
 use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::{AngleBracketedGenericArguments, ExprPath, LitStr, Macro, Path, Token};
@@ -20,13 +19,19 @@ struct PathCall(Name);
 
 struct Arguments;
 
-mod keyword {
-    syn::custom_keyword!(rsx);
+struct Turbofish;
+
+impl Turbofish {
+    fn skip(attempt: ParseStream) -> syn::Result<()> {
+        match attempt.parse::<Option<Token![::]>>()? {
+            Some(_) => AngleBracketedGenericArguments::parse(attempt).map(drop),
+            None => Ok(()),
+        }
+    }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 enum Text {
-    #[default]
     Plain,
     Formatted,
 }
@@ -65,7 +70,7 @@ impl Parse for MethodCall {
     fn parse(attempt: ParseStream) -> syn::Result<MethodCall> {
         attempt.parse::<Token![.]>()?;
         let method: Ident = attempt.parse()?;
-        attempt.peek(Token![::]).then(|| AngleBracketedGenericArguments::parse_turbofish(attempt)).transpose()?;
+        Turbofish::skip(attempt)?;
         Arguments::follow(attempt).map(|()| MethodCall(Name::from(&method)))
     }
 }
@@ -73,13 +78,13 @@ impl Parse for MethodCall {
 impl Parse for PathCall {
     fn parse(attempt: ParseStream) -> syn::Result<PathCall> {
         let path: ExprPath = attempt.parse()?;
-        path.path
-            .segments
+        let segments = &path.path.segments;
+        segments
             .iter()
-            .nth(1)
-            .and_then(|_| path.path.segments.last())
-            .map(|segment| Name::from(&segment.ident))
-            .map(PathCall)
+            .rev()
+            .zip(segments.iter().rev().skip(1))
+            .next()
+            .map(|(segment, _)| PathCall(Name::from(&segment.ident)))
             .ok_or_else(|| attempt.error(Arguments::NOT_A_CALL))
     }
 }
@@ -97,8 +102,13 @@ impl From<PathCall> for Name {
 }
 
 impl Text {
+    const FORMATTING: [&'static str; 1] = ["rsx"];
+
     fn named(name: &Ident) -> Text {
-        syn::parse2::<keyword::rsx>(name.to_token_stream()).map(|_| Text::Formatted).unwrap_or_default()
+        match Self::FORMATTING.into_iter().find(|candidate| name == candidate) {
+            Some(_) => Text::Formatted,
+            None => Text::Plain,
+        }
     }
 
     fn classify(invocation: &Macro) -> Text {

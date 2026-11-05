@@ -4,14 +4,45 @@ use std::str::FromStr;
 use proc_macro2::TokenStream;
 
 #[derive(Debug)]
-pub struct Placeholders(Vec<TokenStream>);
+pub struct Placeholders(Vec<Argument>);
+
+#[derive(Debug)]
+struct Argument(TokenStream);
+
+#[derive(Debug)]
+struct Unclosed;
+
+impl Argument {
+    fn stream(self) -> TokenStream {
+        self.0
+    }
+}
+
+impl FromStr for Argument {
+    type Err = Unclosed;
+
+    fn from_str(rest: &str) -> Result<Argument, Unclosed> {
+        let colons: Vec<usize> = rest.match_indices(':').map(|(at, _)| at).collect();
+        let single = colons
+            .chunk_by(|first, second| *second == *first + 1)
+            .find(|run| run.len() == 1)
+            .and_then(|run| run.first());
+        rest.match_indices('}')
+            .next()
+            .map(|(close, _)| single.map_or(close, |colon| *colon.min(&close)))
+            .and_then(|end| rest.get(..end))
+            .and_then(|text| text.parse().ok())
+            .map(Argument)
+            .ok_or(Unclosed)
+    }
+}
 
 impl Placeholders {
     const ESCAPED_PAIR: usize = 2;
 
     #[must_use]
     pub fn streams(self) -> Vec<TokenStream> {
-        self.0
+        self.0.into_iter().map(Argument::stream).collect()
     }
 }
 
@@ -26,8 +57,7 @@ impl FromStr for Placeholders {
                 .filter(|run| run.len() % Self::ESCAPED_PAIR == 1)
                 .filter_map(|run| run.last())
                 .filter_map(|opening| text.get(opening + 1..))
-                .filter_map(|rest| rest.match_indices('}').next().and_then(|(close, _)| rest.get(..close)))
-                .filter_map(|expression| expression.parse().ok())
+                .filter_map(|rest| rest.parse().ok())
                 .collect(),
         ))
     }
