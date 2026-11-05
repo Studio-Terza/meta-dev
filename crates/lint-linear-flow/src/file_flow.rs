@@ -4,6 +4,7 @@ use std::iter;
 
 use lint_core::{SourceFile, Violation};
 use lint_placement::CrateName;
+use type_facts::Facts;
 
 use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
@@ -17,10 +18,11 @@ pub struct FileFlow<'file> {
 
 impl<'file> FileFlow<'file> {
     pub fn of_files(files: &'file [SourceFile]) -> Vec<FileFlow<'file>> {
+        let facts = Facts::of_files(files);
         files
             .iter()
             .flat_map(|file| iter::once(file).chain(file.test_modules()))
-            .map(|file| FileFlow { file, functions: Collector::collected(file) })
+            .map(|file| FileFlow { file, functions: Collector::collected(file, &facts) })
             .collect()
     }
 

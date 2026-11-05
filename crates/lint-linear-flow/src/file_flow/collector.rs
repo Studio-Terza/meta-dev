@@ -9,21 +9,27 @@ use syn::visit::{self, Visit};
 use syn::{Block, ImplItem, ImplItemFn, ItemFn, ItemImpl, ItemMod, Macro, Signature, TraitItemFn};
 
 use lint_core::{Macros, SourceFile};
+use lint_placement::CrateName;
+use type_facts::Facts;
 
 use crate::function_flow::FunctionFlow;
 use declaring::Declaring;
 use permit::Permit;
 use zone::Zone;
 
-pub struct Collector<'file> {
+pub struct Collector<'file, 'facts> {
     path: &'file Path,
     zone: Zone,
+    facts: &'facts Facts<'file>,
+    krate: &'file CrateName,
     functions: Vec<FunctionFlow<'file>>,
 }
 
-impl<'file> Collector<'file> {
-    pub fn collected(file: &'file SourceFile) -> Vec<FunctionFlow<'file>> {
-        let mut collector = Collector { path: file.path(), zone: Zone::of_file(file), functions: Vec::new() };
+impl<'file, 'facts> Collector<'file, 'facts> {
+    pub fn collected(file: &'file SourceFile, facts: &'facts Facts<'file>) -> Vec<FunctionFlow<'file>> {
+        let krate = file.placement().package().crate_name();
+        let mut collector =
+            Collector { path: file.path(), zone: Zone::of_file(file), facts, krate, functions: Vec::new() };
         collector.visit_file(file.syntax());
         collector.functions
     }
@@ -49,7 +55,7 @@ impl<'file> Collector<'file> {
     }
 }
 
-impl<'ast> Visit<'ast> for Collector<'_> {
+impl<'ast> Visit<'ast> for Collector<'_, '_> {
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         Declaring::within(invocation)
             .into_iter()
@@ -65,7 +71,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
-        let permit = Permit::within(self.zone, item);
+        let permit = Permit::within(self.zone, item, self.facts, self.krate);
         self.visit_generics(&item.generics);
         self.visit_type(&item.self_ty);
         item.items.iter().for_each(|member| self.visit_member(member, permit));

@@ -10,6 +10,7 @@ use crate::function_flow::found::Found;
 use crate::function_flow::scan::Scan;
 use crate::verdict::Verdict;
 use arms::Arms;
+pub use two_way::Target;
 use two_way::TwoWay;
 
 #[derive(Clone, Copy, Debug)]
@@ -27,7 +28,7 @@ impl<'ast> From<&'ast Block> for Root<'ast> {
 }
 
 impl<'ast> Root<'ast> {
-    pub fn converting(body: &'ast Block, input: &Ident, target: &Ident) -> Root<'ast> {
+    pub fn converting(body: &'ast Block, input: &Ident, target: Target<'_>) -> Root<'ast> {
         match TwoWay::within(body, input, target) {
             Some(routed) => Root::Conversion(routed),
             None => Root::from(body),
