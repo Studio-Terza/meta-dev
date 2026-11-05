@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, Error, Ident, Lit, Token, Type};
 
@@ -14,6 +15,22 @@ enum Literal {
 }
 
 impl Literal {
+    const PATHS: [&'static str; 5] =
+        ["", "core::primitive::", "std::primitive::", "::core::primitive::", "::std::primitive::"];
+
+    fn spelled(self, spelling: &str, ty: &Type) -> Option<Literal> {
+        Self::PATHS.iter().take(self.paths()).find_map(|prefix| {
+            syn::parse_str::<Type>(&format!("{prefix}{spelling}")).ok().filter(|parsed| parsed == ty).map(|_| self)
+        })
+    }
+
+    const fn paths(self) -> usize {
+        match self {
+            Literal::Text => 1,
+            Literal::Integer | Literal::Boolean | Literal::Character => Self::PATHS.len(),
+        }
+    }
+
     const SPELLINGS: [(&'static str, Literal); 15] = [
         ("&'static str", Literal::Text),
         ("bool", Literal::Boolean),
@@ -39,8 +56,7 @@ impl TryFrom<&Type> for Literal {
     fn try_from(ty: &Type) -> syn::Result<Literal> {
         Self::SPELLINGS
             .iter()
-            .find(|(spelling, _)| syn::parse_str::<Type>(spelling).is_ok_and(|parsed| parsed == *ty))
-            .map(|(_, literal)| *literal)
+            .find_map(|(spelling, literal)| literal.spelled(spelling, ty))
             .ok_or_else(|| Error::new_spanned(ty, Accessor::UNSUPPORTED))
     }
 }
@@ -61,6 +77,7 @@ impl TryFrom<&Lit> for Literal {
 
 pub struct Accessor {
     name: Ident,
+    key: String,
     ty: Type,
     literal: Literal,
 }
@@ -68,7 +85,7 @@ pub struct Accessor {
 impl Accessor {
     const UNSUPPORTED: &'static str = "an accessor type is &'static str, an integer type, bool or char";
     const WRONG_TYPE: &'static str = "this literal does not have the accessor's declared type";
-    const ATTRIBUTE: &'static str = "accessor";
+    pub const ATTRIBUTE: &'static str = "accessor";
     const RESERVED: &'static str = "an accessor cannot be called name, which is the variant's own name";
     const REPEATED: &'static str = "two accessors have this name";
 
@@ -86,14 +103,14 @@ impl Accessor {
     }
 
     fn refusal(&self, earlier: &[Accessor]) -> Option<Error> {
-        (self.name == "name")
+        (self.key == "name")
             .then_some(Self::RESERVED)
-            .or_else(|| earlier.iter().any(|accessor| accessor.name == self.name).then_some(Self::REPEATED))
+            .or_else(|| earlier.iter().any(|accessor| accessor.key == self.key).then_some(Self::REPEATED))
             .map(|message| Error::new_spanned(&self.name, message))
     }
 
-    pub fn name(&self) -> &Ident {
-        &self.name
+    pub fn key(&self) -> &str {
+        &self.key
     }
 
     pub fn checked<'lit>(&self, lit: &'lit Lit) -> syn::Result<&'lit Lit> {
@@ -127,6 +144,7 @@ impl Parse for Accessor {
         input.parse::<Token![:]>()?;
         let ty = input.parse::<Type>()?;
         let literal = Literal::try_from(&ty)?;
-        Ok(Accessor { name, ty, literal })
+        let key = name.unraw().to_string();
+        Ok(Accessor { name, key, ty, literal })
     }
 }

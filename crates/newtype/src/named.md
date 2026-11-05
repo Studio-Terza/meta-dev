@@ -121,11 +121,26 @@ enum Lamp {
 }
 ```
 
+An accessor of a primitive type spelled with its path, or with a raw name, compiles:
+
+```
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(r#rank: core::primitive::u8)]
+enum Lamp {
+    #[name("on")]
+    #[value(rank = 2)]
+    On,
+    #[name("off")]
+    #[value(r#rank = 1)]
+    Off,
+}
+```
+
 An accessor of a type that is not a literal type:
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
-#[accessor(rank: core::primitive::u8)]
+#[accessor(rank: String)]
 enum Lamp {
     #[name("on")]
     #[value(rank = 2)]
@@ -133,6 +148,48 @@ enum Lamp {
     #[name("off")]
     #[value(rank = 1)]
     Off,
+}
+```
+
+An accessor on a variant, where it would be ignored:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+enum Lamp {
+    #[name("on")]
+    #[accessor(glyph: &'static str)]
+    On,
+    #[name("off")]
+    Off,
+}
+```
+
+A value on the enum, where it would be ignored:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[value(glyph = "*")]
+enum Lamp {
+    #[name("on")]
+    On,
+    #[name("off")]
+    Off,
+}
+```
+
+A variant list that repeats a variant after listing them all:
+
+```compile_fail
+#[derive(newtype::Named, Clone, Copy)]
+enum Lamp {
+    #[name("on")]
+    On,
+    #[name("off")]
+    Off,
+}
+
+impl strum::VariantArray for Lamp {
+    const VARIANTS: &'static [Self] = &[Lamp::On, Lamp::Off, Lamp::On];
 }
 ```
 

@@ -15,6 +15,7 @@ pub struct Named {
 impl Named {
     const ENUMS_ONLY: &'static str = "Named derives for an enum of unit variants";
     const ON_ENUM: &'static str = "name belongs on a variant, not on the enum";
+    const VALUE_ON_ENUM: &'static str = "value belongs on a variant, not on the enum";
     const NO_VARIANTS: &'static str = "Named needs at least one variant to name";
     const REPEATED: &'static str = "two variants have this name, so FromStr could not tell them apart";
 
@@ -31,9 +32,14 @@ impl Named {
         input
             .attrs
             .iter()
-            .find(|attribute| attribute.path().is_ident("name"))
-            .map_or(Ok(()), |attribute| Err(Error::new_spanned(attribute, Self::ON_ENUM)))
-            .map(|()| input)
+            .find_map(|attribute| {
+                let path = attribute.path();
+                path.is_ident("name")
+                    .then_some(Self::ON_ENUM)
+                    .or_else(|| path.is_ident("value").then_some(Self::VALUE_ON_ENUM))
+                    .map(|message| Error::new_spanned(attribute, message))
+            })
+            .map_or(Ok(input), Err)
     }
 
     fn table(DeriveInput { ident, data, attrs, .. }: DeriveInput) -> syn::Result<Named> {
@@ -87,16 +93,13 @@ impl Named {
                 }
 
                 let listed = <#ident as ::strum::VariantArray>::VARIANTS;
-                let mut wanted = 0;
-                while wanted < #count {
-                    let mut found = false;
-                    let mut at = 0;
-                    while at < listed.len() {
-                        found |= ordinal(&listed[at]) == wanted;
-                        at += 1;
-                    }
-                    ::core::assert!(found, "Named needs VariantArray to list every variant of the enum exactly once");
-                    wanted += 1;
+                let mut seen = [false; #count];
+                let mut at = 0;
+                while at < listed.len() {
+                    let ordinal = ordinal(&listed[at]);
+                    ::core::assert!(!seen[ordinal], "Named needs VariantArray to list every variant of the enum exactly once");
+                    seen[ordinal] = true;
+                    at += 1;
                 }
                 ::core::assert!(
                     listed.len() == #count,

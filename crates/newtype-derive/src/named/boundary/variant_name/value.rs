@@ -1,4 +1,5 @@
 use crate::named::boundary::Accessor;
+use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
 use syn::{Error, Ident, Lit, Token};
 
@@ -13,10 +14,14 @@ impl Value {
     pub fn declared_in(&self, accessors: &[Accessor]) -> syn::Result<()> {
         accessors
             .iter()
-            .find(|accessor| accessor.name() == &self.accessor)
+            .find(|accessor| accessor.key() == self.key())
             .ok_or_else(|| Error::new_spanned(&self.accessor, Self::UNDECLARED))
             .and_then(|accessor| accessor.checked(&self.lit))
             .map(|_| ())
+    }
+
+    pub fn key(&self) -> String {
+        self.accessor.unraw().to_string()
     }
 
     pub fn accessor(&self) -> &Ident {

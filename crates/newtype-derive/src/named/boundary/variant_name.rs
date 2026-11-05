@@ -18,6 +18,7 @@ pub struct VariantName {
 
 impl VariantName {
     const ATTRIBUTE: &'static str = "name";
+    const ACCESSOR_ON_VARIANT: &'static str = "accessor belongs on the enum, not on a variant";
     const VALUE: &'static str = "value";
     const UNIT_ONLY: &'static str = "a Named variant carries no fields";
     const REPEATED: &'static str = "a Named variant takes one #[name(\"..\")]";
@@ -52,7 +53,7 @@ impl VariantName {
 
     pub fn accessor_arm(&self, owner: &Ident, accessor: &Accessor) -> TokenStream {
         let variant = &self.variant;
-        let lit = self.values.iter().find(|value| value.accessor() == accessor.name()).map(Value::lit);
+        let lit = self.values.iter().find(|value| accessor.key() == value.key()).map(Value::lit);
         quote!(#owner::#variant => #lit)
     }
 
@@ -66,12 +67,17 @@ impl VariantName {
     }
 
     fn once(&self, accessor: &Accessor) -> syn::Result<()> {
-        let supplied = self.values.iter().filter(|value| value.accessor() == accessor.name()).collect::<Vec<_>>();
+        let supplied = self.values.iter().filter(|value| accessor.key() == value.key()).collect::<Vec<_>>();
         supplied.first().ok_or_else(|| Error::new_spanned(&self.variant, Self::MISSING))?;
         supplied.get(1).map_or(Ok(()), |second| Err(Error::new_spanned(second.accessor(), Self::TWICE)))
     }
 
     fn named(variant: Variant) -> syn::Result<VariantName> {
+        variant
+            .attrs
+            .iter()
+            .find(|attribute| attribute.path().is_ident(Accessor::ATTRIBUTE))
+            .map_or(Ok(()), |attribute| Err(Error::new_spanned(attribute, Self::ACCESSOR_ON_VARIANT)))?;
         let names =
             variant.attrs.iter().filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE)).collect::<Vec<_>>();
         names.get(1).map_or(Ok(()), |second| Err(Error::new_spanned(second, Self::REPEATED)))?;
