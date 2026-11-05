@@ -59,6 +59,17 @@ impl<'file> Facts<'file> {
     }
 
     #[must_use]
+    pub fn enum_named(&self, krate: &CrateName, name: &Name) -> Option<&TypeFact<'file>> {
+        let named: Vec<&TypeFact<'file>> = self
+            .types
+            .iter()
+            .filter(|found| AsRef::<CrateName>::as_ref(*found) == krate)
+            .filter(|found| AsRef::<Name>::as_ref(*found) == name)
+            .collect();
+        named.split_first().filter(|(_, rest)| rest.is_empty()).and_then(|(only, _)| only.as_enum())
+    }
+
+    #[must_use]
     pub fn traits(&self) -> &[TraitFact<'file>] {
         &self.traits
     }

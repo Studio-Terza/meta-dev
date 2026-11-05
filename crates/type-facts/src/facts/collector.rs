@@ -10,7 +10,6 @@ use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
-use crate::dependency::Dependency;
 use crate::facts::Facts;
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
@@ -53,13 +52,10 @@ impl<'file> Collector<'file> {
             .collect()
     }
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape, dependencies: Vec<Dependency<'file>>) {
-        let found = (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
+    fn declared(&self, attributes: &[Attribute], name: &Ident) -> Option<TypeFact<'file>> {
+        (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
             TypeFact::declared(self.krate, Name::from(name), self.site_at(name.span()), Self::derives(attributes))
-                .shaped(shape)
-                .depending_on(dependencies)
-        });
-        self.facts.add_type(found);
+        })
     }
 }
 
@@ -75,7 +71,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             found.fields.iter(),
             &found.generics,
         );
-        self.declared(&found.attrs, &found.ident, shape, dependencies);
+        let fact = self.declared(&found.attrs, &found.ident).map(|fact| fact.shaped(shape).depending_on(dependencies));
+        self.facts.add_type(fact);
     }
 
     fn visit_item_enum(&mut self, found: &'ast ItemEnum) {
@@ -85,7 +82,11 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             fields,
             &found.generics,
         );
-        self.declared(&found.attrs, &found.ident, Shape::Other, dependencies);
+        let variants = found.variants.iter().map(|variant| Name::from(&variant.ident)).collect();
+        let fact = self
+            .declared(&found.attrs, &found.ident)
+            .map(|fact| fact.shaped(Shape::Other).with_variants(variants).depending_on(dependencies));
+        self.facts.add_type(fact);
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {
