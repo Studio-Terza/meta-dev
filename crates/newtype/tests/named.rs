@@ -1,0 +1,47 @@
+use newtype::{Named, Unnamed};
+use strum::VariantArray;
+
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+enum Lamp {
+    #[name("on")]
+    On,
+    #[name("off")]
+    Off,
+    #[name("dimmed-low")]
+    Dimmed,
+}
+
+struct Names;
+
+impl Names {
+    const LIT: &'static str = Lamp::On.name();
+
+    fn parsed(text: &&str) -> Result<Lamp, Unnamed<Lamp>> {
+        text.parse()
+    }
+
+    fn refused(text: &&str) -> Option<String> {
+        text.parse::<Lamp>().err().map(|refusal| refusal.to_string())
+    }
+}
+
+laws::table!(each_variant_has_its_declared_name, |lamp: &Lamp| lamp.name(), [Lamp::On => "on", Lamp::Off => "off", Lamp::Dimmed => "dimmed-low"]);
+
+laws::table!(display_writes_the_declared_name, |lamp: &Lamp| lamp.to_string(), [Lamp::On => "on", Lamp::Dimmed => "dimmed-low"]);
+
+laws::table!(from_str_reads_each_name_and_refuses_any_other_text, Names::parsed, [
+    "off" => Ok(Lamp::Off),
+    "dimmed-low" => Ok(Lamp::Dimmed),
+    "On" => Err(Unnamed::new("On")),
+    "" => Err(Unnamed::new("")),
+]);
+
+laws::table!(a_refusal_names_the_text_and_every_name, Names::refused, ["dim" => Some(String::from("`dim` is not one of: on, off, dimmed-low")), "on" => None]);
+
+laws::table!(every_variant_parses_back_from_its_name, |lamp: &Lamp| lamp.name().parse::<Lamp>(), [Lamp::On => Ok(Lamp::On), Lamp::Off => Ok(Lamp::Off), Lamp::Dimmed => Ok(Lamp::Dimmed)]);
+
+#[test]
+fn a_name_is_a_compile_time_constant() {
+    assert_eq!(Names::LIT, "on");
+    assert_eq!(Lamp::VARIANTS.iter().map(|lamp| lamp.name()).collect::<Vec<_>>(), ["on", "off", "dimmed-low"]);
+}

@@ -1,6 +1,8 @@
 mod plain;
+mod unnamed;
 
 pub use plain::Newtype;
+pub use unnamed::Unnamed;
 
 pub trait Counter: Newtype<Inner = usize> + Copy {
     #[must_use]
