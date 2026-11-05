@@ -28,6 +28,8 @@ const ESCAPED_BRACES: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn
 const LITERAL_IN_ASSERT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn check(label: &str) {\n    assert_eq!(label, \"{item.area()}\");\n}\n";
 const LITERAL_IN_PRINT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn show() {\n    println!(\"{}\", \"{item.area()}\");\n}\n";
 const JSON_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { div { onclick: move |_| { let v = json!(\"{x.area()}\"); } } }\n}\n";
+const PATHED_JSON_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { div { onclick: move |_| { let v = serde_json::json!(\"{x.area()}\"); } } }\n}\n";
+const PATHED_MARKUP_IN_VEC: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Vec<Node> {\n    vec![dioxus::prelude::rsx! { div { \"{x.area()}\" } }]\n}\n";
 const DISPATCHED: &str = "#[enum_dispatch]\ntrait Shape {\n    fn area(&self) -> u32;\n}\n";
 const MARKER: &str = "trait Shape {}\n";
 const CONSTANT_ONLY: &str = "trait Shape {\n    const SIDES: u32;\n}\n";
@@ -41,7 +43,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 33] = [
+const CASES: [Case; 35] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -140,6 +142,16 @@ const CASES: [Case; 33] = [
         Title::new("non-formatting macro nested in markup"),
         &[Source::new(Located::new("a.rs"), Text::new(JSON_IN_MARKUP))],
         Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("pathed non-formatting macro nested in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATHED_JSON_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("pathed markup macro in a vec"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATHED_MARKUP_IN_VEC))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("enum dispatch"),

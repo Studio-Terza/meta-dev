@@ -5,7 +5,7 @@ use std::iter;
 use proc_macro2::{Delimiter, Group, Ident, Literal, TokenStream, TokenTree};
 use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{AngleBracketedGenericArguments, ExprPath, LitStr, Macro, Token};
+use syn::{AngleBracketedGenericArguments, ExprPath, LitStr, Macro, Path, Token};
 
 use lint_layout::Name;
 
@@ -122,11 +122,12 @@ struct Nested(Text, Group);
 impl Parse for Nested {
     fn parse(input: ParseStream) -> syn::Result<Nested> {
         let attempt = input.fork();
-        let name: Ident = attempt.parse()?;
+        let path = Path::parse_mod_style(&attempt)?;
         attempt.parse::<Token![!]>()?;
         let group: Group = attempt.parse()?;
         input.advance_to(&attempt);
-        Ok(Nested(Text::named(&name), group))
+        let text = path.segments.last().map_or(Text::Plain, |segment| Text::named(&segment.ident));
+        Ok(Nested(text, group))
     }
 }
 
@@ -142,8 +143,8 @@ impl Parse for Step {
             .parse::<Token![..]>()
             .map(|_| Step::Skip)
             .or_else(|_| Self::taking::<MethodCall>(input))
-            .or_else(|_| Self::taking::<PathCall>(input))
             .or_else(|_| input.parse::<Nested>().map(Step::from))
+            .or_else(|_| Self::taking::<PathCall>(input))
             .or_else(|_| input.parse::<TokenTree>().map(Step::from))
     }
 }
