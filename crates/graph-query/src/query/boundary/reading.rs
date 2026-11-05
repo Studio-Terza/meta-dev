@@ -1,5 +1,5 @@
 use std::ffi::OsString;
-use std::iter;
+use std::num::ParseFloatError;
 use std::path::PathBuf;
 
 use lint_layout::Name;
@@ -37,18 +37,6 @@ enum Spelling {
     Term,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Presence {
-    Present,
-    Absent,
-}
-
-impl From<bool> for Presence {
-    fn from(found: bool) -> Presence {
-        if found { Presence::Present } else { Presence::Absent }
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct Reading {
     query: Query,
@@ -71,21 +59,21 @@ impl Expecting {
     const FLAG_MARK: char = '-';
 
     fn numeric(word: &str) -> Spelling {
-        match Presence::from(word.chars().any(|symbol| symbol.is_ascii_digit())) {
-            Presence::Present => Spelling::from(Self::parses(word)),
-            Presence::Absent => Spelling::Unknown,
+        match word.chars().find(char::is_ascii_digit) {
+            Some(_) => Self::parses(&word.parse::<f64>()),
+            None => Spelling::Unknown,
         }
     }
 
-    fn parses(word: &str) -> Presence {
-        Presence::from(word.parse::<f64>().is_ok())
+    fn parses(parsed: &Result<f64, ParseFloatError>) -> Spelling {
+        match parsed {
+            Ok(_) => Spelling::Number,
+            Err(_) => Spelling::Unknown,
+        }
     }
 
     fn dashed(word: &str) -> Option<Spelling> {
-        match Presence::from(word.chars().take(1).eq(iter::once(Self::FLAG_MARK))) {
-            Presence::Present => Some(Self::numeric(word)),
-            Presence::Absent => None,
-        }
+        word.chars().next().into_iter().find(|symbol| *symbol == Self::FLAG_MARK).map(|_| Self::numeric(word))
     }
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -122,16 +110,9 @@ impl Flag {
 
     const JOIN: char = '=';
 
-    fn joint(&self, word: &str) -> Presence {
-        let joint = self.spelling.chars().chain(iter::once(Self::JOIN));
-        Presence::from(word.chars().take(self.spelling.chars().count() + 1).eq(joint))
-    }
-
     fn joined(&self, word: &str) -> Option<QueryFailure> {
-        match self.joint(word) {
-            Presence::Present => Some(QueryFailure::Joined(self.spelling.to_owned())),
-            Presence::Absent => None,
-        }
+        let joint = format!("{}{}", self.spelling, Self::JOIN);
+        word.get(..joint.len()).filter(|head| *head == joint).map(|_| QueryFailure::Joined(self.spelling.to_owned()))
     }
 
     pub(crate) fn spelling(&self) -> &'static str {
@@ -140,15 +121,6 @@ impl Flag {
 
     pub(crate) fn arity(&self) -> Arity {
         self.arity
-    }
-}
-
-impl From<Presence> for Spelling {
-    fn from(parsed: Presence) -> Spelling {
-        match parsed {
-            Presence::Present => Spelling::Number,
-            Presence::Absent => Spelling::Unknown,
-        }
     }
 }
 

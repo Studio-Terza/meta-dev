@@ -7,13 +7,13 @@ use proc_macro2::TokenStream;
 pub struct Placeholders(Vec<Argument>);
 
 #[derive(Debug)]
-struct Argument(TokenStream);
+struct Argument(Vec<TokenStream>);
 
 #[derive(Debug)]
 struct Unclosed;
 
 impl Argument {
-    fn stream(self) -> TokenStream {
+    fn streams(self) -> Vec<TokenStream> {
         self.0
     }
 }
@@ -27,12 +27,21 @@ impl FromStr for Argument {
             .chunk_by(|first, second| *second == *first + 1)
             .find(|run| run.len() == 1)
             .and_then(|run| run.first());
-        rest.match_indices('}')
-            .next()
-            .map(|(close, _)| single.map_or(close, |colon| *colon.min(&close)))
+        let close = rest.match_indices('}').next().map(|(at, _)| at);
+        let colon = single.copied().zip(close).filter(|(at, end)| at < end).map(|(at, _)| at);
+        let widths = colon
+            .zip(close)
+            .and_then(|(at, end)| rest.get(at + 1..end))
+            .into_iter()
+            .flat_map(|spec| spec.match_indices('$').filter_map(move |(at, _)| spec.get(..at)))
+            .filter_map(|before| before.parse::<TokenStream>().ok())
+            .filter_map(|tokens| tokens.into_iter().last())
+            .map(TokenStream::from);
+        colon
+            .or(close)
             .and_then(|end| rest.get(..end))
-            .and_then(|text| text.parse().ok())
-            .map(Argument)
+            .and_then(|text| text.parse::<TokenStream>().ok())
+            .map(|stream| Argument(std::iter::once(stream).chain(widths).collect()))
             .ok_or(Unclosed)
     }
 }
@@ -42,7 +51,7 @@ impl Placeholders {
 
     #[must_use]
     pub fn streams(self) -> Vec<TokenStream> {
-        self.0.into_iter().map(Argument::stream).collect()
+        self.0.into_iter().flat_map(Argument::streams).collect()
     }
 }
 
