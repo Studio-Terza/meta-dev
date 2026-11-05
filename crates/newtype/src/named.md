@@ -41,10 +41,27 @@ enum Lamp {
 A variant with a field:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     On(u8),
+    #[name("off")]
+    Off,
+}
+
+impl strum::VariantArray for Lamp {
+    const VARIANTS: &'static [Self] = &[Lamp::Off];
+}
+```
+
+A variant named twice:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+enum Lamp {
+    #[name("on")]
+    #[name("lit")]
+    On,
     #[name("off")]
     Off,
 }

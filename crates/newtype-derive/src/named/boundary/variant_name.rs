@@ -1,6 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{Attribute, Error, Fields, Ident, LitStr, Variant};
+use syn::{Error, Fields, Ident, LitStr, Variant};
 
 pub struct VariantName {
     variant: Ident,
@@ -10,6 +10,7 @@ pub struct VariantName {
 impl VariantName {
     const ATTRIBUTE: &'static str = "name";
     const UNIT_ONLY: &'static str = "a Named variant carries no fields";
+    const REPEATED: &'static str = "a Named variant takes one #[name(\"..\")]";
     const UNNAMED: &'static str = "a Named variant needs #[name(\"..\")]";
 
     pub fn text(&self) -> String {
@@ -27,12 +28,12 @@ impl VariantName {
     }
 
     fn named(variant: Variant) -> syn::Result<VariantName> {
-        let text = variant
-            .attrs
-            .iter()
-            .find(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
-            .ok_or_else(|| Error::new_spanned(&variant.ident, Self::UNNAMED))
-            .and_then(Attribute::parse_args::<LitStr>)?;
+        let mut names = variant.attrs.iter().filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE));
+        let first = names.next().ok_or_else(|| Error::new_spanned(&variant.ident, Self::UNNAMED))?;
+        if let Some(second) = names.next() {
+            return Err(Error::new_spanned(second, Self::REPEATED));
+        }
+        let text = first.parse_args::<LitStr>()?;
         Ok(VariantName { variant: variant.ident, text })
     }
 }
