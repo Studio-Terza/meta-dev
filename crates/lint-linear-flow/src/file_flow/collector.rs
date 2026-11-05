@@ -54,7 +54,7 @@ impl<'file> Collector<'file> {
         let permit = self.permit;
         self.functions.extend(
             body.filter(|_| signature.constness.is_none())
-                .map(|body| FunctionFlow::judged(path, signature.ident.span(), permit.root(body))),
+                .map(|body| FunctionFlow::judged(path, signature.ident.span(), permit.root(signature, body))),
         );
     }
 }
@@ -83,12 +83,16 @@ impl<'ast> Visit<'ast> for Collector<'_> {
 
     fn visit_item_fn(&mut self, function: &'ast ItemFn) {
         self.judge(&function.sig, Some(&function.block));
+        let outer = mem::replace(&mut self.permit, Permit::Plain);
         visit::visit_item_fn(self, function);
+        self.permit = outer;
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast ImplItemFn) {
         self.judge(&function.sig, Some(&function.block));
+        let outer = mem::replace(&mut self.permit, Permit::Plain);
         visit::visit_impl_item_fn(self, function);
+        self.permit = outer;
     }
 
     fn visit_trait_item_fn(&mut self, function: &'ast TraitItemFn) {

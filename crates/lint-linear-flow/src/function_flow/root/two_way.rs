@@ -1,4 +1,4 @@
-use syn::{Block, Expr, ExprBlock, ExprIf, Stmt};
+use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Stmt};
 
 use lint_core::Syntax;
 
@@ -10,10 +10,10 @@ impl TwoWay {
         body.stmts.split_first().and_then(|(only, rest)| rest.first().map_or(Some(only), |_| None))
     }
 
-    pub fn within(body: &Block) -> Option<&ExprIf> {
+    pub fn within<'body>(body: &'body Block, input: &Ident) -> Option<&'body ExprIf> {
         Self::sole(body)
             .and_then(Self::branching)
-            .filter(|routed| Syntax::expr_path(&routed.cond).is_some())
+            .filter(|routed| Syntax::expr_path(&routed.cond).is_some_and(|cond| cond.path.is_ident(input)))
             .filter(|routed| routed.else_branch.as_ref().and_then(|(_, otherwise)| Self::block(otherwise)).is_some())
     }
 

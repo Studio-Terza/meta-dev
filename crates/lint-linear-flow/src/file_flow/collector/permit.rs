@@ -1,4 +1,4 @@
-use syn::{Block, ItemImpl, TypePath};
+use syn::{Block, FnArg, Ident, ItemImpl, PatType, Signature, TypePath};
 
 use lint_core::Syntax;
 
@@ -22,10 +22,29 @@ impl Permit {
         }
     }
 
-    pub fn root(self, body: &Block) -> Root<'_> {
+    pub fn root<'ast>(self, signature: &'ast Signature, body: &'ast Block) -> Root<'ast> {
         match self {
-            Permit::BoolConversion => Root::converting(body),
+            Permit::BoolConversion => {
+                Self::sole_input(signature).map_or_else(|| Root::from(body), |input| Root::converting(body, input))
+            }
             Permit::Plain => Root::from(body),
+        }
+    }
+
+    fn sole_input(signature: &Signature) -> Option<&Ident> {
+        signature
+            .inputs
+            .first()
+            .filter(|_| signature.inputs.len() == 1)
+            .and_then(Self::typed)
+            .and_then(|typed| Syntax::pat_ident(&typed.pat))
+            .map(|binding| &binding.ident)
+    }
+
+    fn typed(argument: &FnArg) -> Option<&PatType> {
+        match argument {
+            FnArg::Typed(typed) => Some(typed),
+            FnArg::Receiver(_) => None,
         }
     }
 

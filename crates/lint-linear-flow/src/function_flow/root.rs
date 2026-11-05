@@ -4,7 +4,7 @@ mod two_way;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprIf, Stmt};
+use syn::{Block, Expr, ExprIf, Ident, Stmt};
 
 use crate::function_flow::found::Found;
 use crate::function_flow::scan::Scan;
@@ -27,8 +27,8 @@ impl<'ast> From<&'ast Block> for Root<'ast> {
 }
 
 impl<'ast> Root<'ast> {
-    pub fn converting(body: &'ast Block) -> Root<'ast> {
-        match TwoWay::within(body) {
+    pub fn converting(body: &'ast Block, input: &Ident) -> Root<'ast> {
+        match TwoWay::within(body, input) {
             Some(routed) => Root::Conversion(routed),
             None => Root::from(body),
         }
@@ -68,8 +68,8 @@ impl<'ast> Root<'ast> {
     pub fn faults(self, path: &Path) -> Vec<Found<'_>> {
         match self {
             Root::Match(routed) => Arms::new(path).matched(routed),
-            Root::IfLet(routed) => Arms::new(path).branched(routed),
-            Root::Conversion(_) | Root::Body(_) => Vec::new(),
+            Root::IfLet(routed) | Root::Conversion(routed) => Arms::new(path).branched(routed),
+            Root::Body(_) => Vec::new(),
         }
     }
 }
