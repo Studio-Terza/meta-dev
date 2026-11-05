@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Files, Kind, Text};
+use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Absent;
@@ -47,5 +47,9 @@ impl Files for Absent {
 
     fn kind(&self, _path: &Path) -> Kind {
         Kind::Missing
+    }
+
+    fn size(&self, _path: &Path) -> Result<Size, FileFailure> {
+        Err(Self::missing())
     }
 }

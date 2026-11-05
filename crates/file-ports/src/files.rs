@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Kind, Text};
+use crate::{Bytes, FileFailure, Kind, Size, Text};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
@@ -20,6 +20,8 @@ pub trait Files {
     fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure>;
 
     fn kind(&self, path: &Path) -> Kind;
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure>;
 
     fn read_many(&self, paths: &[impl AsRef<Path>]) -> Vec<Result<Bytes, FileFailure>> {
         paths.iter().map(|path| self.read(path.as_ref())).collect()
@@ -54,6 +56,18 @@ pub trait Files {
 
     fn kinds(&self, paths: &[impl AsRef<Path>]) -> Vec<Kind> {
         paths.iter().map(|path| self.kind(path.as_ref())).collect()
+    }
+
+    fn bytes_below(&self, root: &Path) -> Result<Size, FileFailure> {
+        self.entries(root)?.iter().map(|path| self.counted(path)).sum()
+    }
+
+    fn counted(&self, path: &Path) -> Result<Size, FileFailure> {
+        match self.kind(path) {
+            Kind::File => self.size(path),
+            Kind::Directory => self.bytes_below(path),
+            Kind::Link | Kind::Missing => Ok(Size::default()),
+        }
     }
 
     fn mirror(&self, root: &Path, into: &impl Files) -> Result<(), FileFailure>

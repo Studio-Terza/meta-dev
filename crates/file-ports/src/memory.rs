@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use newtype::Newtype;
 
-use crate::{Bytes, FileFailure, Files, Kind, Text};
+use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
 use locked::Locked;
 use resolved::Resolved;
 
@@ -119,5 +119,9 @@ impl Files for Memory {
         let file = self.files.held().contains_key(path).then_some(Kind::File);
         let directory = self.directories.held().contains(path).then_some(Kind::Directory);
         file.or(directory).or_else(|| self.holds_below(path)).unwrap_or(Kind::Missing)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.stored(path).map(|bytes| Size::from(&bytes))
     }
 }

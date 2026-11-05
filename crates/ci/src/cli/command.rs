@@ -4,6 +4,7 @@ mod step;
 use std::ffi::OsString;
 use std::io::Write;
 
+use step::cold_size::ColdSize;
 use step::github::{CompileTrend, Labels, Show, SpecLine, StageIssues, Summarize, WallTimes};
 use step::mutation::{Matrix, MutantsChanged, MutantsShard, ShardSummary};
 use step::ratchet::{MeasuredHistory, RatchetLower};
@@ -35,6 +36,7 @@ pub enum Command {
     CompileTrend(CompileTrend),
     ShardSummary(ShardSummary),
     Matrix(Matrix),
+    ColdSize(ColdSize),
 }
 
 impl Command {
@@ -59,6 +61,7 @@ impl Command {
     const COMPILE_TREND: &'static str = "compile-trend";
     const SHARD_SUMMARY: &'static str = "shard-summary";
     const MATRIX: &'static str = "matrix";
+    const COLD_SIZE: &'static str = "cold-size";
 
     pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
@@ -83,6 +86,7 @@ impl Command {
             Some(Self::COMPILE_TREND) => Self::parsed(arguments.collect(), Command::CompileTrend),
             Some(Self::SHARD_SUMMARY) => Self::parsed(arguments.collect(), Command::ShardSummary),
             Some(Self::MATRIX) => Self::parsed(arguments.collect(), Command::Matrix),
+            Some(Self::COLD_SIZE) => Self::parsed(arguments.collect(), Command::ColdSize),
             _ => Err(Failure::Usage),
         }
     }
@@ -114,6 +118,7 @@ impl Command {
             Command::CompileTrend(step) => step.carry_out(ports, out),
             Command::ShardSummary(step) => step.carry_out(ports, out),
             Command::Matrix(step) => step.carry_out(ports, out),
+            Command::ColdSize(step) => step.carry_out(ports, out),
         }
     }
 }

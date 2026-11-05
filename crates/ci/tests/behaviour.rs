@@ -442,6 +442,49 @@ fn a_measured_history_line_names_the_revision_and_every_stage_and_is_appended() 
     Ok(())
 }
 
+#[test]
+fn a_cold_size_sums_every_nested_file_and_rounds_up_to_kibibytes() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.placed(&scratch.path().join("cold/a.bin"), &"a".repeat(1000))?;
+    scratch.placed(&scratch.path().join("cold/deep/er/b.bin"), &"b".repeat(1500))?;
+    let arguments = ["cold-size", &scratch.file("cold"), &scratch.file("cold/size.json")];
+    let answer = scratch.answer(&Script::new(), &arguments);
+    assert_eq!(answer.exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&scratch.read("cold/size.json")), ["{\"kilobytes\": 3}"]);
+    Ok(())
+}
+
+#[test]
+fn a_cold_size_of_an_exact_kibibyte_is_not_rounded_up() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.placed(&scratch.path().join("cold/a.bin"), &"a".repeat(2048))?;
+    let arguments = ["cold-size", &scratch.file("cold"), &scratch.file("size.json")];
+    scratch.answer(&Script::new(), &arguments);
+    assert_eq!(Text::lines(&scratch.read("size.json")), ["{\"kilobytes\": 2}"]);
+    Ok(())
+}
+
+#[test]
+fn an_empty_cold_directory_is_zero_kilobytes() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    scratch.directory("cold")?;
+    let arguments = ["cold-size", &scratch.file("cold"), &scratch.file("size.json")];
+    assert_eq!(scratch.answer(&Script::new(), &arguments).exit, ExitCode::SUCCESS);
+    assert_eq!(Text::lines(&scratch.read("size.json")), ["{\"kilobytes\": 0}"]);
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_cold_directory_is_reported_and_nothing_is_written() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::new()?;
+    let arguments = ["cold-size", &scratch.file("none"), &scratch.file("size.json")];
+    let answer = scratch.answer(&Script::new(), &arguments);
+    assert_eq!(answer.exit, ExitCode::FAILURE);
+    assert!(answer.err.contains("cannot use "));
+    assert_eq!(scratch.kind_of("size.json"), Kind::Missing);
+    Ok(())
+}
+
 const LOWERED_RECORD: [&str; 2] = ["cold-clippy = 48.5", "cold-test-compile = 80"];
 
 #[test]

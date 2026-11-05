@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Text};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Size, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -171,6 +171,7 @@ fn absent_holds_nothing_and_takes_nothing() {
     assert!(matches!(Absent.copy(path, path), Err(FileFailure::Missing(_))));
     assert!(matches!(Absent.entries(path), Err(FileFailure::Missing(_))));
     assert!(matches!(Absent.canonical(path), Err(FileFailure::Missing(_))));
+    assert!(matches!(Absent.size(path), Err(FileFailure::Missing(_))));
     assert_eq!(Absent.kind(path), Kind::Missing);
 }
 
@@ -211,6 +212,11 @@ impl Batches {
         );
         assert_eq!(mirrored.read_text(&root.join("copies/c.txt"))?.as_ref(), "c");
         assert!(files.mirror(&root.join("none"), &Memory::default()).is_err());
+        files.write(&root.join("copies/deep.txt"), Bytes::from("12345"))?;
+        assert_eq!(files.size(&root.join("copies/deep.txt"))?, Size::new(5));
+        assert_eq!(files.bytes_below(&root.join("copies"))?, Size::new(7));
+        assert!(files.bytes_below(&root.join("nothing-here")).is_err());
+        assert!(files.size(&root.join("nothing-here")).is_err());
         Ok(())
     }
 }
