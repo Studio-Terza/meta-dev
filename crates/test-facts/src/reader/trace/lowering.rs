@@ -48,8 +48,12 @@ impl<'trace, 'body, 'file> Lowering<'trace, 'body, 'file> {
 
     fn path(&mut self, expression: &Expr, path: &Path) -> Term {
         let named = path.get_ident().map(Name::from);
-        let quantified = named.as_ref().and_then(|name| self.trace.quantifiers().named(name)).cloned();
-        quantified.or_else(|| self.followed(expression)).unwrap_or_else(|| Operations::constructor(path, Vec::new()))
+        let stated = named.as_ref().and_then(|name| self.trace.frame().locals().state(name)).cloned();
+        let quantified = named.as_ref().and_then(|name| self.trace.frame().quantifiers().named(name)).cloned();
+        stated
+            .or(quantified)
+            .or_else(|| self.followed(expression))
+            .unwrap_or_else(|| Operations::constructor(path, Vec::new()))
     }
 
     fn followed(&mut self, expression: &Expr) -> Option<Term> {

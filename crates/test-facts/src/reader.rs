@@ -1,6 +1,6 @@
 mod assertion;
-mod body;
 mod properties;
+mod run;
 mod scope;
 mod trace;
 
@@ -17,8 +17,8 @@ use lint_placement::{CrateName, ModulePath};
 use crate::claim::Claim;
 use crate::test::{Test, TestId};
 use assertion::Assertion;
-use body::Body;
 use properties::{Properties, Property};
+use run::{Attributes, Execution, Run};
 use scope::{Place, Scope};
 use trace::Quantifiers;
 
@@ -52,7 +52,11 @@ impl<'file> Reader<'file> {
     }
 
     fn marked(&mut self, item: &ItemFn) {
-        let claims = Body::claims(&self.scope, &Place::in_module(&self.module), &item.block, &Quantifiers::default());
+        let claims = Run::claims(
+            &self.scope,
+            &Place::in_module(&self.module),
+            &Execution::new(&item.block, &Quantifiers::default(), Attributes::declared(&item.attrs)),
+        );
         self.tested(Name::from(&item.sig.ident), &item.sig.ident, claims);
     }
 
@@ -64,11 +68,20 @@ impl<'file> Reader<'file> {
 
     fn law(&mut self, invocation: &Macro) {
         let name = Assertion::titled(invocation).unwrap_or_default();
-        let claims = Assertion::named(invocation, self.scope.tables()).law_claims(
-            invocation,
-            &self.scope,
-            &Place::in_module(&self.module),
-        );
+        let place = Place::in_module(&self.module);
+        let proof = Assertion::named(invocation, self.scope.tables()).law_claims(invocation, &self.scope, &place);
+        let claims = proof
+            .bodies()
+            .iter()
+            .flat_map(|body| {
+                Run::claims(
+                    &self.scope,
+                    &place,
+                    &Execution::new(&body.block, proof.quantifiers(), Attributes::declared(&[])),
+                )
+            })
+            .chain(proof.claims().iter().cloned())
+            .collect();
         self.tested(name, &invocation.path, claims);
     }
 }

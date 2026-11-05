@@ -1,28 +1,39 @@
+use lint_layout::{Name, Word, words};
+
 use super::term::{Depths, Substituted, Substitution};
-use super::{Accepted, Binders, Claim, Depth, Occupancy, Ranges, Term};
+use super::{Accepted, Binders, Callee, Claim, Depth, Guard, Occupancy, Ranges, Term};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Statement {
     binders: Binders,
+    guard: Guard,
     subject: Term,
     accepted: Accepted,
 }
 
 impl Statement {
-    pub(crate) fn new(binders: Binders, subject: Term, accepted: Accepted) -> Statement {
-        Statement { binders, subject, accepted }
+    const UNWRAPPERS: [Word<'static>; 2] = words!["unwrap", "expect"];
+
+    pub(crate) fn new(binders: Binders, guard: Guard, subject: Term, accepted: Accepted) -> Statement {
+        Statement { binders, guard, subject, accepted }
     }
 
     pub(crate) fn restated(claim: &Claim) -> Statement {
-        Statement { binders: claim.binders.clone(), subject: claim.subject.clone(), accepted: claim.accepted.clone() }
+        Statement {
+            binders: claim.binders.clone(),
+            guard: claim.guard.clone(),
+            subject: claim.subject.clone(),
+            accepted: claim.accepted.clone(),
+        }
     }
 
     pub(crate) fn grounded(self) -> Vec<Claim> {
-        let listed = self
+        let raised = self.lifted();
+        let listed = raised
             .binders
             .iter()
             .find_map(|(depth, binder)| binder.every().and_then(|every| every.domain().values()).map(|_| *depth));
-        listed.map_or_else(|| self.clone().renumbered().claim().into_iter().collect(), |depth| self.expanded(depth))
+        listed.map_or_else(|| raised.clone().renumbered().claim().into_iter().collect(), |depth| raised.expanded(depth))
     }
 
     pub(crate) fn instance(&self, depth: Depth, value: &Term) -> Statement {
@@ -34,14 +45,35 @@ impl Statement {
                 .filter(|(bound, _)| **bound != depth)
                 .map(|(bound, binder)| (*bound, binder.substituted(&values)))
                 .collect(),
+            guard: self.guard.substituted(&values),
             subject: self.subject.substituted(&values),
             accepted: self.accepted.substituted(&values),
         }
     }
 
-    pub(crate) fn restricted(mut self, depth: Depth, ranges: Ranges) -> Claim {
-        self.binders.entry(depth).and_modify(|binder| *binder = binder.restricted(ranges));
-        Claim { binders: self.binders, subject: self.subject, accepted: self.accepted }
+    pub(crate) fn restricted(mut self, depth: Depth, ranges: &Ranges) -> Claim {
+        self.binders
+            .entry(depth)
+            .and_modify(|binder| *binder = binder.narrowed(ranges).unwrap_or_else(|| binder.clone()));
+        Claim { binders: self.binders, guard: self.guard, subject: self.subject, accepted: self.accepted }
+    }
+
+    fn lifted(&self) -> Statement {
+        let inner = Self::UNWRAPPERS
+            .iter()
+            .find_map(|name| Callee::Method(Name::from(*name)).arguments_of(&self.subject))
+            .and_then(|arguments| arguments.listed().first());
+        inner.map_or_else(
+            || self.clone(),
+            |inner| {
+                Statement {
+                    subject: inner.clone(),
+                    accepted: Accepted::unwrapped(self.accepted.clone()),
+                    ..self.clone()
+                }
+                .lifted()
+            },
+        )
     }
 
     fn expanded(&self, depth: Depth) -> Vec<Claim> {
@@ -60,9 +92,17 @@ impl Statement {
             .iter()
             .filter(|(_, binder)| binder.domain().occupancy() == Occupancy::Unknown)
             .map(|(depth, _)| Depths::from(*depth));
-        let used: Depths =
-            [self.subject.depths(), Depths::from(&self.accepted.mentions())].into_iter().chain(undecided).collect();
-        let vacant = self.binders.values().find(|binder| binder.domain().occupancy() == Occupancy::Vacant).map(|_| ());
+        let used: Depths = [self.subject.depths(), Depths::from(&self.accepted.mentions()), self.guard.depths()]
+            .into_iter()
+            .chain(undecided)
+            .collect();
+        let pruned = self.guard.pruned();
+        let vacant = self
+            .binders
+            .values()
+            .find(|binder| binder.domain().occupancy() == Occupancy::Vacant)
+            .map(|_| ())
+            .or_else(|| pruned.as_ref().map_or(Some(()), |_| None));
         let renumber = Substitution::renumbered(used.iter());
         let binders = used
             .iter()
@@ -74,6 +114,7 @@ impl Statement {
         Renumbered {
             claim: Claim {
                 binders,
+                guard: pruned.unwrap_or_default().substituted(&renumber),
                 subject: self.subject.substituted(&renumber),
                 accepted: self.accepted.substituted(&renumber),
             },
@@ -101,6 +142,7 @@ impl Renumbered {
             || claim.clone(),
             |other| Claim {
                 binders: claim.binders.clone(),
+                guard: claim.guard.clone(),
                 accepted: Accepted::equal(claim.subject.clone()),
                 subject: other,
             },

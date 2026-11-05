@@ -8,6 +8,7 @@ use newtype::{Arbitrary, Display, Newtype};
 use crate::claim::{Cases, Operator};
 
 type Arithmetic = fn(i128, i128) -> Option<i128>;
+type Judging = fn(Ordering) -> bool;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Quantity(i128);
@@ -25,6 +26,15 @@ impl Quantity {
         (Operator::Remainder, i128::checked_rem),
     ];
 
+    const COMPARISONS: [(Operator, Judging); 6] = [
+        (Operator::Equal, Ordering::is_eq),
+        (Operator::Unequal, Ordering::is_ne),
+        (Operator::Below, Ordering::is_lt),
+        (Operator::AtMost, Ordering::is_le),
+        (Operator::Above, Ordering::is_gt),
+        (Operator::AtLeast, Ordering::is_ge),
+    ];
+
     pub(crate) fn cases(self) -> Option<Cases> {
         usize::try_from(self.into_inner()).ok().map(Cases::new)
     }
@@ -35,6 +45,13 @@ impl Quantity {
             .find(|(arithmetic, _)| *arithmetic == operator)
             .and_then(|(_, apply)| apply(self.into_inner(), other.into_inner()))
             .map(Quantity::new)
+    }
+
+    pub(crate) fn compared(self, operator: Operator, other: Quantity) -> Option<Truth> {
+        Self::COMPARISONS
+            .iter()
+            .find(|(comparison, _)| *comparison == operator)
+            .map(|(_, holds)| Truth::judged(holds(self.cmp(&other))))
     }
 
     pub(crate) fn applied(self, operator: &BinOp, other: Quantity) -> Option<Quantity> {
@@ -119,6 +136,12 @@ impl Position {
 
     pub(crate) fn picked<Item>(self, items: &[Item]) -> Option<&Item> {
         items.get(self.0)
+    }
+}
+
+impl From<&Name> for Spelling {
+    fn from(name: &Name) -> Spelling {
+        Spelling(name.to_string())
     }
 }
 

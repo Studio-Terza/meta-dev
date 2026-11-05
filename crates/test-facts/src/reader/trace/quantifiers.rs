@@ -5,7 +5,7 @@ use syn::Pat;
 use lint_layout::Name;
 
 use crate::boundary::Position;
-use crate::claim::{Binder, Binders, Callee, Depth, Term};
+use crate::claim::{Binder, Binders, Callee, Depth, Ranges, Term};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Quantifiers {
@@ -28,6 +28,13 @@ impl Quantifiers {
         next.binders.insert(depth, binder);
         next.bind(pattern, Term::Bound(depth));
         next
+    }
+
+    pub(crate) fn narrowed(&self, depth: Depth, ranges: &Ranges) -> Option<Quantifiers> {
+        let binder = self.binders.get(&depth).and_then(|held| held.narrowed(ranges))?;
+        let mut next = self.clone();
+        next.binders.insert(depth, binder);
+        Some(next)
     }
 
     pub(crate) fn drawn(&self, binder: Binder) -> Quantifiers {

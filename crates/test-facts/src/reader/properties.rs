@@ -2,9 +2,9 @@ use std::iter;
 
 use lint_layout::{Name, Whole, Word, words};
 
-use super::body::Body;
+use super::run::{Attributes, Execution, Run};
 use super::scope::{Place, Scope};
-use super::trace::{Evaluation, Extent, Locals, Lowering, Quantifiers, Trace};
+use super::trace::{Evaluation, Extent, Frame, Lowering, Quantifiers, Trace};
 use crate::boundary::{Quantity, Spelling};
 use crate::claim::{Binder, Cases, Claim, Domain, Draw, Ranges};
 use syn::parse::{Parse, ParseStream};
@@ -94,6 +94,7 @@ pub(crate) struct Property {
     inputs: Vec<Input>,
     body: Block,
     config: Option<Expr>,
+    attributes: Vec<Attribute>,
 }
 
 impl Property {
@@ -102,15 +103,14 @@ impl Property {
     }
 
     pub(crate) fn claims(&self, scope: &Scope<'_>, place: &Place) -> Vec<Claim> {
-        let locals = Locals::default();
-        let empty = Quantifiers::default();
-        let trace = Trace::new(scope, &locals, place, &empty);
+        let frame = Frame::default();
+        let trace = Trace::new(scope, place, &frame);
         let draw = Configured(self.config.as_ref()).draw(&trace);
-        let quantifiers = self.inputs.iter().fold(empty.clone(), |quantifiers, input| {
+        let quantifiers = self.inputs.iter().fold(Quantifiers::default(), |quantifiers, input| {
             let domain = input.drawn.ranges(&trace).map_or_else(|| input.drawn.domain(&trace), Domain::Ranged);
             quantifiers.quantified(Binder::new(domain, draw.clone()), &input.pattern)
         });
-        Body::claims(scope, place, &self.body, &quantifiers)
+        Run::claims(scope, place, &Execution::new(&self.body, &quantifiers, Attributes::declared(&self.attributes)))
     }
 }
 
@@ -161,7 +161,7 @@ impl Parse for Properties {
 
 impl Parse for Property {
     fn parse(input: ParseStream) -> syn::Result<Property> {
-        input.call(Attribute::parse_outer)?;
+        let attributes = input.call(Attribute::parse_outer)?;
         input.parse::<Visibility>()?;
         input.parse::<Token![fn]>()?;
         let site: Ident = input.parse()?;
@@ -169,6 +169,6 @@ impl Parse for Property {
         parenthesized!(arguments in input);
         let inputs = Punctuated::<Input, Token![,]>::parse_terminated(&arguments)?.into_iter().collect();
         input.parse::<ReturnType>()?;
-        Ok(Property { site, inputs, body: input.parse()?, config: None })
+        Ok(Property { site, inputs, body: input.parse()?, config: None, attributes })
     }
 }
