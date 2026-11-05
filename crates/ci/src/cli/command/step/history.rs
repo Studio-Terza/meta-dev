@@ -34,6 +34,6 @@ impl Step for History {
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let record = Changed::answered(Question::History, &self.metadata, ports)?;
         write!(out, "{}\t{record}", self.revision)?;
-        self.file.append(ports.files(), format_args!("{}\t{record}", self.revision)).map(|()| Exit::Success)
+        self.file.append(ports.files(), format_args!("{}\t{record}", self.revision)).map(|()| Exit::Succeeded)
     }
 }

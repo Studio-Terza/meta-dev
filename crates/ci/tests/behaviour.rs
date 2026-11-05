@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io::{self, Write};
-use std::num::NonZeroU8;
+use std::num::NonZeroI32;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
@@ -33,7 +33,10 @@ const EMPTY_REPORT_AND_NOTES: [&str; 5] = [
 const HISTORY_LINE: &str = "abc123\treach 1 of 5";
 const BUILD: [&str; 7] = ["build", "--locked", "-q", "--bin", "reach", "--bin", "lint"];
 const ROUNDED_UP: Duration = Duration::from_millis(1_996);
-const FAILED_WITH: NonZeroU8 = NonZeroU8::new(3).unwrap();
+const FAILED_WITH: NonZeroI32 = NonZeroI32::new(3).unwrap();
+const FIRST: NonZeroI32 = NonZeroI32::new(1).unwrap();
+const SECOND: NonZeroI32 = NonZeroI32::new(2).unwrap();
+const FOURTH: NonZeroI32 = NonZeroI32::new(4).unwrap();
 
 struct Reply {
     key: &'static str,
@@ -61,7 +64,7 @@ struct Script {
 impl Script {
     fn new() -> Script {
         Script {
-            exit: Exit::Success,
+            exit: Exit::Succeeded,
             elapsed: Duration::from_millis(1_500),
             changed: String::new(),
             metadata: METADATA.to_owned(),
@@ -82,7 +85,7 @@ impl Script {
     }
 
     fn exiting(code: u8) -> Script {
-        Script { exit: NonZeroU8::new(code).map_or(Exit::Success, Exit::Failure), ..Script::new() }
+        Script { exit: NonZeroI32::new(i32::from(code)).map_or(Exit::Succeeded, Exit::Failed), ..Script::new() }
     }
 
     fn recorded(&self, invocation: &Invocation) -> io::Result<()> {
@@ -308,9 +311,9 @@ fn a_timed_stage_is_appended_to_what_is_measured() -> Result<(), Box<dyn Error>>
 #[test]
 fn a_failing_program_fails_the_step_with_its_code_and_is_still_measured() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    let fake = Script { exit: Exit::Failure(FAILED_WITH), ..Script::new() };
+    let fake = Script { exit: Exit::Failed(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["timed", &scratch.file("m.toml"), "clippy", "cargo"]);
-    assert_eq!(answer.exit, ExitCode::from(FAILED_WITH.get()));
+    assert_eq!(answer.exit, ExitCode::from(Exit::Failed(FAILED_WITH)));
     assert_eq!(Text::lines(&scratch.read("m.toml")), ["clippy = 1.50"]);
     Ok(())
 }
@@ -776,11 +779,11 @@ fn a_tools_key_needs_metadata_cargo_can_give_and_reach_can_read() -> Result<(), 
 #[test]
 fn a_logged_program_is_run_with_its_log_and_its_exit() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::new()?;
-    let fake = Script { logged_text: "seen\n".to_owned(), exit: Exit::Failure(FAILED_WITH), ..Script::new() };
+    let fake = Script { logged_text: "seen\n".to_owned(), exit: Exit::Failed(FAILED_WITH), ..Script::new() };
     let answer = scratch.answer(&fake, &["logged", &scratch.file("logs/test.txt"), "cargo", "test", "-p", "leaf"]);
     assert_eq!(
         answer.lines(),
-        Printed { exit: ExitCode::from(FAILED_WITH.get()), out: Vec::<&str>::new(), err: Vec::<&str>::new() }
+        Printed { exit: ExitCode::from(Exit::Failed(FAILED_WITH)), out: Vec::<&str>::new(), err: Vec::<&str>::new() }
     );
     assert_eq!(*fake.calls.borrow(), [Invocation::new("cargo", ["test", "-p", "leaf"])]);
     assert_eq!(*fake.logs.borrow(), [scratch.path().join("logs/test.txt")]);
@@ -1077,8 +1080,8 @@ fn limits_that_cannot_be_judged_and_issues_that_cannot_be_handled_are_reported()
     assert_eq!(Text::lines(&scratch.answer(&Script::refusing("gh"), &arguments).err), ["cannot run gh: boom"]);
     let garbled = Script::answering(vec![Reply::to("gh issue", "not json")]);
     assert!(scratch.answer(&garbled, &arguments).err.contains("cannot read the list of issues"));
-    let failing = Script { exit: Exit::Failure(FAILED_WITH), ..Script::answering(vec![Reply::to("gh issue", "[]")]) };
-    assert_eq!(scratch.answer(&failing, &arguments).exit, ExitCode::from(FAILED_WITH.get()));
+    let failing = Script { exit: Exit::Failed(FAILED_WITH), ..Script::answering(vec![Reply::to("gh issue", "[]")]) };
+    assert_eq!(scratch.answer(&failing, &arguments).exit, ExitCode::from(Exit::Failed(FAILED_WITH)));
     let unmeasured = Gh::stage_issues(&scratch, "clippy = 12\n")?;
     assert!(scratch.answer(&Script::new(), &unmeasured).err.contains("the limits cannot be judged"));
     Ok(())
@@ -1651,11 +1654,11 @@ struct Followed;
 
 impl Followed {
     fn run(start: &Start) -> Result<Exit, ()> {
-        start.0.followed_by(|| Ok(Exit::Failure(FAILED_WITH)))
+        start.0.followed_by(|| Ok(Exit::Failed(FAILED_WITH)))
     }
 
     fn excusing(code: &Code) -> Exit {
-        Exit::Failure(NonZeroU8::new(code.0).unwrap_or(FAILED_WITH)).excusing(&[FAILED_WITH, NonZeroU8::MIN])
+        Exit::Failed(NonZeroI32::new(i32::from(code.0)).unwrap_or(FAILED_WITH)).excusing(&[FAILED_WITH, FIRST])
     }
 }
 
@@ -1663,8 +1666,8 @@ laws::table!(
     a_step_follows_only_a_success,
     Followed::run,
     [
-        Start(Exit::Success) => Ok(Exit::Failure(FAILED_WITH)),
-        Start(Exit::Failure(NonZeroU8::MIN)) => Ok(Exit::Failure(NonZeroU8::MIN)),
+        Start(Exit::Succeeded) => Ok(Exit::Failed(FAILED_WITH)),
+        Start(Exit::FAILURE) => Ok(Exit::FAILURE),
     ]
 );
 
@@ -1672,10 +1675,10 @@ laws::table!(
     only_the_excused_failures_become_successes,
     Followed::excusing,
     [
-        Code(1) => Exit::Success,
-        Code(3) => Exit::Success,
-        Code(2) => Exit::Failure(NonZeroU8::MIN.saturating_add(1)),
-        Code(4) => Exit::Failure(NonZeroU8::MIN.saturating_add(3)),
+        Code(1) => Exit::Succeeded,
+        Code(3) => Exit::Succeeded,
+        Code(2) => Exit::Failed(SECOND),
+        Code(4) => Exit::Failed(FOURTH),
     ]
 );
 

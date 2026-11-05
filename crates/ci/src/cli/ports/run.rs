@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::exit::Exit;
+use newtype::Exit;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Run {

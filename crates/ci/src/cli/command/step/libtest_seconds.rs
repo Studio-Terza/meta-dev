@@ -47,6 +47,6 @@ impl Step for LibtestSeconds {
             .map(|_| total)
             .ok_or_else(|| Failure::NoTestResult { path: self.output.as_ref() })
             .and_then(|total| self.measured.append(ports.files(), &self.stage, total))
-            .map(|()| Exit::Success)
+            .map(|()| Exit::Succeeded)
     }
 }

@@ -71,6 +71,6 @@ impl Step for ReachScope {
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         Changed::stored_metadata(ports, &self.metadata)?;
         let report = self.report(ports)?;
-        self.recorded(ports.files(), &report, out).map(|()| Exit::Success)
+        self.recorded(ports.files(), &report, out).map(|()| Exit::Succeeded)
     }
 }

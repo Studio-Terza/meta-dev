@@ -58,6 +58,6 @@ impl Step for CompileTimes {
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let listing = Listing::totalled(Self::per_crate(&self.page, &self.page.read(ports.files())?)?);
         write!(out, "{listing}")?;
-        self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Success)
+        self.report.emptied(ports.files())?.append(ports.files(), &listing).map(|()| Exit::Succeeded)
     }
 }
