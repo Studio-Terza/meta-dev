@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 1 tests in 4 files, 1 of 8 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting:
 conversions and orders have laws:
 src/order.rs:1: `B` has a hand-written Ord or PartialEq; add a `laws::law!` in a test of the same package that names it
 fails

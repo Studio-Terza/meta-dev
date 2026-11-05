@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 0 tests in 3 files, 0 of 18 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting:
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/checked.rs:8: Entry only carries values into one other file; give it the logic that consumes it
 src/free.rs:4: Entry only carries values into one other file; give it the logic that consumes it

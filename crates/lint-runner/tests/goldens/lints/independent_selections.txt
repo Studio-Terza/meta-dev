@@ -1,0 +1,11 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 19 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting:
+src/lib.rs:5: selection whose predicate does not read its element; a predicate that ignores its element is a branch: give the decision a named outcome, an enum a pure router matches
+src/lib.rs:9: selection whose predicate does not read its element; a predicate that ignores its element is a branch: give the decision a named outcome, an enum a pure router matches
+src/lib.rs:13: selection whose predicate does not read its element; a predicate that ignores its element is a branch: give the decision a named outcome, an enum a pure router matches
+primitives appear in signatures and fields only inside a boundary:
+src/lib.rs:12: bare usize in found; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+fails
