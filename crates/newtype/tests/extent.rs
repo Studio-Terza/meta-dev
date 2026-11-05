@@ -50,3 +50,25 @@ laws::roundtrip!(
     |items: &Vec<u8>| Filled::new(items.clone()),
     |filled: &Option<Filled<Vec<u8>>>| filled.clone().map(Filled::into_inner).unwrap_or_default()
 );
+
+struct Reads;
+
+impl Reads {
+    fn borrowed(items: &[u8]) -> Option<Vec<u8>> {
+        Filled::new(items.to_vec()).map(|filled| (&filled).into_iter().chain(filled.iter()).copied().collect())
+    }
+
+    fn owned(items: &[u8]) -> Option<Vec<u8>> {
+        Filled::new(items.to_vec()).map(|filled| filled.into_iter().collect())
+    }
+
+    fn converted(items: &[u8]) -> Option<Vec<u8>> {
+        Filled::new(items.to_vec()).map(Vec::from)
+    }
+}
+
+laws::table!(filled_iterates_by_reference, Reads::borrowed, [[0_u8; 0] => None, [1_u8, 2] => Some(vec![1, 2, 1, 2])]);
+
+laws::table!(filled_iterates_by_value, Reads::owned, [[0_u8; 0] => None, [1_u8, 2] => Some(vec![1, 2])]);
+
+laws::table!(filled_converts_into_a_vec, Reads::converted, [[0_u8; 0] => None, [5_u8, 6] => Some(vec![5, 6])]);
