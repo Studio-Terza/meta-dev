@@ -162,11 +162,10 @@ fn the_query_command_lists_matching_abstractions_and_blocks_nothing() -> Result<
 }
 
 #[test]
-fn the_query_command_refuses_a_malformed_role() {
-    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["query", "--role", "nonsense", "--in"]);
-    assert_eq!(run.exit, ExitCode::FAILURE);
-    assert!(run.err.contains("is not a Rust signature"), "{}", run.err);
-    assert_eq!(run.out, "");
+fn the_query_command_refuses_a_malformed_role_or_an_unknown_flag_with_the_reason() {
+    let refused = Refusal { exit: ExitCode::FAILURE, reasons: 1, out: String::new() };
+    assert_eq!(Trees::refusal(&["query", "--role", "nonsense", "--in"], "is not a Rust signature"), refused);
+    assert_eq!(Trees::refusal(&["query", "--implementor", "Files", "--in"], "`--implementor` is not a flag"), refused);
 }
 
 #[test]
@@ -214,6 +213,11 @@ impl Trees {
             out: String::from_utf8(out).unwrap_or_default(),
             err: String::from_utf8(err).unwrap_or_default(),
         }
+    }
+
+    fn refusal(flags: &[&str], reason: &str) -> Refusal {
+        let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), flags);
+        Refusal { exit: run.exit, reasons: run.err.matches(reason).count(), out: run.out }
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
@@ -278,6 +282,13 @@ impl Scratch {
         let readout = SourceFiles::read(&self.files, &self.root)?;
         Ok(Sources::lines(&CrateGraph::report(readout.files())))
     }
+}
+
+#[derive(Debug, PartialEq)]
+struct Refusal {
+    exit: ExitCode,
+    reasons: usize,
+    out: String,
 }
 
 struct Printed {

@@ -17,9 +17,9 @@ src/loops.rs:4: open loop in const context; walk a slice with while let or recur
 src/loops.rs:5: for loop in const context; walk a slice with while let [head, rest @ ..]
 src/macros.rs:2: as cast outside a const fn; use From, TryFrom, or an EnumMap
 control flow is an expression; every branch yields the value the function returns:
-src/contexts.rs:2: while loop; drive an iterator with combinators, const fns excepted
+src/contexts.rs:2: while loop; drive an iterator with combinators (map, fold, try_fold, take_while), const fns excepted
 src/contexts.rs:2: compound assignment to a local; build the value in one expression or give its type an updater method
-src/walks.rs:5: for loop; drive the iterator with combinators, const fns excepted
+src/walks.rs:5: for loop; drive the iterator with combinators (map, fold, try_fold, take_while), const fns excepted
 function names say what the function does:
 src/casts.rs:1: fn f names nothing; say what it does
 src/casts.rs:2: fn g names nothing; say what it does
@@ -47,5 +47,5 @@ src/contexts.rs:4: field b of A is pub; struct fields are private
 a body leaves through its tail value or ?, never through return, break or continue:
 src/loops.rs:4: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/walks.rs:5: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/walks.rs:5: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)
 fails

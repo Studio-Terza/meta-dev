@@ -1,6 +1,8 @@
+mod exit;
 mod plain;
 mod unnamed;
 
+pub use exit::Exit;
 pub use plain::Newtype;
 pub use unnamed::Unnamed;
 

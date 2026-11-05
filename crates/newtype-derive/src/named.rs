@@ -13,14 +13,25 @@ pub struct Named {
 
 impl Named {
     const ENUMS_ONLY: &'static str = "Named derives for an enum of unit variants";
+    const ON_ENUM: &'static str = "name belongs on a variant, not on the enum";
     const NO_VARIANTS: &'static str = "Named needs at least one variant to name";
     const REPEATED: &'static str = "two variants have this name, so FromStr could not tell them apart";
 
     pub fn expanded(tokens: TokenStream) -> TokenStream {
         syn::parse2(tokens)
+            .and_then(Self::unattributed)
             .and_then(Self::table)
             .and_then(Self::distinct)
             .map_or_else(|error| error.to_compile_error(), Self::implemented)
+    }
+
+    fn unattributed(input: DeriveInput) -> syn::Result<DeriveInput> {
+        input
+            .attrs
+            .iter()
+            .find(|attribute| attribute.path().is_ident("name"))
+            .map_or(Ok(()), |attribute| Err(Error::new_spanned(attribute, Self::ON_ENUM)))
+            .map(|()| input)
     }
 
     fn table(DeriveInput { ident, data, .. }: DeriveInput) -> syn::Result<Named> {

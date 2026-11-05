@@ -9,6 +9,6 @@ primitives appear in signatures and fields only inside a boundary:
 src/lib.rs:4: bare u8 in sized; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/lib.rs:4: bare u8 in sized; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/lib.rs:5: match that is not the whole body; extract it into its own function whose whole body is the match, or use combinators on Option, Result and iterators
-src/lib.rs:9: if; use combinators on Option, Result and iterators (then_some, filter, map_or), or make the whole body one match on an enum, Option or Result
+src/lib.rs:5: match that is not the whole body; extract the match into a pure router (a function whose whole body is that match), or give the decision a named outcome (an enum a pure router matches)
+src/lib.rs:9: if; turn the whole body into a pure router (one match on an enum, Option or Result), or give the decision a named outcome (an enum a pure router matches)
 fails

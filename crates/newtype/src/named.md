@@ -38,6 +38,19 @@ enum Lamp {
 }
 ```
 
+A name on the enum itself:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[name("lamp")]
+enum Lamp {
+    #[name("on")]
+    On,
+    #[name("off")]
+    Off,
+}
+```
+
 A variant with a field:
 
 ```compile_fail

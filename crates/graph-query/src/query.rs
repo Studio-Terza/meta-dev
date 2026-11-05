@@ -17,6 +17,7 @@ use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
 use crate::role::Role;
+pub(crate) use boundary::{Arity, Flag};
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
