@@ -5,7 +5,7 @@ use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Path, Stmt};
 use lint_core::Syntax;
 use lint_layout::Name;
 use lint_placement::CrateName;
-use type_facts::Facts;
+use type_facts::{Facts, TypeFact};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Target<'ast> {
@@ -23,14 +23,12 @@ impl<'ast> Target<'ast> {
         Some(self).filter(|target| target.facts.enums_named(target.krate, &Name::from(target.name)).is_empty().not())
     }
 
-    fn declared(&self, variant: &Name) -> Option<&'ast Name> {
-        let found: Option<Vec<&'ast Name>> = self
-            .facts
+    fn declaring(&self, chosen: &Ident, other: &Ident) -> Option<&'ast TypeFact<'ast>> {
+        let wanted = [Name::from(chosen), Name::from(other)];
+        self.facts
             .enums_named(self.krate, &Name::from(self.name))
             .into_iter()
-            .map(|each| each.variant(variant))
-            .collect();
-        found.and_then(|all| all.first().copied())
+            .find(|each| wanted.iter().all(|variant| each.variant(variant).is_some()))
     }
 }
 
@@ -74,7 +72,7 @@ impl Variants {
         let (_, otherwise) = routed.else_branch.as_ref()?;
         let chosen = Self::variant_of(Self::unit(&routed.then_branch)?, target)?;
         let other = Self::variant_of(Self::unit(&TwoWay::block(otherwise)?.block)?, target)?;
-        Some(chosen).filter(|chosen| *chosen != other)
+        Some(chosen).filter(|chosen| *chosen != other).filter(|chosen| target.declaring(chosen, other).is_some())
     }
 
     fn variant_of<'path>(path: &'path Path, target: Target<'_>) -> Option<&'path Ident> {
@@ -86,7 +84,6 @@ impl Variants {
             .filter(|qualifier| accepted.iter().any(|name| qualifier.ident == **name))
             .and(path.segments.last())
             .map(|segment| &segment.ident)
-            .filter(|variant| target.declared(&Name::from(*variant)).is_some())
     }
 
     fn unit(branch: &Block) -> Option<&Path> {

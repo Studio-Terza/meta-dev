@@ -114,6 +114,10 @@ const TEST_ONLY_LIT: Source = Source::new(
     Located::new("crates/x/src/other.rs"),
     Text::new("#[cfg(test)]\nmod tests {\n    enum Lit { Dim }\n}\n"),
 );
+const TESTED_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/tested.rs"), Text::new("#[cfg(test)]\nenum Lit { Dim }\n"));
+const ON_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/on.rs"), Text::new("pub enum Lit { On }\n"));
+const OFF_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/off.rs"), Text::new("pub enum Lit { Off }\n"));
 const LIGHT_LIT: Source = Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off }\n"));
 const FUSE_LIT: Source = Source::new(Located::new("crates/x/src/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
 const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
@@ -125,7 +129,7 @@ const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod
 const REEXPORTED_LIT: Source =
     Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod light;\npub use light::Lit;\n"));
 
-const LINEAR: [Case; 59] = [
+const LINEAR: [Case; 61] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -346,8 +350,18 @@ const LINEAR: [Case; 59] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool into an enum twin lacking a chosen variant"),
+        Title::new("from bool into an enum while a twin lacks a chosen variant is not flagged"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, PARTIAL_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum while a cfg(test) twin lacks the variants is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TESTED_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum whose variants are split across twins is flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), ON_ONLY_LIT, OFF_ONLY_LIT],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
@@ -361,20 +375,20 @@ const LINEAR: [Case; 59] = [
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
-        Title::new("from bool into an enum while a test-only enum of the name lacks the variants"),
+        Title::new("from bool into an enum while a test-only enum of the name lacks the variants is not flagged"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TEST_ONLY_LIT],
-        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new(
-            "from bool into an imported enum is flagged while another module declares a twin lacking the variants",
+            "from bool into an imported enum is not flagged while another module declares a twin lacking the variants",
         ),
         &[
             Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
             LIGHT_LIT,
             FUSE_LIT,
         ],
-        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool into a renamed import of an enum is flagged because the alias names no enum"),
@@ -382,9 +396,9 @@ const LINEAR: [Case; 59] = [
         Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
     ),
     Case::new(
-        Title::new("from bool into a path-qualified enum is flagged while a twin lacks the variants"),
+        Title::new("from bool into a path-qualified enum is not flagged while a twin lacks the variants"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_BY_PATH)), LIGHT_LIT, FUSE_LIT],
-        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool into an enum imported inside an inline module is not flagged"),
@@ -392,14 +406,16 @@ const LINEAR: [Case; 59] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool into an enum imported through a re-export is flagged while a twin lacks the variants"),
+        Title::new(
+            "from bool into an enum imported through a re-export is not flagged while a twin lacks the variants",
+        ),
         &[
             Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
             REEXPORTED_LIT,
             LIGHT_LIT,
             FUSE_LIT,
         ],
-        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool in a cfg(test) impl beside a cfg(test) enum is not flagged"),
