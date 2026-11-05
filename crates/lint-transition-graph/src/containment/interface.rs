@@ -7,7 +7,7 @@ use super::cluster::Cluster;
 use super::groups::Groups;
 use super::link::Link;
 use super::member::Member;
-use super::{ClusterLint, Containment};
+use super::{ClusterLint, Containment, Toward};
 
 #[derive(Debug)]
 struct Interface<'view, 'found> {
@@ -22,7 +22,8 @@ impl<'view, 'found> Interface<'view, 'found> {
         let cut = view.slice(judged)?.cut();
         let exports = cut.exports();
         let sharing = Containment::adjacency(cut.outgoing().iter().copied());
-        let links = sharing.values().flat_map(Link::star);
+        let signed = view.links_within(exports, Toward::Signed);
+        let links = sharing.values().flat_map(Link::star).chain(signed);
         let groups = Groups::linked(exports, links).split()?;
         Some(Interface { cluster: judged, exports, groups })
     }

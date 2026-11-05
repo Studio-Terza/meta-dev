@@ -8,6 +8,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::context::Context;
+use crate::endpoint::Endpoint;
 use crate::function::Function;
 use crate::ground::Ground;
 use crate::implementer::Implementer;
@@ -33,6 +34,11 @@ impl<'found, 'file> Transition<'found, 'file> {
     #[must_use]
     pub fn gives(&self) -> Output<'found> {
         Output::new(self.function.gives().resolved_with(self.context.selfish()))
+    }
+
+    #[must_use]
+    pub fn fails(&self) -> Option<&'found Endpoint> {
+        self.function.fails().map(|fails| fails.resolved_with(self.context.selfish()))
     }
 
     #[must_use]

@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use lint_placement::CrateName;
+
 use super::member::Member;
 
 const ENDS: usize = 2;
@@ -14,6 +16,11 @@ pub(crate) struct Link<'found> {
 impl<'found> Link<'found> {
     pub(crate) fn new(from: Member<'found>, to: Member<'found>) -> Link<'found> {
         Link { from, to }
+    }
+
+    pub(crate) fn held(own: &CrateName, holder: Member<'found>, end: Member<'found>) -> Link<'found> {
+        let elsewhere = holder.cluster().krate().filter(|krate| *krate != own);
+        elsewhere.map_or(Link { from: holder, to: end }, |_| Link { from: end, to: holder })
     }
 
     pub(crate) fn ends(&self) -> [Member<'found>; ENDS] {

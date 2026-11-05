@@ -21,7 +21,7 @@ use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
-use type_facts::Facts;
+use type_facts::{Facts, Implementation};
 
 use cluster::Cluster;
 use declaration::Declaration;
@@ -50,6 +50,7 @@ pub(crate) enum Toward {
     Users,
     Defined,
     Implementers,
+    Signed,
 }
 
 #[derive(Debug)]
@@ -59,6 +60,7 @@ pub struct Containment<'found, 'file> {
     users: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     defines: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     implementers: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
+    signed: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>,
     slices: BTreeMap<Cluster<'found>, Slice<'found>>,
 }
@@ -127,10 +129,22 @@ impl<'found, 'file> Containment<'found, 'file> {
                 outsiders
             },
         );
-        let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
+        let argued = placed.iter().flat_map(|(member, declaration)| {
+            let implementations: &[Implementation<'file>] = declaration.as_ref();
+            implementations
+                .iter()
+                .flat_map(|implementation| resolver.argument(implementation))
+                .map(|argued| Link::new(*member, argued))
+        });
+        let signed: BTreeSet<Link<'found>> = transitions
+            .all()
+            .flat_map(|transition| resolver.signature(transition))
+            .chain(argued)
+            .chain(defined.iter().copied())
+            .filter_map(Link::apart)
+            .collect();
         let bodies = named.iter().flat_map(|(file, names)| resolver.bodies(file, names));
-        let links: BTreeSet<Link<'found>> =
-            defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
+        let links: BTreeSet<Link<'found>> = signed.iter().copied().chain(bodies).filter_map(Link::apart).collect();
         let users = Self::adjacency(links.iter().copied().map(Link::reversed));
         Containment {
             slices: Slice::all(placed.keys().copied(), &users),
@@ -142,6 +156,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             users,
             defines: Self::adjacency(defined.into_iter()),
             implementers: Self::adjacency(implemented.into_iter().map(Link::reversed)),
+            signed: Self::adjacency(signed.into_iter()),
             outsiders,
         }
     }
@@ -157,6 +172,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             Toward::Users => &self.users,
             Toward::Defined => &self.defines,
             Toward::Implementers => &self.implementers,
+            Toward::Signed => &self.signed,
         }
     }
 

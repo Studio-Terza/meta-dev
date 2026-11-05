@@ -119,6 +119,11 @@ impl<'found> Resolver<'found> {
             .collect()
     }
 
+    pub(crate) fn argument(&self, implementation: &Implementation<'_>) -> Vec<Member<'found>> {
+        let site: &Site<'_> = implementation.as_ref();
+        implementation.argument().map_or_else(Vec::new, |argument| self.members(site.path(), argument, &[], None))
+    }
+
     pub(crate) fn endpoint(&self, file: &Path, endpoint: &Endpoint) -> Vec<Member<'found>> {
         match endpoint.nature() {
             Nature::Named => self.members(file, endpoint.as_ref(), &[], endpoint.origin().map(Borrow::borrow)),
@@ -145,10 +150,9 @@ impl<'found> Resolver<'found> {
             uses.values().flatten().map(|path| (*path, self.used(reach, krate, path))).collect();
         uses.iter()
             .filter_map(|(owner, used)| {
-                let declaring = self.declaring.get(*owner).map_or(&[][..], Vec::as_slice);
-                let holder = reach.target(owner, &[], None).and_then(|target| target.declared(declaring))?;
+                let holder = reach.holder(owner, |name| self.declaring.get(name).map_or(&[][..], Vec::as_slice))?;
                 let ends = used.iter().flat_map(|path| found.get(path).into_iter().flatten());
-                Some(ends.map(move |end| Link::new(holder, *end)))
+                Some(ends.map(move |end| Link::held(krate, holder, *end)))
             })
             .flatten()
             .collect()
@@ -169,10 +173,15 @@ impl<'found> Resolver<'found> {
     pub(crate) fn signature(&self, transition: Transition<'found, '_>) -> Vec<Link<'found>> {
         let site: &Site<'_> = transition.as_ref();
         let file = site.path();
+        let own: &CrateName = transition.as_ref();
         let holders = transition.context().subject().map_or_else(Vec::new, |subject| self.endpoint(file, subject));
-        let ends = transition.takes().iter().chain([transition.gives().endpoint()]);
-        ends.flat_map(|end| self.endpoint(file, end))
-            .flat_map(|end| holders.iter().map(move |holder| Link::new(*holder, end)))
-            .collect()
+        let ends: Vec<Member<'found>> = transition
+            .takes()
+            .iter()
+            .chain([transition.gives().endpoint()])
+            .chain(transition.fails())
+            .flat_map(|end| self.endpoint(file, end))
+            .collect();
+        holders.iter().flat_map(|holder| ends.iter().map(move |end| Link::held(own, *holder, *end))).collect()
     }
 }
