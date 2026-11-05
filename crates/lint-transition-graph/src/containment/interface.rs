@@ -3,11 +3,11 @@ use std::fmt;
 
 use lint_core::{Fix, Headline, Violation};
 
-use super::cluster::Cluster;
+use super::cluster::{Cluster, Level};
 use super::groups::Groups;
 use super::link::Link;
 use super::member::Member;
-use super::{ClusterLint, Containment, Toward};
+use super::{ClusterLint, Containment, Split, Toward};
 
 #[derive(Debug)]
 struct Interface<'view, 'found> {
@@ -16,9 +16,9 @@ struct Interface<'view, 'found> {
     groups: Groups<'found>,
 }
 
-impl<'view, 'found> Interface<'view, 'found> {
-    fn split_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'view, 'found>> {
-        let judged = cluster.krate().map(|_| cluster)?;
+impl<'view, 'found> Split<'view, 'found> for Interface<'view, 'found> {
+    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'view, 'found>> {
+        let judged = cluster.unit().map(|_| cluster)?;
         let cut = view.slice(judged)?.cut();
         let exports = cut.exports();
         let sharing = Containment::adjacency(cut.outgoing().iter().copied());
@@ -26,6 +26,10 @@ impl<'view, 'found> Interface<'view, 'found> {
         let links = sharing.values().flat_map(Link::star).chain(signed);
         let groups = Groups::linked(exports, links).split()?;
         Some(Interface { cluster: judged, exports, groups })
+    }
+
+    fn sited(&self) -> &BTreeSet<Member<'found>> {
+        self.exports
     }
 }
 
@@ -50,9 +54,6 @@ impl ClusterLint for InterfaceByConsumers {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.slices()
-            .filter_map(|slice| Interface::split_in(view, slice.cluster()))
-            .filter_map(|split| view.first_site(split.exports).map(|site| Violation::new(site, &split)))
-            .collect()
+        view.splits::<Interface<'_, '_>>(&[Level::Crate, Level::Module])
     }
 }

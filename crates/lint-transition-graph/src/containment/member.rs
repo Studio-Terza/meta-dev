@@ -4,6 +4,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use super::cluster::Cluster;
+use super::unit::Unit;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Member<'found> {
@@ -13,11 +14,11 @@ pub(crate) struct Member<'found> {
 
 impl<'found> Member<'found> {
     pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Member<'found> {
-        Member { name, cluster: Cluster::module(krate, &[]) }
+        Member { name, cluster: Cluster::module(Unit::library(krate), &[]) }
     }
 
-    pub(crate) fn within(self, segments: &'found [Name]) -> Option<Member<'found>> {
-        self.cluster.krate().map(|krate| Member { name: self.name, cluster: Cluster::module(krate, segments) })
+    pub(crate) fn within(self, home: Cluster<'found>) -> Member<'found> {
+        Member { name: self.name, cluster: home }
     }
 
     pub(crate) fn cluster(&self) -> Cluster<'found> {
@@ -31,7 +32,7 @@ impl<'found> Member<'found> {
 
 impl fmt::Display for Member<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.cluster.krate().into_iter().try_for_each(|krate| write!(formatter, "{krate}"))?;
+        self.cluster.unit().into_iter().try_for_each(|unit| write!(formatter, "{}", unit.krate()))?;
         self.cluster.segments().iter().chain([self.name]).try_for_each(|segment| write!(formatter, "::{segment}"))
     }
 }

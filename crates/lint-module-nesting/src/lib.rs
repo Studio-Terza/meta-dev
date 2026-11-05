@@ -14,7 +14,9 @@ impl Lint for ModuleNesting {
         let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let tree = ModuleTree::from(shipped.as_slice());
         Report::new(
-            Headline::new("modules nest by use: a file used only inside one sibling belongs inside it"),
+            Headline::new(
+                "a module is reached through its parent: a use path does not reach past a directory module into its children, and a module does not re-export more items than its cap allows",
+            ),
             tree.violations().collect(),
         )
     }

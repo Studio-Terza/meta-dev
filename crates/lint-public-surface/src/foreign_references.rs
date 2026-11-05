@@ -40,7 +40,7 @@ impl ForeignReferences {
 
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
         let own_crate = binaries
-            .holding(file.path())
+            .root_of(file.path())
             .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
         let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
         references.visit_file(file.syntax());

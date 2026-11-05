@@ -6,6 +6,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 use transition_facts::Transitions;
 
+use super::super::cluster::Cluster;
 use super::super::member::Member;
 
 #[derive(Debug, Default)]
@@ -14,14 +15,14 @@ pub(crate) struct Functions<'found>(BTreeMap<&'found Path, BTreeMap<&'found Name
 impl<'found> Functions<'found> {
     pub(crate) fn declared<'file>(
         transitions: &'found Transitions<'file>,
-        modules: &BTreeMap<&Path, &'found [Name]>,
+        homes: &BTreeMap<&Path, Cluster<'found>>,
     ) -> Functions<'found> {
         let free = transitions.all().filter(|transition| transition.context().subject().is_none());
         free.fold(Functions::default(), |functions, transition| {
             let site: &'found Site<'file> = transition.function().as_ref();
             let krate: &'found CrateName = transition.context().as_ref();
             let name: &'found Name = transition.function().as_ref();
-            let member = modules.get(site.path()).and_then(|segments| Member::declared(krate, name).within(segments));
+            let member = homes.get(site.path()).map(|home| Member::declared(krate, name).within(*home));
             functions.declaring(site.path(), member)
         })
     }

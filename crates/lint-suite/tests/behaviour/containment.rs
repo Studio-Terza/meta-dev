@@ -1,9 +1,11 @@
 use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
+use lint_layout::Name;
 use lint_transition_graph::{
-    AcyclicQuotients, Clustered as ClusterReport, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers,
-    LowestCluster, TypeSystem,
+    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, ConnectedDirectories, Extraction, GraphLint,
+    InterfaceByConsumers, LowestCluster, TypeSystem,
 };
+use text_lines::Lines;
 
 struct Clustered;
 
@@ -26,6 +28,19 @@ impl Clustered {
         Self::lines(sources, |view| ClusterReport::<ConnectedClusters>::report_graph(view).violations().to_vec())
     }
 
+    fn users(sources: &[Source], names: &[&str]) -> Vec<String> {
+        let files = Sources::parsed(sources);
+        let extraction = Extraction::from(files.as_slice());
+        let system = TypeSystem::built_from(&files, &extraction);
+        names
+            .iter()
+            .flat_map(|name| {
+                let answer = Ask::Users(Name::from(*name)).answered(system.containment(), None).to_string();
+                Lines::from(answer.as_str()).map(str::to_owned).collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
     const fn at(path: &'static str, text: &'static str) -> Source {
         Source::new(Located::new(path), Text::new(text))
     }
@@ -44,6 +59,13 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
         Clustered::lines(&SPLIT, |view| ClusterReport::<ConnectedClusters>::report_graph(view).violations().to_vec()),
         [
             "crates/x/src/a/b.rs:1: crate x falls into 5 groups: [A B] [C] [D E] [F] [G] with no link between them; split it along the groups, or link them through a type they share",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&SPLIT, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+            .violations()
+            .to_vec()),
+        [
             "crates/x/src/a/b.rs:1: x::a falls into 3 groups: [D E] [F] [G] with no link between them; split it along the groups, or link them through a type they share",
         ]
     );
@@ -76,8 +98,8 @@ fn a_name_declared_in_two_modules_of_one_crate_resolves_by_its_own_module_and_it
     assert_eq!(
         Clustered::lines(&twins, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/x/src/a.rs:2: x::a::Leg is used only within x::b; move it into the lowest cluster that holds all its users",
-            "crates/x/src/b.rs:2: x::b::Platform is used only within x::c; move it into the lowest cluster that holds all its users",
+            "crates/x/src/a.rs:2: x::a::Leg is used only within x::b; move it into the lowest module that holds all its users",
+            "crates/x/src/b.rs:2: x::b::Platform is used only within x::c; move it into the lowest module that holds all its users",
         ]
     );
 }
@@ -144,9 +166,12 @@ fn a_type_outside_the_lowest_cluster_of_its_users_is_reported() {
     assert_eq!(
         Clustered::lines(&placed, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/y/src/lib.rs:1: y::Far is used only within x::a; move it into the lowest cluster that holds all its users",
-            "crates/x/src/lib.rs:3: x::Helper is used only within x::a; move it into the lowest cluster that holds all its users",
+            "crates/x/src/lib.rs:3: x::Helper is used only within x::a; move it into the lowest module that holds all its users",
         ]
+    );
+    assert_eq!(
+        Clustered::users(&placed, &["Far"]),
+        ["users of Far:", "  y::Far at crates/y/src/lib.rs:1", "    Near at crates/x/src/a.rs:3"]
     );
 }
 
@@ -192,20 +217,24 @@ fn a_name_declared_in_two_crates_resolves_to_its_qualifier_else_to_the_own_crate
         Clustered::at("crates/x/src/lib.rs", "pub struct P;\n"),
         Clustered::at("crates/y/src/lib.rs", "pub struct P;\npub struct W(P);\n"),
     ];
-    let reported: Vec<Vec<String>> = [qualified, bare]
-        .iter()
-        .map(|sources| {
-            Clustered::lines(sources, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec())
-        })
-        .collect();
     assert_eq!(
-        reported,
+        Clustered::users(&qualified, &["P"]),
         [
-            vec![
-                "crates/x/src/lib.rs:1: x::P is used only within crate y; move it into the lowest cluster that holds all its users"
-                    .to_owned()
-            ],
-            Vec::new()
+            "users of P:",
+            "  x::P at crates/x/src/lib.rs:1",
+            "    U at crates/y/src/lib.rs:2",
+            "  y::P at crates/y/src/lib.rs:1",
+            "    none"
+        ]
+    );
+    assert_eq!(
+        Clustered::users(&bare, &["P"]),
+        [
+            "users of P:",
+            "  x::P at crates/x/src/lib.rs:1",
+            "    none",
+            "  y::P at crates/y/src/lib.rs:1",
+            "    W at crates/y/src/lib.rs:2"
         ]
     );
 }
@@ -220,22 +249,13 @@ fn a_field_with_an_unqualified_name_and_a_method_signature_both_link_across_crat
         Clustered::at("crates/x/src/lib.rs", "pub struct B;\n"),
         Clustered::at("crates/y/src/lib.rs", "pub struct A;\nimpl A {\n    fn b(&self) -> x::B {}\n}\n"),
     ];
-    let reported: Vec<Vec<String>> = [apart, signed]
-        .iter()
-        .map(|sources| {
-            Clustered::lines(sources, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec())
-        })
-        .collect();
     assert_eq!(
-        reported,
-        [
-            [
-                "crates/x/src/lib.rs:1: x::W is used only within crate y; move it into the lowest cluster that holds all its users"
-            ],
-            [
-                "crates/x/src/lib.rs:1: x::B is used only within crate y; move it into the lowest cluster that holds all its users"
-            ]
-        ]
+        Clustered::users(&apart, &["W"]),
+        ["users of W:", "  x::W at crates/x/src/lib.rs:1", "    V at crates/y/src/lib.rs:1"]
+    );
+    assert_eq!(
+        Clustered::users(&signed, &["B"]),
+        ["users of B:", "  x::B at crates/x/src/lib.rs:1", "    A at crates/y/src/lib.rs:1"]
     );
 }
 
@@ -250,20 +270,18 @@ fn an_imported_name_resolves_to_the_crate_it_is_imported_from() {
         Clustered::at("crates/y/src/lib.rs", "use x::P;\npub struct U(P);\n"),
         Clustered::at("crates/z/src/lib.rs", "pub struct P;\n"),
     ];
-    let reported: Vec<Vec<String>> = [external.as_slice(), workspace.as_slice()]
-        .iter()
-        .map(|sources| {
-            Clustered::lines(sources, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec())
-        })
-        .collect();
     assert_eq!(
-        reported,
+        Clustered::users(&external, &["Command"]),
+        ["users of Command:", "  x::Command at crates/x/src/lib.rs:1", "    none"]
+    );
+    assert_eq!(
+        Clustered::users(&workspace, &["P"]),
         [
-            Vec::new(),
-            vec![
-                "crates/x/src/lib.rs:1: x::P is used only within crate y; move it into the lowest cluster that holds all its users"
-                    .to_owned()
-            ]
+            "users of P:",
+            "  x::P at crates/x/src/lib.rs:1",
+            "    U at crates/y/src/lib.rs:2",
+            "  z::P at crates/z/src/lib.rs:1",
+            "    none"
         ]
     );
 }
@@ -275,10 +293,8 @@ fn a_type_alias_stands_for_the_type_it_names() {
         Clustered::at("crates/y/src/lib.rs", "pub struct U(x::A);\n"),
     ];
     assert_eq!(
-        Clustered::lines(&aliased, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
-        [
-            "crates/x/src/lib.rs:1: x::B is used only within crate y; move it into the lowest cluster that holds all its users"
-        ]
+        Clustered::users(&aliased, &["B"]),
+        ["users of B:", "  x::B at crates/x/src/lib.rs:1", "    U at crates/y/src/lib.rs:1"]
     );
 }
 
@@ -325,14 +341,21 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
     assert_eq!(
         Clustered::lines(&pathed, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/x/src/lib.rs:3: x::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
-            "crates/x/src/a/mod.rs:3: x::a::Platform is used only within x::a::inner; move it into the lowest cluster that holds all its users",
+            "crates/x/src/lib.rs:3: x::Platform is used only within x::a::inner; move it into the lowest module that holds all its users",
+            "crates/x/src/a/mod.rs:3: x::a::Platform is used only within x::a::inner; move it into the lowest module that holds all its users",
         ]
     );
     assert_eq!(
         Clustered::lines(&pathed, |view| ClusterReport::<ConnectedClusters>::report_graph(view).violations().to_vec()),
         [
             "crates/x/src/a/deep/kid.rs:1: crate x falls into 6 groups: [Bench Lounge Seat] [Gauge Holder] [Gauge] [Platform Root] [Platform Uses] [Seat] with no link between them; split it along the groups, or link them through a type they share",
+        ]
+    );
+    assert_eq!(
+        Clustered::lines(&pathed, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+            .violations()
+            .to_vec()),
+        [
             "crates/x/src/a/deep/kid.rs:1: x::a falls into 4 groups: [Bench Seat] [Gauge Holder] [Platform Uses] [Root] with no link between them; split it along the groups, or link them through a type they share",
         ]
     );
@@ -371,9 +394,13 @@ fn an_imported_workspace_type_wins_over_a_local_twin() {
         Clustered::at("crates/files/src/text.rs", "pub struct Text;\n"),
     ];
     assert_eq!(
-        Clustered::lines(&imported, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
+        Clustered::users(&imported, &["Text"]),
         [
-            "crates/files/src/text.rs:1: files::text::Text is used only within x::excerpt; move it into the lowest cluster that holds all its users"
+            "users of Text:",
+            "  files::text::Text at crates/files/src/text.rs:1",
+            "    Excerpt at crates/x/src/excerpt.rs:2",
+            "  x::document::text::Text at crates/x/src/document/text.rs:1",
+            "    Document at crates/x/src/document.rs:2"
         ]
     );
 }
@@ -401,8 +428,8 @@ fn a_variant_path_names_its_enum_and_a_module_path_names_its_type() {
     assert_eq!(
         Clustered::lines(&variants, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/x/src/event.rs:1: x::event::Event is used only within x::hub; move it into the lowest cluster that holds all its users",
-            "crates/x/src/hub/pull_request.rs:1: x::hub::pull_request::PullRequest is used only within x::caller; move it into the lowest cluster that holds all its users",
+            "crates/x/src/event.rs:1: x::event::Event is used only within x::hub; move it into the lowest module that holds all its users",
+            "crates/x/src/hub/pull_request.rs:1: x::hub::pull_request::PullRequest is used only within x::caller; move it into the lowest module that holds all its users",
         ]
     );
     assert_eq!(
@@ -444,7 +471,7 @@ fn a_trait_impl_links_the_twin_its_own_file_names() {
     assert_eq!(
         Clustered::lines(&twins, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/x/src/check/rule.rs:1: x::check::rule::Rule is used only within x::check::geometry; move it into the lowest cluster that holds all its users"
+            "crates/x/src/check/rule.rs:1: x::check::rule::Rule is used only within x::check::geometry; move it into the lowest module that holds all its users"
         ]
     );
 }
@@ -459,10 +486,17 @@ fn a_body_use_links_across_crates_through_its_import_or_qualifier() {
         ),
     ];
     assert_eq!(
-        Clustered::lines(&imported, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
+        Clustered::users(&imported, &["Mark", "Touch", "Loose"]),
         [
-            "crates/x/src/lib.rs:1: x::Mark is used only within crate y; move it into the lowest cluster that holds all its users",
-            "crates/x/src/lib.rs:2: x::Touch is used only within crate y; move it into the lowest cluster that holds all its users",
+            "users of Mark:",
+            "  x::Mark at crates/x/src/lib.rs:1",
+            "    View at crates/y/src/lib.rs:2",
+            "users of Touch:",
+            "  x::Touch at crates/x/src/lib.rs:2",
+            "    View at crates/y/src/lib.rs:2",
+            "users of Loose:",
+            "  x::Loose at crates/x/src/lib.rs:3",
+            "    none",
         ]
     );
 }
@@ -481,7 +515,7 @@ fn a_type_named_in_an_interpolated_macro_string_is_used() {
             .violations()
             .to_vec()),
         [
-            "crates/x/src/lib.rs:2: x::Anchor is used only within x::view; move it into the lowest cluster that holds all its users"
+            "crates/x/src/lib.rs:2: x::Anchor is used only within x::view; move it into the lowest module that holds all its users"
         ]
     );
 }
@@ -500,7 +534,7 @@ fn a_const_standing_for_a_variant_stands_for_its_enum() {
     assert_eq!(
         Clustered::lines(&constant, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         [
-            "crates/x/src/mode.rs:1: x::mode::Mode is used only within x::user; move it into the lowest cluster that holds all its users"
+            "crates/x/src/mode.rs:1: x::mode::Mode is used only within x::user; move it into the lowest module that holds all its users"
         ]
     );
 }
@@ -535,10 +569,8 @@ fn a_body_path_reads_through_a_renamed_import_and_keeps_its_module_qualifier() {
         Clustered::at("crates/y/src/view/inner.rs", "pub struct Fast;\n"),
     ];
     assert_eq!(
-        Clustered::lines(&renamed, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
-        [
-            "crates/x/src/lib.rs:1: x::Mark is used only within y::view; move it into the lowest cluster that holds all its users"
-        ]
+        Clustered::users(&renamed, &["Mark"]),
+        ["users of Mark:", "  x::Mark at crates/x/src/lib.rs:1", "    View at crates/y/src/view.rs:4"]
     );
     assert_eq!(
         Clustered::lines(&renamed, |view| ClusterReport::<ConnectedClusters>::report_graph(view).violations().to_vec()),
@@ -703,5 +735,58 @@ fn a_free_function_that_names_a_type_in_its_body_is_a_user_of_it() {
     assert_eq!(
         Clustered::lines(&used, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_binary_target_is_a_crate_of_its_own_beside_the_library() {
+    let one_binary = [
+        Clustered::at("crates/app/src/lib.rs", "pub struct Engine;\n"),
+        Clustered::at(
+            "crates/app/src/main.rs",
+            "struct Args;\nfn main() {\n    let _a = Args;\n    let _e = app::Engine;\n}\n",
+        ),
+    ];
+    assert_eq!(Clustered::connected(&one_binary), Vec::<String>::new());
+    let two_binaries = [
+        Clustered::at("crates/corpus/src/main.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+        Clustered::at("crates/corpus/src/bin/tool.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+        Clustered::at("crates/corpus/src/bin/other.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+    ];
+    assert_eq!(Clustered::connected(&two_binaries), Vec::<String>::new());
+}
+
+#[test]
+fn the_main_of_a_binary_is_a_user_that_places_a_type() {
+    let entry = [
+        Clustered::at("crates/x/src/main.rs", "mod cli;\nmod run;\nfn main() {\n    run::go(cli::Args::new());\n}\n"),
+        Clustered::at("crates/x/src/cli.rs", "pub struct Args;\n"),
+        Clustered::at("crates/x/src/run.rs", "use crate::cli::Args;\npub fn go(a: Args) {\n    let _b: Args = a;\n}\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&entry, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        Clustered::users(&entry, &["Args"]),
+        ["users of Args:", "  x::cli::Args at crates/x/src/cli.rs:1", "    go", "    main"]
+    );
+}
+
+#[test]
+fn a_binary_target_whose_types_fall_apart_is_reported_under_its_own_name() {
+    let split = "struct P;\nstruct Q;\nfn main() {\n    let _p = P;\n    let _q = Q;\n}\n";
+    let binaries = [
+        Clustered::at("crates/x/src/main.rs", split),
+        Clustered::at("crates/x/src/bin/a.rs", split),
+        Clustered::at("crates/x/src/bin/tool/main.rs", split),
+    ];
+    assert_eq!(
+        Clustered::connected(&binaries),
+        [
+            "crates/x/src/bin/a.rs:1: crate x binary a falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/bin/tool/main.rs:1: crate x binary tool falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/main.rs:1: crate x binary x falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+        ]
     );
 }
