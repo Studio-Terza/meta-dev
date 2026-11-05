@@ -186,7 +186,7 @@ fn the_strength_command_refuses_a_third_root() {
 }
 
 #[test]
-fn the_strength_command_fails_on_a_test_that_lost_a_check() -> Result<(), Box<dyn Error>> {
+fn the_strength_command_fails_on_a_test_that_lost_a_claim() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::temporary()?;
     scratch.write("before/Cargo.toml", MANIFEST)?;
     scratch.write("before/src/lib.rs", STRONG_TEST)?;
@@ -194,7 +194,7 @@ fn the_strength_command_fails_on_a_test_that_lost_a_check() -> Result<(), Box<dy
     scratch.write("after/src/lib.rs", WEAK_TEST)?;
     let run = scratch.compared("before", "after");
     assert_eq!(run.exit, ExitCode::FAILURE);
-    assert!(run.err.contains("/scratch/before/src/lib.rs:2: test adds () of r lost a check"), "{}", run.err);
+    assert!(run.err.contains("/scratch/before/src/lib.rs:2: test adds () of r lost a claim"), "{}", run.err);
     Ok(())
 }
 

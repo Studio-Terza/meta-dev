@@ -2,7 +2,12 @@ use std::cmp::Ordering;
 
 use syn::BinOp;
 
+use lint_layout::Name;
 use newtype::{Arbitrary, Display, Newtype};
+
+use crate::claim::{Cases, Operator};
+
+type Arithmetic = fn(i128, i128) -> Option<i128>;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Quantity(i128);
@@ -10,6 +15,27 @@ pub(crate) struct Quantity(i128);
 impl Quantity {
     pub(crate) const ZERO: Quantity = Quantity::new(0);
     pub(crate) const UNIT: Quantity = Quantity::new(1);
+    pub(crate) const LEAST: Quantity = Quantity::new(i128::MIN);
+    pub(crate) const GREATEST: Quantity = Quantity::new(i128::MAX);
+    const ARITHMETIC: [(Operator, Arithmetic); 5] = [
+        (Operator::Add, i128::checked_add),
+        (Operator::Subtract, i128::checked_sub),
+        (Operator::Multiply, i128::checked_mul),
+        (Operator::Divide, i128::checked_div),
+        (Operator::Remainder, i128::checked_rem),
+    ];
+
+    pub(crate) fn cases(self) -> Option<Cases> {
+        usize::try_from(self.into_inner()).ok().map(Cases::new)
+    }
+
+    pub(crate) fn combined(self, operator: Operator, other: Quantity) -> Option<Quantity> {
+        Self::ARITHMETIC
+            .iter()
+            .find(|(arithmetic, _)| *arithmetic == operator)
+            .and_then(|(_, apply)| apply(self.into_inner(), other.into_inner()))
+            .map(Quantity::new)
+    }
 
     pub(crate) fn applied(self, operator: &BinOp, other: Quantity) -> Option<Quantity> {
         match operator {
@@ -56,6 +82,57 @@ impl Truth {
         match self {
             Truth::Holds => Truth::Fails,
             Truth::Fails => Truth::Holds,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Spelling(String);
+
+impl Spelling {
+    pub(crate) fn written(tokens: &impl quote::ToTokens) -> Spelling {
+        Spelling(tokens.to_token_stream().to_string())
+    }
+}
+
+impl std::fmt::Display for Spelling {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Position(usize);
+
+impl Position {
+    pub(crate) fn named(name: &Name) -> Option<Position> {
+        name.to_string().parse().ok().map(Position)
+    }
+
+    pub(crate) fn counted(index: usize) -> Position {
+        Position(index)
+    }
+
+    pub(crate) fn numbered(index: Quantity) -> Option<Position> {
+        usize::try_from(index.into_inner()).ok().map(Position)
+    }
+
+    pub(crate) fn picked<Item>(self, items: &[Item]) -> Option<&Item> {
+        items.get(self.0)
+    }
+}
+
+impl From<Position> for Name {
+    fn from(position: Position) -> Name {
+        Name::from(position.0.to_string().as_str())
+    }
+}
+
+impl std::fmt::Display for Truth {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Truth::Holds => formatter.write_str("true"),
+            Truth::Fails => formatter.write_str("false"),
         }
     }
 }

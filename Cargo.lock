@@ -982,6 +982,7 @@ name = "lint-test-strength"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-placement",
  "lint-transition-graph",
  "newtype",
  "test-facts",
@@ -1379,6 +1380,7 @@ dependencies = [
  "lint-placement",
  "newtype",
  "proc-macro2",
+ "quote",
  "syn 2.0.119",
 ]
 

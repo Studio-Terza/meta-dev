@@ -1,7 +1,9 @@
+mod condition;
+mod operands;
 mod table;
 
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, BinOp, Expr, Ident, Macro};
+use syn::{Attribute, Ident, Macro};
 
 use law_facts::Kind;
 use lint_core::{MacroAliases, MacroCalls, Macros};
@@ -9,7 +11,9 @@ use lint_layout::{Name, Whole, Word, words};
 
 use super::scope::{Place, Scope};
 use super::trace::Trace;
-use crate::check::{Check, Domain, Relation};
+use crate::claim::Claim;
+use condition::Condition;
+use operands::{Comparing, Operands};
 use table::Table;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,7 +31,6 @@ impl Assertion {
     const INEQUALITIES: [Word<'static>; 2] = words!["assert_ne", "prop_assert_ne"];
     const CONDITIONS: [Word<'static>; 2] = words!["assert", "prop_assert"];
     const GOLDENS: [Word<'static>; 1] = words!["golden"];
-    const PATTERNS: [Word<'static>; 1] = words!["matches"];
 
     pub(crate) fn named(invocation: &Macro, tables: &MacroAliases) -> Assertion {
         let name = invocation.path.segments.last().map(|last| Name::from(&last.ident)).unwrap_or_default();
@@ -44,13 +47,21 @@ impl Assertion {
         invocation.parse_body_with(Titled::parse).ok().map(|titled| Name::from(&titled.name))
     }
 
-    pub(crate) fn checks(self, invocation: &Macro, trace: &Trace<'_, '_>, domain: Domain) -> Vec<Check> {
+    pub(crate) fn claims(self, invocation: &Macro, trace: &Trace<'_, '_>) -> Vec<Claim> {
         match self {
-            Assertion::Equality | Assertion::Golden => trace.operands(Relation::Equal, invocation, domain),
-            Assertion::Inequality => trace.operands(Relation::Differs, invocation, domain),
-            Assertion::Condition => Self::condition(invocation, trace, &domain),
+            Assertion::Equality | Assertion::Golden => {
+                Operands::read(invocation).map(|operands| operands.claims(trace, Comparing::Equal)).unwrap_or_default()
+            }
+            Assertion::Inequality => Operands::read(invocation)
+                .map(|operands| operands.claims(trace, Comparing::Unequal))
+                .unwrap_or_default(),
+            Assertion::Condition => Assertion::condition(invocation, trace),
             Assertion::Table | Assertion::Other => Vec::new(),
         }
+    }
+
+    fn condition(invocation: &Macro, trace: &Trace<'_, '_>) -> Vec<Claim> {
+        Macros::arguments(invocation).first().map(|condition| Condition::claims(trace, condition)).unwrap_or_default()
     }
 
     pub(crate) fn nested(self, invocation: &Macro) -> Vec<Macro> {
@@ -64,42 +75,11 @@ impl Assertion {
         }
     }
 
-    pub(crate) fn law_checks(self, invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Check> {
+    pub(crate) fn law_claims(self, invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Claim> {
         match self {
-            Assertion::Table => Table::checks(invocation, scope, place),
+            Assertion::Table => Table::claims(invocation, scope, place),
             Assertion::Other => Table::law(invocation, Kind::of_macro(invocation), scope, place),
             Assertion::Equality | Assertion::Inequality | Assertion::Condition | Assertion::Golden => Vec::new(),
-        }
-    }
-
-    fn condition(invocation: &Macro, trace: &Trace<'_, '_>, domain: &Domain) -> Vec<Check> {
-        Macros::arguments(invocation)
-            .into_iter()
-            .take(1)
-            .flat_map(|condition| Self::tested(&condition, trace, domain.clone()))
-            .collect()
-    }
-
-    fn tested(condition: &Expr, trace: &Trace<'_, '_>, domain: Domain) -> Vec<Check> {
-        match condition {
-            Expr::Binary(binary) => {
-                trace.compared(Self::comparison(binary.op), &[&*binary.left, &*binary.right], domain)
-            }
-            Expr::Macro(inner) => trace.compared(Self::shaped(&inner.mac), &[condition], domain),
-            _ => trace.compared(Relation::Holds, &[condition], domain),
-        }
-    }
-
-    fn shaped(inner: &Macro) -> Relation {
-        let name = inner.path.segments.last().map(|last| Name::from(&last.ident)).unwrap_or_default();
-        name.matches::<Whole>(&Self::PATTERNS).map_or(Relation::Holds, |_| Relation::Pattern)
-    }
-
-    fn comparison(operator: BinOp) -> Relation {
-        match operator {
-            BinOp::Eq(_) => Relation::Equal,
-            BinOp::Ne(_) => Relation::Differs,
-            _ => Relation::Holds,
         }
     }
 }

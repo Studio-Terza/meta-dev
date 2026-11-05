@@ -17,7 +17,7 @@ impl Weakened {
     }
 
     fn lost(before: &[Source], after: &[Source]) -> usize {
-        Self::report(before, after).matches("lost a check").count()
+        Self::report(before, after).matches("lost a claim").count()
     }
 
     fn reported(pair: [&str; 2]) -> String {
@@ -309,7 +309,7 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [ASSOCIATIVE, COMMUTATIVE] => true,
     [ARRAY, ARRAY_SHORT] => true,
     [DIFFERS, BARE] => true,
-    [TWICE, ONCE] => true,
+    [TWICE, ONCE] => false,
     [OK_PINNED, OK_BARE] => false,
     [POSITIVE_THEN_VALUE, VALUE_THEN_POSITIVE] => false,
     [ARRAY_SHORT, ARRAY_MESSAGED] => true,
@@ -329,7 +329,7 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [STRATEGY_PAREN, STRATEGY_NARROW] => true,
     [EQUALS, OTHER_CALL] => true,
     [OTHER_CALL, EQUALS] => true,
-    [EQUALS, BOTH_CALLS] => false,
+    [EQUALS, BOTH_CALLS] => true,
     [BOTH_CALLS, EQUALS] => true,
     [METHOD_CALL, OTHER_METHOD] => true,
     [METHOD_CALL, METHOD_CALL] => false,
@@ -422,18 +422,18 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [EQUALS, WRAPPED] => false,
     [WRAPPED, EMPTY] => true,
     [PATTERNED, BARE_CONDITION] => true,
-    [BARE_CONDITION, PATTERNED] => false,
+    [BARE_CONDITION, PATTERNED] => true,
     [SPELLED_DIFFERS, SPELLED_ORDERED] => true,
-    [SPELLED_ORDERED, SPELLED_DIFFERS] => false,
+    [SPELLED_ORDERED, SPELLED_DIFFERS] => true,
     [NAMED_VALUE, UNNAMED_VALUE] => true,
-    [UNNAMED_VALUE, NAMED_VALUE] => false,
+    [UNNAMED_VALUE, NAMED_VALUE] => true,
     [MACRO_VALUES, MACRO_VALUE_SHORT] => true,
-    [MACRO_VALUE_SHORT, MACRO_VALUES] => false,
+    [MACRO_VALUE_SHORT, MACRO_VALUES] => true,
     [EQUALS, BOUND_WANT] => false,
     [CONSTANT_SIDE, ONE_ELEMENT] => true,
     [CONSTANT_REFERENCE, ONE_ELEMENT_REFERENCE] => true,
     [CONSTANT_PARENTHESISED, ONE_ELEMENT_PARENTHESISED] => true,
-    [ONE_ELEMENT, CONSTANT_SIDE] => false,
+    [ONE_ELEMENT, CONSTANT_SIDE] => true,
     [EQUALS, CRATE_HELPER] => false,
     [SUPER_SUPER_INLINE, SUPER_SUPER_HELPER] => false,
     [EQUALS, RENAMED_IMPORT] => false,
@@ -477,20 +477,20 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
 const ROUNDTRIP: &str = "laws::roundtrip!(rt, any::<u8>(), enc, dec);\n";
 const DECLARED: &str = "laws::law!(holds, any::<u8>(), f);\n";
 
-laws::table!(a_lost_check_is_described_by_its_test_relation_values_and_domain, Weakened::mentions, [
-    [EQUALS, EMPTY, "adds () in tests of x lost a check: an equality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values) calling f"] => true,
-    [DIFFERS, EMPTY, "differs () in tests of x lost a check: an inequality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
-    [BOUNDED, EMPTY, "adds () in tests of x lost a check: a condition pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
-    [PATTERNED, EMPTY, "shapes () in tests of x lost a check: a pattern match pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
-    [ASSOCIATIVE, EMPTY, "joins () in tests of x lost a check: the associative law pinning 0 values over generated domain of 1 cases (1 distinct, 0 values)"] => true,
-    [COMMUTATIVE, EMPTY, "joins () in tests of x lost a check: the commutative law pinning 0 values over generated domain of 1 cases (1 distinct, 0 values)"] => true,
-    [ROUNDTRIP, EMPTY, "rt () in tests of x lost a check: the roundtrip law pinning 0 values over generated domain of 256 cases (256 distinct, 0 values) over 0..=255"] => true,
-    [DECLARED, EMPTY, "holds () in tests of x lost a check: the declared law pinning 0 values over generated domain of 256 cases (256 distinct, 0 values) over 0..=255"] => true,
-    [LAW_ANY, EMPTY, "joins () in tests of x lost a check: the associative law pinning 0 values over generated domain of 256 cases (256 distinct, 0 values) over 0..=255"] => true,
-    [ENUMERATED, EMPTY, "every_mark_shows () in tests of x lost a check: an equality pinning 0 values over enumerated domain of 1 cases (1 distinct, 0 values)"] => true,
-    [LOOPED, EMPTY, "adds () in tests of x lost a check: an equality pinning 0 values over listed domain of 3 cases (3 distinct, 6 values)"] => true,
-    [RANGE_WIDE, EMPTY, "spans () in tests of x lost a check: an equality pinning 1 values over listed domain of 10 cases (10 distinct, 0 values) over 0..=9"] => true,
-    [SUPER_SUPER_INLINE, EMPTY, "adds () in tests in outer in inner of x lost a check: an equality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
+laws::table!(a_lost_claim_is_described_by_its_test_subject_values_and_domain, Weakened::mentions, [
+    [EQUALS, EMPTY, "test adds () in tests of x lost a claim: f(1) equals 2;"] => true,
+    [DIFFERS, EMPTY, "test differs () in tests of x lost a claim: f(1) differs from f(2);"] => true,
+    [BOUNDED, EMPTY, "test adds () in tests of x lost a claim: f(1) lies in 1..="] => true,
+    [PATTERNED, EMPTY, "test shapes () in tests of x lost a claim: f(1) matches Some(is anything);"] => true,
+    [ASSOCIATIVE, EMPTY, "lost a claim: the associative law of (A::join(), x0) equals true, for x0 256 sampled values of any()"] => true,
+    [COMMUTATIVE, EMPTY, "lost a claim: the commutative law of (A::join(), x0) equals true"] => true,
+    [ROUNDTRIP, EMPTY, "test rt () in tests of x lost a claim: the roundtrip law of (enc(), dec(), x0) equals true, for x0 256 sampled values of 0..=255"] => true,
+    [DECLARED, EMPTY, "test holds () in tests of x lost a claim: the declared law of (f(), x0) equals true"] => true,
+    [LAW_ANY, EMPTY, "for x0 256 sampled values of 0..=255"] => true,
+    [ENUMERATED, EMPTY, "for x0 every value of Mark :: ALL"] => true,
+    [LOOPED, EMPTY, "lost a claim: f(3) equals 4;"] => true,
+    [RANGE_WIDE, EMPTY, "test spans () in tests of x lost a claim: f(x0) equals Add(x0, 1), for x0 every value of 0..=9;"] => true,
+    [SUPER_SUPER_INLINE, EMPTY, "test adds () in tests in outer in inner of x lost a claim: f(1) equals 2;"] => true,
 ]);
 
 #[test]
@@ -527,9 +527,88 @@ fn an_assertion_moved_into_a_helper_in_another_file_is_flagged() {
 }
 
 #[test]
-fn the_fix_names_the_spec_detail_that_exempts_a_narrowing() {
-    assert!(
-        Weakened::reported([EQUALS, EMPTY])
-            .contains("owner-approved spec detail that names the test as <package>::<test>")
-    );
+fn the_fix_says_how_to_keep_the_claim() {
+    assert!(Weakened::reported([EQUALS, EMPTY]).contains("restore the claim, or state one that entails it"));
 }
+
+const DUPLICATED_BEFORE: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n    assert_eq!(f(2), 3);\n}\n";
+const DUPLICATED_AFTER: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n    assert_eq!(f(1), 2);\n}\n";
+const LISTED_PAIR: &str = "#[test]\nfn lists() {\n    assert_eq!(all(), [1, 2]);\n}\n";
+const LISTED_ONE_WITH_MESSAGE: &str = "#[test]\nfn lists() {\n    assert_eq!(all(), [1], \"x\");\n}\n";
+const ROW_CONSTANT_LOOP: &str = "const ROWS: [(u8, u8); 3] = [(1, 2), (2, 3), (3, 4)];\n#[test]\nfn adds() {\n    for (input, want) in ROWS {\n        assert_eq!(f(input), want);\n    }\n}\n";
+const ROW_CONSTANT_READ: &str = "const ROWS: [(u8, u8); 3] = [(1, 2), (2, 3), (3, 4)];\n#[test]\nfn adds() {\n    assert_eq!(f(1), ROWS.iter().next().unwrap().1);\n}\n";
+const LOOP_THOUSAND: &str =
+    "#[test]\nfn adds() {\n    for x in 0..1000u32 {\n        assert_eq!(f(x), x + 1);\n    }\n}\n";
+const PROPERTY_TWO: &str =
+    "proptest! {\n    #[test]\n    fn adds(x in 0..2u32) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const PROPERTY_THOUSAND: &str =
+    "proptest! {\n    #[test]\n    fn adds(x in 0..1000u32) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const TEN_ROWS: &str = "#[test]\nfn increments() {\n    for (input, wanted) in [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 10), (10, 11)] {\n        assert_eq!(inc(input), wanted);\n    }\n}\n";
+const PROPERTY_INCREMENTS: &str = "proptest! {\n    #[test]\n    fn increments(input in 0..2u8) {\n        prop_assert_eq!(inc(input), input + 1);\n    }\n}\n";
+const MANY_CASES: &str = "proptest! {\n    #![proptest_config(ProptestConfig::with_cases(10_000))]\n    #[test]\n    fn roundtrips(x in any::<u32>()) {\n        prop_assert_eq!(decode(encode(x)), x);\n    }\n}\n";
+const ONE_CASE: &str = "proptest! {\n    #![proptest_config(ProptestConfig::with_cases(1))]\n    #[test]\n    fn roundtrips(x in any::<u32>()) {\n        prop_assert_eq!(decode(encode(x)), x);\n    }\n}\n";
+const LONG_VECTORS: &str = "proptest! {\n    #[test]\n    fn sorts(v in prop::collection::vec(any::<u8>(), 0..1000)) {\n        prop_assert!(is_sorted(&sort(v)));\n    }\n}\n";
+const SHORT_VECTORS: &str = "proptest! {\n    #[test]\n    fn sorts(v in prop::collection::vec(any::<u8>(), 0..1)) {\n        prop_assert!(is_sorted(&sort(v)));\n    }\n}\n";
+const LONG_WORDS: &str = "proptest! {\n    #[test]\n    fn parses(s in \"[a-z]{1,20}\") {\n        prop_assert!(parse(&s).is_ok());\n    }\n}\n";
+const ONE_WORD: &str =
+    "proptest! {\n    #[test]\n    fn parses(s in \"a\") {\n        prop_assert!(parse(&s).is_ok());\n    }\n}\n";
+const SPLIT_KEEPING_NAME: &str =
+    "#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n#[test]\nfn adds_two() {\n    assert_eq!(f(2), 3);\n}\n";
+const SEPARATE_TESTS: &str =
+    "#[test]\nfn adds_one() {\n    assert_eq!(f(1), 2);\n}\n#[test]\nfn adds_two() {\n    assert_eq!(f(2), 3);\n}\n";
+const MERGED_INTO_ONE: &str = "#[test]\nfn adds_one() {\n    assert_eq!(f(1), 2);\n    assert_eq!(f(2), 3);\n}\n";
+const LOOP_THREE: &str = "#[test]\nfn adds() {\n    for x in 0..3u8 {\n        assert_eq!(f(x), x + 1);\n    }\n}\n";
+const UNROLLED_THREE: &str =
+    "#[test]\nfn adds() {\n    assert_eq!(f(0), 1);\n    assert_eq!(f(1), 2);\n    assert_eq!(f(2), 3);\n}\n";
+const LOOP_TEN: &str = "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_eq!(f(x), x + 1);\n    }\n}\n";
+const SPLIT_LOOPS: &str = "#[test]\nfn adds() {\n    for x in 0..5u8 {\n        assert_eq!(f(x), x + 1);\n    }\n    for x in 5..10u8 {\n        assert_eq!(f(x), x + 1);\n    }\n}\n";
+const TWO_BOUNDS: &str = "#[test]\nfn bounds() {\n    assert!(f(1) > 0);\n    assert!(f(1) < 10);\n}\n";
+const JOINED_BOUNDS: &str = "#[test]\nfn bounds() {\n    assert!((f(1) > 0) && (f(1) < 10));\n}\n";
+const EQUALS_SOME: &str = "#[test]\nfn finds() {\n    assert_eq!(find(1), Some(3));\n}\n";
+const IS_SOME: &str = "#[test]\nfn finds() {\n    assert!(find(1).is_some());\n}\n";
+const MATCHES_FIVE: &str = "#[test]\nfn finds() {\n    assert!(matches!(find(1), Some(1..=5)));\n}\n";
+const MATCHES_NINE: &str = "#[test]\nfn finds() {\n    assert!(matches!(find(1), Some(1..=9)));\n}\n";
+const ABOVE_ZERO: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 0);\n}\n";
+const AT_LEAST_ZERO: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 0);\n}\n";
+const EQUALS_SWAPPED: &str = "#[test]\nfn adds() {\n    assert_eq!(2, f(1));\n}\n";
+const REPINNED: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 3);\n}\n";
+const LAW_ANY_BYTE: &str = "laws::associative!(joins, any::<u8>(), join);\n";
+const LAW_TWO_BYTES: &str = "laws::associative!(joins, 0..2u8, join);\n";
+const EMPTY_LOOP_ONLY: &str = "#[test]\nfn adds() {\n    for _ in 0..0u8 {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+
+laws::table!(claims_are_entailed_or_lost, Weakened::in_one_module, [
+    [DUPLICATED_BEFORE, DUPLICATED_AFTER] => true,
+    [LISTED_PAIR, LISTED_ONE_WITH_MESSAGE] => true,
+    [ROW_CONSTANT_LOOP, ROW_CONSTANT_READ] => true,
+    [LOOP_THOUSAND, PROPERTY_TWO] => true,
+    [LOOP_THOUSAND, PROPERTY_THOUSAND] => true,
+    [PROPERTY_TWO, LOOP_THOUSAND] => false,
+    [TEN_ROWS, PROPERTY_INCREMENTS] => true,
+    [MANY_CASES, ONE_CASE] => true,
+    [ONE_CASE, MANY_CASES] => false,
+    [LONG_VECTORS, SHORT_VECTORS] => true,
+    [LONG_WORDS, ONE_WORD] => true,
+    [LONG_VECTORS, LONG_VECTORS] => false,
+    [DUPLICATED_BEFORE, SPLIT_KEEPING_NAME] => false,
+    [SEPARATE_TESTS, MERGED_INTO_ONE] => false,
+    [LOOP_THREE, UNROLLED_THREE] => false,
+    [UNROLLED_THREE, LOOP_THREE] => false,
+    [LOOP_TEN, SPLIT_LOOPS] => false,
+    [SPLIT_LOOPS, LOOP_TEN] => false,
+    [LOOP_TEN, LOOP_THREE] => true,
+    [TWO_BOUNDS, JOINED_BOUNDS] => false,
+    [JOINED_BOUNDS, TWO_BOUNDS] => false,
+    [EQUALS_SOME, IS_SOME] => true,
+    [IS_SOME, EQUALS_SOME] => false,
+    [MATCHES_FIVE, MATCHES_NINE] => true,
+    [MATCHES_NINE, MATCHES_FIVE] => false,
+    [ABOVE_ZERO, AT_LEAST_ZERO] => true,
+    [AT_LEAST_ZERO, ABOVE_ZERO] => false,
+    [EQUALS, EQUALS_SWAPPED] => false,
+    [EQUALS, SPELLED_OUT] => false,
+    [EQUALS, REPINNED] => true,
+    [LAW_ANY_BYTE, LAW_TWO_BYTES] => true,
+    [LAW_TWO_BYTES, LAW_ANY_BYTE] => false,
+    [EMPTY_LOOP_ONLY, EMPTY] => false,
+    [EQUALS, EMPTY_LOOP_ONLY] => true,
+]);

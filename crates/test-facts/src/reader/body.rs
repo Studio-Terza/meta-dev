@@ -10,44 +10,43 @@ use lint_core::Syntax;
 
 use super::assertion::Assertion;
 use super::scope::{Helper, Place, Route, Scope};
-use super::trace::{Evaluation, Iterations, Locals, Trace};
+use super::trace::{Evaluation, Iterations, Locals, Quantifiers, Trace};
 use crate::boundary::Truth;
-use crate::check::{Check, Domain};
+use crate::claim::Claim;
 use reach::{Flow, Reach};
 
 pub(crate) struct Body<'scope, 'file> {
     scope: &'scope Scope<'file>,
     locals: Locals<'file>,
-    domain: Domain,
+    quantifiers: Quantifiers,
     open: BTreeSet<Route>,
     place: Place,
-    checks: Vec<Check>,
+    claims: Vec<Claim>,
 }
 
 impl<'scope, 'file> Body<'scope, 'file> {
-    pub(crate) fn checks(
+    pub(crate) fn claims(
         scope: &'scope Scope<'file>,
         place: &Place,
         block: &'file Block,
-        domain: Domain,
-    ) -> Vec<Check> {
+        quantifiers: &Quantifiers,
+    ) -> Vec<Claim> {
         let mut body = Body {
             scope,
             locals: Locals::default(),
-            domain,
+            quantifiers: quantifiers.clone(),
             open: BTreeSet::new(),
             place: place.clone(),
-            checks: Vec::new(),
+            claims: Vec::new(),
         };
         body.visit_block(block);
-        body.checks
+        body.claims
     }
 
     fn met(&mut self, invocation: &Macro) {
         let assertion = Assertion::named(invocation, self.scope.tables());
-        let found =
-            assertion.checks(invocation, &Trace::new(self.scope, &self.locals, &self.place), self.domain.clone());
-        self.checks.extend(found);
+        let found = assertion.claims(invocation, &Trace::new(self.scope, &self.locals, &self.place, &self.quantifiers));
+        self.claims.extend(found);
         assertion.nested(invocation).iter().for_each(|inner| self.met(inner));
     }
 
@@ -86,12 +85,15 @@ impl<'file> Visit<'file> for Body<'_, 'file> {
     fn visit_block(&mut self, block: &'file Block) {
         block.stmts.iter().find(|statement| {
             self.visit_stmt(statement);
-            Reach::after(&Trace::new(self.scope, &self.locals, &self.place), statement) == Flow::Ends
+            Reach::after(&Trace::new(self.scope, &self.locals, &self.place, &self.quantifiers), statement) == Flow::Ends
         });
     }
 
     fn visit_expr_if(&mut self, branch: &'file ExprIf) {
-        match Evaluation::condition_of(&Trace::new(self.scope, &self.locals, &self.place), &branch.cond) {
+        match Evaluation::condition_of(
+            &Trace::new(self.scope, &self.locals, &self.place, &self.quantifiers),
+            &branch.cond,
+        ) {
             Some(Truth::Holds) => self.visit_block(&branch.then_branch),
             Some(Truth::Fails) => branch.else_branch.iter().for_each(|(_, other)| self.visit_expr(other)),
             None => visit::visit_expr_if(self, branch),
@@ -99,19 +101,21 @@ impl<'file> Visit<'file> for Body<'_, 'file> {
     }
 
     fn visit_expr_while(&mut self, looped: &'file ExprWhile) {
-        match Evaluation::condition_of(&Trace::new(self.scope, &self.locals, &self.place), &looped.cond) {
+        match Evaluation::condition_of(
+            &Trace::new(self.scope, &self.locals, &self.place, &self.quantifiers),
+            &looped.cond,
+        ) {
             Some(Truth::Fails) => (),
             Some(Truth::Holds) | None => visit::visit_expr_while(self, looped),
         }
     }
 
     fn visit_expr_for_loop(&mut self, looped: &'file ExprForLoop) {
-        let outer = self.domain.clone();
-        let inner =
-            outer.clone().max_with(Iterations::looped(&Trace::new(self.scope, &self.locals, &self.place), looped));
-        self.domain = inner.clone();
-        inner.running().iter().for_each(|_| visit::visit_expr_for_loop(self, looped));
-        self.domain = outer;
+        let binder = Iterations::looped(&Trace::new(self.scope, &self.locals, &self.place, &self.quantifiers), looped);
+        let inner = self.quantifiers.quantified(binder, &looped.pat);
+        let outer = mem::replace(&mut self.quantifiers, inner);
+        visit::visit_expr_for_loop(self, looped);
+        self.quantifiers = outer;
     }
 
     fn visit_macro(&mut self, invocation: &'file Macro) {

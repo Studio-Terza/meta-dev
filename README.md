@@ -252,28 +252,21 @@ A change never weakens a test. Compare two trees, before and after:
 
     lint strength <before-root> <after-root>
 
-Each test is read as a set of checks, each a relation (an equality above a pattern above a bare condition, an inequality
-above a bare condition, a law only by its own kind), the values it pins and the domain it ranges over (generated above
-enumerated by shipped code above listed rows). A domain is measured, not named: its cases, its distinct rows (a table
-row replaced by a duplicate loses a distinct row), the values in its rows, and the value ranges it spans (a range loop
-or a proptest strategy such as `0..9u8`, `any::<u8>()` or `x: u8` must keep every value it covered, and the bounds are
-evaluated through constants, locals and integer arithmetic). Every check before the change must be matched, one to one,
-by a check at least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change
-added to the same package. Pinned values are counted only on the compared sides, the first two arguments of `assert_eq!`
-and `assert_ne!` and the condition of `assert!`, never in a message, and a side repeated verbatim counts once. A
-tautology (the same value on both sides, once locals and constants are followed, or `true == true`) counts as a bare
-condition only. A check also names the functions its compared sides call, resolved by path through the file (a method by its name), and every one before must still be called after, so pointing a check at another function is a weakening. A check that can never run is not counted: after a `return`, `break`, `continue` or `panic!`, in a
-branch whose condition evaluates to false, or in a loop over no cases. A loop widens the domain only over its own
-iterable (a list, a range, a constant, an associated const, or those through `iter`, `into_iter`, `copied`, `cloned`,
-`enumerate` or `rev`), and a constant pins values only when it is itself the compared side. Tests in `proptest!` blocks
-are read as generated laws over their strategies. An assertion moved into a helper defined in the same file is followed
-by the path the call resolves to through the file's modules and imports (`expect(..)`, `self::`, `super::`, `crate::`,
-`Self::expect(..)`, `Type::expect(..)`, `use` and `use ...::*`), never by its bare name, so a helper of the same name in
-another module earns no credit. A renamed test and `assert!(a == b)` written for `assert_eq!(a, b)` are not flagged; a
-lost row, a narrowed range, a hand-written list in place of `T::ALL`, or an equality turned into a bare condition is.
-Method calls and helpers in another file are not followed, so an assertion moved into another file's helper is flagged.
-A deliberate narrowing passes only when the PR cites an owner-approved spec detail that names the test as `<package>::<test>`. The command exits 1 when a
-check was lost and prints each one; it refuses, also with exit 1, any arguments other than exactly two roots.
+Each test is read as a set of claims. A claim says that a subject (the compared side, with locals, constants, helper
+parameters and loop variables substituted, integer arithmetic folded, and `&`, parentheses, casts and `.clone()`
+stripped) lies in an accepted set of values (one value for `assert_eq!`, all but one for `assert_ne!`, a range for `<`,
+`<=`, `>` or `>=` against a number, a constructor for `matches!`, `is_some`, `is_ok`, `is_err` or `is_none`, and `true` for
+any other condition), for every value of its domains (a listed array or table is expanded into one claim per row, a
+range stays a range, and an iterable or strategy the reader cannot evaluate is kept as written) drawn either every time
+(a loop or table) or as a number of samples (a `proptest!` input or a law, with the case count from `proptest_config`).
+Only the compared operands are read, never a message. A claim whose subject is fixed in the test, or whose accepted set
+is the subject itself, says nothing and is dropped, as is a claim over an empty domain. A test is weakened when a claim
+it made before the change is entailed by no claim of its package after it: the same subject (equalities in either
+order), an accepted set inside the old one, and every domain covering the old one, where a sampled domain never covers
+one drawn every time and needs at least as many cases. A range is also covered by the union of the claims over its parts
+and by one claim per value. Duplicates, renamed, moved, split and merged tests within a package, and a loop unrolled into
+its rows or the reverse, are not flagged. The command exits 1 when a claim was lost and prints each one; it refuses,
+also with exit 1, any arguments other than exactly two roots.
 
 ## Rust only
 

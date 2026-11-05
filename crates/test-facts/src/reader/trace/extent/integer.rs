@@ -1,7 +1,7 @@
 use lint_layout::{Name, Word};
 
 use crate::boundary::Quantity;
-use crate::check::Rows;
+use crate::claim::Ranges;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Integer {
@@ -56,22 +56,32 @@ impl Integer {
         }
     }
 
-    pub(crate) fn rows(self) -> Rows {
+    pub(crate) fn ranges(self) -> Ranges {
         match self {
-            Integer::Unsigned8 => Rows::over(Quantity::new(i128::from(u8::MIN)), Quantity::new(i128::from(u8::MAX))),
-            Integer::Unsigned16 => Rows::over(Quantity::new(i128::from(u16::MIN)), Quantity::new(i128::from(u16::MAX))),
-            Integer::Unsigned32 => Rows::over(Quantity::new(i128::from(u32::MIN)), Quantity::new(i128::from(u32::MAX))),
+            Integer::Unsigned8 => {
+                Ranges::between(Quantity::new(i128::from(u8::MIN)), Quantity::new(i128::from(u8::MAX)))
+            }
+            Integer::Unsigned16 => {
+                Ranges::between(Quantity::new(i128::from(u16::MIN)), Quantity::new(i128::from(u16::MAX)))
+            }
+            Integer::Unsigned32 => {
+                Ranges::between(Quantity::new(i128::from(u32::MIN)), Quantity::new(i128::from(u32::MAX)))
+            }
             Integer::Unsigned64 | Integer::Size => {
-                Rows::over(Quantity::new(i128::from(u64::MIN)), Quantity::new(i128::from(u64::MAX)))
+                Ranges::between(Quantity::new(i128::from(u64::MIN)), Quantity::new(i128::from(u64::MAX)))
             }
-            Integer::Unsigned128 => Rows::over(Quantity::ZERO, Quantity::new(i128::MAX)),
-            Integer::Signed8 => Rows::over(Quantity::new(i128::from(i8::MIN)), Quantity::new(i128::from(i8::MAX))),
-            Integer::Signed16 => Rows::over(Quantity::new(i128::from(i16::MIN)), Quantity::new(i128::from(i16::MAX))),
-            Integer::Signed32 => Rows::over(Quantity::new(i128::from(i32::MIN)), Quantity::new(i128::from(i32::MAX))),
+            Integer::Unsigned128 => Ranges::between(Quantity::ZERO, Quantity::new(i128::MAX)),
+            Integer::Signed8 => Ranges::between(Quantity::new(i128::from(i8::MIN)), Quantity::new(i128::from(i8::MAX))),
+            Integer::Signed16 => {
+                Ranges::between(Quantity::new(i128::from(i16::MIN)), Quantity::new(i128::from(i16::MAX)))
+            }
+            Integer::Signed32 => {
+                Ranges::between(Quantity::new(i128::from(i32::MIN)), Quantity::new(i128::from(i32::MAX)))
+            }
             Integer::Signed64 | Integer::SignedSize => {
-                Rows::over(Quantity::new(i128::from(i64::MIN)), Quantity::new(i128::from(i64::MAX)))
+                Ranges::between(Quantity::new(i128::from(i64::MIN)), Quantity::new(i128::from(i64::MAX)))
             }
-            Integer::Signed128 => Rows::over(Quantity::new(i128::MIN), Quantity::new(i128::MAX)),
+            Integer::Signed128 => Ranges::between(Quantity::new(i128::MIN), Quantity::new(i128::MAX)),
         }
     }
 }

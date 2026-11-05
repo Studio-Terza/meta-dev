@@ -5,7 +5,7 @@ use syn::{BinOp, Expr, ExprBinary, ExprLit, ExprUnary, Lit, UnOp};
 
 use lint_layout::Name;
 
-use super::{Constants, Locals, Trace};
+use super::{Locals, Trace};
 use crate::boundary::{Quantity, Truth};
 
 pub(crate) struct Evaluation<'trace, 'body, 'file> {
@@ -68,7 +68,7 @@ impl<'trace, 'body, 'file> Evaluation<'trace, 'body, 'file> {
         let measured = guard
             .as_ref()
             .map_or(Some(()), |name| self.followed.insert(name.clone()).then_some(()))
-            .and_then(|()| self.trace.bound(expression, Constants::Followed))
+            .and_then(|()| self.trace.bound(expression))
             .and_then(|bound| measure(self, bound));
         self.followed.retain(|followed| Some(followed) != guard.as_ref());
         measured

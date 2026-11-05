@@ -1,10 +1,10 @@
 mod boundary;
-mod check;
+mod claim;
 mod reader;
 mod test;
 
-pub use check::Check;
-pub use test::{Test, TestId};
+pub use claim::{Claim, Claims};
+pub use test::Test;
 
 use lint_core::SourceFile;
 use reader::Reader;

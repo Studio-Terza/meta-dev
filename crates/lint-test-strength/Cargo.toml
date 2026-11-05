@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-placement = { path = "../lint-placement" }
 lint-transition-graph = { path = "../lint-transition-graph" }
 newtype = { path = "../newtype" }
 test-facts = { path = "../test-facts" }
