@@ -2,7 +2,7 @@ use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_transition_graph::{
-    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, ConnectedDirectories, Extraction, GraphLint,
+    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, Covered, Extraction, GraphLint,
     InterfaceByConsumers, LowestCluster, TypeSystem,
 };
 use text_lines::Lines;
@@ -62,7 +62,7 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&SPLIT, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+        Clustered::lines(&SPLIT, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
             .violations()
             .to_vec()),
         [
@@ -352,7 +352,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&pathed, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+        Clustered::lines(&pathed, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
             .violations()
             .to_vec()),
         [

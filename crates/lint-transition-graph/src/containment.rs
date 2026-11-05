@@ -33,7 +33,7 @@ use resolver::{Functions, Resolver, StandIns};
 use slice::Slice;
 
 pub use ask::{Answer, Ask, Listed};
-pub use connected::{ConnectedClusters, ConnectedDirectories};
+pub use connected::ConnectedClusters;
 pub use interface::InterfaceByConsumers;
 pub use layered::AcyclicQuotients;
 pub use placed::LowestCluster;
@@ -218,9 +218,9 @@ impl<'found, 'file> Containment<'found, 'file> {
         })
     }
 
-    pub(crate) fn splits<'view, Found: Split<'view, 'found>>(&'view self, levels: &[Level]) -> Vec<Violation<'file>> {
+    pub(crate) fn splits<'view, Found: Split<'view, 'found>>(&'view self, level: Level) -> Vec<Violation<'file>> {
         self.slices()
-            .filter(|slice| levels.contains(&slice.cluster().level()))
+            .filter(|slice| slice.cluster().level() == level)
             .filter_map(|slice| Found::found_in(self, slice.cluster()))
             .filter_map(|found| self.first_site(found.sited()).map(|site| Violation::new(site, &found)))
             .collect()

@@ -3,8 +3,8 @@ mod family;
 
 use lint_core::{Headline, Report};
 
-use crate::GraphLint;
 use crate::system::TypeSystem;
+use crate::{Covered, GraphLint};
 use comparison::Comparison;
 use family::Family;
 
@@ -37,4 +37,8 @@ impl GraphLint for OneEdge {
             Family::repeated_among(edges).iter().filter_map(Family::violation).collect(),
         )
     }
+}
+
+impl Covered for OneEdge {
+    type Coverage = DuplicateTransitions;
 }

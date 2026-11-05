@@ -50,7 +50,8 @@ use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
 use lint_transition_graph::{
-    AcyclicQuotients, Clustered, ConnectedClusters, Extraction, GraphLint, LowestCluster, OneEdge, TypeSystem,
+    AcyclicQuotients, Clustered, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers, LowestCluster,
+    OneEdge, TypeSystem,
 };
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
@@ -119,6 +120,7 @@ impl Lints {
             [
                 OneEdge::dirty(&system),
                 <Clustered<ConnectedClusters>>::dirty(&system),
+                <Clustered<InterfaceByConsumers>>::dirty(&system),
                 <Clustered<AcyclicQuotients>>::dirty(&system),
                 <Clustered<LowestCluster>>::dirty(&system),
                 DistinctSignatures::dirty(&system),
