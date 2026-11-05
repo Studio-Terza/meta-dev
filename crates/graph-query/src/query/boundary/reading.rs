@@ -60,7 +60,8 @@ impl Expecting {
         Some(word)
             .filter(|word| word.chars().next().is_some_and(|first| first == Self::FLAG_MARK))
             .filter(|word| word.chars().nth(1).is_some())
-            .filter(|word| word.chars().skip(1).all(|digit| digit.is_ascii_digit()))
+            .filter(|word| word.chars().any(|digit| digit.is_ascii_digit()))
+            .filter(|word| word.parse::<f64>().is_ok())
             .map(|word| QueryFailure::Top(word.to_owned()))
     }
 

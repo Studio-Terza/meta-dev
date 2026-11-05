@@ -14,8 +14,8 @@ src/mode.rs:3: bare bool in is_a; take and return a domain type (a newtype, an e
 src/mode.rs:4: bare u8 in name; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/plain.rs:3: bare bool in is_a; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 a function returning bool forgets what it found and makes the caller branch on a flag:
-src/elsewhere.rs:2: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/inline.rs:4: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/mode.rs:3: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/plain.rs:3: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+src/elsewhere.rs:2: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
+src/inline.rs:4: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
+src/mode.rs:3: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
+src/plain.rs:3: fn is_a -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
 fails

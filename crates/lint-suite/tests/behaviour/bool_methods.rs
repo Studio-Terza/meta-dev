@@ -106,6 +106,8 @@ fn every_function_returning_bool_is_flagged() {
 fn the_message_names_the_replacements() {
     let shown = BoolMethods::report(&[Sources::file("a.rs", Text::new(LISTED))]).to_string();
     assert!(
-        ["Option", "Result", "enum", "match", "NonEmpty", "fn is_on -> bool"].iter().all(|word| shown.contains(word))
+        ["Option", "Result", "enum", "match", "newtype::Filled", "fn is_on -> bool"]
+            .iter()
+            .all(|word| shown.contains(word))
     );
 }
