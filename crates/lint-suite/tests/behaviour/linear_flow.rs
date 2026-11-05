@@ -77,6 +77,8 @@ const FROM_BOOL_PORT_IMPL: &str = "use crate::ports::Lamp;\nstruct Bulb;\nimpl L
 const FROM_BOOL_PLAIN_IMPL: &str = "use crate::lamps::Lamp;\nstruct Bulb;\nimpl Lamp for Bulb {}\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_EFFECT: &str = "fn load() -> String {\n    std::env::var(\"LIT\").unwrap_or_default()\n}\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_BESIDE: &str = "mod io {\n    extern \"C\" {\n        fn abs(x: i32) -> i32;\n    }\n}\nmod convert {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_NESTED_PORT_IMPL: &str = "mod inner {\n    use crate::ports::Lamp;\n    struct Bulb;\n    impl Lamp for Bulb {}\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_NESTED_PLAIN_IMPL: &str = "mod inner {\n    use crate::lamps::Lamp;\n    struct Bulb;\n    impl Lamp for Bulb {}\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
 const PORT_TRAIT: Source = Source::new(Located::new("crates/x/src/ports.rs"), Text::new("pub trait Lamp {}\n"));
 const PLAIN_TRAIT: Source = Source::new(Located::new("crates/x/src/lamps.rs"), Text::new("pub trait Lamp {}\n"));
 const FROM_BOOL_BOUNDARY_INLINE: &str = "mod boundary {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
@@ -135,7 +137,7 @@ const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod
 const REEXPORTED_LIT: Source =
     Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod light;\npub use light::Lit;\n"));
 
-const LINEAR: [Case; 67] = [
+const LINEAR: [Case; 69] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -465,6 +467,16 @@ const LINEAR: [Case; 67] = [
             TYPES,
         ],
         Flagged::new(&["crates/x/src/boundary/adapter.rs:6"]),
+    ),
+    Case::new(
+        Title::new("from bool in a nested module implementing a port trait imported there"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_NESTED_PORT_IMPL)), PORT_TRAIT, TYPES],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a nested module implementing a trait that is no port"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_NESTED_PLAIN_IMPL)), PLAIN_TRAIT, TYPES],
+        Flagged::new(&["crates/x/src/lib.rs:7"]),
     ),
     Case::new(
         Title::new("from bool in a module calling an OS API"),
