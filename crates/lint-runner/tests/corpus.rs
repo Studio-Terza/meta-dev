@@ -12,6 +12,9 @@ const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
 const FIX_START: &str = "; ";
+const WITHDRAWN: [&str; 6] = ["then_some", "map_or", ".then(", "filter(", "ok_or", "pipeline of let bindings"];
+const COMBINATORS: &str = "combinators";
+const LOOP_FINDINGS: [&str; 2] = ["loop", "iterator"];
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
@@ -33,6 +36,8 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
     assert_ne!(printed, Vec::<&str>::new());
     assert_eq!(unfixed, Vec::<&str>::new());
+    let withdrawn: Vec<&str> = printed.iter().copied().filter(|line| Corpus::withdrawn_advice(line)).collect();
+    assert_eq!(withdrawn, Vec::<&str>::new());
     Ok(())
 }
 
@@ -88,6 +93,13 @@ impl Corpus {
             .and_then(|(at, _)| line.get(..at))
             .and_then(|site| site.chars().last())
             .is_some_and(|last| last.is_ascii_digit())
+    }
+
+    fn withdrawn_advice(line: &str) -> bool {
+        let fix = Self::fix_named(line).unwrap_or_default();
+        let loops = LOOP_FINDINGS.iter().filter(|finding| line.contains(*finding)).count();
+        let spellings = WITHDRAWN.iter().chain(std::iter::repeat_n(&COMBINATORS, usize::from(loops == 0)));
+        spellings.into_iter().any(|spelling| fix.contains(spelling))
     }
 
     fn fix_named(line: &str) -> Option<&str> {

@@ -202,8 +202,8 @@ fn each_crate_counts_its_pipelines_routers_and_the_rest() {
     assert_eq!(
         shown,
         [
-            "crates/x/src/lib.rs:3: workspace: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
-            "crates/x/src/lib.rs:3: crate x: 3 functions, 1 pipelines, 1 pure routers, 1 neither; turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
+            "crates/x/src/lib.rs:3: workspace: 3 functions, 1 pipelines, 1 pure routers, 1 neither; make each function that is neither a pure router, one match on an enum, Option or Result, or give its decisions a named outcome, an enum a pure router matches",
+            "crates/x/src/lib.rs:3: crate x: 3 functions, 1 pipelines, 1 pure routers, 1 neither; make each function that is neither a pure router, one match on an enum, Option or Result, or give its decisions a named outcome, an enum a pure router matches",
         ]
     );
 }
@@ -223,7 +223,7 @@ fn messages_name_the_branch_and_its_fix() {
             "a.rs:2: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches",
             "b.rs:3: if let that is not the whole body; extract it into a pure router, a function whose whole body is the if let, or give the decision a named outcome, an enum a pure router matches",
             "c.rs:3: match that is not the whole body; extract it into a pure router, a function whose whole body is the match, or give the decision a named outcome, an enum a pure router matches",
-            "d.rs:2: let-else; propagate with ? after ok_or, or extract a pure router, a function whose whole body is one match on the Option or Result",
+            "d.rs:2: let-else; extract a pure router, a function whose whole body is one match on the Option or Result, or give the decision a named outcome, an enum a pure router matches",
         ]
     );
 }

@@ -83,7 +83,7 @@ impl fmt::Display for Tally<'_> {
 impl lint_core::Finding for Tally<'_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "turn each function that is neither into a pipeline of let bindings and combinators, or into a pure router",
+            "make each function that is neither a pure router, one match on an enum, Option or Result, or give its decisions a named outcome, an enum a pure router matches",
         )
     }
 }

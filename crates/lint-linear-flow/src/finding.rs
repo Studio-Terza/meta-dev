@@ -106,7 +106,7 @@ impl lint_core::Finding for Finding {
                 Fix::new("drive an iterator with combinators (successors, repeat_with, take_while, try_fold)")
             }
             Finding::LetElse => Fix::new(
-                "propagate with ? after ok_or, or extract a pure router, a function whose whole body is one match on the Option or Result",
+                "extract a pure router, a function whose whole body is one match on the Option or Result, or give the decision a named outcome, an enum a pure router matches",
             ),
             Finding::Guard => Fix::new("name the condition as an enum or a predicate type and match on it"),
             Finding::ValuePattern => Fix::new("match on an enum, Option or Result that names the cases"),
