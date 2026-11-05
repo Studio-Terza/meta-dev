@@ -11,16 +11,10 @@ impl Placeholders {
         self.0
     }
 
-    fn placeholder(text: &str, at: usize) -> Option<&str> {
-        let before = text.get(..at).map_or(0, |head| head.chars().rev().take_while(|symbol| *symbol == '{').count());
-        let after = text.get(at + 1..).and_then(|tail| tail.chars().next());
-        (before % 2 == 0)
-            .then_some(at)
-            .filter(|_| after != Some('{'))
-            .and_then(|opening| text.get(opening + 1..))
-            .and_then(|rest| {
-                rest.char_indices().find(|(_, symbol)| *symbol == '}').and_then(|(length, _)| rest.get(..length))
-            })
+    fn expression(text: &str, opening: usize) -> Option<&str> {
+        text.get(opening + 1..).and_then(|rest| {
+            rest.char_indices().find(|(_, symbol)| *symbol == '}').and_then(|(length, _)| rest.get(..length))
+        })
     }
 }
 
@@ -28,10 +22,13 @@ impl FromStr for Placeholders {
     type Err = Infallible;
 
     fn from_str(text: &str) -> Result<Placeholders, Infallible> {
+        let braces: Vec<usize> = text.char_indices().filter(|(_, symbol)| *symbol == '{').map(|(at, _)| at).collect();
         Ok(Placeholders(
-            text.char_indices()
-                .filter(|(_, symbol)| *symbol == '{')
-                .filter_map(|(at, _)| Self::placeholder(text, at))
+            braces
+                .chunk_by(|first, second| *second == *first + 1)
+                .filter(|run| run.len() % 2 == 1)
+                .filter_map(|run| run.last())
+                .filter_map(|opening| Self::expression(text, *opening))
                 .filter_map(|expression| expression.parse().ok())
                 .collect(),
         ))

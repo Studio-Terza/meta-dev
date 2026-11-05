@@ -65,15 +65,14 @@ impl Parse for MethodCall {
 impl Parse for PathCall {
     fn parse(attempt: ParseStream) -> syn::Result<PathCall> {
         let path: ExprPath = attempt.parse()?;
-        let name = path
-            .path
+        path.path
             .segments
             .iter()
             .nth(1)
             .and_then(|_| path.path.segments.last())
             .map(|segment| Name::from(&segment.ident))
-            .ok_or_else(|| attempt.error(Arguments::NOT_A_CALL))?;
-        Arguments::follow(attempt).map(|()| PathCall(name))
+            .map(PathCall)
+            .ok_or_else(|| attempt.error(Arguments::NOT_A_CALL))
     }
 }
 
