@@ -19,12 +19,12 @@ pub struct VariantName {
 impl VariantName {
     const ATTRIBUTE: &'static str = "name";
     const ACCESSOR_ON_VARIANT: &'static str = "accessor belongs on the enum, not on a variant";
-    const VALUE: &'static str = "value";
+    const VALUE: &'static str = "accessor_value";
     const UNIT_ONLY: &'static str = "a Named variant carries no fields";
     const REPEATED: &'static str = "a Named variant takes one #[name(\"..\")]";
     const UNNAMED: &'static str = "a Named variant needs #[name(\"..\")]";
-    const MISSING: &'static str = "a Named variant needs #[value(accessor = ..)] for every accessor";
-    const TWICE: &'static str = "a Named variant gives each accessor one #[value(accessor = ..)]";
+    const MISSING: &'static str = "a Named variant needs #[accessor_value(accessor = ..)] for every accessor";
+    const TWICE: &'static str = "a Named variant gives each accessor one #[accessor_value(accessor = ..)]";
 
     pub fn text(&self) -> String {
         self.text.value()
