@@ -149,6 +149,11 @@ fn malformed_arguments_are_refused_with_the_reason() {
     assert_eq!(Asked::query(&["index", "-x"]), Err(QueryFailure::Flag("-x".to_owned())));
     assert_eq!(Asked::query(&["--defined", "--implementor"]), Err(QueryFailure::Flag("--implementor".to_owned())));
     assert_eq!(Asked::query(&["--uses", "--users", "Ledger"]), Err(QueryFailure::Unfinished));
+    assert_eq!(Asked::query(&["--in", "--implementor"]), Err(QueryFailure::Flag("--implementor".to_owned())));
+    assert_eq!(Asked::query(&["--role", "--foo"]), Err(QueryFailure::Flag("--foo".to_owned())));
+    assert_eq!(Asked::query(&["index", "--top", "--foo"]), Err(QueryFailure::Flag("--foo".to_owned())));
+    assert_eq!(Asked::query(&["--in", "--users", "Ledger"]), Err(QueryFailure::Unfinished));
+    assert_eq!(Asked::query(&["index", "--top", "--in", "src"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["--path", "Ledger", "--top", "3"]), Err(QueryFailure::Unfinished));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
     assert!(refused.is_err_and(|reason| reason.contains("is not a Rust signature")));
