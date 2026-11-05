@@ -58,8 +58,22 @@ impl Ranges {
         Ranges::spanning(Span::between(low, high))
     }
 
+    pub(crate) fn excluding(value: Quantity) -> Ranges {
+        let below = value.combined(Operator::Subtract, Quantity::UNIT).unwrap_or(value);
+        let above = value.combined(Operator::Add, Quantity::UNIT).unwrap_or(value);
+        &Ranges::between(Quantity::LEAST, below) | &Ranges::between(above, Quantity::GREATEST)
+    }
+
+    pub(crate) fn lowest(&self) -> Ranges {
+        Ranges::spanning(self.0.first().and_then(|span| Span::between(span.low, span.low)))
+    }
+
     pub(crate) fn encloses(&self, inner: &Ranges) -> Option<&Ranges> {
         inner.0.iter().all(|span| self.0.iter().any(|outer| outer.overlap(*span) == Some(*span))).then_some(self)
+    }
+
+    pub(crate) fn occupied(&self) -> Option<&Ranges> {
+        self.0.first().map(|_| self)
     }
 
     pub(crate) fn occupancy(&self) -> Occupancy {

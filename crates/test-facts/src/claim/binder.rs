@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use lint_layout::Name;
 use newtype::{Arbitrary, Display, Newtype};
 
 use super::ranges::Ranges;
-use super::term::{Listing, Substituted, Substitution, Term};
+use super::term::{Callee, Listing, Substituted, Substitution, Term};
 use crate::boundary::Spelling;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -72,6 +73,10 @@ impl FromIterator<Term> for Listed {
 }
 
 impl Listed {
+    fn first(&self) -> Listed {
+        Listed(self.0.first().cloned().into_iter().collect())
+    }
+
     fn inside_ranges(&self, outer: &Ranges) -> Option<&Listed> {
         self.0
             .iter()
@@ -154,6 +159,14 @@ impl Domain {
             Domain::Listed(_) | Domain::Drawn(_) => None,
         }
     }
+
+    pub(crate) fn first(&self) -> Domain {
+        match self {
+            Domain::Listed(values) => Domain::Listed(values.first()),
+            Domain::Ranged(ranges) => Domain::Ranged(ranges.lowest()),
+            Domain::Drawn(source) => Domain::Drawn(Callee::Method(Name::from("next")).folded(vec![source.clone()])),
+        }
+    }
 }
 
 impl Substituted for Domain {
@@ -194,8 +207,12 @@ impl Binder {
         &self.domain
     }
 
-    pub(crate) fn restricted(&self, ranges: Ranges) -> Binder {
-        Binder { domain: Domain::Ranged(ranges), draw: self.draw.clone() }
+    pub(crate) fn narrowed(&self, ranges: &Ranges) -> Option<Binder> {
+        self.domain.ranges().map(|held| Binder { domain: Domain::Ranged(held & ranges), draw: self.draw.clone() })
+    }
+
+    pub(crate) fn first(&self) -> Binder {
+        Binder { domain: self.domain.first(), draw: self.draw.clone() }
     }
 
     pub(crate) fn admits(&self, value: &Term) -> Option<&Binder> {

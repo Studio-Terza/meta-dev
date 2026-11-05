@@ -14,6 +14,7 @@ use super::trace::Trace;
 use crate::claim::Claim;
 use condition::Condition;
 use operands::{Comparing, Operands};
+pub(crate) use table::Proof;
 use table::Table;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,11 +76,13 @@ impl Assertion {
         }
     }
 
-    pub(crate) fn law_claims(self, invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Claim> {
+    pub(crate) fn law_claims(self, invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Proof {
         match self {
-            Assertion::Table => Table::claims(invocation, scope, place),
+            Assertion::Table => Proof::from(Table::claims(invocation, scope, place)),
             Assertion::Other => Table::law(invocation, Kind::of_macro(invocation), scope, place),
-            Assertion::Equality | Assertion::Inequality | Assertion::Condition | Assertion::Golden => Vec::new(),
+            Assertion::Equality | Assertion::Inequality | Assertion::Condition | Assertion::Golden => {
+                Proof::from(Vec::new())
+            }
         }
     }
 }

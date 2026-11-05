@@ -4,10 +4,10 @@ mod single;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use lint_layout::Name;
+use lint_layout::{Name, Whole, Word, words};
 
 use super::ranges::Ranges;
-use super::term::{Callee, Substituted, Substitution, Term};
+use super::term::{Arguments, Callee, Substituted, Substitution, Term};
 use crate::boundary::Spelling;
 pub(crate) use leaves::{Admitting, Exclusion, Inside, Mentions, Order, Relation, Values};
 use single::Single;
@@ -32,6 +32,24 @@ impl Accepted {
 
     pub(crate) fn shaped(constructor: Name, fields: Vec<Accepted>) -> Accepted {
         Accepted::Shaped(Shape { constructor, fields })
+    }
+
+    pub(crate) fn unwrapped(inner: Accepted) -> Accepted {
+        Accepted::shaped(Name::from(Unwrapping::UNWRAPPED), vec![inner])
+    }
+
+    pub(crate) fn consistent(&self) -> Option<&Accepted> {
+        match self {
+            Accepted::Within(ranges) => ranges.occupied().map(|_| self),
+            Accepted::Met(intersection) => intersection.consistent().map(|_| self),
+            Accepted::Any
+            | Accepted::Exactly(_)
+            | Accepted::Excluding(_)
+            | Accepted::Shaped(_)
+            | Accepted::Related(_)
+            | Accepted::Written(_)
+            | Accepted::Joined(_) => Some(self),
+        }
     }
 
     pub(crate) fn ordered(order: Order, bound: Term) -> Accepted {
@@ -211,6 +229,25 @@ impl Conjuncts {
     }
 }
 
+pub(crate) struct Unwrapping;
+
+impl Unwrapping {
+    const UNWRAPPED: Word<'static> = Word::new("Unwrapped");
+    const VARIANTS: [Word<'static>; 2] = words!["Some", "Ok"];
+
+    fn kin(own: &Name, other: &Name) -> Option<()> {
+        let same = (own == other).then_some(());
+        same.or(Self::standing(own, other).and(Some(()))).or(Self::standing(other, own).and(Some(())))
+    }
+
+    fn standing(unwrapped: &Name, variant: &Name) -> Option<Name> {
+        (*unwrapped == Self::UNWRAPPED)
+            .then_some(())
+            .and_then(|()| variant.matches::<Whole>(&Self::VARIANTS))
+            .map(|_| variant.clone())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Shape {
     constructor: Name,
@@ -219,7 +256,9 @@ pub(crate) struct Shape {
 
 impl Shape {
     fn encloses(&self, inner: &Shape) -> Option<Inside> {
-        (inner.constructor == self.constructor).then_some(&inner.fields).and_then(|fields| self.fields_enclose(fields))
+        Unwrapping::kin(&self.constructor, &inner.constructor)
+            .map(|()| &inner.fields)
+            .and_then(|fields| self.fields_enclose(fields))
     }
 
     fn fields_enclose(&self, inner: &[Accepted]) -> Option<Inside> {
@@ -227,21 +266,21 @@ impl Shape {
         inner.iter().zip(&self.fields).try_for_each(|(field, wider)| field.within(wider).map(|_| ())).map(|()| Inside)
     }
 
-    fn fields_admit(&self, arguments: &[Term]) -> Option<Inside> {
-        (arguments.len() == self.fields.len()).then_some(())?;
-        self.fields
-            .iter()
-            .zip(arguments)
-            .try_for_each(|(field, argument)| field.admits(argument).map(|_| ()))
-            .map(|()| Inside)
+    fn fields_admit(&self, arguments: Arguments<'_>) -> Option<Inside> {
+        arguments.each_paired(&self.fields, |argument, field| field.admits(argument).map(|_| ())).map(|()| Inside)
     }
 }
 
 impl Admitting for Shape {
     fn admits(&self, value: &Term) -> Option<Inside> {
-        Callee::Constructor(self.constructor.clone())
+        let own = Callee::Constructor(self.constructor.clone())
             .arguments_of(value)
-            .and_then(|arguments| self.fields_admit(arguments.listed()))
+            .filter(|_| self.constructor != Unwrapping::UNWRAPPED);
+        let variants = Unwrapping::VARIANTS
+            .iter()
+            .filter(|_| self.constructor == Unwrapping::UNWRAPPED)
+            .find_map(|variant| Callee::Constructor(Name::from(*variant)).arguments_of(value));
+        own.or(variants).and_then(|arguments| self.fields_admit(arguments))
     }
 }
 
@@ -287,6 +326,10 @@ impl Admitting for Union {
 pub(crate) struct Intersection(BTreeSet<Accepted>);
 
 impl Intersection {
+    fn consistent(&self) -> Option<Inside> {
+        self.0.iter().try_for_each(|part| part.consistent().map(|_| ())).map(|()| Inside)
+    }
+
     fn some_within(&self, outer: &Accepted) -> Option<Inside> {
         outer
             .clone()

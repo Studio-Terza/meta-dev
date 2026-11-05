@@ -1,4 +1,4 @@
-use syn::{Expr, ExprForLoop};
+use syn::Expr;
 
 use lint_core::Macros;
 use lint_layout::{Name, Whole, Word, words};
@@ -13,8 +13,8 @@ pub(crate) struct Iterations<'trace, 'body, 'file> {
 impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
     const ADAPTERS: [Word<'static>; 5] = words!["iter", "into_iter", "copied", "cloned", "rev"];
 
-    pub(crate) fn looped(trace: &'trace Trace<'body, 'file>, looped: &ExprForLoop) -> Binder {
-        Binder::new(Iterations { trace }.root(&looped.expr), Draw::Every)
+    pub(crate) fn over(trace: &'trace Trace<'body, 'file>, iterable: &Expr) -> Binder {
+        Binder::new(Iterations { trace }.root(iterable), Draw::Every)
     }
 
     fn root(&self, expression: &Expr) -> Domain {

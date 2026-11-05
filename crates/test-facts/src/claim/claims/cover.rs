@@ -50,7 +50,7 @@ impl<'claim> Cover<'claim> {
             .find(|(bound, _)| found.bound_value(**bound) == Some(&marker))
             .and_then(|(_, binder)| binder.domain().ranges())?;
         let part = covering & self.ranges;
-        let restricted = Statement::restated(self.before).restricted(self.depth, part.clone());
+        let restricted = Statement::restated(self.before).restricted(self.depth, &part);
         Instantiation::matching(after, &restricted).entailment().map(|_| UniversalPart(part))
     }
 

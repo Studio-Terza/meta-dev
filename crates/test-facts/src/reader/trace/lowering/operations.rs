@@ -27,13 +27,19 @@ impl Operations {
 
     pub(crate) fn operator(operator: BinOp) -> Option<Operator> {
         match operator {
-            BinOp::Add(_) => Some(Operator::Add),
-            BinOp::Sub(_) => Some(Operator::Subtract),
-            BinOp::Mul(_) => Some(Operator::Multiply),
-            BinOp::Div(_) => Some(Operator::Divide),
-            BinOp::Rem(_) => Some(Operator::Remainder),
+            BinOp::Add(_) | BinOp::AddAssign(_) => Some(Operator::Add),
+            BinOp::Sub(_) | BinOp::SubAssign(_) => Some(Operator::Subtract),
+            BinOp::Mul(_) | BinOp::MulAssign(_) => Some(Operator::Multiply),
+            BinOp::Div(_) | BinOp::DivAssign(_) => Some(Operator::Divide),
+            BinOp::Rem(_) | BinOp::RemAssign(_) => Some(Operator::Remainder),
             BinOp::And(_) => Some(Operator::Both),
             BinOp::Or(_) => Some(Operator::Either),
+            BinOp::Eq(_) => Some(Operator::Equal),
+            BinOp::Ne(_) => Some(Operator::Unequal),
+            BinOp::Lt(_) => Some(Operator::Below),
+            BinOp::Le(_) => Some(Operator::AtMost),
+            BinOp::Gt(_) => Some(Operator::Above),
+            BinOp::Ge(_) => Some(Operator::AtLeast),
             _ => None,
         }
     }

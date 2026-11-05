@@ -1,27 +1,30 @@
 use super::super::term::{Depths, Substituted, Substitution};
-use super::super::{Accepted, Binder, Claim, Term};
+use super::super::{Accepted, Binder, Claim, Guard, Term};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Entailment;
 
 #[derive(Debug)]
 pub(crate) struct View {
+    guard: Guard,
     subject: Term,
     accepted: Accepted,
 }
 
 impl View {
     pub(crate) fn readings(claim: &Claim) -> Vec<View> {
-        let direct = View { subject: claim.subject.clone(), accepted: claim.accepted.clone() };
-        let flipped = claim
-            .accepted
-            .sole()
-            .map(|other| View { subject: other.clone(), accepted: Accepted::equal(claim.subject.clone()) });
+        let direct =
+            View { guard: claim.guard.clone(), subject: claim.subject.clone(), accepted: claim.accepted.clone() };
+        let flipped = claim.accepted.sole().map(|other| View {
+            guard: claim.guard.clone(),
+            subject: other.clone(),
+            accepted: Accepted::equal(claim.subject.clone()),
+        });
         [direct].into_iter().chain(flipped).collect()
     }
 
     fn depths(&self) -> Depths {
-        [self.subject.depths(), Depths::from(&self.accepted.mentions())].into_iter().collect()
+        [self.subject.depths(), Depths::from(&self.accepted.mentions()), self.guard.depths()].into_iter().collect()
     }
 }
 
@@ -43,6 +46,7 @@ impl<'claim> Instantiation<'claim> {
     pub(crate) fn substitution(&self, view: &View) -> Option<Substitution> {
         let mut found = Substitution::default();
         view.subject.matched(&self.target.subject, &mut found)?;
+        view.guard.matched(&self.target.guard, &mut found)?;
         view.accepted
             .mentions()
             .listed()
@@ -57,6 +61,7 @@ impl<'claim> Instantiation<'claim> {
         let found = self.substitution(view)?;
         (view.subject.substituted(&found) == self.target.subject).then_some(())?;
         view.accepted.substituted(&found).within(&self.target.accepted)?;
+        view.guard.substituted(&found).implied_by(&self.target.guard)?;
         self.pattern
             .binders
             .iter()

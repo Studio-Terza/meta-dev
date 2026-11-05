@@ -5,11 +5,10 @@ use syn::{Attribute, Expr, ExprBlock, Ident, Macro, Token, bracketed};
 use law_facts::Kind;
 use lint_core::{Macros, Syntax};
 
-use super::super::body::Body;
 use super::super::scope::{Place, Scope};
-use super::super::trace::{Extent, Locals, Lowering, Quantifiers, Trace};
+use super::super::trace::{Extent, Frame, Lowering, Quantifiers, Trace};
 use crate::boundary::Truth;
-use crate::claim::{Accepted, Binder, Callee, Cases, Claim, Domain, Draw, Term};
+use crate::claim::{Accepted, Binder, Callee, Cases, Claim, Domain, Draw, Guard, Term};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Argument {
@@ -29,14 +28,42 @@ impl Argument {
 }
 
 #[derive(Debug)]
+pub(crate) struct Proof {
+    claims: Vec<Claim>,
+    quantifiers: Quantifiers,
+    bodies: Vec<ExprBlock>,
+}
+
+impl Proof {
+    pub(crate) fn claims(&self) -> &[Claim] {
+        &self.claims
+    }
+
+    pub(crate) fn quantifiers(&self) -> &Quantifiers {
+        &self.quantifiers
+    }
+
+    pub(crate) fn bodies(&self) -> &[ExprBlock] {
+        &self.bodies
+    }
+}
+
+impl From<Vec<Claim>> for Proof {
+    fn from(claims: Vec<Claim>) -> Proof {
+        Proof { claims, quantifiers: Quantifiers::default(), bodies: Vec::new() }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Table;
 
 impl Table {
     pub(crate) fn claims(invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Claim> {
         let listed = invocation.parse_body_with(Listed::parse).unwrap_or_default();
-        let locals = Locals::default();
         let quantifiers = Quantifiers::default();
-        let trace = Trace::new(scope, &locals, place, &quantifiers);
+        let guard = Guard::default();
+        let frame = Frame::default();
+        let trace = Trace::new(scope, place, &frame);
         let function = listed.function.as_ref().map(|function| Self::operation(&trace, function));
         function
             .iter()
@@ -45,6 +72,7 @@ impl Table {
                     let subject = function.invoked(vec![Lowering::term_of(&trace, &row.given)]);
                     Claim::stated(
                         quantifiers.binders(),
+                        &guard,
                         subject,
                         Accepted::equal(Lowering::term_of(&trace, &row.wanted)),
                     )
@@ -60,11 +88,11 @@ impl Table {
         )
     }
 
-    pub(crate) fn law(invocation: &Macro, kind: Kind, scope: &Scope<'_>, place: &Place) -> Vec<Claim> {
+    pub(crate) fn law(invocation: &Macro, kind: Kind, scope: &Scope<'_>, place: &Place) -> Proof {
         let arguments = Macros::arguments(invocation);
-        let locals = Locals::default();
-        let empty = Quantifiers::default();
-        let trace = Trace::new(scope, &locals, place, &empty);
+        let guard = Guard::default();
+        let frame = Frame::default();
+        let trace = Trace::new(scope, place, &frame);
         let operations = arguments
             .iter()
             .skip(1)
@@ -79,14 +107,13 @@ impl Table {
                     .map_or_else(|| Domain::Drawn(Lowering::term_of(&trace, strategy)), Domain::Ranged);
                 Binder::new(domain, Draw::Sampled(Cases::DEFAULT))
             })
-            .fold(empty.clone(), |quantifiers, binder| quantifiers.drawn(binder));
+            .fold(Quantifiers::default(), |quantifiers, binder| quantifiers.drawn(binder));
         let subject = Callee::Law(kind).folded(operations.chain(quantifiers.bound()).collect());
-        arguments
-            .iter()
-            .filter_map(Self::body)
-            .flat_map(|body| Body::claims(scope, place, &body.block, &quantifiers))
-            .chain(Claim::stated(quantifiers.binders(), subject, Accepted::equal(Term::Truth(Truth::Holds))))
-            .collect()
+        Proof {
+            claims: Claim::stated(quantifiers.binders(), &guard, subject, Accepted::equal(Term::Truth(Truth::Holds))),
+            bodies: arguments.iter().filter_map(Self::body).cloned().collect(),
+            quantifiers,
+        }
     }
 
     fn body(argument: &Expr) -> Option<&ExprBlock> {

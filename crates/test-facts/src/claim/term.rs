@@ -78,6 +78,52 @@ pub(crate) enum Operator {
     Not,
     Both,
     Either,
+    Equal,
+    Unequal,
+    Below,
+    AtMost,
+    Above,
+    AtLeast,
+}
+
+impl Operator {
+    const TURNS: [(Operator, Operator, Operator); 6] = [
+        (Operator::Equal, Operator::Unequal, Operator::Equal),
+        (Operator::Unequal, Operator::Equal, Operator::Unequal),
+        (Operator::Below, Operator::AtLeast, Operator::Above),
+        (Operator::AtMost, Operator::Above, Operator::AtLeast),
+        (Operator::Above, Operator::AtMost, Operator::Below),
+        (Operator::AtLeast, Operator::Below, Operator::AtMost),
+    ];
+
+    pub(crate) fn joining(holds: Truth) -> Operator {
+        match holds {
+            Truth::Holds => Operator::Both,
+            Truth::Fails => Operator::Either,
+        }
+    }
+
+    pub(crate) fn turned(self, turn: Turn) -> Operator {
+        Self::TURNS
+            .iter()
+            .find(|(own, _, _)| *own == self)
+            .map_or(self, |(_, complement, reversal)| turn.picked(*complement, *reversal))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Turn {
+    Complement,
+    Reversal,
+}
+
+impl Turn {
+    fn picked(self, complement: Operator, reversal: Operator) -> Operator {
+        match self {
+            Turn::Complement => complement,
+            Turn::Reversal => reversal,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -86,6 +132,16 @@ pub(crate) struct Arguments<'term>(&'term [Term]);
 impl<'term> Arguments<'term> {
     pub(crate) fn listed(&self) -> &'term [Term] {
         self.0
+    }
+
+    pub(crate) fn each_paired<Other>(
+        &self,
+        others: &[Other],
+        test: impl Fn(&Term, &Other) -> Option<()>,
+    ) -> Option<()> {
+        (self.0.len() == others.len())
+            .then_some(())
+            .and_then(|()| self.0.iter().zip(others).try_for_each(|(argument, other)| test(argument, other)))
     }
 }
 
@@ -168,9 +224,13 @@ impl Folding {
         let numbers: Option<Vec<Quantity>> = arguments.iter().map(Term::number).collect();
         numbers
             .and_then(|values| {
-                values.first().zip(values.get(1)).and_then(|(left, right)| left.combined(operator, *right))
+                values.first().zip(values.get(1)).and_then(|(left, right)| Folding::settled(operator, *left, *right))
             })
-            .map_or_else(|| Term::Applied(Callee::Operator(operator), arguments), Term::Number)
+            .unwrap_or(Term::Applied(Callee::Operator(operator), arguments))
+    }
+
+    fn settled(operator: Operator, left: Quantity, right: Quantity) -> Option<Term> {
+        left.combined(operator, right).map(Term::Number).or_else(|| left.compared(operator, right).map(Term::Truth))
     }
 
     fn projected(name: Name, arguments: Vec<Term>) -> Term {

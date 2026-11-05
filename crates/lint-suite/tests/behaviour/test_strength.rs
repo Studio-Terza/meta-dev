@@ -380,11 +380,11 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [EQUALS, AFTER_RETURN] => true,
     [EQUALS, AFTER_PANIC] => true,
     [EQUALS, AFTER_SURE_RETURN] => true,
-    [EQUALS, AFTER_MAYBE_RETURN] => false,
+    [EQUALS, AFTER_MAYBE_RETURN] => true,
     [EQUALS, IN_FALSE_BRANCH] => true,
     [EQUALS, IN_ARITHMETIC_FALSE_BRANCH] => true,
     [EQUALS, IN_DEAD_ELSE] => true,
-    [EQUALS, IN_LIVE_BRANCH] => false,
+    [EQUALS, IN_LIVE_BRANCH] => true,
     [EQUALS, IN_LIVE_ELSE] => false,
     [EQUALS, IN_EMPTY_LOOP] => true,
     [EQUALS, AFTER_BREAK] => true,
@@ -441,16 +441,16 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [INNER_GLOB_INLINE, INNER_GLOB] => false,
     [EQUALS, RECURSIVE_HELPER] => false,
     [EQUALS, IN_DEAD_WHILE] => true,
-    [EQUALS, IN_LIVE_WHILE] => false,
+    [EQUALS, IN_LIVE_WHILE] => true,
     [EQUALS, IN_LOOP_UNKNOWN] => false,
     [EQUALS, AFTER_CONTINUE] => true,
     [EQUALS, AFTER_BLOCK_RETURN] => true,
     [EQUALS, AFTER_UNSAFE_RETURN] => true,
     [EQUALS, AFTER_PAREN_RETURN] => true,
     [EQUALS, AFTER_MATCH_RETURNS] => true,
-    [EQUALS, AFTER_MATCH_PARTLY] => false,
+    [EQUALS, AFTER_MATCH_PARTLY] => true,
     [EQUALS, AFTER_BOTH_RETURN] => true,
-    [EQUALS, AFTER_ELSE_RETURN] => false,
+    [EQUALS, AFTER_ELSE_RETURN] => true,
     [EQUALS, AFTER_DEAD_RETURN] => false,
     [EQUALS, AFTER_DEAD_THEN_ELSE_RETURN] => true,
     [EQUALS, IF_EQUAL] => true,
@@ -470,8 +470,8 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [EQUALS, IF_LIVE_UNEQUAL] => false,
     [EQUALS, IF_LIVE_GREATER] => false,
     [EQUALS, IF_LIVE_LESS] => false,
-    [EQUALS, IF_UNKNOWN_ORDER] => false,
-    [EQUALS, IF_OVERFLOWING] => false,
+    [EQUALS, IF_UNKNOWN_ORDER] => true,
+    [EQUALS, IF_OVERFLOWING] => true,
 ]);
 
 const ROUNDTRIP: &str = "laws::roundtrip!(rt, any::<u8>(), enc, dec);\n";
@@ -611,4 +611,66 @@ laws::table!(claims_are_entailed_or_lost, Weakened::in_one_module, [
     [LAW_TWO_BYTES, LAW_ANY_BYTE] => false,
     [EMPTY_LOOP_ONLY, EMPTY] => false,
     [EQUALS, EMPTY_LOOP_ONLY] => true,
+]);
+
+const CLOSURE_NEVER_CALLED: &str = "#[test]\nfn adds() {\n    let _never = || assert_eq!(f(1), 2);\n}\n";
+const NESTED_FN_NEVER_CALLED: &str = "#[test]\nfn adds() {\n    fn never() {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+const CATCH_UNWIND: &str =
+    "#[test]\nfn adds() {\n    let _swallowed = std::panic::catch_unwind(|| assert_eq!(f(1), 2));\n}\n";
+const CFG_ANY_STATEMENT: &str = "#[test]\nfn adds() {\n    #[cfg(any())]\n    assert_eq!(f(1), 2);\n}\n";
+const SHOULD_PANIC: &str = "#[test]\n#[should_panic]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n";
+const CFG_ANY_TEST: &str = "#[cfg(any())]\n#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n";
+const LOOP_ONLY_FIRST: &str = "#[test]\nfn adds() {\n    for x in 0..1000u32 {\n        if x == 0 {\n            assert_eq!(f(x), x + 1);\n        }\n    }\n}\n";
+const LOOP_BREAKS: &str =
+    "#[test]\nfn adds() {\n    for x in 0..1000u32 {\n        assert_eq!(f(x), x + 1);\n        break;\n    }\n}\n";
+const LOOP_EVERY_OTHER: &str = "#[test]\nfn adds() {\n    for x in 0..1000u32 {\n        if x % 2 == 0 {\n            assert_eq!(f(x), x + 1);\n        }\n    }\n}\n";
+const LOOP_LEAVES_EARLY: &str = "#[test]\nfn adds() {\n    for x in 0..1000u32 {\n        if x == 3 {\n            break;\n        }\n        assert_eq!(f(x), x + 1);\n    }\n}\n";
+const CLOSURE_CALLED: &str = "#[test]\nfn adds() {\n    let check = || assert_eq!(f(1), 2);\n    check();\n}\n";
+const FOR_EACH: &str = "#[test]\nfn adds() {\n    items.iter().for_each(|x| assert_eq!(f(*x), 2));\n}\n";
+const FOR_LOOP: &str = "#[test]\nfn adds() {\n    for x in items {\n        assert_eq!(f(x), 2);\n    }\n}\n";
+const FOUND_SOME: &str = "#[test]\nfn finds() {\n    assert!(find().is_some());\n}\n";
+const FOUND_UNWRAPPED: &str = "#[test]\nfn finds() {\n    find().unwrap();\n}\n";
+const UNWRAPPED_THEN_EQUAL: &str = "#[test]\nfn finds() {\n    let v = find().unwrap();\n    assert_eq!(v, 3);\n}\n";
+const EQUAL_SOME_THREE: &str = "#[test]\nfn finds() {\n    assert_eq!(find(), Some(3));\n}\n";
+const CFG_MACRO_GUARDED: &str =
+    "#[test]\nfn adds() {\n    if cfg!(feature = \"x\") {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+const CFG_FEATURE_STATEMENT: &str = "#[test]\nfn adds() {\n    #[cfg(feature = \"x\")]\n    assert_eq!(f(1), 2);\n}\n";
+const FRESH_AND_RESET: &str = "#[test]\nfn fresh() {\n    let c = Counter::new();\n    assert_eq!(c.get(), 0);\n}\n#[test]\nfn reset() {\n    let mut c = Counter::new();\n    c.inc();\n    c.reset();\n    assert_eq!(c.get(), 0);\n}\n";
+const FRESH_ONLY: &str = "#[test]\nfn fresh() {\n    let c = Counter::new();\n    assert_eq!(c.get(), 0);\n}\n";
+const MIDDLE_BAND: &str = "#[test]\nfn middle() {\n    assert!(matches!(f(1), 2..=4));\n}\n";
+const HIGH_AND_LOW: &str =
+    "#[test]\nfn high() {\n    assert!(f(1) > 5);\n}\n#[test]\nfn low() {\n    assert!(f(1) < 1);\n}\n";
+const MIDDLE_COUNTED: &str = "#[test]\nfn middle() {\n    let mut c = Counter::new();\n    c.add(3);\n    assert!(matches!(c.get(), 2..=4));\n}\n";
+const HIGH_AND_LOW_COUNTED: &str = "#[test]\nfn high() {\n    let mut c = Counter::new();\n    c.add(9);\n    assert!(c.get() > 5);\n}\n#[test]\nfn low() {\n    let c = Counter::new();\n    assert!(c.get() < 1);\n}\n";
+const ACCUMULATED: &str =
+    "#[test]\nfn sums() {\n    let mut total = 0;\n    total += f(1);\n    assert_eq!(total, 2);\n}\n";
+const ACCUMULATED_UNCHECKED: &str = "#[test]\nfn sums() {\n    let mut total = 0;\n    total += f(1);\n}\n";
+const MATCHES_NONE: &str = "#[test]\nfn finds() {\n    assert!(matches!(find(1), None));\n}\n";
+const IS_NONE: &str = "#[test]\nfn finds() {\n    assert!(find(1).is_none());\n}\n";
+
+laws::table!(reach_decides_what_a_test_establishes, Weakened::in_one_module, [
+    [EQUALS, CLOSURE_NEVER_CALLED] => true,
+    [EQUALS, NESTED_FN_NEVER_CALLED] => true,
+    [EQUALS, CATCH_UNWIND] => true,
+    [EQUALS, CFG_ANY_STATEMENT] => true,
+    [EQUALS, SHOULD_PANIC] => true,
+    [EQUALS, CFG_ANY_TEST] => true,
+    [LOOP_THOUSAND, LOOP_ONLY_FIRST] => true,
+    [LOOP_THOUSAND, LOOP_BREAKS] => true,
+    [LOOP_THOUSAND, LOOP_EVERY_OTHER] => true,
+    [LOOP_THOUSAND, LOOP_LEAVES_EARLY] => true,
+    [CLOSURE_CALLED, EQUALS] => false,
+    [FOR_EACH, FOR_LOOP] => false,
+    [FOUND_SOME, FOUND_UNWRAPPED] => false,
+    [UNWRAPPED_THEN_EQUAL, EQUAL_SOME_THREE] => false,
+    [EQUALS, CFG_MACRO_GUARDED] => true,
+    [EQUALS, CFG_FEATURE_STATEMENT] => true,
+    [CFG_MACRO_GUARDED, CFG_MACRO_GUARDED] => false,
+    [FRESH_AND_RESET, FRESH_ONLY] => true,
+    [MIDDLE_BAND, HIGH_AND_LOW] => true,
+    [MIDDLE_COUNTED, HIGH_AND_LOW_COUNTED] => true,
+    [ACCUMULATED, ACCUMULATED_UNCHECKED] => true,
+    [MATCHES_NONE, EMPTY] => true,
+    [IS_NONE, MATCHES_NONE] => false,
+    [MATCHES_NONE, IS_NONE] => false,
 ]);
