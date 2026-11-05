@@ -362,7 +362,19 @@ const LET_BINDING: &str = "fn f(items: &[Lamp], ready: Ready) -> usize {\n    it
 const SHADOWED_ELEMENT: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
 const INLINE_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp}\"))).count()\n}\n";
 
-const SELECTIONS: [Case; 14] = [
+const SHADOW_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
+const READ_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|other| other.sees(lamp))).count()\n}\n";
+const SHADOW_BLOCK: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { let lamp = others.first(); lamp.on() }).count()\n}\n";
+const READ_BLOCK: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { let seen = others.first(); seen.sees(lamp) }).count()\n}\n";
+const SHADOW_ARM: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| match others.first() { Some(lamp) => lamp.on(), None => false }).count()\n}\n";
+const READ_ARM: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| match others.first() { Some(other) => other.sees(lamp), None => false }).count()\n}\n";
+const SHADOW_IF_LET: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| if let Some(lamp) = others.first() { lamp.on() } else { false }).count()\n}\n";
+const READ_IF_LET: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| if let Some(other) = others.first() { other.sees(lamp) } else { false }).count()\n}\n";
+const SHADOW_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { for lamp in others { lamp.on(); } true }).count()\n}\n";
+const READ_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { for other in others { other.sees(lamp); } true }).count()\n}\n";
+const READ_IF: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| if ready() { lamp.on() } else { false }).count()\n}\n";
+
+const SELECTIONS: [Case; 25] = [
     Case::new(
         Title::new("filter ignoring its element"),
         &[Source::new(Located::new("a.rs"), Text::new(IGNORED))],
@@ -431,6 +443,61 @@ const SELECTIONS: [Case; 14] = [
     Case::new(
         Title::new("inline format capture reads the element"),
         &[Source::new(Located::new("a.rs"), Text::new(INLINE_FORMAT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("closure param shadowing the element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOW_CLOSURE))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("closure param reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_CLOSURE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("block let shadowing the element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOW_BLOCK))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("block let reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_BLOCK))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("match arm shadowing the element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOW_ARM))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("match arm reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_ARM))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("if let shadowing the element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOW_IF_LET))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("if let reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_IF_LET))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("for pattern shadowing the element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOW_FOR))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("for pattern reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_FOR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("plain if reading the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_IF))],
         Flagged::new(&[]),
     ),
 ];
