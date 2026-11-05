@@ -19,6 +19,22 @@ impl Clustered {
         Clustered::interface(&declared)
     }
 
+    fn aliased(first_module: &'static str) -> Vec<String> {
+        let aliased = [
+            Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod u;\n"),
+            Clustered::at("crates/x/src/a.rs", first_module),
+            Clustered::at(
+                "crates/x/src/b.rs",
+                "type Outcome<T> = std::result::Result<T, Denial>;\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> Outcome<Desk> {\n        Ok(Desk)\n    }\n}\n",
+            ),
+            Clustered::at(
+                "crates/x/src/u.rs",
+                "use crate::a::{Refusal, Shelf};\nuse crate::b::{Denial, Desk};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
+            ),
+        ];
+        Clustered::interface(&aliased)
+    }
+
     fn lines(
         sources: &[Source],
         report: impl for<'found, 'file> Fn(&TypeSystem<'found, 'file>) -> Vec<Violation<'file>>,
@@ -721,45 +737,14 @@ fn an_error_returned_behind_a_reference_or_parentheses_is_linked_to_the_type() {
     );
 }
 
-#[test]
-fn an_error_returned_through_a_local_result_alias_is_linked_to_the_type() {
-    let aliased = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod u;\n"),
-        Clustered::at(
-            "crates/x/src/a.rs",
-            "type Result<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
-        ),
-        Clustered::at(
-            "crates/x/src/b.rs",
-            "type Outcome<T> = std::result::Result<T, Denial>;\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> Outcome<Desk> {\n        Ok(Desk)\n    }\n}\n",
-        ),
-        Clustered::at(
-            "crates/x/src/u.rs",
-            "use crate::a::{Refusal, Shelf};\nuse crate::b::{Denial, Desk};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
-        ),
-    ];
-    assert_eq!(Clustered::interface(&aliased), Vec::<String>::new());
-}
-
-#[test]
-fn an_error_returned_through_a_chain_of_aliases_is_linked_to_the_type() {
-    let chained = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod u;\n"),
-        Clustered::at(
-            "crates/x/src/a.rs",
-            "type Result<T> = Wrapped<T>;\ntype Wrapped<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
-        ),
-        Clustered::at(
-            "crates/x/src/b.rs",
-            "type Outcome<T> = std::result::Result<T, Denial>;\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> Outcome<Desk> {\n        Ok(Desk)\n    }\n}\n",
-        ),
-        Clustered::at(
-            "crates/x/src/u.rs",
-            "use crate::a::{Refusal, Shelf};\nuse crate::b::{Denial, Desk};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
-        ),
-    ];
-    assert_eq!(Clustered::interface(&chained), Vec::<String>::new());
-}
+laws::table!(
+    an_error_returned_through_an_alias_is_linked_to_the_type,
+    Clustered::aliased,
+    [
+        "type Result<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n" => Vec::<String>::new(),
+        "type Result<T> = Wrapped<T>;\ntype Wrapped<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n" => Vec::<String>::new(),
+    ]
+);
 
 laws::table!(
     aliases_that_name_one_another_are_read_without_recursing,
