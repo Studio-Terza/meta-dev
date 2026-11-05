@@ -4,11 +4,30 @@ use std::marker::PhantomData;
 
 use strum::VariantArray;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unnamed<Of> {
     text: String,
-    of: PhantomData<Of>,
+    of: PhantomData<fn() -> Of>,
 }
+
+impl<Of> Clone for Unnamed<Of> {
+    fn clone(&self) -> Unnamed<Of> {
+        Unnamed { text: self.text.clone(), of: PhantomData }
+    }
+}
+
+impl<Of> fmt::Debug for Unnamed<Of> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Unnamed").field("text", &self.text).finish()
+    }
+}
+
+impl<Of> PartialEq for Unnamed<Of> {
+    fn eq(&self, other: &Unnamed<Of>) -> bool {
+        self.text == other.text
+    }
+}
+
+impl<Of> Eq for Unnamed<Of> {}
 
 impl<Of> Unnamed<Of> {
     #[must_use]
@@ -24,4 +43,4 @@ impl<Of: VariantArray + fmt::Display> fmt::Display for Unnamed<Of> {
     }
 }
 
-impl<Of: VariantArray + fmt::Display + fmt::Debug> Error for Unnamed<Of> {}
+impl<Of: VariantArray + fmt::Display> Error for Unnamed<Of> {}

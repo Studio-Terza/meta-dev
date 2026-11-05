@@ -45,3 +45,24 @@ fn a_name_is_a_compile_time_constant() {
     assert_eq!(Names::LIT, "on");
     assert_eq!(Lamp::VARIANTS.iter().map(|lamp| lamp.name()).collect::<Vec<_>>(), ["on", "off", "dimmed-low"]);
 }
+
+#[derive(Named, VariantArray, Clone, Copy)]
+enum Bare {
+    #[name("bare")]
+    Only,
+}
+
+impl Bare {
+    fn read(text: &str) -> Result<Bare, Box<dyn std::error::Error>> {
+        Ok(text.parse::<Bare>()?)
+    }
+}
+
+#[test]
+fn a_refusal_boxes_into_dyn_error_for_an_enum_without_debug_or_partial_eq() {
+    assert_eq!(
+        Bare::read("other").err().map(|error| error.to_string()),
+        Some("`other` is not one of: bare".to_owned())
+    );
+    assert!(Bare::read("bare").is_ok());
+}
