@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use reserved_names::Reserved;
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, Error, Ident, Lit, Token, Type};
@@ -93,35 +94,6 @@ impl Accessor {
     const UNSUPPORTED: &'static str = "an accessor type is &'static str, an integer type, bool or char";
     const WRONG_TYPE: &'static str = "this literal does not have the accessor's declared type";
     pub const ATTRIBUTE: &'static str = "accessor";
-    const RESERVED_NAMES: [&'static str; 26] = [
-        "name",
-        "clone",
-        "clone_from",
-        "eq",
-        "ne",
-        "partial_cmp",
-        "lt",
-        "le",
-        "gt",
-        "ge",
-        "cmp",
-        "max",
-        "min",
-        "clamp",
-        "hash",
-        "hash_slice",
-        "fmt",
-        "to_string",
-        "from_str",
-        "into",
-        "try_into",
-        "borrow",
-        "as_ref",
-        "to_owned",
-        "clone_into",
-        "default",
-    ];
-    const RESERVED: &'static str = "an accessor cannot take the name of a method of Clone, PartialEq, PartialOrd, Ord, Hash, Debug, Display, ToString, FromStr, Into, TryInto, Borrow, AsRef, ToOwned or Default, or of the derive's own `name`, because it would shadow that method";
     const REPEATED: &'static str = "two accessors have this name";
 
     pub fn declared(attrs: &[Attribute]) -> syn::Result<Vec<Accessor>> {
@@ -138,10 +110,9 @@ impl Accessor {
     }
 
     fn refusal(&self, earlier: &[Accessor]) -> Option<Error> {
-        Self::RESERVED_NAMES
-            .contains(&self.key.as_str())
-            .then_some(Self::RESERVED)
-            .or_else(|| earlier.iter().any(|accessor| accessor.key == self.key).then_some(Self::REPEATED))
+        Reserved::owner(&self.key)
+            .map(|_| Reserved::message())
+            .or_else(|| earlier.iter().any(|accessor| accessor.key == self.key).then(|| Self::REPEATED.to_owned()))
             .map(|message| Error::new_spanned(&self.name, message))
     }
 

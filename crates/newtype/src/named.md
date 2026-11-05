@@ -150,8 +150,9 @@ enum Lamp {
 ```
 
 An accessor takes no name that a method of `Clone`, `PartialEq`, `PartialOrd`, `Ord`, `Hash`, `Debug`, `Display`,
-`ToString`, `FromStr`, `Into`, `TryInto`, `Borrow`, `AsRef`, `ToOwned` or `Default` has, nor `name`, because the
-inherent const method would shadow that trait method on the enum. Each name is refused:
+`ToString`, `FromStr`, `From`, `Into`, `TryFrom`, `TryInto`, `Borrow`, `BorrowMut`, `AsRef`, `ToOwned`, `Any` or
+`Default` has, nor `name`, because the inherent const method would shadow that trait method on the enum. Each name
+is refused:
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
@@ -359,6 +360,46 @@ enum Lamp {
 enum Lamp {
     #[name("on")]
     #[accessor_value(borrow = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(type_id: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(type_id = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(from: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(from = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(try_from: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(try_from = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(borrow_mut: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(borrow_mut = "x")]
     On,
 }
 ```
