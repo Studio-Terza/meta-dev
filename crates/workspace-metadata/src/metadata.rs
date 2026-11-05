@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::crate_name::CrateName;
 use crate::outside::Outside;
+use crate::readers::Readers;
 use package::Package;
 
 #[derive(Debug, Deserialize)]
@@ -34,11 +35,13 @@ impl Metadata {
     }
 
     #[must_use]
-    pub fn readers(&self) -> BTreeMap<&CrateName, &[PathBuf]> {
-        self.packages
-            .iter()
-            .filter_map(|package| package.readings().first().map(|_| (package.name(), package.readings())))
-            .collect()
+    pub fn readers(&self) -> Readers<'_> {
+        Readers::new(
+            self.packages
+                .iter()
+                .filter_map(|package| package.readings().first().map(|_| (package.name(), package.readings())))
+                .collect(),
+        )
     }
 
     #[must_use]

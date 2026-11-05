@@ -8,6 +8,7 @@ use crate::tree::Tree;
 use file_ports::{Files, Kind};
 use lint_layout::Failure;
 use lint_layout::Manifest;
+use newtype::Newtype;
 use package::Package;
 
 #[derive(Debug)]
@@ -48,7 +49,8 @@ impl Packages {
 
     fn surveyed(files: &impl Files, packages: &[&Package]) -> Survey {
         let candidates: Vec<PathBuf> = packages.iter().flat_map(|package| package.candidates()).collect();
-        let directories: Vec<PathBuf> = packages.iter().flat_map(|package| package.target_directories()).collect();
+        let directories: Vec<PathBuf> =
+            packages.iter().flat_map(|package| package.target_directories()).map(Newtype::into_inner).collect();
         let survey = Survey::default().learn(files, Fact::Followed, &candidates).learn(files, Fact::Kind, &directories);
         let real: Vec<PathBuf> =
             directories.into_iter().filter(|directory| survey.kind(directory) == Kind::Directory).collect();
@@ -67,6 +69,7 @@ impl Packages {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)
+            .map(Newtype::into_inner)
             .filter(|directory| survey.kind(directory) == Kind::Directory)
             .collect();
         survey.failure(&real).map_or(Ok(()), Err)

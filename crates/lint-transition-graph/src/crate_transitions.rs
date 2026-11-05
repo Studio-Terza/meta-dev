@@ -27,16 +27,17 @@ impl<'found, 'file> CrateTransitions<'found, 'file> {
         types: &WorkspaceTypes,
         name: &'found CrateName,
         edges: &[&'found Edge<'found, 'file>],
+        coverage: Coverage,
     ) -> CrateTransitions<'found, 'file> {
-        let ends = || edges.iter().flat_map(|edge| edge.ends().all());
+        let ends = |place| edges.iter().flat_map(move |edge| edge.ends().placed(place));
         CrateTransitions {
             name,
             first: edges.iter().map(|edge| edge.site()).min(),
             domain: types.declared_in(name),
-            interfaces: ends().filter(|end| end.place() == Place::Interface).collect(),
-            boxes: ends().filter(|end| end.place() == Place::External).collect(),
+            interfaces: ends(Place::Interface).collect(),
+            boxes: ends(Place::External).collect(),
             pairs: Hop::distinct(edges.iter().map(|edge| edge.ends())),
-            coverage: Coverage::tallied(edges.iter().copied()),
+            coverage,
         }
     }
 

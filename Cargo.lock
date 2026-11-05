@@ -33,6 +33,7 @@ dependencies = [
 name = "body-shape"
 version = "0.1.0"
 dependencies = [
+ "equivalence",
  "laws",
  "lint-layout",
  "newtype",
@@ -111,6 +112,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "equivalence"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "lint-core",
+ "newtype",
 ]
 
 [[package]]
@@ -205,6 +215,7 @@ dependencies = [
  "lint-fixtures",
  "lint-layout",
  "lint-placement",
+ "lint-transition-graph",
  "newtype",
  "syn 2.0.119",
  "text-lines",
@@ -245,6 +256,17 @@ name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+
+[[package]]
+name = "law-facts"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "laws"
@@ -347,11 +369,9 @@ dependencies = [
 name = "lint-distinct-signatures"
 version = "0.1.0"
 dependencies = [
+ "equivalence",
  "lint-core",
- "lint-file",
- "lint-layout",
- "quote",
- "syn 2.0.119",
+ "lint-transition-graph",
 ]
 
 [[package]]
@@ -498,9 +518,9 @@ dependencies = [
 name = "lint-mandatory-laws"
 version = "0.1.0"
 dependencies = [
+ "law-facts",
  "lint-core",
  "lint-layout",
- "proc-macro2",
  "syn 2.0.119",
 ]
 
@@ -774,10 +794,10 @@ name = "lint-repeated-shapes"
 version = "0.1.0"
 dependencies = [
  "body-shape",
+ "equivalence",
  "lint-core",
  "lint-layout",
  "lint-placement",
- "newtype",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -854,8 +874,6 @@ dependencies = [
  "lint-vec-out-params",
  "lint-workflow-run",
  "text-lines",
- "transition-facts",
- "type-facts",
 ]
 
 [[package]]
@@ -973,11 +991,17 @@ name = "lint-transition-graph"
 version = "0.1.0"
 dependencies = [
  "body-lifts",
+ "body-shape",
+ "equivalence",
+ "law-facts",
  "lint-core",
  "lint-item-graph",
  "lint-layout",
  "lint-placement",
  "newtype",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
  "transition-facts",
  "type-facts",
 ]
@@ -1419,6 +1443,7 @@ dependencies = [
  "lint-core",
  "lint-layout",
  "lint-placement",
+ "newtype",
  "syn 2.0.119",
 ]
 

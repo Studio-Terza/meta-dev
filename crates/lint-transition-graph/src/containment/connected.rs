@@ -17,28 +17,27 @@ impl ClusterLint for ConnectedClusters {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.clusters()
-            .into_iter()
-            .filter_map(|cluster| Divided::found_in(view, cluster))
-            .filter_map(|divided| view.first_site(&divided.members).map(|site| Violation::new(site, &divided)))
+        view.slices()
+            .filter_map(|slice| Divided::found_in(view, slice.cluster()))
+            .filter_map(|divided| view.first_site(divided.members).map(|site| Violation::new(site, &divided)))
             .collect()
     }
 }
 
 #[derive(Debug)]
-struct Divided<'found> {
+struct Divided<'view, 'found> {
     cluster: Cluster<'found>,
-    members: BTreeSet<Member<'found>>,
+    members: &'view BTreeSet<Member<'found>>,
     groups: Groups<'found>,
 }
 
-impl<'found> Divided<'found> {
-    fn found_in(view: &Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Divided<'found>> {
-        let members = view.members(cluster);
+impl<'view, 'found> Divided<'view, 'found> {
+    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Divided<'view, 'found>> {
+        let slice = view.slice(cluster)?;
+        let members = slice.members();
         let nested = members.iter().find_map(|member| Part::toward(cluster, member.cluster()).nested());
         let judged = Self::judged(cluster, nested);
-        let links = view.links_within(&members, Toward::Used);
-        let groups = judged.and_then(|_| Groups::linked(&members, links.into_iter()).split())?;
+        let groups = judged.and_then(|_| slice.components(view, Toward::Used))?;
         Some(Divided { cluster, members, groups })
     }
 
@@ -51,13 +50,13 @@ impl<'found> Divided<'found> {
     }
 }
 
-impl fmt::Display for Divided<'_> {
+impl fmt::Display for Divided<'_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{} falls into {} with no link between them", self.cluster, self.groups)
     }
 }
 
-impl lint_core::Finding for Divided<'_> {
+impl lint_core::Finding for Divided<'_, '_> {
     fn fix(&self) -> Fix {
         Fix::new("split it along the groups, or link them through a type they share")
     }

@@ -4,11 +4,12 @@ use std::fmt;
 use crate::class::Class;
 use crate::count::Count;
 use crate::key::Key;
-use lint_layout::Name;
+use lint_layout::{Name, Whole, Word};
 use lint_placement::CrateName;
+use transition_facts::{Mutation, Wrapping};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Node<'found> {
+pub struct Node<'found> {
     krate: &'found CrateName,
     name: &'found Name,
 }
@@ -52,6 +53,10 @@ pub(crate) struct Hop<'found> {
 }
 
 impl<'found> Hop<'found> {
+    pub(crate) fn joins(&self, first: &Hop<'found>, last: &Hop<'found>) -> Option<&Hop<'found>> {
+        Some(self).filter(|hop| hop.takes == first.takes).filter(|hop| hop.gives == last.gives)
+    }
+
     pub(crate) fn distinct<'ends>(ends: impl Iterator<Item = &'ends Ends<'found>>) -> Count
     where
         'found: 'ends,
@@ -88,13 +93,15 @@ impl Place {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct End<'found> {
+pub struct End<'found> {
     place: Place,
     name: &'found Name,
     node: Option<Node<'found>>,
 }
 
 impl<'found> End<'found> {
+    const UNIT: Word<'static> = Word::new("()");
+
     pub(crate) fn placed(place: Place, name: &'found Name) -> End<'found> {
         End { place, name, node: None }
     }
@@ -103,8 +110,19 @@ impl<'found> End<'found> {
         End { place: Place::Domain, name: node.name, node: Some(node) }
     }
 
-    pub(crate) fn place(&self) -> Place {
-        self.place
+    #[must_use]
+    pub fn node(&self) -> Option<&Node<'found>> {
+        self.node.as_ref()
+    }
+
+    pub(crate) fn unit(&self) -> Option<&End<'found>> {
+        Some(self).filter(|end| end.name.matches::<Whole>(&[Self::UNIT]).is_some())
+    }
+}
+
+impl AsRef<Name> for End<'_> {
+    fn as_ref(&self) -> &Name {
+        self.name
     }
 }
 
@@ -133,8 +151,21 @@ impl<'found> Ends<'found> {
         Ends { implementer, ..self }
     }
 
-    pub(crate) fn all(&self) -> impl Iterator<Item = &End<'found>> {
-        self.takes.iter().chain([&self.gives])
+    pub(crate) fn placed(&self, place: Place) -> impl Iterator<Item = &End<'found>> {
+        self.takes.iter().chain([&self.gives]).filter(move |end| end.place == place)
+    }
+
+    pub(crate) fn takes(&self) -> &[End<'found>] {
+        &self.takes
+    }
+
+    pub(crate) fn subject(&self, mutation: Mutation, wrapping: Wrapping) -> Option<Node<'found>> {
+        let receiver = Some(mutation)
+            .filter(|mutation| *mutation == Mutation::ThroughSelf)
+            .filter(|_| wrapping == Wrapping::Plain)
+            .and_then(|_| self.gives.unit())
+            .and_then(|_| self.takes.first().or(self.implementer.as_ref()));
+        self.gives.node.or_else(|| receiver.and_then(|end| end.node))
     }
 
     pub(crate) fn taken(&self) -> impl Iterator<Item = &Node<'found>> {
@@ -142,7 +173,7 @@ impl<'found> Ends<'found> {
     }
 
     pub(crate) fn class(&self) -> Class {
-        match self.all().find(|end| end.place == Place::Primitive) {
+        match self.placed(Place::Primitive).next() {
             Some(_) => Class::Primitive,
             None => Class::Covered,
         }

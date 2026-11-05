@@ -60,15 +60,16 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner =
-        ["::report(readout.files())", "flows.report::<"].iter().map(|call| runner.matches(call).count()).sum::<usize>();
+    let listed_by_the_runner = ["::report(readout.files())", "flows.report::<", "::dirty(&system)"]
+        .iter()
+        .map(|call| runner.matches(call).count())
+        .sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
-    let listed_by_elegance =
-        ["::report(files)", "::report_facts(&facts)", "::report_graph(&facts, &transitions)", "containment.report::<"]
-            .iter()
-            .map(|call| elegance.matches(call).count())
-            .sum::<usize>();
+    let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&system)"]
+        .iter()
+        .map(|call| elegance.matches(call).count())
+        .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
@@ -133,7 +134,7 @@ fn a_repeated_shape_fails_the_run() -> Result<(), Box<dyn Error>> {
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains("/src/one.rs:3: "), "{}", run.err);
     assert!(run.err.contains("2 shipped copies, also at "), "{}", run.err);
-    assert!(run.err.contains("/src/two.rs:3; "), "{}", run.err);
+    assert!(run.err.contains("/src/two.rs:3, "), "{}", run.err);
     Ok(())
 }
 

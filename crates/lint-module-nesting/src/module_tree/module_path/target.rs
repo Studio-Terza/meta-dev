@@ -18,6 +18,13 @@ impl Start {
     fn spelled(name: &Name) -> Start {
         Self::NAMED.iter().find(|(word, _)| *name == *word).map_or(Start::Relative, |(_, start)| *start)
     }
+
+    fn advance<'path>(self, mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {
+        match self {
+            Start::Super => segments.pop().and(Some(segments)),
+            Start::Crate | Start::Relative => Some(segments.into_iter().chain([segment]).collect()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -40,7 +47,10 @@ impl<'path> Target<'path> {
         let child: Vec<&Name> = file.segments.iter().chain([first]).collect();
         anchor.map(|_| ()).or_else(|| modules.same_as(file.crate_root, &child).map(|_| ()))?;
         let skip = anchor.into_iter().count();
-        let segments = path.segments().iter().skip(skip).try_fold(start.iter().collect(), Self::step)?;
+        let segments =
+            path.segments().iter().skip(skip).try_fold(start.iter().collect(), |segments, segment| {
+                Start::spelled(segment).advance(segments, segment)
+            })?;
         Some(Target { crate_root: file.crate_root, segments })
     }
 
@@ -72,13 +82,6 @@ impl<'path> Target<'path> {
             Start::Crate => Some(&[]),
             Start::Super => file.parent().map(|parent| parent.segments),
             Start::Relative => Some(file.segments),
-        }
-    }
-
-    fn step(mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {
-        match Start::spelled(segment) {
-            Start::Super => segments.pop().and(Some(segments)),
-            Start::Crate | Start::Relative => Some(segments.into_iter().chain([segment]).collect()),
         }
     }
 }

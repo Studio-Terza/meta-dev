@@ -34,8 +34,12 @@ no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
-tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its names and
-literals are erased; a group nested inside a larger group is not listed again. The message names the fix by where the
+tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
+and literals (`true` and `false` included) are erased; callees, paths, field accesses and capitalised types stay, while
+struct-literal and pattern fields and lower-case primitive types other than `u8`, `usize`, `bool`, `str` and `char` are
+erased like locals. A group nested inside a
+larger group is not listed again. Each group counts the literal positions at which its copies do not all agree, or says
+that they are identical up to local names. The message names the fix by where the
 copies live: in tests, make them rows of one `laws::table!` or state the property they share with a law; in shipped code,
 extract the shape once, write it generic over an existing trait, or derive it; in both, the test re-implements shipped
 logic and should test through it.
@@ -74,6 +78,14 @@ and not imported, or twice in one crate, is a leaf. Edges touching a bare primit
 compared, nor are derived lifts (a map, field focus or match routing) and store operations. The message names the fix:
 keep the standard conversion, or one transition, and route the others through it; delete a hand-written copy of a map,
 filter or fold over the element transition; where the transitions mean different things, give each its own output type.
+
+`distinct_signatures` keeps the methods of one type apart. Every inherent method of a type, in any file of its crate, is
+read on the type graph: its inputs (the receiver first) and its output as the domain types, interfaces, primitives and
+black boxes they name, read through references, generic arguments and tuples, with whether each is optional, fallible or
+many (a collection, a slice or an `impl Iterator`), and whether the method mutates self or a parameter. Two methods of one
+type that read alike hide a missing type or type parameter. Trait impls are fixed by their trait and are not compared, a
+method written once per `cfg` counts once, and a type name declared twice in one crate is compared within its own file.
+The message names the fix: distinguish the types they take or return, or keep one method and route the other through it.
 
 `effects_in_ports` keeps effects in ports. In shipped code, a call into files, the environment, the clock, the network,
 processes, randomness or stdio (`std::fs`, `std::env`, `SystemTime::now`, `Instant::now`, `thread::sleep`, `std::net`,
@@ -115,10 +127,22 @@ linked by fields, variants, bounds, trait impls and the signatures of their meth
 the transition graph. One engine (`Containment`, with a `ClusterLint` per check) runs every check at the
 crate and the module level: `connected_clusters` (each crate and each directory module is one connected piece),
 `acyclic_quotients` (the crates of the workspace, and the own file and child modules of each crate and module, collapsed
-to single nodes of the definition graph of fields, variants and bounds, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` and `interface_by_internals` (a cluster's exports, the types and
-traits used from outside it, form one group when linked by a shared outside user, or by a shared private item),
-`lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users) and `deep_clusters` (a
-cluster with an interface that exports fewer items than it keeps private). There are no thresholds.
+to single nodes of the definition graph of fields, variants and bounds, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` (a cluster's exports, the types and
+traits used from outside it, form one group when linked by a shared outside user),
+and `lowest_cluster` (each type and trait sits in the deepest cluster that holds all its users). There are no thresholds.
+
+The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. A call is resolved by the type that owns it: `self`, a typed parameter, the output of an earlier resolved call, a type path or `Self`; a bare or module path call goes to a free function. It resolves only when exactly one workspace function of that name has that owner; method calls on any other receiver, and calls into std, are left out. The header states these settings and the share of calls not resolved.
+
+The same run prints `parallel_structures`, report only: domain types whose moves (written, operation, port, lift and
+store edges, with names erased) are the same up to one consistent renaming of the types they reach, checked one hop
+deep, with each type located at its declaration. Trait impls are the shared interface of their fillers and are set
+aside as evidence; where two types fill one interface, their impls of it must have the same bodies with names and
+literals erased. Algebra laws must match where both sides declare them. The header names these settings.
+
+The same run prints `normalised_shapes`, report only: the `repeated_shapes` check with every name erased (callees,
+paths, fields and types as well as locals) and literals erased, floor 40 tokens, nested groups dropped. Groups that
+`repeated_shapes` already blocks are listed again. It is the detector for normalisation before comparison, and the
+owner decides whether it is promoted.
 
 Every lint implements `Lint` and takes the same files. Every message names its fix: `Violation::new` takes a
 `Finding`, whose `Display` states the problem and whose `fix` returns a `Fix`, so a message without a fix does not
@@ -182,6 +206,8 @@ stay split by lint because `crate_graph` flags a crate whose cycle spans more th
 Before writing a new trait, port or store, ask what already exists:
 
     lint query <term>... [--role '<fn signature>']... [--top <n>] [--in <path>]...
+               [--defined <name>]... [--uses <name>]... [--users <name>]... [--implementers <name>]... [--cluster <name>]...
+               [--exports <crate|module>]... [--path <from> <to>]...
 
 It reads the shipped code under each `--in` path (the current directory by default) through the same extraction the
 transition graph uses (`type-facts` and `transition-facts`, no second parser) and lists the traits, generic impls, ports
@@ -198,6 +224,27 @@ The command blocks nothing and exits non-zero only on malformed arguments.
         search fn(&self, _) -> many fits fn(&self, _) -> many
     score 2: generic impl Lookup for T in search at crates/search/src/lib.rs:14
         find fn(&self, _) -> many fits fn(&self, _) -> many
+
+`--defined`, `--uses`, `--users`, `--implementers` and `--cluster` ask about one type or trait by its bare name: where it
+is defined, what it uses, what uses it, what implements it, and the module and lowest cluster it sits in with its
+siblings. A name shared by several items is answered once under each full path. The answers come from the containment
+view, so a field, a bound, an impl, a signature or a body each count as a use; only types and traits are indexed, not
+functions. `--implementers` also lists generic impls and impls on types outside the index (`impl<T: Clone> Priced for Vec<T>`,
+`impl Priced for u32`, and slices, tuples, `dyn` and fn pointers such as `impl for [u8]`) as `impl for <type>` with their site; an impl in another crate for an indexed type counts as that type's implementation. The questions combine with each other and with terms and roles.
+
+`--exports` takes a crate or module name (crate names with underscores, such as `graph_query`) and lists the types and
+traits used from outside it, each with its outside users. `--path` takes two names and prints the shortest chain of uses
+between those types or traits, or `none`; it follows uses between types and traits, not function calls. `--top` caps
+the exports and the path steps shown, as it does the other lists.
+
+    $ lint query --users Cents --implementers Priced
+    users of Cents:
+      shop::Cents at crates/shop/src/lib.rs:5
+        Line at crates/shop/src/till.rs:2
+        Priced at crates/shop/src/lib.rs:2
+    implementers of Priced:
+      shop::Priced at crates/shop/src/lib.rs:2
+        Line at crates/shop/src/till.rs:2
 
 ## Rust only
 

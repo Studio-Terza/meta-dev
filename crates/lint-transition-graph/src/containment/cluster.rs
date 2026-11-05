@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt;
 use std::iter;
 
@@ -31,13 +32,6 @@ impl<'found> Cluster<'found> {
         }
     }
 
-    pub(crate) fn bounded(self) -> Option<Cluster<'found>> {
-        match self.level() {
-            Level::Crate | Level::Module => Some(self),
-            Level::Workspace => None,
-        }
-    }
-
     pub(crate) fn parent(&self) -> Option<Cluster<'found>> {
         self.krate.map(|krate| {
             self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(krate, outer))
@@ -54,6 +48,11 @@ impl<'found> Cluster<'found> {
 
     pub(crate) fn common(self, other: Cluster<'found>) -> Cluster<'found> {
         self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Cluster::WORKSPACE)
+    }
+
+    pub(crate) fn named(self, name: &Name) -> Option<Cluster<'found>> {
+        let own = self.segments.last().or_else(|| self.krate.map(Borrow::borrow));
+        own.filter(|own| *own == name).map(|_| self)
     }
 
     pub(crate) fn krate(&self) -> Option<&'found CrateName> {

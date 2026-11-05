@@ -2,6 +2,7 @@ mod boundary;
 mod candidate;
 mod kind;
 mod matches;
+mod reply;
 mod term;
 mod top;
 
@@ -10,6 +11,8 @@ use std::path::PathBuf;
 
 use lint_layout::Name;
 use lint_placement::CrateName;
+use lint_transition_graph::{Ask, Listed, TypeSystem};
+use newtype::Newtype;
 use transition_facts::{Ground, Transitions};
 use type_facts::Facts;
 
@@ -17,21 +20,17 @@ use crate::role::Role;
 use candidate::Candidate;
 use kind::Kind;
 use matches::Matches;
+use reply::Reply;
 pub use term::Term;
 use top::Top;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Query {
     terms: Vec<Term>,
     roles: Vec<Role>,
-    top: Top,
+    questions: Vec<Ask>,
+    top: Option<Top>,
     roots: Vec<PathBuf>,
-}
-
-impl Default for Query {
-    fn default() -> Query {
-        Query { terms: Vec::new(), roles: Vec::new(), top: Top::DEFAULT, roots: Vec::new() }
-    }
 }
 
 impl Query {
@@ -45,18 +44,38 @@ impl Query {
         self
     }
 
+    pub(crate) fn with_ask(mut self, ask: Ask) -> Query {
+        self.questions.push(ask);
+        self
+    }
+
     pub(crate) fn with_root(mut self, root: PathBuf) -> Query {
         self.roots.push(root);
         self
     }
 
     pub(crate) fn with_top(mut self, top: Top) -> Query {
-        self.top = top;
+        self.top = Some(top);
         self
     }
 
+    fn searches(&self) -> Option<()> {
+        self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()))
+    }
+
     pub(crate) fn asks(&self) -> Option<&Query> {
-        self.terms.first().map(|_| self).or_else(|| self.roles.first().map(|_| self))
+        self.questions.first().map(|_| self).or_else(|| self.searches().map(|()| self))
+    }
+
+    #[must_use]
+    pub fn reply<'view, 'found, 'file>(
+        &'view self,
+        system: &'view TypeSystem<'found, 'file>,
+    ) -> Reply<'view, 'found, 'file> {
+        let extraction = system.extraction();
+        let matches = self.searches().map(|()| self.matches(extraction.facts(), extraction.transitions()));
+        let listed = self.top.map(|top| Listed::new(top.into_inner()));
+        Reply::new(matches, self.questions.iter().map(|ask| ask.answered(system.containment(), listed)).collect())
     }
 
     #[must_use]
@@ -88,6 +107,6 @@ impl Query {
                 .implementer()
                 .map(|kind| Candidate::of_type(found, kind, facts))
         });
-        Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top)
+        Matches::ranked(traits.chain(generics).chain(types), &self.terms, &self.roles, self.top.unwrap_or(Top::DEFAULT))
     }
 }

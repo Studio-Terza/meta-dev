@@ -7,7 +7,8 @@ use lint_layout::{Name, Whole, Word, words};
 use transition_facts::Transition;
 
 use crate::count::Count;
-use crate::edge::{Edge, Role};
+use crate::edge::Edge;
+use crate::form::Acting;
 use crate::key::Key;
 
 #[derive(Debug)]
@@ -20,17 +21,21 @@ impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
     pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
-        let keyed = edges.iter().filter(|edge| edge.role() == Role::Written).fold(
-            BTreeMap::new(),
-            |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
-                edge.ends().key().into_iter().for_each(|key| keys.entry(key).or_default().push(edge.transition()));
+        let keyed = edges
+            .iter()
+            .filter_map(|edge| edge.form().written().map(|_| edge))
+            .filter(|edge| edge.form().algebraic().and_then(Acting::pure).is_none())
+            .fold(BTreeMap::new(), |mut keys: BTreeMap<Key<'found>, Vec<&'found Transition<'found, 'file>>>, edge| {
+                edge.ends()
+                    .key()
+                    .filter(|key| edge.fixed_by().and(key.fixed()).is_none())
+                    .into_iter()
+                    .for_each(|key| keys.entry(key).or_default().push(edge.transition()));
                 keys
-            },
-        );
+            });
         keyed
             .into_iter()
             .filter(|(_, members)| members.len() > 1)
-            .filter(|(key, _)| key.algebraic().is_none())
             .map(|(key, members)| Family { key, members })
             .collect()
     }

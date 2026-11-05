@@ -2,12 +2,12 @@ use lint_complexity::Complexity;
 use lint_core::{Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
+use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
-    ConnectedClusters, Containment, CoreMutation, DeepClusters, DuplicateTransitions, GraphLint, InterfaceByConsumers,
-    InterfaceByInternals, LowestCluster, TransitionGraph,
+    AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
+    Homomorphisms, InterfaceByConsumers, LowestCluster, ParallelStructures, RepeatedRoutes, TransitionGraph,
+    TypeSystem,
 };
-use transition_facts::Transitions;
-use type_facts::Facts;
 
 #[derive(Debug)]
 pub struct Elegance;
@@ -15,21 +15,23 @@ pub struct Elegance;
 impl Elegance {
     #[must_use]
     pub fn reports(files: &[SourceFile]) -> Vec<Report<'_>> {
-        let facts = Facts::of_files(files);
-        let transitions = Transitions::of_files(files);
-        let containment = Containment::clustered(files, &facts, &transitions);
+        let extraction = Extraction::from(files);
+        let system = TypeSystem::built_from(files, &extraction);
         vec![
             Complexity::report(files),
-            TransitionGraph::report_graph(&facts, &transitions),
-            DuplicateTransitions::report_graph(&facts, &transitions),
-            CoreMutation::report_graph(&facts, &transitions),
-            containment.report::<ConnectedClusters>(),
-            containment.report::<InterfaceByConsumers>(),
-            containment.report::<InterfaceByInternals>(),
-            containment.report::<LowestCluster>(),
-            containment.report::<DeepClusters>(),
+            TransitionGraph::report_graph(&system),
+            DuplicateTransitions::report_graph(&system),
+            CoreMutation::report_graph(&system),
+            AlgebraLaws::report_graph(&system),
+            Homomorphisms::report_graph(&system),
+            RepeatedRoutes::report_graph(&system),
+            ParallelStructures::report_graph(&system),
+            <Clustered<ConnectedClusters>>::report_graph(&system),
+            <Clustered<InterfaceByConsumers>>::report_graph(&system),
+            <Clustered<LowestCluster>>::report_graph(&system),
             EffectSites::report(files),
             FlowShapes::report(files),
+            NormalisedShapes::report(files),
         ]
     }
 }

@@ -66,8 +66,6 @@ lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
-transition-facts = { path = "../transition-facts" }
-type-facts = { path = "../type-facts" }
 
 [[test]]
 name = "behaviour"

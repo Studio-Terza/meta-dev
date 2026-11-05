@@ -31,8 +31,26 @@ impl Read {
         Transitions::of_files(&parsed).all().map(|found| shown(&found)).collect()
     }
 
+    fn wrappings(found: &Transition) -> String {
+        let function = found.function();
+        format!("{} {:?} {:?}", AsRef::<Name>::as_ref(function), function.takings(), function.wrapping())
+    }
+
+    fn called(found: &Transition) -> String {
+        let calls: Vec<String> = found.function().calls().iter().map(ToString::to_string).collect();
+        format!("{} {}", AsRef::<Name>::as_ref(found.function()), calls.join(","))
+    }
+
+    fn calls(text: &'static str) -> Vec<String> {
+        Self::files(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))], Self::called)
+    }
+
     fn signatures(text: &'static str) -> Vec<String> {
         Self::files(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))], Self::signature)
+    }
+
+    fn wrapped(text: &'static str) -> Vec<String> {
+        Self::files(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(text))], Self::wrappings)
     }
 
     fn body(text: &'static str) -> Vec<String> {
@@ -167,5 +185,52 @@ fn a_match_that_only_routes_each_variant_to_an_existing_transition_is_a_derived_
     assert_eq!(
         found,
         ["a Routed", "b Routed", "c Routed", "d Routed", "e Written", "f Written", "g Written", "h Written"]
+    );
+}
+
+#[test]
+fn a_domain_type_named_output_is_not_the_associated_type() {
+    let found = Read::signatures(
+        "struct A;\nstruct Output;\nimpl Add for A {\n    type Output = A;\n    fn add(self, other: A) -> Self::Output {}\n    fn make(self) -> Output {}\n    fn viewed(self) -> <A as Add>::Output {}\n}\n",
+    );
+    assert_eq!(
+        found,
+        [
+            "x::A::add(Named:A, Named:A) -> Named:A Absent Core Add",
+            "x::A::make(Named:A) -> Named:Output Absent Core Add",
+            "x::A::viewed(Named:A) -> Named:A Absent Core Add",
+        ]
+    );
+}
+
+#[test]
+fn a_body_records_the_names_it_calls_by_plain_call_and_by_method_in_the_order_they_run() {
+    let found = Read::calls(
+        "struct A;\nimpl A {\n    fn plain(self) -> A { helper(self) }\n    fn pathed(self) -> A { module::helper(self) }\n    fn nested(self) -> A { outer(inner(self)) }\n    fn method(self) -> A { self.helper() }\n    fn mixed(self) -> A { first(self).second() }\n}\n",
+    );
+    assert_eq!(
+        found,
+        ["plain helper", "pathed module::helper", "nested inner,outer", "method self.helper", "mixed first,#0.second"]
+    );
+}
+
+#[test]
+fn an_iterator_taken_or_given_reads_as_many_like_a_collection() {
+    let found = Read::wrapped(
+        "struct A;\nimpl A {\n    fn many(&self, items: impl IntoIterator<Item = A>) -> impl Iterator<Item = A> {}\n    fn boxed(&self) -> Box<dyn Iterator<Item = A>> {}\n    fn listed(&self) -> Vec<A> {}\n    fn shown(&self, shape: &dyn Shape) -> impl Display {}\n    fn bound<I: IntoIterator<Item = A>>(&self, items: I) {}\n    fn clause<I>(&self, items: &I) where I: Iterator<Item = A> {}\n    fn plain<T: Clone>(&self, item: T) {}\n    fn parened<I: IntoIterator<Item = A>>(&self, items: (I)) {}\n    fn boxed_generic<I: Iterator<Item = A>>(&self, items: Box<I>) -> Option<I> {}\n}\n",
+    );
+    assert_eq!(
+        found,
+        [
+            "many [Plain, Many] Many",
+            "boxed [Plain] Many",
+            "listed [Plain] Many",
+            "shown [Plain, Plain] Plain",
+            "bound [Plain, Many] Plain",
+            "clause [Plain, Many] Plain",
+            "plain [Plain, Plain] Plain",
+            "parened [Plain, Many] Plain",
+            "boxed_generic [Plain, Many] Many"
+        ]
     );
 }

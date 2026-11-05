@@ -1,6 +1,6 @@
-use lint_transition_graph::{CoreMutation, OnGraph};
+use lint_transition_graph::CoreMutation;
 
-use crate::shown::Shown;
+use crate::shown::{OnGraph, Shown};
 
 const MUTATION: &str = "struct A;\nimpl A {\n    fn run(&mut self) {}\n    fn fill(&self, out: &mut Vec<A>) {}\n    fn both(&mut self, out: &mut A) {}\n    fn pure(&self) -> A {}\n}\nimpl fmt::Display for A {\n    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {}\n}\nimpl Iterator for A {\n    fn next(&mut self) -> Option<A> {}\n}\nimpl AsMut<A> for B {\n    fn as_mut(&mut self) -> &mut A { &mut self.a }\n}\ntrait Local {\n    fn bump(&mut self);\n}\nimpl Local for A {\n    fn bump(&mut self) {}\n}\nmod ports {\n    fn write(out: &mut A) {}\n}\nmod boundary {\n    fn scan(out: &mut A) {}\n}\nmod store {\n    impl Records {\n        fn insert(&mut self, record: A, f: impl Fn(u8)) -> Option<usize> {}\n        fn merge(&self, into: &mut A) {}\n    }\n}\n";
 const PURE: &str = "struct A;\nimpl A {\n    fn pure(&self) -> A {}\n}\nmod ports {\n    fn write(out: &mut A) {}\n}\n";

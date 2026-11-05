@@ -57,8 +57,8 @@ impl Survey {
     }
 
     #[must_use]
-    pub fn file<'path>(&self, path: &'path Path) -> Option<&'path Path> {
-        self.canonical(path).filter(|real| self.kind(real) == Kind::File).map(|_| path)
+    pub fn file(&self, path: &Path) -> Option<Kind> {
+        self.canonical(path).map(|real| self.kind(real)).filter(|kind| *kind == Kind::File)
     }
 
     #[must_use]
@@ -89,7 +89,7 @@ impl Survey {
 
     fn listing(self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
         match listing {
-            Ok(entries) => self.sorted_into(directory, entries),
+            Ok(entries) => Survey { listed: Self::sorted_into(self.listed, directory, entries), ..self },
             Err(failure) => Survey {
                 failed: self
                     .failed
@@ -101,9 +101,13 @@ impl Survey {
         }
     }
 
-    fn sorted_into(mut self, directory: PathBuf, mut entries: Vec<PathBuf>) -> Survey {
+    fn sorted_into(
+        mut listed: BTreeMap<PathBuf, Vec<PathBuf>>,
+        directory: PathBuf,
+        mut entries: Vec<PathBuf>,
+    ) -> BTreeMap<PathBuf, Vec<PathBuf>> {
         entries.sort();
-        self.listed.insert(directory, entries);
-        self
+        listed.insert(directory, entries);
+        listed
     }
 }

@@ -5,41 +5,43 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Block, ExprClosure, ExprMatch, ImplItemFn, ItemFn, ItemImpl, ItemMod, TraitItemFn};
 
-use body_shape::Shape;
+use body_shape::Reading;
+use equivalence::Equivalence;
 use lint_core::{Bound, Site, SourceFile, Walk};
 use lint_layout::{LineNumber, TestMarks};
 
 use crate::extent::Extent;
 use crate::kind::Kind;
-use crate::node::Node;
 use crate::occurrence::Occurrence;
 
 pub(crate) struct Scan<'file> {
     file: &'file SourceFile,
     kind: Kind,
-    nodes: Vec<Node<'file>>,
+    equivalence: Equivalence,
+    occurrences: Vec<Occurrence<'file>>,
 }
 
 impl<'file> Scan<'file> {
     const FLOOR: Bound = Bound::Least(40);
 
-    pub(crate) fn of_file(file: &'file SourceFile) -> Vec<Node<'file>> {
-        let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests));
-        Self::scanned(file, Kind::of_role(file.placement().role())).into_iter().chain(tests).collect()
+    pub(crate) fn of_file(file: &'file SourceFile, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let tests = file.test_modules().iter().flat_map(|module| Self::scanned(module, Kind::Tests, equivalence));
+        Self::scanned(file, Kind::of_role(file.placement().role()), equivalence).into_iter().chain(tests).collect()
     }
 
-    fn scanned(file: &'file SourceFile, kind: Kind) -> Vec<Node<'file>> {
-        let mut scan = Scan { file, kind, nodes: Vec::new() };
+    fn scanned(file: &'file SourceFile, kind: Kind, equivalence: Equivalence) -> Vec<Occurrence<'file>> {
+        let mut scan = Scan { file, kind, equivalence, occurrences: Vec::new() };
         scan.visit_file(file.syntax());
-        scan.nodes
+        scan.occurrences
     }
 
     fn considered(&mut self, node: &(impl ToTokens + Spanned)) {
-        let shape = Shape::from(node.to_token_stream());
+        let reading = Reading::erasing(node.to_token_stream(), self.equivalence);
         let span = node.span();
         let site = Site::new(self.file.path(), LineNumber::from(span));
-        let occurrence = Occurrence::new(site, Extent::from(span), self.kind);
-        self.nodes.extend(Self::FLOOR.allows(shape.size()).map(|_| Node::new(shape, occurrence)));
+        let tokens = reading.shape().size();
+        let occurrence = Occurrence::new(reading, site, Extent::from(span), self.kind);
+        self.occurrences.extend(Self::FLOOR.allows(tokens).map(|_| occurrence));
     }
 
     fn within(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Self)) {
