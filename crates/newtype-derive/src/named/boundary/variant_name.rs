@@ -28,12 +28,13 @@ impl VariantName {
     }
 
     fn named(variant: Variant) -> syn::Result<VariantName> {
-        let mut names = variant.attrs.iter().filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE));
-        let first = names.next().ok_or_else(|| Error::new_spanned(&variant.ident, Self::UNNAMED))?;
-        if let Some(second) = names.next() {
-            return Err(Error::new_spanned(second, Self::REPEATED));
-        }
-        let text = first.parse_args::<LitStr>()?;
+        let names =
+            variant.attrs.iter().filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE)).collect::<Vec<_>>();
+        names.get(1).map_or(Ok(()), |second| Err(Error::new_spanned(second, Self::REPEATED)))?;
+        let text = names
+            .first()
+            .ok_or_else(|| Error::new_spanned(&variant.ident, Self::UNNAMED))
+            .and_then(|attribute| attribute.parse_args::<LitStr>())?;
         Ok(VariantName { variant: variant.ident, text })
     }
 }
