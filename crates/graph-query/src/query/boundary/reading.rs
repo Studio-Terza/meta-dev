@@ -104,7 +104,7 @@ impl Flag {
             .filter(|word| word.chars().take(length).eq(self.spelling.chars()))
             .map(|word| word.chars().skip(length))
             .filter(|rest| rest.clone().next() == Some(Self::JOIN))
-            .map(|rest| QueryFailure::Joined { flag: self.spelling.to_owned(), value: rest.skip(1).collect() })
+            .map(|_| QueryFailure::Joined(self.spelling.to_owned()))
     }
 
     pub(crate) fn spelling(&self) -> &'static str {
