@@ -18,6 +18,14 @@ impl Clustered {
         report(&system).iter().map(ToString::to_string).collect()
     }
 
+    fn interface(sources: &[Source]) -> Vec<String> {
+        Self::lines(sources, |view| ClusterReport::<InterfaceByConsumers>::report_graph(view).violations().to_vec())
+    }
+
+    fn connected(sources: &[Source]) -> Vec<String> {
+        Self::lines(sources, |view| ClusterReport::<ConnectedClusters>::report_graph(view).violations().to_vec())
+    }
+
     const fn at(path: &'static str, text: &'static str) -> Source {
         Source::new(Located::new(path), Text::new(text))
     }
@@ -639,4 +647,48 @@ fn an_impl_for_a_foreign_type_is_held_by_the_type_its_trait_names() {
             .to_vec()),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn a_trait_argument_behind_a_reference_links_the_kind_to_the_type_implementing_for_it() {
+    let argued = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct Kind;\npub struct Label;\nimpl From<&Kind> for Label {}\n"),
+        Clustered::at("crates/x/src/u.rs", "use crate::a::{Kind, Label};\npub struct K(Kind);\npub struct B(Label);\n"),
+    ];
+    assert_eq!(Clustered::interface(&argued), Vec::<String>::new());
+}
+
+#[test]
+fn an_error_returned_behind_a_reference_or_parentheses_is_linked_to_the_type() {
+    let wrapped = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "pub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn lent(&self) -> &Result<(), Refusal> {\n        todo!()\n    }\n}\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> (Result<(), Denial>) {\n        todo!()\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/u.rs",
+            "use crate::a::{Denial, Desk, Refusal, Shelf};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::interface(&wrapped),
+        [
+            "crates/x/src/a.rs:1: the exports of x::a fall into 2 groups: [Denial Desk] [Refusal Shelf] that no outside user joins; split it along the groups, one part for each kind of user",
+        ]
+    );
+}
+
+#[test]
+fn a_type_named_in_the_body_of_an_impl_for_a_reference_is_linked_to_the_type_behind_it() {
+    let bodies = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "pub struct Kind;\npub struct Made;\nimpl Tr for &Kind {\n    fn f(&self) {\n        Made::new();\n    }\n}\n",
+        ),
+        Clustered::at("crates/x/src/u.rs", "use crate::a::{Kind, Made};\npub struct K(Kind);\npub struct M(Made);\n"),
+    ];
+    assert_eq!(Clustered::connected(&bodies), Vec::<String>::new());
 }
