@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use file_ports::{FileFailure, Files, Kind, Memory};
+use lint_fixtures::Withdrawn;
 use lint_runner::Cli;
 use text_lines::Lines;
 
@@ -12,8 +13,6 @@ const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
 const FIX_START: &str = "; ";
-const WITHDRAWN: [&str; 7] =
-    ["then_some", "map_or", ".then(", "filter(", "ok_or", "pipeline of let bindings", "use combinators"];
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
@@ -35,8 +34,12 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
     assert_ne!(printed, Vec::<&str>::new());
     assert_eq!(unfixed, Vec::<&str>::new());
-    let withdrawn: Vec<&str> = printed.iter().copied().filter(|line| Corpus::withdrawn_advice(line)).collect();
-    assert_eq!(withdrawn, Vec::<&str>::new());
+    let withdrawn: Vec<(&str, Withdrawn)> = printed
+        .iter()
+        .map(|line| (*line, Corpus::withdrawn_advice(line)))
+        .filter(|(_, found)| *found != Withdrawn::default())
+        .collect();
+    assert_eq!(withdrawn, Vec::<(&str, Withdrawn)>::new());
     Ok(())
 }
 
@@ -94,9 +97,8 @@ impl Corpus {
             .is_some_and(|last| last.is_ascii_digit())
     }
 
-    fn withdrawn_advice(line: &str) -> bool {
-        let fix = Self::fix_named(line).unwrap_or_default();
-        WITHDRAWN.iter().any(|spelling| fix.contains(spelling))
+    fn withdrawn_advice(line: &str) -> Withdrawn {
+        Self::fix_named(line).unwrap_or_default().parse().unwrap_or_default()
     }
 
     fn fix_named(line: &str) -> Option<&str> {

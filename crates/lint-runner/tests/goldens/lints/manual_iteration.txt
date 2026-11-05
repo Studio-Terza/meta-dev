@@ -12,11 +12,11 @@ a &mut Vec parameter lets any caller push without the checks; give the collectio
 src/accumulating.rs:1: fn f; give the collection a type that owns its rules
 src/filtered.rs:1: fn f; give the collection a type that owns its rules
 control flow is an expression; every branch yields the value the function returns:
-src/accumulating.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/accumulating.rs:2: for loop; drive the iterator with combinators (map, fold, try_fold, take_while), const fns excepted
 src/counter.rs:2: mutable local that is only reassigned; a mutable binding is borrowed as &mut or has methods called on it
-src/filtered.rs:2: for loop; drive the iterator with combinators, const fns excepted
-src/filtered.rs:3: if without else yields nothing; give the decision a named outcome, an enum a pure router matches, so each case produces a value
-src/working.rs:2: for loop; drive the iterator with combinators, const fns excepted
+src/filtered.rs:2: for loop; drive the iterator with combinators (map, fold, try_fold, take_while), const fns excepted
+src/filtered.rs:3: if without else yields nothing; give the decision a named outcome (an enum a pure router matches), so each case produces a value
+src/working.rs:2: for loop; drive the iterator with combinators (map, fold, try_fold, take_while), const fns excepted
 function names say what the function does:
 src/accumulating.rs:1: fn f names nothing; say what it does
 src/counter.rs:1: fn f names nothing; say what it does
@@ -36,8 +36,8 @@ src/filtered.rs:1: bare u8 in f; take and return a domain type (a newtype, an en
 src/mutable.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/working.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
-src/accumulating.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/filtered.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
-src/filtered.rs:3: if; make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches
-src/working.rs:2: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+src/accumulating.rs:2: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)
+src/filtered.rs:2: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)
+src/filtered.rs:3: if; turn the whole body into a pure router (one match on an enum, Option or Result), or give the decision a named outcome (an enum a pure router matches)
+src/working.rs:2: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)
 fails

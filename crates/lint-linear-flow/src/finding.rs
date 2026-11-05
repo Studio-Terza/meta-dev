@@ -29,7 +29,7 @@ pub enum Finding {
 }
 
 impl Finding {
-    const COMBINATORS: &'static str = "drive an iterator with combinators (map, filter, fold, try_fold, take_while)";
+    const COMBINATORS: &'static str = "drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)";
     const CONDITION: &'static str = "name the condition as an enum or a predicate type";
 
     pub fn branching(condition: &Expr) -> Finding {
@@ -93,20 +93,20 @@ impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         match self {
             Finding::If => Fix::new(
-                "make the whole body a pure router, one match on an enum, Option or Result, or give the decision a named outcome, an enum a pure router matches",
+                "turn the whole body into a pure router (one match on an enum, Option or Result), or give the decision a named outcome (an enum a pure router matches)",
             ),
             Finding::IfLet => Fix::new(
-                "extract it into a pure router, a function whose whole body is the if let, or give the decision a named outcome, an enum a pure router matches",
+                "extract the if let into a pure router (a function whose whole body is that if let), or give the decision a named outcome (an enum a pure router matches)",
             ),
             Finding::Match => Fix::new(
-                "extract it into a pure router, a function whose whole body is the match, or give the decision a named outcome, an enum a pure router matches",
+                "extract the match into a pure router (a function whose whole body is that match), or give the decision a named outcome (an enum a pure router matches)",
             ),
             Finding::While | Finding::For => Fix::new(Self::COMBINATORS),
             Finding::Loop => {
                 Fix::new("drive an iterator with combinators (successors, repeat_with, take_while, try_fold)")
             }
             Finding::LetElse => Fix::new(
-                "extract a pure router, a function whose whole body is one match on the Option or Result, or give the decision a named outcome, an enum a pure router matches",
+                "extract a pure router (a function whose whole body is one match on the Option or Result), or give the decision a named outcome (an enum a pure router matches)",
             ),
             Finding::Guard => Fix::new("name the condition as an enum or a predicate type and match on it"),
             Finding::ValuePattern => Fix::new("match on an enum, Option or Result that names the cases"),
