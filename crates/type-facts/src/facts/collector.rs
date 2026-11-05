@@ -1,8 +1,10 @@
 mod described;
 mod impl_block;
 mod referenced;
+mod tested;
 
 use proc_macro2::Span;
+use syn::parse_quote;
 use syn::visit::{self, Visit};
 use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, Meta, punctuated::Punctuated};
 
@@ -10,7 +12,6 @@ use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_placement::CrateName;
 
-use crate::dependency::Dependency;
 use crate::facts::Facts;
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
@@ -23,6 +24,7 @@ use crate::via::Via;
 use described::Described;
 pub(crate) use impl_block::ImplBlock;
 use referenced::Referenced;
+use tested::Tested;
 
 pub(crate) struct Collector<'file> {
     file: &'file SourceFile,
@@ -34,7 +36,16 @@ impl<'file> Collector<'file> {
     pub(crate) fn collected(facts: Facts<'file>, file: &'file SourceFile) -> Facts<'file> {
         let mut scan = Collector { file, krate: file.placement().package().crate_name(), facts };
         scan.visit_file(file.syntax());
+        scan.facts.add_tested(Tested::enums_in(file, Vec::new()));
+        Self::read_tests(&mut scan.facts, file);
         scan.facts
+    }
+
+    fn read_tests(facts: &mut Facts<'file>, file: &'file SourceFile) {
+        file.test_modules().iter().for_each(|module| {
+            facts.add_tested(Tested::enums_in(module, vec![parse_quote!(#[cfg(test)])]));
+            Self::read_tests(facts, module);
+        });
     }
 
     fn site_at(&self, span: Span) -> Site<'file> {
@@ -53,13 +64,10 @@ impl<'file> Collector<'file> {
             .collect()
     }
 
-    fn declared(&mut self, attributes: &[Attribute], name: &Ident, shape: Shape, dependencies: Vec<Dependency<'file>>) {
-        let found = (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
+    fn declared(&self, attributes: &[Attribute], name: &Ident) -> Option<TypeFact<'file>> {
+        (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
             TypeFact::declared(self.krate, Name::from(name), self.site_at(name.span()), Self::derives(attributes))
-                .shaped(shape)
-                .depending_on(dependencies)
-        });
-        self.facts.add_type(found);
+        })
     }
 }
 
@@ -75,7 +83,8 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             found.fields.iter(),
             &found.generics,
         );
-        self.declared(&found.attrs, &found.ident, shape, dependencies);
+        let fact = self.declared(&found.attrs, &found.ident).map(|fact| fact.shaped(shape).depending_on(dependencies));
+        self.facts.add_type(fact);
     }
 
     fn visit_item_enum(&mut self, found: &'ast ItemEnum) {
@@ -85,7 +94,11 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             fields,
             &found.generics,
         );
-        self.declared(&found.attrs, &found.ident, Shape::Other, dependencies);
+        let variants = found.variants.iter().map(|variant| Name::from(&variant.ident)).collect();
+        let fact = self
+            .declared(&found.attrs, &found.ident)
+            .map(|fact| fact.shaped(Shape::Other).with_variants(variants).depending_on(dependencies));
+        self.facts.add_type(fact);
     }
 
     fn visit_item_trait(&mut self, found: &'ast ItemTrait) {

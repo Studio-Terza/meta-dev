@@ -77,7 +77,59 @@ const FROM_BOOL_FOREIGN: &str = "impl From<bool> for Lit {\n    fn from(on: bool
 const FROM_BOOL_PORTS_INLINE: &str = "mod ports {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
 const FROM_BOOL_TWO_INPUTS: &str = "impl From<bool> for Lit {\n    fn from(on: bool, extra: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
 
-const LINEAR: [Case; 42] = [
+const TYPE_DECLS: &str = "pub enum Lit { On, Off, Dim }\npub enum Family { V4, V6 }\npub enum Side { A, B }\n";
+const TYPES: Source = Source::new(Located::new("crates/x/src/types.rs"), Text::new(TYPE_DECLS));
+const STRUCT_LIT: Source = Source::new(
+    Located::new("crates/x/src/struct_lit.rs"),
+    Text::new(
+        "pub struct Lit(u8);\nimpl Lit {\n    pub const ON: Lit = Lit(1);\n    pub const OFF: Lit = Lit(0);\n}\n",
+    ),
+);
+const TWIN_LIT: Source = Source::new(Located::new("crates/x/src/twin.rs"), Text::new("pub enum Lit { On, Off }\n"));
+const STRUCT_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/wire.rs"), Text::new("pub struct Lit(pub u8);\n"));
+const PARTIAL_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/partial.rs"), Text::new("pub enum Lit { On }\n"));
+const CFG_TWIN_LIT: Source = Source::new(
+    Located::new("crates/x/src/types.rs"),
+    Text::new("#[cfg(unix)]\npub enum Lit { On, Off }\n#[cfg(not(unix))]\npub enum Lit { On, Off }\n"),
+);
+const STRUCT_DELAY: Source = Source::new(
+    Located::new("crates/x/src/struct_delay.rs"),
+    Text::new(
+        "pub struct Delay(u64);\nimpl Delay {\n    pub const SHORT: Delay = Delay(1);\n    pub const LONG: Delay = Delay(9);\n}\n",
+    ),
+);
+const FROM_BOOL_ONOFF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::ON } else { Lit::OFF }\n    }\n}\n";
+const FROM_BOOL_DELAY: &str = "impl From<bool> for Delay {\n    fn from(slow: bool) -> Delay {\n        if slow { Delay::LONG } else { Delay::SHORT }\n    }\n}\n";
+const FROM_BOOL_GONE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Gone }\n    }\n}\n";
+
+const MACRO_LIT: Source = Source::new(
+    Located::new("crates/x/src/made.rs"),
+    Text::new("macro_rules! make {\n    () => {\n        pub enum Lit { On, Off }\n    };\n}\nmake!();\n"),
+);
+const FROM_BOOL_IN_TESTS: &str = "#[cfg(test)]\nmod tests {\n    enum Lit { On, Off }\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+
+const TEST_ONLY_LIT: Source = Source::new(
+    Located::new("crates/x/src/other.rs"),
+    Text::new("#[cfg(test)]\nmod tests {\n    enum Lit { Dim }\n}\n"),
+);
+const TESTED_TWIN_LIT: Source =
+    Source::new(Located::new("crates/x/src/tested.rs"), Text::new("#[cfg(test)]\nenum Lit { Dim }\n"));
+const ON_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/on.rs"), Text::new("pub enum Lit { On }\n"));
+const OFF_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/off.rs"), Text::new("pub enum Lit { Off }\n"));
+const LIGHT_LIT: Source = Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off }\n"));
+const FUSE_LIT: Source = Source::new(Located::new("crates/x/src/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
+const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_RENAMED: &str = "use crate::light::Lit as Lamp;\nimpl From<bool> for Lamp {\n    fn from(on: bool) -> Lamp {\n        if on { Lamp::On } else { Lamp::Off }\n    }\n}\n";
+const FROM_BOOL_BY_PATH: &str = "impl From<bool> for crate::light::Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_INLINE_MOD: &str = "mod inner {\n    use crate::light::Lit;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const TESTED_LIT_AND_IMPL: &str = "#[cfg(test)]\nenum Lit { On, Off }\n#[cfg(test)]\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod tests {\n    use super::*;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const REEXPORTED_LIT: Source =
+    Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod light;\npub use light::Lit;\n"));
+
+const LINEAR: [Case; 61] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -149,52 +201,52 @@ const LINEAR: [Case; 42] = [
     ),
     Case::new(
         Title::new("from bool in a boundary module file"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool in an inline boundary module"),
-        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_INLINE))],
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_INLINE)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool outside a boundary module"),
-        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL))],
+        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL)), TYPES],
         Flagged::new(&["crates/x/src/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool with more than the if"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_AFTER_LET))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_AFTER_LET)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
     ),
     Case::new(
         Title::new("from bool deciding on more than its value"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_JOINED))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_JOINED)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool with an else if"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_ELSE_IF))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_ELSE_IF)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3", "crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool with an if inside a branch"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_NESTED))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_NESTED)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3", "crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("a helper beside from bool"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_HELPER))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_HELPER)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:8"]),
     ),
     Case::new(
         Title::new("from bool deciding on a constant"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_CONST))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_CONST)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("a function nested in from bool"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_PICK))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_PICK)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
@@ -209,68 +261,180 @@ const LINEAR: [Case; 42] = [
     ),
     Case::new(
         Title::new("from bool with a compound branch"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_COMPOUND))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_COMPOUND)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("a function nested in an associated const of from bool"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_CONST_FN))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_CONST_FN)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool naming Self against the type"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SELF))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SELF)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool choosing module constants"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_MODULE))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_MODULE)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool choosing associated constants"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LIMIT))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LIMIT)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool choosing capital and digit variants"),
-        &[Source::new(Located::new("crates/x/src/boundary/family.rs"), Text::new(FROM_BOOL_FAMILY))],
+        &[Source::new(Located::new("crates/x/src/boundary/family.rs"), Text::new(FROM_BOOL_FAMILY)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool choosing lowercase names"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LOWER))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LOWER)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool with identical branches"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SAME))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SAME)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool choosing single letter variants"),
-        &[Source::new(Located::new("crates/x/src/boundary/side.rs"), Text::new(FROM_BOOL_SIDE))],
+        &[Source::new(Located::new("crates/x/src/boundary/side.rs"), Text::new(FROM_BOOL_SIDE)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool in a ports module file"),
-        &[Source::new(Located::new("crates/x/src/ports/lit.rs"), Text::new(FROM_BOOL))],
+        &[Source::new(Located::new("crates/x/src/ports/lit.rs"), Text::new(FROM_BOOL)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool choosing variants of another type"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_FOREIGN))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_FOREIGN)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool in an inline ports module"),
-        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_PORTS_INLINE))],
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_PORTS_INLINE)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
         Title::new("from bool taking two inputs"),
-        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_TWO_INPUTS))],
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_TWO_INPUTS)), TYPES],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing constants of a struct"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_ONOFF)), STRUCT_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing single word constants of a struct"),
+        &[Source::new(Located::new("crates/x/src/boundary/delay.rs"), Text::new(FROM_BOOL_DELAY)), STRUCT_DELAY],
+        Flagged::new(&["crates/x/src/boundary/delay.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing a name the enum does not declare"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_GONE)), TYPES],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum declared twice, both declaring the chosen variants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum sharing its name with a struct"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, STRUCT_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum while a twin lacks a chosen variant is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, PARTIAL_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum while a cfg(test) twin lacks the variants is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TESTED_TWIN_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum whose variants are split across twins is flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), ON_ONLY_LIT, OFF_ONLY_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum declared in a test module"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_IN_TESTS))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum made by a macro is flagged, as macro expansion is not read"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), MACRO_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum while a test-only enum of the name lacks the variants is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TEST_ONLY_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new(
+            "from bool into an imported enum is not flagged while another module declares a twin lacking the variants",
+        ),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
+            LIGHT_LIT,
+            FUSE_LIT,
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into a renamed import of an enum is flagged because the alias names no enum"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_RENAMED)), LIGHT_LIT],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool into a path-qualified enum is not flagged while a twin lacks the variants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_BY_PATH)), LIGHT_LIT, FUSE_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum imported inside an inline module is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_INLINE_MOD)), LIGHT_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new(
+            "from bool into an enum imported through a re-export is not flagged while a twin lacks the variants",
+        ),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
+            REEXPORTED_LIT,
+            LIGHT_LIT,
+            FUSE_LIT,
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a cfg(test) impl beside a cfg(test) enum is not flagged"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(TESTED_LIT_AND_IMPL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a test module over a use super glob finds the shipped enum"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_IN_TESTS_USING_SUPER)),
+            REEXPORTED_LIT,
+            LIGHT_LIT,
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum split by cfg"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), CFG_TWIN_LIT],
+        Flagged::new(&[]),
     ),
 ];
 
@@ -608,4 +772,15 @@ fn loops_routers_and_conditions_pin_their_fix_text() {
             "i.rs:4: boolean operator &&; name the condition as an enum or a predicate type",
         ]
     );
+}
+
+const TESTS_FILE_PARENT: &str = "#[cfg(test)]\nmod tests;\n";
+const TESTS_FILE_ENUM: &str = "enum Lit { On, Off }\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+
+#[test]
+fn from_bool_into_an_enum_declared_in_an_out_of_line_test_module_is_not_flagged() {
+    let module = Sources::file("crates/x/src/boundary/lit/tests.rs", Text::new(TESTS_FILE_ENUM));
+    let files =
+        [Sources::file("crates/x/src/boundary/lit.rs", Text::new(TESTS_FILE_PARENT)).with_test_modules(vec![module])];
+    assert_eq!(Sources::lines(&LinearBodies::report(&files)), Lines::default());
 }

@@ -11,6 +11,7 @@ pub struct TypeFact<'file> {
     name: Name,
     site: Site<'file>,
     derives: Vec<Name>,
+    variants: Option<Vec<Name>>,
     shape: Shape,
     dependencies: Vec<Dependency<'file>>,
 }
@@ -22,11 +23,16 @@ impl<'file> TypeFact<'file> {
         site: Site<'file>,
         derives: Vec<Name>,
     ) -> TypeFact<'file> {
-        TypeFact { krate, name, site, derives, shape: Shape::Other, dependencies: Vec::new() }
+        TypeFact { krate, name, site, derives, variants: None, shape: Shape::Other, dependencies: Vec::new() }
     }
 
     pub(crate) fn depending_on(mut self, dependencies: Vec<Dependency<'file>>) -> TypeFact<'file> {
         self.dependencies = dependencies;
+        self
+    }
+
+    pub(crate) fn with_variants(mut self, variants: Vec<Name>) -> TypeFact<'file> {
+        self.variants = Some(variants);
         self
     }
 
@@ -42,6 +48,15 @@ impl<'file> TypeFact<'file> {
     #[must_use]
     pub fn shape(&self) -> Shape {
         self.shape
+    }
+
+    pub(crate) fn as_enum(&self) -> Option<&TypeFact<'file>> {
+        self.variants.as_ref().map(|_| self)
+    }
+
+    #[must_use]
+    pub fn variant(&self, wanted: &Name) -> Option<&Name> {
+        self.variants.iter().flatten().find(|variant| *variant == wanted)
     }
 
     #[must_use]

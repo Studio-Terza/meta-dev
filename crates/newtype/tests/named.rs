@@ -78,16 +78,16 @@ fn a_refusal_boxes_into_dyn_error_for_an_enum_without_debug_or_partial_eq() {
 #[accessor(mark: char)]
 enum Lit {
     #[name("hi")]
-    #[value(glyph = "*")]
-    #[value(rank = 7)]
-    #[value(lit = true)]
-    #[value(mark = 'h')]
+    #[accessor_value(glyph = "*")]
+    #[accessor_value(rank = 7)]
+    #[accessor_value(lit = true)]
+    #[accessor_value(mark = 'h')]
     High,
     #[name("lo")]
-    #[value(mark = 'l')]
-    #[value(lit = false)]
-    #[value(rank = 1)]
-    #[value(glyph = "-")]
+    #[accessor_value(mark = 'l')]
+    #[accessor_value(lit = false)]
+    #[accessor_value(rank = 1)]
+    #[accessor_value(glyph = "-")]
     Low,
 }
 
@@ -242,13 +242,36 @@ fn an_enum_of_eight_hundred_variants_compiles_and_names_each_one() {
 #[accessor(wide: ::core::primitive::i64)]
 enum Spelled {
     #[name("one")]
-    #[value(glyph = 1)]
-    #[value(r#rank = 2)]
-    #[value(wide = 3)]
+    #[accessor_value(glyph = 1)]
+    #[accessor_value(r#rank = 2)]
+    #[accessor_value(wide = 3)]
     One,
 }
 
 #[test]
 fn accessors_accept_primitive_paths_and_raw_names() {
     assert_eq!((Spelled::One.glyph(), Spelled::One.rank(), Spelled::One.wide()), (1, 2, 3));
+}
+
+#[derive(Named, VariantArray, Clone, Copy)]
+#[accessor(byte: u8)]
+#[accessor(text: &'static core::primitive::str)]
+#[accessor(path: &'static ::std::primitive::str)]
+enum Octets {
+    #[name("a")]
+    #[accessor_value(byte = b'a')]
+    #[accessor_value(text = "t")]
+    #[accessor_value(path = "p")]
+    A,
+    #[name("b")]
+    #[accessor_value(byte = 7)]
+    #[accessor_value(text = "u")]
+    #[accessor_value(path = "q")]
+    B,
+}
+
+#[test]
+fn a_u8_accessor_takes_a_byte_literal_and_a_str_accessor_a_primitive_path() {
+    assert_eq!((Octets::A.byte(), Octets::B.byte()), (b'a', 7));
+    assert_eq!((Octets::A.text(), Octets::B.path()), ("t", "q"));
 }

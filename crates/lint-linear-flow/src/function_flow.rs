@@ -11,7 +11,7 @@ use proc_macro2::Span;
 use crate::finding::Rule;
 use crate::verdict::Verdict;
 use found::Found;
-pub use root::Root;
+pub use root::{Root, Target};
 use scan::Scan;
 
 #[derive(Debug)]
