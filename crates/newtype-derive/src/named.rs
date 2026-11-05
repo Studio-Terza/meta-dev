@@ -4,11 +4,12 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Ident};
 
-use boundary::VariantName;
+use boundary::{Accessor, VariantName};
 
 pub struct Named {
     ident: Ident,
     names: Vec<VariantName>,
+    accessors: Vec<Accessor>,
 }
 
 impl Named {
@@ -22,6 +23,7 @@ impl Named {
             .and_then(Self::unattributed)
             .and_then(Self::table)
             .and_then(Self::distinct)
+            .and_then(|named| named.names.iter().try_for_each(|name| name.supplies(&named.accessors)).map(|()| named))
             .map_or_else(|error| error.to_compile_error(), Self::implemented)
     }
 
@@ -34,14 +36,11 @@ impl Named {
             .map(|()| input)
     }
 
-    fn table(DeriveInput { ident, data, .. }: DeriveInput) -> syn::Result<Named> {
+    fn table(DeriveInput { ident, data, attrs, .. }: DeriveInput) -> syn::Result<Named> {
         match data {
-            Data::Enum(declared) => declared
-                .variants
-                .into_iter()
-                .map(VariantName::try_from)
-                .collect::<syn::Result<Vec<VariantName>>>()
-                .map(|names| Named { ident, names }),
+            Data::Enum(declared) => {
+                Ok(Named { names: VariantName::all(declared.variants)?, accessors: Accessor::declared(&attrs)?, ident })
+            }
             Data::Struct(_) | Data::Union(_) => Err(Error::new_spanned(ident, Self::ENUMS_ONLY)),
         }
     }
@@ -60,7 +59,28 @@ impl Named {
     fn implemented(self) -> TokenStream {
         let ident = &self.ident;
         let arms = self.names.iter().map(|name| name.arm(ident));
+        let accessors = self.accessors.iter().map(|accessor| accessor.method(ident, &self.names));
+        let count = self.names.len();
         quote! {
+            const _: () = {
+                #[diagnostic::on_unimplemented(
+                    message = "Named needs an enum that is Copy: add Copy to its derive list",
+                    label = "this enum is not Copy"
+                )]
+                trait NamedNeedsCopy {}
+
+                impl<Of: ::core::marker::Copy> NamedNeedsCopy for Of {}
+
+                const fn copied<Of: NamedNeedsCopy>() {}
+
+                copied::<#ident>();
+            };
+
+            const _: () = ::core::assert!(
+                <#ident as ::strum::VariantArray>::VARIANTS.len() == #count,
+                "Named needs VariantArray to list every variant of the enum"
+            );
+
             impl #ident {
                 #[must_use]
                 pub const fn name(self) -> &'static str {
@@ -68,6 +88,8 @@ impl Named {
                         #(#arms,)*
                     }
                 }
+
+                #(#accessors)*
             }
 
             impl ::core::fmt::Display for #ident {

@@ -70,3 +70,45 @@ fn a_refusal_boxes_into_dyn_error_for_an_enum_without_debug_or_partial_eq() {
     );
     assert!(Bare::read("bare").is_ok());
 }
+
+#[derive(Named, VariantArray, Clone, Copy)]
+#[accessor(glyph: &'static str)]
+#[accessor(rank: u8)]
+#[accessor(lit: bool)]
+#[accessor(mark: char)]
+enum Lit {
+    #[name("hi")]
+    #[value(glyph = "*")]
+    #[value(rank = 7)]
+    #[value(lit = true)]
+    #[value(mark = 'h')]
+    High,
+    #[name("lo")]
+    #[value(mark = 'l')]
+    #[value(lit = false)]
+    #[value(rank = 1)]
+    #[value(glyph = "-")]
+    Low,
+}
+
+struct Accessors;
+
+impl Accessors {
+    const GLYPH: &'static str = Lit::High.glyph();
+    const RANK: u8 = Lit::Low.rank();
+    const LIT: bool = Lit::High.lit();
+    const MARK: char = Lit::Low.mark();
+}
+
+laws::table!(accessors_read_each_variants_values, |lit: &Lit| (lit.glyph(), lit.rank(), lit.lit(), lit.mark()), [
+    Lit::High => ("*", 7, true, 'h'),
+    Lit::Low => ("-", 1, false, 'l'),
+]);
+
+#[test]
+fn accessors_are_compile_time_constants() {
+    assert_eq!(Accessors::GLYPH, "*");
+    assert_eq!(Accessors::RANK, 1);
+    assert_eq!(u8::from(Accessors::LIT), 1);
+    assert_eq!(Accessors::MARK, 'l');
+}
