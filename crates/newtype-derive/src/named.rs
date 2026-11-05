@@ -15,7 +15,7 @@ pub struct Named {
 impl Named {
     const ENUMS_ONLY: &'static str = "Named derives for an enum of unit variants";
     const ON_ENUM: &'static str = "name belongs on a variant, not on the enum";
-    const VALUE_ON_ENUM: &'static str = "value belongs on a variant, not on the enum";
+    const VALUE_ON_ENUM: &'static str = "accessor_value belongs on a variant, not on the enum";
     const NO_VARIANTS: &'static str = "Named needs at least one variant to name";
     const REPEATED: &'static str = "two variants have this name, so FromStr could not tell them apart";
 
@@ -36,7 +36,7 @@ impl Named {
                 let path = attribute.path();
                 path.is_ident("name")
                     .then_some(Self::ON_ENUM)
-                    .or_else(|| path.is_ident("value").then_some(Self::VALUE_ON_ENUM))
+                    .or_else(|| path.is_ident("accessor_value").then_some(Self::VALUE_ON_ENUM))
                     .map(|message| Error::new_spanned(attribute, message))
             })
             .map_or(Ok(input), Err)

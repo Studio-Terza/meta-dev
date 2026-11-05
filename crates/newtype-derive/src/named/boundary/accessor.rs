@@ -10,6 +10,8 @@ use super::VariantName;
 enum Literal {
     Text,
     Integer,
+    Octet,
+    Byte,
     Boolean,
     Character,
 }
@@ -18,35 +20,39 @@ impl Literal {
     const PATHS: [&'static str; 5] =
         ["", "core::primitive::", "std::primitive::", "::core::primitive::", "::std::primitive::"];
 
-    fn spelled(self, spelling: &str, ty: &Type) -> Option<Literal> {
-        Self::PATHS.iter().take(self.paths()).find_map(|prefix| {
-            syn::parse_str::<Type>(&format!("{prefix}{spelling}")).ok().filter(|parsed| parsed == ty).map(|_| self)
+    fn spelled(self, head: &str, tail: &str, ty: &Type) -> Option<Literal> {
+        Self::PATHS.iter().find_map(|prefix| {
+            syn::parse_str::<Type>(&format!("{head}{prefix}{tail}")).ok().filter(|parsed| parsed == ty).map(|_| self)
         })
     }
 
-    const fn paths(self) -> usize {
+    const fn admitted(self) -> &'static [Literal] {
         match self {
-            Literal::Text => 1,
-            Literal::Integer | Literal::Boolean | Literal::Character => Self::PATHS.len(),
+            Literal::Text => &[Literal::Text],
+            Literal::Integer => &[Literal::Integer],
+            Literal::Octet => &[Literal::Integer, Literal::Byte],
+            Literal::Byte => &[Literal::Byte],
+            Literal::Boolean => &[Literal::Boolean],
+            Literal::Character => &[Literal::Character],
         }
     }
 
-    const SPELLINGS: [(&'static str, Literal); 15] = [
-        ("&'static str", Literal::Text),
-        ("bool", Literal::Boolean),
-        ("char", Literal::Character),
-        ("u8", Literal::Integer),
-        ("u16", Literal::Integer),
-        ("u32", Literal::Integer),
-        ("u64", Literal::Integer),
-        ("u128", Literal::Integer),
-        ("usize", Literal::Integer),
-        ("i8", Literal::Integer),
-        ("i16", Literal::Integer),
-        ("i32", Literal::Integer),
-        ("i64", Literal::Integer),
-        ("i128", Literal::Integer),
-        ("isize", Literal::Integer),
+    const SPELLINGS: [(&'static str, &'static str, Literal); 15] = [
+        ("&'static ", "str", Literal::Text),
+        ("", "bool", Literal::Boolean),
+        ("", "char", Literal::Character),
+        ("", "u8", Literal::Octet),
+        ("", "u16", Literal::Integer),
+        ("", "u32", Literal::Integer),
+        ("", "u64", Literal::Integer),
+        ("", "u128", Literal::Integer),
+        ("", "usize", Literal::Integer),
+        ("", "i8", Literal::Integer),
+        ("", "i16", Literal::Integer),
+        ("", "i32", Literal::Integer),
+        ("", "i64", Literal::Integer),
+        ("", "i128", Literal::Integer),
+        ("", "isize", Literal::Integer),
     ];
 }
 
@@ -56,7 +62,7 @@ impl TryFrom<&Type> for Literal {
     fn try_from(ty: &Type) -> syn::Result<Literal> {
         Self::SPELLINGS
             .iter()
-            .find_map(|(spelling, literal)| literal.spelled(spelling, ty))
+            .find_map(|(head, tail, literal)| literal.spelled(head, tail, ty))
             .ok_or_else(|| Error::new_spanned(ty, Accessor::UNSUPPORTED))
     }
 }
@@ -68,6 +74,7 @@ impl TryFrom<&Lit> for Literal {
         match lit {
             Lit::Str(_) => Ok(Literal::Text),
             Lit::Int(_) => Ok(Literal::Integer),
+            Lit::Byte(_) => Ok(Literal::Byte),
             Lit::Bool(_) => Ok(Literal::Boolean),
             Lit::Char(_) => Ok(Literal::Character),
             _ => Err(Error::new_spanned(lit, Accessor::WRONG_TYPE)),
@@ -86,9 +93,35 @@ impl Accessor {
     const UNSUPPORTED: &'static str = "an accessor type is &'static str, an integer type, bool or char";
     const WRONG_TYPE: &'static str = "this literal does not have the accessor's declared type";
     pub const ATTRIBUTE: &'static str = "accessor";
-    const RESERVED_NAMES: [&'static str; 4] = ["name", "to_string", "fmt", "from_str"];
-    const RESERVED: &'static str =
-        "an accessor cannot be called name, to_string, fmt or from_str, which the derive's own method and impls use";
+    const RESERVED_NAMES: [&'static str; 26] = [
+        "name",
+        "clone",
+        "clone_from",
+        "eq",
+        "ne",
+        "partial_cmp",
+        "lt",
+        "le",
+        "gt",
+        "ge",
+        "cmp",
+        "max",
+        "min",
+        "clamp",
+        "hash",
+        "hash_slice",
+        "fmt",
+        "to_string",
+        "from_str",
+        "into",
+        "try_into",
+        "borrow",
+        "as_ref",
+        "to_owned",
+        "clone_into",
+        "default",
+    ];
+    const RESERVED: &'static str = "an accessor cannot take the name of a method of Clone, PartialEq, PartialOrd, Ord, Hash, Debug, Display, ToString, FromStr, Into, TryInto, Borrow, AsRef, ToOwned or Default, or of the derive's own `name`, because it would shadow that method";
     const REPEATED: &'static str = "two accessors have this name";
 
     pub fn declared(attrs: &[Attribute]) -> syn::Result<Vec<Accessor>> {
@@ -120,7 +153,7 @@ impl Accessor {
         Literal::try_from(lit)
             .and_then(|found| {
                 Some(found)
-                    .filter(|found| *found == self.literal)
+                    .filter(|found| self.literal.admitted().contains(found))
                     .ok_or_else(|| Error::new_spanned(lit, Self::WRONG_TYPE))
             })
             .map(|_| lit)
