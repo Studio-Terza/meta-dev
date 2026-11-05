@@ -64,10 +64,10 @@ impl Expecting {
     }
 
     fn numeric(word: &str) -> Spelling {
-        match word.chars().nth(1) {
-            Some('0'..='9' | '.') => Spelling::from(word.parse::<f64>()),
-            _ => Spelling::Unknown,
-        }
+        Some(word)
+            .filter(|text| text.chars().any(|symbol| symbol.is_ascii_digit()))
+            .and_then(|text| text.parse::<f64>().ok())
+            .map_or(Spelling::Unknown, |_| Spelling::Number)
     }
 
     fn flag(word: &str) -> Option<Expecting> {
