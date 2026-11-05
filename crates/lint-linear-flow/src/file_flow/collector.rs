@@ -78,7 +78,7 @@ impl<'ast> Visit<'ast> for Collector<'_, '_> {
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let entered = self.zone.entering(self.file, module, self.adapters);
+        let entered = Zone::of_module(self.file, module, self.adapters);
         let outer = mem::replace(&mut self.zone, entered);
         visit::visit_item_mod(self, module);
         self.zone = outer;

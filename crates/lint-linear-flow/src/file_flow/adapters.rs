@@ -5,7 +5,7 @@ use std::path::Path;
 
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{ItemForeignMod, ItemImpl, ItemMod};
+use syn::{Expr, ExprCall, ForeignItem, Ident, ItemFn, ItemForeignMod, ItemImpl, ItemMod};
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_effect_sites::EffectSites;
@@ -73,13 +73,15 @@ struct Reader<'file, 'run> {
     module: Module<'file>,
     imports: &'run Imports<'run>,
     ports: &'run PortTraits,
+    foreign: BTreeSet<&'file Ident>,
     found: Adapters<'file>,
 }
 
 impl<'file, 'run> Reader<'file, 'run> {
     fn read(file: &'file SourceFile, imports: &'run Imports<'run>, ports: &'run PortTraits) -> Adapters<'file> {
         let found = Adapters { places: BTreeSet::new(), modules: BTreeSet::new() };
-        let mut reader = Reader { file, module: Module::of_file(file), imports, ports, found };
+        let foreign = Foreign::declared(file);
+        let mut reader = Reader { file, module: Module::of_file(file), imports, ports, foreign, found };
         reader.visit_file(file.syntax());
         reader.found
     }
@@ -93,6 +95,21 @@ impl<'file, 'run> Reader<'file, 'run> {
                 .filter(|kind| *kind == Kind::Port)
                 .map(|_| Site::new(self.file.path(), LineNumber::from(item.span())))
         })
+    }
+
+    fn calls_foreign(&self, call: &ExprCall) -> Option<Site<'file>> {
+        match &*call.func {
+            Expr::Path(called) => Some(&called.path)
+                .filter(|path| path.segments.len() == 1 || Self::here(path))
+                .and_then(|path| path.segments.last())
+                .filter(|last| self.foreign.contains(&last.ident))
+                .map(|_| Site::new(self.file.path(), LineNumber::from(call.span()))),
+            _ => None,
+        }
+    }
+
+    fn here(path: &syn::Path) -> bool {
+        path.segments.first().is_some_and(|first| first.ident == "self" || first.ident == "crate")
     }
 }
 
@@ -110,7 +127,10 @@ impl<'file> Visit<'file> for Reader<'file, '_> {
             LineNumber::from(span.start().line),
             LineNumber::from(span.end().line),
         ));
-        self.nested(module, |reader| visit::visit_item_mod(reader, module));
+        match Walk::outside_tests(&module.attrs) {
+            Walk::Entered => self.nested(module, |reader| visit::visit_item_mod(reader, module)),
+            Walk::Skipped => visit::visit_item_mod(self, module),
+        }
     }
 
     fn visit_item_impl(&mut self, item: &'file ItemImpl) {
@@ -120,9 +140,35 @@ impl<'file> Visit<'file> for Reader<'file, '_> {
         });
     }
 
+    fn visit_item_fn(&mut self, item: &'file ItemFn) {
+        Walk::enter(&item.attrs, || visit::visit_item_fn(self, item));
+    }
+
+    fn visit_expr_call(&mut self, call: &'file ExprCall) {
+        self.found.places.extend(self.calls_foreign(call));
+        visit::visit_expr_call(self, call);
+    }
+}
+
+struct Foreign<'file> {
+    names: BTreeSet<&'file Ident>,
+}
+
+impl<'file> Foreign<'file> {
+    fn declared(file: &'file SourceFile) -> BTreeSet<&'file Ident> {
+        let mut found = Foreign { names: BTreeSet::new() };
+        found.visit_file(file.syntax());
+        found.names
+    }
+}
+
+impl<'file> Visit<'file> for Foreign<'file> {
     fn visit_item_foreign_mod(&mut self, item: &'file ItemForeignMod) {
-        Walk::enter(&item.attrs, || {
-            self.found.places.insert(Site::new(self.file.path(), LineNumber::from(item.span())));
+        let names = item.items.iter().filter_map(|declared| match declared {
+            ForeignItem::Fn(function) => Some(&function.sig.ident),
+            ForeignItem::Static(var) => Some(&var.ident),
+            _ => None,
         });
+        self.names.extend(names);
     }
 }

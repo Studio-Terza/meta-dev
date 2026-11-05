@@ -17,14 +17,7 @@ impl Zone {
         Zone::judged(adapters.evidence(file.path(), LineNumber::FIRST, LineNumber::from(usize::MAX)))
     }
 
-    pub fn entering<'file>(self, file: &'file SourceFile, module: &ItemMod, adapters: &Adapters<'file>) -> Zone {
-        match self {
-            Zone::Boundary => self,
-            Zone::Elsewhere => Zone::of_module(file, module, adapters),
-        }
-    }
-
-    fn of_module<'file>(file: &'file SourceFile, module: &ItemMod, adapters: &Adapters<'file>) -> Zone {
+    pub fn of_module<'file>(file: &'file SourceFile, module: &ItemMod, adapters: &Adapters<'file>) -> Zone {
         let span = module.span();
         Zone::judged(adapters.evidence(
             file.path(),
