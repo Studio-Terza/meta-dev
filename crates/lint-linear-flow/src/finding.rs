@@ -9,6 +9,7 @@ pub enum Rule {
     LinearBodies,
     PureRouters,
     PlainConditions,
+    IndependentSelections,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +27,11 @@ pub enum Finding {
     And,
     Or,
     Not,
+    IgnoredElement,
+}
+
+impl Rule {
+    pub const SHAPING: [Rule; 3] = [Rule::LinearBodies, Rule::PureRouters, Rule::PlainConditions];
 }
 
 impl Finding {
@@ -65,6 +71,7 @@ impl Finding {
             | Finding::LetElse => Rule::LinearBodies,
             Finding::Guard | Finding::ValuePattern | Finding::ArmLogic => Rule::PureRouters,
             Finding::And | Finding::Or | Finding::Not => Rule::PlainConditions,
+            Finding::IgnoredElement => Rule::IndependentSelections,
         }
     }
 }
@@ -85,6 +92,7 @@ impl fmt::Display for Finding {
             Finding::And => formatter.write_str("boolean operator &&"),
             Finding::Or => formatter.write_str("boolean operator ||"),
             Finding::Not => formatter.write_str("boolean operator !"),
+            Finding::IgnoredElement => formatter.write_str("selection whose predicate does not read its element"),
         }
     }
 }
@@ -112,6 +120,9 @@ impl lint_core::Finding for Finding {
             Finding::ValuePattern => Fix::new("match on an enum, Option or Result that names the cases"),
             Finding::ArmLogic => Fix::new("extract the arm's logic into its own linear function and call it"),
             Finding::And | Finding::Or | Finding::Not => Fix::new(Self::CONDITION),
+            Finding::IgnoredElement => Fix::new(
+                "a predicate that ignores its element is a branch: give the decision a named outcome, an enum a pure router matches",
+            ),
         }
     }
 }

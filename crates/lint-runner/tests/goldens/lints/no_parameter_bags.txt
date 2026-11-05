@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 0 tests in 8 files, 0 of 25 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting:
 free functions are not allowed; make them associated functions or methods:
 src/first.rs:1: fn run; make it an associated function or a method
 src/logic_user.rs:1: fn run; make it an associated function or a method

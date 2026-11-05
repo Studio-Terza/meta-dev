@@ -1,5 +1,5 @@
 use lint_core::Lint;
-use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
+use lint_linear_flow::{FlowShapes, IndependentSelections, LinearBodies, PlainConditions, PureRouters};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
@@ -45,7 +45,7 @@ const GUARD_OUTSIDE: &str = "fn f(on: Switch) -> u8 {\n    let lit = on;\n    ma
 const OPERATORS: &str = "fn f(items: &[Item]) -> usize {\n    let kept = items.iter().filter(|item| item.on() && item.lit());\n    let other = kept.filter(|item| item.on() || !item.lit());\n    other.filter(|item| item.size() == -1 && *item.next() != 2).count()\n}\n";
 const OPERATOR_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f() {\n        assert!(a || b);\n    }\n}\n";
 
-const SHAPES: &str = "struct A;\nimpl A {\n    fn piped(&self) -> u8 {\n        g().h()\n    }\n    fn routed(&self, on: Switch) -> u8 {\n        match on {\n            Switch::On => 1,\n            Switch::Off => 0,\n        }\n    }\n    fn tangled(&self) -> u8 {\n        if p { 1 } else { 0 }\n    }\n    const fn fixed() -> u8 {\n        if p { 1 } else { 0 }\n    }\n}\n";
+const SHAPES: &str = "struct A;\nimpl A {\n    fn piped(&self) -> u8 {\n        g().filter(|_| p).h()\n    }\n    fn routed(&self, on: Switch) -> u8 {\n        match on {\n            Switch::On => 1,\n            Switch::Off => 0,\n        }\n    }\n    fn tangled(&self) -> u8 {\n        if p { 1 } else { 0 }\n    }\n    const fn fixed() -> u8 {\n        if p { 1 } else { 0 }\n    }\n}\n";
 
 const FROM_BOOL: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_INLINE: &str = "mod boundary {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
@@ -340,6 +340,76 @@ const CONDITIONS: [Case; 3] = [
     ),
 ];
 
+const IGNORED: &str =
+    "fn f(items: &[Lamp], ready: Ready) -> usize {\n    items.iter().filter(|_| ready.now()).count()\n}\n";
+const UNREAD: &str =
+    "fn f(items: &[Lamp], ready: Ready) -> usize {\n    items.iter().filter(|lamp| ready.now()).count()\n}\n";
+const SINGLE: &str = "fn f(lamp: Lamp, ready: Ready) -> Option<Lamp> {\n    Some(lamp).filter(|_| ready.now())\n}\n";
+const QUANTIFIED: &str = "fn f(items: &[Lamp], ready: Ready) -> Lit {\n    let any = items.iter().any(|_| ready.now());\n    let all = items.iter().all(|_| ready.now());\n    let at = items.iter().position(|_| ready.now());\n    Lit::new(any, all, at)\n}\n";
+const READ: &str = "fn f(items: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| lamp.on()).count()\n}\n";
+const READ_IN_MACRO: &str =
+    "fn f(items: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| matches!(lamp, Lamp::On)).count()\n}\n";
+const DESTRUCTURED: &str =
+    "fn f(items: &[Lamp]) -> usize {\n    items.iter().filter(|&&Lamp { on, .. }| on).count()\n}\n";
+const NAMED_PREDICATE: &str =
+    "fn f(items: &[Lamp]) -> usize {\n    items.iter().copied().filter(Lamp::on).count()\n}\n";
+const OTHER_METHOD: &str =
+    "fn f(items: &[Lamp], ready: Ready) -> Option<&Lamp> {\n    items.iter().find(|_| ready.now())\n}\n";
+const SELECTION_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f(items: &[u8]) -> usize {\n        items.iter().filter(|_| READY).count()\n    }\n}\n";
+
+const SELECTIONS: [Case; 10] = [
+    Case::new(
+        Title::new("filter ignoring its element"),
+        &[Source::new(Located::new("a.rs"), Text::new(IGNORED))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("filter naming its element and not reading it"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNREAD))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("filter on a single value"),
+        &[Source::new(Located::new("a.rs"), Text::new(SINGLE))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("any, all and position ignoring their element"),
+        &[Source::new(Located::new("a.rs"), Text::new(QUANTIFIED))],
+        Flagged::new(&["a.rs:2", "a.rs:3", "a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("filter reading its element"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("filter reading its element inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(READ_IN_MACRO))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("filter reading a destructured field"),
+        &[Source::new(Located::new("a.rs"), Text::new(DESTRUCTURED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("filter by a named predicate"),
+        &[Source::new(Located::new("a.rs"), Text::new(NAMED_PREDICATE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a method outside the selections"),
+        &[Source::new(Located::new("a.rs"), Text::new(OTHER_METHOD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("selection in a test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELECTION_IN_TEST))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+];
+
 #[test]
 fn bodies_with_if_match_or_loops_outside_a_router_are_flagged() {
     assert_eq!(Sources::mismatches::<LinearBodies>(&LINEAR), Lines::default());
@@ -353,6 +423,11 @@ fn routers_with_guards_value_patterns_or_logic_in_arms_are_flagged() {
 #[test]
 fn boolean_operators_are_flagged_in_shipped_and_test_code() {
     assert_eq!(Sources::mismatches::<PlainConditions>(&CONDITIONS), Lines::default());
+}
+
+#[test]
+fn selections_whose_predicate_ignores_its_element_are_flagged() {
+    assert_eq!(Sources::mismatches::<IndependentSelections>(&SELECTIONS), Lines::default());
 }
 
 #[test]

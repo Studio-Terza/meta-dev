@@ -33,7 +33,7 @@ impl<'file> FunctionFlow<'file> {
     }
 
     pub fn verdict(&self) -> Verdict {
-        self.found.first().map_or(self.shape, |_| Verdict::Neither)
+        Rule::SHAPING.into_iter().flat_map(|rule| self.violations(rule)).next().map_or(self.shape, |_| Verdict::Neither)
     }
 
     pub fn violations(&self, rule: Rule) -> impl Iterator<Item = Violation<'file>> {

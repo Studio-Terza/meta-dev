@@ -2,6 +2,7 @@ test budget, report only:
 corpus: 4 tests in 2 files, 18 of 18 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting:
 assertions do not pin long text:
 tests/text.rs:5: assertion pins text with a line break; compare a golden with golden!, or assert on the parts
 tests/text.rs:10: assertion pins Debug-formatted text; compare a golden with golden!, or assert on the parts
