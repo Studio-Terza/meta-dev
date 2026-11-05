@@ -1,41 +1,42 @@
+mod reach;
+
 use std::collections::BTreeSet;
 use std::mem;
 
 use syn::visit::{self, Visit};
-use syn::{Block, Expr, ExprCall, ExprForLoop, Local, Macro, Path};
+use syn::{Block, Expr, ExprCall, ExprForLoop, ExprIf, ExprWhile, Local, Macro, Path};
 
-use lint_core::{MacroAliases, Syntax};
-use lint_layout::Name;
+use lint_core::Syntax;
 
 use super::assertion::Assertion;
-use super::scope::{Helper, Scope, Target};
-use super::trace::{Iterations, Locals, Trace};
+use super::scope::{Helper, Place, Route, Scope};
+use super::trace::{Evaluation, Iterations, Locals, Trace};
+use crate::boundary::Truth;
 use crate::check::{Check, Domain};
+use reach::{Flow, Reach};
 
 pub(crate) struct Body<'scope, 'file> {
     scope: &'scope Scope<'file>,
-    tables: &'scope MacroAliases,
     locals: Locals<'file>,
     domain: Domain,
-    open: BTreeSet<Target>,
-    owner: Option<Name>,
+    open: BTreeSet<Route>,
+    place: Place,
     checks: Vec<Check>,
 }
 
 impl<'scope, 'file> Body<'scope, 'file> {
     pub(crate) fn checks(
         scope: &'scope Scope<'file>,
-        tables: &'scope MacroAliases,
+        place: &Place,
         block: &'file Block,
         domain: Domain,
     ) -> Vec<Check> {
         let mut body = Body {
             scope,
-            tables,
             locals: Locals::default(),
             domain,
             open: BTreeSet::new(),
-            owner: None,
+            place: place.clone(),
             checks: Vec::new(),
         };
         body.visit_block(block);
@@ -43,33 +44,34 @@ impl<'scope, 'file> Body<'scope, 'file> {
     }
 
     fn met(&mut self, invocation: &Macro) {
-        let assertion = Assertion::named(invocation, self.tables);
-        let found = assertion.checks(invocation, &Trace::new(self.scope, &self.locals), self.domain);
+        let assertion = Assertion::named(invocation, self.scope.tables());
+        let found =
+            assertion.checks(invocation, &Trace::new(self.scope, &self.locals, &self.place), self.domain.clone());
         self.checks.extend(found);
         assertion.nested(invocation).iter().for_each(|inner| self.met(inner));
     }
 
     fn called(&mut self, callee: Option<&Path>, arguments: &[&'file Expr]) {
         let scope = self.scope;
-        let owner = self.owner.clone();
+        let place = self.place.clone();
         callee
-            .map(|path| scope.helpers(path, owner.as_ref(), arguments))
+            .map(|path| scope.helpers(path, &place, arguments))
             .unwrap_or_default()
             .iter()
             .for_each(|helper| self.entered(helper, arguments));
     }
 
     fn entered(&mut self, helper: &Helper<'file>, arguments: &[&'file Expr]) {
-        let key = helper.target().clone();
+        let key = helper.route().clone();
         self.open.insert(key.clone()).then(|| self.expanded(helper, arguments, &key));
     }
 
-    fn expanded(&mut self, helper: &Helper<'file>, arguments: &[&'file Expr], key: &Target) {
+    fn expanded(&mut self, helper: &Helper<'file>, arguments: &[&'file Expr], key: &Route) {
         let inner = helper.called(arguments, &self.locals);
         let outer = mem::replace(&mut self.locals, inner);
-        let owner = mem::replace(&mut self.owner, helper.owner());
+        let place = mem::replace(&mut self.place, helper.place().clone());
         helper.visited(self);
-        self.owner = owner;
+        self.place = place;
         self.locals = outer;
         self.open.remove(key);
     }
@@ -81,10 +83,34 @@ impl<'file> Visit<'file> for Body<'_, 'file> {
         visit::visit_local(self, local);
     }
 
+    fn visit_block(&mut self, block: &'file Block) {
+        block.stmts.iter().find(|statement| {
+            self.visit_stmt(statement);
+            Reach::after(&Trace::new(self.scope, &self.locals, &self.place), statement) == Flow::Ends
+        });
+    }
+
+    fn visit_expr_if(&mut self, branch: &'file ExprIf) {
+        match Evaluation::condition_of(&Trace::new(self.scope, &self.locals, &self.place), &branch.cond) {
+            Some(Truth::Holds) => self.visit_block(&branch.then_branch),
+            Some(Truth::Fails) => branch.else_branch.iter().for_each(|(_, other)| self.visit_expr(other)),
+            None => visit::visit_expr_if(self, branch),
+        }
+    }
+
+    fn visit_expr_while(&mut self, looped: &'file ExprWhile) {
+        match Evaluation::condition_of(&Trace::new(self.scope, &self.locals, &self.place), &looped.cond) {
+            Some(Truth::Fails) => (),
+            Some(Truth::Holds) | None => visit::visit_expr_while(self, looped),
+        }
+    }
+
     fn visit_expr_for_loop(&mut self, looped: &'file ExprForLoop) {
-        let outer = self.domain;
-        self.domain = outer.max_with(Iterations::looped(&Trace::new(self.scope, &self.locals), looped));
-        visit::visit_expr_for_loop(self, looped);
+        let outer = self.domain.clone();
+        let inner =
+            outer.clone().max_with(Iterations::looped(&Trace::new(self.scope, &self.locals, &self.place), looped));
+        self.domain = inner.clone();
+        inner.running().iter().for_each(|_| visit::visit_expr_for_loop(self, looped));
         self.domain = outer;
     }
 

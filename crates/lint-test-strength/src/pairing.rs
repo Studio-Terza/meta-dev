@@ -53,7 +53,7 @@ impl<'tests, 'file> Departure<'tests, 'file> {
                 landed: added
                     .iter()
                     .filter(|test| test.identity().package() == package)
-                    .flat_map(|test| test.checks().iter().copied())
+                    .flat_map(|test| test.checks().iter().cloned())
                     .collect(),
             })
             .collect()

@@ -1,17 +1,48 @@
 use std::iter;
 
-use lint_core::MacroAliases;
 use lint_layout::{Name, Whole, Word};
 
 use super::body::Body;
-use super::scope::Scope;
-use crate::check::{Check, Domain};
-use proc_macro2::TokenStream;
+use super::scope::{Place, Scope};
+use super::trace::{Extent, Locals, Trace};
+use crate::check::{Breadth, Check, Domain, Rows};
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Block, Ident, Macro, ReturnType, Token, Visibility, parenthesized};
+use syn::punctuated::Punctuated;
+use syn::{Attribute, Block, Expr, Ident, Macro, Pat, ReturnType, Token, Type, Visibility, parenthesized};
+
+enum Input {
+    Strategy(Expr),
+    Declared(Type),
+}
+
+impl Input {
+    fn rows(&self, trace: &Trace<'_, '_>) -> Option<Rows> {
+        match self {
+            Input::Strategy(strategy) => Extent::strategy(trace, strategy),
+            Input::Declared(declared) => Extent::typed(declared),
+        }
+    }
+}
+
+impl Input {
+    fn declared(input: ParseStream) -> syn::Result<Input> {
+        input.parse::<Token![:]>()?;
+        Ok(Input::Declared(input.parse()?))
+    }
+}
+
+impl Parse for Input {
+    fn parse(input: ParseStream) -> syn::Result<Input> {
+        input.call(Attribute::parse_outer)?;
+        input.call(Pat::parse_single)?;
+        let strategy = input.parse::<Option<Token![in]>>()?.map(|_| input.parse::<Expr>()).transpose()?;
+        strategy.map_or_else(|| Input::declared(input), |strategy| Ok(Input::Strategy(strategy)))
+    }
+}
 
 pub(crate) struct Property {
     site: Ident,
+    inputs: Vec<Input>,
     body: Block,
 }
 
@@ -20,8 +51,16 @@ impl Property {
         &self.site
     }
 
-    pub(crate) fn checks(&self, scope: &Scope<'_>, tables: &MacroAliases) -> Vec<Check> {
-        Body::checks(scope, tables, &self.body, Domain::GENERATED)
+    pub(crate) fn checks(&self, scope: &Scope<'_>, place: &Place) -> Vec<Check> {
+        let locals = Locals::default();
+        let trace = Trace::new(scope, &locals, place);
+        let domain = self
+            .inputs
+            .iter()
+            .filter_map(|input| input.rows(&trace))
+            .map(|rows| Domain::new(Breadth::Generated, rows))
+            .fold(Domain::GENERATED, Domain::max_with);
+        Body::checks(scope, place, &self.body, domain)
     }
 }
 
@@ -58,10 +97,10 @@ impl Parse for Property {
         input.parse::<Visibility>()?;
         input.parse::<Token![fn]>()?;
         let site: Ident = input.parse()?;
-        let inputs;
-        parenthesized!(inputs in input);
-        inputs.parse::<TokenStream>()?;
+        let arguments;
+        parenthesized!(arguments in input);
+        let inputs = Punctuated::<Input, Token![,]>::parse_terminated(&arguments)?.into_iter().collect();
         input.parse::<ReturnType>()?;
-        Ok(Property { site, body: input.parse()? })
+        Ok(Property { site, inputs, body: input.parse()? })
     }
 }

@@ -15,8 +15,10 @@ pub(crate) struct Lost<'tests, 'file> {
 
 impl<'tests, 'file> Lost<'tests, 'file> {
     pub(crate) fn unmatched(before: &[&'tests Test<'file>], after: &[Check]) -> Vec<Lost<'tests, 'file>> {
-        let pooled: Vec<Lost<'tests, 'file>> =
-            before.iter().flat_map(|test| test.checks().iter().map(|check| Lost { test, check: *check })).collect();
+        let pooled: Vec<Lost<'tests, 'file>> = before
+            .iter()
+            .flat_map(|test| test.checks().iter().map(|check| Lost { test, check: check.clone() }))
+            .collect();
         Matching::unplaced(pooled, after)
     }
 }
@@ -49,7 +51,7 @@ impl fmt::Display for Weakened<'_, '_, '_> {
 impl Finding for Weakened<'_, '_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "restore the check, or keep one at least as strong (the same or a stronger relation, as many pinned values, as many cases); a deliberate narrowing is named in the PR body",
+            "restore the check, or keep one at least as strong (the same or a stronger relation, as many pinned values, as many cases); a deliberate narrowing is declared in the PR body with the line `weakens: <package>::<test>`",
         )
     }
 }

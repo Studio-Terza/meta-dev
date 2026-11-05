@@ -3,32 +3,43 @@ use syn::punctuated::Punctuated;
 use syn::{Attribute, Expr, ExprBlock, Ident, Macro, Token, bracketed};
 
 use law_facts::Kind;
-use lint_core::{MacroAliases, Macros};
+use lint_core::Macros;
 use newtype::Counter;
 
 use super::super::body::Body;
-use super::super::scope::Scope;
-use super::super::trace::{Leaves, Locals, Trace};
-use crate::check::{Cases, Check, Domain, Relation, Rows, Values};
+use super::super::scope::{Place, Scope};
+use super::super::trace::{Extent, Leaves, Locals, Trace};
+use crate::check::{Breadth, Cases, Check, Domain, Relation, Rows, Values};
 
 #[derive(Debug)]
 pub(crate) struct Table;
 
 impl Table {
-    pub(crate) fn checks(invocation: &Macro, scope: &Scope<'_>) -> Vec<Check> {
-        let rows: Vec<Expr> = invocation.parse_body_with(Listed::parse).map(|listed| listed.wanted).unwrap_or_default();
+    pub(crate) fn checks(invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Check> {
+        let rows: Vec<Row> = invocation.parse_body_with(Listed::parse).map(|listed| listed.rows).unwrap_or_default();
         let locals = Locals::default();
-        let trace = Trace::new(scope, &locals);
-        let leaves = Values::total(rows.iter().map(|row| Leaves::counted(&trace, row)));
-        vec![Check::new(Relation::Equal, leaves, Domain::listed(Rows::new(Cases::new(rows.len()), leaves)))]
+        let trace = Trace::new(scope, &locals, place);
+        let distinct = Trace::distinct(&rows.iter().collect::<Vec<&Row>>());
+        let leaves = Values::total(distinct.iter().map(|row| Leaves::counted(&trace, &row.wanted)));
+        let domain =
+            Domain::new(Breadth::Listed, Rows::listed(Cases::new(rows.len()), Cases::new(distinct.len()), leaves));
+        vec![Check::new(Relation::Equal, leaves, domain)]
     }
 
-    pub(crate) fn law(invocation: &Macro, kind: Kind, scope: &Scope<'_>, tables: &MacroAliases) -> Vec<Check> {
-        Macros::arguments(invocation)
+    pub(crate) fn law(invocation: &Macro, kind: Kind, scope: &Scope<'_>, place: &Place) -> Vec<Check> {
+        let arguments = Macros::arguments(invocation);
+        let locals = Locals::default();
+        let trace = Trace::new(scope, &locals, place);
+        let domain = arguments
+            .iter()
+            .filter_map(|argument| Extent::strategy(&trace, argument))
+            .map(|rows| Domain::new(Breadth::Generated, rows))
+            .fold(Domain::GENERATED, Domain::max_with);
+        arguments
             .iter()
             .filter_map(Self::body)
-            .flat_map(|body| Body::checks(scope, tables, &body.block, Domain::GENERATED))
-            .chain([Check::new(Relation::Law(kind), Values::zero(), Domain::GENERATED)])
+            .flat_map(|body| Body::checks(scope, place, &body.block, domain.clone()))
+            .chain([Check::new(Relation::Law(kind), Values::zero(), domain.clone())])
             .collect()
     }
 
@@ -40,20 +51,22 @@ impl Table {
     }
 }
 
+#[derive(PartialEq)]
 struct Row {
+    given: Expr,
     wanted: Expr,
 }
 
 impl Parse for Row {
     fn parse(input: ParseStream) -> syn::Result<Row> {
-        input.parse::<Expr>()?;
+        let given = input.parse()?;
         input.parse::<Token![=>]>()?;
-        Ok(Row { wanted: input.parse()? })
+        Ok(Row { given, wanted: input.parse()? })
     }
 }
 
 struct Listed {
-    wanted: Vec<Expr>,
+    rows: Vec<Row>,
 }
 
 impl Parse for Listed {
@@ -65,8 +78,8 @@ impl Parse for Listed {
         input.parse::<Token![,]>()?;
         let rows;
         bracketed!(rows in input);
-        let wanted = Punctuated::<Row, Token![,]>::parse_terminated(&rows)?.into_iter().map(|row| row.wanted).collect();
+        let rows = Punctuated::<Row, Token![,]>::parse_terminated(&rows)?.into_iter().collect();
         input.parse::<Option<Token![,]>>()?;
-        Ok(Listed { wanted })
+        Ok(Listed { rows })
     }
 }

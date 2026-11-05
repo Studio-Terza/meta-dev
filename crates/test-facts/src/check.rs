@@ -6,12 +6,12 @@ mod values;
 use std::cmp::Ordering;
 use std::fmt;
 
-pub use domain::{Cases, Domain, Rows};
+pub use domain::{Breadth, Cases, Domain, Rows};
 use product::Product;
 pub use relation::Relation;
 pub use values::Values;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Check {
     relation: Relation,
     values: Values,
@@ -41,6 +41,6 @@ impl PartialOrd for Check {
 
 impl fmt::Display for Check {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} of {} values over {}", self.relation, self.values, self.domain)
+        write!(formatter, "{} pinning {} values over {}", self.relation, self.values, self.domain)
     }
 }

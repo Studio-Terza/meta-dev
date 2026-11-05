@@ -253,19 +253,27 @@ A change never weakens a test. Compare two trees, before and after:
     lint strength <before-root> <after-root>
 
 Each test is read as a set of checks, each a relation (an equality above a pattern above a bare condition, an inequality
-above a bare condition, a law only by its own kind), the values it pins and the cases it ranges over (generated above
-enumerated by shipped code above listed rows). Every check before the change must be matched, one to one, by a check at
-least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change added to the
-same package. Pinned values are counted only on the compared sides, the first two arguments of `assert_eq!` and
-`assert_ne!` and the condition of `assert!`, never in a message, and a side repeated verbatim counts once. A loop widens
-the cases only over its own iterable (a list, a constant, an associated const, or those through `iter`, `into_iter`,
-`copied`, `cloned`, `enumerate` or `rev`), and a constant pins values only when it is itself the compared side. Tests in
-`proptest!` blocks are read as generated laws. An assertion moved into a helper defined in the same file and called by
-plain path (`expect(..)`, `Self::expect(..)`, `Type::expect(..)`) with as many arguments as the helper takes, a renamed
-test, and `assert!(a == b)` written for `assert_eq!(a, b)` are not flagged; a lost row, a hand-written list in place of
-`T::ALL`, or an equality turned into a bare condition is. Method calls and helpers in another file are not followed, so
-an assertion moved into another file's helper is flagged. The command exits 1 when a check was lost and prints each one;
-it refuses, also with exit 1, any arguments other than exactly two roots.
+above a bare condition, a law only by its own kind), the values it pins and the domain it ranges over (generated above
+enumerated by shipped code above listed rows). A domain is measured, not named: its cases, its distinct rows (a table
+row replaced by a duplicate loses a distinct row), the values in its rows, and the value ranges it spans (a range loop
+or a proptest strategy such as `0..9u8`, `any::<u8>()` or `x: u8` must keep every value it covered, and the bounds are
+evaluated through constants, locals and integer arithmetic). Every check before the change must be matched, one to one,
+by a check at least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change
+added to the same package. Pinned values are counted only on the compared sides, the first two arguments of `assert_eq!`
+and `assert_ne!` and the condition of `assert!`, never in a message, and a side repeated verbatim counts once. A
+tautology (the same value on both sides, once locals and constants are followed, or `true == true`) counts as a bare
+condition only. A check that can never run is not counted: after a `return`, `break`, `continue` or `panic!`, in a
+branch whose condition evaluates to false, or in a loop over no cases. A loop widens the domain only over its own
+iterable (a list, a range, a constant, an associated const, or those through `iter`, `into_iter`, `copied`, `cloned`,
+`enumerate` or `rev`), and a constant pins values only when it is itself the compared side. Tests in `proptest!` blocks
+are read as generated laws over their strategies. An assertion moved into a helper defined in the same file is followed
+by the path the call resolves to through the file's modules and imports (`expect(..)`, `self::`, `super::`, `crate::`,
+`Self::expect(..)`, `Type::expect(..)`, `use` and `use ...::*`), never by its bare name, so a helper of the same name in
+another module earns no credit. A renamed test and `assert!(a == b)` written for `assert_eq!(a, b)` are not flagged; a
+lost row, a narrowed range, a hand-written list in place of `T::ALL`, or an equality turned into a bare condition is.
+Method calls and helpers in another file are not followed, so an assertion moved into another file's helper is flagged.
+A deliberate narrowing is declared in the PR body with the line `weakens: <package>::<test>`. The command exits 1 when a
+check was lost and prints each one; it refuses, also with exit 1, any arguments other than exactly two roots.
 
 ## Rust only
 

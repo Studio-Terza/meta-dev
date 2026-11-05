@@ -7,7 +7,7 @@ use law_facts::Kind;
 use lint_core::{MacroAliases, MacroCalls, Macros};
 use lint_layout::{Name, Whole, Word, words};
 
-use super::scope::Scope;
+use super::scope::{Place, Scope};
 use super::trace::Trace;
 use crate::check::{Check, Domain, Relation};
 use table::Table;
@@ -48,7 +48,7 @@ impl Assertion {
         match self {
             Assertion::Equality | Assertion::Golden => trace.operands(Relation::Equal, invocation, domain),
             Assertion::Inequality => trace.operands(Relation::Differs, invocation, domain),
-            Assertion::Condition => Self::condition(invocation, trace, domain),
+            Assertion::Condition => Self::condition(invocation, trace, &domain),
             Assertion::Table | Assertion::Other => Vec::new(),
         }
     }
@@ -64,19 +64,19 @@ impl Assertion {
         }
     }
 
-    pub(crate) fn law_checks(self, invocation: &Macro, scope: &Scope<'_>, tables: &MacroAliases) -> Vec<Check> {
+    pub(crate) fn law_checks(self, invocation: &Macro, scope: &Scope<'_>, place: &Place) -> Vec<Check> {
         match self {
-            Assertion::Table => Table::checks(invocation, scope),
-            Assertion::Other => Table::law(invocation, Kind::of_macro(invocation), scope, tables),
+            Assertion::Table => Table::checks(invocation, scope, place),
+            Assertion::Other => Table::law(invocation, Kind::of_macro(invocation), scope, place),
             Assertion::Equality | Assertion::Inequality | Assertion::Condition | Assertion::Golden => Vec::new(),
         }
     }
 
-    fn condition(invocation: &Macro, trace: &Trace<'_, '_>, domain: Domain) -> Vec<Check> {
+    fn condition(invocation: &Macro, trace: &Trace<'_, '_>, domain: &Domain) -> Vec<Check> {
         Macros::arguments(invocation)
             .into_iter()
             .take(1)
-            .flat_map(|condition| Self::tested(&condition, trace, domain))
+            .flat_map(|condition| Self::tested(&condition, trace, domain.clone()))
             .collect()
     }
 

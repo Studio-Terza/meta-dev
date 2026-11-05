@@ -4,8 +4,8 @@ use lint_core::Macros;
 use lint_layout::{Casing, Name, Whole, Word, words};
 use newtype::Counter;
 
-use super::{Constants, Leaves, Trace};
-use crate::check::{Cases, Domain, Rows, Values};
+use super::{Constants, Extent, Leaves, Trace};
+use crate::check::{Breadth, Cases, Domain, Rows, Values};
 
 pub(crate) struct Iterations<'trace, 'body, 'file> {
     trace: &'trace Trace<'body, 'file>,
@@ -23,6 +23,9 @@ impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
             Expr::Array(array) => self.listed(&array.elems.iter().collect::<Vec<&Expr>>()),
             Expr::Reference(reference) => self.root(&reference.expr),
             Expr::Paren(inner) => self.root(&inner.expr),
+            Expr::Range(range) => {
+                Extent::ranged(self.trace, range).map_or(Domain::SINGLE, |rows| Domain::new(Breadth::Listed, rows))
+            }
             Expr::Macro(invocation) => self.listed(&Macros::arguments(&invocation.mac).iter().collect::<Vec<&Expr>>()),
             Expr::Path(path) => self
                 .trace
@@ -36,8 +39,9 @@ impl<'trace, 'body, 'file> Iterations<'trace, 'body, 'file> {
     }
 
     fn listed(&self, elements: &[&Expr]) -> Domain {
-        let leaves = Values::total(elements.iter().map(|element| Leaves::counted(self.trace, element)));
-        Domain::listed(Rows::new(Cases::new(elements.len()), leaves))
+        let distinct = Trace::distinct(elements);
+        let leaves = Values::total(distinct.iter().map(|element| Leaves::counted(self.trace, element)));
+        Domain::new(Breadth::Listed, Rows::listed(Cases::new(elements.len()), Cases::new(distinct.len()), leaves))
     }
 
     fn enumerated(path: &Path) -> Domain {

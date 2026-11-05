@@ -1,3 +1,4 @@
+mod boundary;
 mod check;
 mod reader;
 mod test;

@@ -1,8 +1,6 @@
-use syn::Expr;
+use syn::{Expr, Path};
 
-use lint_layout::Name;
-
-use crate::reader::scope::Scope;
+use crate::reader::scope::{Place, Scope};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Constants {
@@ -20,9 +18,9 @@ impl Constants {
         }
     }
 
-    pub(crate) fn looked_up<'file>(self, scope: &Scope<'file>, name: &Name) -> Option<&'file Expr> {
+    pub(crate) fn looked_up<'file>(self, scope: &Scope<'file>, path: &Path, place: &Place) -> Option<&'file Expr> {
         match self {
-            Constants::Followed => scope.constant(name),
+            Constants::Followed => scope.constant(path, place),
             Constants::Named => None,
         }
     }

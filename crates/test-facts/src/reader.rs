@@ -10,8 +10,8 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemMod, Macro};
 
-use lint_core::{MacroAliases, Site, SourceFile};
-use lint_layout::{LineNumber, Name, TestMarks, Word};
+use lint_core::{Site, SourceFile};
+use lint_layout::{LineNumber, Name, TestMarks};
 use lint_placement::{CrateName, ModulePath};
 
 use crate::check::{Check, Domain};
@@ -19,27 +19,19 @@ use crate::test::{Test, TestId};
 use assertion::Assertion;
 use body::Body;
 use properties::{Properties, Property};
-use scope::Scope;
+use scope::{Place, Scope};
 
 pub(crate) struct Reader<'file> {
     file: &'file SourceFile,
     scope: Scope<'file>,
-    tables: MacroAliases,
     module: ModulePath,
     tests: Vec<Test<'file>>,
 }
 
 impl<'file> Reader<'file> {
-    const TABLE: Word<'static> = Word::new("table");
-
     pub(crate) fn read(file: &'file SourceFile) -> Vec<Test<'file>> {
-        let mut reader = Reader {
-            file,
-            scope: Scope::of_file(file.syntax()),
-            tables: MacroAliases::in_file(file.syntax(), Self::TABLE),
-            module: file.placement().module().clone(),
-            tests: Vec::new(),
-        };
+        let mut reader =
+            Reader { file, scope: Scope::from(file), module: file.placement().module().clone(), tests: Vec::new() };
         reader.visit_file(file.syntax());
         reader.tests
     }
@@ -59,19 +51,23 @@ impl<'file> Reader<'file> {
     }
 
     fn marked(&mut self, item: &ItemFn) {
-        let checks = Body::checks(&self.scope, &self.tables, &item.block, Domain::SINGLE);
+        let checks = Body::checks(&self.scope, &Place::in_module(&self.module), &item.block, Domain::SINGLE);
         self.tested(Name::from(&item.sig.ident), &item.sig.ident, checks);
     }
 
     fn proven(&mut self, found: &[Property]) {
         let measured: Vec<Vec<Check>> =
-            found.iter().map(|property| property.checks(&self.scope, &self.tables)).collect();
+            found.iter().map(|property| property.checks(&self.scope, &Place::in_module(&self.module))).collect();
         found.iter().zip(measured).for_each(|(one, checks)| self.tested(Name::from(one.site()), one.site(), checks));
     }
 
     fn law(&mut self, invocation: &Macro) {
         let name = Assertion::titled(invocation).unwrap_or_default();
-        let checks = Assertion::named(invocation, &self.tables).law_checks(invocation, &self.scope, &self.tables);
+        let checks = Assertion::named(invocation, self.scope.tables()).law_checks(
+            invocation,
+            &self.scope,
+            &Place::in_module(&self.module),
+        );
         self.tested(name, &invocation.path, checks);
     }
 }
