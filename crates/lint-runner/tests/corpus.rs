@@ -12,9 +12,8 @@ const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
 const FIX_START: &str = "; ";
-const WITHDRAWN: [&str; 6] = ["then_some", "map_or", ".then(", "filter(", "ok_or", "pipeline of let bindings"];
-const COMBINATORS: &str = "combinators";
-const LOOP_FINDINGS: [&str; 2] = ["loop", "iterator"];
+const WITHDRAWN: [&str; 7] =
+    ["then_some", "map_or", ".then(", "filter(", "ok_or", "pipeline of let bindings", "use combinators"];
 
 #[test]
 fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_fix() -> Result<(), Box<dyn Error>> {
@@ -97,9 +96,7 @@ impl Corpus {
 
     fn withdrawn_advice(line: &str) -> bool {
         let fix = Self::fix_named(line).unwrap_or_default();
-        let loops = LOOP_FINDINGS.iter().filter(|finding| line.contains(*finding)).count();
-        let spellings = WITHDRAWN.iter().chain(std::iter::repeat_n(&COMBINATORS, usize::from(loops == 0)));
-        spellings.into_iter().any(|spelling| fix.contains(spelling))
+        WITHDRAWN.iter().any(|spelling| fix.contains(spelling))
     }
 
     fn fix_named(line: &str) -> Option<&str> {
