@@ -1,5 +1,7 @@
+mod named;
 mod wrapped;
 
+use named::Named;
 use proc_macro::TokenStream;
 use wrapped::{Constructors, Formatting, Strategy, Wrapped};
 
@@ -16,4 +18,9 @@ pub fn derive_arbitrary(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Display, attributes(newtype))]
 pub fn derive_display(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Formatting>(input.into()).into()
+}
+
+#[proc_macro_derive(Named, attributes(name))]
+pub fn derive_named(input: TokenStream) -> TokenStream {
+    Named::expanded(input.into()).into()
 }

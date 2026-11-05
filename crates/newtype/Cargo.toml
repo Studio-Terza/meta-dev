@@ -7,14 +7,15 @@ publish.workspace = true
 
 [lib]
 test = false
-doctest = false
 
 [dependencies]
 newtype-derive = { path = "../newtype-derive" }
 proptest.workspace = true
+strum.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
+strum = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
