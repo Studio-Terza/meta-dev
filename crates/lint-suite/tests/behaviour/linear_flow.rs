@@ -110,7 +110,22 @@ const MACRO_LIT: Source = Source::new(
 );
 const FROM_BOOL_IN_TESTS: &str = "#[cfg(test)]\nmod tests {\n    enum Lit { On, Off }\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
 
-const LINEAR: [Case; 51] = [
+const TEST_ONLY_LIT: Source = Source::new(
+    Located::new("crates/x/src/other.rs"),
+    Text::new("#[cfg(test)]\nmod tests {\n    enum Lit { Dim }\n}\n"),
+);
+const LIGHT_LIT: Source =
+    Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off, Dim }\n"));
+const FUSE_LIT: Source = Source::new(Located::new("crates/x/src/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
+const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const NEAR_LIGHT_LIT: Source =
+    Source::new(Located::new("crates/x/src/boundary/light.rs"), Text::new("pub enum Lit { On, Off, Dim }\n"));
+const NEAR_FUSE_LIT: Source =
+    Source::new(Located::new("crates/x/src/boundary/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
+const FROM_BOOL_USING_NEAR_LIGHT: &str = "use super::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_USING_FUSE: &str = "use crate::fuse::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+
+const LINEAR: [Case; 55] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -344,6 +359,38 @@ const LINEAR: [Case; 51] = [
         Title::new("from bool into an enum made by a macro is flagged, as macro expansion is not read"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), MACRO_LIT],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool into an enum while a test-only enum of the name lacks the variants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES, TEST_ONLY_LIT],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into the enum its module imports while another module declares an enum of the name"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_LIGHT)),
+            LIGHT_LIT,
+            FUSE_LIT,
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into the enum a super path imports while a sibling module declares an enum of the name"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_NEAR_LIGHT)),
+            NEAR_LIGHT_LIT,
+            NEAR_FUSE_LIT,
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool into the imported enum lacking a chosen variant is flagged beside a complete twin"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_USING_FUSE)),
+            LIGHT_LIT,
+            FUSE_LIT,
+        ],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
     ),
     Case::new(
         Title::new("from bool into an enum split by cfg"),
@@ -667,4 +714,15 @@ fn loops_routers_and_conditions_pin_their_fix_text() {
             "i.rs:4: boolean operator &&; name the condition as an enum or a predicate type",
         ]
     );
+}
+
+const TESTS_FILE_PARENT: &str = "#[cfg(test)]\nmod tests;\n";
+const TESTS_FILE_ENUM: &str = "enum Lit { On, Off }\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+
+#[test]
+fn from_bool_into_an_enum_declared_in_an_out_of_line_test_module_is_not_flagged() {
+    let module = Sources::file("crates/x/src/boundary/lit/tests.rs", Text::new(TESTS_FILE_ENUM));
+    let files =
+        [Sources::file("crates/x/src/boundary/lit.rs", Text::new(TESTS_FILE_PARENT)).with_test_modules(vec![module])];
+    assert_eq!(Sources::lines(&LinearBodies::report(&files)), Lines::default());
 }

@@ -1,7 +1,10 @@
 mod described;
 mod impl_block;
+mod imports;
 mod referenced;
 mod tested;
+
+use std::mem;
 
 use proc_macro2::Span;
 use syn::visit::{self, Visit};
@@ -9,9 +12,10 @@ use syn::{Attribute, Ident, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemTrait, 
 
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name};
-use lint_placement::CrateName;
+use lint_placement::{CrateName, ModulePath};
 
 use crate::facts::Facts;
+use crate::gating::Gating;
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
 use crate::method::Method;
@@ -22,21 +26,34 @@ use crate::type_fact::TypeFact;
 use crate::via::Via;
 use described::Described;
 pub(crate) use impl_block::ImplBlock;
+use imports::Imports;
 use referenced::Referenced;
 use tested::Tested;
 
 pub(crate) struct Collector<'file> {
     file: &'file SourceFile,
     krate: &'file CrateName,
+    module: ModulePath,
     facts: Facts<'file>,
 }
 
 impl<'file> Collector<'file> {
     pub(crate) fn collected(facts: Facts<'file>, file: &'file SourceFile) -> Facts<'file> {
-        let mut scan = Collector { file, krate: file.placement().package().crate_name(), facts };
+        let module = file.placement().module().clone();
+        let mut scan = Collector { file, krate: file.placement().package().crate_name(), module, facts };
         scan.visit_file(file.syntax());
-        scan.facts.add_tested(Tested::enums_in(file));
+        scan.facts.add_tested(Tested::enums_in(file, Gating::Shipped));
+        scan.facts.add_imports(Imports::in_file(file));
+        Self::read_tests(&mut scan.facts, file);
         scan.facts
+    }
+
+    fn read_tests(facts: &mut Facts<'file>, file: &'file SourceFile) {
+        file.test_modules().iter().for_each(|module| {
+            facts.add_tested(Tested::enums_in(module, Gating::Tested));
+            facts.add_imports(Imports::in_file(module));
+            Self::read_tests(facts, module);
+        });
     }
 
     fn site_at(&self, span: Span) -> Site<'file> {
@@ -58,13 +75,17 @@ impl<'file> Collector<'file> {
     fn declared(&self, attributes: &[Attribute], name: &Ident) -> Option<TypeFact<'file>> {
         (Walk::outside_tests(attributes) == Walk::Entered).then(|| {
             TypeFact::declared(self.krate, Name::from(name), self.site_at(name.span()), Self::derives(attributes))
+                .housed(self.module.clone())
         })
     }
 }
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
+        let inside = self.module.child(Name::from(&module.ident));
+        let outside = mem::replace(&mut self.module, inside);
         Walk::enter(&module.attrs, || visit::visit_item_mod(self, module));
+        self.module = outside;
     }
 
     fn visit_item_struct(&mut self, found: &'ast ItemStruct) {

@@ -1,10 +1,8 @@
 mod collector;
 
-use std::iter;
-
 use lint_core::{SourceFile, Violation};
 use lint_placement::CrateName;
-use type_facts::Facts;
+use type_facts::{Facts, Gating};
 
 use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
@@ -19,10 +17,11 @@ pub struct FileFlow<'file> {
 impl<'file> FileFlow<'file> {
     pub fn of_files(files: &'file [SourceFile]) -> Vec<FileFlow<'file>> {
         let facts = Facts::of_files(files);
-        files
-            .iter()
-            .flat_map(|file| iter::once(file).chain(file.test_modules()))
-            .map(|file| FileFlow { file, functions: Collector::collected(file, &facts) })
+        let shipped = files.iter().map(|file| (file, Gating::Shipped));
+        let tests = files.iter().flat_map(SourceFile::test_modules).map(|file| (file, Gating::Tested));
+        shipped
+            .chain(tests)
+            .map(|(file, gating)| FileFlow { file, functions: Collector::collected(file, &facts, gating) })
             .collect()
     }
 

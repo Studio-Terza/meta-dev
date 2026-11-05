@@ -1,4 +1,5 @@
 mod collector;
+mod import;
 mod members;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,7 +8,7 @@ use std::ops::Not;
 
 use lint_core::SourceFile;
 use lint_layout::Name;
-use lint_placement::CrateName;
+use lint_placement::{CrateName, ModulePath};
 
 use crate::generic_impl::GenericImpl;
 use crate::implementation::Implementation;
@@ -15,13 +16,16 @@ use crate::method::Method;
 use crate::outside::Outside;
 use crate::trait_fact::TraitFact;
 use crate::type_fact::TypeFact;
+use crate::vantage::Vantage;
 use collector::{Collector, ImplBlock};
+use import::Import;
 pub(crate) use members::Members;
 
 #[derive(Clone, Debug, Default)]
 pub struct Facts<'file> {
     types: Vec<TypeFact<'file>>,
     tested_enums: Vec<TypeFact<'file>>,
+    imports: Vec<Import<'file>>,
     traits: Vec<TraitFact<'file>>,
     generic_impls: Vec<GenericImpl<'file>>,
     members: BTreeMap<&'file CrateName, BTreeMap<Name, Members<'file>>>,
@@ -39,6 +43,10 @@ impl<'file> Facts<'file> {
 
     pub(crate) fn add_tested(&mut self, found: Vec<TypeFact<'file>>) {
         self.tested_enums.extend(found);
+    }
+
+    pub(crate) fn add_imports(&mut self, found: Vec<Import<'file>>) {
+        self.imports.extend(found);
     }
 
     pub(crate) fn add_trait(&mut self, found: Option<TraitFact<'file>>) {
@@ -64,14 +72,36 @@ impl<'file> Facts<'file> {
     }
 
     #[must_use]
-    pub fn enums_named(&self, krate: &CrateName, name: &Name) -> Vec<&TypeFact<'file>> {
-        self.types
+    pub fn enums_named(&self, vantage: &Vantage<'_>, name: &Name) -> Vec<&TypeFact<'file>> {
+        let shipped = Self::enums_of(&self.types, vantage, name);
+        let tested = Self::enums_of(&self.tested_enums, vantage, name);
+        let reachable: Vec<&TypeFact<'file>> =
+            vantage.gating().pick(shipped.clone(), shipped.iter().chain(&tested).copied().collect());
+        let here =
+            reachable.iter().copied().filter(|found| AsRef::<ModulePath>::as_ref(*found) == vantage.module()).collect();
+        let brought = reachable.iter().copied().filter(|found| self.brought(vantage, found).is_some()).collect();
+        let own = vantage.gating().pick(shipped, tested);
+        [here, brought, own].into_iter().find(|found| found.is_empty().not()).unwrap_or_default()
+    }
+
+    fn enums_of<'found>(
+        found: &'found [TypeFact<'file>],
+        vantage: &Vantage<'_>,
+        name: &Name,
+    ) -> Vec<&'found TypeFact<'file>> {
+        found
             .iter()
-            .chain(&self.tested_enums)
-            .filter(|found| AsRef::<CrateName>::as_ref(*found) == krate)
-            .filter(|found| AsRef::<Name>::as_ref(*found) == name)
+            .filter(|each| AsRef::<CrateName>::as_ref(*each) == vantage.krate())
+            .filter(|each| AsRef::<Name>::as_ref(*each) == name)
             .filter_map(TypeFact::as_enum)
             .collect()
+    }
+
+    fn brought(&self, vantage: &Vantage<'_>, found: &TypeFact<'file>) -> Option<&Import<'file>> {
+        self.imports
+            .iter()
+            .filter_map(|import| import.made_in(vantage.krate(), vantage.module()))
+            .find_map(|import| import.bringing(found))
     }
 
     #[must_use]
