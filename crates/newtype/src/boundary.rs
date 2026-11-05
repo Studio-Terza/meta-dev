@@ -1,5 +1,7 @@
+mod exit;
 mod plain;
 
+pub use exit::Exit;
 pub use plain::Newtype;
 
 pub trait Counter: Newtype<Inner = usize> + Copy {

@@ -14,6 +14,22 @@ const PROVIDED: &str = "trait Shape {\n    fn area(&self) -> u32 { 1 }\n}\n";
 const PROVIDED_CALLED: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> u32 { item.area() }\n";
 const PROVIDED_PATH: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> u32 { Square::area() }\n";
 const PROVIDED_ONLY_IN_TESTS: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\n#[cfg(test)]\nmod tests {\n    fn total(item: &u8) -> u32 { item.area() }\n}\n";
+const PROVIDED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { width: item.area(), \"wide\" } }\n}\n";
+const PROVIDED_NESTED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { p { width: item.area(), } } }\n}\n";
+const TURBOFISH_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { width: item.area::<u8>() } }\n}\n";
+const PATH_ARGUMENT_IN_MARKUP: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total(items: &[u8]) -> Node {\n    rsx! { for w in items.iter().map(Square::area) { p {} } }\n}\n";
+const PATH_IN_VEC_MACRO: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> Vec<fn() -> u32> {\n    vec![Square::area]\n}\n";
+const RANGE_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { for i in 0..area(3) { p {} } }\n}\n";
+const INTERPOLATED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { class: \"w {item.area()}\" } }\n}\n";
+const FIELD_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &Plan) -> Node {\n    rsx! { div { width: item.area } }\n}\n";
+const PATH_IN_MARKUP: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> Node {\n    rsx! { div { width: Square::area() } }\n}\n";
+const LITERAL_IN_JSON: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Value {\n    json!({ \"hint\": \"{x.area()}\" })\n}\n";
+const ESCAPED_BRACES: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Node {\n    rsx! { div { \"{{item.area()}}\" } }\n}\n";
+const LITERAL_IN_ASSERT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn check(label: &str) {\n    assert_eq!(label, \"{item.area()}\");\n}\n";
+const LITERAL_IN_PRINT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn show() {\n    println!(\"{}\", \"{item.area()}\");\n}\n";
+const JSON_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { div { onclick: move |_| { let v = json!(\"{x.area()}\"); } } }\n}\n";
+const PATHED_JSON_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { div { onclick: move |_| { let v = serde_json::json!(\"{x.area()}\"); } } }\n}\n";
+const PATHED_MARKUP_IN_VEC: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Vec<Node> {\n    vec![dioxus::prelude::rsx! { div { \"{x.area()}\" } }]\n}\n";
 const DISPATCHED: &str = "#[enum_dispatch]\ntrait Shape {\n    fn area(&self) -> u32;\n}\n";
 const MARKER: &str = "trait Shape {}\n";
 const CONSTANT_ONLY: &str = "trait Shape {\n    const SIDES: u32;\n}\n";
@@ -27,7 +43,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 19] = [
+const CASES: [Case; 35] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -56,6 +72,86 @@ const CASES: [Case; 19] = [
         Title::new("provided method called only in tests"),
         &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_ONLY_IN_TESTS))],
         Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("provided method called inside markup a macro does not parse as Rust"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("provided method called in nested markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROVIDED_NESTED_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a field of the provided method's name in markup is no call"),
+        &[Source::new(Located::new("a.rs"), Text::new(FIELD_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("trait method passed by path in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATH_ARGUMENT_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("trait method passed by path in vec macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATH_IN_VEC_MACRO))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("turbofish method call in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(TURBOFISH_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a free function after a range in markup is no method call"),
+        &[Source::new(Located::new("a.rs"), Text::new(RANGE_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("method call inside an interpolated markup string"),
+        &[Source::new(Located::new("a.rs"), Text::new(INTERPOLATED_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("path call inside markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATH_IN_MARKUP))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("string literal inside a non-formatting macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(LITERAL_IN_JSON))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("escaped braces are not placeholders"),
+        &[Source::new(Located::new("a.rs"), Text::new(ESCAPED_BRACES))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("string literal inside an assertion macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(LITERAL_IN_ASSERT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("string literal argument of a print macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(LITERAL_IN_PRINT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("non-formatting macro nested in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(JSON_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("pathed non-formatting macro nested in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATHED_JSON_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("pathed markup macro in a vec"),
+        &[Source::new(Located::new("a.rs"), Text::new(PATHED_MARKUP_IN_VEC))],
+        Flagged::new(&[]),
     ),
     Case::new(
         Title::new("enum dispatch"),

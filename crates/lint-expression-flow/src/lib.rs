@@ -175,7 +175,9 @@ impl<'ast> Visit<'ast> for Flows<'_> {
             Self::lonely_if(expr),
             Message::new(
                 Problem::new("if without else yields nothing"),
-                Fix::new("use then_some, filter, or an else branch that produces the value"),
+                Fix::new(
+                    "give the decision a named outcome (an enum a pure router matches), so each case produces a value",
+                ),
             ),
         );
         syn::visit::visit_expr_if(self, expr);
@@ -184,7 +186,10 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     fn visit_expr_loop(&mut self, expr: &'ast ExprLoop) {
         self.report(
             [expr.loop_token.span],
-            Message::new(Problem::new("loop"), Fix::new("drive an iterator with combinators, const fns excepted")),
+            Message::new(
+                Problem::new("loop"),
+                Fix::new("drive an iterator with combinators (map, fold, try_fold, take_while), const fns excepted"),
+            ),
         );
         syn::visit::visit_expr_loop(self, expr);
     }
@@ -192,7 +197,10 @@ impl<'ast> Visit<'ast> for Flows<'_> {
     fn visit_expr_for_loop(&mut self, expr: &'ast ExprForLoop) {
         self.report(
             [expr.for_token.span],
-            Message::new(Problem::new("for loop"), Fix::new("drive the iterator with combinators, const fns excepted")),
+            Message::new(
+                Problem::new("for loop"),
+                Fix::new("drive the iterator with combinators (map, fold, try_fold, take_while), const fns excepted"),
+            ),
         );
         syn::visit::visit_expr_for_loop(self, expr);
     }
@@ -202,7 +210,7 @@ impl<'ast> Visit<'ast> for Flows<'_> {
             [expr.while_token.span],
             Message::new(
                 Problem::new("while loop"),
-                Fix::new("drive an iterator with combinators, const fns excepted"),
+                Fix::new("drive an iterator with combinators (map, fold, try_fold, take_while), const fns excepted"),
             ),
         );
         syn::visit::visit_expr_while(self, expr);

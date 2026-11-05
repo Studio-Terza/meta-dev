@@ -66,7 +66,8 @@ boundary. The message names the fix: take and return a domain type, or move the 
 
 `unconsumed_traits` refuses a local trait with methods that nothing in shipped code consumes: no bound (generic, where
 clause or supertrait), no `impl Trait` or `dyn Trait`, and no call to one of its provided methods. Delete the trait and
-keep its methods inherent, or give it a consumer.
+keep its methods inherent, or give it a consumer. Calls inside macro bodies count, read at token level: `.method(` and
+`A::b` in any macro, and `{expr}` placeholders in strings inside `rsx!`, including macros nested in it by name or path.
 
 `one_edge` keeps one transition per pair. In shipped code, a set of domain input types reaches one domain output type
 by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
@@ -116,7 +117,7 @@ form is a pure router: a function whose whole body is one `match` or `if let`. `
 `Result` (no literal, range, tuple or slice, nested or not), and each arm a single call or value (a call or method chain,
 path, literal, constructor, macro, reference, field, index, cast, closure, `?` or `.await`, or a block holding one of
 these). `plain_conditions` lists every `&&`, `||` and `!`, inside conditions and out. There are no thresholds. The
-fixes: combinators on `Option`, `Result` and iterators; extract an arm's logic into its own linear function; name the
+fixes: a pure router or a named outcome, an enum a pure router matches (iterator combinators are for loops only); extract an arm's logic into its own linear function; name the
 condition as an enum or a predicate type. Shared routers over syn and token shapes live in `lint_core::Syntax`. The
 `--report` run keeps `flow_shapes`, which counts per crate the functions that are a pipeline, a pure router, or
 neither.
