@@ -85,3 +85,10 @@ enum Lamp {
     Off,
 }
 ```
+
+An enum with no variants:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+enum Lamp {}
+```

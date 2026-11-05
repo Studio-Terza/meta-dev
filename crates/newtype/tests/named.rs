@@ -29,6 +29,10 @@ laws::table!(each_variant_has_its_declared_name, |lamp: &Lamp| lamp.name(), [Lam
 
 laws::table!(display_writes_the_declared_name, |lamp: &Lamp| lamp.to_string(), [Lamp::On => "on", Lamp::Dimmed => "dimmed-low"]);
 
+laws::table!(display_honours_width_and_alignment, |lamp: &Lamp| (format!("{lamp:>5}"), format!("{lamp:<5}|"), format!("{lamp:^7}")), [
+    Lamp::On => (String::from("   on"), String::from("on   |"), String::from("  on   ")),
+]);
+
 laws::table!(from_str_reads_each_name_and_refuses_any_other_text, Names::parsed, [
     "off" => Ok(Lamp::Off),
     "dimmed-low" => Ok(Lamp::Dimmed),

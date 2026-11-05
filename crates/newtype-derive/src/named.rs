@@ -13,6 +13,7 @@ pub struct Named {
 
 impl Named {
     const ENUMS_ONLY: &'static str = "Named derives for an enum of unit variants";
+    const NO_VARIANTS: &'static str = "Named needs at least one variant to name";
     const REPEATED: &'static str = "two variants have this name, so FromStr could not tell them apart";
 
     pub fn expanded(tokens: TokenStream) -> TokenStream {
@@ -35,12 +36,13 @@ impl Named {
     }
 
     fn distinct(self) -> syn::Result<Named> {
+        let empty = self.names.is_empty().then(|| Error::new_spanned(&self.ident, Self::NO_VARIANTS));
         let repeated = self
             .names
             .iter()
             .find(|name| self.names.iter().filter(|other| other.text() == name.text()).nth(1).is_some())
             .map(|name| Error::new(name.span(), Self::REPEATED));
-        repeated.map_or(Ok(self), Err)
+        empty.or(repeated).map_or(Ok(self), Err)
     }
 
     fn implemented(self) -> TokenStream {
@@ -58,7 +60,7 @@ impl Named {
 
             impl ::core::fmt::Display for #ident {
                 fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    formatter.write_str(Self::name(*self))
+                    formatter.pad(Self::name(*self))
                 }
             }
 
