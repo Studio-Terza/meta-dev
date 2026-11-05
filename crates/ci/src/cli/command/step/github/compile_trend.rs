@@ -42,7 +42,7 @@ impl CompileTrend {
 
     fn steady(notice: &Notice<'_>, out: &mut impl Write) -> Result<Exit, Failure<'static>> {
         writeln!(out, "{notice}")?;
-        Ok(Exit::Success)
+        Ok(Exit::Succeeded)
     }
 }
 

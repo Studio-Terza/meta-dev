@@ -26,8 +26,8 @@ impl Verdict<'_> {
 
     fn exit(self) -> Exit {
         match self {
-            Verdict::Skipped | Verdict::NoneMissed => Exit::Success,
-            Verdict::Missed(_) => Exit::Failure(CargoMutants::MISSED),
+            Verdict::Skipped | Verdict::NoneMissed => Exit::Succeeded,
+            Verdict::Missed(_) => Exit::Failed(CargoMutants::MISSED),
         }
     }
 }

@@ -32,6 +32,6 @@ impl Step for MeasuredHistory {
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         let row = self.measured.row(ports.files())?;
         writeln!(out, "{}\t{row}", self.revision)?;
-        self.file.append(ports.files(), format_args!("{}\t{row}\n", self.revision)).map(|()| Exit::Success)
+        self.file.append(ports.files(), format_args!("{}\t{row}\n", self.revision)).map(|()| Exit::Succeeded)
     }
 }

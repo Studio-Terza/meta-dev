@@ -85,6 +85,6 @@ impl Step for ShardSummary {
         let report = self.report(ports.files())?;
         write!(out, "{report}")?;
         self.summary.append(ports.files(), report)?;
-        Ok(Exit::Success)
+        Ok(Exit::Succeeded)
     }
 }

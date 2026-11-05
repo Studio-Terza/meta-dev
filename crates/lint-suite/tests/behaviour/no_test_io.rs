@@ -18,6 +18,7 @@ const EXITED: &str = "fn f() {\n    std::process::exit(1);\n}\n";
 const LINKED: &str = "fn f() {\n    std::os::unix::fs::symlink(\"a\", \"b\");\n}\n";
 const IN_MACRO: &str = "fn f() {\n    assert!(std::fs::read(\"a\").is_ok());\n}\n";
 const EXIT_CODE: &str = "use std::process::ExitCode;\nfn f() -> ExitCode {\n    ExitCode::SUCCESS\n}\n";
+const EXIT_STATUS: &str = "use std::process::ExitStatus;\nfn f() -> ExitStatus {\n    ExitStatus::default()\n}\n";
 const COMPILED: &str = "use std::env;\nconst A: &str = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/a\");\n";
 const TYPED: &str = "fn f(_file: std::fs::File) -> std::io::Result<()> {\n    Ok(())\n}\n";
 const OTHER_MODULE: &str = "fn f() {\n    std::path::Path::new(\"a\");\n}\n";
@@ -30,7 +31,7 @@ const PRINTED: &str = "use std::io::{self, Write};\nfn f() {\n    writeln!(io::s
 const FAKES: &str =
     "use file_ports::{Files, Memory};\nfn f() {\n    Memory::default().read(std::path::Path::new(\"a\"));\n}\n";
 
-const CASES: [Case; 28] = [
+const CASES: [Case; 29] = [
     Case::new(
         Title::new("qualified read"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(READ))],
@@ -89,6 +90,11 @@ const CASES: [Case; 28] = [
     Case::new(
         Title::new("exit code is a value"),
         &[Source::new(Located::new("tests/a.rs"), Text::new(EXIT_CODE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("exit status is a value"),
+        &[Source::new(Located::new("tests/a.rs"), Text::new(EXIT_STATUS))],
         Flagged::new(&[]),
     ),
     Case::new(

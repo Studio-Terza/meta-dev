@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::num::NonZeroU8;
+use std::num::NonZeroI32;
 use std::path::Path;
 
 use crate::cli::ports::Invocation;
@@ -8,8 +8,8 @@ use crate::cli::ports::Invocation;
 pub struct CargoMutants;
 
 impl CargoMutants {
-    pub(crate) const MISSED: NonZeroU8 = NonZeroU8::MIN.saturating_add(1);
-    pub(crate) const TIMEOUT: NonZeroU8 = Self::MISSED.saturating_add(1);
+    pub(crate) const MISSED: NonZeroI32 = NonZeroI32::new(2).unwrap();
+    pub(crate) const TIMEOUT: NonZeroI32 = NonZeroI32::new(3).unwrap();
 
     const SUBCOMMAND: &'static str = "mutants";
     const FIXED: [&'static str; 4] = ["--jobs", "2", "--colors", "never"];
