@@ -12,12 +12,15 @@ use lint_core::{Macros, SourceFile};
 use lint_placement::CrateName;
 use type_facts::Facts;
 
+use super::adapters::Adapters;
 use crate::function_flow::FunctionFlow;
 use declaring::Declaring;
 use permit::Permit;
 use zone::Zone;
 
 pub struct Collector<'file, 'facts> {
+    file: &'file SourceFile,
+    adapters: &'facts Adapters<'file>,
     path: &'file Path,
     zone: Zone,
     facts: &'facts Facts<'file>,
@@ -26,10 +29,21 @@ pub struct Collector<'file, 'facts> {
 }
 
 impl<'file, 'facts> Collector<'file, 'facts> {
-    pub fn collected(file: &'file SourceFile, facts: &'facts Facts<'file>) -> Vec<FunctionFlow<'file>> {
+    pub fn collected(
+        file: &'file SourceFile,
+        facts: &'facts Facts<'file>,
+        adapters: &'facts Adapters<'file>,
+    ) -> Vec<FunctionFlow<'file>> {
         let krate = file.placement().package().crate_name();
-        let mut collector =
-            Collector { path: file.path(), zone: Zone::of_file(file), facts, krate, functions: Vec::new() };
+        let mut collector = Collector {
+            file,
+            adapters,
+            path: file.path(),
+            zone: Zone::of_file(file, adapters),
+            facts,
+            krate,
+            functions: Vec::new(),
+        };
         collector.visit_file(file.syntax());
         collector.functions
     }
@@ -64,7 +78,7 @@ impl<'ast> Visit<'ast> for Collector<'_, '_> {
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        let entered = self.zone.entering(module);
+        let entered = self.zone.entering(self.file, module, self.adapters);
         let outer = mem::replace(&mut self.zone, entered);
         visit::visit_item_mod(self, module);
         self.zone = outer;

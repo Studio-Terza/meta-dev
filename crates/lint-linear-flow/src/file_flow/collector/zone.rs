@@ -1,6 +1,10 @@
 use syn::ItemMod;
+use syn::spanned::Spanned;
 
-use lint_core::{Gate, SourceFile};
+use lint_core::{Site, SourceFile};
+use lint_layout::LineNumber;
+
+use super::super::adapters::Adapters;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Zone {
@@ -9,17 +13,30 @@ pub enum Zone {
 }
 
 impl Zone {
-    pub fn of_file(file: &SourceFile) -> Zone {
-        match Gate::BOUNDARY.admits(file).or_else(|| Gate::PORTS.admits(file)) {
-            Some(_) => Zone::Boundary,
-            None => Zone::Elsewhere,
+    pub fn of_file<'file>(file: &'file SourceFile, adapters: &Adapters<'file>) -> Zone {
+        Zone::judged(adapters.evidence(file.path(), LineNumber::FIRST, LineNumber::from(usize::MAX)))
+    }
+
+    pub fn entering<'file>(self, file: &'file SourceFile, module: &ItemMod, adapters: &Adapters<'file>) -> Zone {
+        match self {
+            Zone::Boundary => self,
+            Zone::Elsewhere => Zone::of_module(file, module, adapters),
         }
     }
 
-    pub fn entering(self, module: &ItemMod) -> Zone {
-        match Gate::BOUNDARY.names(module).or_else(|| Gate::PORTS.names(module)) {
+    fn of_module<'file>(file: &'file SourceFile, module: &ItemMod, adapters: &Adapters<'file>) -> Zone {
+        let span = module.span();
+        Zone::judged(adapters.evidence(
+            file.path(),
+            LineNumber::from(span.start().line),
+            LineNumber::from(span.end().line),
+        ))
+    }
+
+    fn judged(evidence: Option<&Site<'_>>) -> Zone {
+        match evidence {
             Some(_) => Zone::Boundary,
-            None => self,
+            None => Zone::Elsewhere,
         }
     }
 }

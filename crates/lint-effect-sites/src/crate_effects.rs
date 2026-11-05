@@ -41,6 +41,10 @@ impl<'file> CrateEffects<'file> {
         summary.into_iter().chain(self.outside_ports()).collect()
     }
 
+    pub(crate) fn places(&self) -> BTreeSet<Site<'file>> {
+        self.0.iter().map(EffectSite::place).collect()
+    }
+
     pub(crate) fn outside_ports(&self) -> Vec<Violation<'file>> {
         self.0.iter().filter_map(EffectSite::outside_ports).collect()
     }

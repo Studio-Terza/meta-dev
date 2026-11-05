@@ -47,35 +47,41 @@ const OPERATOR_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f() {\n       
 
 const SHAPES: &str = "struct A;\nimpl A {\n    fn piped(&self) -> u8 {\n        g().filter(|_| p).h()\n    }\n    fn routed(&self, on: Switch) -> u8 {\n        match on {\n            Switch::On => 1,\n            Switch::Off => 0,\n        }\n    }\n    fn tangled(&self) -> u8 {\n        if p { 1 } else { 0 }\n    }\n    const fn fixed() -> u8 {\n        if p { 1 } else { 0 }\n    }\n}\n";
 
-const FROM_BOOL: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_INLINE: &str = "mod boundary {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
-const FROM_BOOL_AFTER_LET: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        let lit = on;\n        if lit { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_JOINED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on && READY { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_ELSE_IF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else if READY { Lit::Dim } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_NESTED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { if READY { Lit::Dim } else { Lit::Off } }\n    }\n}\n";
-const FROM_BOOL_HELPER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        Lit::lit(on)\n    }\n}\nimpl Lit {\n    fn lit(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_CONST: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if READY { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_PICK: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        fn pick(x: bool) -> Lit { if x { Lit::On } else { Lit::Off } }\n        pick(on)\n    }\n}\n";
-const FROM_BOOL_COMPOUND: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { let lit = Lit::On; lit.dimmed() } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_STRUCT: &str = "pub struct Delay {\n    millis: u64,\n}\nimpl From<bool> for Delay {\n    fn from(on: bool) -> Delay {\n        if on { Delay::from_millis(500) } else { Delay::from_millis(0) }\n    }\n}\n";
-const FROM_COUNT: &str = "impl From<u8> for Lit {\n    fn from(count: u8) -> Lit {\n        if count > 0 { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_MATCHED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        match on {\n            true => Lit::On,\n            false => Lit::Off,\n        }\n    }\n}\n";
+const FROM_BOOL: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_INLINE: &str = "mod convert {\n    extern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_AFTER_LET: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        let lit = on;\n        if lit { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_JOINED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on && READY { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_ELSE_IF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else if READY { Lit::Dim } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_NESTED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { if READY { Lit::Dim } else { Lit::Off } }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_HELPER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        Lit::lit(on)\n    }\n}\nimpl Lit {\n    fn lit(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_CONST: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if READY { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_PICK: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        fn pick(x: bool) -> Lit { if x { Lit::On } else { Lit::Off } }\n        pick(on)\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_COMPOUND: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { let lit = Lit::On; lit.dimmed() } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_STRUCT: &str = "pub struct Delay {\n    millis: u64,\n}\nimpl From<bool> for Delay {\n    fn from(on: bool) -> Delay {\n        if on { Delay::from_millis(500) } else { Delay::from_millis(0) }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_COUNT: &str = "impl From<u8> for Lit {\n    fn from(count: u8) -> Lit {\n        if count > 0 { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_MATCHED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        match on {\n            true => Lit::On,\n            false => Lit::Off,\n        }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
-const FROM_BOOL_CONST_FN: &str = "impl From<bool> for Lit {\n    const C: u8 = {\n        fn helper(b: bool) -> Lit { if b { Lit::On } else { Lit::Off } }\n        0\n    };\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_SELF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Self {\n        if on { Self::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_MODULE: &str = "impl From<bool> for Level {\n    fn from(on: bool) -> Level {\n        if on { limits::HIGH } else { limits::LOW }\n    }\n}\n";
-const FROM_BOOL_LIMIT: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::MAX_LIMIT } else { Lit::MIN_FLOOR }\n    }\n}\n";
-const FROM_BOOL_FAMILY: &str = "impl From<bool> for Family {\n    fn from(six: bool) -> Family {\n        if six { Family::V6 } else { Family::V4 }\n    }\n}\n";
-const FROM_BOOL_LOWER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::on } else { Lit::off }\n    }\n}\n";
-const FROM_BOOL_SAME: &str =
-    "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::On }\n    }\n}\n";
+const FROM_BOOL_CONST_FN: &str = "impl From<bool> for Lit {\n    const C: u8 = {\n        fn helper(b: bool) -> Lit { if b { Lit::On } else { Lit::Off } }\n        0\n    };\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_SELF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Self {\n        if on { Self::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_MODULE: &str = "impl From<bool> for Level {\n    fn from(on: bool) -> Level {\n        if on { limits::HIGH } else { limits::LOW }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_LIMIT: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::MAX_LIMIT } else { Lit::MIN_FLOOR }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_FAMILY: &str = "impl From<bool> for Family {\n    fn from(six: bool) -> Family {\n        if six { Family::V6 } else { Family::V4 }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_LOWER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::on } else { Lit::off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_SAME: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::On }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
-const FROM_BOOL_SIDE: &str =
-    "impl From<bool> for Side {\n    fn from(b: bool) -> Side {\n        if b { Side::A } else { Side::B }\n    }\n}\n";
-const FROM_BOOL_FOREIGN: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Other::On } else { Other::Off }\n    }\n}\n";
+const FROM_BOOL_SIDE: &str = "impl From<bool> for Side {\n    fn from(b: bool) -> Side {\n        if b { Side::A } else { Side::B }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_FOREIGN: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Other::On } else { Other::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
+const FROM_BOOL_BARE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_PORT_IMPL: &str = "use crate::ports::Lamp;\nstruct Bulb;\nimpl Lamp for Bulb {}\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_PLAIN_IMPL: &str = "use crate::lamps::Lamp;\nstruct Bulb;\nimpl Lamp for Bulb {}\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_EFFECT: &str = "fn load() -> String {\n    std::env::var(\"LIT\").unwrap_or_default()\n}\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_BESIDE: &str = "mod io {\n    extern \"C\" {\n        fn abs(x: i32) -> i32;\n    }\n}\nmod convert {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const PORT_TRAIT: Source = Source::new(Located::new("crates/x/src/ports.rs"), Text::new("pub trait Lamp {}\n"));
+const PLAIN_TRAIT: Source = Source::new(Located::new("crates/x/src/lamps.rs"), Text::new("pub trait Lamp {}\n"));
+const FROM_BOOL_BOUNDARY_INLINE: &str = "mod boundary {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
 const FROM_BOOL_PORTS_INLINE: &str = "mod ports {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
-const FROM_BOOL_TWO_INPUTS: &str = "impl From<bool> for Lit {\n    fn from(on: bool, extra: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_TWO_INPUTS: &str = "impl From<bool> for Lit {\n    fn from(on: bool, extra: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
 const TYPE_DECLS: &str = "pub enum Lit { On, Off, Dim }\npub enum Family { V4, V6 }\npub enum Side { A, B }\n";
 const TYPES: Source = Source::new(Located::new("crates/x/src/types.rs"), Text::new(TYPE_DECLS));
@@ -100,15 +106,15 @@ const STRUCT_DELAY: Source = Source::new(
         "pub struct Delay(u64);\nimpl Delay {\n    pub const SHORT: Delay = Delay(1);\n    pub const LONG: Delay = Delay(9);\n}\n",
     ),
 );
-const FROM_BOOL_ONOFF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::ON } else { Lit::OFF }\n    }\n}\n";
-const FROM_BOOL_DELAY: &str = "impl From<bool> for Delay {\n    fn from(slow: bool) -> Delay {\n        if slow { Delay::LONG } else { Delay::SHORT }\n    }\n}\n";
-const FROM_BOOL_GONE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Gone }\n    }\n}\n";
+const FROM_BOOL_ONOFF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::ON } else { Lit::OFF }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_DELAY: &str = "impl From<bool> for Delay {\n    fn from(slow: bool) -> Delay {\n        if slow { Delay::LONG } else { Delay::SHORT }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_GONE: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Gone }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
 const MACRO_LIT: Source = Source::new(
     Located::new("crates/x/src/made.rs"),
     Text::new("macro_rules! make {\n    () => {\n        pub enum Lit { On, Off }\n    };\n}\nmake!();\n"),
 );
-const FROM_BOOL_IN_TESTS: &str = "#[cfg(test)]\nmod tests {\n    enum Lit { On, Off }\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_IN_TESTS: &str = "#[cfg(test)]\nmod tests {\n    enum Lit { On, Off }\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
 const TEST_ONLY_LIT: Source = Source::new(
     Located::new("crates/x/src/other.rs"),
@@ -120,16 +126,16 @@ const ON_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/on.rs"), Text
 const OFF_ONLY_LIT: Source = Source::new(Located::new("crates/x/src/off.rs"), Text::new("pub enum Lit { Off }\n"));
 const LIGHT_LIT: Source = Source::new(Located::new("crates/x/src/light.rs"), Text::new("pub enum Lit { On, Off }\n"));
 const FUSE_LIT: Source = Source::new(Located::new("crates/x/src/fuse.rs"), Text::new("pub enum Lit { Lit, Unlit }\n"));
-const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_RENAMED: &str = "use crate::light::Lit as Lamp;\nimpl From<bool> for Lamp {\n    fn from(on: bool) -> Lamp {\n        if on { Lamp::On } else { Lamp::Off }\n    }\n}\n";
-const FROM_BOOL_BY_PATH: &str = "impl From<bool> for crate::light::Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_INLINE_MOD: &str = "mod inner {\n    use crate::light::Lit;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
-const TESTED_LIT_AND_IMPL: &str = "#[cfg(test)]\nenum Lit { On, Off }\n#[cfg(test)]\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
-const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod tests {\n    use super::*;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_USING_LIGHT: &str = "use crate::light::Lit;\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_RENAMED: &str = "use crate::light::Lit as Lamp;\nimpl From<bool> for Lamp {\n    fn from(on: bool) -> Lamp {\n        if on { Lamp::On } else { Lamp::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_BY_PATH: &str = "impl From<bool> for crate::light::Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_INLINE_MOD: &str = "mod inner {\n    use crate::light::Lit;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const TESTED_LIT_AND_IMPL: &str = "#[cfg(test)]\nenum Lit { On, Off }\n#[cfg(test)]\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
+const FROM_BOOL_IN_TESTS_USING_SUPER: &str = "use crate::Lit;\n#[cfg(test)]\nmod tests {\n    use super::*;\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 const REEXPORTED_LIT: Source =
     Source::new(Located::new("crates/x/src/lib.rs"), Text::new("mod light;\npub use light::Lit;\n"));
 
-const LINEAR: [Case; 61] = [
+const LINEAR: [Case; 67] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -200,18 +206,18 @@ const LINEAR: [Case; 61] = [
         Flagged::new(&["a.rs:3", "a.rs:8"]),
     ),
     Case::new(
-        Title::new("from bool in a boundary module file"),
+        Title::new("from bool in a module declaring a foreign API"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool in an inline boundary module"),
+        Title::new("from bool in an inline module declaring a foreign API"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_INLINE)), TYPES],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool outside a boundary module"),
-        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL)), TYPES],
+        Title::new("from bool in a module that adapts no port"),
+        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL_BARE)), TYPES],
         Flagged::new(&["crates/x/src/lit.rs:3"]),
     ),
     Case::new(
@@ -305,9 +311,9 @@ const LINEAR: [Case; 61] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("from bool in a ports module file"),
-        &[Source::new(Located::new("crates/x/src/ports/lit.rs"), Text::new(FROM_BOOL)), TYPES],
-        Flagged::new(&[]),
+        Title::new("from bool in a file named ports that adapts no port"),
+        &[Source::new(Located::new("crates/x/src/ports/lit.rs"), Text::new(FROM_BOOL_BARE)), TYPES],
+        Flagged::new(&["crates/x/src/ports/lit.rs:3"]),
     ),
     Case::new(
         Title::new("from bool choosing variants of another type"),
@@ -315,9 +321,9 @@ const LINEAR: [Case; 61] = [
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(
-        Title::new("from bool in an inline ports module"),
+        Title::new("from bool in an inline module named ports that adapts no port"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_PORTS_INLINE)), TYPES],
-        Flagged::new(&[]),
+        Flagged::new(&["crates/x/src/lib.rs:4"]),
     ),
     Case::new(
         Title::new("from bool taking two inputs"),
@@ -435,6 +441,40 @@ const LINEAR: [Case; 61] = [
         Title::new("from bool into an enum split by cfg"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL)), CFG_TWIN_LIT],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a file named boundary that adapts no port"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_BARE)), TYPES],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool in an inline module named boundary that adapts no port"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_BOUNDARY_INLINE)), TYPES],
+        Flagged::new(&["crates/x/src/lib.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool in a module implementing a port trait"),
+        &[Source::new(Located::new("crates/x/src/adapter.rs"), Text::new(FROM_BOOL_PORT_IMPL)), PORT_TRAIT, TYPES],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a module implementing a trait that is no port"),
+        &[
+            Source::new(Located::new("crates/x/src/boundary/adapter.rs"), Text::new(FROM_BOOL_PLAIN_IMPL)),
+            PLAIN_TRAIT,
+            TYPES,
+        ],
+        Flagged::new(&["crates/x/src/boundary/adapter.rs:6"]),
+    ),
+    Case::new(
+        Title::new("from bool in a module calling an OS API"),
+        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL_EFFECT)), TYPES],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in a module beside the one that calls a foreign API"),
+        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL_BESIDE)), TYPES],
+        Flagged::new(&["crates/x/src/lit.rs:9"]),
     ),
 ];
 
@@ -756,7 +796,7 @@ fn loops_routers_and_conditions_pin_their_fix_text() {
 }
 
 const TESTS_FILE_PARENT: &str = "#[cfg(test)]\nmod tests;\n";
-const TESTS_FILE_ENUM: &str = "enum Lit { On, Off }\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const TESTS_FILE_ENUM: &str = "enum Lit { On, Off }\nimpl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\nextern \"C\" {\n    fn abs(x: i32) -> i32;\n}\n";
 
 #[test]
 fn from_bool_into_an_enum_declared_in_an_out_of_line_test_module_is_not_flagged() {
