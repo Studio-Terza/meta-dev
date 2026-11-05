@@ -1,5 +1,4 @@
-use newtype::{Named, Unnamed};
-use strum::VariantArray;
+use newtype::{Named, Unnamed, VariantArray};
 
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Lamp {
@@ -274,4 +273,9 @@ enum Octets {
 fn a_u8_accessor_takes_a_byte_literal_and_a_str_accessor_a_primitive_path() {
     assert_eq!((Octets::A.byte(), Octets::B.byte()), (b'a', 7));
     assert_eq!((Octets::A.text(), Octets::B.path()), ("t", "q"));
+}
+
+#[test]
+fn the_variant_array_derive_lists_every_variant_in_order() {
+    assert_eq!(Lamp::VARIANTS, [Lamp::On, Lamp::Off, Lamp::Dimmed]);
 }

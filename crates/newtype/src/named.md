@@ -4,7 +4,7 @@ defect and must not compile.
 Every unit variant names itself once:
 
 ```
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     On,
@@ -19,7 +19,7 @@ Other per-variant values become const accessors. The enum declares each accessor
 (`&'static str`, an integer type, `bool` or `char`), and every variant supplies a value:
 
 ```
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(glyph: &'static str)]
 #[accessor(rank: u8)]
 enum Lamp {
@@ -47,7 +47,7 @@ A `u8` accessor takes an integer literal or a byte literal such as `b'a'`; a `ch
 An `&'static str` accessor may also be spelled `&'static core::primitive::str`:
 
 ```
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(byte: u8)]
 #[accessor(text: &'static core::primitive::str)]
 #[accessor(path: &'static ::std::primitive::str)]
@@ -70,7 +70,7 @@ const BYTE: u8 = Lamp::On.byte();
 An accessor value missing on a variant:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(glyph: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -84,7 +84,7 @@ enum Lamp {
 An accessor value given twice:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(glyph: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -101,7 +101,7 @@ An accessor value of the wrong literal type, here a char literal for a `u8`, whi
 does not have the accessor's declared type":
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(rank: u8)]
 enum Lamp {
     #[name("on")]
@@ -116,7 +116,7 @@ enum Lamp {
 An accessor value that no accessor declares:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     #[accessor_value(glyph = "*")]
@@ -129,7 +129,7 @@ enum Lamp {
 Two accessors with one name, or an accessor called `name`:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(rank: u8)]
 #[accessor(rank: u16)]
 enum Lamp {
@@ -140,7 +140,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(name: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -154,7 +154,7 @@ An accessor takes no name that a method of `Clone`, `PartialEq`, `PartialOrd`, `
 is refused:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(clone: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -164,7 +164,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(clone_from: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -174,7 +174,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(eq: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -184,7 +184,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(ne: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -194,7 +194,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(partial_cmp: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -204,7 +204,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(lt: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -214,7 +214,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(le: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -224,7 +224,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(gt: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -234,7 +234,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(ge: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -244,7 +244,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(cmp: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -254,7 +254,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(max: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -264,7 +264,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(min: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -274,7 +274,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(clamp: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -284,7 +284,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(hash: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -294,7 +294,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(hash_slice: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -304,7 +304,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(fmt: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -314,7 +314,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(to_string: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -324,7 +324,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(from_str: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -334,7 +334,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(into: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -344,7 +344,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(try_into: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -354,7 +354,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(borrow: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -364,7 +364,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(type_id: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -374,7 +374,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(from: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -384,7 +384,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(try_from: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -394,7 +394,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(VARIANTS: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -404,7 +404,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(borrow_mut: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -414,7 +414,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(as_ref: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -424,7 +424,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(to_owned: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -434,7 +434,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(clone_into: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -444,7 +444,7 @@ enum Lamp {
 ```
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(default: &'static str)]
 enum Lamp {
     #[name("on")]
@@ -456,7 +456,7 @@ enum Lamp {
 An accessor of a primitive type spelled with its path, or with a raw name, compiles:
 
 ```
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(r#rank: core::primitive::u8)]
 enum Lamp {
     #[name("on")]
@@ -471,7 +471,7 @@ enum Lamp {
 An accessor of a type that is not a literal type:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor(rank: String)]
 enum Lamp {
     #[name("on")]
@@ -486,7 +486,7 @@ enum Lamp {
 An accessor on a variant, where it would be ignored:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     #[accessor(glyph: &'static str)]
@@ -499,7 +499,7 @@ enum Lamp {
 A value on the enum, where it would be ignored:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[accessor_value(glyph = "*")]
 enum Lamp {
     #[name("on")]
@@ -520,7 +520,7 @@ enum Lamp {
     Off,
 }
 
-impl strum::VariantArray for Lamp {
+impl newtype::VariantArray for Lamp {
     const VARIANTS: &'static [Self] = &[Lamp::On, Lamp::Off, Lamp::On];
 }
 ```
@@ -536,7 +536,7 @@ enum Lamp {
     Off,
 }
 
-impl strum::VariantArray for Lamp {
+impl newtype::VariantArray for Lamp {
     const VARIANTS: &'static [Self] = &[Lamp::On, Lamp::On];
 }
 ```
@@ -552,7 +552,7 @@ enum Lamp {
     Off,
 }
 
-impl strum::VariantArray for Lamp {
+impl newtype::VariantArray for Lamp {
     const VARIANTS: &'static [Self] = &[Lamp::On];
 }
 ```
@@ -562,7 +562,7 @@ check is a trait bound on the enum, so Copy from a derive, from a hand-written `
 macro all satisfy it:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone)]
+#[derive(newtype::Named, newtype::VariantArray, Clone)]
 enum Lamp {
     #[name("on")]
     On,
@@ -574,7 +574,7 @@ enum Lamp {
 A variant without a name:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     On,
@@ -585,7 +585,7 @@ enum Lamp {
 Two variants with one name:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     On,
@@ -597,7 +597,7 @@ enum Lamp {
 A name on the enum itself:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 #[name("lamp")]
 enum Lamp {
     #[name("on")]
@@ -618,7 +618,7 @@ enum Lamp {
     Off,
 }
 
-impl strum::VariantArray for Lamp {
+impl newtype::VariantArray for Lamp {
     const VARIANTS: &'static [Self] = &[Lamp::Off];
 }
 ```
@@ -626,7 +626,7 @@ impl strum::VariantArray for Lamp {
 A variant named twice:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
     #[name("lit")]
@@ -658,6 +658,29 @@ enum Lamp {
 An enum with no variants:
 
 ```compile_fail
-#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {}
+```
+
+A type that only lists its variants, with no `FromStr` that refuses with an `Unnamed`, cannot make an `Unnamed`:
+
+```compile_fail
+use std::fmt;
+
+#[derive(Clone, Copy)]
+struct Hand;
+
+impl fmt::Display for Hand {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("hand")
+    }
+}
+
+impl newtype::VariantArray for Hand {
+    const VARIANTS: &'static [Hand] = &[Hand];
+}
+
+fn refuse() -> newtype::Unnamed<Hand> {
+    newtype::Unnamed::new("foot")
+}
 ```

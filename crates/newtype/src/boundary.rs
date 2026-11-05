@@ -4,7 +4,7 @@ mod unnamed;
 
 pub use exit::Exit;
 pub use plain::Newtype;
-pub use unnamed::Unnamed;
+pub use unnamed::{Listed, Unnamed};
 
 pub trait Counter: Newtype<Inner = usize> + Copy {
     #[must_use]

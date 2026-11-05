@@ -1,3 +1,4 @@
+mod absolute_path;
 mod crate_reach;
 
 use std::collections::BTreeMap;
@@ -12,6 +13,7 @@ use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
 
+use absolute_path::AbsolutePath;
 use crate_reach::CrateReach;
 
 #[derive(Default)]
@@ -119,6 +121,9 @@ impl<'ast> Visit<'ast> for ForeignReferences {
 
     fn visit_macro(&mut self, invocation: &'ast Macro) {
         Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        AbsolutePath::walk(&invocation.tokens, |path| {
+            path.reach(|crate_ident, item| self.record(Some(crate_ident), Leaf::Named(item)));
+        });
         syn::visit::visit_macro(self, invocation);
     }
 

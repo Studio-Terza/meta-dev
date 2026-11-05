@@ -92,7 +92,7 @@ impl Named {
                     }
                 }
 
-                let listed = <#ident as ::strum::VariantArray>::VARIANTS;
+                let listed = <#ident as ::newtype::VariantArray>::VARIANTS;
                 let mut seen = [false; #count];
                 let mut at = 0;
                 while at < listed.len() {
