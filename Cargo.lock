@@ -867,6 +867,7 @@ dependencies = [
  "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",
+ "lint-test-strength",
  "lint-thin-main",
  "lint-transition-graph",
  "lint-type-shape",
@@ -952,6 +953,7 @@ dependencies = [
  "lint-rust-only",
  "lint-state-graph",
  "lint-test-budget",
+ "lint-test-strength",
  "lint-thin-main",
  "lint-transition-graph",
  "lint-type-shape",
@@ -973,6 +975,16 @@ dependencies = [
  "newtype",
  "proc-macro2",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-test-strength"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-transition-graph",
+ "newtype",
+ "test-facts",
 ]
 
 [[package]]
@@ -1002,6 +1014,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "test-facts",
  "transition-facts",
  "type-facts",
 ]
@@ -1354,6 +1367,19 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys",
+]
+
+[[package]]
+name = "test-facts"
+version = "0.1.0"
+dependencies = [
+ "law-facts",
+ "lint-core",
+ "lint-layout",
+ "lint-placement",
+ "newtype",
+ "proc-macro2",
+ "syn 2.0.119",
 ]
 
 [[package]]

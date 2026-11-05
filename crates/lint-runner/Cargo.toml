@@ -16,6 +16,7 @@ graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
 lint-core = { path = "../lint-core" }
+lint-test-strength = { path = "../lint-test-strength" }
 lint-reader = { path = "../lint-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-bool-methods = { path = "../lint-bool-methods" }

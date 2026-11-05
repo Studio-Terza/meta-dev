@@ -1,6 +1,7 @@
 use std::cell::OnceCell;
 
 use lint_core::SourceFile;
+use test_facts::Tests;
 use transition_facts::Transitions;
 use type_facts::Facts;
 
@@ -43,6 +44,7 @@ pub struct TypeSystem<'found, 'file> {
     containment: OnceCell<Containment<'found, 'file>>,
     algebras: OnceCell<Algebras<'found, 'file>>,
     declarations: OnceCell<Declarations<'file>>,
+    tests: OnceCell<Tests<'file>>,
     transitions: &'found Transitions<'file>,
     facts: &'found Facts<'file>,
 }
@@ -60,6 +62,7 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
             containment: OnceCell::new(),
             algebras: OnceCell::new(),
             declarations: OnceCell::new(),
+            tests: OnceCell::new(),
             transitions: extraction.transitions(),
             facts: extraction.facts(),
         }
@@ -82,6 +85,11 @@ impl<'found, 'file> TypeSystem<'found, 'file> {
 
     pub(crate) fn declarations(&self) -> &Declarations<'file> {
         self.declarations.get_or_init(|| Declarations::from(self.files))
+    }
+
+    #[must_use]
+    pub fn tests(&self) -> &Tests<'file> {
+        self.tests.get_or_init(|| Tests::from(self.files))
     }
 
     pub(crate) fn types(&self) -> &WorkspaceTypes<'found> {

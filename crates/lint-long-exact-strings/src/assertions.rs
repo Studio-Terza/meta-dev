@@ -6,11 +6,10 @@ mod table_rows;
 
 use std::path::Path;
 
-use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{BinOp, Expr, ImplItemFn, ItemFn, Macro, Token};
+use syn::{BinOp, Expr, ImplItemFn, ItemFn, Macro};
 
-use lint_core::{MacroAliases, MacroCalls, Site, SourceFile, Violation};
+use lint_core::{MacroAliases, MacroCalls, Macros, Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
 
 use bindings::Bindings;
@@ -116,18 +115,11 @@ impl Assertion {
 
     fn compared(self, invocation: &Macro) -> Option<Vec<Expr>> {
         match self {
-            Assertion::Equality => Some(Self::arguments(invocation).into_iter().take(Self::SIDES_LENGTH).collect()),
-            Assertion::Bare => Some(Self::arguments(invocation).into_iter().take(1).flat_map(Self::sides).collect()),
+            Assertion::Equality => Some(Macros::arguments(invocation).into_iter().take(Self::SIDES_LENGTH).collect()),
+            Assertion::Bare => Some(Macros::arguments(invocation).into_iter().take(1).flat_map(Self::sides).collect()),
             Assertion::Table => Some(TableRows::expected(&invocation.tokens)),
             Assertion::Other => None,
         }
-    }
-
-    fn arguments(invocation: &Macro) -> Vec<Expr> {
-        invocation
-            .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
-            .map(|arguments| arguments.into_iter().collect())
-            .unwrap_or_default()
     }
 
     fn sides(condition: Expr) -> Vec<Expr> {

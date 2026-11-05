@@ -197,7 +197,7 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `test-facts` (the checks of every test: relation, pinned values and domain), `lint-test-strength` (the `lint strength` comparison), `lint-runner` (the runner
 library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
@@ -245,6 +245,20 @@ the exports and the path steps shown, as it does the other lists.
     implementers of Priced:
       shop::Priced at crates/shop/src/lib.rs:2
         Line at crates/shop/src/till.rs:2
+
+## Strength
+
+A change never weakens a test. Compare two trees, before and after:
+
+    lint strength <before-root> <after-root>
+
+Each test is read as a set of checks, each a relation (an equality above a pattern above a bare condition, an inequality
+above a bare condition, a law only by its own kind), the values it pins and the cases it ranges over (generated above
+enumerated by shipped code above listed rows). Every check before the change must be matched, one to one, by a check at
+least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change added to the
+same package. An assertion moved into a helper, a renamed test, and `assert!(a == b)` written for `assert_eq!(a, b)` are
+not flagged; a lost row, a hand-written list in place of `T::ALL`, or an equality turned into a bare condition is. The
+command reports only; it exits non-zero on malformed arguments.
 
 ## Rust only
 

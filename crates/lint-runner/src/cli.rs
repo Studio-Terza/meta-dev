@@ -53,7 +53,7 @@ impl Cli {
         thread::scope(|scope| {
             let helpers = self.mode.helpers(scope, sources);
             let read = SourceFiles::read_all(sources.files(), sources.roots());
-            let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, out));
+            let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, sources.files(), out));
             let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
             let written =
                 outcome.ok().as_ref().and_then(Outcome::violations).map(|violations| Self::written(violations, err));

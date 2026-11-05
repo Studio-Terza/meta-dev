@@ -21,3 +21,7 @@ impl<Check: ClusterLint> GraphLint for Clustered<Check> {
         system.containment().report::<Check>()
     }
 }
+
+pub trait ChangeLint {
+    fn report_change<'file>(before: &TypeSystem<'_, 'file>, after: &TypeSystem<'_, 'file>) -> Report<'file>;
+}

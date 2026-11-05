@@ -26,6 +26,14 @@ impl Macros {
             .collect()
     }
 
+    #[must_use]
+    pub fn arguments(invocation: &Macro) -> Vec<Expr> {
+        invocation
+            .parse_body_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+            .map(|arguments| arguments.into_iter().collect())
+            .unwrap_or_default()
+    }
+
     pub fn walk(invocation: &Macro, visit: impl FnMut(&Stmt)) {
         Self::statements(invocation).iter().for_each(visit);
     }

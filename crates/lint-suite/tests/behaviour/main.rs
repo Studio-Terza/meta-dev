@@ -51,6 +51,7 @@ mod rust_only;
 mod shown;
 mod state_graph;
 mod test_budget;
+mod test_strength;
 mod thin_main;
 mod transition_facts;
 mod transition_graph;
