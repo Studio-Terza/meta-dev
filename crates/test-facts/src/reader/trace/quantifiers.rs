@@ -52,7 +52,6 @@ impl Quantifiers {
             }),
             Pat::Reference(reference) => self.bind(&reference.pat, value),
             Pat::Paren(inner) => self.bind(&inner.pat, value),
-            Pat::Type(typed) => self.bind(&typed.pat, value),
             _ => (),
         }
     }

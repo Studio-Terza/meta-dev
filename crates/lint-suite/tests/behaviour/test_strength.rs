@@ -292,6 +292,84 @@ const IF_LIVE_LESS: &str = "#[test]\nfn adds() {\n    if 1 < 2 {\n        assert
 const IF_UNKNOWN_ORDER: &str = "#[test]\nfn adds() {\n    if 1 & 2 > 0 {\n        assert_eq!(f(1), 2);\n    }\n}\n";
 const IF_OVERFLOWING: &str = "#[test]\nfn adds() {\n    if 170141183460469231731687303715884105727 + 1 > 0 {\n        assert_eq!(f(1), 2);\n    }\n}\n";
 
+const FORMS_PLAIN: &str = "#[test]\nfn adds() {\n    assert_eq!(f(a.b, a[0], 1 as u8, &1, [1, 2], vec![1, 2], a - b, a * b, a / b, a % b, a && b, a || b), 2);\n}\n";
+const FORMS_PAREN: &str = "#[test]\nfn adds() {\n    assert_eq!(f((a).b, (a)[0], (1) as u8, &(1), [(1), 2], vec![(1), 2], (a) - b, (a) * b, (a) / b, (a) % b, (a) && b, (a) || b), 2);\n}\n";
+const PAREN_ARG: &str = "#[test]\nfn adds() {\n    assert_eq!(f((1)), 2);\n}\n";
+const NEGATIVE_ARG: &str = "#[test]\nfn adds() {\n    assert_eq!(f(-1), 2);\n}\n";
+const POSITIVE_ARG: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n";
+const NOT_ARG: &str = "#[test]\nfn adds() {\n    assert_eq!(f(!x), 2);\n}\n";
+const PLAIN_ARG: &str = "#[test]\nfn adds() {\n    assert_eq!(f(x), 2);\n}\n";
+const FIELD_B: &str = "#[test]\nfn adds() {\n    assert_eq!(f(a.b), 2);\n}\n";
+const FIELD_C: &str = "#[test]\nfn adds() {\n    assert_eq!(f(a.c), 2);\n}\n";
+const FIELD_ZERO: &str = "#[test]\nfn adds() {\n    assert_eq!(f(a.0), 2);\n}\n";
+const FIELD_ONE: &str = "#[test]\nfn adds() {\n    assert_eq!(f(a.1), 2);\n}\n";
+const NOT_BEFORE: &str = "#[test]\nfn adds() {\n    assert!(!(f(1) > 0));\n}\n";
+const NOT_AFTER: &str = "#[test]\nfn adds() {\n    assert!(f(1) <= 0);\n}\n";
+const NOT_OR_BEFORE: &str = "#[test]\nfn adds() {\n    assert!(!(f(1) > 0 || g(1) > 0));\n}\n";
+const NOT_OR_AFTER: &str = "#[test]\nfn adds() {\n    assert!(f(1) <= 0); assert!(g(1) <= 0);\n}\n";
+const SPELLED_UNEQUAL: &str = "#[test]\nfn adds() {\n    assert!(f(1) != 2);\n}\n";
+const ASSERTED_UNEQUAL: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), 2);\n}\n";
+const SPELLED_LESS: &str = "#[test]\nfn adds() {\n    assert!(f(1) < 5);\n}\n";
+const SPELLED_AT_MOST: &str = "#[test]\nfn adds() {\n    assert!(f(1) <= 4);\n}\n";
+const NOT_LESS: &str = "#[test]\nfn adds() {\n    assert!(!(f(1) < 5));\n}\n";
+const AT_LEAST_FIVE: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 5);\n}\n";
+const SHAPES_WRITTEN: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), 2)); assert!(matches!(f(2), n @ 2)); assert!(matches!(f(3), None)); assert!(matches!(f(4), (_, 2))); assert!(matches!(f(5), 1 | 2)); assert!(matches!(f(6), &2)); assert!(matches!(f(7), (2)));\n}\n";
+const SHAPES_NORMAL: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 2); assert!(matches!(f(2), 2)); assert!(matches!(f(3), Option::None)); assert!(matches!(f(4), (1, 2))); assert!(matches!(f(5), 2 | 1)); assert!(matches!(f(6), 2)); assert!(matches!(f(7), 2));\n}\n";
+const LOOP_BOUND: &str = "#[test]\nfn adds() {\n    for x in 0..3u8 {\n        assert_eq!(f(x), x);\n    }\n}\n";
+const LOOP_REFERENCED_PATTERN: &str =
+    "#[test]\nfn adds() {\n    for &x in 0..3u8 {\n        assert_eq!(f(x), x);\n    }\n}\n";
+const LOOP_PARENTHESISED_PATTERN: &str =
+    "#[test]\nfn adds() {\n    for (x) in 0..3u8 {\n        assert_eq!(f(x), x);\n    }\n}\n";
+const COUNTED_FEW: &str = "proptest! {\n    #![proptest_config(ProptestConfig { cases: 10, ..ProptestConfig::default() })]\n    #[test]\n    fn holds(x in 0..9u8) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const COUNTED_MANY: &str = "proptest! {\n    #![proptest_config(ProptestConfig { cases: 100, ..ProptestConfig::default() })]\n    #[test]\n    fn holds(x in 0..9u8) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const INNER_FLAT: &str = "mod inner {\n    #[test]\n    fn adds() {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+const INNER_OWN_HELPER: &str = "fn expect(_: u8, _: u8) {}\nmod inner {\n    fn expect(value: u8, want: u8) {\n        assert_eq!(f(value), want);\n    }\n    #[test]\n    fn adds() {\n        expect(1, 2);\n    }\n}\n";
+const TWO_ONES: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1, 1), 2);\n}\n";
+const FOLLOWED_TWICE: &str = "#[test]\nfn adds() {\n    let a = 1; assert_eq!(f(a, a), 2);\n}\n";
+
+const ONE_OF_THREE: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), 1 | 2 | 3));\n}\n";
+const ONE_OF_TWO: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), 1 | 2));\n}\n";
+const SOME_OR_NONE: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), Some(_) | None));\n}\n";
+const SOME_ANY: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), Some(_)));\n}\n";
+const POSITIVE_NOT_TWENTY: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 0); assert_ne!(f(1), 20);\n}\n";
+const POSITIVE_NOT_FIVE: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 0); assert_ne!(f(1), 5);\n}\n";
+const INSIDE_NINE: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 1); assert!(f(1) < 10);\n}\n";
+const POSITIVE_ONLY: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 0);\n}\n";
+const NOT_FIVE: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), 5);\n}\n";
+const NOT_FIVE_NOT_SIX: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), 5); assert_ne!(f(1), 6);\n}\n";
+const NOT_TWO: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), 2);\n}\n";
+const ABOVE_G: &str = "#[test]\nfn adds() {\n    assert!(f(1) > g(1));\n}\n";
+const ABOVE_H: &str = "#[test]\nfn adds() {\n    assert!(f(1) > h(1));\n}\n";
+const AT_LEAST_G: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= g(1));\n}\n";
+
+const COUNT_BY_CALL: &str = "proptest! {\n    #![proptest_config(ProptestConfig::with_cases(count()))]\n    #[test]\n    fn holds(x in 0..9u8) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const COUNT_BY_OTHER_CALL: &str = "proptest! {\n    #![proptest_config(ProptestConfig::with_cases(other()))]\n    #[test]\n    fn holds(x in 0..9u8) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
+const GUARDED: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), n if n > 1));\n}\n";
+const GUARDED_OTHER: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), n if n > 2));\n}\n";
+const CLOSED_TAUTOLOGIES: &str = "#[test]\nfn adds() {\n    assert_eq!(Some(1), Some(1)); assert_eq!((1, 2), (1, 2)); assert_eq!([1, 2], [1, 2]); assert_eq!(true && false, true && false);\n}\n";
+const INDEXED: &str = "#[test]\nfn adds() {\n    assert_eq!(f([10, 20][1]), 2);\n}\n";
+const PICKED: &str = "#[test]\nfn adds() {\n    assert_eq!(f(20), 2);\n}\n";
+const OPERATOR_POINT: &str = "#[test]\nfn adds() {\n    assert_eq!(f(3, 4), 5);\n}\n";
+const OPERATOR_ALL: &str =
+    "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_eq!(f(x, x + 1), 5);\n    }\n}\n";
+const FOR_ALL_EQUAL: &str = "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_eq!(f(1), x);\n    }\n}\n";
+const FOR_ALL_ABOVE: &str = "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert!(f(1) > g(x));\n    }\n}\n";
+const ABOVE_G_TWO: &str = "#[test]\nfn adds() {\n    assert!(f(1) > g(2));\n}\n";
+const FOR_ALL_DIFFERENT: &str =
+    "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_ne!(f(1), x);\n    }\n}\n";
+const NOT_TWO_ONLY: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), 2);\n}\n";
+const FOR_ALL_EQUAL_NOT_TWENTY: &str = "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_eq!(f(1), x);\n        assert_ne!(f(1), 20);\n    }\n}\n";
+const UNUSED_LOOP: &str = "#[test]\nfn adds() {\n    for x in 0..3u8 {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+const UNKNOWN_LOOP: &str = "#[test]\nfn adds() {\n    for x in inputs() {\n        assert_eq!(f(1), 2);\n    }\n}\n";
+const INNER_USED: &str = "#[test]\nfn adds() {\n    for i in 0..4u8 {\n        for j in 0..4u8 {\n            assert_eq!(f(j), j);\n        }\n    }\n}\n";
+const SINGLE_USED: &str = "#[test]\nfn adds() {\n    for j in 0..4u8 {\n        assert_eq!(f(j), j);\n    }\n}\n";
+const TABLE_ROW: &str = "laws::table!(adds, f, [1 => 2]);\n";
+const ORIENTED: &str = "#[test]\nfn adds() {\n    assert_eq!(2, f(1));\n}\n";
+
+const MATCHED_RANGE: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), 3..=8));\n}\n";
+const BOTH_BOUNDS: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 3); assert!(f(1) <= 8);\n}\n";
+const ONE_BOUND: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 3);\n}\n";
+
 laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::in_one_module, [
     [EQUALS, EQUALS] => false,
     [EQUALS, BOUNDED] => true,
@@ -472,6 +550,61 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [EQUALS, IF_LIVE_LESS] => false,
     [EQUALS, IF_UNKNOWN_ORDER] => false,
     [EQUALS, IF_OVERFLOWING] => false,
+    [EQUALS, PAREN_ARG] => false,
+    [FORMS_PLAIN, FORMS_PAREN] => false,
+    [NEGATIVE_ARG, POSITIVE_ARG] => true,
+    [NOT_ARG, PLAIN_ARG] => true,
+    [FIELD_B, FIELD_C] => true,
+    [FIELD_ZERO, FIELD_ONE] => true,
+    [NOT_BEFORE, NOT_AFTER] => false,
+    [NOT_OR_BEFORE, NOT_OR_AFTER] => false,
+    [SPELLED_UNEQUAL, ASSERTED_UNEQUAL] => false,
+    [SPELLED_LESS, SPELLED_AT_MOST] => false,
+    [NOT_LESS, AT_LEAST_FIVE] => false,
+    [SHAPES_WRITTEN, SHAPES_NORMAL] => false,
+    [LOOP_BOUND, LOOP_REFERENCED_PATTERN] => false,
+    [LOOP_BOUND, LOOP_PARENTHESISED_PATTERN] => false,
+    [COUNTED_FEW, COUNTED_MANY] => false,
+    [COUNTED_MANY, COUNTED_FEW] => true,
+    [INNER_FLAT, INNER_OWN_HELPER] => false,
+    [TWO_ONES, FOLLOWED_TWICE] => false,
+    [ONE_OF_THREE, ONE_OF_TWO] => false,
+    [ONE_OF_TWO, ONE_OF_THREE] => true,
+    [SOME_OR_NONE, SOME_ANY] => false,
+    [POSITIVE_NOT_TWENTY, INSIDE_NINE] => false,
+    [POSITIVE_NOT_TWENTY, EQUALS] => false,
+    [POSITIVE_NOT_FIVE, INSIDE_NINE] => true,
+    [POSITIVE_ONLY, POSITIVE_NOT_FIVE] => false,
+    [NOT_FIVE, NOT_FIVE_NOT_SIX] => false,
+    [NOT_FIVE_NOT_SIX, NOT_FIVE] => true,
+    [NOT_FIVE, EQUALS] => false,
+    [NOT_TWO, EQUALS] => true,
+    [AT_LEAST_G, ABOVE_G] => false,
+    [ABOVE_G, AT_LEAST_G] => true,
+    [ABOVE_G, ABOVE_G] => false,
+    [ABOVE_G, ABOVE_H] => true,
+    [COUNT_BY_CALL, COUNT_BY_CALL] => false,
+    [COUNT_BY_CALL, COUNT_BY_OTHER_CALL] => true,
+    [GUARDED, GUARDED] => false,
+    [GUARDED, GUARDED_OTHER] => true,
+    [CLOSED_TAUTOLOGIES, EMPTY] => false,
+    [INDEXED, PICKED] => false,
+    [OPERATOR_POINT, OPERATOR_ALL] => false,
+    [EQUALS, FOR_ALL_EQUAL] => false,
+    [ABOVE_G_TWO, FOR_ALL_ABOVE] => false,
+    [NOT_TWO_ONLY, FOR_ALL_DIFFERENT] => false,
+    [EQUALS, FOR_ALL_EQUAL_NOT_TWENTY] => false,
+    [EQUALS, UNUSED_LOOP] => false,
+    [UNUSED_LOOP, EQUALS] => false,
+    [UNKNOWN_LOOP, UNKNOWN_LOOP] => false,
+    [EQUALS, UNKNOWN_LOOP] => true,
+    [INNER_USED, SINGLE_USED] => false,
+    [SINGLE_USED, INNER_USED] => false,
+    [EQUALS, TABLE_ROW] => false,
+    [EQUALS, ORIENTED] => false,
+    [ORIENTED, EQUALS] => false,
+    [MATCHED_RANGE, BOTH_BOUNDS] => false,
+    [MATCHED_RANGE, ONE_BOUND] => true,
 ]);
 
 const ROUNDTRIP: &str = "laws::roundtrip!(rt, any::<u8>(), enc, dec);\n";
@@ -491,6 +624,8 @@ laws::table!(a_lost_claim_is_described_by_its_test_subject_values_and_domain, We
     [LOOPED, EMPTY, "lost a claim: f(3) equals 4;"] => true,
     [RANGE_WIDE, EMPTY, "test spans () in tests of x lost a claim: f(x0) equals Add(x0, 1), for x0 every value of 0..=9;"] => true,
     [SUPER_SUPER_INLINE, EMPTY, "test adds () in tests in outer in inner of x lost a claim: f(1) equals 2;"] => true,
+    [ONE_OF_TWO, EMPTY, "f(1) either equals 1 or equals 2;"] => true,
+    [ABOVE_G, EMPTY, "f(1) is Above g(1);"] => true,
 ]);
 
 #[test]

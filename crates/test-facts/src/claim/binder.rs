@@ -71,15 +71,6 @@ impl FromIterator<Term> for Listed {
     }
 }
 
-impl Listed {
-    fn inside_ranges(&self, outer: &Ranges) -> Option<&Listed> {
-        self.0
-            .iter()
-            .try_for_each(|value| value.number().and_then(|number| outer.admits(number)).map(|_| ()))
-            .map(|()| self)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Occupancy {
     Inhabited,
@@ -97,24 +88,16 @@ pub(crate) enum Domain {
 impl Domain {
     pub(crate) fn covers(&self, inner: &Domain) -> Option<&Domain> {
         match self {
-            Domain::Listed(outer) => inner.listed_within(outer).map(|_| self),
+            Domain::Listed(_) => None,
             Domain::Ranged(outer) => inner.ranged_within(outer).map(|_| self),
             Domain::Drawn(source) => inner.drawn_as(source).map(|_| self),
         }
     }
 
-    pub(crate) fn listed_within(&self, outer: &Listed) -> Option<&Listed> {
-        match self {
-            Domain::Listed(values) => values.0.is_subset(&outer.0).then_some(values),
-            Domain::Ranged(_) | Domain::Drawn(_) => None,
-        }
-    }
-
     pub(crate) fn ranged_within(&self, outer: &Ranges) -> Option<&Domain> {
         match self {
-            Domain::Listed(values) => values.inside_ranges(outer).map(|_| self),
             Domain::Ranged(ranges) => outer.encloses(ranges).map(|_| self),
-            Domain::Drawn(_) => None,
+            Domain::Listed(_) | Domain::Drawn(_) => None,
         }
     }
 

@@ -27,7 +27,6 @@ impl<'trace, 'body, 'file> Lowering<'trace, 'body, 'file> {
         match expression {
             Expr::Lit(literal) => Operations::literal(&literal.lit),
             Expr::Paren(inner) => self.term(&inner.expr),
-            Expr::Group(inner) => self.term(&inner.expr),
             Expr::Reference(inner) => self.term(&inner.expr),
             Expr::Cast(cast) => self.term(&cast.expr),
             Expr::Unary(unary) => Composite::unary(self, unary),

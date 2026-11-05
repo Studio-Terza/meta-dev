@@ -98,14 +98,13 @@ impl Accepted {
     fn containing(&self, inner: Single<'_>) -> Option<Inside> {
         match self {
             Accepted::Any => Some(Inside),
-            Accepted::Met(intersection) => intersection.all_containing(inner),
             Accepted::Joined(union) => union.any_containing(inner),
             Accepted::Within(ranges) => inner.in_ranges(ranges),
             Accepted::Excluding(exclusion) => inner.avoiding(exclusion),
             Accepted::Shaped(shape) => inner.in_shape(shape),
             Accepted::Related(relation) => inner.in_relation(relation),
             Accepted::Written(spelling) => inner.written_as(spelling),
-            Accepted::Exactly(_) => None,
+            Accepted::Exactly(_) | Accepted::Met(_) => None,
         }
     }
 }
@@ -119,8 +118,7 @@ impl Admitting for Accepted {
             Accepted::Within(ranges) => value.number().and_then(|number| ranges.admits(number)).map(|_| Inside),
             Accepted::Shaped(shape) => shape.admits(value),
             Accepted::Joined(union) => union.admits(value),
-            Accepted::Met(intersection) => intersection.admits(value),
-            Accepted::Related(_) | Accepted::Written(_) => None,
+            Accepted::Related(_) | Accepted::Written(_) | Accepted::Met(_) => None,
         }
     }
 }
@@ -295,15 +293,5 @@ impl Intersection {
             .iter()
             .all(|wider| self.0.iter().any(|part| part.within(wider).is_some()))
             .then_some(Inside)
-    }
-
-    fn all_containing(&self, inner: Single<'_>) -> Option<Inside> {
-        self.0.iter().try_for_each(|part| part.containing(inner).map(|_| ())).map(|()| Inside)
-    }
-}
-
-impl Admitting for Intersection {
-    fn admits(&self, value: &Term) -> Option<Inside> {
-        self.0.iter().try_for_each(|part| part.admits(value).map(|_| ())).map(|()| Inside)
     }
 }
