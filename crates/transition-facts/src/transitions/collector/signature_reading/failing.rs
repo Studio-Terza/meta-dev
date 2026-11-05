@@ -1,6 +1,11 @@
-use syn::{GenericArgument, PathArguments, PathSegment, ReturnType, Type};
+mod expanding;
+
+use syn::{GenericArgument, Path, PathArguments, ReturnType, Type};
 
 use lint_layout::{Name, Whole, Word, words};
+
+use crate::transitions::collector::origins::Origins;
+use expanding::Expanding;
 
 #[derive(Debug)]
 pub(super) struct Failing;
@@ -9,25 +14,42 @@ impl Failing {
     const RESULT: [Word<'static>; 1] = words!["Result"];
     const ERROR: usize = 1;
 
-    pub(super) fn of_output(output: &ReturnType) -> Option<&Type> {
+    pub(super) fn of_output<'found>(output: &'found ReturnType, origins: &'found Origins<'_>) -> Option<&'found Type> {
         match output {
             ReturnType::Default => None,
-            ReturnType::Type(_, returned) => Self::peeled(returned),
+            ReturnType::Type(_, returned) => Self::peeled(returned, origins, &Expanding::default()),
         }
     }
 
-    fn peeled(found: &Type) -> Option<&Type> {
+    fn peeled<'found>(
+        found: &'found Type,
+        origins: &'found Origins<'_>,
+        expanding: &Expanding,
+    ) -> Option<&'found Type> {
         match found {
-            Type::Reference(reference) => Self::peeled(&reference.elem),
-            Type::Paren(paren) => Self::peeled(&paren.elem),
-            Type::Path(path) => path.path.segments.last().and_then(Self::error_of),
+            Type::Reference(reference) => Self::peeled(&reference.elem, origins, expanding),
+            Type::Paren(paren) => Self::peeled(&paren.elem, origins, expanding),
+            Type::Path(path) => Self::error_of(&path.path, origins, expanding),
             _ => None,
         }
     }
 
-    fn error_of(segment: &PathSegment) -> Option<&Type> {
-        let result = Name::from(&segment.ident).matches::<Whole>(&Self::RESULT).map(|_| &segment.arguments);
-        result.into_iter().flat_map(Self::arguments).filter_map(Self::typed).nth(Self::ERROR)
+    fn error_of<'found>(
+        path: &'found Path,
+        origins: &'found Origins<'_>,
+        expanding: &Expanding,
+    ) -> Option<&'found Type> {
+        let result = path
+            .segments
+            .last()
+            .filter(|segment| Name::from(&segment.ident).matches::<Whole>(&Self::RESULT).is_some())
+            .map(|segment| &segment.arguments);
+        result
+            .into_iter()
+            .flat_map(Self::arguments)
+            .filter_map(Self::typed)
+            .nth(Self::ERROR)
+            .or_else(|| expanding.through(path, origins, |target, within| Self::peeled(target, origins, within)))
     }
 
     fn arguments(arguments: &PathArguments) -> Vec<&GenericArgument> {

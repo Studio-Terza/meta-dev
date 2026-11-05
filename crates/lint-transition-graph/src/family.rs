@@ -12,7 +12,7 @@ use crate::form::Acting;
 use crate::key::Key;
 
 #[derive(Debug)]
-pub(super) struct Family<'found, 'file> {
+pub(crate) struct Family<'found, 'file> {
     key: Key<'found>,
     members: Vec<&'found Transition<'found, 'file>>,
 }
@@ -20,7 +20,7 @@ pub(super) struct Family<'found, 'file> {
 impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
-    pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
+    pub(crate) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
         let keyed = edges
             .iter()
             .filter_map(|edge| edge.form().written().map(|_| edge))
@@ -40,12 +40,12 @@ impl<'found, 'file> Family<'found, 'file> {
             .collect()
     }
 
-    pub(super) fn violation(&self) -> Option<Violation<'file>> {
+    pub(crate) fn violation(&self) -> Option<Violation<'file>> {
         let first = self.members.iter().map(|member| *AsRef::<Site<'file>>::as_ref(*member)).min();
         first.map(|site| Violation::new(site, self))
     }
 
-    pub(super) fn size(&self) -> Count {
+    pub(crate) fn size(&self) -> Count {
         Count::new(self.members.len())
     }
 

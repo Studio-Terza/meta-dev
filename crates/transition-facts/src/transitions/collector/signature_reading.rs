@@ -95,7 +95,10 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 Wrapping::returned(&signature.output, self.output, &|name| scope.generic_wrapping(name)),
                 signature.inputs.iter().map(|input| scope.taken(input)).collect(),
             )
-            .failing(Failing::of_output(&signature.output).map(|error| self.origins.located(scope.endpoint(error))))
+            .failing(
+                Failing::of_output(&signature.output, self.origins)
+                    .map(|error| self.origins.located(scope.endpoint(error))),
+            )
             .called(Calls::made(signature, body))
     }
 

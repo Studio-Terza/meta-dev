@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::{self, Visit};
-use syn::{File, ItemMod, ItemUse, UseTree};
+use syn::{File, ItemMod, ItemType, ItemUse, Type, UseTree};
 
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
@@ -14,19 +14,25 @@ pub(crate) struct Origins<'file> {
     own: &'file CrateName,
     modules: BTreeSet<Name>,
     imported: BTreeMap<Name, Name>,
+    aliased: BTreeMap<Name, Type>,
 }
 
 impl<'file> Origins<'file> {
     const LOCAL: [Word<'static>; 3] = words!["crate", "self", "super"];
 
     pub(crate) fn of_file(own: &'file CrateName, syntax: &File) -> Origins<'file> {
-        let mut origins = Origins { own, modules: BTreeSet::new(), imported: BTreeMap::new() };
+        let mut origins =
+            Origins { own, modules: BTreeSet::new(), imported: BTreeMap::new(), aliased: BTreeMap::new() };
         origins.visit_file(syntax);
         origins
     }
 
     pub(crate) fn own(&self) -> &'file CrateName {
         self.own
+    }
+
+    pub(crate) fn aliased(&self, name: &Name) -> Option<&Type> {
+        self.aliased.get(name)
     }
 
     pub(crate) fn located(&self, resolved: Resolved) -> Resolved {
@@ -74,6 +80,10 @@ struct Import {
 impl<'ast> Visit<'ast> for Origins<'_> {
     fn visit_item_use(&mut self, found: &'ast ItemUse) {
         self.imported.extend(Self::imports(None, &found.tree).into_iter().map(|import| (import.name, import.head)));
+    }
+
+    fn visit_item_type(&mut self, found: &'ast ItemType) {
+        self.aliased.insert(Name::from(&found.ident), (*found.ty).clone());
     }
 
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
