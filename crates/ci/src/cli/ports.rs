@@ -1,4 +1,3 @@
-mod exit;
 mod invocation;
 mod run;
 mod system;
@@ -10,9 +9,9 @@ use std::process::ExitCode;
 
 use file_ports::Files;
 
-pub use exit::Exit;
 pub use file_ports::Text;
 pub use invocation::Invocation;
+pub use newtype::Exit;
 pub use run::Run;
 pub use system::{System, Tee};
 

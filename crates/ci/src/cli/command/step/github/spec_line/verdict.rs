@@ -1,7 +1,6 @@
 mod boundary;
 
 use std::io::Write;
-use std::num::NonZeroU8;
 
 use text_lines::Lines;
 
@@ -57,8 +56,8 @@ impl<'body> Verdict<'body> {
 
     pub(crate) fn exit(&self) -> Exit {
         match self {
-            Verdict::Repair | Verdict::Attached(_) => Exit::Success,
-            Verdict::Malformed(_) | Verdict::Missing => Exit::Failure(NonZeroU8::MIN),
+            Verdict::Repair | Verdict::Attached(_) => Exit::Succeeded,
+            Verdict::Malformed(_) | Verdict::Missing => Exit::FAILURE,
         }
     }
 }
