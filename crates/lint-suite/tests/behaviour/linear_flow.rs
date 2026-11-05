@@ -357,7 +357,12 @@ const OTHER_METHOD: &str =
     "fn f(items: &[Lamp], ready: Ready) -> Option<&Lamp> {\n    items.iter().find(|_| ready.now())\n}\n";
 const SELECTION_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f(items: &[u8]) -> usize {\n        items.iter().filter(|_| READY).count()\n    }\n}\n";
 
-const SELECTIONS: [Case; 10] = [
+const NESTED_BINDING: &str = "fn f(items: &[Lamp], flags: &[Flag]) -> usize {\n    items.iter().filter(|_| flags.iter().any(|flag| flag.on())).count()\n}\n";
+const LET_BINDING: &str = "fn f(items: &[Lamp], ready: Ready) -> usize {\n    items.iter().filter(|_| { let now = ready.now(); now }).count()\n}\n";
+const SHADOWED_ELEMENT: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
+const INLINE_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp}\"))).count()\n}\n";
+
+const SELECTIONS: [Case; 14] = [
     Case::new(
         Title::new("filter ignoring its element"),
         &[Source::new(Located::new("a.rs"), Text::new(IGNORED))],
@@ -407,6 +412,26 @@ const SELECTIONS: [Case; 10] = [
         Title::new("selection in a test module"),
         &[Source::new(Located::new("a.rs"), Text::new(SELECTION_IN_TEST))],
         Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("nested closure binding is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(NESTED_BINDING))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("let binding in the body is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(LET_BINDING))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("shadowed element is not a read"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHADOWED_ELEMENT))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("inline format capture reads the element"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_FORMAT))],
+        Flagged::new(&[]),
     ),
 ];
 
