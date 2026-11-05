@@ -24,12 +24,12 @@ Other per-variant values become const accessors. The enum declares each accessor
 #[accessor(rank: u8)]
 enum Lamp {
     #[name("on")]
-    #[value(glyph = "*")]
-    #[value(rank = 2)]
+    #[accessor_value(glyph = "*")]
+    #[accessor_value(rank = 2)]
     On,
     #[name("off")]
-    #[value(glyph = "-")]
-    #[value(rank = 1)]
+    #[accessor_value(glyph = "-")]
+    #[accessor_value(rank = 1)]
     Off,
 }
 
@@ -37,8 +37,35 @@ const GLYPH: &str = Lamp::On.glyph();
 const RANK: u8 = Lamp::Off.rank();
 ```
 
-The attribute that supplies a value is `#[value(glyph = "*")]` because a derive can only register helper
-attributes by name ahead of time, so a variant cannot be annotated with the accessor's own name.
+The attribute that supplies a value is `#[accessor_value(glyph = "*")]` because a derive can only register helper
+attributes by name ahead of time, so a variant cannot be annotated with the accessor's own name. It is not called
+`value` because `clap::ValueEnum` registers a helper attribute named `value`, and two derives on one enum cannot
+both register it: with `accessor_value`, an enum can derive `Named` and `clap::ValueEnum` together. This crate has
+no clap dependency, so the reason is documented here and not compiled.
+
+A `u8` accessor takes an integer literal or a byte literal such as `b'a'`; a `char` accessor takes a char literal.
+An `&'static str` accessor may also be spelled `&'static core::primitive::str`:
+
+```
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(byte: u8)]
+#[accessor(text: &'static core::primitive::str)]
+#[accessor(path: &'static ::std::primitive::str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(byte = b'a')]
+    #[accessor_value(text = "*")]
+    #[accessor_value(path = "+")]
+    On,
+    #[name("off")]
+    #[accessor_value(byte = 1)]
+    #[accessor_value(text = "-")]
+    #[accessor_value(path = "-")]
+    Off,
+}
+
+const BYTE: u8 = Lamp::On.byte();
+```
 
 An accessor value missing on a variant:
 
@@ -47,7 +74,7 @@ An accessor value missing on a variant:
 #[accessor(glyph: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(glyph = "*")]
+    #[accessor_value(glyph = "*")]
     On,
     #[name("off")]
     Off,
@@ -61,26 +88,27 @@ An accessor value given twice:
 #[accessor(glyph: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(glyph = "*")]
-    #[value(glyph = "+")]
+    #[accessor_value(glyph = "*")]
+    #[accessor_value(glyph = "+")]
     On,
     #[name("off")]
-    #[value(glyph = "-")]
+    #[accessor_value(glyph = "-")]
     Off,
 }
 ```
 
-An accessor value of the wrong literal type:
+An accessor value of the wrong literal type, here a char literal for a `u8`, which is refused with "this literal
+does not have the accessor's declared type":
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
 #[accessor(rank: u8)]
 enum Lamp {
     #[name("on")]
-    #[value(rank = b'a')]
+    #[accessor_value(rank = 'a')]
     On,
     #[name("off")]
-    #[value(rank = 1)]
+    #[accessor_value(rank = 1)]
     Off,
 }
 ```
@@ -91,7 +119,7 @@ An accessor value that no accessor declares:
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
 enum Lamp {
     #[name("on")]
-    #[value(glyph = "*")]
+    #[accessor_value(glyph = "*")]
     On,
     #[name("off")]
     Off,
@@ -106,7 +134,7 @@ Two accessors with one name, or an accessor called `name`:
 #[accessor(rank: u16)]
 enum Lamp {
     #[name("on")]
-    #[value(rank = 2)]
+    #[accessor_value(rank = 2)]
     On,
 }
 ```
@@ -116,19 +144,161 @@ enum Lamp {
 #[accessor(name: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(name = "x")]
+    #[accessor_value(name = "x")]
     On,
 }
 ```
 
-An accessor called `to_string`, `fmt` or `from_str` would shadow the `Display` and `FromStr` impls the derive writes:
+An accessor takes no name that a method of `Clone`, `PartialEq`, `PartialOrd`, `Ord`, `Hash`, `Debug`, `Display`,
+`ToString`, `FromStr`, `Into`, `TryInto`, `Borrow`, `AsRef`, `ToOwned` or `Default` has, nor `name`, because the
+inherent const method would shadow that trait method on the enum. Each name is refused:
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
-#[accessor(to_string: &'static str)]
+#[accessor(clone: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(to_string = "x")]
+    #[accessor_value(clone = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(clone_from: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(clone_from = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(eq: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(eq = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(ne: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(ne = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(partial_cmp: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(partial_cmp = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(lt: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(lt = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(le: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(le = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(gt: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(gt = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(ge: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(ge = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(cmp: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(cmp = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(max: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(max = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(min: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(min = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(clamp: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(clamp = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(hash: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(hash = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(hash_slice: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(hash_slice = "x")]
     On,
 }
 ```
@@ -138,7 +308,17 @@ enum Lamp {
 #[accessor(fmt: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(fmt = "x")]
+    #[accessor_value(fmt = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(to_string: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(to_string = "x")]
     On,
 }
 ```
@@ -148,7 +328,77 @@ enum Lamp {
 #[accessor(from_str: &'static str)]
 enum Lamp {
     #[name("on")]
-    #[value(from_str = "x")]
+    #[accessor_value(from_str = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(into: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(into = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(try_into: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(try_into = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(borrow: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(borrow = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(as_ref: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(as_ref = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(to_owned: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(to_owned = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(clone_into: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(clone_into = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(default: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(default = "x")]
     On,
 }
 ```
@@ -160,10 +410,10 @@ An accessor of a primitive type spelled with its path, or with a raw name, compi
 #[accessor(r#rank: core::primitive::u8)]
 enum Lamp {
     #[name("on")]
-    #[value(rank = 2)]
+    #[accessor_value(rank = 2)]
     On,
     #[name("off")]
-    #[value(r#rank = 1)]
+    #[accessor_value(r#rank = 1)]
     Off,
 }
 ```
@@ -175,10 +425,10 @@ An accessor of a type that is not a literal type:
 #[accessor(rank: String)]
 enum Lamp {
     #[name("on")]
-    #[value(rank = 2)]
+    #[accessor_value(rank = 2)]
     On,
     #[name("off")]
-    #[value(rank = 1)]
+    #[accessor_value(rank = 1)]
     Off,
 }
 ```
@@ -200,7 +450,7 @@ A value on the enum, where it would be ignored:
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
-#[value(glyph = "*")]
+#[accessor_value(glyph = "*")]
 enum Lamp {
     #[name("on")]
     On,

@@ -20,7 +20,7 @@ pub fn derive_display(input: TokenStream) -> TokenStream {
     Wrapped::expanded::<Formatting>(input.into()).into()
 }
 
-#[proc_macro_derive(Named, attributes(name, accessor, value))]
+#[proc_macro_derive(Named, attributes(name, accessor, accessor_value))]
 pub fn derive_named(input: TokenStream) -> TokenStream {
     Named::expanded(input.into()).into()
 }
