@@ -1,6 +1,10 @@
-use newtype::Unnamed;
+use newtype::{Named, Unnamed, VariantArray};
 
-struct Marker;
+#[derive(Named, VariantArray, Clone, Copy)]
+enum Marker {
+    #[name("marker")]
+    Only,
+}
 
 laws::table!(unnamed_equality_follows_the_text, |pair: &(&str, &str)| Unnamed::<Marker>::new(pair.0) == Unnamed::<Marker>::new(pair.1), [
     ("a", "a") => true,

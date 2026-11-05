@@ -1,5 +1,4 @@
-use newtype::{Named, Unnamed};
-use strum::VariantArray;
+use newtype::{Named, Unnamed, VariantArray};
 
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 enum Lamp {

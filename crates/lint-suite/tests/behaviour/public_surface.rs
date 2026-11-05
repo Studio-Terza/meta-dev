@@ -41,7 +41,24 @@ const MODULE_GROUP_USER: Source =
     Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::{used::Thing, inner};\n"));
 const MODULE_BARE_USER: Source = Source::new(Located::new("crates/b/src/lib.rs"), Text::new("use a::used;\n"));
 
-const CASES: [Case; 19] = [
+const DERIVE_USER: Source = Source::new(
+    Located::new("crates/a-derive/src/lib.rs"),
+    Text::new(
+        "fn expand() -> TokenStream {\n    quote! {\n        impl ::a::Used for #ident {}\n        type Err = ::a::Other<#ident>;\n    }\n}\n",
+    ),
+);
+const DERIVE_BOTH: Source = Source::new(
+    Located::new("crates/a-derive/src/lib.rs"),
+    Text::new(
+        "fn expand() -> TokenStream {\n    quote! {\n        impl ::a::Used for #ident {}\n        type Err = ::a::Unused;\n    }\n}\n",
+    ),
+);
+const PLAIN_PATH_DERIVE: Source = Source::new(
+    Located::new("crates/a-derive/src/lib.rs"),
+    Text::new("fn expand() -> TokenStream {\n    quote! {\n        impl b::a::Unused for #ident {}\n    }\n}\n"),
+);
+
+const CASES: [Case; 22] = [
     Case::new(Title::new("no dependent"), &[LONELY], Flagged::new(&[])),
     Case::new(Title::new("used by itself"), &[EXPORTER, USER, SELF_USER], Flagged::new(&["crates/a/src/lib.rs:2"])),
     Case::new(Title::new("named by its binary"), &[EXPORTER, USER, BINARY], Flagged::new(&[])),
@@ -89,6 +106,21 @@ const CASES: [Case; 19] = [
         Flagged::new(&["crates/a/src/lib.rs:1"]),
     ),
     Case::new(Title::new("a public module alone"), &[MODULES], Flagged::new(&[])),
+    Case::new(
+        Title::new("named only by a derive's absolute path"),
+        &[EXPORTER, DERIVE_USER],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a derive's absolute path and a user name every export"),
+        &[EXPORTER, DERIVE_BOTH],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a derive's path through another crate names nothing of this one"),
+        &[EXPORTER, USER, PLAIN_PATH_DERIVE],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
 ];
 
 #[test]

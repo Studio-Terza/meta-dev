@@ -29,7 +29,9 @@ impl<Of> PartialEq for Unnamed<Of> {
 
 impl<Of> Eq for Unnamed<Of> {}
 
-impl<Of> Unnamed<Of> {
+pub trait Listed: VariantArray + fmt::Display {}
+
+impl<Of: Listed> Unnamed<Of> {
     #[must_use]
     pub fn new(text: &str) -> Unnamed<Of> {
         Unnamed { text: text.to_owned(), of: PhantomData }
