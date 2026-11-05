@@ -22,6 +22,7 @@ const PATH_IN_VEC_MACRO: &str = "trait Shape {\n    fn sides() -> u32;\n    fn a
 const RANGE_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { for i in 0..area(3) { p {} } }\n}\n";
 const INTERPOLATED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &u8) -> Node {\n    rsx! { div { class: \"w {item.area()}\" } }\n}\n";
 const FIELD_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &Plan) -> Node {\n    rsx! { div { width: item.area } }\n}\n";
+const INDEXED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &Plan) -> Node {\n    rsx! { div { width: item.area[0] } }\n}\n";
 const PATH_IN_MARKUP: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> Node {\n    rsx! { div { width: Square::area() } }\n}\n";
 const LITERAL_IN_JSON: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Value {\n    json!({ \"hint\": \"{x.area()}\" })\n}\n";
 const ESCAPED_BRACES: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Node {\n    rsx! { div { \"{{item.area()}}\" } }\n}\n";
@@ -43,7 +44,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 35] = [
+const CASES: [Case; 36] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -86,6 +87,11 @@ const CASES: [Case; 35] = [
     Case::new(
         Title::new("a field of the provided method's name in markup is no call"),
         &[Source::new(Located::new("a.rs"), Text::new(FIELD_IN_MARKUP))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("indexed field in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(INDEXED_IN_MARKUP))],
         Flagged::new(&["a.rs:1"]),
     ),
     Case::new(
