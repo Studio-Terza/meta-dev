@@ -100,6 +100,10 @@ const PROPTEST_EMPTIED: &str =
 
 const MACRO_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(vec![f(1)], [2]);\n}\n";
 const MACRO_OTHER_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(vec![g(1)], [2]);\n}\n";
+const TAUTOLOGY_WIDE: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1) + 5, f(1) + 5);\n}\n";
+const AFTER_MATCH_PANICS: &str = "#[test]\nfn adds() {\n    match f(0) {\n        0 => panic!(\"x\"),\n        _ => panic!(\"y\"),\n    }\n    assert_eq!(f(1), 2);\n}\n";
+const STRATEGY_PAREN: &str =
+    "proptest! {\n    #[test]\n    fn holds(x in (0..9u8)) {\n        prop_assert_eq!(f(x), x + 1);\n    }\n}\n";
 const OTHER_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(g(1), 2);\n}\n";
 const BOTH_CALLS: &str = "#[test]\nfn adds() {\n    assert_eq!(g(f(1)), 2);\n}\n";
 const METHOD_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(a.run(1), 2);\n}\n";
@@ -319,6 +323,10 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [PROPTESTED, PROPTESTED] => false,
     [PROPTESTED, PROPTEST_EMPTIED] => true,
     [MACRO_CALL, MACRO_OTHER_CALL] => true,
+    [EQUALS, TAUTOLOGY_WIDE] => true,
+    [EQUALS, AFTER_MATCH_PANICS] => true,
+    [STRATEGY_WIDE, STRATEGY_PAREN] => false,
+    [STRATEGY_PAREN, STRATEGY_NARROW] => true,
     [EQUALS, OTHER_CALL] => true,
     [OTHER_CALL, EQUALS] => true,
     [EQUALS, BOTH_CALLS] => false,
@@ -470,7 +478,7 @@ const ROUNDTRIP: &str = "laws::roundtrip!(rt, any::<u8>(), enc, dec);\n";
 const DECLARED: &str = "laws::law!(holds, any::<u8>(), f);\n";
 
 laws::table!(a_lost_check_is_described_by_its_test_relation_values_and_domain, Weakened::mentions, [
-    [EQUALS, EMPTY, "adds () in tests of x lost a check: an equality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
+    [EQUALS, EMPTY, "adds () in tests of x lost a check: an equality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values) calling f"] => true,
     [DIFFERS, EMPTY, "differs () in tests of x lost a check: an inequality pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
     [BOUNDED, EMPTY, "adds () in tests of x lost a check: a condition pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
     [PATTERNED, EMPTY, "shapes () in tests of x lost a check: a pattern match pinning 2 values over listed domain of 1 cases (1 distinct, 0 values)"] => true,
