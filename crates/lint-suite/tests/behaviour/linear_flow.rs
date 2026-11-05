@@ -73,7 +73,10 @@ const FROM_BOOL_SIDE: &str =
     "impl From<bool> for Side {\n    fn from(b: bool) -> Side {\n        if b { Side::A } else { Side::B }\n    }\n}\n";
 const FROM_BOOL_FOREIGN: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Other::On } else { Other::Off }\n    }\n}\n";
 
-const LINEAR: [Case; 39] = [
+const FROM_BOOL_PORTS_INLINE: &str = "mod ports {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_TWO_INPUTS: &str = "impl From<bool> for Lit {\n    fn from(on: bool, extra: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+
+const LINEAR: [Case; 41] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -251,6 +254,16 @@ const LINEAR: [Case; 39] = [
     Case::new(
         Title::new("from bool choosing variants of another type"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_FOREIGN))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool in an inline ports module"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_PORTS_INLINE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool taking two inputs"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_TWO_INPUTS))],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
 ];
