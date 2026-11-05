@@ -47,7 +47,17 @@ const OPERATOR_IN_TEST: &str = "#[cfg(test)]\nmod tests {\n    fn f() {\n       
 
 const SHAPES: &str = "struct A;\nimpl A {\n    fn piped(&self) -> u8 {\n        g().h()\n    }\n    fn routed(&self, on: Switch) -> u8 {\n        match on {\n            Switch::On => 1,\n            Switch::Off => 0,\n        }\n    }\n    fn tangled(&self) -> u8 {\n        if p { 1 } else { 0 }\n    }\n    const fn fixed() -> u8 {\n        if p { 1 } else { 0 }\n    }\n}\n";
 
-const LINEAR: [Case; 17] = [
+const FROM_BOOL: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_INLINE: &str = "mod boundary {\n    impl From<bool> for Lit {\n        fn from(on: bool) -> Lit {\n            if on { Lit::On } else { Lit::Off }\n        }\n    }\n}\n";
+const FROM_BOOL_AFTER_LET: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        let lit = on;\n        if lit { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_JOINED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on && READY { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_ELSE_IF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else if READY { Lit::Dim } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_NESTED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { if READY { Lit::Dim } else { Lit::Off } }\n    }\n}\n";
+const FROM_BOOL_HELPER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        Lit::lit(on)\n    }\n}\nimpl Lit {\n    fn lit(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_COUNT: &str = "impl From<u8> for Lit {\n    fn from(count: u8) -> Lit {\n        if count > 0 { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_MATCHED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        match on {\n            true => Lit::On,\n            false => Lit::Off,\n        }\n    }\n}\n";
+
+const LINEAR: [Case; 26] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -117,9 +127,59 @@ const LINEAR: [Case; 17] = [
         &[Source::new(Located::new("a.rs"), Text::new(METHODS))],
         Flagged::new(&["a.rs:3", "a.rs:8"]),
     ),
+    Case::new(
+        Title::new("from bool in a boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool in an inline boundary module"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(FROM_BOOL_INLINE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool outside a boundary module"),
+        &[Source::new(Located::new("crates/x/src/lit.rs"), Text::new(FROM_BOOL))],
+        Flagged::new(&["crates/x/src/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool with more than the if"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_AFTER_LET))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4"]),
+    ),
+    Case::new(
+        Title::new("from bool deciding on more than its value"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_JOINED))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool with an else if"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_ELSE_IF))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3", "crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool with an if inside a branch"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_NESTED))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a helper beside from bool"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_HELPER))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:8"]),
+    ),
+    Case::new(
+        Title::new("from another type in a boundary module"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_COUNT))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
 ];
 
-const ROUTERS: [Case; 12] = [
+const ROUTERS: [Case; 13] = [
+    Case::new(
+        Title::new("from bool matched on true and false"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_MATCHED))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:4", "crates/x/src/boundary/lit.rs:5"]),
+    ),
     Case::new(Title::new("pure router"), &[Source::new(Located::new("a.rs"), Text::new(ROUTER))], Flagged::new(&[])),
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("guard"), &[Source::new(Located::new("a.rs"), Text::new(GUARD))], Flagged::new(&["a.rs:3"])),

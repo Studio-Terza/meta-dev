@@ -11,6 +11,7 @@ use lint_layout::LineNumber;
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
 
+#[derive(Debug)]
 pub struct Scan<'file> {
     path: &'file Path,
     found: Vec<Found<'file>>,
@@ -23,6 +24,11 @@ impl<'file> Scan<'file> {
 
     pub fn into_found(self) -> Vec<Found<'file>> {
         self.found
+    }
+
+    pub fn branches(&mut self, routed: &ExprIf) {
+        self.visit_block(&routed.then_branch);
+        routed.else_branch.iter().for_each(|(_, otherwise)| self.visit_expr(otherwise));
     }
 
     fn record(&mut self, span: Span, finding: Option<Finding>) {
