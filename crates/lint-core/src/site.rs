@@ -24,6 +24,11 @@ impl<'file> Site<'file> {
     pub fn path(&self) -> &'file Path {
         self.path
     }
+
+    #[must_use]
+    pub fn line(&self) -> LineNumber {
+        self.line
+    }
 }
 
 impl fmt::Display for Site<'_> {

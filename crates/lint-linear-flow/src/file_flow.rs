@@ -1,3 +1,4 @@
+mod adapters;
 mod collector;
 
 use std::iter;
@@ -8,6 +9,7 @@ use type_facts::Facts;
 
 use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
+use adapters::Adapters;
 use collector::Collector;
 
 #[derive(Debug)]
@@ -19,10 +21,11 @@ pub struct FileFlow<'file> {
 impl<'file> FileFlow<'file> {
     pub fn of_files(files: &'file [SourceFile]) -> Vec<FileFlow<'file>> {
         let facts = Facts::of_files(files);
+        let adapters = Adapters::from(files);
         files
             .iter()
             .flat_map(|file| iter::once(file).chain(file.test_modules()))
-            .map(|file| FileFlow { file, functions: Collector::collected(file, &facts) })
+            .map(|file| FileFlow { file, functions: Collector::collected(file, &facts, &adapters) })
             .collect()
     }
 

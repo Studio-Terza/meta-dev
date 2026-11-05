@@ -11,7 +11,10 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+lint-effect-sites = { path = "../lint-effect-sites" }
+lint-fakes-at-ports = { path = "../lint-fakes-at-ports" }
 lint-layout = { path = "../lint-layout" }
+lint-paths = { path = "../lint-paths" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
 type-facts = { path = "../type-facts" }

@@ -494,7 +494,10 @@ name = "lint-linear-flow"
 version = "0.1.0"
 dependencies = [
  "lint-core",
+ "lint-effect-sites",
+ "lint-fakes-at-ports",
  "lint-layout",
+ "lint-paths",
  "lint-placement",
  "newtype",
  "proc-macro2",
