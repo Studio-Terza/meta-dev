@@ -22,7 +22,10 @@ const INTERPOLATED_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;
 const FIELD_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total(item: &Plan) -> Node {\n    rsx! { div { width: item.area } }\n}\n";
 const PATH_IN_MARKUP: &str = "trait Shape {\n    fn sides() -> u32;\n    fn area() -> u32 { Self::sides() }\n}\nfn total() -> Node {\n    rsx! { div { width: Square::area() } }\n}\n";
 const LITERAL_IN_JSON: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Value {\n    json!({ \"hint\": \"{x.area()}\" })\n}\n";
-const ESCAPED_BRACES: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() {\n    println!(\"{{item.area()}}\");\n}\n";
+const ESCAPED_BRACES: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn note() -> Node {\n    rsx! { div { \"{{item.area()}}\" } }\n}\n";
+const LITERAL_IN_ASSERT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn check(label: &str) {\n    assert_eq!(label, \"{item.area()}\");\n}\n";
+const LITERAL_IN_PRINT: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn show() {\n    println!(\"{}\", \"{item.area()}\");\n}\n";
+const JSON_IN_MARKUP: &str = "trait Shape {\n    fn sides(&self) -> u32;\n    fn area(&self) -> u32 { self.sides() }\n}\nfn total() -> Node {\n    rsx! { div { onclick: move |_| { let v = json!(\"{x.area()}\"); } } }\n}\n";
 const DISPATCHED: &str = "#[enum_dispatch]\ntrait Shape {\n    fn area(&self) -> u32;\n}\n";
 const MARKER: &str = "trait Shape {}\n";
 const CONSTANT_ONLY: &str = "trait Shape {\n    const SIDES: u32;\n}\n";
@@ -36,7 +39,7 @@ const TWO: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n  
 
 const IN_MODULE: &str = "trait Shape {\n    fn area(&self) -> u32;\n}\nmod inner {\n    fn total<T: Shape>(item: &T) -> u32 { item.area() }\n}\n";
 
-const CASES: [Case; 28] = [
+const CASES: [Case; 31] = [
     Case::new(
         Title::new("only impls"),
         &[Source::new(Located::new("a.rs"), Text::new(BARE))],
@@ -109,6 +112,21 @@ const CASES: [Case; 28] = [
     Case::new(
         Title::new("escaped braces are not placeholders"),
         &[Source::new(Located::new("a.rs"), Text::new(ESCAPED_BRACES))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("string literal inside an assertion macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(LITERAL_IN_ASSERT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("string literal argument of a print macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(LITERAL_IN_PRINT))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("non-formatting macro nested in markup"),
+        &[Source::new(Located::new("a.rs"), Text::new(JSON_IN_MARKUP))],
         Flagged::new(&["a.rs:1"]),
     ),
     Case::new(

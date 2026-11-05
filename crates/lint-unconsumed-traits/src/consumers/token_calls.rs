@@ -32,6 +32,7 @@ enum Text {
 enum Step {
     Call(Name),
     Group(Group),
+    Nested(Text, Group),
     Text(Literal),
     Skip,
 }
@@ -89,38 +90,14 @@ impl From<PathCall> for Name {
 }
 
 impl Text {
-    const FORMATTING: [&'static str; 22] = [
-        "rsx",
-        "format",
-        "format_args",
-        "print",
-        "println",
-        "eprint",
-        "eprintln",
-        "write",
-        "writeln",
-        "panic",
-        "todo",
-        "unimplemented",
-        "unreachable",
-        "assert",
-        "assert_eq",
-        "assert_ne",
-        "debug_assert",
-        "trace",
-        "debug",
-        "info",
-        "warn",
-        "error",
-    ];
+    const MARKUP: &'static str = "rsx";
+
+    fn named(name: &Ident) -> Text {
+        Some(name).filter(|name| *name == Self::MARKUP).map_or(Text::Plain, |_| Text::Formatted)
+    }
 
     fn classify(invocation: &Macro) -> Text {
-        invocation
-            .path
-            .segments
-            .last()
-            .filter(|segment| Self::FORMATTING.iter().any(|name| segment.ident == name))
-            .map_or(Text::Plain, |_| Text::Formatted)
+        invocation.path.segments.last().map_or(Text::Plain, |segment| Self::named(&segment.ident))
     }
 
     fn interpolated(self, literal: Literal) -> Vec<Name> {
@@ -141,6 +118,25 @@ impl Step {
     }
 }
 
+struct Nested(Text, Group);
+
+impl Parse for Nested {
+    fn parse(input: ParseStream) -> syn::Result<Nested> {
+        let attempt = input.fork();
+        let name: Ident = attempt.parse()?;
+        attempt.parse::<Token![!]>()?;
+        let group: Group = attempt.parse()?;
+        input.advance_to(&attempt);
+        Ok(Nested(Text::named(&name), group))
+    }
+}
+
+impl From<Nested> for Step {
+    fn from(nested: Nested) -> Step {
+        Step::Nested(nested.0, nested.1)
+    }
+}
+
 impl Parse for Step {
     fn parse(input: ParseStream) -> syn::Result<Step> {
         input
@@ -148,6 +144,7 @@ impl Parse for Step {
             .map(|_| Step::Skip)
             .or_else(|_| Self::taking::<MethodCall>(input))
             .or_else(|_| Self::taking::<PathCall>(input))
+            .or_else(|_| input.parse::<Nested>().map(Step::from))
             .or_else(|_| input.parse::<TokenTree>().map(Step::from))
     }
 }
@@ -167,6 +164,7 @@ impl Step {
         match self {
             Step::Call(method) => vec![method],
             Step::Group(group) => TokenCalls::within(group.stream(), text),
+            Step::Nested(own, group) => TokenCalls::within(group.stream(), own),
             Step::Text(literal) => text.interpolated(literal),
             Step::Skip => Vec::new(),
         }
@@ -184,7 +182,7 @@ impl Interpolated {
             .parse::<Placeholders>()
             .into_iter()
             .flat_map(Placeholders::streams)
-            .flat_map(|stream| TokenCalls::within(stream, Text::Formatted))
+            .flat_map(|stream| TokenCalls::within(stream, Text::Plain))
             .collect()
     }
 }
