@@ -1,4 +1,5 @@
-use body_lifts::{Body, Branching};
+use body_lifts::Body;
+use branching::Branching;
 use lint_core::Site;
 use lint_layout::Name;
 

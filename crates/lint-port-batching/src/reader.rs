@@ -13,10 +13,11 @@ use syn::{
     ImplItemFn, ItemFn, ItemImpl, ItemMod, ItemTrait, Macro, Signature, TraitItemFn,
 };
 
-use lint_core::{Macros, SourceFile, Violation, Walk};
+use lint_core::{SourceFile, Violation, Walk};
 use lint_layout::{LineNumber, Name};
 use lint_paths::{Module, Nested};
 use lint_placement::CrateName;
+use macro_facts::Macros;
 
 use crate::holders::Holders;
 use crate::judge::Judge;

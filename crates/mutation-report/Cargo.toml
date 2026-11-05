@@ -13,7 +13,8 @@ doctest = false
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
-text-lines = { path = "../text-lines" }
+one-line = { path = "../one-line" }
+lossy-text = { path = "../lossy-text" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

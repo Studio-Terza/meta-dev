@@ -3,7 +3,8 @@ mod type_scope;
 
 use syn::{Block, FnArg, ImplItem, ItemImpl, ItemTrait, ReturnType, Signature, Type};
 
-use body_lifts::{BodyReading, Branches, Propagation};
+use body_lifts::BodyReading;
+use branching::{Branches, Propagation};
 use lint_core::Site;
 use lint_layout::{Name, Whole, Word};
 

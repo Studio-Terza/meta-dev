@@ -5,7 +5,7 @@ use syn::parse::Parse;
 use syn::visit::{self, Visit};
 use syn::{Block, ImplItemFn, ItemFn, Macro, Signature, TraitItemFn};
 
-use lint_core::Macros;
+use macro_facts::Macros;
 
 use crate::function_flow::FunctionFlow;
 

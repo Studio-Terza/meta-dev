@@ -6,7 +6,6 @@ use syn::{ExprConst, ImplItemConst, ItemConst, ItemImpl, ItemMod, LitFloat, LitI
 
 use lint_core::Fix;
 use lint_core::Gate;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Report;
@@ -16,6 +15,7 @@ use lint_core::SupportModules;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::{LineNumber, Word, words};
+use macro_facts::Macros;
 
 #[derive(Debug)]
 pub struct NamedNumbers;

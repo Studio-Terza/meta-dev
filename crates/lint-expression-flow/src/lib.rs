@@ -18,7 +18,6 @@ use syn::{
 };
 
 use lint_core::Fix;
-use lint_core::Macros;
 use lint_core::Message;
 use lint_core::Problem;
 use lint_core::Report;
@@ -28,6 +27,7 @@ use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
+use macro_facts::Macros;
 
 #[derive(Debug)]
 pub struct ExpressionFlow;

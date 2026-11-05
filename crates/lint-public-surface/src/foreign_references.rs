@@ -7,10 +7,10 @@ use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
 use lint_core::BinaryFiles;
-use lint_core::Macros;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
+use macro_facts::Macros;
 
 use crate_reach::CrateReach;
 

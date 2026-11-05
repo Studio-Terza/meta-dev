@@ -17,6 +17,8 @@ newtype = { path = "../newtype" }
 mutation-report = { path = "../mutation-report" }
 reach = { path = "../reach" }
 text-lines = { path = "../text-lines" }
+one-line = { path = "../one-line" }
+lossy-text = { path = "../lossy-text" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -1,7 +1,8 @@
 use syn::visit::Visit;
 use syn::{Ident, ItemEnum, ItemMod, ItemStruct, ItemUnion, Macro};
 
-use lint_core::{Macros, SourceFile};
+use lint_core::SourceFile;
+use macro_facts::Macros;
 
 use super::{Declaration, Kind};
 

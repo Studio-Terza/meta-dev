@@ -3,8 +3,8 @@ use std::io;
 use std::path::PathBuf;
 
 use file_ports::{FileFailure, Text};
+use one_line::OneLine;
 use serde::Deserialize;
-use text_lines::OneLine;
 
 use super::recorded_mutant::RecordedMutant;
 use crate::cli::report::failure::Failure;
