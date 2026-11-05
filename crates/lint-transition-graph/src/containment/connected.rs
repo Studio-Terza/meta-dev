@@ -7,6 +7,7 @@ use super::cluster::{Cluster, Level, Part};
 use super::groups::Groups;
 use super::member::Member;
 use super::{ClusterLint, Containment, Split, Toward};
+use crate::Covered;
 
 #[derive(Debug)]
 pub struct ConnectedClusters;
@@ -17,8 +18,12 @@ impl ClusterLint for ConnectedClusters {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.splits::<Divided<'_, '_>>(&[Level::Crate])
+        view.splits::<Divided<'_, '_>>(Level::Crate)
     }
+}
+
+impl Covered for ConnectedClusters {
+    type Coverage = ConnectedDirectories;
 }
 
 #[derive(Debug)]
@@ -30,7 +35,7 @@ impl ClusterLint for ConnectedDirectories {
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.splits::<Divided<'_, '_>>(&[Level::Module])
+        view.splits::<Divided<'_, '_>>(Level::Module)
     }
 }
 

@@ -1,0 +1,12 @@
+test budget, report only:
+corpus: 0 tests in 2 files, 0 of 6 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+a struct with no logic of its own that one other file consumes is a parameter bag:
+src/shelf.rs:1: Book only carries values into one other file; give it the logic that consumes it
+src/shelf.rs:2: Price only carries values into one other file; give it the logic that consumes it
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/lib.rs:3: crate corpus falls into 2 groups: [Book Reader] [Price Seller] with no link between them; split it along the groups, or link them through a type they share
+each module has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, when one names the other in its fields, variants, bounds or method signatures (parameters, returns and errors), or when one implements a trait for the other, and the linked exports form one group:
+src/shelf.rs:1: the exports of corpus::shelf fall into 2 groups: [Book] [Price] that no outside user joins; split it along the groups, one part for each kind of user
+fails

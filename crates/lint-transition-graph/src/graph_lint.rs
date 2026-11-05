@@ -13,6 +13,10 @@ pub trait GraphLint {
     }
 }
 
+pub trait Covered {
+    type Coverage;
+}
+
 #[derive(Debug)]
 pub struct Clustered<Check>(PhantomData<Check>);
 

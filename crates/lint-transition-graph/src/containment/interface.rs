@@ -8,6 +8,7 @@ use super::groups::Groups;
 use super::link::Link;
 use super::member::Member;
 use super::{ClusterLint, Containment, Split, Toward};
+use crate::Covered;
 
 #[derive(Debug)]
 struct Interface<'view, 'found> {
@@ -50,10 +51,27 @@ pub struct InterfaceByConsumers;
 
 impl ClusterLint for InterfaceByConsumers {
     const HEADLINE: Headline = Headline::new(
-        "report only, each crate and module has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, and the linked exports form one group",
+        "each module has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, when one names the other in its fields, variants, bounds or method signatures (parameters, returns and errors), or when one implements a trait for the other, and the linked exports form one group",
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
-        view.splits::<Interface<'_, '_>>(&[Level::Crate, Level::Module])
+        view.splits::<Interface<'_, '_>>(Level::Module)
+    }
+}
+
+impl Covered for InterfaceByConsumers {
+    type Coverage = CrateInterfaces;
+}
+
+#[derive(Debug)]
+pub struct CrateInterfaces;
+
+impl ClusterLint for CrateInterfaces {
+    const HEADLINE: Headline = Headline::new(
+        "report only, each crate has one interface by its users: its exports are the types and traits used from outside it, two exports are linked when one outside type or trait uses both, when one names the other in its fields, variants, bounds or method signatures (parameters, returns and errors), or when one implements a trait for the other, and the linked exports form one group",
+    );
+
+    fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
+        view.splits::<Interface<'_, '_>>(Level::Crate)
     }
 }

@@ -30,11 +30,9 @@ use crate_transitions::CrateTransitions;
 use edge::Edge;
 
 pub use algebra_laws::AlgebraLaws;
-pub use containment::{
-    AcyclicQuotients, Answer, Ask, ConnectedClusters, ConnectedDirectories, InterfaceByConsumers, Listed, LowestCluster,
-};
-pub use duplicates::{DuplicateTransitions, OneEdge};
-pub use graph_lint::{Clustered, GraphLint};
+pub use containment::{AcyclicQuotients, Answer, Ask, ConnectedClusters, InterfaceByConsumers, Listed, LowestCluster};
+pub use duplicates::OneEdge;
+pub use graph_lint::{Clustered, Covered, GraphLint};
 pub use homomorphism::Homomorphisms;
 pub use mutation::CoreMutation;
 pub use parallel::ParallelStructures;

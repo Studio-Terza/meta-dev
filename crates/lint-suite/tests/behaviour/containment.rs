@@ -2,7 +2,7 @@ use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_transition_graph::{
-    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, ConnectedDirectories, Extraction, GraphLint,
+    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, Covered, Extraction, GraphLint,
     InterfaceByConsumers, LowestCluster, TypeSystem,
 };
 use text_lines::Lines;
@@ -62,7 +62,7 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&SPLIT, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+        Clustered::lines(&SPLIT, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
             .violations()
             .to_vec()),
         [
@@ -145,7 +145,11 @@ const USED: [Source; 2] = [
 #[test]
 fn exports_that_no_outside_user_joins_are_reported() {
     assert_eq!(
-        Clustered::lines(&USED, |view| ClusterReport::<InterfaceByConsumers>::report_graph(view).violations().to_vec()),
+        Clustered::lines(&USED, |view| ClusterReport::<<InterfaceByConsumers as Covered>::Coverage>::report_graph(
+            view
+        )
+        .violations()
+        .to_vec()),
         [
             "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P R] [Q] that no outside user joins; split it along the groups, one part for each kind of user"
         ]
@@ -352,7 +356,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&pathed, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
+        Clustered::lines(&pathed, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
             .violations()
             .to_vec()),
         [

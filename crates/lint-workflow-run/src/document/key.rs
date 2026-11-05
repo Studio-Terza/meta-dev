@@ -1,6 +1,6 @@
 use newtype::Newtype;
 
-use crate::document::text::Text;
+use crate::excerpt::Text;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Key {

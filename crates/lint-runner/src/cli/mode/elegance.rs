@@ -4,8 +4,8 @@ use lint_effect_sites::EffectSites;
 use lint_linear_flow::FlowShapes;
 use lint_repeated_shapes::NormalisedShapes;
 use lint_transition_graph::{
-    AlgebraLaws, Clustered, ConnectedDirectories, CoreMutation, DuplicateTransitions, Extraction, GraphLint,
-    Homomorphisms, InterfaceByConsumers, ParallelStructures, RepeatedRoutes, TransitionGraph, TypeSystem,
+    AlgebraLaws, Clustered, ConnectedClusters, CoreMutation, Covered, Extraction, GraphLint, Homomorphisms,
+    InterfaceByConsumers, OneEdge, ParallelStructures, RepeatedRoutes, TransitionGraph, TypeSystem,
 };
 
 #[derive(Debug)]
@@ -19,14 +19,14 @@ impl Elegance {
         vec![
             Complexity::report(files),
             TransitionGraph::report_graph(&system),
-            DuplicateTransitions::report_graph(&system),
+            <<OneEdge as Covered>::Coverage>::report_graph(&system),
             CoreMutation::report_graph(&system),
             AlgebraLaws::report_graph(&system),
             Homomorphisms::report_graph(&system),
             RepeatedRoutes::report_graph(&system),
             ParallelStructures::report_graph(&system),
-            <Clustered<ConnectedDirectories>>::report_graph(&system),
-            <Clustered<InterfaceByConsumers>>::report_graph(&system),
+            <Clustered<<ConnectedClusters as Covered>::Coverage>>::report_graph(&system),
+            <Clustered<<InterfaceByConsumers as Covered>::Coverage>>::report_graph(&system),
             EffectSites::report(files),
             FlowShapes::report(files),
             NormalisedShapes::report(files),

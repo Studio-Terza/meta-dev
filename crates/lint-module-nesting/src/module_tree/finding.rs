@@ -1,31 +1,24 @@
 use std::fmt;
 
 use super::module_path::Target;
-use super::reexport_count::ReexportCount;
-use lint_core::Bound;
 use lint_core::Fix;
 
-pub enum Finding<'path> {
-    ReachesPastModRs { target: &'path Target<'path> },
-    CrowdedReexports { count: ReexportCount, most: Bound },
-}
+pub struct ReachesPastModRs<'path>(&'path Target<'path>);
 
-impl fmt::Display for Finding<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Finding::ReachesPastModRs { target } => write!(formatter, "reaches into {target}"),
-            Finding::CrowdedReexports { count, most } => {
-                write!(formatter, "re-exports {count} items, at most {most} allowed")
-            }
-        }
+impl<'path> From<&'path Target<'path>> for ReachesPastModRs<'path> {
+    fn from(target: &'path Target<'path>) -> ReachesPastModRs<'path> {
+        ReachesPastModRs(target)
     }
 }
 
-impl lint_core::Finding for Finding<'_> {
+impl fmt::Display for ReachesPastModRs<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "reaches into {}", self.0)
+    }
+}
+
+impl lint_core::Finding for ReachesPastModRs<'_> {
     fn fix(&self) -> Fix {
-        match self {
-            Finding::ReachesPastModRs { .. } => Fix::new("import the parent's re-export instead"),
-            Finding::CrowdedReexports { .. } => Fix::new("split the module"),
-        }
+        Fix::new("import the parent's re-export instead")
     }
 }

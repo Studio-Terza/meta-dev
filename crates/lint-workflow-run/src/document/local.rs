@@ -1,7 +1,7 @@
 use crate::actions::Actions;
 use crate::document::node::Node;
-use crate::document::text::Text;
 use crate::excerpt::Excerpt;
+use crate::excerpt::Text;
 use crate::finding::Finding;
 
 #[derive(Debug)]
