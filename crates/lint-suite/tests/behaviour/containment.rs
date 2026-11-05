@@ -692,3 +692,16 @@ fn a_type_named_in_the_body_of_an_impl_for_a_reference_is_linked_to_the_type_beh
     ];
     assert_eq!(Clustered::connected(&bodies), Vec::<String>::new());
 }
+
+#[test]
+fn a_free_function_that_names_a_type_in_its_body_is_a_user_of_it() {
+    let used = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\npub struct Helper;\n"),
+        Clustered::at("crates/x/src/a.rs", "pub struct User(crate::Helper);\n"),
+        Clustered::at("crates/x/src/b.rs", "pub fn run() {\n    crate::Helper::new();\n}\n"),
+    ];
+    assert_eq!(
+        Clustered::lines(&used, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
+        Vec::<String>::new()
+    );
+}

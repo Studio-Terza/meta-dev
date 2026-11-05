@@ -50,7 +50,9 @@ impl<'place, 'found> Reach<'place, 'found> {
         'found: 'declared,
     {
         let declared = |name: &Name| self.target(name, &[], None).and_then(|target| target.declared(declaring(name)));
-        declared(owner.as_ref()).or_else(|| owner.argument().and_then(declared))
+        declared(owner.as_ref())
+            .or_else(|| owner.argument().and_then(declared))
+            .or_else(|| self.place.function(owner.as_ref()))
     }
 
     fn pathed(&self, path: &[Name]) -> Option<Target<'found>> {

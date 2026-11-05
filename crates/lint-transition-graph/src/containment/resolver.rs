@@ -1,3 +1,4 @@
+mod functions;
 mod place;
 mod reach;
 mod stand_ins;
@@ -16,6 +17,7 @@ use type_facts::{Dependency, Implementation};
 
 use super::link::Link;
 use super::member::Member;
+pub(crate) use functions::Functions;
 use place::Place;
 use reach::Reach;
 pub(crate) use stand_ins::StandIns;
@@ -32,6 +34,7 @@ pub(crate) struct Resolver<'found> {
 impl<'found> Resolver<'found> {
     pub(crate) fn of_members(
         members: impl Iterator<Item = Member<'found>>,
+        functions: &Functions<'found>,
         files: &[&'found SourceFile],
         stand_ins: StandIns<'found>,
     ) -> Resolver<'found> {
@@ -46,6 +49,7 @@ impl<'found> Resolver<'found> {
                 placement.package().crate_name(),
                 placement.module().segments(),
                 Scope::of_file(file.syntax()),
+                functions.in_file(file.path()),
             );
             (file.path(), place)
         });
