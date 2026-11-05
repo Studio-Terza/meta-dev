@@ -1,84 +1,60 @@
-mod callees;
-mod constants;
 mod evaluation;
 mod extent;
 mod iterations;
-mod leaves;
 mod locals;
-mod tautology;
+mod lowering;
+mod quantifiers;
 
-use newtype::Counter;
-use syn::{Expr, ExprLit, Lit, Macro};
+use syn::Expr;
 
-use lint_core::{Macros, Syntax};
+use lint_core::Syntax;
 
 use super::scope::{Place, Scope};
-use crate::check::{Check, Domain, Relation, Values};
-use callees::Callees;
-pub(crate) use constants::Constants;
+use crate::claim::{Accepted, Claim};
 pub(crate) use evaluation::Evaluation;
 pub(crate) use extent::Extent;
 pub(crate) use iterations::Iterations;
-pub(crate) use leaves::Leaves;
 pub(crate) use locals::Locals;
-use tautology::Tautology;
+pub(crate) use lowering::{Lowering, Operations};
+pub(crate) use quantifiers::Quantifiers;
 
 #[derive(Debug)]
 pub(crate) struct Trace<'body, 'file> {
     scope: &'body Scope<'file>,
     locals: &'body Locals<'file>,
     place: &'body Place,
+    quantifiers: &'body Quantifiers,
 }
 
 impl<'body, 'file> Trace<'body, 'file> {
-    const SIDES_LENGTH: usize = 2;
-
     pub(crate) fn new(
         scope: &'body Scope<'file>,
         locals: &'body Locals<'file>,
         place: &'body Place,
+        quantifiers: &'body Quantifiers,
     ) -> Trace<'body, 'file> {
-        Trace { scope, locals, place }
+        Trace { scope, locals, place, quantifiers }
     }
 
-    pub(crate) fn compared(&self, relation: Relation, sides: &[&Expr], domain: Domain) -> Vec<Check> {
-        let relation = self.vacuous(sides).unwrap_or(relation);
-        let unbooleaned: Vec<&Expr> = sides.iter().copied().filter(|side| Self::boolean(side).is_none()).collect();
-        let measured = Self::distinct(&unbooleaned);
-        let values = Values::total(measured.iter().map(|side| Leaves::counted(self, side)));
-        vec![Check::new(relation, values, domain, Callees::within(self, sides))]
+    pub(crate) fn stated(&self, subject: &Expr, accepted: Accepted) -> Vec<Claim> {
+        Claim::stated(self.quantifiers.binders(), Lowering::term_of(self, subject), accepted)
     }
 
-    fn vacuous(&self, sides: &[&Expr]) -> Option<Relation> {
-        Tautology::among(self, sides).or_else(|| sides.iter().copied().find_map(Self::boolean).map(|_| Relation::Holds))
+    pub(crate) fn scope(&self) -> &'body Scope<'file> {
+        self.scope
     }
 
-    pub(crate) fn operands(&self, relation: Relation, invocation: &Macro, domain: Domain) -> Vec<Check> {
-        let arguments = Macros::arguments(invocation);
-        let sides: Vec<&Expr> = arguments.iter().take(Self::SIDES_LENGTH).collect();
-        self.compared(relation, &sides, domain)
+    pub(crate) fn place(&self) -> &'body Place {
+        self.place
     }
 
-    pub(crate) fn distinct<'side, Item: PartialEq>(sides: &[&'side Item]) -> Vec<&'side Item> {
-        sides
-            .iter()
-            .copied()
-            .enumerate()
-            .filter(|(index, side)| sides.iter().position(|other| other == side) == Some(*index))
-            .map(|(_, side)| side)
-            .collect()
+    pub(crate) fn quantifiers(&self) -> &'body Quantifiers {
+        self.quantifiers
     }
 
-    pub(crate) fn bound(&self, expression: &Expr, constants: Constants) -> Option<&'file Expr> {
-        Locals::named(expression).and_then(|name| self.locals.bound(&name)).or_else(|| {
-            Syntax::expr_path(expression).and_then(|path| constants.looked_up(self.scope, &path.path, self.place))
-        })
-    }
-
-    fn boolean(side: &Expr) -> Option<&Expr> {
-        match side {
-            Expr::Lit(ExprLit { lit: Lit::Bool(_), .. }) => Some(side),
-            _ => None,
-        }
+    pub(crate) fn bound(&self, expression: &Expr) -> Option<&'file Expr> {
+        Locals::named(expression)
+            .and_then(|name| self.locals.bound(&name))
+            .or_else(|| Syntax::expr_path(expression).and_then(|path| self.scope.constant(&path.path, self.place)))
     }
 }
