@@ -772,3 +772,21 @@ fn the_main_of_a_binary_is_a_user_that_places_a_type() {
         ["users of Args:", "  x::cli::Args at crates/x/src/cli.rs:1", "    go", "    main"]
     );
 }
+
+#[test]
+fn a_binary_target_whose_types_fall_apart_is_reported_under_its_own_name() {
+    let split = "struct P;\nstruct Q;\nfn main() {\n    let _p = P;\n    let _q = Q;\n}\n";
+    let binaries = [
+        Clustered::at("crates/x/src/main.rs", split),
+        Clustered::at("crates/x/src/bin/a.rs", split),
+        Clustered::at("crates/x/src/bin/tool/main.rs", split),
+    ];
+    assert_eq!(
+        Clustered::connected(&binaries),
+        [
+            "crates/x/src/bin/a.rs:1: crate x binary a falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/bin/tool/main.rs:1: crate x binary tool falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+            "crates/x/src/main.rs:1: crate x binary x falls into 2 groups: [P] [Q] with no link between them; split it along the groups, or link them through a type they share",
+        ]
+    );
+}
