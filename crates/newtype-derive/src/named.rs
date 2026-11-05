@@ -51,8 +51,9 @@ impl Named {
         let repeated = self
             .names
             .iter()
-            .find(|name| self.names.iter().filter(|other| other.text() == name.text()).nth(1).is_some())
-            .map(|name| Error::new(name.span(), Self::REPEATED));
+            .enumerate()
+            .find(|(index, name)| self.names.iter().take(*index).any(|earlier| earlier.text() == name.text()))
+            .map(|(_, name)| Error::new(name.span(), Self::REPEATED));
         empty.or(repeated).map_or(Ok(self), Err)
     }
 
