@@ -59,6 +59,6 @@ impl Step for Matrix {
         let markdown = self.written(ports.files())?.read(ports.files())?;
         write!(out, "{markdown}")?;
         self.summary.append(ports.files(), &markdown)?;
-        Ok(Exit::Success)
+        Ok(Exit::Succeeded)
     }
 }

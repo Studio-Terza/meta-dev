@@ -29,7 +29,7 @@ impl<'title> Issue<'title> {
 
     pub(super) fn filed(filings: &[Invocation], ports: &impl Ports) -> Result<Exit, Failure<'static>> {
         let runs = Failure::started(ports.runs(filings), filings)?;
-        Ok(runs.iter().map(Run::exit).find(|exit| *exit != Exit::Success).unwrap_or(Exit::Success))
+        Ok(runs.iter().map(Run::exit).find(|exit| *exit != Exit::Succeeded).unwrap_or(Exit::Succeeded))
     }
 
     pub(super) fn filing(

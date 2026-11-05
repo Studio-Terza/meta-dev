@@ -9,7 +9,6 @@ mod scope;
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
-use std::num::NonZeroU8;
 use std::path::Path;
 
 use super::super::Step;
@@ -64,6 +63,6 @@ impl Step for Labels {
         let judged: Vec<Owed> = scope.judged(ports, &checks, pull_request.refactor(), &changes)?;
         let faults: Vec<&Owed> = judged.iter().filter_map(Owed::outstanding).collect();
         faults.iter().try_for_each(|owed| owed.complained(out))?;
-        Ok(faults.first().map_or(Exit::Success, |_| Exit::Failure(NonZeroU8::MIN)))
+        Ok(faults.first().map_or(Exit::Succeeded, |_| Exit::FAILURE))
     }
 }
