@@ -1,10 +1,14 @@
+mod token_calls;
+
 use std::collections::BTreeSet;
 
 use syn::visit::{self, Visit};
-use syn::{ExprMethodCall, ExprPath, ItemMod, TraitBound};
+use syn::{ExprMethodCall, ExprPath, ItemMod, Macro, TraitBound};
 
 use lint_core::{SourceFile, Walk};
 use lint_layout::Name;
+
+use token_calls::TokenCalls;
 
 #[derive(Debug, Default)]
 pub(crate) struct Consumers {
@@ -38,6 +42,11 @@ impl<'ast> Visit<'ast> for Consumers {
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
         self.called.insert(Name::from(&call.method));
         visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        self.called.extend(TokenCalls::called_in(invocation));
+        visit::visit_macro(self, invocation);
     }
 
     fn visit_expr_path(&mut self, path: &'ast ExprPath) {
