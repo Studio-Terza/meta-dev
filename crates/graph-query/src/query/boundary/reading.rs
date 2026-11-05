@@ -5,7 +5,7 @@ use lint_layout::Name;
 use lint_transition_graph::Ask;
 
 use crate::boundary::QueryFailure;
-use crate::query::Query;
+use crate::query::{Query, Top};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Item {
@@ -55,6 +55,14 @@ impl TryFrom<&[OsString]> for Query {
 
 impl Expecting {
     const FLAG_MARK: char = '-';
+
+    fn signed(word: &str) -> Option<QueryFailure> {
+        Some(word)
+            .filter(|word| word.chars().next().is_some_and(|first| first == Self::FLAG_MARK))
+            .filter(|word| word.chars().nth(1).is_some())
+            .filter(|word| word.chars().skip(1).all(|digit| digit.is_ascii_digit()))
+            .map(|word| QueryFailure::Top(word.to_owned()))
+    }
 
     fn flag(word: &str) -> Option<Expecting> {
         Flag::ALL.into_iter().find(|flag| flag.spelling == word).map(|flag| flag.expecting)
@@ -112,16 +120,11 @@ impl From<&str> for Spelling {
     fn from(word: &str) -> Spelling {
         match Expecting::flag(word) {
             Some(expecting) => Spelling::Flag(expecting),
-            None => word.parse::<i64>().map_or_else(|_| Self::unflagged(word.chars().next()), |_| Spelling::Term),
-        }
-    }
-}
-
-impl Spelling {
-    fn unflagged(first: Option<char>) -> Spelling {
-        match first.filter(|first| *first == Expecting::FLAG_MARK) {
-            Some(_) => Spelling::Unknown,
-            None => Spelling::Term,
+            None => word
+                .chars()
+                .next()
+                .filter(|first| *first == Expecting::FLAG_MARK)
+                .map_or(Spelling::Term, |_| Spelling::Unknown),
         }
     }
 }
@@ -133,6 +136,10 @@ impl Spelling {
             Spelling::Unknown => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(word),
         }
+    }
+
+    fn top(word: &str) -> Result<Top, QueryFailure> {
+        Expecting::signed(word).map_or_else(|| Spelling::unflagged_word(word).and_then(str::parse), Err)
     }
 
     fn refusal(word: &str) -> QueryFailure {
@@ -169,10 +176,9 @@ impl Reading {
                 query: self.query.with_role(Spelling::unflagged_word(word)?.parse()?),
                 expecting: Expecting::Word,
             }),
-            Expecting::Top => Ok(Reading {
-                query: self.query.with_top(Spelling::unflagged_word(word)?.parse()?),
-                expecting: Expecting::Word,
-            }),
+            Expecting::Top => {
+                Ok(Reading { query: self.query.with_top(Spelling::top(word)?), expecting: Expecting::Word })
+            }
             Expecting::Item(item) => {
                 Ok(Reading { query: self.query.with_ask(item.ask(Spelling::name(word)?)), expecting: Expecting::Word })
             }

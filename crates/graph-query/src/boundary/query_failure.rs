@@ -16,6 +16,19 @@ pub enum QueryFailure {
 }
 
 impl QueryFailure {
+    fn escaped(character: char) -> String {
+        Some(character).filter(|found| *found != '\'').map_or_else(|| "'\\''".to_owned(), String::from)
+    }
+
+    fn quoted(value: &str) -> String {
+        let plain = |character: char| matches!(character, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '.' | '/' | ':' | ',' | '@' | '+' | '%');
+        let single_quoted = || format!("'{}'", value.chars().map(Self::escaped).collect::<String>());
+        Some(value)
+            .filter(|value| value.chars().next().is_some())
+            .filter(|value| value.chars().all(plain))
+            .map_or_else(single_quoted, str::to_owned)
+    }
+
     fn listed(arity: Option<Arity>) -> String {
         let spellings: Vec<&str> = Flag::ALL
             .iter()
@@ -44,7 +57,8 @@ impl fmt::Display for QueryFailure {
             }
             QueryFailure::Joined { flag, value } => write!(
                 formatter,
-                "`{flag}={value}` is not a flag: write the value as the next argument: {flag} {value}"
+                "`{flag}={value}` is not a flag: write the value as the next argument: {flag} {}",
+                Self::quoted(value)
             ),
             QueryFailure::Unreadable => formatter.write_str("an argument is not valid UTF-8"),
             QueryFailure::Unfinished => write!(

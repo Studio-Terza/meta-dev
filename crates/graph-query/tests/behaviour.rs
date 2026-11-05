@@ -170,7 +170,27 @@ fn malformed_arguments_are_refused_with_the_reason() {
     );
     assert_eq!(
         Asked::query(&["--path=A B"]).map_err(|failure| failure.to_string()),
-        Err("`--path=A B` is not a flag: write the value as the next argument: --path A B".to_owned())
+        Err("`--path=A B` is not a flag: write the value as the next argument: --path 'A B'".to_owned())
+    );
+    assert_eq!(
+        Asked::query(&["--role=fn f(&self) -> Self"]).map_err(|failure| failure.to_string()),
+        Err("`--role=fn f(&self) -> Self` is not a flag: write the value as the next argument: --role 'fn f(&self) -> Self'".to_owned())
+    );
+    assert_eq!(
+        Asked::query(&["--role=it's"]).map_err(|failure| failure.to_string()),
+        Err("`--role=it's` is not a flag: write the value as the next argument: --role 'it'\\''s'".to_owned())
+    );
+    assert_eq!(
+        Asked::query(&["--top="]).map_err(|failure| failure.to_string()),
+        Err("`--top=` is not a flag: write the value as the next argument: --top ''".to_owned())
+    );
+    assert_eq!(Asked::query(&["-1"]), Err(QueryFailure::Flag("-1".to_owned())));
+    assert_eq!(Asked::query(&["Ledger", "-3"]), Err(QueryFailure::Flag("-3".to_owned())));
+    assert_eq!(Asked::query(&["--in", "-1", "Ledger"]), Err(QueryFailure::Flag("-1".to_owned())));
+    assert_eq!(Asked::query(&["--path", "-2", "B"]), Err(QueryFailure::Flag("-2".to_owned())));
+    assert_eq!(
+        Asked::query(&["Ledger", "--top", "-99999999999999999999"]),
+        Err(QueryFailure::Top("-99999999999999999999".to_owned()))
     );
     assert_eq!(Asked::query(&["--bogus=3"]), Err(QueryFailure::Flag("--bogus=3".to_owned())));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
