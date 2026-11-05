@@ -661,3 +661,26 @@ An enum with no variants:
 #[derive(newtype::Named, newtype::VariantArray, Clone, Copy)]
 enum Lamp {}
 ```
+
+A type that only lists its variants, with no `FromStr` that refuses with an `Unnamed`, cannot make an `Unnamed`:
+
+```compile_fail
+use std::fmt;
+
+#[derive(Clone, Copy)]
+struct Hand;
+
+impl fmt::Display for Hand {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("hand")
+    }
+}
+
+impl newtype::VariantArray for Hand {
+    const VARIANTS: &'static [Hand] = &[Hand];
+}
+
+fn refuse() -> newtype::Unnamed<Hand> {
+    newtype::Unnamed::new("foot")
+}
+```

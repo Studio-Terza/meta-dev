@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
+use std::str::FromStr;
 
 use strum::VariantArray;
 
@@ -29,11 +30,25 @@ impl<Of> PartialEq for Unnamed<Of> {
 
 impl<Of> Eq for Unnamed<Of> {}
 
-pub trait Listed: VariantArray + fmt::Display {}
+mod sealed {
+    use super::{FromStr, Unnamed, VariantArray, fmt};
+
+    pub trait Sealed {}
+
+    impl<Of: VariantArray + fmt::Display + FromStr<Err = Unnamed<Of>>> Sealed for Of {}
+}
+
+pub trait Listed: sealed::Sealed + VariantArray + fmt::Display {}
+
+impl<Of: sealed::Sealed + VariantArray + fmt::Display> Listed for Of {}
 
 impl<Of: Listed> Unnamed<Of> {
     #[must_use]
     pub fn new(text: &str) -> Unnamed<Of> {
+        assert!(
+            Of::VARIANTS.iter().all(|variant| variant.to_string() != text),
+            "`{text}` names a variant, so it cannot be an Unnamed"
+        );
         Unnamed { text: text.to_owned(), of: PhantomData }
     }
 }

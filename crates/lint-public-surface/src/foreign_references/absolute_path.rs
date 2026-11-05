@@ -2,6 +2,8 @@ use std::iter::successors;
 
 use proc_macro2::{Ident, Punct, TokenStream, TokenTree};
 
+use syn::PathSegment;
+
 use lint_core::Syntax;
 
 pub struct AbsolutePath {
@@ -65,6 +67,6 @@ impl<'trees> Cursor<'trees> {
     fn segment_before(&self) -> Option<&Ident> {
         self.before
             .and_then(Syntax::token_ident)
-            .filter(|ident| syn::parse2::<Ident>(std::iter::once(TokenTree::from((*ident).clone())).collect()).is_ok())
+            .filter(|ident| syn::parse2::<PathSegment>(TokenTree::from((*ident).clone()).into()).is_ok())
     }
 }

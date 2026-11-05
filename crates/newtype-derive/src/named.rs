@@ -126,8 +126,6 @@ impl Named {
                 }
             }
 
-            impl ::newtype::Listed for #ident {}
-
             impl ::core::str::FromStr for #ident {
                 type Err = ::newtype::Unnamed<#ident>;
 

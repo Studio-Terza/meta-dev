@@ -7,5 +7,10 @@ pub use extent::{Extent, Filled, Measured};
 pub use newtype_derive::Named;
 pub use newtype_derive::{Arbitrary, Display, Newtype};
 
+pub use newtype_derive::VariantArray;
 pub use proptest;
-pub use strum::VariantArray;
+pub use strum_trait::*;
+
+mod strum_trait {
+    pub use strum::VariantArray;
+}

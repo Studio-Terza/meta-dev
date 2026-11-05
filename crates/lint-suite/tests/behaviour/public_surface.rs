@@ -58,7 +58,16 @@ const PLAIN_PATH_DERIVE: Source = Source::new(
     Text::new("fn expand() -> TokenStream {\n    quote! {\n        impl b::a::Unused for #ident {}\n    }\n}\n"),
 );
 
-const CASES: [Case; 22] = [
+const CRATE_MACRO: Source = Source::new(
+    Located::new("crates/b/src/lib.rs"),
+    Text::new("use a::Used;\nmacro_rules! m {\n    () => { crate::a::Unused };\n}\n"),
+);
+const SELF_MACRO: Source = Source::new(
+    Located::new("crates/b/src/lib.rs"),
+    Text::new("use a::Used;\nfn f() {\n    println!(\"{:?}\", self::a::Unused);\n}\n"),
+);
+
+const CASES: [Case; 24] = [
     Case::new(Title::new("no dependent"), &[LONELY], Flagged::new(&[])),
     Case::new(Title::new("used by itself"), &[EXPORTER, USER, SELF_USER], Flagged::new(&["crates/a/src/lib.rs:2"])),
     Case::new(Title::new("named by its binary"), &[EXPORTER, USER, BINARY], Flagged::new(&[])),
@@ -119,6 +128,16 @@ const CASES: [Case; 22] = [
     Case::new(
         Title::new("a derive's path through another crate names nothing of this one"),
         &[EXPORTER, USER, PLAIN_PATH_DERIVE],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a crate:: path through a module named like a crate"),
+        &[EXPORTER, CRATE_MACRO],
+        Flagged::new(&["crates/a/src/lib.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a self:: path through a module named like a crate"),
+        &[EXPORTER, SELF_MACRO],
         Flagged::new(&["crates/a/src/lib.rs:2"]),
     ),
 ];
