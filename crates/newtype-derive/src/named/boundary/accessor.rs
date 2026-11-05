@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use reserved_names::Reserved;
+use reserved_names::{Key, Reserved};
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
 use syn::{Attribute, Error, Ident, Lit, Token, Type};
@@ -110,8 +110,8 @@ impl Accessor {
     }
 
     fn refusal(&self, earlier: &[Accessor]) -> Option<Error> {
-        Reserved::owner(&self.key)
-            .map(|_| Reserved::message())
+        Reserved::refusal(Key::from(self.key.as_str()))
+            .map(|refusal| refusal.to_string())
             .or_else(|| earlier.iter().any(|accessor| accessor.key == self.key).then(|| Self::REPEATED.to_owned()))
             .map(|message| Error::new_spanned(&self.name, message))
     }

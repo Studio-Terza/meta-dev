@@ -1,3 +1,3 @@
-mod boundary;
+mod table;
 
-pub use boundary::Reserved;
+pub use table::{Key, Reserved};

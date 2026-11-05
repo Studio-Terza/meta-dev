@@ -150,8 +150,7 @@ enum Lamp {
 ```
 
 An accessor takes no name that a method of `Clone`, `PartialEq`, `PartialOrd`, `Ord`, `Hash`, `Debug`, `Display`,
-`ToString`, `FromStr`, `From`, `Into`, `TryFrom`, `TryInto`, `Borrow`, `BorrowMut`, `AsRef`, `ToOwned`, `Any` or
-`Default` has, nor `name`, because the inherent const method would shadow that trait method on the enum. Each name
+`ToString`, `FromStr`, `From`, `Into`, `TryFrom`, `TryInto`, `Borrow`, `BorrowMut`, `AsRef`, `ToOwned`, `Any`, `Default` or `VariantArray` has, nor `name`, because the inherent const method would shadow that trait method on the enum. Each name
 is refused:
 
 ```compile_fail
@@ -390,6 +389,16 @@ enum Lamp {
 enum Lamp {
     #[name("on")]
     #[accessor_value(try_from = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(VARIANTS: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[accessor_value(VARIANTS = "x")]
     On,
 }
 ```
