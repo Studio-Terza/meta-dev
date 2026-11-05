@@ -19,6 +19,7 @@ lint-item-graph = { path = "../lint-item-graph" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }
 newtype = { path = "../newtype" }
+test-facts = { path = "../test-facts" }
 transition-facts = { path = "../transition-facts" }
 type-facts = { path = "../type-facts" }
 proc-macro2.workspace = true

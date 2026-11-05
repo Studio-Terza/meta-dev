@@ -1,0 +1,19 @@
+[package]
+name = "lint-test-strength"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+lint-core = { path = "../lint-core" }
+lint-transition-graph = { path = "../lint-transition-graph" }
+newtype = { path = "../newtype" }
+test-facts = { path = "../test-facts" }
+
+[lints]
+workspace = true

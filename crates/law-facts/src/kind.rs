@@ -1,3 +1,5 @@
+use std::fmt;
+
 use syn::Macro;
 
 use lint_layout::Name;
@@ -32,7 +34,7 @@ impl Property {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
     Roundtrip,
     Law,
@@ -44,6 +46,8 @@ pub enum Kind {
 impl Kind {
     const ROUNDTRIP: &'static str = "roundtrip";
     const PROPTEST: &'static str = "proptest";
+    const LAW: &'static str = "declared";
+    const OTHER: &'static str = "undeclared";
 
     #[must_use]
     pub fn of_macro(invocation: &Macro) -> Kind {
@@ -67,6 +71,24 @@ impl Kind {
         match self {
             Kind::Property(property) => Some(property),
             Kind::Roundtrip | Kind::Law | Kind::Proptest | Kind::Other => None,
+        }
+    }
+}
+
+impl fmt::Display for Property {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Self::NAMED.iter().find(|(_, property)| property == self).map_or(Ok(()), |(word, _)| formatter.write_str(word))
+    }
+}
+
+impl fmt::Display for Kind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Kind::Roundtrip => formatter.write_str(Self::ROUNDTRIP),
+            Kind::Law => formatter.write_str(Self::LAW),
+            Kind::Proptest => formatter.write_str(Self::PROPTEST),
+            Kind::Property(property) => property.fmt(formatter),
+            Kind::Other => formatter.write_str(Self::OTHER),
         }
     }
 }

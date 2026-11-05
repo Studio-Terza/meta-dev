@@ -1,7 +1,9 @@
 mod elegance;
 mod lints;
+mod revisions;
 
 use std::ffi::OsString;
+use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
@@ -18,34 +20,43 @@ use super::boundary::Helpers;
 use super::{Outcome, Sources};
 use elegance::Elegance;
 use lints::Lints;
+use revisions::{Revisions, Usage};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     Gate,
     Report,
     Query(Result<Query, QueryFailure>),
+    Strength(Result<Revisions, Usage>),
 }
 
 impl Mode {
     const REPORT_FLAG: &'static str = "--report";
     const QUERY_WORD: &'static str = "query";
+    const STRENGTH_WORD: &'static str = "strength";
 
     pub(crate) fn of_arguments(arguments: &[OsString]) -> Mode {
-        arguments.split_first().filter(|(first, _)| first.as_os_str() == Self::QUERY_WORD).map_or_else(
-            || {
-                arguments
-                    .iter()
-                    .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
-                    .map_or(Mode::Gate, |_| Mode::Report)
-            },
-            |(_, rest)| Mode::Query(Query::try_from(rest)),
-        )
+        let queried = arguments
+            .split_first()
+            .filter(|(first, _)| first.as_os_str() == Self::QUERY_WORD)
+            .map(|(_, rest)| Mode::Query(Query::try_from(rest)));
+        let compared = arguments
+            .split_first()
+            .filter(|(first, _)| first.as_os_str() == Self::STRENGTH_WORD)
+            .map(|(_, rest)| Mode::Strength(Revisions::try_from(rest)));
+        queried.or(compared).unwrap_or_else(|| {
+            arguments
+                .iter()
+                .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
+                .map_or(Mode::Gate, |_| Mode::Report)
+        })
     }
 
     pub(crate) fn roots(&self, arguments: &[OsString]) -> Vec<PathBuf> {
         match self {
             Mode::Query(Ok(query)) => query.roots().to_vec(),
-            Mode::Query(Err(_)) => Vec::new(),
+            Mode::Query(Err(_)) | Mode::Strength(Err(_)) => Vec::new(),
+            Mode::Strength(Ok(revisions)) => revisions.roots(),
             Mode::Gate | Mode::Report => arguments
                 .iter()
                 .filter(|argument| argument.as_os_str() != Self::REPORT_FLAG)
@@ -54,10 +65,11 @@ impl Mode {
         }
     }
 
-    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
+    pub(crate) fn refusal(&self) -> Option<&dyn fmt::Display> {
         match self {
             Mode::Query(Err(failure)) => Some(failure),
-            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) => None,
+            Mode::Strength(Err(usage)) => Some(usage),
+            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) | Mode::Strength(Ok(_)) => None,
         }
     }
 
@@ -68,7 +80,7 @@ impl Mode {
     ) -> Helpers<'scope> {
         match self {
             Mode::Gate => Lints::started(scope, sources),
-            Mode::Report | Mode::Query(_) => Vec::new(),
+            Mode::Report | Mode::Query(_) | Mode::Strength(_) => Vec::new(),
         }
     }
 
@@ -76,12 +88,15 @@ impl Mode {
         &self,
         readout: &'file Readout,
         helpers: Helpers<'_>,
+        files: &impl Files,
         out: &mut impl Write,
     ) -> Outcome<'file> {
         match self {
             Mode::Gate => Self::gated(readout, helpers, out),
             Mode::Report => Self::reported(readout.files(), out),
             Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
+            Mode::Strength(Ok(revisions)) => revisions.outcome(readout, files),
+            Mode::Strength(Err(_)) => Outcome::Clean,
         }
     }
 

@@ -32,6 +32,8 @@ const DEEP_NESTING: usize = 5_000;
 const SHALLOW_NESTING: usize = 100;
 const MIDDLING_NESTING: usize = 200;
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
+const STRONG_TEST: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n";
+const WEAK_TEST: &str = "#[test]\nfn adds() {\n    assert!(f(1) > 0);\n}\n";
 
 #[test]
 fn every_lint_reports_over_the_same_files() -> Result<(), Box<dyn Error>> {
@@ -170,6 +172,56 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_strength_command_refuses_a_single_root() {
+    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["strength"]);
+    assert_eq!((run.exit, run.out.as_str()), (ExitCode::FAILURE, ""));
+    assert!(run.err.contains("exactly two"), "{}", run.err);
+}
+
+#[test]
+fn the_strength_command_refuses_a_third_root() {
+    let run = Trees::flagged(&Memory::default(), Path::new("/scratch"), &["strength", "/a", "/b"]);
+    assert_eq!((run.exit, run.out.as_str()), (ExitCode::FAILURE, ""));
+    assert!(run.err.contains("exactly two"), "{}", run.err);
+}
+
+#[test]
+fn the_strength_command_fails_on_a_test_that_lost_a_check() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::temporary()?;
+    scratch.write("before/Cargo.toml", MANIFEST)?;
+    scratch.write("before/src/lib.rs", STRONG_TEST)?;
+    scratch.write("after/Cargo.toml", MANIFEST)?;
+    scratch.write("after/src/lib.rs", WEAK_TEST)?;
+    let run = scratch.compared("before", "after");
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("/scratch/before/src/lib.rs:2: test adds () of r lost a check"), "{}", run.err);
+    Ok(())
+}
+
+#[test]
+fn the_strength_command_passes_a_change_that_keeps_every_check() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::temporary()?;
+    scratch.write("before/Cargo.toml", MANIFEST)?;
+    scratch.write("before/src/lib.rs", WEAK_TEST)?;
+    scratch.write("after/Cargo.toml", MANIFEST)?;
+    scratch.write("after/src/lib.rs", STRONG_TEST)?;
+    let run = scratch.compared("before", "after");
+    assert_eq!((run.exit, run.out.as_str(), run.err.as_str()), (ExitCode::SUCCESS, "", ""));
+    Ok(())
+}
+
+#[test]
+fn the_strength_command_fails_when_the_before_root_cannot_be_read() -> Result<(), Box<dyn Error>> {
+    let scratch = Scratch::temporary()?;
+    scratch.write("after/Cargo.toml", MANIFEST)?;
+    scratch.write("after/src/lib.rs", STRONG_TEST)?;
+    let run = scratch.compared("missing", "after");
+    assert_eq!(run.exit, ExitCode::FAILURE);
+    assert!(run.err.contains("missing"), "{}", run.err);
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
@@ -272,6 +324,11 @@ impl Scratch {
 
     fn flagged(&self, flags: &[&str]) -> Printed {
         Trees::flagged(&self.files, &self.root, flags)
+    }
+
+    fn compared(&self, before: &str, after: &str) -> Printed {
+        let before = self.at(before);
+        Trees::flagged(&self.files, &self.at(after), &["strength", before.to_str().unwrap_or_default()])
     }
 
     fn crate_graph_lines(&self) -> Result<Lines, Box<dyn Error>> {

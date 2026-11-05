@@ -197,7 +197,7 @@ goes in an `examples/` target that the gate runs, never behind `#[ignore]`. `no_
 uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
-per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
+per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `test-facts` (the checks of every test: relation, pinned values and domain), `lint-test-strength` (the `lint strength` comparison), `lint-runner` (the runner
 library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
@@ -245,6 +245,35 @@ the exports and the path steps shown, as it does the other lists.
     implementers of Priced:
       shop::Priced at crates/shop/src/lib.rs:2
         Line at crates/shop/src/till.rs:2
+
+## Strength
+
+A change never weakens a test. Compare two trees, before and after:
+
+    lint strength <before-root> <after-root>
+
+Each test is read as a set of checks, each a relation (an equality above a pattern above a bare condition, an inequality
+above a bare condition, a law only by its own kind), the values it pins and the domain it ranges over (generated above
+enumerated by shipped code above listed rows). A domain is measured, not named: its cases, its distinct rows (a table
+row replaced by a duplicate loses a distinct row), the values in its rows, and the value ranges it spans (a range loop
+or a proptest strategy such as `0..9u8`, `any::<u8>()` or `x: u8` must keep every value it covered, and the bounds are
+evaluated through constants, locals and integer arithmetic). Every check before the change must be matched, one to one,
+by a check at least as strong after it, in the same test or, for a renamed, moved or split test, in a test the change
+added to the same package. Pinned values are counted only on the compared sides, the first two arguments of `assert_eq!`
+and `assert_ne!` and the condition of `assert!`, never in a message, and a side repeated verbatim counts once. A
+tautology (the same value on both sides, once locals and constants are followed, or `true == true`) counts as a bare
+condition only. A check also names the functions its compared sides call, resolved by path through the file (a method by its name), and every one before must still be called after, so pointing a check at another function is a weakening. A check that can never run is not counted: after a `return`, `break`, `continue` or `panic!`, in a
+branch whose condition evaluates to false, or in a loop over no cases. A loop widens the domain only over its own
+iterable (a list, a range, a constant, an associated const, or those through `iter`, `into_iter`, `copied`, `cloned`,
+`enumerate` or `rev`), and a constant pins values only when it is itself the compared side. Tests in `proptest!` blocks
+are read as generated laws over their strategies. An assertion moved into a helper defined in the same file is followed
+by the path the call resolves to through the file's modules and imports (`expect(..)`, `self::`, `super::`, `crate::`,
+`Self::expect(..)`, `Type::expect(..)`, `use` and `use ...::*`), never by its bare name, so a helper of the same name in
+another module earns no credit. A renamed test and `assert!(a == b)` written for `assert_eq!(a, b)` are not flagged; a
+lost row, a narrowed range, a hand-written list in place of `T::ALL`, or an equality turned into a bare condition is.
+Method calls and helpers in another file are not followed, so an assertion moved into another file's helper is flagged.
+A deliberate narrowing passes only when the PR cites an owner-approved spec detail that names the test as `<package>::<test>`. The command exits 1 when a
+check was lost and prints each one; it refuses, also with exit 1, any arguments other than exactly two roots.
 
 ## Rust only
 
