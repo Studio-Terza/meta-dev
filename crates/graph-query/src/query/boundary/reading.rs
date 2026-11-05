@@ -116,12 +116,16 @@ impl Spelling {
 }
 
 impl Spelling {
-    fn name(word: &str) -> Result<Name, QueryFailure> {
+    fn unflagged_word(word: &str) -> Result<&str, QueryFailure> {
         match Spelling::from(word) {
             Spelling::Flag(_) => Err(QueryFailure::Unfinished),
             Spelling::Unknown => Err(QueryFailure::Flag(word.to_owned())),
-            Spelling::Term => Ok(Name::from(word)),
+            Spelling::Term => Ok(word),
         }
+    }
+
+    fn name(word: &str) -> Result<Name, QueryFailure> {
+        Spelling::unflagged_word(word).map(Name::from)
     }
 }
 
@@ -142,11 +146,18 @@ impl Reading {
     fn next(self, word: &str) -> Result<Reading, QueryFailure> {
         match self.expecting {
             Expecting::Word => self.flagged(Spelling::from(word), word),
-            Expecting::Root => {
-                Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
-            }
-            Expecting::Role => Ok(Reading { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
-            Expecting::Top => Ok(Reading { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
+            Expecting::Root => Ok(Reading {
+                query: self.query.with_root(PathBuf::from(Spelling::unflagged_word(word)?)),
+                expecting: Expecting::Word,
+            }),
+            Expecting::Role => Ok(Reading {
+                query: self.query.with_role(Spelling::unflagged_word(word)?.parse()?),
+                expecting: Expecting::Word,
+            }),
+            Expecting::Top => Ok(Reading {
+                query: self.query.with_top(Spelling::unflagged_word(word)?.parse()?),
+                expecting: Expecting::Word,
+            }),
             Expecting::Item(item) => {
                 Ok(Reading { query: self.query.with_ask(item.ask(Spelling::name(word)?)), expecting: Expecting::Word })
             }
