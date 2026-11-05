@@ -30,6 +30,10 @@ impl Route {
         Route { names: self.names.iter().chain(names).cloned().collect() }
     }
 
+    fn spelled(&self) -> Name {
+        Name::from(self.names.iter().map(Name::to_string).collect::<Vec<String>>().join("::").as_str())
+    }
+
     fn parent(&self) -> Option<Route> {
         self.names.split_last().map(|(_, rest)| Route { names: rest.to_vec() })
     }
@@ -219,6 +223,12 @@ impl<'file> Scope<'file> {
             .flatten()
             .filter_map(|helper| helper.matching(arguments))
             .collect()
+    }
+
+    pub(crate) fn called(&self, path: &Path, place: &Place) -> Name {
+        let written = Route { names: path.segments.iter().map(|segment| Name::from(&segment.ident)).collect() };
+        let defined = self.resolved(path, place).into_iter().find(|route| self.helpers.contains_key(route));
+        defined.unwrap_or(written).spelled()
     }
 
     fn resolved(&self, path: &Path, place: &Place) -> Vec<Route> {

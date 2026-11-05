@@ -1,3 +1,4 @@
+mod callees;
 mod constants;
 mod evaluation;
 mod extent;
@@ -13,6 +14,7 @@ use lint_core::{Macros, Syntax};
 
 use super::scope::{Place, Scope};
 use crate::check::{Check, Domain, Relation, Values};
+use callees::Callees;
 pub(crate) use constants::Constants;
 pub(crate) use evaluation::Evaluation;
 pub(crate) use extent::Extent;
@@ -44,7 +46,7 @@ impl<'body, 'file> Trace<'body, 'file> {
         let unbooleaned: Vec<&Expr> = sides.iter().copied().filter(|side| Self::boolean(side).is_none()).collect();
         let measured = Self::distinct(&unbooleaned);
         let values = Values::total(measured.iter().map(|side| Leaves::counted(self, side)));
-        vec![Check::new(relation, values, domain)]
+        vec![Check::new(relation, values, domain, Callees::within(self, sides))]
     }
 
     fn vacuous(&self, sides: &[&Expr]) -> Option<Relation> {

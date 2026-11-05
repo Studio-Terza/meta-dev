@@ -51,7 +51,7 @@ impl fmt::Display for Weakened<'_, '_, '_> {
 impl Finding for Weakened<'_, '_, '_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "restore the check, or keep one at least as strong (the same or a stronger relation, as many pinned values, as many cases); a deliberate narrowing is declared in the PR body with the line `weakens: <package>::<test>`",
+            "restore the check, or keep one at least as strong (the same or a stronger relation, as many pinned values, as many cases); a deliberate narrowing passes only when the PR cites an owner-approved spec detail that names the test as <package>::<test>",
         )
     }
 }

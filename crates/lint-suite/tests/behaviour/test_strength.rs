@@ -98,6 +98,14 @@ const PROPTESTED: &str =
 const PROPTEST_EMPTIED: &str =
     "proptest! {\n    #[test]\n    fn holds(x in 0..9u8) {\n        let _ = f(x);\n    }\n}\n";
 
+const MACRO_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(vec![f(1)], [2]);\n}\n";
+const MACRO_OTHER_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(vec![g(1)], [2]);\n}\n";
+const OTHER_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(g(1), 2);\n}\n";
+const BOTH_CALLS: &str = "#[test]\nfn adds() {\n    assert_eq!(g(f(1)), 2);\n}\n";
+const METHOD_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(a.run(1), 2);\n}\n";
+const OTHER_METHOD: &str = "#[test]\nfn adds() {\n    assert_eq!(a.walk(1), 2);\n}\n";
+const TABLE_OTHER_FUNCTION: &str = "laws::table!(adds, g, [1 => 2, 2 => 3]);\n";
+const QUALIFIED_CALL: &str = "#[test]\nfn adds() {\n    assert_eq!(other::f(1), 2);\n}\n";
 const RANGE_WIDE: &str = "#[test]\nfn spans() {\n    for i in 0..10u8 {\n        assert_eq!(f(i), i + 1);\n    }\n}\n";
 const RANGE_NARROW: &str = "#[test]\nfn spans() {\n    for i in 0..5u8 {\n        assert_eq!(f(i), i + 1);\n    }\n}\n";
 const RANGE_SHIFTED: &str =
@@ -214,7 +222,7 @@ const ENUMERATED_UPPER_OWNER: &str =
     "#[test]\nfn adds() {\n    for input in MARK::ALL {\n        assert_eq!(f(input), input + 1);\n    }\n}\n";
 const TWO_TABLES: &str = "laws::table!(adds, f, [1 => 2, 2 => 3]);\nlaws::table!(subs, g, [3 => 2, 4 => 3]);\n";
 const TWO_TABLES_FIRST_SHORT: &str = "laws::table!(adds, f, [1 => 2]);\nlaws::table!(subs, g, [3 => 2, 4 => 3]);\n";
-const LAW_WITH_BLOCK: &str = "laws::law!(holds, any::<u8>(), {\n    assert_eq!(f(1), 2);\n});\n";
+const LAW_WITH_BLOCK: &str = "laws::law!(holds, any::<u8>(), f, {\n    assert_eq!(f(1), 2);\n});\n";
 const LAW_WITHOUT_BLOCK: &str = "laws::law!(holds, any::<u8>(), f);\n";
 const WRAPPED: &str = "#[test]\nfn adds() {\n    fixture!(assert_eq!(f(1), 2));\n}\n";
 const PATTERNED: &str = "#[test]\nfn shapes() {\n    assert!(matches!(f(1), Some(_)));\n}\n";
@@ -310,6 +318,15 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [INLINE, ASSOCIATED] => false,
     [PROPTESTED, PROPTESTED] => false,
     [PROPTESTED, PROPTEST_EMPTIED] => true,
+    [MACRO_CALL, MACRO_OTHER_CALL] => true,
+    [EQUALS, OTHER_CALL] => true,
+    [OTHER_CALL, EQUALS] => true,
+    [EQUALS, BOTH_CALLS] => false,
+    [BOTH_CALLS, EQUALS] => true,
+    [METHOD_CALL, OTHER_METHOD] => true,
+    [METHOD_CALL, METHOD_CALL] => false,
+    [TWO_ROWS, TABLE_OTHER_FUNCTION] => true,
+    [EQUALS, QUALIFIED_CALL] => true,
     [RANGE_WIDE, RANGE_NARROW] => true,
     [RANGE_WIDE, RANGE_SHIFTED] => true,
     [RANGE_WIDE, RANGE_CLOSED] => false,
@@ -502,6 +519,9 @@ fn an_assertion_moved_into_a_helper_in_another_file_is_flagged() {
 }
 
 #[test]
-fn the_fix_names_the_declaration_that_exempts_a_narrowing() {
-    assert!(Weakened::reported([EQUALS, EMPTY]).contains("`weakens: <package>::<test>`"));
+fn the_fix_names_the_spec_detail_that_exempts_a_narrowing() {
+    assert!(
+        Weakened::reported([EQUALS, EMPTY])
+            .contains("owner-approved spec detail that names the test as <package>::<test>")
+    );
 }
