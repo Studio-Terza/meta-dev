@@ -45,6 +45,6 @@ impl Step for Show {
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
-        Self::shown(ports.files(), &self.journals, out).map(|()| Exit::Success)
+        Self::shown(ports.files(), &self.journals, out).map(|()| Exit::Succeeded)
     }
 }

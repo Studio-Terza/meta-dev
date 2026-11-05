@@ -5,7 +5,7 @@ use lint_layout::Name;
 use lint_transition_graph::Ask;
 
 use crate::boundary::QueryFailure;
-use crate::query::Query;
+use crate::query::{Query, Top};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Item {
@@ -56,6 +56,14 @@ impl TryFrom<&[OsString]> for Query {
 impl Expecting {
     const FLAG_MARK: char = '-';
 
+    fn signed(word: &str) -> Option<QueryFailure> {
+        Some(word)
+            .filter(|word| word.chars().next().is_some_and(|first| first == Self::FLAG_MARK))
+            .filter(|word| word.chars().nth(1).is_some())
+            .filter(|word| word.chars().skip(1).all(|digit| digit.is_ascii_digit()))
+            .map(|word| QueryFailure::Top(word.to_owned()))
+    }
+
     fn flag(word: &str) -> Option<Expecting> {
         Flag::ALL.into_iter().find(|flag| flag.spelling == word).map(|flag| flag.expecting)
     }
@@ -88,6 +96,17 @@ impl Flag {
         Flag { spelling: "--path", arity: Arity::Two, expecting: Expecting::From },
     ];
 
+    const JOIN: char = '=';
+
+    fn joined(&self, word: &str) -> Option<QueryFailure> {
+        let length = self.spelling.chars().count();
+        Some(word)
+            .filter(|word| word.chars().take(length).eq(self.spelling.chars()))
+            .map(|word| word.chars().skip(length))
+            .filter(|rest| rest.clone().next() == Some(Self::JOIN))
+            .map(|_| QueryFailure::Joined(self.spelling.to_owned()))
+    }
+
     pub(crate) fn spelling(&self) -> &'static str {
         self.spelling
     }
@@ -101,16 +120,11 @@ impl From<&str> for Spelling {
     fn from(word: &str) -> Spelling {
         match Expecting::flag(word) {
             Some(expecting) => Spelling::Flag(expecting),
-            None => Self::unflagged(word.chars().next()),
-        }
-    }
-}
-
-impl Spelling {
-    fn unflagged(first: Option<char>) -> Spelling {
-        match first.filter(|first| *first == Expecting::FLAG_MARK) {
-            Some(_) => Spelling::Unknown,
-            None => Spelling::Term,
+            None => word
+                .chars()
+                .next()
+                .filter(|first| *first == Expecting::FLAG_MARK)
+                .map_or(Spelling::Term, |_| Spelling::Unknown),
         }
     }
 }
@@ -119,9 +133,17 @@ impl Spelling {
     fn unflagged_word(word: &str) -> Result<&str, QueryFailure> {
         match Spelling::from(word) {
             Spelling::Flag(_) => Err(QueryFailure::Unfinished),
-            Spelling::Unknown => Err(QueryFailure::Flag(word.to_owned())),
+            Spelling::Unknown => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(word),
         }
+    }
+
+    fn top(word: &str) -> Result<Top, QueryFailure> {
+        Expecting::signed(word).map_or_else(|| Spelling::unflagged_word(word).and_then(str::parse), Err)
+    }
+
+    fn refusal(word: &str) -> QueryFailure {
+        Flag::ALL.iter().find_map(|flag| flag.joined(word)).unwrap_or_else(|| QueryFailure::Flag(word.to_owned()))
     }
 
     fn name(word: &str) -> Result<Name, QueryFailure> {
@@ -154,10 +176,9 @@ impl Reading {
                 query: self.query.with_role(Spelling::unflagged_word(word)?.parse()?),
                 expecting: Expecting::Word,
             }),
-            Expecting::Top => Ok(Reading {
-                query: self.query.with_top(Spelling::unflagged_word(word)?.parse()?),
-                expecting: Expecting::Word,
-            }),
+            Expecting::Top => {
+                Ok(Reading { query: self.query.with_top(Spelling::top(word)?), expecting: Expecting::Word })
+            }
             Expecting::Item(item) => {
                 Ok(Reading { query: self.query.with_ask(item.ask(Spelling::name(word)?)), expecting: Expecting::Word })
             }
@@ -172,7 +193,7 @@ impl Reading {
     fn flagged(self, spelling: Spelling, word: &str) -> Result<Reading, QueryFailure> {
         match spelling {
             Spelling::Flag(expecting) => Ok(Reading { query: self.query, expecting }),
-            Spelling::Unknown => Err(QueryFailure::Flag(word.to_owned())),
+            Spelling::Unknown => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
     }

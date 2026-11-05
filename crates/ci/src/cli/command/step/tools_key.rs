@@ -44,6 +44,6 @@ impl Step for ToolsKey {
             ports.files(),
             format_args!("{}<<{}\n{listed}{}\n", Self::SOURCES, Self::DELIMITER, Self::DELIMITER),
         )?;
-        Ok(Exit::Success)
+        Ok(Exit::Succeeded)
     }
 }

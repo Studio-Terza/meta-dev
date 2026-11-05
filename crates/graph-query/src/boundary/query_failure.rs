@@ -9,6 +9,7 @@ pub enum QueryFailure {
     Role { text: String, reason: String },
     Top(String),
     Flag(String),
+    Joined(String),
     Unreadable,
     Unfinished,
     Empty,
@@ -40,6 +41,9 @@ impl fmt::Display for QueryFailure {
             QueryFailure::Top(text) => write!(formatter, "--top takes a whole number, not `{text}`"),
             QueryFailure::Flag(text) => {
                 write!(formatter, "`{text}` is not a flag: the flags are {}", Self::listed(None))
+            }
+            QueryFailure::Joined(flag) => {
+                write!(formatter, "`{flag}=value` is not a flag: write the flag and its value as separate arguments")
             }
             QueryFailure::Unreadable => formatter.write_str("an argument is not valid UTF-8"),
             QueryFailure::Unfinished => write!(

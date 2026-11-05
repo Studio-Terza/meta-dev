@@ -24,7 +24,8 @@ impl EffectPaths {
         &words!["golden", "Disk"],
         &words!["golden", "Process"],
     ];
-    const VALUES: [&[Word<'static>]; 1] = [&words!["std", "process", "ExitCode"]];
+    const VALUES: [&[Word<'static>]; 2] =
+        [&words!["std", "process", "ExitCode"], &words!["std", "process", "ExitStatus"]];
 
     pub fn effect<'used>(used: &'used Use<'_>) -> Option<&'used UsePath> {
         Self::EFFECTS

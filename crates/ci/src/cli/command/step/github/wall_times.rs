@@ -63,6 +63,6 @@ impl Step for WallTimes {
         let table = ports.output(&invocation).map_err(Failure::starting(&invocation))?;
         writeln!(out, "{self}")?;
         write!(out, "{table}")?;
-        Ok(Exit::Success)
+        Ok(Exit::Succeeded)
     }
 }
