@@ -1,6 +1,6 @@
 use lint_layout::{Name, Word};
-use lint_placement::CrateName;
 
+use super::super::super::unit::Unit;
 use super::super::place::Place;
 use super::super::target::Target;
 
@@ -10,7 +10,7 @@ pub(super) enum Head<'found> {
     Itself,
     Parent,
     Local,
-    Krate(&'found CrateName),
+    Krate(Unit<'found>),
     External,
     Own,
     Unknown,
@@ -27,7 +27,7 @@ impl<'found> Head<'found> {
             Head::Itself => path.split_first().map(|(_, rest)| place.within(place.module(), rest)),
             Head::Parent => Some(Self::parented(place, path)),
             Head::Local => Some(place.within(place.module(), path)),
-            Head::Krate(krate) => path.split_first().map(|(_, rest)| Target::new(krate, Some(rest.to_vec()), None)),
+            Head::Krate(unit) => path.split_first().map(|(_, rest)| Target::new(unit, Some(rest.to_vec()), None)),
             Head::Own => Some(place.target(None)),
             Head::External | Head::Unknown => None,
         }

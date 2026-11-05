@@ -739,14 +739,36 @@ fn a_free_function_that_names_a_type_in_its_body_is_a_user_of_it() {
 }
 
 #[test]
-fn the_main_of_a_binary_is_not_a_user_that_places_a_type() {
+fn a_binary_target_is_a_crate_of_its_own_beside_the_library() {
+    let one_binary = [
+        Clustered::at("crates/app/src/lib.rs", "pub struct Engine;\n"),
+        Clustered::at(
+            "crates/app/src/main.rs",
+            "struct Args;\nfn main() {\n    let _a = Args;\n    let _e = app::Engine;\n}\n",
+        ),
+    ];
+    assert_eq!(Clustered::connected(&one_binary), Vec::<String>::new());
+    let two_binaries = [
+        Clustered::at("crates/corpus/src/main.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+        Clustered::at("crates/corpus/src/bin/tool.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+        Clustered::at("crates/corpus/src/bin/other.rs", "struct Extra;\nfn main() {\n    let _x = Extra;\n}\n"),
+    ];
+    assert_eq!(Clustered::connected(&two_binaries), Vec::<String>::new());
+}
+
+#[test]
+fn the_main_of_a_binary_is_a_user_that_places_a_type() {
     let entry = [
-        Clustered::at("crates/x/src/lib.rs", "pub struct Cli;\n"),
-        Clustered::at("crates/y/src/main.rs", "fn main() {\n    x::Cli::new();\n}\n"),
+        Clustered::at("crates/x/src/main.rs", "mod cli;\nmod run;\nfn main() {\n    run::go(cli::Args::new());\n}\n"),
+        Clustered::at("crates/x/src/cli.rs", "pub struct Args;\n"),
+        Clustered::at("crates/x/src/run.rs", "use crate::cli::Args;\npub fn go(a: Args) {\n    let _b: Args = a;\n}\n"),
     ];
     assert_eq!(
         Clustered::lines(&entry, |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec()),
         Vec::<String>::new()
     );
-    assert_eq!(Clustered::users(&entry, &["Cli"]), ["users of Cli:", "  x::Cli at crates/x/src/lib.rs:1", "    none"]);
+    assert_eq!(
+        Clustered::users(&entry, &["Args"]),
+        ["users of Args:", "  x::cli::Args at crates/x/src/cli.rs:1", "    go", "    main"]
+    );
 }

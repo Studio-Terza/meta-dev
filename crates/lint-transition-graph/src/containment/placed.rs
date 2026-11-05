@@ -12,7 +12,7 @@ pub struct LowestCluster;
 
 impl ClusterLint for LowestCluster {
     const HEADLINE: Headline = Headline::new(
-        "each type and trait sits in the lowest module of its crate that holds all its users: the users are the types, traits and free functions of its crate that hold it in a field, variant or bound, implement it, name it in a method signature or use it in a body, the functions of a binary root are not users, and the lowest module is the deepest one whose subtree holds them all; a type with users in other crates is placed by its crate",
+        "each type and trait sits in the lowest module of its crate that holds all its users: the users are the types, traits and free functions of its crate that hold it in a field, variant or bound, implement it, name it in a method signature or use it in a body, and the lowest module is the deepest one whose subtree holds them all; a type with users in other crates, or in a binary target of its own crate, is placed by its crate",
     );
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>> {
@@ -35,7 +35,7 @@ impl<'found> Misplaced<'found> {
     fn found(view: &Containment<'found, '_>, member: Member<'found>) -> Option<Misplaced<'found>> {
         let lowest = view
             .users_within(member)
-            .filter(|lowest| lowest.krate().is_some_and(|krate| member.cluster().krate() == Some(krate)))?;
+            .filter(|lowest| lowest.unit().is_some_and(|unit| member.cluster().unit() == Some(unit)))?;
         let outside = lowest.holding(member.cluster()).map_or(Some(lowest), |_| None)?;
         Some(Misplaced { member, lowest: outside })
     }
