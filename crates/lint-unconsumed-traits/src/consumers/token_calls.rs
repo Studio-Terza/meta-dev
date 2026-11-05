@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::iter;
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, TokenStream, TokenTree};
@@ -5,8 +7,9 @@ use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::{AngleBracketedGenericArguments, ExprPath, LitStr, Macro, Path, Token};
 
-use lint_core::Placeholders;
 use lint_layout::Name;
+
+use boundary::Placeholders;
 
 #[derive(Debug)]
 pub(crate) struct TokenCalls(Vec<Name>);

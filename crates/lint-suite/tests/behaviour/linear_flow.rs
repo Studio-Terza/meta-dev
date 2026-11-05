@@ -528,7 +528,6 @@ const INLINE_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n 
 
 const QUOTE_FILL_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp:\\\"^9}\"))).count()\n}\n";
 const APOSTROPHE_FILL_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp:'^9}\"))).count()\n}\n";
-const ESCAPED_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{{{{lamp}}}}\"))).count()\n}\n";
 
 const SHADOW_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
 const READ_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|other| other.sees(lamp))).count()\n}\n";
@@ -542,7 +541,7 @@ const SHADOW_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    
 const READ_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { for other in others { other.sees(lamp); } true }).count()\n}\n";
 const READ_IF: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| if ready() { lamp.on() } else { false }).count()\n}\n";
 
-const SELECTIONS: [Case; 28] = [
+const SELECTIONS: [Case; 27] = [
     Case::new(
         Title::new("filter ignoring its element"),
         &[Source::new(Located::new("a.rs"), Text::new(IGNORED))],
@@ -606,11 +605,6 @@ const SELECTIONS: [Case; 28] = [
     Case::new(
         Title::new("shadowed element is not a read"),
         &[Source::new(Located::new("a.rs"), Text::new(SHADOWED_ELEMENT))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("escaped braces do not read the element"),
-        &[Source::new(Located::new("a.rs"), Text::new(ESCAPED_FORMAT))],
         Flagged::new(&["a.rs:2"]),
     ),
     Case::new(

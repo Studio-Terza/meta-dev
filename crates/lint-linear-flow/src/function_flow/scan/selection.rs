@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
+use std::convert::Infallible;
 use std::mem;
+use std::str::FromStr;
 
 use proc_macro2::{Literal, TokenStream, TokenTree};
 use syn::parse::Parse;
@@ -9,7 +11,6 @@ use syn::{
     PatIdent, Stmt,
 };
 
-use lint_core::Placeholders;
 use lint_layout::Name;
 
 use crate::finding::Finding;
@@ -40,6 +41,38 @@ impl<'ast> Visit<'ast> for Bindings {
 }
 
 #[derive(Debug)]
+struct Placeholders(Vec<Name>);
+
+#[derive(Debug)]
+struct Leading(Name);
+
+impl FromStr for Leading {
+    type Err = Infallible;
+
+    fn from_str(piece: &str) -> Result<Leading, Infallible> {
+        let word: String = piece
+            .chars()
+            .map_while(|ch| Some(ch).filter(|ch| ch.is_alphanumeric()).or(Some(ch).filter(|ch| *ch == '_')))
+            .collect();
+        Ok(Leading(Name::from(word.as_str())))
+    }
+}
+
+impl FromStr for Placeholders {
+    type Err = Infallible;
+
+    fn from_str(text: &str) -> Result<Placeholders, Infallible> {
+        Ok(Placeholders(
+            text.match_indices('{')
+                .filter_map(|(at, _)| text.get(at + 1..))
+                .filter_map(|piece| piece.parse::<Leading>().ok())
+                .map(|leading| leading.0)
+                .collect(),
+        ))
+    }
+}
+
+#[derive(Debug)]
 struct Mentions(Vec<Name>);
 
 impl Mentions {
@@ -56,11 +89,8 @@ impl Mentions {
         syn::parse2::<LitStr>(TokenStream::from(TokenTree::Literal(literal)))
             .ok()
             .and_then(|text| text.value().parse::<Placeholders>().ok())
-            .map(Placeholders::streams)
+            .map(|placeholders| placeholders.0)
             .unwrap_or_default()
-            .into_iter()
-            .flat_map(|stream| Mentions::from(stream).0)
-            .collect()
     }
 }
 

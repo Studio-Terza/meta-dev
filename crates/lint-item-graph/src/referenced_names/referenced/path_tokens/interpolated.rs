@@ -1,4 +1,3 @@
-use lint_core::Placeholders;
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use syn::{Lit, LitStr};
 
@@ -6,6 +5,10 @@ use syn::{Lit, LitStr};
 pub struct Interpolated;
 
 impl Interpolated {
+    const PAIR: usize = 2;
+    const OPENING: &str = "{";
+    const CLOSING: &str = "}";
+
     pub fn of_macro(group: &Group) -> TokenTree {
         let tokens = group.stream().into_iter().map(Self::read).collect();
         TokenTree::Group(Group::new(group.delimiter(), tokens))
@@ -27,11 +30,16 @@ impl Interpolated {
     }
 
     fn braced(found: &LitStr) -> TokenTree {
-        let holes = found
-            .value()
-            .parse::<Placeholders>()
-            .into_iter()
-            .flat_map(Placeholders::streams)
+        let text = found.value();
+        let openings: Vec<usize> = text.match_indices(Self::OPENING).map(|(at, _)| at).collect();
+        let holes = openings
+            .chunk_by(|first, second| *second == *first + Self::OPENING.len())
+            .filter(|run| run.len() % Self::PAIR == 1)
+            .filter_map(|run| run.last())
+            .map(|open| open + Self::OPENING.len())
+            .filter_map(|start| text.get(start..).map(|rest| (rest, rest.match_indices(Self::CLOSING).next())))
+            .filter_map(|(rest, close)| close.and_then(|(end, _)| rest.get(..end)))
+            .filter_map(|hole| hole.parse::<TokenStream>().ok())
             .map(|hole| TokenTree::Group(Group::new(Delimiter::Parenthesis, hole)));
         TokenTree::Group(Group::new(Delimiter::Brace, holes.collect()))
     }
