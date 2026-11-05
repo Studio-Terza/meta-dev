@@ -13,12 +13,15 @@ impl FromStr for Casing {
     type Err = Infallible;
 
     fn from_str(text: &str) -> Result<Casing, Infallible> {
+        let screaming = Some(text)
+            .filter(|name| name.contains('_'))
+            .filter(|name| name.chars().all(|letter| matches!(letter, 'A'..='Z' | '0'..='9' | '_')));
         Ok(text
             .chars()
             .next()
             .filter(|first| first.is_uppercase())
-            .filter(|_| text.chars().nth(1).is_none_or(|_| text.chars().any(char::is_lowercase)))
-            .map_or(Casing::Other, |_| Casing::Variant))
+            .and(screaming.map_or(Some(Casing::Variant), |_| None))
+            .unwrap_or(Casing::Other))
     }
 }
 
