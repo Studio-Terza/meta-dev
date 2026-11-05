@@ -159,6 +159,17 @@ fn malformed_arguments_are_refused_with_the_reason() {
         Asked::query(&["Ledger", "--top", "-1"]).map_err(|failure| failure.to_string()),
         Err("--top takes a whole number, not `-1`".to_owned())
     );
+    let numbers = ["-1.5", "-0.5", "-.5", "-1e5", "-1E-5", "-2.5e+3", "-0", "-007"];
+    assert_eq!(
+        numbers.map(|number| Asked::query(&["Ledger", "--top", number]).map_err(|failure| failure.to_string())),
+        numbers.map(|number| Err(format!("--top takes a whole number, not `{number}`")))
+    );
+    let words = ["--1", "-", "-1.5.2", "-e5", "-1x"];
+    assert_eq!(
+        words.map(|word| Asked::query(&["Ledger", "--top", word])),
+        words.map(|word| Err(QueryFailure::Flag(word.to_owned())))
+    );
+    assert_eq!(Asked::query(&["Ledger", "-1.5"]), Err(QueryFailure::Flag("-1.5".to_owned())));
     assert_eq!(Asked::query(&["Ledger", "--top", "-x"]), Err(QueryFailure::Flag("-x".to_owned())));
     let joined = [
         ("--top=3", "--top"),

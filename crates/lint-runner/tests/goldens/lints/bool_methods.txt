@@ -8,9 +8,9 @@ src/lib.rs:3: bare bool in is_on; take and return a domain type (a newtype, an e
 src/lib.rs:4: bare bool in has_power; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/lib.rs:5: bare bool in is_off; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 a function returning bool forgets what it found and makes the caller branch on a flag:
-src/lib.rs:3: fn is_on -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/lib.rs:4: fn has_power -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
-src/lib.rs:5: fn is_off -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty
+src/lib.rs:3: fn is_on -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
+src/lib.rs:4: fn has_power -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
+src/lib.rs:5: fn is_off -> bool; return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled
 two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
 src/lib.rs:3: corpus::Switch: is_on at src/lib.rs:3, has_power at src/lib.rs:4, is_off at src/lib.rs:5 share the signature (corpus::Switch) -> bool; distinguish the types they take or return, or keep one method and route the other through it
 fails

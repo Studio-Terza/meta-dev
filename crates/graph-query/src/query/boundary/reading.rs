@@ -1,4 +1,6 @@
 use std::ffi::OsString;
+use std::iter;
+use std::num::ParseFloatError;
 use std::path::PathBuf;
 
 use lint_layout::Name;
@@ -32,6 +34,7 @@ enum Expecting {
 enum Spelling {
     Flag(Expecting),
     Unknown,
+    Number,
     Term,
 }
 
@@ -56,12 +59,8 @@ impl TryFrom<&[OsString]> for Query {
 impl Expecting {
     const FLAG_MARK: char = '-';
 
-    fn signed(word: &str) -> Option<QueryFailure> {
-        Some(word)
-            .filter(|word| word.chars().next().is_some_and(|first| first == Self::FLAG_MARK))
-            .filter(|word| word.chars().nth(1).is_some())
-            .filter(|word| word.chars().skip(1).all(|digit| digit.is_ascii_digit()))
-            .map(|word| QueryFailure::Top(word.to_owned()))
+    fn dashed(word: &str) -> Option<Spelling> {
+        word.chars().next().filter(|first| *first == Self::FLAG_MARK).map(|_| Spelling::from(word.parse::<f64>()))
     }
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -99,12 +98,10 @@ impl Flag {
     const JOIN: char = '=';
 
     fn joined(&self, word: &str) -> Option<QueryFailure> {
-        let length = self.spelling.chars().count();
-        Some(word)
-            .filter(|word| word.chars().take(length).eq(self.spelling.chars()))
-            .map(|word| word.chars().skip(length))
-            .filter(|rest| rest.clone().next() == Some(Self::JOIN))
-            .map(|_| QueryFailure::Joined(self.spelling.to_owned()))
+        word.chars()
+            .take(self.spelling.chars().count() + 1)
+            .eq(self.spelling.chars().chain(iter::once(Self::JOIN)))
+            .then(|| QueryFailure::Joined(self.spelling.to_owned()))
     }
 
     pub(crate) fn spelling(&self) -> &'static str {
@@ -118,13 +115,15 @@ impl Flag {
 
 impl From<&str> for Spelling {
     fn from(word: &str) -> Spelling {
-        match Expecting::flag(word) {
-            Some(expecting) => Spelling::Flag(expecting),
-            None => word
-                .chars()
-                .next()
-                .filter(|first| *first == Expecting::FLAG_MARK)
-                .map_or(Spelling::Term, |_| Spelling::Unknown),
+        Expecting::flag(word).map(Spelling::Flag).or_else(|| Expecting::dashed(word)).unwrap_or(Spelling::Term)
+    }
+}
+
+impl From<Result<f64, ParseFloatError>> for Spelling {
+    fn from(parsed: Result<f64, ParseFloatError>) -> Spelling {
+        match parsed {
+            Ok(_) => Spelling::Number,
+            Err(_) => Spelling::Unknown,
         }
     }
 }
@@ -133,13 +132,18 @@ impl Spelling {
     fn unflagged_word(word: &str) -> Result<&str, QueryFailure> {
         match Spelling::from(word) {
             Spelling::Flag(_) => Err(QueryFailure::Unfinished),
-            Spelling::Unknown => Err(Spelling::refusal(word)),
+            Spelling::Unknown | Spelling::Number => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(word),
         }
     }
 
     fn top(word: &str) -> Result<Top, QueryFailure> {
-        Expecting::signed(word).map_or_else(|| Spelling::unflagged_word(word).and_then(str::parse), Err)
+        match Spelling::from(word) {
+            Spelling::Number => Err(QueryFailure::Top(word.to_owned())),
+            Spelling::Flag(_) | Spelling::Unknown | Spelling::Term => {
+                Spelling::unflagged_word(word).and_then(str::parse)
+            }
+        }
     }
 
     fn refusal(word: &str) -> QueryFailure {
@@ -193,7 +197,7 @@ impl Reading {
     fn flagged(self, spelling: Spelling, word: &str) -> Result<Reading, QueryFailure> {
         match spelling {
             Spelling::Flag(expecting) => Ok(Reading { query: self.query, expecting }),
-            Spelling::Unknown => Err(Spelling::refusal(word)),
+            Spelling::Unknown | Spelling::Number => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
     }

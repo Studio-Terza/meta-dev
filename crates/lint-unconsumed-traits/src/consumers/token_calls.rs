@@ -1,15 +1,13 @@
-mod boundary;
-
 use std::iter;
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, TokenStream, TokenTree};
+use quote::ToTokens;
 use syn::parse::discouraged::Speculative;
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::{AngleBracketedGenericArguments, ExprPath, LitStr, Macro, Path, Token};
 
+use lint_core::Placeholders;
 use lint_layout::Name;
-
-use boundary::Placeholders;
 
 #[derive(Debug)]
 pub(crate) struct TokenCalls(Vec<Name>);
@@ -22,8 +20,13 @@ struct PathCall(Name);
 
 struct Arguments;
 
-#[derive(Clone, Copy, Debug)]
+mod keyword {
+    syn::custom_keyword!(rsx);
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 enum Text {
+    #[default]
     Plain,
     Formatted,
 }
@@ -46,10 +49,15 @@ impl Arguments {
         attempt
             .fork()
             .parse::<Group>()
-            .ok()
-            .filter(|arguments| arguments.delimiter() == Delimiter::Parenthesis)
-            .map(|_| ())
-            .ok_or_else(|| attempt.error(Self::NOT_A_CALL))
+            .map_err(|_| attempt.error(Self::NOT_A_CALL))
+            .and_then(|arguments| Self::opens(arguments.delimiter(), attempt))
+    }
+
+    fn opens(delimiter: Delimiter, attempt: ParseStream) -> syn::Result<()> {
+        match delimiter {
+            Delimiter::Parenthesis => Ok(()),
+            Delimiter::Brace | Delimiter::Bracket | Delimiter::None => Err(attempt.error(Self::NOT_A_CALL)),
+        }
     }
 }
 
@@ -89,10 +97,8 @@ impl From<PathCall> for Name {
 }
 
 impl Text {
-    const MARKUP: &'static str = "rsx";
-
     fn named(name: &Ident) -> Text {
-        Some(name).filter(|name| *name == Self::MARKUP).map_or(Text::Plain, |_| Text::Formatted)
+        syn::parse2::<keyword::rsx>(name.to_token_stream()).map(|_| Text::Formatted).unwrap_or_default()
     }
 
     fn classify(invocation: &Macro) -> Text {
