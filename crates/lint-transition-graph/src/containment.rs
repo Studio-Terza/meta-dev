@@ -1,7 +1,11 @@
 mod ask;
 mod cluster;
 mod connected;
+mod connected_directories;
+mod consumed;
+mod crate_interfaces;
 mod declaration;
+mod divided;
 mod groups;
 mod housing;
 mod interface;
@@ -36,6 +40,8 @@ use unit::Unit;
 
 pub use ask::{Answer, Ask, Listed};
 pub use connected::ConnectedClusters;
+pub use connected_directories::ConnectedDirectories;
+pub use crate_interfaces::CrateInterfaces;
 pub use interface::InterfaceByConsumers;
 pub use layered::AcyclicQuotients;
 pub use placed::LowestCluster;

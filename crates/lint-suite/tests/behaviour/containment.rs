@@ -2,8 +2,8 @@ use lint_core::Violation;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_layout::Name;
 use lint_transition_graph::{
-    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, Covered, Extraction, GraphLint,
-    InterfaceByConsumers, LowestCluster, TypeSystem,
+    AcyclicQuotients, Ask, Clustered as ClusterReport, ConnectedClusters, ConnectedDirectories, CrateInterfaces,
+    Extraction, GraphLint, InterfaceByConsumers, LowestCluster, TypeSystem,
 };
 use text_lines::Lines;
 
@@ -62,7 +62,7 @@ fn a_crate_or_directory_whose_types_fall_apart_is_reported_and_a_file_is_not() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&SPLIT, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
+        Clustered::lines(&SPLIT, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
             .violations()
             .to_vec()),
         [
@@ -145,11 +145,7 @@ const USED: [Source; 2] = [
 #[test]
 fn exports_that_no_outside_user_joins_are_reported() {
     assert_eq!(
-        Clustered::lines(&USED, |view| ClusterReport::<<InterfaceByConsumers as Covered>::Coverage>::report_graph(
-            view
-        )
-        .violations()
-        .to_vec()),
+        Clustered::lines(&USED, |view| ClusterReport::<CrateInterfaces>::report_graph(view).violations().to_vec()),
         [
             "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P R] [Q] that no outside user joins; split it along the groups, one part for each kind of user"
         ]
@@ -356,7 +352,7 @@ fn a_twin_resolves_through_self_super_and_child_module_paths() {
         ]
     );
     assert_eq!(
-        Clustered::lines(&pathed, |view| ClusterReport::<<ConnectedClusters as Covered>::Coverage>::report_graph(view)
+        Clustered::lines(&pathed, |view| ClusterReport::<ConnectedDirectories>::report_graph(view)
             .violations()
             .to_vec()),
         [
@@ -714,6 +710,26 @@ fn an_error_returned_behind_a_reference_or_parentheses_is_linked_to_the_type() {
             "crates/x/src/a.rs:1: the exports of x::a fall into 2 groups: [Denial Desk] [Refusal Shelf] that no outside user joins; split it along the groups, one part for each kind of user",
         ]
     );
+}
+
+#[test]
+fn an_error_returned_through_a_local_result_alias_is_linked_to_the_type() {
+    let aliased = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "type Result<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/b.rs",
+            "type Outcome<T> = std::result::Result<T, Denial>;\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> Outcome<Desk> {\n        Ok(Desk)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/u.rs",
+            "use crate::a::{Refusal, Shelf};\nuse crate::b::{Denial, Desk};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
+        ),
+    ];
+    assert_eq!(Clustered::interface(&aliased), Vec::<String>::new());
 }
 
 #[test]

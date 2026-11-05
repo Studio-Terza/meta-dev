@@ -4,10 +4,10 @@ use lint_core::Fix;
 use lint_core::{Site, Violation};
 use transition_facts::Transitions;
 
-use super::family::Family;
 use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
+use crate::family::Family;
 use newtype::Counter;
 
 #[derive(Debug)]

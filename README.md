@@ -122,16 +122,24 @@ condition as an enum or a predicate type. Shared routers over syn and token shap
 neither.
 
 The lint gate blocks on `connected_clusters` (each crate is one connected piece of the type and trait graph),
-`acyclic_quotients` and `lowest_cluster`; the `--report` run prints the remaining containment reports of
-`lint-transition-graph` (`connected_directories` and `interface_by_consumers`), report only until the owner has
-reviewed them. The crates, modules and files are a nested clustering of the type and trait graph: types and traits are
-linked by fields, variants, bounds, trait impls and the signatures of their methods, read through the same facts as
-the transition graph. One engine (`Containment`, with a `ClusterLint` per check) runs every check at the
-crate and the module level: `connected_clusters` (each crate is one connected piece, and each binary target, `src/main.rs` or `src/bin/*.rs` with its module tree, is a crate of its own beside the library; `connected_directories` reports the same for each directory module),
-`acyclic_quotients` (the crates of the workspace, and the own file and child modules of each crate and module, collapsed
-to single nodes of the definition graph of fields, variants and bounds, form no cycle; signatures and bodies may cycle, as functions do), `interface_by_consumers` (a cluster's exports, the types and
-traits used from outside it, form one group when linked by a shared outside user),
-and `lowest_cluster` (each type and trait sits in the deepest module of its crate that holds all its users; the users are the types, traits and free functions of that crate, `main` included; a type with users in other crates is placed by its crate). There are no thresholds.
+`interface_by_consumers` at module level, `acyclic_quotients` (at module level, the own file and child modules of each
+module, collapsed to single nodes, form no cycle) and `lowest_cluster`; the `--report` run prints the remaining
+containment reports of `lint-transition-graph` (`connected_directories` and `crate_interfaces`, the crate-level
+interface check), report only until the owner has reviewed them. The crates, modules and files are a nested clustering
+of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls and the signatures of
+their methods, read through the same facts as the transition graph. One engine (`Containment`, with a `ClusterLint` per
+check) runs every check at the crate and the module level: `connected_clusters` (each crate is one connected piece, and
+each binary target, `src/main.rs` or `src/bin/*.rs` with its module tree, is a crate of its own beside the library;
+`connected_directories` reports the same for each directory module), `acyclic_quotients` (the own file and child
+modules of each crate and module, collapsed to single nodes of the definition graph of fields, variants and bounds,
+form no cycle; signatures and bodies may cycle, as functions do; the crates of the workspace are not judged here),
+`interface_by_consumers` (a module's exports, the types and traits used from outside it, form one group: two exports
+are linked when one outside type or trait uses both, when either appears in the other's fields, variants, bounds or
+method signatures (parameters, returns and errors, an error read through a locally declared `Result` alias included),
+or when one implements a trait for the other; `crate_interfaces` reports the same for each crate), and
+`lowest_cluster` (each type and trait sits in the deepest module of its crate that holds all its users; the users are
+the types, traits and free functions of that crate, `main` included; a type with users in other crates is placed by its
+crate). There are no thresholds.
 
 The same run prints `repeated_routes`, report only: call sub-sequences of at least three hops through at least two distinct functions that repeat in at least two different bodies, with their locations. A repeat inside one body is not counted, and a route whose ends are already joined by a function is noted. A call is resolved by the type that owns it: `self`, a typed parameter, the output of an earlier resolved call, a type path or `Self`; a bare or module path call goes to a free function. It resolves only when exactly one workspace function of that name has that owner; method calls on any other receiver, and calls into std, are left out. The header states these settings and the share of calls not resolved.
 
