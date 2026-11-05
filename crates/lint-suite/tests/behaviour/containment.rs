@@ -744,14 +744,18 @@ fn an_error_returned_through_a_local_result_alias_is_linked_to_the_type() {
 #[test]
 fn an_error_returned_through_a_chain_of_aliases_is_linked_to_the_type() {
     let chained = [
-        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod b;\nmod u;\n"),
         Clustered::at(
             "crates/x/src/a.rs",
-            "type Outcome<T> = Wrapped<T>;\ntype Wrapped<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Outcome<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
+            "type Result<T> = Wrapped<T>;\ntype Wrapped<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/b.rs",
+            "type Outcome<T> = std::result::Result<T, Denial>;\npub struct Desk;\npub struct Denial;\nimpl Desk {\n    pub fn held(&self) -> Outcome<Desk> {\n        Ok(Desk)\n    }\n}\n",
         ),
         Clustered::at(
             "crates/x/src/u.rs",
-            "use crate::a::{Refusal, Shelf};\npub struct S(Shelf);\npub struct R(Refusal);\n",
+            "use crate::a::{Refusal, Shelf};\nuse crate::b::{Denial, Desk};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct D(Desk);\npub struct N(Denial);\n",
         ),
     ];
     assert_eq!(Clustered::interface(&chained), Vec::<String>::new());
