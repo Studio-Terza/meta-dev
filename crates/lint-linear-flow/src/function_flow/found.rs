@@ -1,6 +1,7 @@
 use lint_core::{Site, Violation};
 
-use crate::finding::{Finding, Rule};
+use super::finding::Finding;
+use crate::rule::Rule;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Found<'file> {

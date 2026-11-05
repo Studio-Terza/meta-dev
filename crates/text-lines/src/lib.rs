@@ -1,7 +1,25 @@
-mod lines;
-mod lossy_text;
-mod one_line;
+#[derive(Debug)]
+pub struct Lines<'text>(&'text str);
 
-pub use lines::Lines;
-pub use lossy_text::LossyText;
-pub use one_line::OneLine;
+impl<'text> From<&'text str> for Lines<'text> {
+    fn from(text: &'text str) -> Lines<'text> {
+        Lines(text)
+    }
+}
+
+impl Lines<'_> {
+    const BREAK: char = '\n';
+}
+
+impl<'text> Iterator for Lines<'text> {
+    type Item = &'text str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.as_bytes().first().map(|_| {
+            let end = self.0.match_indices(Self::BREAK).next().map_or(self.0.len(), |(at, _)| at);
+            let (line, rest) = self.0.split_at(end);
+            self.0 = rest.get(Self::BREAK.len_utf8()..).unwrap_or_default();
+            line
+        })
+    }
+}

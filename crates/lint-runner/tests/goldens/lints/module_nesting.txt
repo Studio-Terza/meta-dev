@@ -1,12 +1,12 @@
 test budget, report only:
-corpus: 0 tests in 8 files, 0 of 13 lines, 0 process starts
+corpus: 0 tests in 6 files, 0 of 9 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-modules nest by use: a file used only inside one sibling belongs inside it:
-src/helper.rs:1: used only from crate::parent; move it inside that module
+a module is reached through its parent: a use path does not reach past a directory module into its children:
 src/reaching.rs:1: reaches into crate::outer::inner; import the parent's re-export instead
-src/wide.rs:1: re-exports 9 items, at most 8 allowed; split the module
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/helper.rs:1: Tool only carries values into one other file; give it the logic that consumes it
 src/outer/inner.rs:1: Thing only carries values into one other file; give it the logic that consumes it
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/helper.rs:1: crate corpus falls into 2 groups: [Thing] [Tool] with no link between them; split it along the groups, or link them through a type they share
 fails

@@ -1,8 +1,13 @@
 mod ask;
 mod cluster;
 mod connected;
+mod connected_directories;
+mod consumed;
+mod crate_interfaces;
 mod declaration;
+mod divided;
 mod groups;
+mod housing;
 mod interface;
 mod layered;
 mod link;
@@ -12,28 +17,31 @@ mod outsider;
 mod placed;
 mod resolver;
 mod slice;
+mod unit;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
-use lint_placement::CrateName;
 use transition_facts::Transitions;
-use type_facts::Facts;
+use type_facts::{Facts, Implementation};
 
-use cluster::Cluster;
+use cluster::{Cluster, Level};
 use declaration::Declaration;
+use housing::Housing;
 use link::Link;
 use located::Located;
 use member::Member;
 use outsider::Outsider;
-use resolver::{Resolver, StandIns};
+use resolver::{Functions, Resolver, StandIns};
 use slice::Slice;
+use unit::Unit;
 
 pub use ask::{Answer, Ask, Listed};
 pub use connected::ConnectedClusters;
+pub use connected_directories::ConnectedDirectories;
+pub use crate_interfaces::CrateInterfaces;
 pub use interface::InterfaceByConsumers;
 pub use layered::AcyclicQuotients;
 pub use placed::LowestCluster;
@@ -44,12 +52,19 @@ pub trait ClusterLint {
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>>;
 }
 
+pub(crate) trait Split<'view, 'found>: lint_core::Finding + Sized {
+    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Self>;
+
+    fn sited(&self) -> &BTreeSet<Member<'found>>;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Toward {
     Used,
     Users,
     Defined,
     Implementers,
+    Signed,
 }
 
 #[derive(Debug)]
@@ -59,6 +74,7 @@ pub struct Containment<'found, 'file> {
     users: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     defines: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     implementers: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
+    signed: BTreeMap<Member<'found>, BTreeSet<Member<'found>>>,
     outsiders: BTreeMap<Member<'found>, BTreeSet<Outsider<'found, 'file>>>,
     slices: BTreeMap<Cluster<'found>, Slice<'found>>,
 }
@@ -70,31 +86,27 @@ impl<'found, 'file> Containment<'found, 'file> {
         facts: &'found Facts<'file>,
         transitions: &'found Transitions<'file>,
     ) -> Containment<'found, 'file> {
-        let modules: BTreeMap<&Path, &[Name]> = files
-            .iter()
-            .filter_map(SourceFile::shipped)
-            .map(|file| (file.path(), file.placement().module().segments()))
-            .collect();
+        let housing = Housing::by_target(files);
+        let homes = housing.homes();
         let declarations = Declaration::all(facts);
         let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declarations
             .iter()
             .filter_map(|declaration| {
                 let site: &Site<'file> = declaration.as_ref();
                 let named: &Member<'found> = declaration.as_ref();
-                modules.get(site.path()).and_then(|segments| named.within(segments)).map(|member| (member, declaration))
+                homes.get(site.path()).map(|home| (named.within(*home), declaration))
             })
             .collect();
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let named: Vec<(&SourceFile, ReferencedNames)> =
-            shipped.iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
+            housing.files().iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
         let crates = named.iter().fold(
             BTreeMap::new(),
-            |mut crates: BTreeMap<&CrateName, Vec<&ReferencedNames>>, (file, names)| {
-                crates.entry(file.placement().package().crate_name()).or_default().push(names);
+            |mut crates: BTreeMap<Unit<'found>, Vec<&ReferencedNames>>, (file, names)| {
+                housing.unit(file.path()).into_iter().for_each(|unit| crates.entry(unit).or_default().push(names));
                 crates
             },
         );
-        let graphs: Vec<(&CrateName, ItemGraph)> = crates
+        let graphs: Vec<(Unit<'found>, ItemGraph)> = crates
             .into_iter()
             .map(|(krate, names)| {
                 let merged = names.into_iter().cloned().fold(ReferencedNames::default(), ReferencedNames::merged);
@@ -102,8 +114,9 @@ impl<'found, 'file> Containment<'found, 'file> {
             })
             .collect();
         let stand_ins =
-            graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
-        let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
+            graphs.iter().fold(StandIns::default(), |stand_ins, (unit, graph)| stand_ins.with_graph(*unit, graph));
+        let functions = Functions::declared(transitions, &homes);
+        let resolver = &Resolver::of_members(placed.keys().copied(), &functions, &housing, stand_ins);
         let located: Vec<Located<'found, 'file>> =
             facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
         let implemented: BTreeSet<Link<'found>> = placed
@@ -127,10 +140,22 @@ impl<'found, 'file> Containment<'found, 'file> {
                 outsiders
             },
         );
-        let signed = transitions.all().flat_map(|transition| resolver.signature(transition));
+        let argued = placed.iter().flat_map(|(member, declaration)| {
+            let implementations: &[Implementation<'file>] = declaration.as_ref();
+            implementations
+                .iter()
+                .flat_map(|implementation| resolver.argument(implementation))
+                .map(|argued| Link::new(*member, argued))
+        });
+        let signed: BTreeSet<Link<'found>> = transitions
+            .all()
+            .flat_map(|transition| resolver.signature(transition))
+            .chain(argued)
+            .chain(defined.iter().copied())
+            .filter_map(Link::apart)
+            .collect();
         let bodies = named.iter().flat_map(|(file, names)| resolver.bodies(file, names));
-        let links: BTreeSet<Link<'found>> =
-            defined.iter().copied().chain(signed).chain(bodies).filter_map(Link::apart).collect();
+        let links: BTreeSet<Link<'found>> = signed.iter().copied().chain(bodies).filter_map(Link::apart).collect();
         let users = Self::adjacency(links.iter().copied().map(Link::reversed));
         Containment {
             slices: Slice::all(placed.keys().copied(), &users),
@@ -142,6 +167,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             users,
             defines: Self::adjacency(defined.into_iter()),
             implementers: Self::adjacency(implemented.into_iter().map(Link::reversed)),
+            signed: Self::adjacency(signed.into_iter()),
             outsiders,
         }
     }
@@ -157,6 +183,7 @@ impl<'found, 'file> Containment<'found, 'file> {
             Toward::Users => &self.users,
             Toward::Defined => &self.defines,
             Toward::Implementers => &self.implementers,
+            Toward::Signed => &self.signed,
         }
     }
 
@@ -191,6 +218,14 @@ impl<'found, 'file> Containment<'found, 'file> {
             adjacency.entry(from).or_default().insert(to);
             adjacency
         })
+    }
+
+    pub(crate) fn splits<'view, Found: Split<'view, 'found>>(&'view self, level: Level) -> Vec<Violation<'file>> {
+        self.slices()
+            .filter(|slice| slice.cluster().level() == level)
+            .filter_map(|slice| Found::found_in(self, slice.cluster()))
+            .filter_map(|found| self.first_site(found.sited()).map(|site| Violation::new(site, &found)))
+            .collect()
     }
 
     pub(crate) fn slices(&self) -> impl Iterator<Item = &Slice<'found>> + '_ {

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use newtype::Newtype;
-use text_lines::OneLine;
+use one_line::OneLine;
 
 use super::super::build::Build;
 use crate::cli::command::step::seconds::Seconds;

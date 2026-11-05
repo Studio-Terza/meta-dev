@@ -5,8 +5,8 @@ use std::iter;
 use lint_core::{SourceFile, Violation};
 use lint_placement::CrateName;
 
-use crate::finding::Rule;
 use crate::function_flow::FunctionFlow;
+use crate::rule::Rule;
 use collector::Collector;
 
 #[derive(Debug)]

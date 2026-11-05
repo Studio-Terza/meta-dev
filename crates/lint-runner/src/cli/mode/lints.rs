@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::iter;
 use std::thread::Scope;
 
@@ -47,14 +49,19 @@ use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
+use lint_transition_graph::{
+    AcyclicQuotients, Clustered, ConnectedClusters, Extraction, GraphLint, InterfaceByConsumers, LowestCluster,
+    OneEdge, TypeSystem,
+};
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Rendered, Shard, Workers};
+use super::boundary::{Helper, Helpers, Shard};
+use crate::cli::boundary::Rendered;
 use crate::cli::{Outcome, Sources};
+use boundary::Workers;
 
 #[derive(Debug)]
 pub struct Lints;
@@ -110,10 +117,17 @@ impl Lints {
         |readout| {
             let extraction = Extraction::from(readout.files());
             let system = TypeSystem::built_from(readout.files(), &extraction);
-            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
-                .into_iter()
-                .flatten()
-                .collect()
+            [
+                OneEdge::dirty(&system),
+                <Clustered<ConnectedClusters>>::dirty(&system),
+                <Clustered<InterfaceByConsumers>>::dirty(&system),
+                <Clustered<AcyclicQuotients>>::dirty(&system),
+                <Clustered<LowestCluster>>::dirty(&system),
+                DistinctSignatures::dirty(&system),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()
         },
         |readout| vec![UnconsumedTraits::report(readout.files())],
         |readout| vec![RustOnly::report(readout.repo_files())],

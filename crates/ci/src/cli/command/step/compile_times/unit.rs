@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 use crate::cli::command::step::seconds::Seconds;
-use text_lines::OneLine;
+use one_line::OneLine;
 
 #[derive(Debug, Deserialize)]
 pub struct Unit {

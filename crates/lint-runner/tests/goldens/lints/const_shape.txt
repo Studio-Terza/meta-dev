@@ -48,4 +48,6 @@ a body leaves through its tail value or ?, never through return, break or contin
 src/loops.rs:4: break; yield the value from an if or match expression, drive the iteration with find, take_while, try_fold or position, or split it into smaller functions
 linear bodies: a body is let bindings and pipeline expressions, with no if, match or loop; the one non-linear form is a pure router, a body that is one match or if let:
 src/walks.rs:5: for loop; drive an iterator with combinators (map, filter, fold, try_fold, take_while)
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/contexts.rs:3: crate corpus falls into 3 groups: [A] [E] [T] with no link between them; split it along the groups, or link them through a type they share
 fails

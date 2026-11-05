@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 body-lifts = { path = "../body-lifts" }
+branching = { path = "../branching" }
 lint-core = { path = "../lint-core" }
 lint-layout = { path = "../lint-layout" }
 lint-placement = { path = "../lint-placement" }

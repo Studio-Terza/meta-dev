@@ -7,10 +7,10 @@ use syn::{Ident, ItemUse, Macro, Path, UsePath, UseTree};
 
 use super::export::Export;
 use lint_core::BinaryFiles;
-use lint_core::Macros;
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::CrateName;
+use macro_facts::Macros;
 
 use crate_reach::CrateReach;
 
@@ -40,7 +40,7 @@ impl ForeignReferences {
 
     pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
         let own_crate = binaries
-            .holding(file.path())
+            .root_of(file.path())
             .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
         let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
         references.visit_file(file.syntax());

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use syn::ItemMod;
@@ -10,7 +10,7 @@ use lint_layout::Name;
 use lint_placement::Role;
 
 #[derive(Debug)]
-pub struct BinaryFiles(BTreeSet<PathBuf>);
+pub struct BinaryFiles(BTreeMap<PathBuf, PathBuf>);
 
 impl BinaryFiles {
     const MAIN_FILE: &'static str = "main.rs";
@@ -24,30 +24,33 @@ impl BinaryFiles {
             files
                 .iter()
                 .filter(|file| file.placement().role() == Role::BinaryRoot)
-                .fold(BTreeSet::new(), |members, root| Self::gather(root, &by_path, members)),
+                .fold(BTreeMap::new(), |members, root| Self::gather(root, root, &by_path, members)),
         )
     }
 
     #[must_use]
-    pub fn holding<'path>(&self, path: &'path Path) -> Option<&'path Path> {
-        self.0.contains(path).then_some(path)
+    pub fn root_of(&self, path: &Path) -> Option<&Path> {
+        self.0.get(path).map(PathBuf::as_path)
     }
 
     fn gather(
         file: &SourceFile,
+        root: &SourceFile,
         by_path: &BTreeMap<&Path, &SourceFile>,
-        members: BTreeSet<PathBuf>,
-    ) -> BTreeSet<PathBuf> {
+        members: BTreeMap<PathBuf, PathBuf>,
+    ) -> BTreeMap<PathBuf, PathBuf> {
         match members.get(file.path()).map(|_| ()) {
             Some(()) => members,
             None => Self::children(file, by_path)
                 .into_iter()
-                .fold(Self::joined_by(members, file.path()), |members, child| Self::gather(child, by_path, members)),
+                .fold(Self::joined_by(members, file.path(), root.path()), |members, child| {
+                    Self::gather(child, root, by_path, members)
+                }),
         }
     }
 
-    fn joined_by(mut members: BTreeSet<PathBuf>, path: &Path) -> BTreeSet<PathBuf> {
-        members.insert(path.to_owned());
+    fn joined_by(mut members: BTreeMap<PathBuf, PathBuf>, path: &Path, root: &Path) -> BTreeMap<PathBuf, PathBuf> {
+        members.insert(path.to_owned(), root.to_owned());
         members
     }
 

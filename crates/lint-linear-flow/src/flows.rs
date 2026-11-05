@@ -1,7 +1,7 @@
 use lint_core::{Headline, Report, SourceFile};
 
 use crate::file_flow::FileFlow;
-use crate::finding::Rule;
+use crate::rule::Rule;
 
 pub trait FlowLint {
     const HEADLINE: &'static str;

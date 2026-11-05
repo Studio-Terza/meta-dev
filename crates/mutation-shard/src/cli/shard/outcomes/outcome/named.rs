@@ -1,8 +1,8 @@
 use std::fmt::{self, Write};
 use std::path::{Path, PathBuf};
 
+use one_line::OneLine;
 use serde::Deserialize;
-use text_lines::OneLine;
 
 use crate::cli::shard::title::Title;
 

@@ -13,10 +13,13 @@ doctest = false
 console-ports = { path = "../console-ports" }
 file-ports = { path = "../file-ports" }
 newtype = { path = "../newtype" }
-text-lines = { path = "../text-lines" }
+one-line = { path = "../one-line" }
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true
+
+[dev-dependencies]
+text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true

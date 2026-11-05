@@ -1,6 +1,6 @@
 use syn::{Block, Expr, Stmt};
 
-use crate::finding::Finding;
+use crate::function_flow::Finding;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArmShape {

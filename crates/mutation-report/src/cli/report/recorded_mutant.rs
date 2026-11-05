@@ -2,8 +2,8 @@ mod verdict;
 
 use std::fmt;
 
+use one_line::OneLine;
 use serde::Deserialize;
-use text_lines::OneLine;
 
 pub use verdict::Verdict;
 

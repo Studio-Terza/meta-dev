@@ -1,8 +1,11 @@
+mod listing;
+
 use std::fmt;
 
 use super::super::Toward;
-use super::listing::{Listed, Listing};
+use super::listing::Listed;
 use super::named::Named;
+use listing::Listing;
 
 #[derive(Debug)]
 pub(super) struct Neighbours<'view, 'found, 'file> {

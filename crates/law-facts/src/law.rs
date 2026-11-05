@@ -1,11 +1,14 @@
+mod unresolved;
+
 use std::collections::BTreeSet;
 
 use lint_core::Site;
 use lint_layout::Name;
 
 use crate::kind::Kind;
-use crate::law_path::{LawPath, Route, Side, Unresolved};
+use crate::law_path::{LawPath, Route, Side};
 use crate::package::Package;
+pub use unresolved::Unresolved;
 
 #[derive(Debug)]
 pub(crate) struct Origin<'file> {

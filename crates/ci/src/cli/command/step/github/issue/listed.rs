@@ -1,5 +1,5 @@
+use one_line::OneLine;
 use serde::Deserialize;
-use text_lines::OneLine;
 
 use super::number::Number;
 use super::title::Title;

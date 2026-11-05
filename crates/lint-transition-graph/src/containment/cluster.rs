@@ -2,8 +2,8 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::iter;
 
+use super::unit::Unit;
 use lint_layout::Name;
-use lint_placement::CrateName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Level {
@@ -14,27 +14,27 @@ pub(crate) enum Level {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Cluster<'found> {
-    krate: Option<&'found CrateName>,
+    unit: Option<Unit<'found>>,
     segments: &'found [Name],
 }
 
 impl<'found> Cluster<'found> {
-    pub(crate) const WORKSPACE: Cluster<'static> = Cluster { krate: None, segments: &[] };
+    pub(crate) const WORKSPACE: Cluster<'static> = Cluster { unit: None, segments: &[] };
 
-    pub(crate) fn module(krate: &'found CrateName, segments: &'found [Name]) -> Cluster<'found> {
-        Cluster { krate: Some(krate), segments }
+    pub(crate) fn module(unit: Unit<'found>, segments: &'found [Name]) -> Cluster<'found> {
+        Cluster { unit: Some(unit), segments }
     }
 
     pub(crate) fn level(&self) -> Level {
-        match self.krate {
+        match self.unit {
             None => Level::Workspace,
             Some(_) => self.segments.first().map_or(Level::Crate, |_| Level::Module),
         }
     }
 
     pub(crate) fn parent(&self) -> Option<Cluster<'found>> {
-        self.krate.map(|krate| {
-            self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(krate, outer))
+        self.unit.map(|unit| {
+            self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(unit, outer))
         })
     }
 
@@ -51,12 +51,12 @@ impl<'found> Cluster<'found> {
     }
 
     pub(crate) fn named(self, name: &Name) -> Option<Cluster<'found>> {
-        let own = self.segments.last().or_else(|| self.krate.map(Borrow::borrow));
+        let own = self.segments.last().or_else(|| self.unit.map(|unit| unit.krate().borrow()));
         own.filter(|own| *own == name).map(|_| self)
     }
 
-    pub(crate) fn krate(&self) -> Option<&'found CrateName> {
-        self.krate
+    pub(crate) fn unit(&self) -> Option<Unit<'found>> {
+        self.unit
     }
 
     pub(crate) fn segments(&self) -> &'found [Name] {
@@ -66,9 +66,9 @@ impl<'found> Cluster<'found> {
 
 impl fmt::Display for Cluster<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.krate {
+        match self.unit {
             None => write!(formatter, "the workspace"),
-            Some(krate) => Segments(self.segments).named_in(krate, formatter),
+            Some(unit) => Segments(self.segments).named_in(unit, formatter),
         }
     }
 }
@@ -102,10 +102,10 @@ impl fmt::Display for Part<'_> {
 pub(crate) struct Segments<'found>(&'found [Name]);
 
 impl Segments<'_> {
-    fn named_in(self, krate: &CrateName, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn named_in(self, unit: Unit<'_>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.first() {
-            None => write!(formatter, "crate {krate}"),
-            Some(_) => write!(formatter, "{krate}::{self}"),
+            None => write!(formatter, "{unit}"),
+            Some(_) => write!(formatter, "{}::{self}", unit.krate()),
         }
     }
 }

@@ -5,9 +5,10 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{ItemMod, Macro};
 
-use lint_core::{MacroAliases, MacroCalls, SourceFile, Violation, Walk};
+use lint_core::{SourceFile, Violation, Walk};
 use lint_file::FileLint;
 use lint_layout::{Name, Word};
+use macro_facts::{MacroAliases, Macros};
 
 use graph::Graph;
 
@@ -23,7 +24,7 @@ impl<'scan> DeclaredGraphs<'scan> {
     fn found_in(&self, invocation: &Macro) -> Vec<Violation<'scan>> {
         match invocation.path.segments.last().and_then(|last| self.names.call(&Name::from(&last.ident))) {
             Some(_) => Graph::checked(invocation, self.path),
-            None => MacroCalls::within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),
+            None => Macros::calls_within(invocation).iter().flat_map(|inner| self.found_in(inner)).collect(),
         }
     }
 }
@@ -32,7 +33,7 @@ impl FileLint for DeclaredGraphs<'_> {
     fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
         let mut graphs = DeclaredGraphs {
             path: file.path(),
-            names: MacroAliases::in_file(file.syntax(), Word::new(DeclaredGraphs::MACRO)),
+            names: Macros::aliases(file.syntax(), Word::new(DeclaredGraphs::MACRO)),
             violations: Vec::new(),
         };
         graphs.visit_file(file.syntax());

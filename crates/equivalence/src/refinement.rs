@@ -1,11 +1,18 @@
+mod cluster;
+mod placing;
+
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 use std::iter;
 
 use newtype::{Arbitrary, Display, Newtype};
 
-use crate::cluster::{Cluster, Placing};
 use crate::erased::Laws;
+use crate::groups::Groups;
+use crate::placed::Placed;
 use crate::renaming::Renaming;
+use cluster::Cluster;
+use placing::Placing;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Colour(usize);
@@ -92,7 +99,7 @@ pub struct Refinement<Node, Label, Law> {
     laws: Option<Laws>,
 }
 
-impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
+impl<Node: Ord + Copy + fmt::Debug, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
     #[must_use]
     pub fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Refinement<Node, Label, Law> {
         Refinement { moves, laws }
@@ -119,19 +126,19 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
         &self,
         colours: &BTreeMap<Node, Colour>,
         alike: impl Fn(Node, Node) -> Option<Node>,
-    ) -> Vec<Cluster<Node>> {
+    ) -> Groups<Placed<Node>> {
         let coloured =
             colours.iter().fold(BTreeMap::new(), |mut found: BTreeMap<Colour, Vec<Node>>, (node, colour)| {
                 found.entry(*colour).or_default().push(*node);
                 found
             });
-        coloured
-            .values()
-            .flat_map(|nodes| {
-                nodes.iter().fold(Vec::new(), |clusters, node| self.placed(clusters, *node, colours, &alike))
-            })
-            .filter(|cluster| cluster.members().nth(1).is_some())
-            .collect()
+        Groups::grouped(coloured.values().flat_map(|nodes| {
+            nodes
+                .iter()
+                .fold(Vec::new(), |clusters, node| self.placed(clusters, *node, colours, &alike))
+                .into_iter()
+                .flat_map(Cluster::placed)
+        }))
     }
 
     fn placed(

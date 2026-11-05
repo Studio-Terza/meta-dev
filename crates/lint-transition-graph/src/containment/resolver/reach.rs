@@ -1,11 +1,12 @@
-use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use lint_item_graph::Owner;
 use lint_layout::{Name, Whole, Word, words};
-use lint_placement::CrateName;
 
 mod head;
 
+use super::super::member::Member;
+use super::super::unit::Unit;
 use super::place::Place;
 use super::target::Target;
 use head::Head;
@@ -13,7 +14,7 @@ use head::Head;
 #[derive(Debug)]
 pub(crate) struct Reach<'place, 'found> {
     place: &'place Place<'found>,
-    modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
+    modules: &'place BTreeMap<Unit<'found>, BTreeSet<&'found Name>>,
 }
 
 impl<'place, 'found> Reach<'place, 'found> {
@@ -21,7 +22,7 @@ impl<'place, 'found> Reach<'place, 'found> {
 
     pub(crate) fn new(
         place: &'place Place<'found>,
-        modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
+        modules: &'place BTreeMap<Unit<'found>, BTreeSet<&'found Name>>,
     ) -> Reach<'place, 'found> {
         Reach { place, modules }
     }
@@ -39,6 +40,20 @@ impl<'place, 'found> Reach<'place, 'found> {
         )
     }
 
+    pub(crate) fn holder<'declared>(
+        &self,
+        owner: &Owner,
+        declaring: impl Fn(&Name) -> &'declared [Member<'found>],
+    ) -> Option<Member<'found>>
+    where
+        'found: 'declared,
+    {
+        let declared = |name: &Name| self.target(name, &[], None).and_then(|target| target.declared(declaring(name)));
+        declared(owner.as_ref())
+            .or_else(|| owner.argument().and_then(declared))
+            .or_else(|| self.place.function(owner.as_ref()))
+    }
+
     fn pathed(&self, path: &[Name]) -> Option<Target<'found>> {
         let (head, _) = path.split_first()?;
         self.head_of(head).target(self.place, path)
@@ -50,13 +65,11 @@ impl<'place, 'found> Reach<'place, 'found> {
             .find(|(keyword, _)| *head == *keyword)
             .map(|(_, kind)| kind)
             .or_else(|| self.place.scope().module_root(head).map(|_| Head::Local))
-            .or_else(|| {
-                self.modules.keys().copied().find(|krate| Borrow::<Name>::borrow(*krate) == head).map(Head::Krate)
-            })
+            .or_else(|| self.modules.keys().copied().find_map(|unit| unit.library_named(head)).map(Head::Krate))
             .or_else(|| head.matches::<Whole>(&Self::EXTERNAL).map(|_| Head::External))
             .unwrap_or_else(|| {
                 self.modules
-                    .get(self.place.krate())
+                    .get(&self.place.unit())
                     .and_then(|segments| segments.get(head))
                     .map_or(Head::Unknown, |_| Head::Own)
             })

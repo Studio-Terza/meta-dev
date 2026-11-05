@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::Path;
 use std::slice;
 
-use text_lines::LossyText;
+use lossy_text::LossyText;
 
 use super::super::journal::Journal;
 use super::Step;

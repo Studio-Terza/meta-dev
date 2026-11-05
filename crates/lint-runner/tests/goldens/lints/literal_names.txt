@@ -9,6 +9,8 @@ function names say what the function does:
 src/vague.rs:1: fn get names nothing; say what it does
 src/vague.rs:4: fn handle names nothing; say what it does
 src/vague.rs:5: fn go names nothing; say what it does
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/said.rs:2: crate corpus falls into 2 groups: [A] [A] with no link between them; split it along the groups, or link them through a type they share
 two methods of one type with the same signature hide a missing type or type parameter: every inherent method of a type, across all files of its crate, is compared on the type graph by its inputs (the receiver first), its output, whether each is optional, fallible or many, and whether it mutates self or a parameter; trait impls are fixed by their trait and are not compared:
 src/vague.rs:4: A: handle at src/vague.rs:4, go at src/vague.rs:5 share the signature (A) -> (); distinguish the types they take or return, or keep one method and route the other through it
 fails

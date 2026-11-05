@@ -1,7 +1,7 @@
 use syn::visit::{self, Visit};
 use syn::{Attribute, Block, Ident, ImplItemFn, ItemFn, ItemMod, TraitItemFn};
 
-use body_lifts::{Branches, Propagation};
+use branching::{Branches, Propagation};
 use lint_core::{Site, SourceFile, Walk};
 use lint_layout::{LineNumber, Name, TestMarks};
 

@@ -9,7 +9,7 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::algebra::Operation;
-use crate::algebra_laws::attached::Attached;
+use crate::attached::Attached;
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::end::Node;

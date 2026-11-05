@@ -9,9 +9,10 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemImpl, ItemMod, Macro, Type, TypePath};
 
-use lint_core::{Headline, Lint, Macros, Report, Site, SourceFile, Syntax, Violation};
+use lint_core::{Headline, Lint, Report, Site, SourceFile, Syntax, Violation};
 use lint_layout::{LineNumber, Name};
 use lint_placement::ModulePath;
+use macro_facts::Macros;
 
 use declaration::Declaration;
 use declarations::Declarations;

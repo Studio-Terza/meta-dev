@@ -6,4 +6,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 a crate whose items form one big cycle is split:
 cycle/src/lib.rs:1: cycle of 41 items: R0 R1 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R2 R20 R21 R22 R23 R24 R25 R26 R27 R28 R29 R3 R30 R31 R32 R33 R34 R35 R36 R37 R38 R39 R4 R40 R5 R6 R7 R8 R9; break the cycle with a standard trait, else a generic over an existing trait, else a derive
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+groups/src/lib.rs:1: crate groups falls into 2 groups: [A0 A1 A2 A3 A4] [B0 B1 B2 B3 B4] with no link between them; split it along the groups, or link them through a type they share
 fails

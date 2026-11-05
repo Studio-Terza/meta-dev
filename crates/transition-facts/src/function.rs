@@ -1,4 +1,5 @@
-use body_lifts::{Body, Branching};
+use body_lifts::Body;
+use branching::Branching;
 use lint_core::Site;
 use lint_layout::Name;
 
@@ -13,6 +14,7 @@ pub struct Function<'file> {
     name: Name,
     takes: Vec<Resolved>,
     gives: Resolved,
+    fails: Option<Resolved>,
     mutation: Mutation,
     body: Body,
     branching: Branching,
@@ -28,6 +30,7 @@ impl<'file> Function<'file> {
             name,
             takes,
             gives,
+            fails: None,
             mutation: Mutation::Absent,
             body: Body::Written,
             branching: Branching::new(1),
@@ -50,6 +53,11 @@ impl<'file> Function<'file> {
         self
     }
 
+    pub(crate) fn failing(mut self, fails: Option<Resolved>) -> Function<'file> {
+        self.fails = fails;
+        self
+    }
+
     pub(crate) fn called(mut self, calls: Vec<Callee>) -> Function<'file> {
         self.calls = calls;
         self
@@ -61,6 +69,10 @@ impl<'file> Function<'file> {
 
     pub(crate) fn gives(&self) -> &Resolved {
         &self.gives
+    }
+
+    pub(crate) fn fails(&self) -> Option<&Resolved> {
+        self.fails.as_ref()
     }
 
     #[must_use]

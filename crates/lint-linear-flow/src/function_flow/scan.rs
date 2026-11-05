@@ -5,10 +5,11 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, Item, Local, Macro};
 
-use lint_core::{Macros, Site};
+use lint_core::Site;
 use lint_layout::LineNumber;
+use macro_facts::Macros;
 
-use crate::finding::Finding;
+use super::finding::Finding;
 use crate::function_flow::found::Found;
 
 pub struct Scan<'file> {
