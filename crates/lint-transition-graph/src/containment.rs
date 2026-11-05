@@ -29,7 +29,7 @@ use link::Link;
 use located::Located;
 use member::Member;
 use outsider::Outsider;
-use resolver::{Resolver, StandIns};
+use resolver::{Functions, Resolver, StandIns};
 use slice::Slice;
 
 pub use ask::{Answer, Ask, Listed};
@@ -105,7 +105,8 @@ impl<'found, 'file> Containment<'found, 'file> {
             .collect();
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
-        let resolver = &Resolver::of_members(placed.keys().copied(), &shipped, stand_ins);
+        let functions = Functions::declared(transitions, &modules);
+        let resolver = &Resolver::of_members(placed.keys().copied(), &functions, &shipped, stand_ins);
         let located: Vec<Located<'found, 'file>> =
             facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
         let implemented: BTreeSet<Link<'found>> = placed

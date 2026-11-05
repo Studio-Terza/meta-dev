@@ -1,4 +1,4 @@
-use crate::cluster::Cluster;
+use super::cluster::Cluster;
 use crate::renaming::Renaming;
 
 #[derive(Debug)]

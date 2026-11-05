@@ -424,7 +424,7 @@ only generates values its check admits. It reaches proptest through `newtype::pr
 `arbitrary_newtypes` fails a struct in shipped code that derives `Newtype` without `Arbitrary`, so `any::<T>()` works
 for every domain value. A newtype that borrows (a reference or a lifetime in its field or generics) passes, since
 proptest cannot own what it generates. When the inner type has no `Arbitrary`, the fix is `#[newtype(strategy = ...)]`
-or a generator for the inner type: `text_lines::OneLine` and `lint_layout::Name` have hand-written ones.
+or a generator for the inner type: `one_line::OneLine` and `lint_layout::Name` have hand-written ones.
 
 `#[newtype(strategy = ...)]` gives the derived `Arbitrary` its own proptest strategy for the inner value, for checks
 that admit a small share of it (`strategy = 0u32..1000`, `strategy = "[0-9a-f]{40}"`). A validated newtype with a
@@ -442,7 +442,7 @@ counts as `Inner`); a `const fn` is never counted, since a trait method cannot b
 
 Text is typed: `primitive_boundary` fails a bare `&str` or `String` in a public function signature or field, except in trait impls and inside `ports`; a public trait declaration is checked like a public function, a private one is not, and a type alias is read through (`type Label = String;` then `pub fn f(x: Label)` is flagged, the alias itself is not); use a newtype, with `Display` at the render edge and `FromStr` at the parse edge.
 
-Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `text_lines::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
+Data read from a file has structure, so `no_plaintext` fails a type that derives `Deserialize` and has a field of `String`, `&str`, `Cow<str>` (also inside `Option`, `Vec` and other generics) or a newtype that wraps one without validation. A newtype around text passes only if its deserialization validates: `#[serde(try_from = ...)]` on the type, or a hand-written `Deserialize` that calls `FromStr` (`from_str` or `parse`). The fix is typed parts (an enum, a number, a `PathBuf`) or a validating newtype such as `one_line::OneLine`. A type with `try_from` is not checked field by field. There is no allow-list.
 
 ## Guards
 

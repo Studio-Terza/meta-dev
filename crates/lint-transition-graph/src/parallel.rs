@@ -32,8 +32,9 @@ impl GraphLint for ParallelStructures {
         let structures: Vec<Structure<'_, 'file>> = behaviour
             .refinement()
             .clustered(coloured.colours(), |first, other| fillers.alike(first, other))
+            .listed()
             .iter()
-            .filter_map(|cluster| Structure::of_cluster(cluster, &behaviour))
+            .filter_map(|group| Structure::of_group(group, &behaviour))
             .collect();
         Report::new(
             Headline::new(

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use equivalence::{Cluster, Holes};
+use equivalence::{Group, Holes, Placed};
 use lint_core::{Fix, Site, Violation};
 use newtype::Counter;
 
@@ -33,17 +33,22 @@ impl<'found, 'file> Structure<'found, 'file> {
     const LEAST_MOVES: usize = 2;
     const LEAST_MEMBERS: usize = 2;
 
-    pub(super) fn of_cluster(
-        cluster: &Cluster<Node<'found>>,
+    pub(super) fn of_group(
+        group: &Group<Placed<Node<'found>>>,
         behaviour: &Behaviour<'found, 'file>,
     ) -> Option<Structure<'found, 'file>> {
-        let members: Vec<Member<'found, 'file>> =
-            cluster.members().filter_map(|node| behaviour.site(&node).map(|site| Member { node, site })).collect();
-        let moves = cluster
+        let members: Vec<Member<'found, 'file>> = group
             .members()
-            .next()
+            .iter()
+            .map(Placed::node)
+            .filter_map(|node| behaviour.site(&node).map(|site| Member { node, site }))
+            .collect();
+        let moves = group
+            .members()
+            .first()
+            .map(Placed::node)
             .map_or(Count::zero(), |node| Count::new(behaviour.refinement().moves_of(&node).len()));
-        Some(Structure { members, moves, holes: cluster.holes() })
+        Some(Structure { members, moves, holes: group.holes() })
             .filter(|structure| structure.moves.count() >= Self::LEAST_MOVES)
             .filter(|structure| structure.members.len() >= Self::LEAST_MEMBERS)
     }
