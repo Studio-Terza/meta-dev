@@ -3,9 +3,9 @@ use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{ItemFn, ItemMod, Macro, PathSegment};
 
-use lint_core::Macros;
 use lint_core::Walk;
 use lint_layout::TestMarks;
+use macro_facts::Macros;
 use newtype::Counter;
 
 use super::CrateBudget;

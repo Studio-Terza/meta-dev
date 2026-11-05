@@ -10,8 +10,9 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{BinOp, Expr, ImplItemFn, ItemFn, Macro, Token};
 
-use lint_core::{MacroAliases, MacroCalls, Site, SourceFile, Violation};
+use lint_core::{Site, SourceFile, Violation};
 use lint_layout::{LineNumber, Name, Whole, Word, words};
+use macro_facts::{MacroAliases, Macros};
 
 use bindings::Bindings;
 use compared::Compared;
@@ -33,7 +34,7 @@ impl<'file> From<&'file SourceFile> for Assertions<'file> {
             path: file.path(),
             constants: Bindings::constants(file.syntax()),
             locals: Bindings::default(),
-            tables: MacroAliases::in_file(file.syntax(), Self::TABLE),
+            tables: Macros::aliases(file.syntax(), Self::TABLE),
             found: Vec::new(),
         };
         assertions.visit_file(file.syntax());
@@ -88,7 +89,7 @@ impl Assertions<'_> {
         .compared(invocation)
         {
             Some(compared) => self.judged(invocation, &compared),
-            None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
+            None => Macros::calls_within(invocation).iter().for_each(|inner| self.met(inner)),
         }
     }
 }

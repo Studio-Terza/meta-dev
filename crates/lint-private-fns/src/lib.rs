@@ -8,7 +8,6 @@ use syn::visit::Visit;
 use syn::{ImplItem, ImplItemFn, ItemImpl, ItemMod, Macro, Visibility};
 
 use lint_core::Bound;
-use lint_core::Macros;
 use lint_core::Report;
 use lint_core::Site;
 use lint_core::SourceFile;
@@ -16,6 +15,7 @@ use lint_core::TypeName;
 use lint_core::Violation;
 use lint_core::Walk;
 use lint_layout::{Length, Name};
+use macro_facts::Macros;
 
 #[derive(Debug)]
 pub struct PrivateFns;

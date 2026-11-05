@@ -1,3 +1,5 @@
+mod macro_calls;
+
 use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::quote;
 use syn::parse::discouraged::Speculative;
@@ -5,7 +7,13 @@ use syn::parse::{ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::{Attribute, Block, Expr, Macro, Stmt, Token};
 
-use crate::syntax::Syntax;
+use lint_core::Syntax;
+use lint_layout::{Name, Word};
+use syn::File;
+use syn::visit::Visit;
+
+use crate::macro_aliases::MacroAliases;
+use macro_calls::MacroCalls;
 
 #[derive(Debug)]
 pub struct Macros;
@@ -24,6 +32,18 @@ impl Macros {
             .into_iter()
             .flat_map(|tokens| Self::statements_or_expressions.parse2(tokens).unwrap_or_default())
             .collect()
+    }
+
+    #[must_use]
+    pub fn calls_within(invocation: &Macro) -> Vec<Macro> {
+        syn::parse2::<MacroCalls>(invocation.tokens.clone()).map(Vec::from).unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn aliases(file: &File, original: Word<'_>) -> MacroAliases {
+        let mut aliases = MacroAliases::new(Name::from(original));
+        aliases.visit_file(file);
+        aliases
     }
 
     pub fn walk(invocation: &Macro, visit: impl FnMut(&Stmt)) {

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files};
-use text_lines::OneLine;
+use one_line::OneLine;
 
 use crate::cli::command::failure::Failure;
 use crate::cli::command::step::CompileTimes;

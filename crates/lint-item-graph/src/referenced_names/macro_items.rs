@@ -1,7 +1,7 @@
 use syn::{Item, ItemMacro, Stmt};
 
-use lint_core::Macros;
 use lint_layout::Name;
+use macro_facts::Macros;
 
 #[derive(Debug)]
 pub struct MacroItems;

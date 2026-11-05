@@ -7,8 +7,8 @@ use std::fmt;
 
 use crate::cli::command::step::seconds::Seconds;
 use entry::Entry;
+use one_line::OneLine;
 use rows::Rows;
-use text_lines::OneLine;
 
 #[derive(Debug)]
 pub struct Listing(Vec<Entry>);

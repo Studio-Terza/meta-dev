@@ -10,9 +10,9 @@ use std::str::FromStr;
 
 use boundary::GoldenTest;
 use file_ports::Files;
+use lossy_text::LossyText;
 use newtype::Newtype;
 use rust_files::RustFiles;
-use text_lines::LossyText;
 
 use crate::cli::report::failure::Failure;
 use crate::cli::report::test_name::TestName;

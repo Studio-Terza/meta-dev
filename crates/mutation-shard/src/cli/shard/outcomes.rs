@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Text};
 
+use lossy_text::LossyText;
 use outcome::Outcome;
 use serde::Deserialize;
 use test_log::{TestLog, TestName};
-use text_lines::LossyText;
 
 use super::mutant_result::MutantResult;
 use crate::cli::shard::failure::Failure;

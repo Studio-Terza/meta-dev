@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use crate::cli::command::step::seconds::Seconds;
-use text_lines::OneLine;
+use one_line::OneLine;
 
 #[derive(Debug, PartialEq)]
 pub(super) struct Entry {

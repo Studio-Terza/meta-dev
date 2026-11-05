@@ -11,7 +11,7 @@ doctest = false
 
 [dependencies]
 newtype = { path = "../newtype" }
-text-lines = { path = "../text-lines" }
+one-line = { path = "../one-line" }
 serde.workspace = true
 thiserror.workspace = true
 

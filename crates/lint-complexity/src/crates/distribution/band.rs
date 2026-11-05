@@ -1,6 +1,6 @@
 use std::fmt;
 
-use body_lifts::Branching;
+use branching::Branching;
 use lint_core::Bound;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

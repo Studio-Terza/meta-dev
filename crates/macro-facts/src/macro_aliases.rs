@@ -1,10 +1,9 @@
 use std::collections::BTreeSet;
 
 use syn::visit::Visit;
-use syn::{File, ItemUse, UseRename, UseTree};
+use syn::{ItemUse, UseRename, UseTree};
 
 use lint_layout::Name;
-use lint_layout::Word;
 
 #[derive(Debug)]
 pub struct MacroAliases {
@@ -13,11 +12,8 @@ pub struct MacroAliases {
 }
 
 impl MacroAliases {
-    #[must_use]
-    pub fn in_file(file: &File, original: Word<'_>) -> MacroAliases {
-        let mut aliases = MacroAliases { names: BTreeSet::new(), original: Name::from(original) };
-        aliases.visit_file(file);
-        aliases
+    pub(crate) fn new(original: Name) -> MacroAliases {
+        MacroAliases { names: BTreeSet::new(), original }
     }
 
     #[must_use]

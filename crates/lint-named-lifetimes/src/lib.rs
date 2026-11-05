@@ -51,6 +51,6 @@ impl<'ast> Visit<'ast> for ShortLifetimes<'_> {
     }
 
     fn visit_macro(&mut self, invocation: &'ast syn::Macro) {
-        lint_core::Macros::walk(invocation, |statement| self.visit_stmt(statement));
+        macro_facts::Macros::walk(invocation, |statement| self.visit_stmt(statement));
     }
 }

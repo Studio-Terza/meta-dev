@@ -10,13 +10,9 @@ test = false
 doctest = false
 
 [dependencies]
-proptest.workspace = true
-serde.workspace = true
-thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }
-serde_json.workspace = true
 
 [lints]
 workspace = true

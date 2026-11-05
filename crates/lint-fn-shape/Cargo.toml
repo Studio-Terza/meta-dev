@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 lint-core = { path = "../lint-core" }
+macro-facts = { path = "../macro-facts" }
 lint-file = { path = "../lint-file" }
 lint-layout = { path = "../lint-layout" }
 newtype = { path = "../newtype" }

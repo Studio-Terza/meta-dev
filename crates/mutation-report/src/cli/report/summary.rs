@@ -13,9 +13,9 @@ use boundary::Count;
 use entry::Entry;
 use file_ports::{Bytes, Files};
 use heading::Heading;
+use one_line::OneLine;
 use section::Section;
 use serde::Serialize;
-use text_lines::OneLine;
 
 use super::failure::Failure;
 use super::golden_tests::GoldenTests;
