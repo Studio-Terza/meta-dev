@@ -5,7 +5,8 @@ use syn::{Lit, LitStr};
 pub struct Interpolated;
 
 impl Interpolated {
-    const PAIR: usize = 2;
+    const OPEN: char = '{';
+    const CLOSE: char = '}';
     const OPENING: &str = "{";
     const CLOSING: &str = "}";
 
@@ -31,14 +32,12 @@ impl Interpolated {
 
     fn braced(found: &LitStr) -> TokenTree {
         let text = found.value();
-        let openings: Vec<usize> = text.match_indices(Self::OPENING).map(|(at, _)| at).collect();
-        let holes = openings
-            .chunk_by(|first, second| *second == *first + Self::OPENING.len())
-            .filter(|run| run.len() % Self::PAIR == 1)
-            .filter_map(|run| run.last())
-            .map(|open| open + Self::OPENING.len())
-            .filter_map(|start| text.get(start..).map(|rest| (rest, rest.match_indices(Self::CLOSING).next())))
-            .filter_map(|(rest, close)| close.and_then(|(end, _)| rest.get(..end)))
+        let braces: Vec<(usize, &str)> = text.match_indices([Self::OPEN, Self::CLOSE]).collect();
+        let holes = braces
+            .iter()
+            .zip(braces.iter().skip(1))
+            .filter(|((_, left), (_, right))| (*left, *right) == (Self::OPENING, Self::CLOSING))
+            .filter_map(|((open, _), (close, _))| text.get(open + Self::OPENING.len()..*close))
             .filter_map(|hole| hole.parse::<TokenStream>().ok())
             .map(|hole| TokenTree::Group(Group::new(Delimiter::Parenthesis, hole)));
         TokenTree::Group(Group::new(Delimiter::Brace, holes.collect()))

@@ -22,17 +22,6 @@ struct PathCall(Name);
 
 struct Arguments;
 
-struct Turbofish;
-
-impl Turbofish {
-    fn skip(attempt: ParseStream) -> syn::Result<()> {
-        match attempt.parse::<Option<Token![::]>>()? {
-            Some(_) => AngleBracketedGenericArguments::parse(attempt).map(drop),
-            None => Ok(()),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 enum Text {
     Plain,
@@ -57,15 +46,10 @@ impl Arguments {
         attempt
             .fork()
             .parse::<Group>()
-            .map_err(|_| attempt.error(Self::NOT_A_CALL))
-            .and_then(|arguments| Self::opens(arguments.delimiter(), attempt))
-    }
-
-    fn opens(delimiter: Delimiter, attempt: ParseStream) -> syn::Result<()> {
-        match delimiter {
-            Delimiter::Parenthesis => Ok(()),
-            Delimiter::Brace | Delimiter::Bracket | Delimiter::None => Err(attempt.error(Self::NOT_A_CALL)),
-        }
+            .ok()
+            .filter(|arguments| arguments.delimiter() == Delimiter::Parenthesis)
+            .map(|_| ())
+            .ok_or_else(|| attempt.error(Self::NOT_A_CALL))
     }
 }
 
@@ -73,7 +57,7 @@ impl Parse for MethodCall {
     fn parse(attempt: ParseStream) -> syn::Result<MethodCall> {
         attempt.parse::<Token![.]>()?;
         let method: Ident = attempt.parse()?;
-        Turbofish::skip(attempt)?;
+        attempt.peek(Token![::]).then(|| AngleBracketedGenericArguments::parse_turbofish(attempt)).transpose()?;
         Arguments::follow(attempt).map(|()| MethodCall(Name::from(&method)))
     }
 }
@@ -84,9 +68,10 @@ impl Parse for PathCall {
         path.path
             .segments
             .iter()
-            .skip(1)
-            .next_back()
-            .map(|segment| PathCall(Name::from(&segment.ident)))
+            .nth(1)
+            .and_then(|_| path.path.segments.last())
+            .map(|segment| Name::from(&segment.ident))
+            .map(PathCall)
             .ok_or_else(|| attempt.error(Arguments::NOT_A_CALL))
     }
 }
@@ -104,13 +89,10 @@ impl From<PathCall> for Name {
 }
 
 impl Text {
-    const FORMATTING: [&'static str; 1] = ["rsx"];
+    const MARKUP: &'static str = "rsx";
 
     fn named(name: &Ident) -> Text {
-        match Self::FORMATTING.into_iter().find(|candidate| name == candidate) {
-            Some(_) => Text::Formatted,
-            None => Text::Plain,
-        }
+        Some(name).filter(|name| *name == Self::MARKUP).map_or(Text::Plain, |_| Text::Formatted)
     }
 
     fn classify(invocation: &Macro) -> Text {

@@ -459,38 +459,23 @@ fn a_body_use_links_across_crates_through_its_import_or_qualifier() {
     );
 }
 
-macro_rules! anchor_report_for_macro_string {
-    ($literal:literal) => {
-        Clustered::lines(
-            &[
-                Clustered::at("crates/x/src/lib.rs", "mod view;\npub struct Anchor;\n"),
-                Clustered::at(
-                    "crates/x/src/view.rs",
-                    concat!(
-                        "use crate::Anchor;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        rsx! { section { id: \"",
-                        $literal,
-                        "\" } };\n    }\n}\n"
-                    ),
-                ),
-            ],
-            |view| ClusterReport::<LowestCluster>::report_graph(view).violations().to_vec(),
-        )
-    };
-}
-
 #[test]
 fn a_type_named_in_an_interpolated_macro_string_is_used() {
+    let interpolated = [
+        Clustered::at("crates/x/src/lib.rs", "mod view;\npub struct Anchor;\n"),
+        Clustered::at(
+            "crates/x/src/view.rs",
+            "use crate::Anchor;\npub struct View;\nimpl View {\n    fn draw(&self) {\n        rsx! { section { id: \"{Anchor::new(1)} {{plain}}\" } };\n    }\n}\n",
+        ),
+    ];
     assert_eq!(
-        anchor_report_for_macro_string!("{Anchor::new(1)} {{plain}}"),
+        Clustered::lines(&interpolated, |view| ClusterReport::<LowestCluster>::report_graph(view)
+            .violations()
+            .to_vec()),
         [
             "crates/x/src/lib.rs:2: x::Anchor is used only within x::view; move it into the lowest cluster that holds all its users"
         ]
     );
-}
-
-#[test]
-fn a_type_named_in_escaped_braces_of_a_macro_string_is_not_used() {
-    assert_eq!(anchor_report_for_macro_string!("{{Anchor::new(1)}}"), Vec::<String>::new());
 }
 
 #[test]

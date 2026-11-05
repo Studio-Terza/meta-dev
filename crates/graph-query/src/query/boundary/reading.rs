@@ -1,5 +1,4 @@
 use std::ffi::OsString;
-use std::num::ParseFloatError;
 use std::path::PathBuf;
 
 use lint_layout::Name;
@@ -33,7 +32,6 @@ enum Expecting {
 enum Spelling {
     Flag(Expecting),
     Unknown,
-    Number,
     Term,
 }
 
@@ -58,22 +56,13 @@ impl TryFrom<&[OsString]> for Query {
 impl Expecting {
     const FLAG_MARK: char = '-';
 
-    fn numeric(word: &str) -> Spelling {
-        match word.chars().find(char::is_ascii_digit) {
-            Some(_) => Self::parses(&word.parse::<f64>()),
-            None => Spelling::Unknown,
-        }
-    }
-
-    fn parses(parsed: &Result<f64, ParseFloatError>) -> Spelling {
-        match parsed {
-            Ok(_) => Spelling::Number,
-            Err(_) => Spelling::Unknown,
-        }
-    }
-
-    fn dashed(word: &str) -> Option<Spelling> {
-        word.chars().next().into_iter().find(|symbol| *symbol == Self::FLAG_MARK).map(|_| Self::numeric(word))
+    fn signed(word: &str) -> Option<QueryFailure> {
+        Some(word)
+            .filter(|word| word.chars().next().is_some_and(|first| first == Self::FLAG_MARK))
+            .filter(|word| word.chars().nth(1).is_some())
+            .filter(|word| word.chars().any(|digit| digit.is_ascii_digit()))
+            .filter(|word| word.parse::<f64>().is_ok())
+            .map(|word| QueryFailure::Top(word.to_owned()))
     }
 
     fn flag(word: &str) -> Option<Expecting> {
@@ -111,8 +100,12 @@ impl Flag {
     const JOIN: char = '=';
 
     fn joined(&self, word: &str) -> Option<QueryFailure> {
-        let joint = format!("{}{}", self.spelling, Self::JOIN);
-        word.get(..joint.len()).filter(|head| *head == joint).map(|_| QueryFailure::Joined(self.spelling.to_owned()))
+        let length = self.spelling.chars().count();
+        Some(word)
+            .filter(|word| word.chars().take(length).eq(self.spelling.chars()))
+            .map(|word| word.chars().skip(length))
+            .filter(|rest| rest.clone().next() == Some(Self::JOIN))
+            .map(|_| QueryFailure::Joined(self.spelling.to_owned()))
     }
 
     pub(crate) fn spelling(&self) -> &'static str {
@@ -126,7 +119,14 @@ impl Flag {
 
 impl From<&str> for Spelling {
     fn from(word: &str) -> Spelling {
-        Expecting::flag(word).map(Spelling::Flag).or_else(|| Expecting::dashed(word)).unwrap_or(Spelling::Term)
+        match Expecting::flag(word) {
+            Some(expecting) => Spelling::Flag(expecting),
+            None => word
+                .chars()
+                .next()
+                .filter(|first| *first == Expecting::FLAG_MARK)
+                .map_or(Spelling::Term, |_| Spelling::Unknown),
+        }
     }
 }
 
@@ -134,18 +134,13 @@ impl Spelling {
     fn unflagged_word(word: &str) -> Result<&str, QueryFailure> {
         match Spelling::from(word) {
             Spelling::Flag(_) => Err(QueryFailure::Unfinished),
-            Spelling::Unknown | Spelling::Number => Err(Spelling::refusal(word)),
+            Spelling::Unknown => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(word),
         }
     }
 
     fn top(word: &str) -> Result<Top, QueryFailure> {
-        match Spelling::from(word) {
-            Spelling::Number => Err(QueryFailure::Top(word.to_owned())),
-            Spelling::Flag(_) | Spelling::Unknown | Spelling::Term => {
-                Spelling::unflagged_word(word).and_then(str::parse)
-            }
-        }
+        Expecting::signed(word).map_or_else(|| Spelling::unflagged_word(word).and_then(str::parse), Err)
     }
 
     fn refusal(word: &str) -> QueryFailure {
@@ -199,7 +194,7 @@ impl Reading {
     fn flagged(self, spelling: Spelling, word: &str) -> Result<Reading, QueryFailure> {
         match spelling {
             Spelling::Flag(expecting) => Ok(Reading { query: self.query, expecting }),
-            Spelling::Unknown | Spelling::Number => Err(Spelling::refusal(word)),
+            Spelling::Unknown => Err(Spelling::refusal(word)),
             Spelling::Term => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
     }

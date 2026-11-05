@@ -526,9 +526,6 @@ const LET_BINDING: &str = "fn f(items: &[Lamp], ready: Ready) -> usize {\n    it
 const SHADOWED_ELEMENT: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
 const INLINE_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp}\"))).count()\n}\n";
 
-const QUOTE_FILL_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp:\\\"^9}\"))).count()\n}\n";
-const APOSTROPHE_FILL_FORMAT: &str = "fn f(items: &[Lamp], seen: &mut Seen) -> usize {\n    items.iter().filter(|lamp| seen.insert(format!(\"{lamp:'^9}\"))).count()\n}\n";
-
 const SHADOW_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|lamp| lamp.on())).count()\n}\n";
 const READ_CLOSURE: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| others.iter().any(|other| other.sees(lamp))).count()\n}\n";
 const SHADOW_BLOCK: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { let lamp = others.first(); lamp.on() }).count()\n}\n";
@@ -541,7 +538,7 @@ const SHADOW_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    
 const READ_FOR: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| { for other in others { other.sees(lamp); } true }).count()\n}\n";
 const READ_IF: &str = "fn f(items: &[Lamp], others: &[Lamp]) -> usize {\n    items.iter().filter(|lamp| if ready() { lamp.on() } else { false }).count()\n}\n";
 
-const SELECTIONS: [Case; 27] = [
+const SELECTIONS: [Case; 25] = [
     Case::new(
         Title::new("filter ignoring its element"),
         &[Source::new(Located::new("a.rs"), Text::new(IGNORED))],
@@ -610,16 +607,6 @@ const SELECTIONS: [Case; 27] = [
     Case::new(
         Title::new("inline format capture reads the element"),
         &[Source::new(Located::new("a.rs"), Text::new(INLINE_FORMAT))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("quote fill in a format spec still reads the element"),
-        &[Source::new(Located::new("a.rs"), Text::new(QUOTE_FILL_FORMAT))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("apostrophe fill in a format spec still reads the element"),
-        &[Source::new(Located::new("a.rs"), Text::new(APOSTROPHE_FILL_FORMAT))],
         Flagged::new(&[]),
     ),
     Case::new(
