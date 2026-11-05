@@ -137,23 +137,9 @@ impl Callee {
         arguments.iter().try_for_each(|argument| argument.closed().map(|_| ()))
     }
 
-    fn deferred(&self) -> Option<()> {
-        match self {
-            Callee::Operator(_) => Some(()),
-            Callee::Function(_)
-            | Callee::Method(_)
-            | Callee::Constructor(_)
-            | Callee::Field(_)
-            | Callee::Index
-            | Callee::Sequence
-            | Callee::Tuple
-            | Callee::Law(_) => None,
-        }
-    }
-
     fn matched_against(&self, arguments: &[Term], target: &Term, found: &mut Substitution) -> Option<()> {
-        self.arguments_of(target).filter(|targets| targets.listed().len() == arguments.len()).map_or_else(
-            || self.deferred(),
+        self.arguments_of(target).filter(|targets| targets.listed().len() == arguments.len()).map_or(
+            Some(()),
             |targets| {
                 arguments.iter().zip(targets.listed()).try_for_each(|(argument, inner)| argument.matched(inner, found))
             },

@@ -370,6 +370,17 @@ const MATCHED_RANGE: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), 3.
 const BOTH_BOUNDS: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 3); assert!(f(1) <= 8);\n}\n";
 const ONE_BOUND: &str = "#[test]\nfn adds() {\n    assert!(f(1) >= 3);\n}\n";
 
+const TUPLE_EQUAL: &str = "#[test]\nfn adds() {\n    assert_eq!(f(1), (3, 4));\n}\n";
+const TUPLE_AVOIDED: &str = "#[test]\nfn adds() {\n    assert_ne!(f(1), (1, 2));\n}\n";
+const SUPER_CALL: &str = "fn f(x: u8) -> u8 {\n    x\n}\nmod inner {\n    #[test]\n    fn adds() {\n        assert_eq!(super::f(1), 2);\n    }\n}\n";
+const SIBLING_CALL: &str = "fn f(x: u8) -> u8 {\n    x\n}\n#[test]\nfn adds() {\n    assert_eq!(f(1), 2);\n}\n";
+const PATH_SHORT: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), Mark::A));\n}\n";
+const PATH_LONG: &str = "#[test]\nfn adds() {\n    assert!(matches!(f(1), self::Mark::A));\n}\n";
+const FOR_ALL_EQUAL_AND_ABOVE: &str = "#[test]\nfn adds() {\n    for x in 0..10u8 {\n        assert_eq!(f(1), x);\n        assert!(f(1) > g(x));\n    }\n}\n";
+const ANYTHING_FOR_ALL: &str =
+    "#[test]\nfn adds() {\n    for y in 0..5u8 {\n        assert!(matches!(f(y), _ | Some(_)));\n    }\n}\n";
+const PAIRED_LOOPS: &str = "#[test]\nfn adds() {\n    for x in 0..5u8 {\n        for z in 0..5u8 {\n            assert_eq!(f(x), z);\n        }\n    }\n}\n";
+
 laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::in_one_module, [
     [EQUALS, EQUALS] => false,
     [EQUALS, BOUNDED] => true,
@@ -605,6 +616,11 @@ laws::table!(a_change_is_flagged_exactly_when_a_test_loses_strength, Weakened::i
     [ORIENTED, EQUALS] => false,
     [MATCHED_RANGE, BOTH_BOUNDS] => false,
     [MATCHED_RANGE, ONE_BOUND] => true,
+    [TUPLE_AVOIDED, TUPLE_EQUAL] => false,
+    [SUPER_CALL, SIBLING_CALL] => false,
+    [PATH_SHORT, PATH_LONG] => false,
+    [EQUALS, FOR_ALL_EQUAL_AND_ABOVE] => false,
+    [ANYTHING_FOR_ALL, PAIRED_LOOPS] => true,
 ]);
 
 const ROUNDTRIP: &str = "laws::roundtrip!(rt, any::<u8>(), enc, dec);\n";

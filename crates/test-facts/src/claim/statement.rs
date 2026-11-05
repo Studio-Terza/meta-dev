@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::term::{Depths, Substituted, Substitution};
 use super::{Accepted, Binders, Claim, Depth, Occupancy, Ranges, Term};
 
@@ -95,7 +97,10 @@ impl Renumbered {
         let swapped = claim
             .accepted
             .sole()
-            .filter(|other| (other.closed().is_some(), *other) < (claim.subject.closed().is_some(), &claim.subject))
+            .filter(|other| {
+                (other.closed().is_some(), *other).cmp(&(claim.subject.closed().is_some(), &claim.subject))
+                    == Ordering::Less
+            })
             .cloned();
         let oriented = swapped.map_or_else(
             || claim.clone(),
