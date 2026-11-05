@@ -4,6 +4,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/lib.rs:2: Helper only carries values into one other file; give it the logic that consumes it
-each type and trait sits in the lowest module of its crate that holds all its users: the users are the types, traits and free functions of its crate that hold it in a field, variant or bound, implement it, name it in a method signature or use it in a body, the functions of a binary root are not users, and the lowest module is the deepest one whose subtree holds them all; a type with users in other crates is placed by its crate:
+each type and trait sits in the lowest module of its crate that holds all its users: the users are the types, traits and free functions of its crate that hold it in a field, variant or bound, implement it, name it in a method signature or use it in a body, and the lowest module is the deepest one whose subtree holds them all; a type with users in other crates, or in a binary target of its own crate, is placed by its crate:
 src/lib.rs:2: corpus::Helper is used only within corpus::a; move it into the lowest module that holds all its users
 fails

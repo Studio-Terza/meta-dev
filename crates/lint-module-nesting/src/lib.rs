@@ -15,7 +15,7 @@ impl Lint for ModuleNesting {
         let tree = ModuleTree::from(shipped.as_slice());
         Report::new(
             Headline::new(
-                "a module is reached through its parent: a use path does not reach past a directory module into its children",
+                "a module is reached through its parent: a use path does not reach past a directory module into its children, and a module does not re-export more items than its cap allows",
             ),
             tree.violations().collect(),
         )

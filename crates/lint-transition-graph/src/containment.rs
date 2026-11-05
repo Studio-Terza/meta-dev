@@ -3,6 +3,7 @@ mod cluster;
 mod connected;
 mod declaration;
 mod groups;
+mod housing;
 mod interface;
 mod layered;
 mod link;
@@ -12,25 +13,26 @@ mod outsider;
 mod placed;
 mod resolver;
 mod slice;
+mod unit;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
-use lint_placement::{CrateName, Role};
 use transition_facts::Transitions;
 use type_facts::{Facts, Implementation};
 
 use cluster::{Cluster, Level};
 use declaration::Declaration;
+use housing::Housing;
 use link::Link;
 use located::Located;
 use member::Member;
 use outsider::Outsider;
 use resolver::{Functions, Resolver, StandIns};
 use slice::Slice;
+use unit::Unit;
 
 pub use ask::{Answer, Ask, Listed};
 pub use connected::ConnectedClusters;
@@ -78,31 +80,27 @@ impl<'found, 'file> Containment<'found, 'file> {
         facts: &'found Facts<'file>,
         transitions: &'found Transitions<'file>,
     ) -> Containment<'found, 'file> {
-        let modules: BTreeMap<&Path, &[Name]> = files
-            .iter()
-            .filter_map(SourceFile::shipped)
-            .map(|file| (file.path(), file.placement().module().segments()))
-            .collect();
+        let housing = Housing::by_target(files);
+        let homes = housing.homes();
         let declarations = Declaration::all(facts);
         let placed: BTreeMap<Member<'found>, &Declaration<'found, 'file>> = declarations
             .iter()
             .filter_map(|declaration| {
                 let site: &Site<'file> = declaration.as_ref();
                 let named: &Member<'found> = declaration.as_ref();
-                modules.get(site.path()).and_then(|segments| named.within(segments)).map(|member| (member, declaration))
+                homes.get(site.path()).map(|home| (named.within(*home), declaration))
             })
             .collect();
-        let shipped: Vec<&SourceFile> = files.iter().filter_map(SourceFile::shipped).collect();
         let named: Vec<(&SourceFile, ReferencedNames)> =
-            shipped.iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
+            housing.files().iter().map(|file| (*file, ReferencedNames::of_file(file))).collect();
         let crates = named.iter().fold(
             BTreeMap::new(),
-            |mut crates: BTreeMap<&CrateName, Vec<&ReferencedNames>>, (file, names)| {
-                crates.entry(file.placement().package().crate_name()).or_default().push(names);
+            |mut crates: BTreeMap<Unit<'found>, Vec<&ReferencedNames>>, (file, names)| {
+                housing.unit(file.path()).into_iter().for_each(|unit| crates.entry(unit).or_default().push(names));
                 crates
             },
         );
-        let graphs: Vec<(&CrateName, ItemGraph)> = crates
+        let graphs: Vec<(Unit<'found>, ItemGraph)> = crates
             .into_iter()
             .map(|(krate, names)| {
                 let merged = names.into_iter().cloned().fold(ReferencedNames::default(), ReferencedNames::merged);
@@ -110,11 +108,9 @@ impl<'found, 'file> Containment<'found, 'file> {
             })
             .collect();
         let stand_ins =
-            graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
-        let entries: BTreeSet<&Path> =
-            shipped.iter().filter(|file| file.placement().role() == Role::BinaryRoot).map(|file| file.path()).collect();
-        let functions = Functions::declared(transitions, &modules, &entries);
-        let resolver = &Resolver::of_members(placed.keys().copied(), &functions, &shipped, stand_ins);
+            graphs.iter().fold(StandIns::default(), |stand_ins, (unit, graph)| stand_ins.with_graph(*unit, graph));
+        let functions = Functions::declared(transitions, &homes);
+        let resolver = &Resolver::of_members(placed.keys().copied(), &functions, &housing, stand_ins);
         let located: Vec<Located<'found, 'file>> =
             facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
         let implemented: BTreeSet<Link<'found>> = placed

@@ -19,7 +19,7 @@ struct Interface<'view, 'found> {
 
 impl<'view, 'found> Split<'view, 'found> for Interface<'view, 'found> {
     fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'view, 'found>> {
-        let judged = cluster.krate().map(|_| cluster)?;
+        let judged = cluster.unit().map(|_| cluster)?;
         let cut = view.slice(judged)?.cut();
         let exports = cut.exports();
         let sharing = Containment::adjacency(cut.outgoing().iter().copied());
