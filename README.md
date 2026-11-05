@@ -66,7 +66,8 @@ boundary. The message names the fix: take and return a domain type, or move the 
 
 `unconsumed_traits` refuses a local trait with methods that nothing in shipped code consumes: no bound (generic, where
 clause or supertrait), no `impl Trait` or `dyn Trait`, and no call to one of its provided methods. Delete the trait and
-keep its methods inherent, or give it a consumer.
+keep its methods inherent, or give it a consumer. Calls inside macro bodies count, read at token level: `.method(` and
+`A::b` in any macro, and `{expr}` placeholders in strings inside `rsx!`, including macros nested in it by name or path.
 
 `one_edge` keeps one transition per pair. In shipped code, a set of domain input types reaches one domain output type
 by one written edge: a function, a method (the receiver is an input) or a trait impl, read through references, `Option`,
