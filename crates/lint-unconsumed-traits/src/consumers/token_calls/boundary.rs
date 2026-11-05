@@ -11,10 +11,16 @@ impl Placeholders {
         self.0
     }
 
-    fn enclosed(text: &str, start: usize) -> Option<&str> {
-        text.get(start..).and_then(|rest| {
-            rest.char_indices().find(|(_, symbol)| *symbol == '}').and_then(|(length, _)| rest.get(..length))
-        })
+    fn placeholder(text: &str, at: usize) -> Option<&str> {
+        let before = text.get(..at).map_or(0, |head| head.chars().rev().take_while(|symbol| *symbol == '{').count());
+        let after = text.get(at + 1..).and_then(|tail| tail.chars().next());
+        (before % 2 == 0)
+            .then_some(at)
+            .filter(|_| after != Some('{'))
+            .and_then(|opening| text.get(opening + 1..))
+            .and_then(|rest| {
+                rest.char_indices().find(|(_, symbol)| *symbol == '}').and_then(|(length, _)| rest.get(..length))
+            })
     }
 }
 
@@ -25,7 +31,7 @@ impl FromStr for Placeholders {
         Ok(Placeholders(
             text.char_indices()
                 .filter(|(_, symbol)| *symbol == '{')
-                .filter_map(|(at, _)| Self::enclosed(text, at + 1))
+                .filter_map(|(at, _)| Self::placeholder(text, at))
                 .filter_map(|expression| expression.parse().ok())
                 .collect(),
         ))
