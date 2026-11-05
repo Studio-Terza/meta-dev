@@ -58,3 +58,9 @@ impl<'file> AsRef<Site<'file>> for Declaration<'_, 'file> {
         &self.site
     }
 }
+
+impl<'file> AsRef<[Implementation<'file>]> for Declaration<'_, 'file> {
+    fn as_ref(&self) -> &[Implementation<'file>] {
+        self.implementations
+    }
+}

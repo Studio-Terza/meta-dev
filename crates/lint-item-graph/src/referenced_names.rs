@@ -1,5 +1,6 @@
 mod kind;
 mod macro_items;
+mod owner;
 mod parameters;
 mod referenced;
 mod spoken;
@@ -18,6 +19,7 @@ use crate::ItemGraph;
 use crate::scope::Scope;
 use kind::Kind;
 use macro_items::MacroItems;
+pub use owner::Owner;
 use parameters::Parameters;
 use referenced::Referenced;
 use spoken::Spoken;
@@ -26,7 +28,7 @@ use spoken::Spoken;
 pub struct ReferencedNames {
     declared: BTreeMap<Name, Vec<UsePath>>,
     implemented: BTreeMap<Name, Vec<UsePath>>,
-    across: BTreeMap<Name, Vec<UsePath>>,
+    across: BTreeMap<Owner, Vec<UsePath>>,
     stand_ins: BTreeSet<Name>,
     types: BTreeSet<Name>,
 }
@@ -40,7 +42,7 @@ impl ReferencedNames {
     }
 
     #[must_use]
-    pub fn uses(&self) -> BTreeMap<&Name, BTreeSet<&UsePath>> {
+    pub fn uses(&self) -> BTreeMap<&Owner, BTreeSet<&UsePath>> {
         self.across.iter().map(|(owner, uses)| (owner, uses.iter().collect())).collect()
     }
 
@@ -75,7 +77,10 @@ impl ReferencedNames {
             .collect()
     }
 
-    fn united(all: BTreeMap<Name, Vec<UsePath>>, more: BTreeMap<Name, Vec<UsePath>>) -> BTreeMap<Name, Vec<UsePath>> {
+    fn united<Key: Ord>(
+        all: BTreeMap<Key, Vec<UsePath>>,
+        more: BTreeMap<Key, Vec<UsePath>>,
+    ) -> BTreeMap<Key, Vec<UsePath>> {
         more.into_iter().fold(all, |mut all, (owner, uses)| {
             all.entry(owner).or_default().extend(uses);
             all
@@ -87,10 +92,12 @@ impl ReferencedNames {
         self.merged(own.unwrap_or_default())
     }
 
-    fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
-        owner.filter(|owner| *owner != Self::UNNAMED).map_or_else(ReferencedNames::default, |owner| {
-            Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
-        })
+    fn named(owner: Option<Owner>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
+        owner
+            .filter(|owner| *AsRef::<Name>::as_ref(owner) != Self::UNNAMED)
+            .map_or_else(ReferencedNames::default, |owner| {
+                Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
+            })
     }
 }
 
@@ -150,7 +157,7 @@ impl<'item> Parts<'item> {
         match self.item {
             Item::Impl(found) => Self::implementing(found, scope, parameters),
             _ => Kind::of_item(self.item).declaring(self.owner.clone()).merged(ReferencedNames::named(
-                self.owner,
+                self.owner.map(Owner::declared),
                 scope,
                 parameters,
                 Spoken::of_item(self.item),
@@ -159,7 +166,7 @@ impl<'item> Parts<'item> {
     }
 
     fn implementing(found: &ItemImpl, scope: &Scope<'_>, parameters: &Parameters) -> ReferencedNames {
-        let read = ReferencedNames::named(Name::of_type(&found.self_ty), scope, parameters, found);
+        let read = ReferencedNames::named(Owner::of_impl(found), scope, parameters, found);
         ReferencedNames { implemented: read.declared, declared: BTreeMap::new(), ..read }
     }
 }

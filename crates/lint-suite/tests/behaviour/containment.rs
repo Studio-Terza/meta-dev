@@ -578,3 +578,65 @@ fn a_cycle_closed_through_a_trait_impl_is_reported() {
         ]
     );
 }
+
+#[test]
+fn exports_named_in_one_another_s_signatures_are_one_interface() {
+    let signed = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "pub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf, Refusal> {\n        Ok(Shelf)\n    }\n}\npub struct Card(Vec<Line>);\npub enum Line {\n    Plain,\n}\npub enum Kind {\n    One,\n}\npub struct Label;\nimpl From<&Kind> for Label {\n    fn from(_: &Kind) -> Label {\n        Label\n    }\n}\npub struct Even(Option<Box<Odd>>);\npub struct Odd(Even);\n",
+        ),
+        Clustered::at(
+            "crates/x/src/u.rs",
+            "use crate::a::{Card, Even, Kind, Label, Line, Odd, Refusal, Shelf};\npub struct S(Shelf);\npub struct R(Refusal);\npub struct C(Card);\npub struct L(Line);\npub struct K(Kind);\npub struct B(Label);\npub struct E(Even);\npub struct O(Odd);\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&signed, |view| ClusterReport::<InterfaceByConsumers>::report_graph(view)
+            .violations()
+            .to_vec()),
+        [
+            "crates/x/src/a.rs:1: the exports of x::a fall into 4 groups: [Card Line] [Even Odd] [Kind Label] [Refusal Shelf] that no outside user joins; split it along the groups, one part for each kind of user",
+        ]
+    );
+}
+
+#[test]
+fn an_impl_written_for_a_type_of_another_crate_is_held_by_its_own_types() {
+    let foreign = [
+        Clustered::at("crates/core/src/lib.rs", "pub struct Violation;\n"),
+        Clustered::at("crates/x/src/lib.rs", "mod a;\npub struct Runner(a::Lint);\n"),
+        Clustered::at("crates/x/src/a/mod.rs", "mod s;\npub struct Lint(s::Structure);\n"),
+        Clustered::at(
+            "crates/x/src/a/s.rs",
+            "use core::Violation;\npub struct Structure;\nimpl From<&Structure> for Option<Violation> {\n    fn from(_: &Structure) -> Option<Violation> {\n        None\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&foreign, |view| ClusterReport::<InterfaceByConsumers>::report_graph(view)
+            .violations()
+            .to_vec()),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn an_impl_for_a_foreign_type_is_held_by_the_type_its_trait_names() {
+    let converted = [
+        Clustered::at(
+            "crates/x/src/lib.rs",
+            "mod motion;\npub struct Menu(Follow);\npub enum Follow {\n    Ease,\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/motion.rs",
+            "use std::time::Duration;\npub enum Motion {\n    Slide,\n}\nimpl From<crate::Follow> for Duration {\n    fn from(_: crate::Follow) -> Duration {\n        Duration::from(Motion::Slide)\n    }\n}\n",
+        ),
+    ];
+    assert_eq!(
+        Clustered::lines(&converted, |view| ClusterReport::<ConnectedClusters>::report_graph(view)
+            .violations()
+            .to_vec()),
+        Vec::<String>::new()
+    );
+}

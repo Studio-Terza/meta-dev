@@ -1,11 +1,13 @@
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use lint_item_graph::Owner;
 use lint_layout::{Name, Whole, Word, words};
 use lint_placement::CrateName;
 
 mod head;
 
+use super::super::member::Member;
 use super::place::Place;
 use super::target::Target;
 use head::Head;
@@ -37,6 +39,18 @@ impl<'place, 'found> Reach<'place, 'found> {
             },
             |_| self.pathed(&spelled),
         )
+    }
+
+    pub(crate) fn holder<'declared>(
+        &self,
+        owner: &Owner,
+        declaring: impl Fn(&Name) -> &'declared [Member<'found>],
+    ) -> Option<Member<'found>>
+    where
+        'found: 'declared,
+    {
+        let declared = |name: &Name| self.target(name, &[], None).and_then(|target| target.declared(declaring(name)));
+        declared(owner.as_ref()).or_else(|| owner.argument().and_then(declared))
     }
 
     fn pathed(&self, path: &[Name]) -> Option<Target<'found>> {

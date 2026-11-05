@@ -1,4 +1,5 @@
 mod calls;
+mod failing;
 mod type_scope;
 
 use syn::{Block, FnArg, ImplItem, ItemImpl, ItemTrait, ReturnType, Signature, Type};
@@ -17,6 +18,7 @@ use crate::mutation::Mutation;
 use crate::resolved::Resolved;
 use crate::wrapping::Wrapping;
 use calls::Calls;
+use failing::Failing;
 use type_scope::TypeScope;
 
 #[derive(Debug)]
@@ -92,6 +94,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
                 Wrapping::returned(&signature.output, self.output, &|name| scope.generic_wrapping(name)),
                 signature.inputs.iter().map(|input| scope.taken(input)).collect(),
             )
+            .failing(Failing::of_output(&signature.output).map(|error| self.origins.located(scope.endpoint(error))))
             .called(Calls::made(signature, body))
     }
 

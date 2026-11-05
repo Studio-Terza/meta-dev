@@ -3,7 +3,7 @@ mod referenced_names;
 mod scope;
 mod traversal;
 
-pub use referenced_names::ReferencedNames;
+pub use referenced_names::{Owner, ReferencedNames};
 pub use scope::Scope;
 pub use traversal::Traversal;
 

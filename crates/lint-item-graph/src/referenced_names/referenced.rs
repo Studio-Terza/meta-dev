@@ -7,8 +7,8 @@ use lint_core::Syntax;
 use lint_layout::{Name, UsePath};
 use proc_macro2::{TokenStream, TokenTree};
 
-use super::ReferencedNames;
 use super::parameters::Parameters;
+use super::{Owner, ReferencedNames};
 use crate::scope::Scope;
 use path_tokens::PathTokens;
 
@@ -57,9 +57,9 @@ impl Referenced {
         self
     }
 
-    pub fn owned(self, owner: Name, parameters: &Parameters) -> ReferencedNames {
+    pub fn owned(self, owner: Owner, parameters: &Parameters) -> ReferencedNames {
         ReferencedNames {
-            declared: BTreeMap::from([(owner.clone(), parameters.unbound(self.local))]),
+            declared: BTreeMap::from([(AsRef::<Name>::as_ref(&owner).clone(), parameters.unbound(self.local))]),
             across: BTreeMap::from([(owner, parameters.unbound(self.across))]),
             ..ReferencedNames::default()
         }
