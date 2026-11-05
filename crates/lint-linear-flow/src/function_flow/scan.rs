@@ -11,6 +11,7 @@ use lint_layout::LineNumber;
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
 
+#[derive(Debug)]
 pub struct Scan<'file> {
     path: &'file Path,
     found: Vec<Found<'file>>,
