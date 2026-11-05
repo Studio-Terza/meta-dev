@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
-use syn::{Attribute, Error, Fields, Ident, LitStr, Variant};
+use syn::{Arm, Attribute, Error, Fields, Ident, LitStr, Variant, parse_quote};
 
 use super::accessor::Accessor;
 
@@ -37,6 +37,17 @@ impl VariantName {
         let variant = &self.variant;
         let text = &self.text;
         quote!(#owner::#variant => #text)
+    }
+
+    pub fn parse_arm(&self, owner: &Ident) -> Arm {
+        let variant = &self.variant;
+        let text = &self.text;
+        parse_quote!(#text => ::core::result::Result::Ok(#owner::#variant))
+    }
+
+    pub fn ordinal(&self, owner: &Ident, index: usize) -> TokenStream {
+        let variant = &self.variant;
+        quote!(#owner::#variant => #index)
     }
 
     pub fn accessor_arm(&self, owner: &Ident, accessor: &Accessor) -> TokenStream {

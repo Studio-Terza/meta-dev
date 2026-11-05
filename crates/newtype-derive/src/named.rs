@@ -58,7 +58,10 @@ impl Named {
 
     fn implemented(self) -> TokenStream {
         let ident = &self.ident;
-        let arms = self.names.iter().map(|name| name.arm(ident));
+        let arms = self.names.iter().map(|name| name.arm(ident)).collect::<Vec<_>>();
+        let parses = self.names.iter().map(|name| name.parse_arm(ident)).collect::<Vec<_>>();
+        let ordinals =
+            self.names.iter().enumerate().map(|(index, name)| name.ordinal(ident, index)).collect::<Vec<_>>();
         let accessors = self.accessors.iter().map(|accessor| accessor.method(ident, &self.names));
         let count = self.names.len();
         quote! {
@@ -76,10 +79,30 @@ impl Named {
                 copied::<#ident>();
             };
 
-            const _: () = ::core::assert!(
-                <#ident as ::strum::VariantArray>::VARIANTS.len() == #count,
-                "Named needs VariantArray to list every variant of the enum"
-            );
+            const _: () = {
+                const fn ordinal(of: &#ident) -> usize {
+                    match *of {
+                        #(#ordinals,)*
+                    }
+                }
+
+                let listed = <#ident as ::strum::VariantArray>::VARIANTS;
+                let mut wanted = 0;
+                while wanted < #count {
+                    let mut found = false;
+                    let mut at = 0;
+                    while at < listed.len() {
+                        found |= ordinal(&listed[at]) == wanted;
+                        at += 1;
+                    }
+                    ::core::assert!(found, "Named needs VariantArray to list every variant of the enum exactly once");
+                    wanted += 1;
+                }
+                ::core::assert!(
+                    listed.len() == #count,
+                    "Named needs VariantArray to list every variant of the enum exactly once"
+                );
+            };
 
             impl #ident {
                 #[must_use]
@@ -94,7 +117,9 @@ impl Named {
 
             impl ::core::fmt::Display for #ident {
                 fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    formatter.pad(Self::name(*self))
+                    formatter.pad(match *self {
+                        #(#arms,)*
+                    })
                 }
             }
 
@@ -102,11 +127,10 @@ impl Named {
                 type Err = ::newtype::Unnamed<#ident>;
 
                 fn from_str(text: &str) -> ::core::result::Result<#ident, ::newtype::Unnamed<#ident>> {
-                    <#ident as ::strum::VariantArray>::VARIANTS
-                        .iter()
-                        .copied()
-                        .find(|variant| variant.name() == text)
-                        .ok_or_else(|| ::newtype::Unnamed::new(text))
+                    match text {
+                        #(#parses,)*
+                        _ => ::core::result::Result::Err(::newtype::Unnamed::new(text)),
+                    }
                 }
             }
         }

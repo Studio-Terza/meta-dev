@@ -77,7 +77,7 @@ An accessor value of the wrong literal type:
 #[accessor(rank: u8)]
 enum Lamp {
     #[name("on")]
-    #[value(rank = "high")]
+    #[value(rank = b'a')]
     On,
     #[name("off")]
     #[value(rank = 1)]
@@ -98,18 +98,57 @@ enum Lamp {
 }
 ```
 
+Two accessors with one name, or an accessor called `name`:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(rank: u8)]
+#[accessor(rank: u16)]
+enum Lamp {
+    #[name("on")]
+    #[value(rank = 2)]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(name: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[value(name = "x")]
+    On,
+}
+```
+
 An accessor of a type that is not a literal type:
 
 ```compile_fail
 #[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
-#[accessor(glyph: Vec<u8>)]
+#[accessor(rank: core::primitive::u8)]
 enum Lamp {
     #[name("on")]
-    #[value(glyph = "*")]
+    #[value(rank = 2)]
     On,
     #[name("off")]
-    #[value(glyph = "-")]
+    #[value(rank = 1)]
     Off,
+}
+```
+
+A variant list that repeats a variant and so leaves another out:
+
+```compile_fail
+#[derive(newtype::Named, Clone, Copy)]
+enum Lamp {
+    #[name("on")]
+    On,
+    #[name("off")]
+    Off,
+}
+
+impl strum::VariantArray for Lamp {
+    const VARIANTS: &'static [Self] = &[Lamp::On, Lamp::On];
 }
 ```
 

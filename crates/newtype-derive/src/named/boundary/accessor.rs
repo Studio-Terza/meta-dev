@@ -69,13 +69,27 @@ impl Accessor {
     const UNSUPPORTED: &'static str = "an accessor type is &'static str, an integer type, bool or char";
     const WRONG_TYPE: &'static str = "this literal does not have the accessor's declared type";
     const ATTRIBUTE: &'static str = "accessor";
+    const RESERVED: &'static str = "an accessor cannot be called name, which is the variant's own name";
+    const REPEATED: &'static str = "two accessors have this name";
 
     pub fn declared(attrs: &[Attribute]) -> syn::Result<Vec<Accessor>> {
-        attrs
+        let accessors = attrs
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
             .map(Attribute::parse_args::<Accessor>)
-            .collect()
+            .collect::<syn::Result<Vec<Accessor>>>()?;
+        accessors
+            .iter()
+            .enumerate()
+            .find_map(|(index, accessor)| accessor.refusal(accessors.get(..index).unwrap_or_default()))
+            .map_or(Ok(accessors), Err)
+    }
+
+    fn refusal(&self, earlier: &[Accessor]) -> Option<Error> {
+        (self.name == "name")
+            .then_some(Self::RESERVED)
+            .or_else(|| earlier.iter().any(|accessor| accessor.name == self.name).then_some(Self::REPEATED))
+            .map(|message| Error::new_spanned(&self.name, message))
     }
 
     pub fn name(&self) -> &Ident {
