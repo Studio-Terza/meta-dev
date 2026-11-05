@@ -746,6 +746,35 @@ fn a_result_alias_that_renames_another_result_is_read_without_recursing() {
 }
 
 #[test]
+fn an_error_returned_through_a_chain_of_aliases_is_linked_to_the_type() {
+    let chained = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "type Outcome<T> = Wrapped<T>;\ntype Wrapped<T> = std::result::Result<T, Refusal>;\npub struct Shelf;\npub struct Refusal;\nimpl Shelf {\n    pub fn taken(&self) -> Outcome<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
+        ),
+        Clustered::at(
+            "crates/x/src/u.rs",
+            "use crate::a::{Refusal, Shelf};\npub struct S(Shelf);\npub struct R(Refusal);\n",
+        ),
+    ];
+    assert_eq!(Clustered::interface(&chained), Vec::<String>::new());
+}
+
+#[test]
+fn aliases_that_name_one_another_in_a_cycle_are_read_without_recursing() {
+    let cycled = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "type First<T> = Second<T>;\ntype Second<T> = First<T>;\npub struct Shelf;\nimpl Shelf {\n    pub fn taken(&self) -> First<Shelf> {\n        loop {}\n    }\n}\n",
+        ),
+        Clustered::at("crates/x/src/u.rs", "use crate::a::Shelf;\npub struct S(Shelf);\n"),
+    ];
+    assert_eq!(Clustered::interface(&cycled), Vec::<String>::new());
+}
+
+#[test]
 fn a_type_named_in_the_body_of_an_impl_for_a_reference_is_linked_to_the_type_behind_it() {
     let bodies = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
