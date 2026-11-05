@@ -6,7 +6,7 @@ mod structure;
 use equivalence::{Equivalence, Erased, Laws};
 use lint_core::{Headline, Report, Violation};
 
-use crate::algebra_laws::attached::Attached;
+use crate::attached::Attached;
 use crate::edge::Edge;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;

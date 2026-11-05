@@ -8,10 +8,10 @@ use lint_placement::CrateName;
 use newtype::Newtype;
 use type_facts::{Facts, GenericImpl, Implementation, Method, TraitFact, TypeFact};
 
+use super::Role;
+use super::score::Score;
 use crate::query::kind::Kind;
 use crate::query::term::Term;
-use crate::role::Role;
-use crate::score::Score;
 
 #[derive(Clone, Copy, Debug)]
 enum Label<'facts, 'file> {

@@ -1,7 +1,6 @@
 mod kind;
 mod law;
 pub mod law_path;
-mod operators;
 mod package;
 mod reader;
 mod traits;
@@ -9,8 +8,8 @@ mod uses;
 
 pub use kind::{Kind, Property};
 pub use law::Law;
-pub use operators::Operators;
 pub use package::Package;
+pub use traits::Operators;
 
 use lint_core::SourceFile;
 use lint_layout::Name;

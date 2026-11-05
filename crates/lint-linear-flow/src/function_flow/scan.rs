@@ -8,7 +8,7 @@ use syn::{ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprW
 use lint_core::{Macros, Site};
 use lint_layout::LineNumber;
 
-use crate::finding::Finding;
+use super::finding::Finding;
 use crate::function_flow::found::Found;
 
 pub struct Scan<'file> {

@@ -11,9 +11,9 @@ use super::leg::Leg;
 use super::stops::Stops;
 use super::walk::Walk;
 use crate::count::Count;
-use crate::coverage::Share;
 use crate::edge::Edge;
 use crate::listed::Listed;
+use crate::share::Share;
 
 #[derive(Debug)]
 pub(super) struct Route<'walk, 'graph, 'found, 'file> {

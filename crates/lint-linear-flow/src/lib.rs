@@ -1,7 +1,7 @@
 mod file_flow;
-mod finding;
 mod flows;
 mod function_flow;
+mod rule;
 mod tally;
 mod verdict;
 
@@ -11,7 +11,7 @@ pub use flows::Flows;
 
 use flows::FlowLint;
 
-use finding::Rule;
+use rule::Rule;
 use tally::Tally;
 
 #[derive(Debug)]

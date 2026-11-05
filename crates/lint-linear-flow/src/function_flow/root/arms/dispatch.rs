@@ -1,6 +1,6 @@
 use syn::Pat;
 
-use crate::finding::Finding;
+use crate::function_flow::Finding;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Dispatch {

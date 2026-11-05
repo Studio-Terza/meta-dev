@@ -1,3 +1,4 @@
+mod boundary;
 mod elegance;
 mod lints;
 
@@ -14,8 +15,8 @@ use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
-use super::boundary::Helpers;
 use super::{Outcome, Sources};
+use boundary::Helpers;
 use elegance::Elegance;
 use lints::Lints;
 

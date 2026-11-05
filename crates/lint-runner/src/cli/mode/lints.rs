@@ -1,3 +1,5 @@
+mod boundary;
+
 use std::iter;
 use std::thread::Scope;
 
@@ -53,8 +55,10 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Rendered, Shard, Workers};
+use super::boundary::{Helper, Helpers, Shard};
+use crate::cli::boundary::Rendered;
 use crate::cli::{Outcome, Sources};
+use boundary::Workers;
 
 #[derive(Debug)]
 pub struct Lints;

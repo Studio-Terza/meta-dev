@@ -5,7 +5,6 @@ use newtype::{Arbitrary, Newtype};
 
 use super::super::Containment;
 use super::super::member::Member;
-use super::super::outsider::Outsider;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Listed(usize);
@@ -28,18 +27,6 @@ pub(super) struct Placed<'view, 'found, 'file> {
 }
 
 #[derive(Debug)]
-pub(super) struct Listing<'view, 'found, 'file> {
-    lines: Vec<Line<'view, 'found, 'file>>,
-    listed: Listed,
-}
-
-#[derive(Debug)]
-enum Line<'view, 'found, 'file> {
-    Member(Placed<'view, 'found, 'file>),
-    Outside(Outsider<'found, 'file>),
-}
-
-#[derive(Debug)]
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
 impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
@@ -49,21 +36,6 @@ impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
         spelled: Spelled,
     ) -> Placed<'view, 'found, 'file> {
         Placed { view, member, spelled }
-    }
-}
-
-impl<'view, 'found, 'file> Listing<'view, 'found, 'file> {
-    pub(super) fn new(
-        view: &'view Containment<'found, 'file>,
-        members: impl Iterator<Item = Member<'found>>,
-        outsiders: impl Iterator<Item = Outsider<'found, 'file>>,
-        listed: Listed,
-    ) -> Listing<'view, 'found, 'file> {
-        let lines = members
-            .map(|member| Line::Member(Placed::new(view, member, Spelled::Name)))
-            .chain(outsiders.map(Line::Outside))
-            .collect();
-        Listing { lines, listed }
     }
 }
 
@@ -92,27 +64,10 @@ impl Names<'_> {
     const SHOWN: usize = 8;
 }
 
-impl fmt::Display for Line<'_, '_, '_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Line::Member(placed) => write!(formatter, "{placed}"),
-            Line::Outside(outsider) => write!(formatter, "{outsider}"),
-        }
-    }
-}
-
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.spelled.written(self.member, formatter)?;
         self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
-    }
-}
-
-impl fmt::Display for Listing<'_, '_, '_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.lines.first().map_or_else(|| writeln!(formatter, "    none"), |_| Ok(()))?;
-        self.lines.iter().take(self.listed.into_inner()).try_for_each(|line| writeln!(formatter, "    {line}"))?;
-        self.listed.more(&self.lines).map_or(Ok(()), |more| writeln!(formatter, "    and {more} more"))
     }
 }
 

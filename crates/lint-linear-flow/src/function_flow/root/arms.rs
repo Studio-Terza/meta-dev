@@ -10,7 +10,7 @@ use syn::{Arm, Expr, ExprIf, ExprMatch};
 use lint_core::Site;
 use lint_layout::LineNumber;
 
-use crate::finding::Finding;
+use crate::function_flow::Finding;
 use crate::function_flow::found::Found;
 use arm_shape::ArmShape;
 use dispatch::Dispatch;

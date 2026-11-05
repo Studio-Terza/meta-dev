@@ -1,5 +1,3 @@
-pub(crate) mod attached;
-
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -8,12 +6,12 @@ use lint_layout::Name;
 use lint_placement::CrateName;
 
 use crate::algebra::Operation;
+use crate::attached::Attached;
 use crate::count::Count;
 use crate::declarations::Checked;
 use crate::end::Node;
 use crate::graph_lint::GraphLint;
 use crate::system::TypeSystem;
-use attached::Attached;
 
 #[derive(Debug)]
 pub struct AlgebraLaws;

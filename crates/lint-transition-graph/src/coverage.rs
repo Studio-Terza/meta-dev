@@ -1,5 +1,3 @@
-mod share;
-
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -12,8 +10,8 @@ use crate::class::Class;
 use crate::count::Count;
 use crate::edge::Edge;
 use crate::form::Form;
+use crate::share::Share;
 use crate::system::TypeSystem;
-pub(crate) use share::Share;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Coverage {
