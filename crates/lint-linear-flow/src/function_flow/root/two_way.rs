@@ -1,5 +1,8 @@
+mod boundary;
+
 use syn::{Block, Expr, ExprBlock, ExprIf, Ident, Path, Stmt};
 
+use boundary::Casing;
 use lint_core::Syntax;
 
 #[derive(Debug)]
@@ -54,6 +57,7 @@ impl Variants {
             .filter(|qualifier| accepted.iter().any(|name| qualifier.ident == **name))
             .and(path.segments.last())
             .map(|segment| &segment.ident)
+            .filter(|variant| Casing::from(*variant) == Casing::Variant)
     }
 
     fn unit(branch: &Block) -> Option<&Path> {

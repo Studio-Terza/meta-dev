@@ -64,10 +64,12 @@ const FROM_BOOL_MATCHED: &str = "impl From<bool> for Lit {\n    fn from(on: bool
 const FROM_BOOL_CONST_FN: &str = "impl From<bool> for Lit {\n    const C: u8 = {\n        fn helper(b: bool) -> Lit { if b { Lit::On } else { Lit::Off } }\n        0\n    };\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_SELF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Self {\n        if on { Self::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_MODULE: &str = "impl From<bool> for Level {\n    fn from(on: bool) -> Level {\n        if on { limits::HIGH } else { limits::LOW }\n    }\n}\n";
+const FROM_BOOL_LIMIT: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::LIMIT } else { Lit::FLOOR }\n    }\n}\n";
+const FROM_BOOL_LOWER: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::on } else { Lit::off }\n    }\n}\n";
 const FROM_BOOL_SAME: &str =
     "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::On }\n    }\n}\n";
 
-const LINEAR: [Case; 34] = [
+const LINEAR: [Case; 36] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -215,6 +217,16 @@ const LINEAR: [Case; 34] = [
     Case::new(
         Title::new("from bool choosing module constants"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_MODULE))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing associated constants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LIMIT))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool choosing lowercase names"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_LOWER))],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
     Case::new(

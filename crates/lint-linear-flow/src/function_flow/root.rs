@@ -60,7 +60,7 @@ impl<'ast> Root<'ast> {
         match self {
             Root::Match(routed) => visit::visit_expr_match(scan, routed),
             Root::IfLet(routed) => visit::visit_expr_if(scan, routed),
-            Root::Conversion(routed) => scan.branches(routed),
+            Root::Conversion(_) => {}
             Root::Body(body) => scan.visit_block(body),
         }
     }

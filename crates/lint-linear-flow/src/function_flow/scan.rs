@@ -26,11 +26,6 @@ impl<'file> Scan<'file> {
         self.found
     }
 
-    pub fn branches(&mut self, routed: &ExprIf) {
-        self.visit_block(&routed.then_branch);
-        routed.else_branch.iter().for_each(|(_, otherwise)| self.visit_expr(otherwise));
-    }
-
     fn record(&mut self, span: Span, finding: Option<Finding>) {
         self.found.extend(finding.map(|finding| Found::new(Site::new(self.path, LineNumber::from(span)), finding)));
     }
