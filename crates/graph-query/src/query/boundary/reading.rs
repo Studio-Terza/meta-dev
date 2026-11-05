@@ -28,6 +28,13 @@ enum Expecting {
     To(Name),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Spelling {
+    Flag(Expecting),
+    Unknown,
+    Term,
+}
+
 #[derive(Debug)]
 pub(crate) struct Reading {
     query: Query,
@@ -47,6 +54,7 @@ impl TryFrom<&[OsString]> for Query {
 }
 
 impl Expecting {
+    const FLAG_MARK: char = '-';
     const FLAGS: [(&'static str, Expecting); 10] = [
         ("--in", Expecting::Root),
         ("--role", Expecting::Role),
@@ -62,6 +70,24 @@ impl Expecting {
 
     fn flag(word: &str) -> Option<Expecting> {
         Self::FLAGS.into_iter().find(|(flag, _)| *flag == word).map(|(_, expecting)| expecting)
+    }
+}
+
+impl From<&str> for Spelling {
+    fn from(word: &str) -> Spelling {
+        match Expecting::flag(word) {
+            Some(expecting) => Spelling::Flag(expecting),
+            None => Self::unflagged(word.chars().next()),
+        }
+    }
+}
+
+impl Spelling {
+    fn unflagged(first: Option<char>) -> Spelling {
+        match first.filter(|first| *first == Expecting::FLAG_MARK) {
+            Some(_) => Spelling::Unknown,
+            None => Spelling::Term,
+        }
     }
 }
 
@@ -81,7 +107,7 @@ impl Item {
 impl Reading {
     fn next(self, word: &str) -> Result<Reading, QueryFailure> {
         match self.expecting {
-            Expecting::Word => self.flagged(Expecting::flag(word), word),
+            Expecting::Word => self.flagged(Spelling::from(word), word),
             Expecting::Root => {
                 Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
             }
@@ -98,10 +124,11 @@ impl Reading {
         }
     }
 
-    fn flagged(self, flag: Option<Expecting>, word: &str) -> Result<Reading, QueryFailure> {
-        match flag {
-            Some(expecting) => Ok(Reading { query: self.query, expecting }),
-            None => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
+    fn flagged(self, spelling: Spelling, word: &str) -> Result<Reading, QueryFailure> {
+        match spelling {
+            Spelling::Flag(expecting) => Ok(Reading { query: self.query, expecting }),
+            Spelling::Unknown => Err(QueryFailure::Flag(word.to_owned())),
+            Spelling::Term => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
     }
 
