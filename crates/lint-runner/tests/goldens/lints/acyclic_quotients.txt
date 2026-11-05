@@ -7,4 +7,7 @@ src/a.rs:2: C only carries values into one other file; give it the logic that co
 src/b.rs:1: B only carries values into one other file; give it the logic that consumes it
 the parts of each crate and module are layered: collapse the own file and child modules of each crate and module into single nodes of the definition graph (fields, variants and bounds), and no group of them depends on one another in a cycle; signatures and bodies may cycle, as functions do:
 src/a.rs:1: in crate corpus, the parts corpus::a, corpus::b use one another in a cycle, through corpus::a::A -> corpus::b::B, corpus::b::B -> corpus::a::C; move the shared types into one part that the others use, so the parts form layers
+each type and trait sits in the lowest module of its crate that holds all its users: the users are the types, traits and free functions of its crate that hold it in a field, variant or bound, implement it, name it in a method signature or use it in a body, the functions of a binary root are not users, and the lowest module is the deepest one whose subtree holds them all; a type with users in other crates is placed by its crate:
+src/b.rs:1: corpus::b::B is used only within corpus::a; move it into the lowest module that holds all its users
+src/a.rs:2: corpus::a::C is used only within corpus::b; move it into the lowest module that holds all its users
 fails

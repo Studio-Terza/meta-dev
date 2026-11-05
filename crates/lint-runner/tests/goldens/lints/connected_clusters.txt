@@ -1,0 +1,7 @@
+test budget, report only:
+corpus: 0 tests in 1 files, 0 of 3 lines, 0 process starts
+report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
+report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/lib.rs:1: crate corpus falls into 2 groups: [A B] [C] with no link between them; split it along the groups, or link them through a type they share
+fails

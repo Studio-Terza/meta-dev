@@ -10,4 +10,6 @@ src/two.rs:4: bare u8 in view; take and return a domain type (a newtype, an enum
 src/two.rs:7: bare u8 in view; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 one public method shape on many types is repeated; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive:
 src/three.rs:5: fn show(& self) -> u8 on A, B, C; use AsRef<T> for a stored field or From<&T> for a computed value, with a newtype, or a derive
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/three.rs:1: crate corpus falls into 5 groups: [A] [B] [C] [D] [E] with no link between them; split it along the groups, or link them through a type they share
 fails

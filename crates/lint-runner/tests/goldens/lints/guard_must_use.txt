@@ -4,4 +4,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 guard types are #[must_use]:
 src/unmarked.rs:1: Lock implements Drop; mark it #[must_use]
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/marked.rs:2: crate corpus falls into 3 groups: [Held] [Lock] [Plain] with no link between them; split it along the groups, or link them through a type they share
 fails

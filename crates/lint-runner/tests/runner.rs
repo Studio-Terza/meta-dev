@@ -498,16 +498,18 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
 }
 
 #[test]
-fn a_module_used_by_a_sibling_and_its_test_file_stays_put() -> Result<(), Box<dyn Error>> {
+fn a_type_used_by_one_sibling_is_placed_there_whether_or_not_its_test_file_uses_it() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub mod a;\n")?;
     root.write("src/a.rs", "mod helper;\npub mod user;\n#[cfg(test)]\nmod tests;\n")?;
     root.write("src/a/helper.rs", "pub struct Help;\nimpl Help {\n    pub fn lift(&self) {}\n}\n")?;
     root.write("src/a/user.rs", "use super::helper::Help;\npub struct User(Help);\n")?;
     root.write("src/a/tests.rs", "use super::helper::Help;\n")?;
-    assert_eq!(root.reported().violations(), 1);
+    let with_test_file = root.reported();
+    assert_eq!(with_test_file.violations(), 2);
+    assert!(with_test_file.err.contains("src/a/helper.rs:1: r::a::helper::Help is used only within r::a::user"));
     root.write("src/a/tests.rs", "")?;
-    assert_eq!(root.reported().violations(), 2);
+    assert_eq!(root.reported().err, with_test_file.err);
     Ok(())
 }
 
@@ -519,7 +521,7 @@ fn a_crate_is_named_by_its_manifest_not_its_directory() -> Result<(), Box<dyn Er
     root.write("crates/engine-impl/src/lib.rs", "mod x;\npub use x::{Used, Unused};\n")?;
     root.write(
         "crates/engine-impl/src/x.rs",
-        "pub struct Used;\nimpl Used {\n    pub fn lift(&self) {}\n}\npub struct Unused;\nimpl Unused {\n    pub fn lift(&self) {}\n}\n",
+        "pub struct Used;\nimpl Used {\n    pub fn lift(&self) {}\n}\npub struct Unused(Used);\nimpl Unused {\n    pub fn lift(&self) {}\n}\n",
     )?;
     root.write("crates/app/Cargo.toml", "[package]\nname = \"app\"\n")?;
     root.write("crates/app/src/lib.rs", "pub use engine::Used;\n")?;

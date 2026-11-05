@@ -17,4 +17,6 @@ src/method.rs:3: bare u8 in work; take and return a domain type (a newtype, an e
 src/method.rs:7: bare u8 in work; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/own_logic.rs:3: bare u8 in work; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/own_logic.rs:7: bare u8 in work; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/associated.rs:1: crate corpus falls into 4 groups: [Caller Maker] [Inner Outer] [Own Wrapper] [Sized] with no link between them; split it along the groups, or link them through a type they share
 fails

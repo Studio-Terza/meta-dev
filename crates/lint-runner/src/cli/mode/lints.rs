@@ -49,7 +49,9 @@ use lint_repeated_shapes::RepeatedShapes;
 use lint_rust_only::RustOnly;
 use lint_state_graph::StateGraph;
 use lint_thin_main::ThinMain;
-use lint_transition_graph::{AcyclicQuotients, Clustered, Extraction, GraphLint, OneEdge, TypeSystem};
+use lint_transition_graph::{
+    AcyclicQuotients, Clustered, ConnectedClusters, Extraction, GraphLint, LowestCluster, OneEdge, TypeSystem,
+};
 use lint_type_shape::TypeShape;
 use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
@@ -114,10 +116,16 @@ impl Lints {
         |readout| {
             let extraction = Extraction::from(readout.files());
             let system = TypeSystem::built_from(readout.files(), &extraction);
-            [OneEdge::dirty(&system), <Clustered<AcyclicQuotients>>::dirty(&system), DistinctSignatures::dirty(&system)]
-                .into_iter()
-                .flatten()
-                .collect()
+            [
+                OneEdge::dirty(&system),
+                <Clustered<ConnectedClusters>>::dirty(&system),
+                <Clustered<AcyclicQuotients>>::dirty(&system),
+                <Clustered<LowestCluster>>::dirty(&system),
+                DistinctSignatures::dirty(&system),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()
         },
         |readout| vec![UnconsumedTraits::report(readout.files())],
         |readout| vec![RustOnly::report(readout.repo_files())],

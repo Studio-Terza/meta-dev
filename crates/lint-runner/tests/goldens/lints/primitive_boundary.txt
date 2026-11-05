@@ -35,4 +35,6 @@ src/text.rs:4: format handles text outside a door; parse in FromStr or render in
 src/text.rs:5: to_string handles text outside a door; parse in FromStr or render in Display
 src/wire.rs:2: serde_json::Value in f is a wire form; parse it into a type at the door
 src/wire.rs:3: serde_json::Value in g is a wire form; parse it into a type at the door
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/door.rs:1: crate corpus falls into 3 groups: [A] [A] [Count] with no link between them; split it along the groups, or link them through a type they share
 fails

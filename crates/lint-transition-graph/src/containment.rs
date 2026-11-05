@@ -19,11 +19,11 @@ use std::path::Path;
 use lint_core::{Headline, Report, Site, SourceFile, Violation};
 use lint_item_graph::{ItemGraph, ReferencedNames};
 use lint_layout::Name;
-use lint_placement::CrateName;
+use lint_placement::{CrateName, Role};
 use transition_facts::Transitions;
 use type_facts::{Facts, Implementation};
 
-use cluster::Cluster;
+use cluster::{Cluster, Level};
 use declaration::Declaration;
 use link::Link;
 use located::Located;
@@ -33,7 +33,7 @@ use resolver::{Functions, Resolver, StandIns};
 use slice::Slice;
 
 pub use ask::{Answer, Ask, Listed};
-pub use connected::ConnectedClusters;
+pub use connected::{ConnectedClusters, ConnectedDirectories};
 pub use interface::InterfaceByConsumers;
 pub use layered::AcyclicQuotients;
 pub use placed::LowestCluster;
@@ -42,6 +42,12 @@ pub trait ClusterLint {
     const HEADLINE: Headline;
 
     fn violations<'file>(view: &Containment<'_, 'file>) -> Vec<Violation<'file>>;
+}
+
+pub(crate) trait Split<'view, 'found>: lint_core::Finding + Sized {
+    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Self>;
+
+    fn sited(&self) -> &BTreeSet<Member<'found>>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,7 +111,9 @@ impl<'found, 'file> Containment<'found, 'file> {
             .collect();
         let stand_ins =
             graphs.iter().fold(StandIns::default(), |stand_ins, (krate, graph)| stand_ins.with_graph(krate, graph));
-        let functions = Functions::declared(transitions, &modules);
+        let entries: BTreeSet<&Path> =
+            shipped.iter().filter(|file| file.placement().role() == Role::BinaryRoot).map(|file| file.path()).collect();
+        let functions = Functions::declared(transitions, &modules, &entries);
         let resolver = &Resolver::of_members(placed.keys().copied(), &functions, &shipped, stand_ins);
         let located: Vec<Located<'found, 'file>> =
             facts.outside_implementations().map(|outside| Located::resolved_by(resolver, outside)).collect();
@@ -208,6 +216,14 @@ impl<'found, 'file> Containment<'found, 'file> {
             adjacency.entry(from).or_default().insert(to);
             adjacency
         })
+    }
+
+    pub(crate) fn splits<'view, Found: Split<'view, 'found>>(&'view self, levels: &[Level]) -> Vec<Violation<'file>> {
+        self.slices()
+            .filter(|slice| levels.contains(&slice.cluster().level()))
+            .filter_map(|slice| Found::found_in(self, slice.cluster()))
+            .filter_map(|found| self.first_site(found.sited()).map(|site| Violation::new(site, &found)))
+            .collect()
     }
 
     pub(crate) fn slices(&self) -> impl Iterator<Item = &Slice<'found>> + '_ {

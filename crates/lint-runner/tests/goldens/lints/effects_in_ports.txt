@@ -6,4 +6,6 @@ effects on files, environment, clock, network, processes, randomness and stdio h
 src/lib.rs:10: files effect outside ports: calls std::fs::read_to_string; move the effect behind a port in a ports module and call the port from here
 src/lib.rs:11: environment effect outside ports: calls std::env::var_os; move the effect behind a port in a ports module and call the port from here
 src/lib.rs:12: stdio effect outside ports: calls println!; move the effect behind a port in a ports module and call the port from here
+each crate is one connected piece of the type and trait graph: types and traits are linked by fields, variants, bounds, trait impls, the signatures of their methods and the names their bodies use, and a crate whose items fall into groups with no link between them is several crates in one:
+src/lib.rs:6: crate corpus falls into 2 groups: [Disk] [Notes] with no link between them; split it along the groups, or link them through a type they share
 fails

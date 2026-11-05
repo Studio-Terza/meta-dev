@@ -987,6 +987,7 @@ dependencies = [
  "lint-unconsumed-traits",
  "lint-vec-out-params",
  "lint-workflow-run",
+ "text-lines",
  "transition-facts",
  "type-facts",
 ]

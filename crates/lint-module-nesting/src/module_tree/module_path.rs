@@ -1,11 +1,7 @@
-mod ancestor;
 mod index;
-mod inside_sibling;
 mod target;
 
-pub use ancestor::Ancestor;
 pub use index::ModuleIndex;
-pub use inside_sibling::InsideSibling;
 pub use target::Target;
 
 use std::fmt;
@@ -38,10 +34,6 @@ impl<'file> ModulePath<'file> {
     pub fn parent(&self) -> Option<ModulePath<'file>> {
         let (_, parents) = self.segments.split_last()?;
         Some(self.with_segments(parents))
-    }
-
-    pub fn truncated_like(&self, other: &ModulePath<'file>) -> ModulePath<'file> {
-        self.with_segments(self.segments.get(..other.segments.len()).unwrap_or(self.segments))
     }
 
     fn with_segments(&self, segments: &'file [Name]) -> ModulePath<'file> {

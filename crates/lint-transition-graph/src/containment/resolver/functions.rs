@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use lint_core::Site;
@@ -15,8 +15,12 @@ impl<'found> Functions<'found> {
     pub(crate) fn declared<'file>(
         transitions: &'found Transitions<'file>,
         modules: &BTreeMap<&Path, &'found [Name]>,
+        entries: &BTreeSet<&Path>,
     ) -> Functions<'found> {
-        let free = transitions.all().filter(|transition| transition.context().subject().is_none());
+        let free = transitions
+            .all()
+            .filter(|transition| transition.context().subject().is_none())
+            .filter(|transition| entries.get(AsRef::<Site<'_>>::as_ref(transition.function()).path()).is_none());
         free.fold(Functions::default(), |functions, transition| {
             let site: &'found Site<'file> = transition.function().as_ref();
             let krate: &'found CrateName = transition.context().as_ref();
