@@ -86,7 +86,9 @@ impl Accessor {
     const UNSUPPORTED: &'static str = "an accessor type is &'static str, an integer type, bool or char";
     const WRONG_TYPE: &'static str = "this literal does not have the accessor's declared type";
     pub const ATTRIBUTE: &'static str = "accessor";
-    const RESERVED: &'static str = "an accessor cannot be called name, which is the variant's own name";
+    const RESERVED_NAMES: [&'static str; 4] = ["name", "to_string", "fmt", "from_str"];
+    const RESERVED: &'static str =
+        "an accessor cannot be called name, to_string, fmt or from_str, which the derive's own method and impls use";
     const REPEATED: &'static str = "two accessors have this name";
 
     pub fn declared(attrs: &[Attribute]) -> syn::Result<Vec<Accessor>> {
@@ -103,7 +105,8 @@ impl Accessor {
     }
 
     fn refusal(&self, earlier: &[Accessor]) -> Option<Error> {
-        (self.key == "name")
+        Self::RESERVED_NAMES
+            .contains(&self.key.as_str())
             .then_some(Self::RESERVED)
             .or_else(|| earlier.iter().any(|accessor| accessor.key == self.key).then_some(Self::REPEATED))
             .map(|message| Error::new_spanned(&self.name, message))

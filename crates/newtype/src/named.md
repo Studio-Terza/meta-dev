@@ -121,6 +121,38 @@ enum Lamp {
 }
 ```
 
+An accessor called `to_string`, `fmt` or `from_str` would shadow the `Display` and `FromStr` impls the derive writes:
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(to_string: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[value(to_string = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(fmt: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[value(fmt = "x")]
+    On,
+}
+```
+
+```compile_fail
+#[derive(newtype::Named, strum::VariantArray, Clone, Copy)]
+#[accessor(from_str: &'static str)]
+enum Lamp {
+    #[name("on")]
+    #[value(from_str = "x")]
+    On,
+}
+```
+
 An accessor of a primitive type spelled with its path, or with a raw name, compiles:
 
 ```
