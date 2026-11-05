@@ -1,16 +1,22 @@
+mod selection;
+
 use std::path::Path;
 
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use syn::{ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprUnary, ExprWhile, Item, Local, Macro};
+use syn::{
+    ExprBinary, ExprForLoop, ExprIf, ExprLoop, ExprMatch, ExprMethodCall, ExprUnary, ExprWhile, Item, Local, Macro,
+};
 
 use lint_core::{Macros, Site};
 use lint_layout::LineNumber;
 
 use crate::finding::Finding;
 use crate::function_flow::found::Found;
+use selection::Selection;
 
+#[derive(Debug)]
 pub struct Scan<'file> {
     path: &'file Path,
     found: Vec<Found<'file>>,
@@ -69,6 +75,11 @@ impl<'ast> Visit<'ast> for Scan<'_> {
             .filter_map(|init| init.diverge.as_ref())
             .for_each(|(otherwise, _)| self.record(otherwise.span, Some(Finding::LetElse)));
         visit::visit_local(self, local);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
+        self.record(call.method.span(), Selection::ignoring(call));
+        visit::visit_expr_method_call(self, call);
     }
 
     fn visit_expr_binary(&mut self, expr: &'ast ExprBinary) {

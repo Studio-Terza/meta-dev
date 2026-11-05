@@ -24,6 +24,9 @@ pub struct PureRouters;
 pub struct PlainConditions;
 
 #[derive(Debug)]
+pub struct IndependentSelections;
+
+#[derive(Debug)]
 pub struct FlowShapes;
 
 impl FlowLint for LinearBodies {
@@ -55,6 +58,17 @@ impl FlowLint for PlainConditions {
 }
 
 impl Lint for PlainConditions {
+    fn report(files: &[SourceFile]) -> Report<'_> {
+        Flows::from(files).report::<Self>()
+    }
+}
+
+impl FlowLint for IndependentSelections {
+    const HEADLINE: &'static str = "report only, disguised branches: a filter, any, all or position whose predicate does not read its element decides without selecting";
+    const RULE: Rule = Rule::IndependentSelections;
+}
+
+impl Lint for IndependentSelections {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Flows::from(files).report::<Self>()
     }

@@ -2,13 +2,33 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::fmt;
 
+use crate::query::{Arity, Flag};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum QueryFailure {
     Role { text: String, reason: String },
     Top(String),
+    Flag(String),
+    Joined(String),
     Unreadable,
     Unfinished,
     Empty,
+}
+
+impl QueryFailure {
+    fn listed(arity: Option<Arity>) -> String {
+        let spellings: Vec<&str> = Flag::ALL
+            .iter()
+            .filter(|flag| arity.is_none_or(|arity| arity == flag.arity()))
+            .map(Flag::spelling)
+            .collect();
+        let (init, last) = spellings.split_at(spellings.len().saturating_sub(1));
+        [init.join(", "), last.join("")]
+            .into_iter()
+            .filter(|part| part.chars().next().is_some())
+            .collect::<Vec<_>>()
+            .join(" and ")
+    }
 }
 
 impl fmt::Display for QueryFailure {
@@ -19,11 +39,19 @@ impl fmt::Display for QueryFailure {
                 "the role `{text}` is not a Rust signature such as `fn f(&self, x: Self) -> Option<Self>`: {reason}"
             ),
             QueryFailure::Top(text) => write!(formatter, "--top takes a whole number, not `{text}`"),
+            QueryFailure::Flag(text) => {
+                write!(formatter, "`{text}` is not a flag: the flags are {}", Self::listed(None))
+            }
+            QueryFailure::Joined(flag) => {
+                write!(formatter, "`{flag}=value` is not a flag: write the flag and its value as separate arguments")
+            }
             QueryFailure::Unreadable => formatter.write_str("an argument is not valid UTF-8"),
-            QueryFailure::Unfinished => formatter.write_str(concat!(
-                "--in, --role, --top, --defined, --uses, --users, --implementers, --cluster and --exports ",
-                "each take a value, and --path takes two"
-            )),
+            QueryFailure::Unfinished => write!(
+                formatter,
+                "{} each take a value, and {} takes two",
+                Self::listed(Some(Arity::One)),
+                Self::listed(Some(Arity::Two))
+            ),
             QueryFailure::Empty => formatter.write_str(concat!(
                 "give search terms, a --role signature, ",
                 "or an item question such as --defined <Name>"

@@ -21,6 +21,8 @@ impl fmt::Display for Finding {
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        Fix::new("return an enum to match on, an Option or Result carrying the value, or a proof type such as NonEmpty")
+        Fix::new(
+            "return an enum to match on, an Option or Result carrying the value, or a proof type such as newtype::Filled",
+        )
     }
 }

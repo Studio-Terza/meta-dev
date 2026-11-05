@@ -39,7 +39,7 @@ impl InstallTools {
             .into_iter()
             .zip(copied)
             .try_for_each(|(from, copied)| copied.map_err(|failure| Failure::unusable(from, failure)))
-            .map(|()| Exit::Success)
+            .map(|()| Exit::Succeeded)
     }
 }
 

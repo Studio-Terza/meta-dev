@@ -21,6 +21,7 @@ pub(crate) use members::Members;
 #[derive(Clone, Debug, Default)]
 pub struct Facts<'file> {
     types: Vec<TypeFact<'file>>,
+    tested_enums: Vec<TypeFact<'file>>,
     traits: Vec<TraitFact<'file>>,
     generic_impls: Vec<GenericImpl<'file>>,
     members: BTreeMap<&'file CrateName, BTreeMap<Name, Members<'file>>>,
@@ -34,6 +35,10 @@ impl<'file> Facts<'file> {
 
     pub(crate) fn add_type(&mut self, found: Option<TypeFact<'file>>) {
         self.types.extend(found);
+    }
+
+    pub(crate) fn add_tested(&mut self, found: Vec<TypeFact<'file>>) {
+        self.tested_enums.extend(found);
     }
 
     pub(crate) fn add_trait(&mut self, found: Option<TraitFact<'file>>) {
@@ -56,6 +61,17 @@ impl<'file> Facts<'file> {
     #[must_use]
     pub fn declared_once<'found>(&self, found: &'found TypeFact<'file>) -> Option<&'found TypeFact<'file>> {
         (self.types.iter().filter_map(|other| other.named_like(found)).count() == 1).then_some(found)
+    }
+
+    #[must_use]
+    pub fn enums_named(&self, krate: &CrateName, name: &Name) -> Vec<&TypeFact<'file>> {
+        self.types
+            .iter()
+            .chain(&self.tested_enums)
+            .filter(|found| AsRef::<CrateName>::as_ref(*found) == krate)
+            .filter(|found| AsRef::<Name>::as_ref(*found) == name)
+            .filter_map(TypeFact::as_enum)
+            .collect()
     }
 
     #[must_use]

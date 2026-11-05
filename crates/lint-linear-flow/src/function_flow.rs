@@ -4,16 +4,14 @@ mod scan;
 
 use std::path::Path;
 
-use proc_macro2::Span;
-use syn::Block;
-
 use lint_core::{Site, Violation};
 use lint_layout::LineNumber;
+use proc_macro2::Span;
 
 use crate::finding::Rule;
 use crate::verdict::Verdict;
 use found::Found;
-use root::Root;
+pub use root::{Root, Target};
 use scan::Scan;
 
 #[derive(Debug)]
@@ -24,8 +22,7 @@ pub struct FunctionFlow<'file> {
 }
 
 impl<'file> FunctionFlow<'file> {
-    pub fn judged(path: &'file Path, name: Span, body: &Block) -> FunctionFlow<'file> {
-        let root = Root::from(body);
+    pub fn judged(path: &'file Path, name: Span, root: Root<'_>) -> FunctionFlow<'file> {
         let mut scan = Scan::new(path);
         root.scanned_by(&mut scan);
         FunctionFlow {
@@ -36,7 +33,7 @@ impl<'file> FunctionFlow<'file> {
     }
 
     pub fn verdict(&self) -> Verdict {
-        self.found.first().map_or(self.shape, |_| Verdict::Neither)
+        Rule::SHAPING.into_iter().flat_map(|rule| self.violations(rule)).next().map_or(self.shape, |_| Verdict::Neither)
     }
 
     pub fn violations(&self, rule: Rule) -> impl Iterator<Item = Violation<'file>> {
