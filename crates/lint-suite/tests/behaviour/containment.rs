@@ -733,6 +733,19 @@ fn an_error_returned_through_a_local_result_alias_is_linked_to_the_type() {
 }
 
 #[test]
+fn a_result_alias_that_renames_another_result_is_read_without_recursing() {
+    let renamed = [
+        Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),
+        Clustered::at(
+            "crates/x/src/a.rs",
+            "type Result<T> = std::io::Result<T>;\npub struct Shelf;\nimpl Shelf {\n    pub fn taken(&self) -> Result<Shelf> {\n        Ok(Shelf)\n    }\n}\n",
+        ),
+        Clustered::at("crates/x/src/u.rs", "use crate::a::Shelf;\npub struct S(Shelf);\n"),
+    ];
+    assert_eq!(Clustered::interface(&renamed), Vec::<String>::new());
+}
+
+#[test]
 fn a_type_named_in_the_body_of_an_impl_for_a_reference_is_linked_to_the_type_behind_it() {
     let bodies = [
         Clustered::at("crates/x/src/lib.rs", "mod a;\nmod u;\n"),

@@ -1,8 +1,11 @@
-use syn::{GenericArgument, PathArguments, PathSegment, ReturnType, Type};
+mod expanding;
+
+use syn::{GenericArgument, Path, PathArguments, ReturnType, Type};
 
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::transitions::collector::origins::Origins;
+use expanding::Expanding;
 
 #[derive(Debug)]
 pub(super) struct Failing;
@@ -14,27 +17,39 @@ impl Failing {
     pub(super) fn of_output<'found>(output: &'found ReturnType, origins: &'found Origins<'_>) -> Option<&'found Type> {
         match output {
             ReturnType::Default => None,
-            ReturnType::Type(_, returned) => Self::peeled(returned, origins),
+            ReturnType::Type(_, returned) => Self::peeled(returned, origins, &Expanding::default()),
         }
     }
 
-    fn peeled<'found>(found: &'found Type, origins: &'found Origins<'_>) -> Option<&'found Type> {
+    fn peeled<'found>(
+        found: &'found Type,
+        origins: &'found Origins<'_>,
+        expanding: &Expanding,
+    ) -> Option<&'found Type> {
         match found {
-            Type::Reference(reference) => Self::peeled(&reference.elem, origins),
-            Type::Paren(paren) => Self::peeled(&paren.elem, origins),
-            Type::Path(path) => path.path.segments.last().and_then(|segment| Self::error_of(segment, origins)),
+            Type::Reference(reference) => Self::peeled(&reference.elem, origins, expanding),
+            Type::Paren(paren) => Self::peeled(&paren.elem, origins, expanding),
+            Type::Path(path) => Self::error_of(&path.path, origins, expanding),
             _ => None,
         }
     }
 
-    fn error_of<'found>(segment: &'found PathSegment, origins: &'found Origins<'_>) -> Option<&'found Type> {
-        let result = Name::from(&segment.ident).matches::<Whole>(&Self::RESULT).map(|_| &segment.arguments);
+    fn error_of<'found>(
+        path: &'found Path,
+        origins: &'found Origins<'_>,
+        expanding: &Expanding,
+    ) -> Option<&'found Type> {
+        let result = path
+            .segments
+            .last()
+            .filter(|segment| Name::from(&segment.ident).matches::<Whole>(&Self::RESULT).is_some())
+            .map(|segment| &segment.arguments);
         result
             .into_iter()
             .flat_map(Self::arguments)
             .filter_map(Self::typed)
             .nth(Self::ERROR)
-            .or_else(|| origins.aliased(&Name::from(&segment.ident)).and_then(|target| Self::peeled(target, origins)))
+            .or_else(|| expanding.through(path, origins, |target, within| Self::peeled(target, origins, within)))
     }
 
     fn arguments(arguments: &PathArguments) -> Vec<&GenericArgument> {
