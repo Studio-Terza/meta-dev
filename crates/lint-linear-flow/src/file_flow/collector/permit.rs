@@ -6,27 +6,28 @@ use super::zone::Zone;
 use crate::function_flow::Root;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Permit {
-    BoolConversion,
+pub enum Permit<'ast> {
+    BoolConversion(&'ast Ident),
     Plain,
 }
 
-impl Permit {
+impl<'ast> Permit<'ast> {
     const FROM: &'static str = "From";
     const BOOL: &'static str = "bool";
 
-    pub fn within(zone: Zone, item: &ItemImpl) -> Permit {
+    pub fn within(zone: Zone, item: &'ast ItemImpl) -> Permit<'ast> {
         match zone {
-            Zone::Boundary => Self::converting(Self::bool_source(item)),
+            Zone::Boundary => {
+                Self::bool_source(item).and_then(|_| Self::target(item)).map_or(Permit::Plain, Permit::BoolConversion)
+            }
             Zone::Elsewhere => Permit::Plain,
         }
     }
 
-    pub fn root<'ast>(self, signature: &'ast Signature, body: &'ast Block) -> Root<'ast> {
+    pub fn root(self, signature: &'ast Signature, body: &'ast Block) -> Root<'ast> {
         match self {
-            Permit::BoolConversion => {
-                Self::sole_input(signature).map_or_else(|| Root::from(body), |input| Root::converting(body, input))
-            }
+            Permit::BoolConversion(target) => Self::sole_input(signature)
+                .map_or_else(|| Root::from(body), |input| Root::converting(body, input, target)),
             Permit::Plain => Root::from(body),
         }
     }
@@ -48,11 +49,8 @@ impl Permit {
         }
     }
 
-    fn converting(source: Option<&TypePath>) -> Permit {
-        match source {
-            Some(_) => Permit::BoolConversion,
-            None => Permit::Plain,
-        }
+    fn target(item: &ItemImpl) -> Option<&Ident> {
+        Syntax::type_path(&item.self_ty).and_then(|target| target.path.segments.last()).map(|segment| &segment.ident)
     }
 
     fn bool_source(item: &ItemImpl) -> Option<&TypePath> {

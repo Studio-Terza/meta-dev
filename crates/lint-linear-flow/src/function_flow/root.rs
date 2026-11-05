@@ -27,8 +27,8 @@ impl<'ast> From<&'ast Block> for Root<'ast> {
 }
 
 impl<'ast> Root<'ast> {
-    pub fn converting(body: &'ast Block, input: &Ident) -> Root<'ast> {
-        match TwoWay::within(body, input) {
+    pub fn converting(body: &'ast Block, input: &Ident, target: &Ident) -> Root<'ast> {
+        match TwoWay::within(body, input, target) {
             Some(routed) => Root::Conversion(routed),
             None => Root::from(body),
         }

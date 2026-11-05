@@ -61,7 +61,13 @@ const FROM_BOOL_STRUCT: &str = "pub struct Delay {\n    millis: u64,\n}\nimpl Fr
 const FROM_COUNT: &str = "impl From<u8> for Lit {\n    fn from(count: u8) -> Lit {\n        if count > 0 { Lit::On } else { Lit::Off }\n    }\n}\n";
 const FROM_BOOL_MATCHED: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        match on {\n            true => Lit::On,\n            false => Lit::Off,\n        }\n    }\n}\n";
 
-const LINEAR: [Case; 30] = [
+const FROM_BOOL_CONST_FN: &str = "impl From<bool> for Lit {\n    const C: u8 = {\n        fn helper(b: bool) -> Lit { if b { Lit::On } else { Lit::Off } }\n        0\n    };\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_SELF: &str = "impl From<bool> for Lit {\n    fn from(on: bool) -> Self {\n        if on { Self::On } else { Lit::Off }\n    }\n}\n";
+const FROM_BOOL_MODULE: &str = "impl From<bool> for Level {\n    fn from(on: bool) -> Level {\n        if on { limits::HIGH } else { limits::LOW }\n    }\n}\n";
+const FROM_BOOL_SAME: &str =
+    "impl From<bool> for Lit {\n    fn from(on: bool) -> Lit {\n        if on { Lit::On } else { Lit::On }\n    }\n}\n";
+
+const LINEAR: [Case; 34] = [
     Case::new(Title::new("pipeline"), &[Source::new(Located::new("a.rs"), Text::new(PIPELINE))], Flagged::new(&[])),
     Case::new(Title::new("if"), &[Source::new(Located::new("a.rs"), Text::new(IF))], Flagged::new(&["a.rs:2"])),
     Case::new(
@@ -194,6 +200,26 @@ const LINEAR: [Case; 30] = [
     Case::new(
         Title::new("from bool with a compound branch"),
         &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_COMPOUND))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a function nested in an associated const of from bool"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_CONST_FN))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool naming Self against the type"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SELF))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("from bool choosing module constants"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_MODULE))],
+        Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
+    ),
+    Case::new(
+        Title::new("from bool with identical branches"),
+        &[Source::new(Located::new("crates/x/src/boundary/lit.rs"), Text::new(FROM_BOOL_SAME))],
         Flagged::new(&["crates/x/src/boundary/lit.rs:3"]),
     ),
 ];
