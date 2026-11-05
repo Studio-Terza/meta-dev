@@ -155,6 +155,24 @@ fn malformed_arguments_are_refused_with_the_reason() {
     assert_eq!(Asked::query(&["--in", "--users", "Ledger"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["index", "--top", "--in", "src"]), Err(QueryFailure::Unfinished));
     assert_eq!(Asked::query(&["--path", "Ledger", "--top", "3"]), Err(QueryFailure::Unfinished));
+    assert_eq!(
+        Asked::query(&["Ledger", "--top", "-1"]).map_err(|failure| failure.to_string()),
+        Err("--top takes a whole number, not `-1`".to_owned())
+    );
+    assert_eq!(Asked::query(&["Ledger", "--top", "-x"]), Err(QueryFailure::Flag("-x".to_owned())));
+    assert_eq!(
+        Asked::query(&["Ledger", "--top=3"]).map_err(|failure| failure.to_string()),
+        Err("`--top=3` is not a flag: write the value as the next argument: --top 3".to_owned())
+    );
+    assert_eq!(
+        Asked::query(&["Ledger", "--defined=Shelf"]).map_err(|failure| failure.to_string()),
+        Err("`--defined=Shelf` is not a flag: write the value as the next argument: --defined Shelf".to_owned())
+    );
+    assert_eq!(
+        Asked::query(&["--path=A B"]).map_err(|failure| failure.to_string()),
+        Err("`--path=A B` is not a flag: write the value as the next argument: --path A B".to_owned())
+    );
+    assert_eq!(Asked::query(&["--bogus=3"]), Err(QueryFailure::Flag("--bogus=3".to_owned())));
     let refused = Asked::query(&["--role", "not a signature"]).map_err(|failure| failure.to_string());
     assert!(refused.is_err_and(|reason| reason.contains("is not a Rust signature")));
 }
