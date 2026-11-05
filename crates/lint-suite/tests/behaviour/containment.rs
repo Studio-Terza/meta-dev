@@ -145,7 +145,11 @@ const USED: [Source; 2] = [
 #[test]
 fn exports_that_no_outside_user_joins_are_reported() {
     assert_eq!(
-        Clustered::lines(&USED, |view| ClusterReport::<InterfaceByConsumers>::report_graph(view).violations().to_vec()),
+        Clustered::lines(&USED, |view| ClusterReport::<<InterfaceByConsumers as Covered>::Coverage>::report_graph(
+            view
+        )
+        .violations()
+        .to_vec()),
         [
             "crates/x/src/lib.rs:1: the exports of crate x fall into 2 groups: [P R] [Q] that no outside user joins; split it along the groups, one part for each kind of user"
         ]

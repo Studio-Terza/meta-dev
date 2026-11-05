@@ -1,9 +1,9 @@
 use crate::characters::Characters;
 use crate::document::key::Key;
-use crate::document::lines::Lines;
-use crate::document::text::Text;
 use crate::excerpt::Excerpt;
+use crate::excerpt::Text;
 use crate::finding::Finding;
+use crate::lines::Lines;
 use crate::word::Word;
 
 mod inline;

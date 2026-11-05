@@ -1,4 +1,7 @@
 mod boundary;
+mod text;
+
+pub(crate) use text::Text;
 
 use newtype::{Arbitrary, Display, Newtype};
 
