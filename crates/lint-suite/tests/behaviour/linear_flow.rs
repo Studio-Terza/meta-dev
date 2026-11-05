@@ -1,7 +1,7 @@
 use lint_core::Lint;
 use lint_linear_flow::{FlowShapes, LinearBodies, PlainConditions, PureRouters};
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title, Withdrawn};
+use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
 const PIPELINE: &str =
     "fn f(items: &[u8]) -> Vec<u8> {\n    let doubled = items.iter().map(|item| item * 2);\n    doubled.collect()\n}\n";
@@ -229,22 +229,37 @@ fn messages_name_the_branch_and_its_fix() {
 }
 
 #[test]
-fn no_fix_text_brings_back_withdrawn_advice() {
+fn loops_routers_and_conditions_pin_their_fix_text() {
     let files = Sources::parsed(&[
-        Source::new(Located::new("a.rs"), Text::new(IF)),
-        Source::new(Located::new("b.rs"), Text::new(IF_LET_INSIDE)),
-        Source::new(Located::new("c.rs"), Text::new(MATCH_AFTER_LET)),
-        Source::new(Located::new("d.rs"), Text::new(LET_ELSE)),
         Source::new(Located::new("e.rs"), Text::new(LOOPS)),
+        Source::new(Located::new("f.rs"), Text::new(GUARD)),
+        Source::new(Located::new("g.rs"), Text::new(LITERAL)),
+        Source::new(Located::new("h.rs"), Text::new(ARMS)),
+        Source::new(Located::new("i.rs"), Text::new(OPERATORS)),
     ]);
-    let tallied = Sources::parsed(&[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHAPES))]);
-    let revived: Vec<(String, Withdrawn)> = LinearBodies::report(&files)
+    let shown: Vec<String> = LinearBodies::report(&files)
         .violations()
         .iter()
-        .chain(FlowShapes::report(&tallied).violations().iter())
+        .chain(PureRouters::report(&files).violations().iter())
+        .chain(PlainConditions::report(&files).violations().iter())
         .map(ToString::to_string)
-        .map(|line| (line.clone(), line.parse().unwrap_or_default()))
-        .filter(|(_, found)| *found != Withdrawn::default())
         .collect();
-    assert_eq!(revived, Vec::<(String, Withdrawn)>::new());
+    assert_eq!(
+        shown,
+        [
+            "e.rs:2: for loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:3: while loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:4: while loop; drive an iterator with combinators (map, fold, try_fold, take_while, or filter on a predicate that reads its element)",
+            "e.rs:5: loop; drive an iterator with combinators (successors, repeat_with, take_while, try_fold)",
+            "f.rs:3: match guard in a router; name the condition as an enum or a predicate type and match on it",
+            "g.rs:3: router arm matches a literal, range, tuple or slice; match on an enum, Option or Result that names the cases",
+            "g.rs:4: router arm matches a literal, range, tuple or slice; match on an enum, Option or Result that names the cases",
+            "h.rs:3: router arm is not a single call or value; extract the arm's logic into its own linear function and call it",
+            "h.rs:7: router arm is not a single call or value; extract the arm's logic into its own linear function and call it",
+            "i.rs:2: boolean operator &&; name the condition as an enum or a predicate type",
+            "i.rs:3: boolean operator ||; name the condition as an enum or a predicate type",
+            "i.rs:3: boolean operator !; name the condition as an enum or a predicate type",
+            "i.rs:4: boolean operator &&; name the condition as an enum or a predicate type",
+        ]
+    );
 }

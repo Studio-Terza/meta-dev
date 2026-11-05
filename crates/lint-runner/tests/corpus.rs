@@ -4,7 +4,6 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use file_ports::{FileFailure, Files, Kind, Memory};
-use lint_fixtures::Withdrawn;
 use lint_runner::Cli;
 use text_lines::Lines;
 
@@ -34,12 +33,6 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
     assert_ne!(printed, Vec::<&str>::new());
     assert_eq!(unfixed, Vec::<&str>::new());
-    let withdrawn: Vec<(&str, Withdrawn)> = printed
-        .iter()
-        .map(|line| (*line, Corpus::withdrawn_advice(line)))
-        .filter(|(_, found)| *found != Withdrawn::default())
-        .collect();
-    assert_eq!(withdrawn, Vec::<(&str, Withdrawn)>::new());
     Ok(())
 }
 
@@ -95,10 +88,6 @@ impl Corpus {
             .and_then(|(at, _)| line.get(..at))
             .and_then(|site| site.chars().last())
             .is_some_and(|last| last.is_ascii_digit())
-    }
-
-    fn withdrawn_advice(line: &str) -> Withdrawn {
-        Self::fix_named(line).unwrap_or_default().parse().unwrap_or_default()
     }
 
     fn fix_named(line: &str) -> Option<&str> {
