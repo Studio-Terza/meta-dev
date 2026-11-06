@@ -8,5 +8,5 @@ pub use calls::Calls;
 pub use op::{Op, OpName, Pass};
 pub use port::{Metered, Port};
 pub use port_derive::port;
-pub use run::{Measured, RootRefused, Rooting, Run};
+pub use run::{Measured, Run};
 pub use snapshot::{Counted, Snapshot};

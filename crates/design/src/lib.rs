@@ -1,3 +1,3 @@
 mod cli;
 
-pub use cli::{Cli, Failure, Printed, Streams};
+pub use cli::{Cli, Failure, Streams};

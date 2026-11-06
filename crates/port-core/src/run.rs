@@ -1,6 +1,4 @@
 use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt;
 use std::sync::{Mutex, PoisonError};
 
 use newtype::Counter;
@@ -26,64 +24,6 @@ impl Measured {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Rooting {
-    Shared,
-    Sole,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RootRefused;
-
-impl fmt::Display for RootRefused {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a sole run refuses every other root while it lives")
-    }
-}
-
-impl Error for RootRefused {}
-
-#[derive(Debug, Clone, Copy)]
-enum Roots {
-    Shared(Calls),
-    Sole,
-}
-
-static ROOTS: Mutex<Roots> = Mutex::new(Roots::Shared(Calls::new(0)));
-
-impl Rooting {
-    fn admitting(self, live: Calls) -> Result<Roots, RootRefused> {
-        match self {
-            Rooting::Shared => Ok(Roots::Shared(live.incremented())),
-            Rooting::Sole => Roots::alone(live),
-        }
-    }
-}
-
-impl Roots {
-    fn admitted(self, rooting: Rooting) -> Result<Roots, RootRefused> {
-        self.live().and_then(|live| rooting.admitting(live))
-    }
-
-    fn live(self) -> Result<Calls, RootRefused> {
-        match self {
-            Roots::Shared(live) => Ok(live),
-            Roots::Sole => Err(RootRefused),
-        }
-    }
-
-    fn alone(live: Calls) -> Result<Roots, RootRefused> {
-        (live == Calls::zero()).then_some(Roots::Sole).ok_or(RootRefused)
-    }
-
-    fn left(self) -> Roots {
-        match self {
-            Roots::Shared(live) => Roots::Shared(Calls::new(live.count().saturating_sub(1))),
-            Roots::Sole => Roots::Shared(Calls::zero()),
-        }
-    }
-}
-
 #[must_use = "a run counts until it is finished"]
 #[derive(Debug)]
 pub struct Run {
@@ -91,16 +31,12 @@ pub struct Run {
 }
 
 impl Run {
-    pub fn root(rooting: Rooting) -> Result<Run, RootRefused> {
-        let mut roots = ROOTS.lock().unwrap_or_else(PoisonError::into_inner);
-        roots.admitted(rooting).map(|admitted| {
-            *roots = admitted;
-            Run { ledger: Ledger::default() }
-        })
+    pub fn root() -> Run {
+        Run { ledger: Ledger::default() }
     }
 
     pub fn finish(self) -> Measured {
-        let calls = std::mem::take(&mut *self.ledger.calls.lock().unwrap_or_else(PoisonError::into_inner));
+        let calls = self.ledger.calls.into_inner().unwrap_or_else(PoisonError::into_inner);
         Measured { snapshot: Snapshot::counted(calls) }
     }
 
@@ -108,12 +44,5 @@ impl Run {
         let mut calls = self.ledger.calls.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = calls.entry(name).or_default();
         *entry = entry.incremented();
-    }
-}
-
-impl Drop for Run {
-    fn drop(&mut self) {
-        let mut roots = ROOTS.lock().unwrap_or_else(PoisonError::into_inner);
-        *roots = roots.left();
     }
 }

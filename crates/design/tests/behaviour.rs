@@ -5,7 +5,7 @@ use console_ports::Variables;
 use design::Streams;
 use design::{Cli, Failure};
 use file_ports::{Bytes, Files, Memory};
-use port_core::{Rooting, Run};
+use port_core::Run;
 
 const HOME: &str = "/home/tester";
 
@@ -86,7 +86,7 @@ impl Invocation {
             .map(|(name, value)| (OsString::from(name), OsString::from(value)))
             .into_iter()
             .collect();
-        let run = Run::root(Rooting::Shared)?;
+        let run = Run::root();
         let mut out = Vec::new();
         Cli::new(&environment, session.files()).report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(String::from_utf8(out).unwrap_or_default())
@@ -118,11 +118,8 @@ impl Rooted {
             .into_iter()
             .collect();
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let _ = Cli::new(&environment, session.files()).rooted(
-            Rooting::Shared,
-            arguments.iter().map(OsString::from),
-            &mut Streams::new(&mut out, &mut err),
-        );
+        let _ = Cli::new(&environment, session.files())
+            .rooted(arguments.iter().map(OsString::from), &mut Streams::new(&mut out, &mut err));
         Captured { out: String::from_utf8(out).unwrap_or_default(), err: String::from_utf8(err).unwrap_or_default() }
     }
 }

@@ -9,11 +9,11 @@ use std::process::ExitCode;
 
 use console_ports::Environment;
 use file_ports::Files;
-use port_core::{Rooting, Run};
+use port_core::Run;
 use transcript_ports::ClaudeCodeDir;
 
 pub use failure::Failure;
-pub use printed::Printed;
+use printed::Printed;
 use request::Request;
 pub use streams::Streams;
 
@@ -31,15 +31,12 @@ impl<'environment, E: Environment, F: Files> Cli<'environment, E, F> {
     #[must_use]
     pub fn rooted(
         self,
-        rooting: Rooting,
         arguments: impl Iterator<Item = OsString>,
         streams: &mut Streams<impl Write, impl Write>,
     ) -> ExitCode {
-        let outcome = Run::root(rooting).map_err(Failure::from).and_then(|run| {
-            let reported = self.report(&run, arguments, streams.out());
-            run.finish();
-            reported
-        });
+        let run = Run::root();
+        let outcome = self.report(&run, arguments, streams.out());
+        run.finish();
         outcome.map_or_else(|failure| streams.refused(&failure), |_printed| ExitCode::SUCCESS)
     }
 

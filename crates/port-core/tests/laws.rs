@@ -2,7 +2,7 @@ use std::sync::{Mutex, PoisonError};
 
 use laws::proptest::prelude::{any, prop_assert_eq};
 use newtype::Counter;
-use port_core::{Calls, Counted, Measured, Metered, Op, Pass, Port, RootRefused, Rooting, Run, Snapshot, port};
+use port_core::{Calls, Counted, Measured, Metered, Op, Pass, Port, Run, Snapshot, port};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Session(String);
@@ -62,10 +62,6 @@ impl Tally {
         O::NAME.to_string()
     }
 
-    fn shared() -> Result<Run, RootRefused> {
-        Run::root(Rooting::Shared)
-    }
-
     fn over<F>(run: &Run, filler: F) -> Port<'_, F> {
         run.port(filler)
     }
@@ -84,7 +80,7 @@ impl Tally {
 }
 
 laws::law!(an_op_is_counted_once_per_call_of_its_own, 0usize..24, calls, {
-    let run = Tally::shared()?;
+    let run = Run::root();
     let port = run.port(Memory::holding(&["a"]));
     (0..calls).for_each(|_| {
         let _ = Transcripts::sessions(&port);
@@ -98,7 +94,7 @@ laws::law!(an_op_is_counted_once_per_call_of_its_own, 0usize..24, calls, {
 
 laws::law!(a_provided_method_counts_the_required_calls_it_makes, 0usize..8, sessions, {
     let names: Vec<String> = (0..sessions).map(|number| number.to_string()).collect();
-    let run = Tally::shared()?;
+    let run = Run::root();
     let port = run.port(Memory::holding(&names.iter().map(String::as_str).collect::<Vec<_>>()));
     prop_assert_eq!(Transcripts::read_all(Tally::metered(&port)).len(), sessions);
     drop(port);
@@ -108,7 +104,7 @@ laws::law!(a_provided_method_counts_the_required_calls_it_makes, 0usize..8, sess
 });
 
 laws::law!(calls_on_scoped_threads_are_all_counted, 1usize..6, threads, {
-    let run = Tally::shared()?;
+    let run = Run::root();
     let port = run.port(Memory::holding(&["a"]));
     std::thread::scope(|scope| {
         (0..threads).for_each(|_| {
@@ -121,7 +117,7 @@ laws::law!(calls_on_scoped_threads_are_all_counted, 1usize..6, threads, {
 });
 
 laws::law!(runs_never_share_their_counts, (0usize..8, 0usize..8), pair, {
-    let (first, second) = (Tally::shared()?, Tally::shared()?);
+    let (first, second) = (Run::root(), Run::root());
     let (left, right) = (first.port(Memory::default()), second.port(Memory::default()));
     (0..pair.0).for_each(|_| {
         let _ = Transcripts::sessions(&left);
@@ -136,7 +132,7 @@ laws::law!(runs_never_share_their_counts, (0usize..8, 0usize..8), pair, {
 });
 
 laws::law!(a_snapshot_lists_ops_in_name_order, any::<(bool, bool)>(), which, {
-    let run = Tally::shared()?;
+    let run = Run::root();
     let port = Tally::over(&run, Memory::holding(&["a"]));
     let session = Session("a".to_owned());
     let _ = which.0.then(|| Transcripts::read_from(&port, &session, 0));
@@ -155,11 +151,10 @@ fn op_names_are_the_module_path_then_the_trait_and_method() {
 }
 
 #[test]
-fn a_two_word_trait_names_its_ops_module_in_snake_case() -> Result<(), RootRefused> {
-    let run = Tally::shared()?;
+fn a_two_word_trait_names_its_ops_module_in_snake_case() {
+    let run = Run::root();
     let port = Tally::over(&run, Memory::default());
     SessionCache::clear(Tally::metered(&port));
     drop(port);
     assert_eq!(Tally::names(run.finish().snapshot()), ["laws::session_cache_ops::SessionCache::clear"]);
-    Ok(())
 }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
-use port_core::{Rooting, Run};
+use port_core::Run;
 use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, ClaudeCodeDir, Transcripts, Uuid};
 
@@ -82,7 +82,7 @@ impl Fixture {
         memory.create_directories(Path::new(DIRECTORY))?;
         memory
             .write(Path::new("/projects/work/s.jsonl"), Bytes::from(&said.iter().map(Say::line).collect::<String>()))?;
-        let run = Run::root(Rooting::Shared)?;
+        let run = Run::root();
         let port = run.port(ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY)));
         let sessions = Transcripts::sessions(&port)?;
         let reads = Transcripts::read_all(&port, &sessions)?;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
-use port_core::{Calls, Rooting, Run};
+use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Instant, Line, Read, Record, Session, Transcripts};
 
@@ -73,7 +73,7 @@ impl Transcript {
     }
 
     fn read(&self, cursor: Cursor) -> Result<Read, Box<dyn Error>> {
-        let run = Run::root(Rooting::Shared)?;
+        let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port)?;
         let session = sessions.first().ok_or("no session")?;
@@ -81,14 +81,11 @@ impl Transcript {
     }
 
     fn sessions(&self) -> Vec<Session> {
-        Run::root(Rooting::Shared)
-            .ok()
-            .and_then(|run| Transcripts::sessions(&run.port(self.directory())).ok())
-            .unwrap_or_default()
+        Transcripts::sessions(&Run::root().port(self.directory())).unwrap_or_default()
     }
 
     fn calls(&self) -> Option<Counted> {
-        let run = Run::root(Rooting::Shared).ok()?;
+        let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port).ok()?;
         Transcripts::read_all(&port, &sessions).ok()?;

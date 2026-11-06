@@ -26,12 +26,13 @@ impl Ops {
     fn op_declaration(caller: &CallerName, method: &Method) -> TokenStream {
         let op = Spelling::camel(method.name());
         let path = Spelling::method_path(caller, method.name());
+        let name = quote!(::port_core::OpName);
         quote! {
             #[derive(Debug)]
             pub struct #op;
 
             impl ::port_core::Op for #op {
-                const NAME: ::port_core::OpName = ::port_core::OpName::new(concat!(module_path!(), #path));
+                const NAME: #name = #name::new(concat!(module_path!(), #path));
             }
         }
     }
