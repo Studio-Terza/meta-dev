@@ -1,9 +1,8 @@
-use std::cell::OnceCell;
 use std::iter;
 use std::thread::Scope;
 
 use code_model::Model;
-use code_reader::Reader;
+
 use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
@@ -63,7 +62,7 @@ use crate::cli::{Outcome, Sources};
 #[derive(Debug)]
 pub struct Lints;
 
-type Check = for<'file> fn(&'file Readout, &'file OnceCell<Model>) -> Vec<Report<'file>>;
+type Check = for<'file> fn(&'file Readout, &'file Queue) -> Vec<Report<'file>>;
 
 type Query = for<'model> fn(&'model Model) -> Report<'model>;
 
@@ -87,7 +86,7 @@ impl Lints {
         |readout, _| vec![NoNumbersInBinaries::report(readout.files())],
         |readout, _| vec![NoParameterBags::report(readout.files())],
         |readout, _| vec![NoPlaintext::report(readout.files())],
-        |readout, model| vec![<PrimitiveBoundary as ModelLint>::report(model.get_or_init(|| Reader::read(readout)))],
+        |readout, queue| vec![<PrimitiveBoundary as ModelLint>::report(queue.model(readout))],
         |readout, _| vec![PrivateFns::report(readout.files())],
         |readout, _| vec![ProcessStarters::report(readout.files())],
         |readout, _| vec![RawResources::report(readout.files())],
@@ -164,8 +163,7 @@ impl Lints {
             )
             .rev()
             .collect();
-        let model = OnceCell::new();
-        queue.claimed(&jobs).flat_map(|job| job.done(readout, &model)).collect()
+        queue.claimed(&jobs).flat_map(|job| job.done(readout, queue)).collect()
     }
 }
 
@@ -176,18 +174,16 @@ enum Job {
 }
 
 impl Job {
-    fn done(self, readout: &Readout, model: &OnceCell<Model>) -> Vec<Rendered> {
+    fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
         match self {
-            Job::Check { slot, check } => check(readout, model)
+            Job::Check { slot, check } => check(readout, queue)
                 .into_iter()
                 .filter_map(Report::dirty)
                 .map(|report| Rendered::render(slot, &report))
                 .collect(),
-            Job::Query { slot, query } => query(model.get_or_init(|| Reader::read(readout)))
-                .dirty()
-                .map(|report| Rendered::render(slot, &report))
-                .into_iter()
-                .collect(),
+            Job::Query { slot, query } => {
+                query(queue.model(readout)).dirty().map(|report| Rendered::render(slot, &report)).into_iter().collect()
+            }
         }
     }
 }

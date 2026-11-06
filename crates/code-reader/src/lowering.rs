@@ -4,6 +4,7 @@ mod held;
 mod regions;
 mod seat;
 mod signature;
+mod subjects;
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -17,8 +18,8 @@ use syn::{
 };
 
 use code_model::{
-    Alias, Building, Entry, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Region,
-    Seat as Seated, Signature, Sited, Spelling, Subject, TypeRef,
+    Alias, Building, Entry, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Region, Signature,
+    Sited, Spelling, Subject, TypeRef,
 };
 use lint_layout::{LineNumber, Name, TestMarks, Whole, Word, words};
 
@@ -33,6 +34,7 @@ use held::{Holder, HoldingRow, Link};
 use regions::{Context, Regions};
 use seat::{Built, Located, Seat};
 use signature::{DeclaredParameter, InScope, LoweredInput, Written};
+use subjects::{SubjectId, SubjectRows, Subjects};
 
 #[derive(Clone, Copy, Debug, Default)]
 enum Enclosure {
@@ -152,7 +154,7 @@ struct FnRow {
     output: Option<TypeRef<Written>>,
     constraints: Vec<TypeRef<Written>>,
     region: Region,
-    subject: Option<TypeRef<Written>>,
+    subject: Option<SubjectId>,
 }
 
 impl FnRow {
@@ -164,15 +166,14 @@ impl FnRow {
     }
 }
 
-impl Built for FnRow {
-    fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
+impl FnRow {
+    fn built(self, resolving: &Resolving<'_, '_, '_>, subjects: &Subjects, building: Building) -> Building {
         let scope = self.located.scope();
         let inputs = self.inputs.into_iter().map(|input| input.typed(resolving, scope)).collect();
         let constraints = self.constraints.into_iter().map(|ty| Written::typed(ty, resolving, scope)).collect();
         let signature = Signature::new(inputs, Self::resolved(resolving, scope, self.output), constraints);
-        let subject = self.subject.map(|subject| Written::typed(subject, resolving, scope));
-        let function =
-            Function::new(self.name, self.owner, self.entry, signature).seated(Seated::new(self.region, subject));
+        let function = Function::new(self.name, self.owner, self.entry, signature)
+            .seated(subjects.seat(self.region, self.subject));
         self.located.function(building, function)
     }
 }
@@ -264,6 +265,7 @@ pub(crate) struct Lowered<'read> {
     aliases: Vec<AliasRow>,
     holdings: Vec<HoldingRow>,
     calls: Vec<CallRow>,
+    subjects: SubjectRows,
 }
 
 impl<'read> Lowered<'read> {
@@ -306,9 +308,10 @@ impl<'read> Lowered<'read> {
         let resolving = Resolving::new(Resolver::new(&self.space, &tables), &ids);
         let building = Self::each_built(self.aliases, &resolving, StdNames::aliased(building));
         let building = Self::each_built(self.rows, &resolving, building);
-        let building = Self::each_built(self.functions, &resolving, building);
+        let subjects = self.subjects.settled(&resolving);
+        let building = self.functions.into_iter().fold(building, |built, row| row.built(&resolving, &subjects, built));
         let building = Self::each_built(self.holdings, &resolving, building);
-        Self::each_built(self.calls, &resolving, building).built()
+        self.calls.into_iter().fold(building, |built, row| row.built(&subjects, built)).built()
     }
 
     fn each_built<Row: Built>(rows: Vec<Row>, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
@@ -412,7 +415,8 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
         let subject = declared.lowered(&block.self_ty);
         let generics = declared.subject(subject.clone());
         self.lowered.rows.push(ImplRow::written(&self.here, self.context.region(), block, subject.clone()));
-        let context = self.context.of_impl(block, subject);
+        let subjected = self.subjected(subject);
+        let context = self.context.of_impl(block, subjected);
         self.contextual(context, |lowering| {
             lowering.enclosed(Enclosure::of_impl(block), generics, |lowering| visit::visit_item_impl(lowering, block));
         });

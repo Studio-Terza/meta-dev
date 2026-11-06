@@ -74,15 +74,18 @@ impl Newtypes {
     }
 
     fn edge(&self, function: &Function) -> Option<ItemId> {
-        let inherent = [function.owner()].into_iter().find(|owner| *owner == Owner::Inherent);
-        let inputs = function.signature().inputs();
-        let alone = inputs.first().xor(inputs.get(1));
         let name: &Name = function.as_ref();
         let edge = name.matches::<Whole>(&Self::EDGES);
+        let inherent = edge.and([function.owner()].into_iter().find(|owner| *owner == Owner::Inherent));
+        let inputs = function.signature().inputs();
+        let alone = inherent.and(inputs.first().xor(inputs.get(1)));
         let seat: &Seat = function.as_ref();
-        let item =
-            seat.subject().and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref).and_then(Resolved::crate_item);
-        inherent.and(alone).and(edge).and(self.newtype(item))
+        let item = alone
+            .and(seat.subject())
+            .and_then(TypeRef::named)
+            .map(AsRef::<Resolved>::as_ref)
+            .and_then(Resolved::crate_item);
+        self.newtype(item)
     }
 }
 

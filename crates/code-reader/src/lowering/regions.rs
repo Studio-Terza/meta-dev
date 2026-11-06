@@ -1,12 +1,12 @@
 use syn::{Attribute, ItemImpl, ItemMod};
 
-use code_model::{Reach, Region, TypeRef, Within, Zone};
+use code_model::{Reach, Region, Within, Zone};
 use lint_core::{Gate, SourceFile, Walk};
 
 use crate::planting::ReadFile;
 
 use super::Lowering;
-use super::signature::Written;
+use super::subjects::SubjectId;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Regions;
@@ -45,7 +45,7 @@ impl Regions {
 #[derive(Debug)]
 pub(super) struct Context {
     region: Region,
-    subject: Option<TypeRef<Written>>,
+    subject: Option<SubjectId>,
 }
 
 impl Context {
@@ -54,10 +54,10 @@ impl Context {
     }
 
     pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), subject: self.subject.clone() }
+        Context { region: Regions::of_module(self.region, item), subject: self.subject }
     }
 
-    pub(super) fn of_impl(&self, block: &ItemImpl, subject: TypeRef<Written>) -> Context {
+    pub(super) fn of_impl(&self, block: &ItemImpl, subject: SubjectId) -> Context {
         Context { region: self.region.inside(Self::within(block)), subject: Some(subject) }
     }
 
@@ -69,8 +69,8 @@ impl Context {
         self.region
     }
 
-    pub(super) fn subject(&self) -> Option<TypeRef<Written>> {
-        self.subject.clone()
+    pub(super) fn subject(&self) -> Option<SubjectId> {
+        self.subject
     }
 
     fn within(block: &ItemImpl) -> Within {

@@ -1,4 +1,4 @@
-use code_model::{Callee, ItemPath, Model};
+use code_model::{Call, Callee, ItemPath, Model, Placed};
 use lint_core::Violation;
 use lint_layout::{Name, Whole, Word, words};
 
@@ -33,14 +33,13 @@ impl<'read, 'model> Texts<'read, 'model> {
     }
 
     pub fn found(&self, model: &'model Model) -> Vec<Violation<'model>> {
-        model
-            .calls()
-            .filter_map(|placed| {
-                let call = self.scope.call(placed.entity(), placed.site().path());
-                let handler = call.and_then(|call| self.handler(call.callee()));
-                handler.map(|handler| Violation::new(placed.site(), Finding::TextOutsideDoor { handler }))
-            })
-            .collect()
+        model.calls().filter_map(|placed| self.sighted(placed)).collect()
+    }
+
+    fn sighted(&self, placed: Placed<'model, &'model Call>) -> Option<Violation<'model>> {
+        let handler = self.handler(placed.entity().callee());
+        let call = handler.as_ref().and_then(|_| self.scope.call(placed.entity(), placed.site().path()));
+        call.and(handler).map(|handler| Violation::new(placed.site(), Finding::TextOutsideDoor { handler }))
     }
 
     fn handler(&self, callee: &Callee) -> Option<Name> {

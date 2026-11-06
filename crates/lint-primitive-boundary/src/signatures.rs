@@ -69,32 +69,33 @@ impl<'read, 'model> Signatures<'read, 'model> {
     }
 
     pub fn found(&self, model: &'model Model) -> Vec<Violation<'model>> {
-        let functions = model.functions().map(|placed| {
+        let functions = model.functions().filter_map(|placed| {
             let function = self.scope.function(placed.entity());
-            let types = function.into_iter().flat_map(|function| function.signature().written());
-            Signed { site: placed.site(), found: self.walked(placed.site().path(), placed.entity().as_ref(), types) }
+            function.map(|function| self.signed(placed.site(), function.as_ref(), function.signature().written()))
         });
-        let holdings = model.holdings().map(|placed| {
+        let holdings = model.holdings().filter_map(|placed| {
             let holding = self.scope.holding(placed.entity());
-            let types = holding.into_iter().map(AsRef::<TypeRef>::as_ref);
-            Signed { site: placed.site(), found: self.walked(placed.site().path(), placed.entity().as_ref(), types) }
+            holding.map(|holding| self.signed(placed.site(), holding.as_ref(), [holding.as_ref()].into_iter()))
         });
-        let mut signed: Vec<Signed<'model>> = functions.chain(holdings).collect();
+        let mut signed: Vec<Signed<'model>> =
+            functions.chain(holdings).filter(|signed| signed.found.first().is_some()).collect();
         signed.sort_by(|left, right| left.site.cmp(&right.site));
         signed.into_iter().flat_map(|signed| signed.found).collect()
     }
 
-    fn walked<'ty>(
+    fn signed<'ty>(
         &self,
-        file: &'model Path,
+        site: Site<'model>,
         context: &Name,
         types: impl Iterator<Item = &'ty TypeRef>,
-    ) -> Vec<Violation<'model>> {
-        let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file, found: Vec::new() };
+    ) -> Signed<'model> {
+        let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file: site.path(), found: Vec::new() };
         types.for_each(|ty| ty.each_use(&mut walk));
-        walk.found
+        let found = walk
+            .found
             .into_iter()
-            .map(|found| Violation::new(Site::new(file, found.line), found.identity.finding(context.clone())))
-            .collect()
+            .map(|found| Violation::new(Site::new(site.path(), found.line), found.identity.finding(context.clone())))
+            .collect();
+        Signed { site, found }
     }
 }

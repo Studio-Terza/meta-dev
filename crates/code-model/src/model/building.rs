@@ -64,8 +64,8 @@ impl Building {
             files: model.files,
             implementations: Filed::sorted(model.implementations),
             functions: Filed::sorted(model.functions),
-            holdings: Filed::sorted(model.holdings),
-            calls: Filed::sorted(model.calls),
+            holdings: model.holdings,
+            calls: model.calls,
             declarations: Declarations::new(self.items, self.aliases),
         }
     }

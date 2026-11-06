@@ -1,43 +1,43 @@
 use syn::spanned::Spanned;
-use syn::{ExprCall, ExprMethodCall, ExprPath, Macro};
+use syn::{ExprCall, ExprMethodCall, Macro};
 
-use code_model::{Building, Call, Callee, MacroCall, Region, Seat, TypeRef};
+use code_model::{Building, Call, Callee, ItemPath, MacroCall, Region};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name};
 
-use crate::namespace::{Resolving, UsePath};
-
 use super::Lowering;
-use super::seat::{Built, Located};
-use super::signature::Written;
+use super::seat::Located;
+use super::subjects::{SubjectId, Subjects};
 
 #[derive(Debug)]
 pub(super) struct CallRow {
     located: Located,
     callee: Callee,
     region: Region,
-    subject: Option<TypeRef<Written>>,
+    subject: Option<SubjectId>,
 }
 
-impl Built for CallRow {
-    fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
-        let scope = self.located.scope();
-        let subject = self.subject.map(|subject| Written::typed(subject, resolving, scope));
-        self.located.call(building, Call::new(self.callee, Seat::new(self.region, subject)))
+impl CallRow {
+    pub(super) fn built(self, subjects: &Subjects, building: Building) -> Building {
+        self.located.call(building, Call::new(self.callee, subjects.seat(self.region, self.subject)))
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 struct CallPath<'path> {
-    path: &'path ExprPath,
+    path: &'path syn::Path,
 }
 
 impl CallPath<'_> {
     fn line(self) -> LineNumber {
-        match self.path.path.segments.last() {
+        match self.path.segments.last() {
             Some(last) => LineNumber::from(last.ident.span()),
             None => LineNumber::from(self.path.span()),
         }
+    }
+
+    fn written(self) -> ItemPath {
+        self.path.segments.iter().map(|segment| Name::from(&segment.ident)).collect()
     }
 }
 
@@ -48,15 +48,15 @@ impl Lowering<'_, '_> {
 
     pub(super) fn path_called(&mut self, call: &ExprCall) {
         Syntax::expr_path(&call.func).into_iter().fold(self, |lowering, path| {
-            let line = CallPath { path }.line();
-            lowering.called(line, Callee::Path(UsePath::from(&path.path).written()));
+            let called = CallPath { path: &path.path };
+            lowering.called(called.line(), Callee::Path(called.written()));
             lowering
         });
     }
 
     pub(super) fn macro_called(&mut self, invoked: &Macro) {
-        let line = LineNumber::from(invoked.path.span());
-        self.called(line, Callee::Macro(MacroCall::from(UsePath::from(&invoked.path).written())));
+        let called = CallPath { path: &invoked.path };
+        self.called(LineNumber::from(invoked.path.span()), Callee::Macro(MacroCall::from(called.written())));
     }
 
     fn called(&mut self, line: LineNumber, callee: Callee) {
