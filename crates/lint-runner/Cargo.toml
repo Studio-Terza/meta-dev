@@ -60,6 +60,7 @@ lint-repeated-methods = { path = "../lint-repeated-methods" }
 lint-repeated-shapes = { path = "../lint-repeated-shapes" }
 lint-rust-only = { path = "../lint-rust-only" }
 lint-state-graph = { path = "../lint-state-graph" }
+lint-store-queries = { path = "../lint-store-queries" }
 lint-test-budget = { path = "../lint-test-budget" }
 lint-thin-main = { path = "../lint-thin-main" }
 lint-transition-graph = { path = "../lint-transition-graph" }

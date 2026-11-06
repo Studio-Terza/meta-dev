@@ -1,5 +1,5 @@
 use lint_fixtures::{Lines, Located, Source, Sources, Text};
-use lint_port_dependencies::{CountedCalls, EffectsInFillers, OwnedDependencies};
+use lint_port_dependencies::{CountedCalls, EffectsInFillers, HiddenSqlx, OwnedDependencies};
 
 const CRATES: &[Source] = &[
     Source::new(Located::new("crates/grammar/src/lib.rs"), Text::new("pub struct Lexer;\n")),
@@ -134,6 +134,23 @@ const IN_MACRO: &[Source] = &[Source::new(
     Text::new("fn f() {\n    vec![port_core::counted_call(a)];\n}\n"),
 )];
 
+const IN_STORE_PORTS: &[Source] =
+    &[Source::new(Located::new("crates/store-ports/src/lib.rs"), Text::new("pub use sqlx as __sqlx;\n"))];
+const IN_STORE_PORTS_MACROS: &[Source] = &[Source::new(
+    Located::new("crates/store-ports-macros/src/lib.rs"),
+    Text::new("fn f() {\n    quote!(store_ports::__sqlx);\n}\n"),
+)];
+const SQLX_ELSEWHERE: &[Source] = &[Source::new(
+    Located::new("crates/design-store/src/lib.rs"),
+    Text::new("use store_ports::__sqlx::SqliteConnection;\n"),
+)];
+const SQLX_IN_MACRO: &[Source] = &[Source::new(
+    Located::new("crates/design/tests/run.rs"),
+    Text::new("fn f() {\n    vec![store_ports::__sqlx::query(a)];\n}\n"),
+)];
+const SQLX_ITSELF: &[Source] =
+    &[Source::new(Located::new("crates/design/src/lib.rs"), Text::new("use store_ports::Store;\nfn sqlx() {}\n"))];
+
 struct Owning;
 
 impl Owning {
@@ -151,8 +168,8 @@ laws::table!(
         [OWNER, RENAMED] => ["crates/design/Cargo.toml:5"],
         [OWNER, ELSEWHERE] => Lines::default(),
         [UNOWNED, DEPENDS] => Lines::default(),
-        [OWNER, CO_OWNER] => Lines::default(),
-        [OWNER, CO_OWNER, THIRD] => ["crates/store/Cargo.toml:5"],
+        [OWNER, CO_OWNER] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8"],
+        [OWNER, CO_OWNER, THIRD] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8", "crates/store/Cargo.toml:5"],
     ]
 );
 
@@ -184,5 +201,17 @@ laws::table!(
         ACQUIRED_ELSEWHERE => ["crates/store-ports/src/lib.rs:2"],
         IMPORTED => ["crates/design/src/lib.rs:1"],
         IN_MACRO => ["crates/design/tests/run.rs:2"],
+    ]
+);
+
+laws::table!(
+    the_sqlx_store_ports_re_exports_is_named_only_in_store_ports_and_its_macros,
+    Sources::flagged::<HiddenSqlx>,
+    [
+        IN_STORE_PORTS => Lines::default(),
+        IN_STORE_PORTS_MACROS => Lines::default(),
+        SQLX_ELSEWHERE => ["crates/design-store/src/lib.rs:1"],
+        SQLX_IN_MACRO => ["crates/design/tests/run.rs:2"],
+        SQLX_ITSELF => Lines::default(),
     ]
 );
