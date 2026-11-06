@@ -39,8 +39,7 @@ impl NodeEdge {
 
     fn leaning(self, source: Role, target: Role) -> Option<[Role; ENDS]> {
         match self.relation {
-            NodeRelation::Refines => Some([target, source]),
-            NodeRelation::Consumes => Some([source, target]),
+            NodeRelation::Refines | NodeRelation::Consumes => Some([source, target]),
             NodeRelation::Supersedes => None,
         }
     }

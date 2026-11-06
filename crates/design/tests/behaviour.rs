@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, Planting, ShownMessage, Stored, StreamSchema};
+use design_store::{AppliedId, Linked, Planting, ShownMessage, ShownNode, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -1434,31 +1434,82 @@ fn a_lifecycle_command_is_refused_while_the_store_lock_is_held() -> Result<(), F
 }
 
 #[test]
-fn a_core_node_never_depends_on_a_secondary_one_and_the_refusal_names_the_edge() -> Result<(), Failure> {
+fn a_secondary_parent_never_takes_a_core_child_and_the_refusal_names_the_edge() -> Result<(), Failure> {
     let applying = Lifecycle::reached(Stage::Vague)?;
     let edge = NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1));
-    let child = applying.run(&["role", "n2", "secondary"]);
-    assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
-    assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
-    assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
-    let parent = applying.run(&["role", "n1", "core"]);
+    let parent = applying.run(&["role", "n1", "secondary"]);
     assert!(matches!(parent, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    let parent = applying.run(&["show", "n1"])?;
-    assert!(parent.contains("n1 demo project vague secondary entered init\n"));
-    assert!(parent.contains("  role secondary entered role\n"));
+    assert!(applying.run(&["show", "n1"])?.contains("n1 demo project vague core entered init\n"));
+    assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
+    assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
+    let child = applying.run(&["role", "n2", "core"]);
+    assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
+    let child = applying.run(&["show", "n2"])?;
+    assert!(child.contains("n2 demo feature vague secondary entered apply"));
+    assert!(child.contains("  role secondary entered role\n"));
     Ok(())
 }
 
 #[test]
-fn a_proposal_is_core_even_under_a_secondary_parent() -> Result<(), Failure> {
+fn a_proposal_inherits_a_secondary_parent_s_role_and_records_the_inheritance() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.run(&["role", "n1", "secondary"])?;
     applying.applied("propose(new, refines(n1), feature, \"child\")")?;
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
+    let child = applying.run(&["show", "n2"])?;
+    assert!(child.contains("n2 demo feature vague secondary entered apply"));
+    assert!(child.contains("  role secondary entered inheritance\n"));
     assert_eq!(applying.outcome(&["role", "n1", "core"])?, Outcome::Recast(Role::Core));
     Ok(())
 }
+
+#[derive(Clone, Copy, Debug)]
+struct Ruled {
+    parent: Role,
+    child: Role,
+}
+
+impl Ruled {
+    fn recast(self) -> Result<Roles, Option<NodeEdge>> {
+        let applying = Applying::ready().map_err(|_unready| None)?;
+        applying.outcome(&["role", "n1", self.parent.name()]).map_err(|_unrecast| None)?;
+        applying.applied("propose(new, refines(n1), feature, \"metering\")").map_err(|_unproposed| None)?;
+        let proposed = applying.role(NodeId::new(2)).ok_or(None)?;
+        applying.outcome(&["role", "n2", self.child.name()]).map_err(Ruled::inverted)?;
+        applying.role(NodeId::new(2)).map(|recast| Roles { proposed, recast }).ok_or(None)
+    }
+
+    fn inverted(failure: Failure) -> Option<NodeEdge> {
+        match failure {
+            Failure::Inverted { edge } => Some(edge),
+            _other => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Roles {
+    proposed: Role,
+    recast: Role,
+}
+
+impl Applying {
+    fn role(&self, node: NodeId) -> Option<Role> {
+        let run = Run::root();
+        let placed = run.port(self.store.clone()).read(ShownNode::from(node)).ok().flatten();
+        placed.map(|placed| placed.node().casting().role())
+    }
+}
+
+laws::table!(
+    a_core_parent_may_take_a_secondary_child_and_a_secondary_parent_never_a_core_one,
+    |ruled: &Ruled| Ruled::recast(*ruled),
+    [
+        Ruled { parent: Role::Core, child: Role::Secondary } => Ok(Roles { proposed: Role::Core, recast: Role::Secondary }),
+        Ruled { parent: Role::Core, child: Role::Core } => Ok(Roles { proposed: Role::Core, recast: Role::Core }),
+        Ruled { parent: Role::Secondary, child: Role::Secondary } => Ok(Roles { proposed: Role::Secondary, recast: Role::Secondary }),
+        Ruled { parent: Role::Secondary, child: Role::Core } => Err(Some(NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1)))),
+    ]
+);
 
 struct Workspace {
     store: Sqlite,

@@ -1,4 +1,4 @@
-use crate::{Provenance, Role};
+use crate::{Entered, Provenance, Role};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Casting {
@@ -10,6 +10,14 @@ impl Casting {
     #[must_use]
     pub fn new(role: Role, provenance: Provenance) -> Casting {
         Casting { role, provenance }
+    }
+
+    #[must_use]
+    pub fn inherited(self, provenance: Provenance) -> Casting {
+        match self.role {
+            Role::Core => Casting::new(Role::Core, provenance),
+            Role::Secondary => Casting::new(Role::Secondary, Provenance::from(Entered::Inheritance)),
+        }
     }
 
     #[must_use]

@@ -349,8 +349,8 @@ laws::table!(
     a_core_node_never_depends_on_a_secondary_one_and_the_refusal_names_the_edge,
     |ends: &Ends| Dependence::upheld(*ends),
     [
-        Ends(NodeRelation::Refines, Role::Secondary, Role::Core) => Some(NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1))),
-        Ends(NodeRelation::Refines, Role::Core, Role::Secondary) => None,
+        Ends(NodeRelation::Refines, Role::Core, Role::Secondary) => Some(NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1))),
+        Ends(NodeRelation::Refines, Role::Secondary, Role::Core) => None,
         Ends(NodeRelation::Refines, Role::Core, Role::Core) => None,
         Ends(NodeRelation::Refines, Role::Secondary, Role::Secondary) => None,
         Ends(NodeRelation::Consumes, Role::Core, Role::Secondary) => Some(NodeEdge::new(NodeId::new(2), NodeRelation::Consumes, NodeId::new(1))),

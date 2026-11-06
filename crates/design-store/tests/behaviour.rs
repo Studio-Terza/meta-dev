@@ -980,7 +980,7 @@ impl Held {
     }
 
     fn inverted(self, edge: Edge) -> Option<Edge> {
-        let leaning = [self.roles.get(edge.parent), self.roles.get(edge.child)];
+        let leaning = [self.roles.get(edge.child), self.roles.get(edge.parent)];
         (leaning == [Some(&Role::Core), Some(&Role::Secondary)]).then_some(edge)
     }
 }

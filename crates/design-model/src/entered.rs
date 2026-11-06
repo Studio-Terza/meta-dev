@@ -9,4 +9,6 @@ pub enum Entered {
     Apply,
     #[name("role")]
     Role,
+    #[name("inheritance")]
+    Inheritance,
 }

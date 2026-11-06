@@ -21,6 +21,12 @@ impl Node<Vague> {
         let casting = Casting::new(Role::Core, entry.provenance());
         Node { identity, entry, title: None, casting, stage: Vague }
     }
+
+    #[must_use]
+    pub fn proposed(identity: NodeId, entry: Entry, parent: Casting) -> Node<Vague> {
+        let casting = parent.inherited(entry.provenance());
+        Node { identity, entry, title: None, casting, stage: Vague }
+    }
 }
 
 impl<S: Refinable> Node<S> {
