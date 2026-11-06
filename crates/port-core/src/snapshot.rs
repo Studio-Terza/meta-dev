@@ -27,7 +27,12 @@ impl Counted {
 impl Snapshot {
     #[must_use]
     pub fn calls<O: Op>(&self) -> Calls {
-        self.0.get(&O::NAME).copied().unwrap_or_default()
+        self.named(O::NAME)
+    }
+
+    #[must_use]
+    pub fn named(&self, name: OpName) -> Calls {
+        self.0.get(&name).copied().unwrap_or_default()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Counted> + '_ {

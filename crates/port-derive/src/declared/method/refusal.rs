@@ -1,7 +1,7 @@
 use quote::ToTokens;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
-use syn::{Error, FnArg, Receiver, Signature};
+use syn::{Error, FnArg, Generics, Receiver, Signature};
 
 pub struct Refusal;
 
@@ -18,13 +18,12 @@ impl Refusal {
             })
     }
 
-    pub fn generics(signature: &Signature) -> syn::Result<()> {
-        signature
-            .generics
+    pub fn generics(generics: &Generics) -> syn::Result<()> {
+        generics
             .params
             .is_empty()
             .then_some(())
-            .ok_or_else(|| Error::new_spanned(&signature.generics, "port methods take no generics"))
+            .ok_or_else(|| Error::new_spanned(generics, "port methods take no generics"))
     }
 
     pub fn receiver(inputs: &Punctuated<FnArg, Comma>) -> syn::Result<()> {

@@ -3,7 +3,7 @@ mod refusal;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, Block, Ident, Signature, TraitItemFn};
+use syn::{Attribute, Block, Signature, TraitItemFn};
 
 use super::boundary::Spelling;
 use super::names::OpsName;
@@ -21,7 +21,7 @@ impl Method {
     pub fn declared(item: TraitItemFn) -> syn::Result<Method> {
         let TraitItemFn { attrs, sig, default, .. } = item;
         Refusal::qualifiers(&sig)?;
-        Refusal::generics(&sig)?;
+        Refusal::generics(&sig.generics)?;
         Refusal::receiver(&sig.inputs)?;
         let parameters = sig.inputs.iter().skip(1).map(Parameter::parsed).collect::<syn::Result<Vec<_>>>()?;
         Ok(Method { attributes: attrs, signature: sig, provided: default, parameters })
@@ -43,12 +43,8 @@ impl Method {
         &self.parameters
     }
 
-    pub fn op_struct(&self) -> Ident {
-        Spelling::camel(&self.signature.ident)
-    }
-
     pub fn pass(&self, ops: &OpsName) -> TokenStream {
-        let op = self.op_struct();
+        let op = Spelling::camel(&self.signature.ident);
         quote! { ::port_core::Pass<'_, #ops::#op> }
     }
 }

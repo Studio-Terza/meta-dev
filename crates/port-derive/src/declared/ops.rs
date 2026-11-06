@@ -18,7 +18,7 @@ impl Rendered for Ops {
             .as_ref()
             .iter()
             .filter(|method| method.provided().is_none())
-            .map(|method| Self::op_declaration(&method.op_struct(), caller, method));
+            .map(|method| Self::op_declaration(&Spelling::camel(&method.signature().ident), caller, method));
         quote! {
             #visibility mod #module {
                 #(#declarations)*
