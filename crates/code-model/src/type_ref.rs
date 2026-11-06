@@ -58,7 +58,7 @@ impl Named<Resolved> {
         let declared = self.path.parameter().and_then(|name| {
             parameters.iter().enumerate().find(|(_, parameter)| AsRef::<Name>::as_ref(*parameter) == name)
         });
-        let bound = declared.and_then(|(at, parameter)| arguments.get(at).or(parameter.default()));
+        let bound = declared.and_then(|(at, _)| arguments.get(at));
         bound.cloned().unwrap_or_else(|| {
             TypeRef::Named(Named {
                 path: self.path.clone(),
@@ -69,9 +69,7 @@ impl Named<Resolved> {
 
     fn expanded(&self, aliases: &Aliases, steps: Steps) -> Option<TypeRef> {
         match aliases.aliasing(&self.path) {
-            Some(alias) => {
-                alias.target().substituted(alias.parameters(), &self.arguments).expanded(aliases, steps.taken()?)
-            }
+            Some(alias) => alias.expansion(&self.arguments).expanded(aliases, steps.taken()?),
             None => TypeRef::each_expanded(&self.arguments, aliases, steps)
                 .map(|arguments| TypeRef::Named(Named { path: self.path.clone(), arguments })),
         }

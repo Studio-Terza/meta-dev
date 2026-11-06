@@ -59,11 +59,15 @@ impl Alias {
         Alias { parameters, target }
     }
 
-    pub(crate) fn parameters(&self) -> &[AliasParameter] {
-        &self.parameters
-    }
-
-    pub(crate) fn target(&self) -> &TypeRef {
-        &self.target
+    pub(crate) fn expansion(&self, given: &[TypeRef]) -> TypeRef {
+        let arguments = self.parameters.iter().skip(given.len()).map_while(AliasParameter::default).fold(
+            given.to_vec(),
+            |mut bound, default| {
+                let argument = default.substituted(&self.parameters, &bound);
+                bound.push(argument);
+                bound
+            },
+        );
+        self.target.substituted(&self.parameters, &arguments)
     }
 }
