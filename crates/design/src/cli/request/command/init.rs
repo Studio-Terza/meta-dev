@@ -1,13 +1,13 @@
 use std::fmt;
 
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Project, Provenance, Stage};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Project, Provenance};
 use design_store::{Linked, NewNode, ProjectRoot};
 use file_ports::Files;
 use store_ports::{Store, Written};
 
 use crate::cli::failure::Failure;
 use crate::cli::rendering::Id;
-use crate::cli::request::{Ground, Token};
+use crate::cli::request::{Ground, Token, Valued};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Init {
@@ -31,7 +31,8 @@ impl TryFrom<&[Token]> for Init {
     type Error = Failure;
 
     fn try_from(rest: &[Token]) -> Result<Init, Failure> {
-        let (consuming, naming): (Vec<&Token>, Vec<&Token>) = rest.iter().partition(|token| token.consumed().is_some());
+        let (consuming, naming): (Vec<&Token>, Vec<&Token>) =
+            rest.iter().partition(|token| token.valued(Valued::Consumes).is_some());
         let [project] = <[&Token; 1]>::try_from(naming).map_err(|_named| Failure::Usage)?;
         let consumed = <[&Token; 1]>::try_from(consuming)
             .map(|[consumed]| Some(consumed))
@@ -64,7 +65,7 @@ impl Init {
     }
 
     fn sown(store: &impl Store, project: &Project) -> Result<NodeId, Failure> {
-        let entry = Entry::new(project.clone(), Facet::Project, Stage::Vague, Provenance::from(Entered::Init));
+        let entry = Entry::new(project.clone(), Facet::Project, Provenance::from(Entered::Init));
         store.write(NewNode::from(entry))?;
         store.read(ProjectRoot::from(project.clone()))?.ok_or_else(|| Failure::Unrooted(project.clone()))
     }

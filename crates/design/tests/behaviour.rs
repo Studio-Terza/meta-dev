@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, SegmentRelation, Stage};
+use design_model::{Entered, Entry, Facet, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
 use design_store::{AppliedId, Linked, NewNode, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
@@ -649,7 +649,9 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
     let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
     assert!(consuming.contains("consumes n1 project meta-dev"));
-    assert!(Graph::shown(&store, "n2")?.contains("n2 demo project vague entered init\n  consumes n1 entered init\n"));
+    assert!(
+        Graph::shown(&store, "n2")?.contains("n2 demo project vague core entered init\n  consumes n1 entered init\n")
+    );
     assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
     Ok(())
 }
@@ -821,16 +823,16 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
     applying.applied("propose(new, refines(n2), feature, \"echo\")")?;
     let child = applying.run(&["show", "n4"])?;
     let wanted = [
-        "n4 demo feature vague entered apply \"echo\"",
-        "  ancestor n1 demo project vague entered init",
-        "  ancestor n2 demo feature vague entered apply \"apply\"",
+        "n4 demo feature vague core entered apply \"echo\"",
+        "  ancestor n1 demo project vague core entered init",
+        "  ancestor n2 demo feature vague core entered apply \"apply\"",
         "  refines n2 entered apply",
     ];
     assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
     assert_eq!(child.matches('\n').count(), wanted.len());
     let root = applying.run(&["show", "n1"])?;
     assert_eq!(root.matches("  child ").count(), 2);
-    assert!(root.contains("  child n3 demo smell vague entered apply \"drift\"\n"));
+    assert!(root.contains("  child n3 demo smell vague core entered apply \"drift\"\n"));
     Ok(())
 }
 
@@ -839,11 +841,14 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
-    let root = "  ancestor n1 demo project vague entered init";
+    let root = "  ancestor n1 demo project vague core entered init";
     let refines = "  refines n1 entered apply";
     let wanted = [
-        ("n2", vec!["n2 demo feature vague entered apply \"old\"", root, refines]),
-        ("n3", vec!["n3 demo feature vague entered apply \"new\"", root, refines, "  supersedes n2 entered apply"]),
+        ("n2", vec!["n2 demo feature vague core entered apply \"old\"", root, refines]),
+        (
+            "n3",
+            vec!["n3 demo feature vague core entered apply \"new\"", root, refines, "  supersedes n2 entered apply"],
+        ),
     ];
     wanted.iter().try_for_each(|(node, lines)| {
         let shown = applying.run(&["show", node])?;
@@ -893,7 +898,7 @@ fn an_unknown_reference_is_refused_and_nothing_is_written() -> Result<(), Failur
 fn a_supersession_across_project_roots_is_refused_naming_both_nodes_and_nothing_is_written() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     let run = Run::root();
-    let entry = Entry::new("other".parse()?, Facet::Project, Stage::Vague, Entered::Init.into());
+    let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
     run.port(applying.store.clone()).write(NewNode::from(entry))?;
     assert!(matches!(applying.refused("supersede(n1, by(n2))"), Some(Failure::Unresolved(Unresolved::Straddling(_)))));
     assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
@@ -1018,8 +1023,11 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     ];
     assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
     let node = applying.run(&["show", "n3"])?;
-    let wanted =
-        ["n3 demo feature vague entered apply \"b\"", "  refines n2 entered apply", "  supersedes n2 entered apply"];
+    let wanted = [
+        "n3 demo feature vague core entered apply \"b\"",
+        "  refines n2 entered apply",
+        "  supersedes n2 entered apply",
+    ];
     assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
     Ok(())
 }
@@ -1171,10 +1179,10 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
     let store = Sqlite::in_memory::<StreamSchema>();
     let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let wanted = [
-        format!("n3 demo {facet} vague entered init"),
-        "  ancestor n1 demo project vague entered init".to_owned(),
-        format!("  ancestor n2 demo {facet} vague entered init"),
-        format!("  child n5 demo {facet} vague entered init"),
+        format!("n3 demo {facet} vague core entered init"),
+        "  ancestor n1 demo project vague core entered init".to_owned(),
+        format!("  ancestor n2 demo {facet} vague core entered init"),
+        format!("  child n5 demo {facet} vague core entered init"),
         "  refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
@@ -1196,7 +1204,7 @@ impl Graph {
         let written = (2_i64..)
             .zip(parents)
             .map(|(child, parent)| {
-                let entry = Entry::new("demo".parse()?, facet, Stage::Vague, Entered::Init.into());
+                let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
                 let planted = port.write(NewNode::from(entry))?;
                 let linked = port.write(Linked::new(
                     NodeId::new(child),
@@ -1209,4 +1217,233 @@ impl Graph {
             .collect::<Result<Vec<Written>, Failure>>()?;
         Ok(Written::total(written.into_iter()))
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Asked(Stage, Lifecycle);
+
+#[derive(Debug, PartialEq, Eq)]
+struct Refused(NodeId, Stage);
+
+#[derive(Clone, Copy, Debug)]
+enum Lifecycle {
+    Refine,
+    Specify,
+    Reopen,
+    Drop,
+}
+
+impl Lifecycle {
+    fn words(self) -> &'static [&'static str] {
+        match self {
+            Lifecycle::Refine => &["refine", "n2"],
+            Lifecycle::Specify => {
+                &["specify", "n2", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]
+            }
+            Lifecycle::Reopen => &["reopen", "n2"],
+            Lifecycle::Drop => &["drop", "n2", "--reason", "folded into n1"],
+        }
+    }
+
+    fn path(stage: Stage) -> &'static [Lifecycle] {
+        match stage {
+            Stage::Vague => &[],
+            Stage::Refining => &[Lifecycle::Refine],
+            Stage::Terminal => &[Lifecycle::Refine, Lifecycle::Specify],
+            Stage::Dropped => &[Lifecycle::Drop],
+        }
+    }
+
+    fn reached(stage: Stage) -> Result<Applying, Failure> {
+        let applying = Applying::ready()?;
+        applying.applied("propose(new, refines(n1), feature, \"child\")")?;
+        Lifecycle::path(stage).iter().try_for_each(|step| applying.outcome(step.words()).map(|_outcome| ()))?;
+        Ok(applying)
+    }
+
+    fn moved(Asked(stage, command): Asked) -> Result<Outcome, Option<Refused>> {
+        let applying = Lifecycle::reached(stage).map_err(|_unreached| None)?;
+        applying.outcome(command.words()).map_err(Lifecycle::refused)
+    }
+
+    fn refused(failure: Failure) -> Option<Refused> {
+        match failure {
+            Failure::Misstaged { node, stage } => Some(Refused(node, stage)),
+            _other => None,
+        }
+    }
+}
+
+impl Applying {
+    fn outcome(&self, arguments: &[&str]) -> Result<Outcome, Failure> {
+        Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone())
+            .rooted(arguments.iter().map(OsString::from), &mut Vec::new())
+    }
+}
+
+laws::table!(
+    each_lifecycle_command_moves_only_from_its_allowed_stages_and_is_refused_naming_the_node_s_stage_elsewhere,
+    |asked: &Asked| Lifecycle::moved(*asked),
+    [
+        Asked(Stage::Vague, Lifecycle::Refine) => Ok(Outcome::Moved(Stage::Refining)),
+        Asked(Stage::Refining, Lifecycle::Refine) => Err(Some(Refused(NodeId::new(2), Stage::Refining))),
+        Asked(Stage::Terminal, Lifecycle::Refine) => Err(Some(Refused(NodeId::new(2), Stage::Terminal))),
+        Asked(Stage::Dropped, Lifecycle::Refine) => Err(Some(Refused(NodeId::new(2), Stage::Dropped))),
+        Asked(Stage::Vague, Lifecycle::Specify) => Err(Some(Refused(NodeId::new(2), Stage::Vague))),
+        Asked(Stage::Refining, Lifecycle::Specify) => Ok(Outcome::Moved(Stage::Terminal)),
+        Asked(Stage::Terminal, Lifecycle::Specify) => Err(Some(Refused(NodeId::new(2), Stage::Terminal))),
+        Asked(Stage::Dropped, Lifecycle::Specify) => Err(Some(Refused(NodeId::new(2), Stage::Dropped))),
+        Asked(Stage::Vague, Lifecycle::Reopen) => Err(Some(Refused(NodeId::new(2), Stage::Vague))),
+        Asked(Stage::Refining, Lifecycle::Reopen) => Err(Some(Refused(NodeId::new(2), Stage::Refining))),
+        Asked(Stage::Terminal, Lifecycle::Reopen) => Ok(Outcome::Moved(Stage::Refining)),
+        Asked(Stage::Dropped, Lifecycle::Reopen) => Ok(Outcome::Moved(Stage::Refining)),
+        Asked(Stage::Vague, Lifecycle::Drop) => Ok(Outcome::Moved(Stage::Dropped)),
+        Asked(Stage::Refining, Lifecycle::Drop) => Ok(Outcome::Moved(Stage::Dropped)),
+        Asked(Stage::Terminal, Lifecycle::Drop) => Ok(Outcome::Moved(Stage::Dropped)),
+        Asked(Stage::Dropped, Lifecycle::Drop) => Err(Some(Refused(NodeId::new(2), Stage::Dropped))),
+    ]
+);
+
+#[test]
+fn a_refused_transition_leaves_the_node_as_it_was() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Terminal)?;
+    let before = applying.run(&["show", "n2"])?;
+    assert!(applying.run(Lifecycle::Specify.words()).is_err());
+    assert!(applying.run(Lifecycle::Refine.words()).is_err());
+    assert_eq!(applying.run(&["show", "n2"])?, before);
+    Ok(())
+}
+
+#[test]
+fn specify_without_both_an_artifact_and_a_condition_fails_to_parse() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Refining)?;
+    let refused = [
+        applying.run(&["specify", "n2", "--artifact", "lint:no-comments"]),
+        applying.run(&["specify", "n2", "--condition", "every comment is refused"]),
+        applying.run(&["specify", "n2"]),
+        applying.run(&["specify", "n2", "--artifact", "lint:no-comments", "--condition"]),
+        applying.run(&["specify", "--artifact", "lint:no-comments", "--condition", "every comment is refused"]),
+    ];
+    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature refining core entered apply"));
+    Ok(())
+}
+
+#[test]
+fn an_unparsed_artifact_condition_or_reason_is_refused_as_such() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Refining)?;
+    let unspecified = applying.run(&["specify", "n2", "--artifact", "rule:x", "--condition", "it holds"]);
+    let unstated = applying.run(&["specify", "n2", "--artifact", "lint:x", "--condition", "it\nholds"]);
+    let unreasoned = applying.run(&["drop", "n2", "--reason", " "]);
+    assert!(matches!(unspecified, Err(Failure::Unspecified(_))));
+    assert!(matches!(unstated, Err(Failure::Unstated(_))));
+    assert!(matches!(unreasoned, Err(Failure::Unstated(_))));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature refining core entered apply"));
+    Ok(())
+}
+
+#[test]
+fn each_lifecycle_option_belongs_to_its_own_command() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Vague)?;
+    let refused = [
+        applying.run(&["refine", "n2", "--reason", "no"]),
+        applying.run(&["reopen", "n2", "--artifact", "lint:x"]),
+        applying.run(&["drop", "n2", "--condition", "it holds"]),
+        applying.run(&["drop", "n2", "--reason", "one", "--reason", "two"]),
+        applying.run(&["specify", "n2", "--artifact", "lint:x", "--condition", "it holds", "--reason", "no"]),
+        applying.run(&["specify", "n2", "--artifact", "lint:x", "--artifact", "lint:y", "--condition", "it holds"]),
+        applying.run(&["role", "n2", "core", "--reason", "no"]),
+        applying.run(&["role", "n2"]),
+        applying.run(&["role", "n2", "chief"]),
+        applying.run(&["show", "n2", "--artifact", "lint:x"]),
+        applying.run(&["init", "other", "--reason", "no"]),
+        applying.run(&["search", "thanks", "--condition", "it holds"]),
+        applying.run(&["refine", "n2", "--dry-run"]),
+    ];
+    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
+    Ok(())
+}
+
+#[test]
+fn show_renders_a_terminal_node_with_its_artifact_and_condition() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Terminal)?;
+    let shown = applying.run(&["show", "n2"])?;
+    let wanted = [
+        "n2 demo feature terminal core entered apply \"child\"",
+        "  artifact lint:no-comments",
+        "  condition \"every comment is refused\"",
+        "  ancestor n1 demo project vague core entered init",
+        "  refines n1 entered apply",
+    ];
+    assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
+    assert_eq!(shown.matches('\n').count(), wanted.len());
+    let reopened = applying.run(&["reopen", "n2"])?;
+    assert!(reopened.contains("n2 demo feature refining core entered apply \"child\"\n  ancestor "));
+    Ok(())
+}
+
+#[test]
+fn a_dropped_node_stays_resolvable_with_its_reason() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Dropped)?;
+    let shown = applying.run(&["show", "n2"])?;
+    let wanted = [
+        "n2 demo feature dropped core entered apply \"child\"",
+        "  reason \"folded into n1\"",
+        "  ancestor n1 demo project vague core entered init",
+        "  refines n1 entered apply",
+    ];
+    assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
+    assert_eq!(shown.matches('\n').count(), wanted.len());
+    assert!(applying.run(&["show", "n1"])?.contains("  child n2 demo feature dropped core entered apply \"child\"\n"));
+    let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
+    assert!(placed.contains("written 2\n"));
+    Ok(())
+}
+
+#[test]
+fn a_lifecycle_command_on_an_unknown_node_fails_naming_it() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    assert!(matches!(applying.run(&["refine", "n9"]), Err(Failure::Unplaced(_))));
+    assert!(matches!(applying.run(&["role", "n9", "secondary"]), Err(Failure::Unplaced(_))));
+    assert!(matches!(applying.run(&["refine", "o1"]), Err(Failure::Unnumbered(_))));
+    Ok(())
+}
+
+#[test]
+fn a_lifecycle_command_is_refused_while_the_store_lock_is_held() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Vague)?;
+    let holder = Run::root();
+    let port = holder.port(applying.store.clone());
+    let held = port.lock()?;
+    assert!(matches!(applying.run(&["refine", "n2"]), Err(Failure::Busy(_))));
+    assert!(matches!(applying.run(&["role", "n2", "secondary"]), Err(Failure::Busy(_))));
+    drop(held);
+    assert_eq!(applying.outcome(&["refine", "n2"])?, Outcome::Moved(Stage::Refining));
+    Ok(())
+}
+
+#[test]
+fn a_core_node_never_depends_on_a_secondary_one_and_the_refusal_names_the_edge() -> Result<(), Failure> {
+    let applying = Lifecycle::reached(Stage::Vague)?;
+    let edge = NodeEdge::new(NodeId::new(2), NodeRelation::Refines, NodeId::new(1));
+    let child = applying.run(&["role", "n2", "secondary"]);
+    assert!(matches!(child, Err(Failure::Inverted { edge: refused }) if refused == edge));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
+    assert_eq!(applying.outcome(&["role", "n1", "secondary"])?, Outcome::Recast(Role::Secondary));
+    assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
+    let parent = applying.run(&["role", "n1", "core"]);
+    assert!(matches!(parent, Err(Failure::Inverted { edge: refused }) if refused == edge));
+    assert!(applying.run(&["show", "n1"])?.contains("n1 demo project vague secondary entered init"));
+    Ok(())
+}
+
+#[test]
+fn a_proposal_is_core_even_under_a_secondary_parent() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    applying.run(&["role", "n1", "secondary"])?;
+    applying.applied("propose(new, refines(n1), feature, \"child\")")?;
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague core entered apply"));
+    assert_eq!(applying.outcome(&["role", "n1", "core"])?, Outcome::Recast(Role::Core));
+    Ok(())
 }

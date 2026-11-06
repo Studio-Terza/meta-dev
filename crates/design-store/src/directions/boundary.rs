@@ -1,6 +1,6 @@
 use design_model::{
     Entered, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Standing,
-    Supersession,
+    Supersession, Vague,
 };
 use newtype::{Counter, Newtype};
 use store_ports::{Batch, Statements, StoreFailure, Written};
@@ -273,7 +273,7 @@ impl Annotating<'_, '_> {
         Linking { source, target, relation, provenance: self.provenance() }.closed(self.statements)
     }
 
-    pub(super) fn proposed(&mut self, node: &Node, parent: NodeId) -> Result<Written, Refusal> {
+    pub(super) fn proposed(&mut self, node: &Node<Vague>, parent: NodeId) -> Result<Written, Refusal> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let linked =
             Linked::new(node.identity(), NodeRelation::Refines, parent, self.provenance).written(self.statements)?;

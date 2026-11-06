@@ -1,6 +1,7 @@
 mod apply;
 mod ingest;
 mod init;
+mod lifecycle;
 mod printed;
 mod search;
 mod subject;
@@ -21,6 +22,7 @@ use crate::cli::failure::Failure;
 pub use apply::{Application, Applied, Unresolved};
 use ingest::Ingest;
 use init::Init;
+use lifecycle::{Move, Moving, Recast};
 use printed::Printed;
 use search::Search;
 use subject::Subject;
@@ -32,6 +34,8 @@ pub enum Command {
     Search(Terms, Scope),
     Init(Init),
     Apply(PathBuf),
+    Move(Move),
+    Recast(Recast),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,6 +45,8 @@ enum Verb {
     Search,
     Init,
     Apply,
+    Move(Moving),
+    Role,
 }
 
 impl FromStr for Verb {
@@ -52,12 +58,17 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 5] = [
+    const NAMED: [(&'static str, Verb); 10] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
+        ("refine", Verb::Move(Moving::Refine)),
+        ("specify", Verb::Move(Moving::Specify)),
+        ("reopen", Verb::Move(Moving::Reopen)),
+        ("drop", Verb::Move(Moving::Drop)),
+        ("role", Verb::Role),
     ];
 
     fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
@@ -73,6 +84,8 @@ impl Verb {
                 .map(|terms| Command::Search(terms, scope)),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
+            Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
+            Verb::Role => Recast::read(rest).map(Command::Recast),
         }
     }
 }
@@ -90,7 +103,12 @@ impl Command {
     pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opened),
-            Command::Show(_) | Command::Search(..) | Command::Init(_) | Command::Apply(_) => opened(path),
+            Command::Show(_)
+            | Command::Search(..)
+            | Command::Init(_)
+            | Command::Apply(_)
+            | Command::Move(_)
+            | Command::Recast(_) => opened(path),
         }
     }
 
@@ -112,6 +130,8 @@ impl Command {
                 .and_then(|initialised| Printed::shown(out, &initialised))
                 .map(|_printed| Outcome::Initialised),
             Command::Apply(path) => Application::read(&ground, &path).and_then(|application| application.reported(out)),
+            Command::Move(moving) => moving.written(ground.store(), out),
+            Command::Recast(recast) => recast.written(ground.store(), out),
         }
     }
 }

@@ -20,7 +20,7 @@ pub use ground::Ground;
 use persistence::Persistence;
 use projects::Located;
 use projects::Projects;
-pub use token::Token;
+pub use token::{Shaped, Token, Valued};
 
 #[derive(Debug)]
 pub struct Request {
@@ -41,7 +41,7 @@ enum Expecting {
     #[default]
     Word,
     Path,
-    Project,
+    Value(Valued),
 }
 
 #[derive(Debug)]
@@ -49,7 +49,7 @@ enum Argument {
     Workspace,
     DryRun,
     All,
-    Consumes,
+    Valued(Valued),
     Plain(OsString),
 }
 
@@ -58,7 +58,7 @@ enum Flag {
     Workspace,
     DryRun,
     All,
-    Consumes,
+    Valued(Valued),
 }
 
 impl FromStr for Flag {
@@ -70,11 +70,14 @@ impl FromStr for Flag {
 }
 
 impl Flag {
-    const NAMED: [(&'static str, Flag); 4] = [
+    const NAMED: [(&'static str, Flag); 7] = [
         ("--workspace", Flag::Workspace),
         ("--dry-run", Flag::DryRun),
         ("--all", Flag::All),
-        ("--consumes", Flag::Consumes),
+        ("--consumes", Flag::Valued(Valued::Consumes)),
+        ("--artifact", Flag::Valued(Valued::Artifact)),
+        ("--condition", Flag::Valued(Valued::Condition)),
+        ("--reason", Flag::Valued(Valued::Reason)),
     ];
 }
 
@@ -84,7 +87,7 @@ impl From<OsString> for Argument {
             Some(Flag::Workspace) => Argument::Workspace,
             Some(Flag::DryRun) => Argument::DryRun,
             Some(Flag::All) => Argument::All,
-            Some(Flag::Consumes) => Argument::Consumes,
+            Some(Flag::Valued(valued)) => Argument::Valued(valued),
             None => Argument::Plain(argument),
         }
     }
@@ -94,7 +97,7 @@ impl Argument {
     fn expectation(&self) -> Expecting {
         match self {
             Argument::Workspace => Expecting::Path,
-            Argument::Consumes => Expecting::Project,
+            Argument::Valued(valued) => Expecting::Value(*valued),
             Argument::DryRun | Argument::All | Argument::Plain(_) => Expecting::Word,
         }
     }
@@ -102,13 +105,13 @@ impl Argument {
     fn scope(&self, current: Scope) -> Scope {
         match self {
             Argument::All => Scope::Everyone,
-            Argument::Workspace | Argument::DryRun | Argument::Consumes | Argument::Plain(_) => current,
+            Argument::Workspace | Argument::DryRun | Argument::Valued(_) | Argument::Plain(_) => current,
         }
     }
 
     fn token(self) -> Option<Token> {
         match self {
-            Argument::Workspace | Argument::All | Argument::Consumes => None,
+            Argument::Workspace | Argument::All | Argument::Valued(_) => None,
             Argument::DryRun => Some(Token::Persisted(Persistence::DryRun)),
             Argument::Plain(word) => Some(Token::Word(word)),
         }
@@ -119,8 +122,8 @@ impl Words {
     fn taking(self, argument: OsString) -> Words {
         match self.expecting {
             Expecting::Path => self.placed(PathBuf::from(argument)),
-            Expecting::Project => Words {
-                spoken: self.spoken.into_iter().chain([Token::Consumes(argument)]).collect(),
+            Expecting::Value(valued) => Words {
+                spoken: self.spoken.into_iter().chain([Token::Valued(valued, argument)]).collect(),
                 expecting: Expecting::Word,
                 ..self
             },
@@ -147,7 +150,7 @@ impl TryFrom<Words> for Request {
 
     fn try_from(words: Words) -> Result<Request, Failure> {
         match words.expecting {
-            Expecting::Path | Expecting::Project => Err(Failure::Usage),
+            Expecting::Path | Expecting::Value(_) => Err(Failure::Usage),
             Expecting::Word => Command::spoken(&words.spoken, words.scope)
                 .map(|command| Request { command, workspace: words.workspace }),
         }

@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession};
+use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession, Vague};
 use port_core::Op;
 use store_ports::Written;
 
@@ -14,7 +14,7 @@ pub enum Directed {
     Placed { segment: Segment, node: NodeId, relation: SpanRelation },
     Sensed { segment: Segment, sense: Sense },
     Related { source: Segment, target: Segment, relation: SegmentRelation },
-    Proposed { node: Node, parent: NodeId },
+    Proposed { node: Node<Vague>, parent: NodeId },
     Superseded(Supersession),
     Conversational { segment: Segment },
 }

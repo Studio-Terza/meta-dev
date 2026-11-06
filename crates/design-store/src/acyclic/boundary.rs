@@ -38,11 +38,14 @@ impl<R: Acyclic> Closing<R> {
         Closing { source, target, relation: PhantomData }
     }
 
-    pub(crate) fn written(
+    pub(crate) fn written<Failure>(
         self,
         statements: &mut Statements<'_>,
-        edge: impl FnOnce(&mut Statements<'_>) -> Result<Written, StoreFailure>,
-    ) -> Result<Written, Refusal> {
+        edge: impl FnOnce(&mut Statements<'_>) -> Result<Written, Failure>,
+    ) -> Result<Written, Refusal>
+    where
+        Refusal: From<Failure>,
+    {
         let open = self.opened(statements)?;
         let edged = edge(statements)?;
         let closed = open.closed(R::CLOSED.name(), statements)?;

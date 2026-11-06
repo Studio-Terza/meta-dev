@@ -1,7 +1,10 @@
 use std::error::Error;
 use std::str::FromStr;
 
-use design_model::{Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Project, Provenance, Title};
+use design_model::{
+    AnyNode, AnyStage, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance,
+    Reason, Refining, Role, Stage, Staging, Terminal, Title, Vague,
+};
 use newtype::Newtype;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
@@ -11,6 +14,15 @@ use crate::{Link, Relative};
 
 #[derive(Clone, Debug, Op)]
 pub struct NewNode(Entry);
+
+#[derive(Clone, Debug, Op)]
+pub struct Restaged(AnyNode);
+
+#[derive(Clone, Copy, Debug, Op)]
+pub struct Cast {
+    node: NodeId,
+    role: Role,
+}
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Linked {
@@ -36,6 +48,10 @@ pub(crate) struct NodeRow {
     stage: String,
     provenance: String,
     title: Option<String>,
+    role: String,
+    artifact: Option<String>,
+    condition: Option<String>,
+    reason: Option<String>,
 }
 
 #[derive(Debug)]
@@ -47,6 +63,27 @@ pub(crate) struct RelativeRow {
     stage: String,
     provenance: String,
     title: Option<String>,
+    role: String,
+    artifact: Option<String>,
+    condition: Option<String>,
+    reason: Option<String>,
+}
+
+#[derive(Debug)]
+struct StageColumns {
+    stage: String,
+    artifact: Option<String>,
+    condition: Option<String>,
+    reason: Option<String>,
+}
+
+#[derive(Debug)]
+struct LeaningRow {
+    source: i64,
+    relation: String,
+    target: i64,
+    source_role: String,
+    target_role: String,
 }
 
 #[derive(Debug)]
@@ -59,6 +96,19 @@ pub(crate) struct OutgoingRow {
 impl From<Entry> for NewNode {
     fn from(entry: Entry) -> NewNode {
         NewNode(entry)
+    }
+}
+
+impl From<AnyNode> for Restaged {
+    fn from(node: AnyNode) -> Restaged {
+        Restaged(node)
+    }
+}
+
+impl Cast {
+    #[must_use]
+    pub fn new(node: NodeId, role: Role) -> Cast {
+        Cast { node, role }
     }
 }
 
@@ -81,14 +131,15 @@ impl From<Linked> for EdgeColumns {
 }
 
 impl EdgeColumns {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        let written = statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
             self.source,
             self.relation,
             self.target,
             self.provenance
-        ))
+        ))?;
+        LeaningRow::upheld(NodeId::new(self.source), statements).map(|_upheld| written)
     }
 }
 
@@ -99,7 +150,7 @@ impl Batch for NewNode {
         let entry = self.0;
         let project = entry.project().to_string();
         let facet = entry.facet().name();
-        let stage = entry.stage().name();
+        let stage = Stage::Vague.name();
         let provenance = Entered::from(entry.provenance()).name();
         statements.written(sqlx::query!(
             "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
@@ -120,22 +171,106 @@ impl Batch for Linked {
                 .written(statements, |edged| EdgeColumns::from(self).written(edged)),
             NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source, self.target)
                 .written(statements, |edged| EdgeColumns::from(self).written(edged)),
-            NodeRelation::Consumes => Ok(EdgeColumns::from(self).written(statements)?),
+            NodeRelation::Consumes => EdgeColumns::from(self).written(statements),
         }
     }
 }
 
-impl TryFrom<NodeRow> for Node {
+impl Batch for Restaged {
+    type Failure = StoreFailure;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let id = self.0.identity().into_inner();
+        let StageColumns { stage, artifact, condition, reason } = StageColumns::from(self.0.stage());
+        statements.written(sqlx::query!(
+            "UPDATE nodes SET stage = ?2, artifact = ?3, condition = ?4, reason = ?5 WHERE id = ?1",
+            id,
+            stage,
+            artifact,
+            condition,
+            reason
+        ))
+    }
+}
+
+impl Batch for Cast {
+    type Failure = Refusal;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        let id = self.node.into_inner();
+        let role = self.role.name();
+        let written = statements.written(sqlx::query!("UPDATE nodes SET role = ?2 WHERE id = ?1", id, role))?;
+        LeaningRow::upheld(self.node, statements).map(|_upheld| written)
+    }
+}
+
+impl From<&AnyStage> for StageColumns {
+    fn from(stage: &AnyStage) -> StageColumns {
+        stage.staged(StageColumns::bare(stage.stage()))
+    }
+}
+
+impl StageColumns {
+    fn bare(stage: Stage) -> StageColumns {
+        StageColumns { stage: stage.name().to_owned(), artifact: None, condition: None, reason: None }
+    }
+}
+
+impl Staging for StageColumns {
+    type Output = StageColumns;
+
+    fn vague(self, _vague: &Vague) -> StageColumns {
+        self
+    }
+
+    fn refining(self, _refining: &Refining) -> StageColumns {
+        self
+    }
+
+    fn terminal(self, terminal: &Terminal) -> StageColumns {
+        StageColumns {
+            artifact: Some(terminal.artifact().to_string()),
+            condition: Some(terminal.condition().to_string()),
+            ..self
+        }
+    }
+
+    fn dropped(self, dropped: &Dropped) -> StageColumns {
+        StageColumns { reason: Some(dropped.reason().to_string()), ..self }
+    }
+}
+
+impl TryFrom<StageColumns> for AnyStage {
     type Error = sqlx::Error;
 
-    fn try_from(row: NodeRow) -> Result<Node, sqlx::Error> {
+    fn try_from(columns: StageColumns) -> Result<AnyStage, sqlx::Error> {
+        match NodeRow::decoded::<Stage>(&columns.stage)? {
+            Stage::Vague => Ok(AnyStage::Vague(Vague)),
+            Stage::Refining => Ok(AnyStage::Refining(Refining)),
+            Stage::Terminal => Ok(AnyStage::Terminal(Terminal::new(
+                NodeRow::decoded(columns.artifact.as_deref().unwrap_or_default())?,
+                NodeRow::decoded(columns.condition.as_deref().unwrap_or_default())?,
+            ))),
+            Stage::Dropped => Ok(AnyStage::Dropped(Dropped::from(NodeRow::decoded::<Reason>(
+                columns.reason.as_deref().unwrap_or_default(),
+            )?))),
+        }
+    }
+}
+
+impl TryFrom<NodeRow> for AnyNode {
+    type Error = sqlx::Error;
+
+    fn try_from(row: NodeRow) -> Result<AnyNode, sqlx::Error> {
         let entry = Entry::new(
             NodeRow::decoded(&row.project)?,
             NodeRow::decoded(&row.facet)?,
-            NodeRow::decoded(&row.stage)?,
             Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?),
         );
-        Ok(row.title.map(Title::new).into_iter().fold(Node::new(NodeId::new(row.id), entry), Node::titled))
+        let columns =
+            StageColumns { stage: row.stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
+        let node = AnyNode::loaded(NodeId::new(row.id), entry, NodeRow::decoded(&row.role)?, columns.try_into()?);
+        Ok(row.title.map(Title::new).into_iter().fold(node, Node::titled))
     }
 }
 
@@ -150,8 +285,12 @@ impl TryFrom<RelativeRow> for Relative {
             stage: row.stage,
             provenance: row.provenance,
             title: row.title,
+            role: row.role,
+            artifact: row.artifact,
+            condition: row.condition,
+            reason: row.reason,
         };
-        Ok(Relative::new(NodeRow::decoded(&row.kin)?, Node::try_from(node)?))
+        Ok(Relative::new(NodeRow::decoded(&row.kin)?, AnyNode::try_from(node)?))
     }
 }
 
@@ -183,14 +322,14 @@ impl NodeRow {
         Ok(rows.into_iter().map(|row| NodeId::new(row.id)).collect())
     }
 
-    pub(crate) fn named(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Node>, StoreFailure> {
+    pub(crate) fn named(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
         let id = id.into_inner();
         let rows = statements.rows(sqlx::query_as!(
             NodeRow,
-            "SELECT id, project, facet, stage, provenance, title FROM nodes WHERE id = ?1",
+            "SELECT id, project, facet, stage, provenance, title, role, artifact, condition, reason FROM nodes WHERE id = ?1",
             id
         ))?;
-        Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
+        Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, sqlx::Error>>()?)
     }
 
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
@@ -198,22 +337,24 @@ impl NodeRow {
         Ok(rows.into_iter().map(|row| NodeId::new(row.next)).collect())
     }
 
-    pub(crate) fn proposed(node: &Node, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    pub(crate) fn proposed(node: &Node<Vague>, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let id = node.identity().into_inner();
         let entry = node.entry();
         let project = entry.project().to_string();
         let facet = entry.facet().name();
-        let stage = entry.stage().name();
+        let stage = Stage::Vague.name();
         let provenance = Entered::from(entry.provenance()).name();
         let title = node.title().map(ToString::to_string);
+        let role = node.role().name();
         statements.written(sqlx::query!(
-            "INSERT INTO nodes (id, project, facet, stage, provenance, title) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO nodes (id, project, facet, stage, provenance, title, role) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             id,
             project,
             facet,
             stage,
             provenance,
-            title
+            title,
+            role
         ))
     }
 }
@@ -229,7 +370,7 @@ impl RelativeRow {
         let relation = R::CLOSED.name();
         let rows = statements.rows(sqlx::query_as!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
             id,
             ancestor,
             child,
@@ -248,5 +389,24 @@ impl OutgoingRow {
             id
         ))?;
         Ok(rows.into_iter().map(Link::try_from).collect::<Result<Vec<Link>, sqlx::Error>>()?)
+    }
+}
+
+impl LeaningRow {
+    fn upheld(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<NodeEdge>, Refusal> {
+        let id = node.into_inner();
+        let rows = statements.rows(sqlx::query_as!(
+            LeaningRow,
+            "SELECT node_edges.source, node_edges.relation, node_edges.target, sources.role AS source_role, targets.role AS target_role FROM node_edges JOIN nodes AS sources ON sources.id = node_edges.source JOIN nodes AS targets ON targets.id = node_edges.target WHERE node_edges.source = ?1 OR node_edges.target = ?1 ORDER BY node_edges.source, node_edges.relation, node_edges.target",
+            id
+        ))?;
+        rows.into_iter().map(LeaningRow::edge).collect()
+    }
+
+    fn edge(self) -> Result<NodeEdge, Refusal> {
+        let relation = NodeRow::decoded(&self.relation).map_err(StoreFailure::from)?;
+        let source = NodeRow::decoded(&self.source_role).map_err(StoreFailure::from)?;
+        let target = NodeRow::decoded(&self.target_role).map_err(StoreFailure::from)?;
+        Ok(NodeEdge::new(NodeId::new(self.source), relation, NodeId::new(self.target)).upheld(source, target)?)
     }
 }

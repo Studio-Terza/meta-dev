@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use design_model::{NodeId, Project, Unnamed, Unnumbered};
+use design_model::{Misstaged, NodeEdge, NodeId, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated};
 use design_store::Refusal;
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
@@ -19,7 +19,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -52,6 +52,14 @@ pub enum Failure {
     Misread(#[from] Misread),
     #[error("{0}; nothing was written")]
     Unresolved(#[from] Unresolved),
+    #[error("{0}")]
+    Unspecified(#[from] Unspecified),
+    #[error("{0}")]
+    Unstated(#[from] Unstated),
+    #[error("{} is {stage}, and that command does not start from {stage}; nothing was written", Id::from(*node))]
+    Misstaged { node: NodeId, stage: Stage },
+    #[error("{edge} would have a core node depend on a secondary one; nothing was written")]
+    Inverted { edge: NodeEdge },
     #[error("the design store lock was refused: {0}")]
     Busy(#[from] Busy),
     #[error("the design store failed: {0}")]
@@ -68,8 +76,15 @@ impl From<Refusal> for Failure {
     fn from(refusal: Refusal) -> Failure {
         match refusal {
             Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
+            Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
             Refusal::Store(failure) => Failure::Store(failure),
         }
+    }
+}
+
+impl From<Misstaged> for Failure {
+    fn from(misstaged: Misstaged) -> Failure {
+        Failure::Misstaged { node: misstaged.node(), stage: misstaged.stage() }
     }
 }
 

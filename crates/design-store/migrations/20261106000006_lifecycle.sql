@@ -1,0 +1,7 @@
+ALTER TABLE nodes ADD COLUMN role TEXT NOT NULL DEFAULT 'core';
+
+ALTER TABLE nodes ADD COLUMN artifact TEXT;
+
+ALTER TABLE nodes ADD COLUMN condition TEXT;
+
+ALTER TABLE nodes ADD COLUMN reason TEXT;
