@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use syn::{ReturnType, Type};
+use syn::Type;
 
 use lint_layout::Name;
 
@@ -27,7 +27,7 @@ impl Described<'_> {
 }
 
 #[derive(Clone, Copy)]
-struct Returned<'ast>(&'ast ReturnType);
+struct Returned<'ast>(Option<&'ast Type>);
 
 #[derive(Clone, Copy)]
 enum Separator {
@@ -47,8 +47,8 @@ impl fmt::Display for Separator {
 impl fmt::Display for Returned<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            ReturnType::Type(_, returned) => write!(formatter, " -> {}", Described(returned)),
-            ReturnType::Default => Ok(()),
+            Some(returned) => write!(formatter, " -> {}", Described(returned)),
+            None => Ok(()),
         }
     }
 }
@@ -72,7 +72,7 @@ impl fmt::Display for Described<'_> {
                 formatter,
                 "fn({}){}",
                 Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
-                Returned(&function.output)
+                Returned(Spelled::returned_by(&function.output))
             ),
             Type::Ptr(pointer) => {
                 write!(formatter, "*{} {}", pointer.mutability.map_or("const", |_| "mut"), Described(&pointer.elem))
