@@ -286,12 +286,14 @@ dependencies = [
  "file-ports",
  "grammar",
  "laws",
+ "named-derive",
  "newtype",
  "port-core",
  "sqlx",
  "store-ports",
  "stream",
  "strum",
+ "thiserror",
  "transcript-ports",
 ]
 

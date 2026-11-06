@@ -7,6 +7,7 @@ use store_ports::{Batch, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
 use super::Directions;
+use crate::acyclic::{Closing, Refusal, SegmentCorrects, SegmentSupersedes};
 use crate::annotation::Remark;
 use crate::graph::NodeRow;
 use crate::{Annotation, Linked};
@@ -15,6 +16,22 @@ use crate::{Annotation, Linked};
 pub(super) struct Annotating<'held, 'run> {
     provenance: Provenance,
     statements: &'held mut Statements<'run>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Linking<'ends> {
+    source: &'ends Segment,
+    target: &'ends Segment,
+    relation: SegmentRelation,
+    provenance: &'static str,
+}
+
+#[derive(Debug)]
+struct LinkColumns {
+    source: Columns,
+    relation: &'static str,
+    target: Columns,
+    provenance: &'static str,
 }
 
 #[derive(Debug)]
@@ -71,29 +88,21 @@ impl Columns {
         Ok(Provenance::from(NodeRow::decoded::<Entered>(text)?))
     }
 
+    pub(crate) fn rowid(self, statements: &mut Statements<'_>) -> Result<i64, StoreFailure> {
+        let rows = statements.rows(sqlx::query!(
+            r#"SELECT rowid AS "key!: i64" FROM segments WHERE message = ?1 AND ordinal = ?2"#,
+            self.message,
+            self.ordinal
+        ))?;
+        Ok(rows.first().map(|row| row.key).ok_or(sqlx::Error::RowNotFound)?)
+    }
+
     pub(crate) fn covered(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
         let message = message.to_string();
         let rows = statements.rows(sqlx::query_as!(
             Columns,
             r#"SELECT message AS "message!: String", ordinal AS "ordinal!: i64" FROM (SELECT message, ordinal FROM span_edges WHERE message = ?1 UNION SELECT message, ordinal FROM senses WHERE message = ?1 UNION SELECT message, ordinal FROM conversational WHERE message = ?1 UNION SELECT source_message, source_ordinal FROM segment_links WHERE source_message = ?1 UNION SELECT target_message, target_ordinal FROM segment_links WHERE target_message = ?1) ORDER BY ordinal"#,
             message
-        ))?;
-        Ok(rows.into_iter().map(Columns::segment).collect::<Result<Vec<Segment>, sqlx::Error>>()?)
-    }
-
-    pub(crate) fn ordered(
-        from: &Segment,
-        relation: SegmentRelation,
-        statements: &mut Statements<'_>,
-    ) -> Result<Vec<Segment>, StoreFailure> {
-        let Columns { message, ordinal } = Columns::from(from);
-        let relation = relation.name();
-        let rows = statements.rows(sqlx::query_as!(
-            Columns,
-            r#"WITH RECURSIVE chain (message, ordinal) AS (SELECT ?1, ?2 UNION SELECT segment_links.target_message, segment_links.target_ordinal FROM segment_links JOIN chain ON segment_links.source_message = chain.message AND segment_links.source_ordinal = chain.ordinal WHERE segment_links.relation = ?3) SELECT message AS "message!: String", ordinal AS "ordinal!: i64" FROM chain ORDER BY message, ordinal"#,
-            message,
-            ordinal,
-            relation
         ))?;
         Ok(rows.into_iter().map(Columns::segment).collect::<Result<Vec<Segment>, sqlx::Error>>()?)
     }
@@ -197,14 +206,17 @@ impl From<&Segment> for Columns {
 }
 
 impl Batch for Directions {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    type Failure = Refusal;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let mut annotating = Annotating { provenance: self.provenance, statements };
         let written = self
             .directed
             .iter()
             .map(|directed| directed.written(&mut annotating))
-            .collect::<Result<Vec<Written>, StoreFailure>>()?;
-        Ok(Written::total(written.into_iter()))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        let recorded = self.file.written(annotating.provenance(), annotating.statements)?;
+        Ok(Written::total(written.into_iter().chain([recorded])))
     }
 }
 
@@ -218,29 +230,29 @@ impl Annotating<'_, '_> {
         segment: &Segment,
         node: NodeId,
         relation: SpanRelation,
-    ) -> Result<Written, StoreFailure> {
+    ) -> Result<Written, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let node = node.into_inner();
         let relation = relation.name();
         let provenance = self.provenance();
-        self.statements.written(sqlx::query!(
+        Ok(self.statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance) VALUES (?1, ?2, ?3, ?4, ?5)",
             message,
             ordinal,
             relation,
             node,
             provenance
-        ))
+        ))?)
     }
 
-    pub(super) fn sensed(&mut self, segment: &Segment, sense: Sense) -> Result<Written, StoreFailure> {
+    pub(super) fn sensed(&mut self, segment: &Segment, sense: Sense) -> Result<Written, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let kind = sense.kind().name();
         let specificity = sense.specificity().name();
         let confidence = sense.confidence().name();
         let explicitness = sense.explicitness().name();
         let provenance = self.provenance();
-        self.statements.written(sqlx::query!(
+        Ok(self.statements.written(sqlx::query!(
             "INSERT INTO senses (message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT earlier.id FROM senses AS earlier WHERE earlier.message = ?1 AND earlier.ordinal = ?2 AND NOT EXISTS (SELECT 1 FROM senses AS later WHERE later.supersedes = earlier.id)))",
             message,
             ordinal,
@@ -249,7 +261,7 @@ impl Annotating<'_, '_> {
             confidence,
             explicitness,
             provenance
-        ))
+        ))?)
     }
 
     pub(super) fn related(
@@ -257,42 +269,67 @@ impl Annotating<'_, '_> {
         source: &Segment,
         target: &Segment,
         relation: SegmentRelation,
-    ) -> Result<Written, StoreFailure> {
-        let source = Columns::from(source);
-        let target = Columns::from(target);
-        let relation = relation.name();
-        let provenance = self.provenance();
-        self.statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            source.message,
-            source.ordinal,
-            relation,
-            target.message,
-            target.ordinal,
-            provenance
-        ))
+    ) -> Result<Written, Refusal> {
+        Linking { source, target, relation, provenance: self.provenance() }.closed(self.statements)
     }
 
-    pub(super) fn proposed(&mut self, node: &Node, parent: NodeId) -> Result<Written, StoreFailure> {
+    pub(super) fn proposed(&mut self, node: &Node, parent: NodeId) -> Result<Written, Refusal> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let linked =
             Linked::new(node.identity(), NodeRelation::Refines, parent, self.provenance).written(self.statements)?;
         Ok(planted.plus(linked))
     }
 
-    pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, StoreFailure> {
+    pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, Refusal> {
         let [old, by] = supersession.ends();
         Linked::new(by, NodeRelation::Supersedes, old, self.provenance).written(self.statements)
     }
 
-    pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, StoreFailure> {
+    pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance();
-        self.statements.written(sqlx::query!(
+        Ok(self.statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO conversational (message, ordinal, provenance) VALUES (?1, ?2, ?3)",
             message,
             ordinal,
             provenance
+        ))?)
+    }
+}
+
+impl Linking<'_> {
+    fn closed(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        match self.relation {
+            SegmentRelation::Supersedes => Closing::<SegmentSupersedes>::new(self.source.clone(), self.target.clone())
+                .written(statements, |linked| LinkColumns::from(self).written(linked)),
+            SegmentRelation::Corrects => Closing::<SegmentCorrects>::new(self.source.clone(), self.target.clone())
+                .written(statements, |linked| LinkColumns::from(self).written(linked)),
+            SegmentRelation::Answers | SegmentRelation::RefersTo => Ok(LinkColumns::from(self).written(statements)?),
+        }
+    }
+}
+
+impl From<Linking<'_>> for LinkColumns {
+    fn from(linking: Linking<'_>) -> LinkColumns {
+        LinkColumns {
+            source: Columns::from(linking.source),
+            relation: linking.relation.name(),
+            target: Columns::from(linking.target),
+            provenance: linking.provenance,
+        }
+    }
+}
+
+impl LinkColumns {
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(sqlx::query!(
+            "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            self.source.message,
+            self.source.ordinal,
+            self.relation,
+            self.target.message,
+            self.target.ordinal,
+            self.provenance
         ))
     }
 }

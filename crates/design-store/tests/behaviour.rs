@@ -8,8 +8,9 @@ use design_model::{
     SegmentRelation, Stage, Supersession, Title,
 };
 use design_store::{
-    Covered, Directed, Directions, Linked, NewNode, NextNode, Ordered, Placed, Prefixed, ProjectRoot, Scope,
-    SearchSegments, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema, SupersededBy,
+    AppliedFile, Covered, Cycle, Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot,
+    Refusal, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema,
+    Unseen,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -306,22 +307,18 @@ impl Ids {
             .map(|relative| relative.node().identity())
             .collect()
     }
+
+    fn earlier(seen: &Seen) -> Option<i64> {
+        match seen {
+            Seen::Before(earlier) => Some(earlier.identity().into_inner()),
+            Seen::Unseen(_) => None,
+        }
+    }
 }
 
-laws::law!(the_closure_holds_exactly_the_transitive_refinements, Dag::any(), dag, {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    dag.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    (0..dag.facets.len()).try_for_each(|node| {
-        let placed = store
-            .read(ShownNode::from(Dag::id(node)))
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?
-            .ok_or_else(|| TestCaseError::fail("a planted node is not shown"))?;
-        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), dag.ancestors(node));
-        prop_assert_eq!(Ids::kin(&placed, Kin::Child), dag.children(node));
-        prop_assert_eq!(placed.node().entry().facet(), dag.facets.get(node).copied().unwrap_or(Facet::Project));
-        Ok(())
-    })?;
+laws::law!(a_node_s_kin_are_exactly_its_transitive_refinements_whatever_else_is_closed, Mixed::any(), mixed, {
+    let shown = mixed.shown().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(shown, mixed.wanted());
 });
 
 struct Projects;
@@ -425,7 +422,17 @@ impl Proposals {
     }
 
     fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
-        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), directed))?)
+        let file = Proposals::unseen(store, &format!("{directed:?}"))?;
+        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed))?)
+    }
+
+    fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, Box<dyn Error>> {
+        match store.read(AppliedFile::from(Bytes::from(contents)))? {
+            Seen::Unseen(unseen) => Ok(unseen),
+            Seen::Before(earlier) => {
+                Err(format!("{contents} was applied as file {}", earlier.identity().into_inner()).into())
+            }
+        }
     }
 
     fn segment(message: &str, ordinal: usize) -> Segment {
@@ -473,6 +480,29 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    let root = Projects::rooted(&store, "p")?;
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let refused = Proposals::unseen(&store, "refused")?;
+    assert!(store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray])).is_err());
+    assert!(matches!(store.read(AppliedFile::from(Bytes::from("refused")))?, Seen::Unseen(_)));
+    let kept = Proposals::unseen(&store, "kept")?;
+    store.write(Directions::new(Provenance::from(Entered::Apply), kept, vec![Proposals::child(root, 2)?]))?;
+    let other = Proposals::unseen(&store, "other")?;
+    store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new()))?;
+    let seen = [Bytes::from("kept"), Bytes::from("other"), Bytes::from("kept ")]
+        .map(|contents| store.read(AppliedFile::from(contents)).map(|seen| Ids::earlier(&seen)))
+        .into_iter()
+        .collect::<Result<Vec<Option<i64>>, _>>()?;
+    assert_eq!(seen, [Some(1), Some(2), None]);
+    Ok(())
+}
+
+#[test]
 fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
@@ -485,23 +515,6 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
     let applied = Provenance::from(Entered::Apply);
     assert_eq!(links, [(NodeRelation::Refines, root, applied), (NodeRelation::Supersedes, NodeId::new(2), applied)]);
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_some());
-    Ok(())
-}
-
-#[test]
-fn a_node_supersedes_itself_and_every_node_down_its_chain_and_no_other() -> Result<(), Box<dyn Error>> {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let root = Projects::rooted(&store, "p")?;
-    let children = (2..=5).map(|id| Proposals::child(root, id)).collect::<Result<Vec<Directed>, Box<dyn Error>>>()?;
-    Proposals::written(&store, children)?;
-    Proposals::written(&store, vec![Proposals::superseded(2, 3)?, Proposals::superseded(3, 4)?])?;
-    let chain = |id: i64| -> Result<Vec<NodeId>, Box<dyn Error>> {
-        Ok(store.read(SupersededBy::from(NodeId::new(id)))?.into_iter().collect())
-    };
-    assert_eq!(chain(4)?, [2, 3, 4].map(NodeId::new));
-    assert_eq!(chain(3)?, [2, 3].map(NodeId::new));
-    assert_eq!(chain(5)?, [NodeId::new(5)]);
     Ok(())
 }
 
@@ -545,33 +558,221 @@ fn a_message_is_covered_where_any_annotation_names_its_segments() -> Result<(), 
     Ok(())
 }
 
+const SEGMENTED: &str = concat!(
+    "{\"type\":\"user\",\"uuid\":\"o1\",\"parentUuid\":null,\"sessionId\":\"s\",",
+    "\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{\"kind\":\"human\"},",
+    "\"message\":{\"content\":\"1. a\\n2. b\\n3. c\\n4. d\\n5. e\"}}\n"
+);
+
+const ENDS: usize = 5;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Closed {
+    Refines,
+    Supersedes,
+    SegmentSupersedes,
+    SegmentCorrects,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Ends {
+    Nodes(NodeRelation),
+    Segments(SegmentRelation),
+}
+
+#[derive(Clone, Debug)]
+struct Probe {
+    closed: Closed,
+    edges: Vec<Edge>,
+    tried: Edge,
+}
+
+impl Closed {
+    const ALL: [Closed; 4] = [Closed::Refines, Closed::Supersedes, Closed::SegmentSupersedes, Closed::SegmentCorrects];
+
+    fn ends(self) -> Ends {
+        match self {
+            Closed::Refines => Ends::Nodes(NodeRelation::Refines),
+            Closed::Supersedes => Ends::Nodes(NodeRelation::Supersedes),
+            Closed::SegmentSupersedes => Ends::Segments(SegmentRelation::Supersedes),
+            Closed::SegmentCorrects => Ends::Segments(SegmentRelation::Corrects),
+        }
+    }
+}
+
+impl Ends {
+    fn linked(self, store: &Port<'_, Sqlite>, edge: Edge, file: Unseen) -> Result<Written, Refusal> {
+        match self {
+            Ends::Nodes(relation) => {
+                store.write(Linked::new(Dag::id(edge.child), relation, Dag::id(edge.parent), Entered::Init.into()))
+            }
+            Ends::Segments(relation) => store.write(Directions::new(
+                Provenance::from(Entered::Apply),
+                file,
+                vec![Directed::Related {
+                    source: Proposals::segment("o1", edge.child),
+                    target: Proposals::segment("o1", edge.parent),
+                    relation,
+                }],
+            )),
+        }
+    }
+
+    fn cycle(self, edge: Edge) -> Cycle {
+        match self {
+            Ends::Nodes(relation) => {
+                Cycle::Nodes { source: Dag::id(edge.child), relation, target: Dag::id(edge.parent) }
+            }
+            Ends::Segments(relation) => Cycle::Segments {
+                source: Proposals::segment("o1", edge.child),
+                relation,
+                target: Proposals::segment("o1", edge.parent),
+            },
+        }
+    }
+}
+
+impl Probe {
+    fn any() -> impl Strategy<Value = Probe> {
+        (select(Closed::ALL.to_vec()), Probe::edges(), 0..ENDS, 0..ENDS)
+            .prop_map(|(closed, edges, child, parent)| Probe { closed, edges, tried: Edge { child, parent } })
+    }
+
+    fn edges() -> impl Strategy<Value = Vec<Edge>> {
+        vec((0..ENDS, 0..ENDS), 0..10).prop_map(|pairs| {
+            pairs
+                .into_iter()
+                .filter(|(first, second)| first != second)
+                .map(|(first, second)| Edge { child: first.max(second), parent: first.min(second) })
+                .collect()
+        })
+    }
+
+    fn refused(&self) -> Result<Option<Cycle>, Box<dyn Error>> {
+        let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(records)?;
+        (0..ENDS)
+            .map(|_node| Ok(store.write(Dag::node(Facet::Feature)?)?))
+            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        let ends = self.closed.ends();
+        let mut files = (0..=self.edges.len())
+            .map(|nth| Proposals::unseen(&store, &nth.to_string()))
+            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?
+            .into_iter();
+        let tried = files.next().ok_or("no file for the tried edge")?;
+        self.edges
+            .iter()
+            .zip(files)
+            .map(|(edge, file)| ends.linked(&store, *edge, file))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        Probe::cyclic(ends.linked(&store, self.tried, tried))
+    }
+
+    fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, Box<dyn Error>> {
+        match written {
+            Ok(_written) => Ok(None),
+            Err(Refusal::Cyclic(cycle)) => Ok(Some(cycle)),
+            Err(failure) => Err(failure.into()),
+        }
+    }
+
+    fn reached(&self) -> BTreeSet<usize> {
+        std::iter::successors(Some(BTreeSet::from([self.tried.parent])), |frontier| {
+            let next: BTreeSet<usize> =
+                self.edges.iter().filter(|edge| frontier.contains(&edge.child)).map(|edge| edge.parent).collect();
+            Some(frontier.union(&next).copied().collect())
+        })
+        .nth(ENDS)
+        .unwrap_or_default()
+    }
+
+    fn chain() -> Vec<Edge> {
+        vec![Edge { child: 1, parent: 0 }, Edge { child: 2, parent: 1 }]
+    }
+
+    fn closing() -> Edge {
+        Edge { child: 0, parent: 2 }
+    }
+
+    fn wanted(&self) -> Option<Cycle> {
+        self.reached().get(&self.tried.child).map(|_reached| self.closed.ends().cycle(self.tried))
+    }
+}
+
+laws::law!(an_edge_is_refused_exactly_where_the_closure_holds_its_reverse_path, Probe::any(), probe, {
+    let refused = probe.refused().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(refused, probe.wanted());
+});
+
 #[test]
-fn a_segment_reaches_itself_and_every_segment_down_its_chain_of_one_relation() -> Result<(), Box<dyn Error>> {
-    let Recorded { records, .. } = Recorded::session()?;
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    store.write(records)?;
-    let [asked, answered, said] =
-        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
-    let link = |source: &Segment, target: &Segment, relation| Directed::Related {
-        source: source.clone(),
-        target: target.clone(),
-        relation,
-    };
-    Proposals::written(
-        &store,
-        vec![
-            link(&said, &answered, SegmentRelation::Supersedes),
-            link(&answered, &asked, SegmentRelation::Supersedes),
-            link(&asked, &said, SegmentRelation::Corrects),
-        ],
-    )?;
-    let reached = |relation, from: &Segment| -> Result<Vec<Segment>, Box<dyn Error>> {
-        Ok(store.read(Ordered::along(relation, from.clone()))?.into_iter().collect())
-    };
-    assert_eq!(reached(SegmentRelation::Supersedes, &said)?, [said.clone(), asked.clone(), answered.clone()]);
-    assert_eq!(reached(SegmentRelation::Supersedes, &answered)?, [asked.clone(), answered.clone()]);
-    assert_eq!(reached(SegmentRelation::Corrects, &asked)?, [said.clone(), asked.clone()]);
-    assert_eq!(reached(SegmentRelation::Answers, &said)?, [said]);
-    Ok(())
+fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
+    let refused = Closed::ALL
+        .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
+    assert_eq!(refused, Closed::ALL.map(|closed| Some(closed.ends().cycle(Probe::closing()))));
+}
+
+#[derive(Clone, Debug)]
+struct Mixed {
+    dag: Dag,
+    closed: Closed,
+    edges: Vec<Edge>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Shown {
+    ancestors: Vec<NodeId>,
+    children: Vec<NodeId>,
+    facet: Facet,
+}
+
+impl Mixed {
+    fn any() -> impl Strategy<Value = Mixed> {
+        let others: Vec<Closed> = Closed::ALL.into_iter().filter(|closed| *closed != Closed::Refines).collect();
+        (Dag::any(), select(others), Probe::edges()).prop_map(|(dag, closed, edges)| {
+            let ends = dag.facets.len().min(ENDS);
+            Mixed { dag, closed, edges: edges.into_iter().filter(|edge| edge.child < ends).collect() }
+        })
+    }
+
+    fn shown(&self) -> Result<Vec<Shown>, Box<dyn Error>> {
+        let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(records)?;
+        self.dag.planted(&store)?;
+        let ends = self.closed.ends();
+        let files = (0..self.edges.len())
+            .map(|nth| Proposals::unseen(&store, &nth.to_string()))
+            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?;
+        self.edges
+            .iter()
+            .zip(files)
+            .map(|(edge, file)| ends.linked(&store, *edge, file))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        (0..self.dag.facets.len())
+            .map(|node| {
+                let placed = store.read(ShownNode::from(Dag::id(node)))?.ok_or("a planted node is not shown")?;
+                Ok(Shown {
+                    ancestors: Ids::kin(&placed, Kin::Ancestor),
+                    children: Ids::kin(&placed, Kin::Child),
+                    facet: placed.node().entry().facet(),
+                })
+            })
+            .collect()
+    }
+
+    fn wanted(&self) -> Vec<Shown> {
+        self.dag
+            .facets
+            .iter()
+            .enumerate()
+            .map(|(node, facet)| Shown {
+                ancestors: self.dag.ancestors(node),
+                children: self.dag.children(node),
+                facet: *facet,
+            })
+            .collect()
+    }
 }

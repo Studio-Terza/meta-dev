@@ -1,7 +1,7 @@
 use std::fmt;
 
 use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
-use design_store::{Annotation, Placed, Remarking};
+use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
 
@@ -18,6 +18,9 @@ pub struct Neighbourhood<'placed>(&'placed Placed);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Annotated<'annotation>(&'annotation Annotation);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Repeat<'earlier>(&'earlier Earlier);
 
 struct Writing<'out, 'formatter>(&'out mut fmt::Formatter<'formatter>);
 
@@ -42,6 +45,12 @@ impl<'placed> From<&'placed Placed> for Neighbourhood<'placed> {
 impl<'annotation> From<&'annotation Annotation> for Annotated<'annotation> {
     fn from(annotation: &'annotation Annotation) -> Annotated<'annotation> {
         Annotated(annotation)
+    }
+}
+
+impl<'earlier> From<&'earlier Earlier> for Repeat<'earlier> {
+    fn from(earlier: &'earlier Earlier) -> Repeat<'earlier> {
+        Repeat(earlier)
     }
 }
 
@@ -142,5 +151,12 @@ impl fmt::Display for Applied {
             .iter()
             .try_for_each(|segment| writeln!(formatter, "uncovered {}", SegmentRef::from(segment)))?;
         writeln!(formatter, "written {}", self.written().count())
+    }
+}
+
+impl fmt::Display for Repeat<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let applied: AppliedId = self.0.identity();
+        writeln!(formatter, "already applied as file {} at {}; nothing written", applied.into_inner(), self.0.stamp())
     }
 }

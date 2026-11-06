@@ -2,10 +2,11 @@ use std::error::Error;
 use std::str::FromStr;
 
 use design_model::{Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Project, Provenance, Title};
-use newtype::{Counter, Newtype};
+use newtype::Newtype;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
 
+use crate::acyclic::{Acyclic, Closing, Refines, Refusal, Supersedes};
 use crate::{Link, Relative};
 
 #[derive(Clone, Debug, Op)]
@@ -17,6 +18,14 @@ pub struct Linked {
     relation: NodeRelation,
     target: NodeId,
     provenance: Provenance,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EdgeColumns {
+    source: i64,
+    relation: &'static str,
+    target: i64,
+    provenance: &'static str,
 }
 
 #[derive(Debug)]
@@ -47,12 +56,6 @@ pub(crate) struct OutgoingRow {
     provenance: String,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Refinement {
-    child: i64,
-    parent: i64,
-}
-
 impl From<Entry> for NewNode {
     fn from(entry: Entry) -> NewNode {
         NewNode(entry)
@@ -64,63 +67,61 @@ impl Linked {
     pub fn new(source: NodeId, relation: NodeRelation, target: NodeId, provenance: Provenance) -> Linked {
         Linked { source, relation, target, provenance }
     }
+}
 
-    fn refinement(self) -> Option<Refinement> {
-        match self.relation {
-            NodeRelation::Refines => {
-                Some(Refinement { child: self.source.into_inner(), parent: self.target.into_inner() })
-            }
-            NodeRelation::Supersedes | NodeRelation::Consumes => None,
+impl From<Linked> for EdgeColumns {
+    fn from(linked: Linked) -> EdgeColumns {
+        EdgeColumns {
+            source: linked.source.into_inner(),
+            relation: linked.relation.name(),
+            target: linked.target.into_inner(),
+            provenance: Entered::from(linked.provenance).name(),
         }
     }
 }
 
-impl Refinement {
-    fn closed(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+impl EdgeColumns {
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         statements.written(sqlx::query!(
-            "INSERT INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2 ON CONFLICT (ancestor, descendant) DO UPDATE SET depth = excluded.depth WHERE excluded.depth < closure.depth",
-            self.parent,
-            self.child
+            "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
+            self.source,
+            self.relation,
+            self.target,
+            self.provenance
         ))
     }
 }
 
 impl Batch for NewNode {
+    type Failure = StoreFailure;
+
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let entry = self.0;
         let project = entry.project().to_string();
         let facet = entry.facet().name();
         let stage = entry.stage().name();
         let provenance = Entered::from(entry.provenance()).name();
-        let node = statements.written(sqlx::query!(
+        statements.written(sqlx::query!(
             "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
             project,
             facet,
             stage,
             provenance
-        ))?;
-        let reflexive = statements.written(sqlx::query!(
-            "INSERT INTO closure (ancestor, descendant, depth) VALUES (last_insert_rowid(), last_insert_rowid(), 0)"
-        ))?;
-        Ok(node.plus(reflexive))
+        ))
     }
 }
 
 impl Batch for Linked {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let source = self.source.into_inner();
-        let relation = self.relation.name();
-        let target = self.target.into_inner();
-        let provenance = Entered::from(self.provenance).name();
-        let edge = statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
-            source,
-            relation,
-            target,
-            provenance
-        ))?;
-        let closed = self.refinement().map(|refinement| refinement.closed(statements)).transpose()?;
-        Ok(edge.plus(closed.unwrap_or_default()))
+    type Failure = Refusal;
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        match self.relation {
+            NodeRelation::Refines => Closing::<Refines>::new(self.source, self.target)
+                .written(statements, |edged| EdgeColumns::from(self).written(edged)),
+            NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source, self.target)
+                .written(statements, |edged| EdgeColumns::from(self).written(edged)),
+            NodeRelation::Consumes => Ok(EdgeColumns::from(self).written(statements)?),
+        }
     }
 }
 
@@ -192,17 +193,6 @@ impl NodeRow {
         Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
     }
 
-    pub(crate) fn superseded_by(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
-        let id = id.into_inner();
-        let supersedes = NodeRelation::Supersedes.name();
-        let rows = statements.rows(sqlx::query!(
-            r#"WITH RECURSIVE chain (id) AS (SELECT ?1 UNION SELECT node_edges.target FROM node_edges JOIN chain ON node_edges.source = chain.id WHERE node_edges.relation = ?2) SELECT id AS "id!: i64" FROM chain ORDER BY id"#,
-            id,
-            supersedes
-        ))?;
-        Ok(rows.into_iter().map(|row| NodeId::new(row.id)).collect())
-    }
-
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
         let rows = statements.rows(sqlx::query!(r#"SELECT COALESCE(MAX(id), 0) + 1 AS "next!: i64" FROM nodes"#))?;
         Ok(rows.into_iter().map(|row| NodeId::new(row.next)).collect())
@@ -216,7 +206,7 @@ impl NodeRow {
         let stage = entry.stage().name();
         let provenance = Entered::from(entry.provenance()).name();
         let title = node.title().map(ToString::to_string);
-        let planted = statements.written(sqlx::query!(
+        statements.written(sqlx::query!(
             "INSERT INTO nodes (id, project, facet, stage, provenance, title) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             id,
             project,
@@ -224,24 +214,26 @@ impl NodeRow {
             stage,
             provenance,
             title
-        ))?;
-        let reflexive = statements
-            .written(sqlx::query!("INSERT INTO closure (ancestor, descendant, depth) VALUES (?1, ?1, 0)", id))?;
-        Ok(planted.plus(reflexive))
+        ))
     }
 }
 
 impl RelativeRow {
-    pub(crate) fn around(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Relative>, StoreFailure> {
+    pub(crate) fn around<R: Acyclic<End = NodeId>>(
+        id: NodeId,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<Relative>, StoreFailure> {
         let id = id.into_inner();
         let ancestor = Kin::Ancestor.name();
         let child = Kin::Child.name();
+        let relation = R::CLOSED.name();
         let rows = statements.rows(sqlx::query_as!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
             id,
             ancestor,
-            child
+            child,
+            relation
         ))?;
         Ok(rows.into_iter().map(Relative::try_from).collect::<Result<Vec<Relative>, sqlx::Error>>()?)
     }

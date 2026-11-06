@@ -18,7 +18,7 @@ use super::persistence::Persistence;
 use super::{Ground, Token};
 use crate::Outcome;
 use crate::cli::failure::Failure;
-pub use apply::{Applied, Unresolved};
+pub use apply::{Application, Applied, Unresolved};
 use ingest::Ingest;
 use init::Init;
 use printed::Printed;
@@ -111,9 +111,7 @@ impl Command {
                 .planted(&ground)
                 .and_then(|initialised| Printed::shown(out, &initialised))
                 .map(|_printed| Outcome::Initialised),
-            Command::Apply(path) => Applied::read(&ground, &path)
-                .and_then(|applied| Printed::shown(out, &applied))
-                .map(|_printed| Outcome::Applied),
+            Command::Apply(path) => Application::read(&ground, &path).and_then(|application| application.reported(out)),
         }
     }
 }

@@ -16,11 +16,13 @@ doctest = false
 design-model = { path = "../design-model" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
+named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 sqlx.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
+thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
