@@ -68,6 +68,10 @@ const BLOCK_GLOB_FALLS_THROUGH: &str =
     "trait Clone {}\nmod a {}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
 const BLOCK_GLOB_SUPPLIES: &str = "trait Clone {}\nmod a {\n    pub trait Clone {}\n}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
 
+const OWN_ITEM_HIDES_GLOB: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    trait Clone {}\n}\nuse m::*;\nimpl Clone for R {}\nimpl m::Clone for R {}\n";
+const OWN_IMPORT_HIDES_GLOB: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    use std::fmt::Debug as Clone;\n}\nuse m::*;\nimpl Clone for R {}\n";
+const OWN_VISIBLE_ITEM_HIDES_GLOB: &str = "mod inner {\n    pub struct Clone;\n}\nmod m {\n    pub use crate::inner::*;\n    pub trait Clone {}\n}\nuse m::*;\nimpl Clone for R {}\n";
+
 const GLOB_PRIVATE_SELF: &str = "trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\nfn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
 const GLOB_VISIBLE_CRATE: &str = "mod a {\n    pub(crate) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
 const GLOB_RESTRICTED: &str = "mod a {\n    pub(super) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
@@ -370,6 +374,12 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
 laws::table!(a_block_looks_past_its_glob_to_the_enclosing_module, |text: &&str| Read::resolved(text), [
     BLOCK_GLOB_FALLS_THROUGH => [Expect::krate(&["crate", "Clone"])],
     BLOCK_GLOB_SUPPLIES => [Expect::krate(&["crate", "a", "Clone"])],
+]);
+
+laws::table!(a_module_s_own_name_hides_the_same_name_in_its_globs, |text: &&str| Read::resolved(text), [
+    OWN_ITEM_HIDES_GLOB => [Expect::std(&["std", "clone", "Clone"]), Expect::unknown(&["m", "Clone"])],
+    OWN_IMPORT_HIDES_GLOB => [Expect::std(&["std", "clone", "Clone"])],
+    OWN_VISIBLE_ITEM_HIDES_GLOB => [Expect::krate(&["crate", "m", "Clone"])],
 ]);
 
 laws::table!(a_glob_carries_the_hidden_names_of_its_module, |text: &&str| Read::resolved(text), [

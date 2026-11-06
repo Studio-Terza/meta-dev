@@ -49,7 +49,10 @@ const ASSERTED_BODY: &str =
     "struct R;\nfn f() {\n    assert!(true);\n    impl Clone for R {\n        fn clone(&self) -> R { R }\n    }\n}\n";
 const SELF_AS_CORE: &str = "extern crate self as core;\npub mod clone {\n    pub trait Clone {}\n}\npub struct R;\nimpl core::clone::Clone for R {}\n";
 
-const CASES: [Case; 28] = [
+const BLOCK_GLOB_RENAME: &str = "mod a {}\nuse std::fmt::Debug as Clone;\npub struct R;\npub fn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
+const GLOB_UNDER_OWN_ITEM: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    trait Clone {}\n}\nuse m::*;\npub struct R;\nimpl Clone for R {}\n";
+
+const CASES: [Case; 30] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -199,6 +202,16 @@ const CASES: [Case; 28] = [
         Title::new("a crate declared as core by extern crate self"),
         &[Source::new(Located::new("a.rs"), Text::new(SELF_AS_CORE))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a rename made in a block whose glob does not supply the name"),
+        &[Source::new(Located::new("a.rs"), Text::new(BLOCK_GLOB_RENAME))],
+        Flagged::new(&["a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("a prelude trait whose name a module's private item hides in that module's glob"),
+        &[Source::new(Located::new("a.rs"), Text::new(GLOB_UNDER_OWN_ITEM))],
+        Flagged::new(&["a.rs:10"]),
     ),
 ];
 

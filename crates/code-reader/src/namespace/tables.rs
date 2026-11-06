@@ -59,11 +59,6 @@ pub(super) enum Layer {
 
 impl Layer {
     const ORDER: [Layer; 3] = [Layer::Declared, Layer::Imported, Layer::Extern];
-
-    fn found<'rows>(self, explicit: &Explicit<'rows>, key: Key<'_>, sight: Sight) -> View<'rows> {
-        let rows = explicit.0.get(&Placed { key, layer: self }).map(Vec::as_slice).unwrap_or_default();
-        rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight)))
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -102,15 +97,16 @@ impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
 }
 
 impl<'rows> Explicit<'rows> {
-    fn found(&self, sought: Sought<'_>, sight: Sight) -> View<'rows> {
+    fn found(&self, sought: Sought<'_>, sight: Sight) -> Option<View<'rows>> {
         match sought {
             Sought::Named(key) => self.named(key, sight),
-            Sought::Unlisted => View::ABSENT,
+            Sought::Unlisted => None,
         }
     }
 
-    fn named(&self, key: Key<'_>, sight: Sight) -> View<'rows> {
-        Layer::ORDER.iter().fold(View::ABSENT, |found, layer| found.or_else(|| layer.found(self, key, sight)))
+    fn named(&self, key: Key<'_>, sight: Sight) -> Option<View<'rows>> {
+        let rows = Layer::ORDER.iter().find_map(|layer| self.0.get(&Placed { key, layer: *layer }))?;
+        Some(rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight))))
     }
 }
 
@@ -216,7 +212,7 @@ struct Level<'tables, 'rows> {
 impl<'tables, 'rows> Level<'tables, 'rows> {
     fn found(self, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
         let globbed = || self.globs(ignored).fold(View::ABSENT, |found, glob| found.union(glob.found(sought, sight)));
-        self.explicit.found(sought, sight).or_else(globbed)
+        self.explicit.found(sought, sight).unwrap_or_else(globbed)
     }
 
     fn exposure(self, sight: Sight) -> Exposed<'rows> {
