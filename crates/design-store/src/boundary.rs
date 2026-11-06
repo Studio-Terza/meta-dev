@@ -141,7 +141,19 @@ impl MessageRow {
     pub(crate) fn named(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             MessageRow,
-            "SELECT uuid, session, parent, at, author, body FROM messages WHERE uuid = ?1",
+            r#"
+SELECT
+  uuid,
+  session,
+  parent,
+  at,
+  author,
+  body
+FROM
+  messages
+WHERE
+  uuid = ?1
+"#,
             uuid: Uuid
         ))
     }
@@ -149,7 +161,22 @@ impl MessageRow {
     pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             MessageRow,
-            "SELECT messages.uuid, messages.session, messages.parent, messages.at, messages.author, messages.body FROM edges JOIN messages ON messages.uuid = edges.uuid WHERE edges.session = ?1 ORDER BY edges.rowid",
+            r#"
+SELECT
+  messages.uuid,
+  messages.session,
+  messages.parent,
+  messages.at,
+  messages.author,
+  messages.body
+FROM
+  edges
+  JOIN messages ON messages.uuid = edges.uuid
+WHERE
+  edges.session = ?1
+ORDER BY
+  edges.rowid
+"#,
             session: SessionId
         ))?;
         Ok(rows.into_iter().map(Record::from).collect())
@@ -194,7 +221,19 @@ impl SegmentRow {
     pub(crate) fn stored_for(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<SegmentRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             SegmentRow,
-            "SELECT message, ordinal, shape, body FROM segments WHERE message = ?1 ORDER BY ordinal",
+            r#"
+SELECT
+  message,
+  ordinal,
+  shape,
+  body
+FROM
+  segments
+WHERE
+  message = ?1
+ORDER BY
+  ordinal
+"#,
             uuid: Uuid
         ))
     }
@@ -214,7 +253,20 @@ impl LinkRow {
     pub(crate) fn touching(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<LinkRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             LinkRow,
-            "SELECT source, relation, target, source_message, target_message FROM mechanical_links WHERE ?1 IN (source_message, target_message) ORDER BY rowid",
+            r#"
+SELECT
+  source,
+  relation,
+  target,
+  source_message,
+  target_message
+FROM
+  mechanical_links
+WHERE
+  ?1 IN (source_message, target_message)
+ORDER BY
+  rowid
+"#,
             uuid: Uuid
         ))
     }
@@ -239,7 +291,25 @@ impl Hit {
         let only = scope.only();
         statements.rows(store_ports::query!(
             Hit,
-            r#"SELECT segments.rowid AS "id!: i64", messages.uuid, messages.author, messages.at, segments.body, segments_fts.rank AS "rank!: f64" FROM segments_fts JOIN segments ON segments.rowid = segments_fts.rowid JOIN messages ON messages.uuid = segments.message WHERE segments_fts MATCH ?1 AND (?2 IS NULL OR messages.author = ?2)"#,
+            r#"
+SELECT
+  segments.rowid AS "id!: i64",
+  messages.uuid,
+  messages.author,
+  messages.at,
+  segments.body,
+  segments_fts.rank AS "rank!: f64"
+FROM
+  segments_fts
+  JOIN segments ON segments.rowid = segments_fts.rowid
+  JOIN messages ON messages.uuid = segments.message
+WHERE
+  segments_fts MATCH ?1
+  AND (
+    ?2 IS NULL
+    OR messages.author = ?2
+  )
+"#,
             term: Term,
             only: Option<Authorship>
         ))
@@ -276,7 +346,15 @@ impl RankRow {
     pub(crate) fn matching(term: &Term, statements: &mut Statements<'_>) -> Result<Vec<RankRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             RankRow,
-            r#"SELECT rowid AS "id!: i64", rank AS "rank!: f64" FROM segments_fts WHERE segments_fts MATCH ?1"#,
+            r#"
+SELECT
+  rowid AS "id!: i64",
+  rank AS "rank!: f64"
+FROM
+  segments_fts
+WHERE
+  segments_fts MATCH ?1
+"#,
             term: Term
         ))
     }
@@ -299,7 +377,24 @@ impl EdgeRow {
     pub(crate) fn passing(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Skipped>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             EdgeRow,
-            "SELECT session, uuid, parent FROM edges WHERE session = ?1 AND uuid NOT IN (SELECT uuid FROM messages) ORDER BY rowid",
+            r#"
+SELECT
+  session,
+  uuid,
+  parent
+FROM
+  edges
+WHERE
+  session = ?1
+  AND uuid NOT IN (
+    SELECT
+      uuid
+    FROM
+      messages
+  )
+ORDER BY
+  rowid
+"#,
             session: SessionId
         ))?;
         Ok(rows.into_iter().map(Skipped::from).collect())
@@ -312,7 +407,16 @@ impl CursorRow {
     }
 
     pub(crate) fn all(statements: &mut Statements<'_>) -> Result<Vec<CursorRow>, StoreFailure> {
-        statements.rows(store_ports::query!(CursorRow, "SELECT session, read_to FROM cursors"))
+        statements.rows(store_ports::query!(
+            CursorRow,
+            r#"
+SELECT
+  session,
+  read_to
+FROM
+  cursors
+"#
+        ))
     }
 
     pub(crate) fn session(&self) -> SessionId {
@@ -328,7 +432,12 @@ impl Row for MessageRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let MessageRow { uuid, session, parent, at, author, body } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO messages (uuid, session, parent, at, author, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            r#"
+INSERT
+  OR IGNORE INTO messages (uuid, session, parent, at, author, body)
+VALUES
+  (?1, ?2, ?3, ?4, ?5, ?6)
+"#,
             uuid: Uuid,
             session: SessionId,
             parent: Option<Uuid>,
@@ -343,7 +452,12 @@ impl Row for SegmentRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let SegmentRow { message, ordinal, shape, body } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO segments (message, ordinal, shape, body) VALUES (?1, ?2, ?3, ?4)",
+            r#"
+INSERT
+  OR IGNORE INTO segments (message, ordinal, shape, body)
+VALUES
+  (?1, ?2, ?3, ?4)
+"#,
             message: Uuid,
             ordinal: Ordinal,
             shape: ShapeName,
@@ -356,7 +470,18 @@ impl Row for LinkRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let LinkRow { source, relation, target, source_message, target_message } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO mechanical_links (source, relation, target, source_message, target_message) VALUES (?1, ?2, ?3, ?4, ?5)",
+            r#"
+INSERT
+  OR IGNORE INTO mechanical_links (
+    source,
+    relation,
+    target,
+    source_message,
+    target_message
+  )
+VALUES
+  (?1, ?2, ?3, ?4, ?5)
+"#,
             source: AnchorName,
             relation: RelationName,
             target: AnchorName,
@@ -370,7 +495,12 @@ impl Row for EdgeRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let EdgeRow { session, uuid, parent } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO edges (session, uuid, parent) VALUES (?1, ?2, ?3)",
+            r#"
+INSERT
+  OR IGNORE INTO edges (session, uuid, parent)
+VALUES
+  (?1, ?2, ?3)
+"#,
             session: SessionId,
             uuid: Uuid,
             parent: Option<Uuid>
@@ -382,7 +512,18 @@ impl Row for CursorRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let CursorRow { session, read_to } = self;
         statements.written(store_ports::query!(
-            "INSERT INTO cursors (session, read_to) VALUES (?1, ?2) ON CONFLICT (session) DO UPDATE SET read_to = excluded.read_to WHERE read_to <> excluded.read_to",
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  (?1, ?2)
+ON CONFLICT
+  (session)
+DO UPDATE SET
+  read_to = excluded.read_to
+WHERE
+  read_to <> excluded.read_to
+"#,
             session: SessionId,
             read_to: Offset
         ))

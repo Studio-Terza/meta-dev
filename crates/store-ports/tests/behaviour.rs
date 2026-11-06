@@ -34,7 +34,14 @@ impl Batch for Resumed {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(store_ports::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 7)"))
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 7)
+"#
+        ))
     }
 }
 
@@ -42,8 +49,22 @@ impl Batch for HalfWritten {
     type Failure = StoreFailure;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(store_ports::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 1)"))?;
-        statements.written(store_ports::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 2)"))
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 1)
+"#
+        ))?;
+        statements.written(store_ports::query!(
+            r#"
+INSERT INTO
+  cursors (session, read_to)
+VALUES
+  ('s', 2)
+"#
+        ))
     }
 }
 
@@ -59,7 +80,15 @@ impl Query for Applied {
     type Rows = Vec<Version>;
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Vec<Version>, StoreFailure> {
-        let rows = statements.rows(store_ports::query!(Migrated, "SELECT version AS \"version!\" FROM _sqlx_migrations"))?;
+        let rows = statements.rows(store_ports::query!(
+            Migrated,
+            r#"
+SELECT
+  version AS "version!"
+FROM
+  _sqlx_migrations
+"#
+        ))?;
         Ok(rows.into_iter().map(|row| row.version).collect())
     }
 }

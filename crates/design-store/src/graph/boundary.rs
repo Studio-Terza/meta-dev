@@ -119,7 +119,18 @@ pub(crate) struct EdgeRow {
 
 impl Resolved {
     pub(crate) fn read(id: NodeId, statements: &mut Statements<'_>) -> Result<Resolved, StoreFailure> {
-        let row = statements.one(store_ports::query!(IdRow, "SELECT id FROM nodes WHERE id = ?1", id: NodeId))?;
+        let row = statements.one(store_ports::query!(
+            IdRow,
+            r#"
+SELECT
+  id
+FROM
+  nodes
+WHERE
+  id = ?1
+"#,
+            id: NodeId
+        ))?;
         Ok(Resolved(row.id))
     }
 
@@ -140,7 +151,18 @@ impl Query for Resolving {
 
     fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Resolved>, StoreFailure> {
         let id = self.0;
-        let rows = statements.rows(store_ports::query!(IdRow, "SELECT id FROM nodes WHERE id = ?1", id: NodeId))?;
+        let rows = statements.rows(store_ports::query!(
+            IdRow,
+            r#"
+SELECT
+  id
+FROM
+  nodes
+WHERE
+  id = ?1
+"#,
+            id: NodeId
+        ))?;
         Ok(rows.into_iter().next().map(|row| Resolved(row.id)))
     }
 }
@@ -218,7 +240,18 @@ impl Linked {
 impl RoleRow {
     fn read(end: Resolved, statements: &mut Statements<'_>) -> Result<Role, StoreFailure> {
         let id = end.0;
-        let row = statements.one(store_ports::query!(RoleRow, "SELECT role FROM nodes WHERE id = ?1", id: NodeId))?;
+        let row = statements.one(store_ports::query!(
+            RoleRow,
+            r#"
+SELECT
+  role
+FROM
+  nodes
+WHERE
+  id = ?1
+"#,
+            id: NodeId
+        ))?;
         Ok(row.role)
     }
 }
@@ -227,7 +260,12 @@ impl EdgeColumns {
     fn inserted(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let EdgeColumns { source, relation, target, provenance } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
+            r#"
+INSERT
+  OR IGNORE INTO node_edges (source, relation, target, provenance)
+VALUES
+  (?1, ?2, ?3, ?4)
+"#,
             source: NodeId,
             relation: NodeRelation,
             target: NodeId,
@@ -268,7 +306,17 @@ impl Batch for Restaged {
         let moved = self.transition.applied(NodeRow::loaded(self.node, statements)?)?;
         let StageColumns { stage, artifact, condition, reason } = StageColumns::from(moved.stage());
         Ok(statements.written(store_ports::query!(
-            "UPDATE nodes SET stage = ?2, artifact = ?3, condition = ?4, reason = ?5 WHERE id = ?1",
+            r#"
+UPDATE
+  nodes
+SET
+  stage = ?2,
+  artifact = ?3,
+  condition = ?4,
+  reason = ?5
+WHERE
+  id = ?1
+"#,
             id: NodeId,
             stage: Stage,
             artifact: Option<Artifact>,
@@ -286,7 +334,15 @@ impl Batch for Cast {
         let role = self.casting.role();
         let provenance = Entered::from(self.casting.provenance());
         let written = statements.written(store_ports::query!(
-            "UPDATE nodes SET role = ?2, role_provenance = ?3 WHERE id = ?1",
+            r#"
+UPDATE
+  nodes
+SET
+  role = ?2,
+  role_provenance = ?3
+WHERE
+  id = ?1
+"#,
             id: NodeId,
             role: Role,
             provenance: Entered
@@ -395,7 +451,19 @@ impl NodeRow {
         let facet = Facet::Project;
         let rows = statements.rows(store_ports::query!(
             IdRow,
-            "SELECT id FROM nodes WHERE project = ?1 AND facet = ?2 ORDER BY id LIMIT 1",
+            r#"
+SELECT
+  id
+FROM
+  nodes
+WHERE
+  project = ?1
+  AND facet = ?2
+ORDER BY
+  id
+LIMIT
+  1
+"#,
             project: Project,
             facet: Facet
         ))?;
@@ -405,7 +473,24 @@ impl NodeRow {
     pub(crate) fn named(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<AnyNode>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             NodeRow,
-            "SELECT id, project, facet, stage, provenance, title, role, role_provenance, artifact, condition, reason FROM nodes WHERE id = ?1",
+            r#"
+SELECT
+  id,
+  project,
+  facet,
+  stage,
+  provenance,
+  title,
+  role,
+  role_provenance,
+  artifact,
+  condition,
+  reason
+FROM
+  nodes
+WHERE
+  id = ?1
+"#,
             id: NodeId
         ))?;
         Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, ColumnFailure>>()?)
@@ -415,14 +500,39 @@ impl NodeRow {
         let id = node.0;
         let row = statements.one(store_ports::query!(
             NodeRow,
-            "SELECT id, project, facet, stage, provenance, title, role, role_provenance, artifact, condition, reason FROM nodes WHERE id = ?1",
+            r#"
+SELECT
+  id,
+  project,
+  facet,
+  stage,
+  provenance,
+  title,
+  role,
+  role_provenance,
+  artifact,
+  condition,
+  reason
+FROM
+  nodes
+WHERE
+  id = ?1
+"#,
             id: NodeId
         ))?;
         Ok(AnyNode::try_from(row)?)
     }
 
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<NodeId, StoreFailure> {
-        let row = statements.one(store_ports::query!(NextRow, r#"SELECT COALESCE(MAX(id), 0) + 1 AS "next!: i64" FROM nodes"#))?;
+        let row = statements.one(store_ports::query!(
+            NextRow,
+            r#"
+SELECT
+  COALESCE(MAX(id), 0) + 1 AS "next!: i64"
+FROM
+  nodes
+"#
+        ))?;
         Ok(row.next)
     }
 
@@ -437,7 +547,21 @@ impl NodeRow {
         let role = node.casting().role();
         let cast = Entered::from(node.casting().provenance());
         statements.written(store_ports::query!(
-            "INSERT INTO nodes (id, project, facet, stage, provenance, title, role, role_provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            r#"
+INSERT INTO
+  nodes (
+    id,
+    project,
+    facet,
+    stage,
+    provenance,
+    title,
+    role,
+    role_provenance
+  )
+VALUES
+  (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+"#,
             id: NodeId,
             project: Project,
             facet: Facet,
@@ -458,7 +582,48 @@ impl RelativeRow {
         let (ancestor, child, relation) = (Kin::Ancestor, Kin::Child, R::CLOSED);
         let rows = statements.rows(store_ports::query!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.role_provenance, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            r#"
+SELECT
+  CASE
+    WHEN closure.descendant = ?1 THEN ?2
+    ELSE ?3
+  END AS "kin!: String",
+  nodes.id,
+  nodes.project,
+  nodes.facet,
+  nodes.stage,
+  nodes.provenance,
+  nodes.title,
+  nodes.role,
+  nodes.role_provenance,
+  nodes.artifact,
+  nodes.condition,
+  nodes.reason
+FROM
+  closure
+  JOIN nodes ON nodes.id = CASE
+    WHEN closure.descendant = ?1 THEN closure.ancestor
+    ELSE closure.descendant
+  END
+WHERE
+  closure.relation = ?4
+  AND (
+    (
+      closure.descendant = ?1
+      AND closure.depth > 0
+    )
+    OR (
+      closure.ancestor = ?1
+      AND closure.depth = 1
+    )
+  )
+ORDER BY
+  CASE
+    WHEN closure.descendant = ?1 THEN - closure.depth
+    ELSE nodes.id
+  END,
+  nodes.id
+"#,
             id: NodeId,
             ancestor: Kin,
             child: Kin,
@@ -472,7 +637,22 @@ impl EdgeRow {
     fn around(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<EdgeRow>, StoreFailure> {
         statements.rows(store_ports::query!(
             EdgeRow,
-            "SELECT source, relation, target, provenance FROM node_edges WHERE source = ?1 OR target = ?1 ORDER BY source, relation, target",
+            r#"
+SELECT
+  source,
+  relation,
+  target,
+  provenance
+FROM
+  node_edges
+WHERE
+  source = ?1
+  OR target = ?1
+ORDER BY
+  source,
+  relation,
+  target
+"#,
             id: NodeId
         ))
     }

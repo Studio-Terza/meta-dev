@@ -25,7 +25,20 @@ impl Query for Prefixed {
         let prefix = self.0;
         let rows = statements.rows(store_ports::query!(
             SpokenRow,
-            "SELECT messages.uuid, messages.author, segments.ordinal FROM messages JOIN segments ON segments.message = messages.uuid WHERE substr(messages.uuid, 1, length(?1)) = ?1 ORDER BY messages.uuid, segments.ordinal",
+            r#"
+SELECT
+  messages.uuid,
+  messages.author,
+  segments.ordinal
+FROM
+  messages
+  JOIN segments ON segments.message = messages.uuid
+WHERE
+  substr(messages.uuid, 1, length(?1)) = ?1
+ORDER BY
+  messages.uuid,
+  segments.ordinal
+"#,
             prefix: Prefix
         ))?;
         Ok(rows.into_iter().map(Spoken::from).collect())

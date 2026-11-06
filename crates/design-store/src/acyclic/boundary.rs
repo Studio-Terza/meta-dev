@@ -66,7 +66,21 @@ impl<R: Acyclic> Closing<R> {
         let (relation, descendant, ancestor) = (R::CLOSED, open.descendant, open.ancestor);
         let reverse = statements.rows(store_ports::query!(
             Reached,
-            r#"SELECT depth AS "depth!: i64" FROM closure WHERE relation = ?1 AND ancestor = ?2 AND descendant = ?3 UNION ALL SELECT 0 WHERE ?2 = ?3"#,
+            r#"
+SELECT
+  depth AS "depth!: i64"
+FROM
+  closure
+WHERE
+  relation = ?1
+  AND ancestor = ?2
+  AND descendant = ?3
+UNION ALL
+SELECT
+  0
+WHERE
+  ?2 = ?3
+"#,
             relation: Closed,
             descendant: Keyed,
             ancestor: Keyed
@@ -79,7 +93,52 @@ impl Open {
     fn closed(self, relation: Closed, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let Open { ancestor, descendant } = self;
         statements.written(store_ports::query!(
-            "INSERT INTO closure (relation, ancestor, descendant, depth) SELECT ?1, above.ancestor, below.descendant, above.depth + below.depth + 1 FROM (SELECT ?2 AS ancestor, 0 AS depth UNION ALL SELECT ancestor, depth FROM closure WHERE relation = ?1 AND descendant = ?2) AS above, (SELECT ?3 AS descendant, 0 AS depth UNION ALL SELECT descendant, depth FROM closure WHERE relation = ?1 AND ancestor = ?3) AS below WHERE true ON CONFLICT (relation, ancestor, descendant) DO UPDATE SET depth = excluded.depth WHERE excluded.depth < closure.depth",
+            r#"
+INSERT INTO
+  closure (relation, ancestor, descendant, depth)
+SELECT
+  ?1,
+  above.ancestor,
+  below.descendant,
+  above.depth + below.depth + 1
+FROM
+  (
+    SELECT
+      ?2 AS ancestor,
+      0 AS depth
+    UNION ALL
+    SELECT
+      ancestor,
+      depth
+    FROM
+      closure
+    WHERE
+      relation = ?1
+      AND descendant = ?2
+  ) AS above,
+  (
+    SELECT
+      ?3 AS descendant,
+      0 AS depth
+    UNION ALL
+    SELECT
+      descendant,
+      depth
+    FROM
+      closure
+    WHERE
+      relation = ?1
+      AND ancestor = ?3
+  ) AS below
+WHERE
+  true
+ON CONFLICT
+  (relation, ancestor, descendant)
+DO UPDATE SET
+  depth = excluded.depth
+WHERE
+  excluded.depth < closure.depth
+"#,
             relation: Closed,
             ancestor: Keyed,
             descendant: Keyed

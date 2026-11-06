@@ -80,7 +80,15 @@ impl Columns {
         let Columns { message, ordinal } = self;
         let row = statements.one(store_ports::query!(
             KeyRow,
-            r#"SELECT rowid AS "key!: i64" FROM segments WHERE message = ?1 AND ordinal = ?2"#,
+            r#"
+SELECT
+  rowid AS "key!: i64"
+FROM
+  segments
+WHERE
+  message = ?1
+  AND ordinal = ?2
+"#,
             message: Uuid,
             ordinal: Ordinal
         ))?;
@@ -90,7 +98,55 @@ impl Columns {
     pub(crate) fn covered(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             Columns,
-            r#"SELECT message AS "message!: String", ordinal AS "ordinal!: i64" FROM (SELECT message, ordinal FROM span_edges WHERE message = ?1 UNION SELECT message, ordinal FROM senses WHERE message = ?1 UNION SELECT message, ordinal FROM conversational WHERE message = ?1 UNION SELECT source_message, source_ordinal FROM segment_links WHERE source_message = ?1 UNION SELECT target_message, target_ordinal FROM segment_links WHERE target_message = ?1) ORDER BY ordinal"#,
+            r#"
+SELECT
+  message AS "message!: String",
+  ordinal AS "ordinal!: i64"
+FROM
+  (
+    SELECT
+      message,
+      ordinal
+    FROM
+      span_edges
+    WHERE
+      message = ?1
+    UNION
+    SELECT
+      message,
+      ordinal
+    FROM
+      senses
+    WHERE
+      message = ?1
+    UNION
+    SELECT
+      message,
+      ordinal
+    FROM
+      conversational
+    WHERE
+      message = ?1
+    UNION
+    SELECT
+      source_message,
+      source_ordinal
+    FROM
+      segment_links
+    WHERE
+      source_message = ?1
+    UNION
+    SELECT
+      target_message,
+      target_ordinal
+    FROM
+      segment_links
+    WHERE
+      target_message = ?1
+  )
+ORDER BY
+  ordinal
+"#,
             message: Uuid
         ))?;
         Ok(rows.into_iter().map(Segment::from).collect())
@@ -140,24 +196,94 @@ impl Annotation {
         let (current, superseded) = (Standing::Current, Standing::Superseded);
         let placed = statements.rows(store_ports::query!(
             PlacedRow,
-            "SELECT message, ordinal, relation, node, provenance FROM span_edges WHERE message = ?1 ORDER BY ordinal, relation, node",
+            r#"
+SELECT
+  message,
+  ordinal,
+  relation,
+  node,
+  provenance
+FROM
+  span_edges
+WHERE
+  message = ?1
+ORDER BY
+  ordinal,
+  relation,
+  node
+"#,
             message: Uuid
         ))?;
         let sensed = statements.rows(store_ports::query!(
             SensedRow,
-            r#"SELECT message, ordinal, kind, specificity, confidence, explicitness, provenance, CASE WHEN EXISTS (SELECT 1 FROM senses AS later WHERE later.supersedes = senses.id) THEN ?2 ELSE ?3 END AS "standing!: String" FROM senses WHERE message = ?1 ORDER BY ordinal, id"#,
+            r#"
+SELECT
+  message,
+  ordinal,
+  kind,
+  specificity,
+  confidence,
+  explicitness,
+  provenance,
+  CASE
+    WHEN EXISTS (
+      SELECT
+        1
+      FROM
+        senses AS later
+      WHERE
+        later.supersedes = senses.id
+    ) THEN ?2
+    ELSE ?3
+  END AS "standing!: String"
+FROM
+  senses
+WHERE
+  message = ?1
+ORDER BY
+  ordinal,
+  id
+"#,
             message: Uuid,
             superseded: Standing,
             current: Standing
         ))?;
         let related = statements.rows(store_ports::query!(
             RelatedRow,
-            "SELECT source_message, source_ordinal, relation, target_message, target_ordinal, provenance FROM segment_links WHERE source_message = ?1 ORDER BY source_ordinal, relation, target_message, target_ordinal",
+            r#"
+SELECT
+  source_message,
+  source_ordinal,
+  relation,
+  target_message,
+  target_ordinal,
+  provenance
+FROM
+  segment_links
+WHERE
+  source_message = ?1
+ORDER BY
+  source_ordinal,
+  relation,
+  target_message,
+  target_ordinal
+"#,
             message: Uuid
         ))?;
         let conversational = statements.rows(store_ports::query!(
             ConversationalRow,
-            "SELECT message, ordinal, provenance FROM conversational WHERE message = ?1 ORDER BY ordinal",
+            r#"
+SELECT
+  message,
+  ordinal,
+  provenance
+FROM
+  conversational
+WHERE
+  message = ?1
+ORDER BY
+  ordinal
+"#,
             message: Uuid
         ))?;
         let annotations = placed
@@ -205,7 +331,12 @@ impl Annotating<'_, '_> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance();
         Ok(self.statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance) VALUES (?1, ?2, ?3, ?4, ?5)",
+            r#"
+INSERT
+  OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance)
+VALUES
+  (?1, ?2, ?3, ?4, ?5)
+"#,
             message: Uuid,
             ordinal: Ordinal,
             relation: SpanRelation,
@@ -220,7 +351,46 @@ impl Annotating<'_, '_> {
             (sense.kind(), sense.specificity(), sense.confidence(), sense.explicitness());
         let provenance = self.provenance();
         Ok(self.statements.written(store_ports::query!(
-            "INSERT INTO senses (message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT earlier.id FROM senses AS earlier WHERE earlier.message = ?1 AND earlier.ordinal = ?2 AND NOT EXISTS (SELECT 1 FROM senses AS later WHERE later.supersedes = earlier.id)))",
+            r#"
+INSERT INTO
+  senses (
+    message,
+    ordinal,
+    kind,
+    specificity,
+    confidence,
+    explicitness,
+    provenance,
+    supersedes
+  )
+VALUES
+  (
+    ?1,
+    ?2,
+    ?3,
+    ?4,
+    ?5,
+    ?6,
+    ?7,
+    (
+      SELECT
+        earlier.id
+      FROM
+        senses AS earlier
+      WHERE
+        earlier.message = ?1
+        AND earlier.ordinal = ?2
+        AND NOT EXISTS (
+          SELECT
+            1
+          FROM
+            senses AS later
+          WHERE
+            later.supersedes = earlier.id
+        )
+    )
+  )
+"#,
             message: Uuid,
             ordinal: Ordinal,
             kind: SenseKind,
@@ -258,7 +428,12 @@ impl Annotating<'_, '_> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance();
         Ok(self.statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO conversational (message, ordinal, provenance) VALUES (?1, ?2, ?3)",
+            r#"
+INSERT
+  OR IGNORE INTO conversational (message, ordinal, provenance)
+VALUES
+  (?1, ?2, ?3)
+"#,
             message: Uuid,
             ordinal: Ordinal,
             provenance: Entered
@@ -282,7 +457,19 @@ impl Linking<'_> {
         let Columns { message: target_message, ordinal: target_ordinal } = Columns::from(self.target);
         let Linking { relation, provenance, .. } = self;
         statements.written(store_ports::query!(
-            "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            r#"
+INSERT
+  OR IGNORE INTO segment_links (
+    source_message,
+    source_ordinal,
+    relation,
+    target_message,
+    target_ordinal,
+    provenance
+  )
+VALUES
+  (?1, ?2, ?3, ?4, ?5, ?6)
+"#,
             source_message: Uuid,
             source_ordinal: Ordinal,
             relation: SegmentRelation,
