@@ -1,23 +1,16 @@
 mod anchor;
 mod form;
 mod link;
-mod links;
 mod message;
 mod ordinal;
 mod relation;
 mod segment;
 mod segment_id;
-mod segmenter;
 mod shape;
 mod stream;
 
-pub use anchor::Anchor;
-pub use form::Form;
 pub use link::MechanicalLink;
 pub use message::Message;
-pub use ordinal::Ordinal;
 pub use relation::Relation;
-pub use segment::Segment;
-pub use segment_id::SegmentId;
 pub use shape::Shape;
 pub use stream::Stream;

@@ -1,11 +1,16 @@
 use grammar::message::{Lexeme, Mark, Span};
 
-use crate::Form;
+use crate::form::Form;
+use transcript_ports::Uuid;
+
+use crate::ordinal::Ordinal;
+use crate::segment::Segment;
+use crate::segment_id::SegmentId;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Part {
-    pub form: Form,
-    pub span: Span,
+struct Part {
+    form: Form,
+    span: Span,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -32,8 +37,14 @@ pub struct Segmenter {
     open: Option<Open>,
 }
 
+impl Part {
+    fn joined(self, later: Part) -> Part {
+        Part { form: self.form, span: self.span.through(later.span) }
+    }
+}
+
 impl Fill {
-    fn of(mark: Mark) -> Fill {
+    fn marked(mark: Mark) -> Fill {
         match mark {
             Mark::Break => Fill::Blank,
             Mark::Stop | Mark::Numbered(_) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Fill::Written,
@@ -42,7 +53,7 @@ impl Fill {
 
     fn after(self, mark: Mark) -> Fill {
         match self {
-            Fill::Blank => Fill::of(mark),
+            Fill::Blank => Fill::marked(mark),
             Fill::Written => Fill::Written,
         }
     }
@@ -67,15 +78,15 @@ impl Form {
 impl Open {
     fn starting(lexeme: Lexeme) -> Open {
         Open {
-            part: Part { form: Form::opened_by(lexeme.mark).unwrap_or(Form::Sentence), span: lexeme.span },
-            fill: Fill::of(lexeme.mark),
+            part: Part { form: Form::opened_by(lexeme.mark()).unwrap_or(Form::Sentence), span: lexeme.span() },
+            fill: Fill::marked(lexeme.mark()),
         }
     }
 
     fn extended(self, lexeme: Lexeme) -> Open {
         Open {
-            part: Part { form: self.part.form, span: Span { start: self.part.span.start, end: lexeme.span.end } },
-            fill: self.fill.after(lexeme.mark),
+            part: self.part.joined(Part { form: self.part.form, span: lexeme.span() }),
+            fill: self.fill.after(lexeme.mark()),
         }
     }
 
@@ -86,20 +97,37 @@ impl Open {
             Mark::Numbered(_) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Ending::Continue,
         }
     }
+
+    fn placed(self, previous: Option<Part>) -> Vec<Part> {
+        match self.fill {
+            Fill::Blank => previous.map_or_else(|| vec![self.part], |earlier| vec![earlier.joined(self.part)]),
+            Fill::Written => previous.into_iter().chain(Some(self.part)).collect(),
+        }
+    }
 }
 
 impl Segmenter {
-    pub fn parts(lexemes: Vec<Lexeme>) -> Vec<Part> {
-        lexemes.into_iter().fold(Segmenter::default(), Segmenter::pushed).closed().done
+    pub fn segments(lexemes: Vec<Lexeme>, message: &Uuid) -> Vec<Segment> {
+        lexemes
+            .into_iter()
+            .fold(Segmenter::default(), Segmenter::pushed)
+            .closed()
+            .done
+            .into_iter()
+            .enumerate()
+            .map(|(position, part)| {
+                Segment::new(SegmentId::new(message.clone(), Ordinal::new(position)), part.span, part.form)
+            })
+            .collect()
     }
 
     fn pushed(mut self, lexeme: Lexeme) -> Segmenter {
         let previous = self.open.take();
-        let opening = Form::opened_by(lexeme.mark);
+        let opening = Form::opened_by(lexeme.mark());
         let segmenter = opening.and(previous).into_iter().fold(self, Segmenter::record);
         let continuing = opening.map_or(previous, |_| None);
         let open = continuing.map_or_else(|| Open::starting(lexeme), |open| open.extended(lexeme));
-        Segmenter { open: Some(open), ..segmenter }.ended(open.ending_at(lexeme.mark))
+        Segmenter { open: Some(open), ..segmenter }.ended(open.ending_at(lexeme.mark()))
     }
 
     fn ended(self, ending: Ending) -> Segmenter {
@@ -115,10 +143,8 @@ impl Segmenter {
     }
 
     fn record(mut self, open: Open) -> Segmenter {
-        let attached = Some(open)
-            .filter(|blank| matches!(blank.fill, Fill::Blank))
-            .and_then(|blank| self.done.last_mut().map(|last| last.span.end = blank.part.span.end));
-        attached.unwrap_or_else(|| self.done.push(open.part));
+        let previous = self.done.pop();
+        self.done.extend(open.placed(previous));
         self
     }
 }

@@ -5,8 +5,8 @@ use file_ports::{FileFailure, Files};
 use newtype::Newtype;
 use port_core::Pass;
 
-use crate::boundary::Lines;
-use crate::{Cursor, Read, ReadFailure, Session, TranscriptsFiller, Uuid, transcripts_ops};
+use crate::transcripts::{TranscriptsFiller, transcripts_ops};
+use crate::{Cursor, Read, ReadFailure, Session, SessionId};
 
 #[derive(Debug)]
 pub struct ClaudeCodeDir<F: Files> {
@@ -23,7 +23,7 @@ impl<F: Files> ClaudeCodeDir<F> {
         Some(path.as_path())
             .filter(|file| file.extension() == Some(OsStr::new("jsonl")))
             .and_then(Path::file_stem)
-            .map(|stem| Uuid::new(stem.to_string_lossy().into_owned()))
+            .map(|stem| SessionId::new(stem.to_string_lossy().into_owned()))
             .map(|id| Session::found(id, path))
     }
 }
@@ -43,6 +43,6 @@ impl<F: Files> TranscriptsFiller for ClaudeCodeDir<F> {
         cursor: Cursor,
     ) -> Result<Read, ReadFailure> {
         let bytes = self.files.read_from(file.file(), cursor.into_inner())?;
-        Lines::read(bytes.as_ref(), cursor)
+        Read::complete(bytes.as_ref(), cursor)
     }
 }

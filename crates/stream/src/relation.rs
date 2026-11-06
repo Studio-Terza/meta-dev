@@ -10,11 +10,11 @@ pub enum Relation {
 
 impl fmt::Display for Relation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Relation::RepliesTo => "replies-to",
-            Relation::Answers => "answers",
-            Relation::Cites => "cites",
-            Relation::Resends => "resends",
-        })
+        match self {
+            Relation::RepliesTo => formatter.write_str("replies-to"),
+            Relation::Answers => formatter.write_str("answers"),
+            Relation::Cites => formatter.write_str("cites"),
+            Relation::Resends => formatter.write_str("resends"),
+        }
     }
 }

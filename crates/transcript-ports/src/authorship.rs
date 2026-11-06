@@ -9,10 +9,10 @@ pub enum Authorship {
 
 impl fmt::Display for Authorship {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Authorship::Owner => "owner",
-            Authorship::Lead => "lead",
-            Authorship::Bystander => "bystander",
-        })
+        match self {
+            Authorship::Owner => formatter.write_str("owner"),
+            Authorship::Lead => formatter.write_str("lead"),
+            Authorship::Bystander => formatter.write_str("bystander"),
+        }
     }
 }

@@ -1,6 +1,6 @@
 mod authorship;
+mod blank;
 mod body;
-mod boundary;
 mod claude_code_dir;
 mod cursor;
 mod instant;
@@ -8,6 +8,7 @@ mod read;
 mod read_failure;
 mod record;
 mod session;
+mod session_id;
 mod transcripts;
 mod uuid;
 
@@ -20,5 +21,6 @@ pub use read::Read;
 pub use read_failure::ReadFailure;
 pub use record::Record;
 pub use session::Session;
-pub use transcripts::{Transcripts, TranscriptsFiller, transcripts_ops};
+pub use session_id::SessionId;
+pub use transcripts::{Transcripts, transcripts_ops};
 pub use uuid::Uuid;

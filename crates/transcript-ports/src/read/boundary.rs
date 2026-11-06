@@ -1,19 +1,13 @@
 use file_ports::Offset;
 use newtype::Newtype;
 
-use super::entry::Entry;
-use crate::{Cursor, Read, ReadFailure, Record};
+use super::Read;
+use crate::{Cursor, ReadFailure, Record};
 
-pub struct Lines;
-
-impl Lines {
-    pub fn read(bytes: &[u8], cursor: Cursor) -> Result<Read, ReadFailure> {
+impl Read {
+    pub(crate) fn complete(bytes: &[u8], cursor: Cursor) -> Result<Read, ReadFailure> {
         let consumed = bytes.iter().rposition(|byte| *byte == b'\n').map_or(0, |last| last.saturating_add(1));
-        let complete = bytes.get(..consumed).unwrap_or_default();
-        let records = serde_json::Deserializer::from_slice(complete)
-            .into_iter::<Entry>()
-            .filter_map(|entry| entry.map(Option::<Record>::from).transpose())
-            .collect::<Result<Vec<_>, _>>()?;
+        let records = Record::parsed(bytes.get(..consumed).unwrap_or_default())?;
         Ok(Read { records, cursor: Self::advanced(cursor, consumed) })
     }
 

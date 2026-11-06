@@ -15,7 +15,9 @@ newtype = { path = "../newtype" }
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
+file-ports = { path = "../file-ports" }
 laws = { path = "../laws" }
+port-core = { path = "../port-core" }
 
 [lints]
 workspace = true

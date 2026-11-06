@@ -1,21 +1,21 @@
 use std::path::{Path, PathBuf};
 
-use crate::Uuid;
+use crate::SessionId;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Session {
-    id: Uuid,
+    stem: SessionId,
     file: PathBuf,
 }
 
 impl Session {
-    pub(crate) fn found(id: Uuid, file: PathBuf) -> Session {
-        Session { id, file }
+    pub(crate) fn found(stem: SessionId, file: PathBuf) -> Session {
+        Session { stem, file }
     }
 
     #[must_use]
-    pub fn id(&self) -> &Uuid {
-        &self.id
+    pub fn stem(&self) -> &SessionId {
+        &self.stem
     }
 
     #[must_use]

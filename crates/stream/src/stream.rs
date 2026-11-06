@@ -1,7 +1,9 @@
+mod links;
+
 use transcript_ports::Record;
 
-use crate::links::Links;
 use crate::{MechanicalLink, Message};
+use links::Links;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Stream {
@@ -23,6 +25,6 @@ impl AsRef<[Message]> for Stream {
 impl Stream {
     #[must_use]
     pub fn links(&self) -> Vec<MechanicalLink> {
-        Links::of(&self.messages).all()
+        Links::over(&self.messages).all()
     }
 }

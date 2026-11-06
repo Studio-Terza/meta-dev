@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{Authorship, Body, Instant, Record, Uuid};
+use crate::{Authorship, Body, Instant, Record, SessionId, Uuid};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -40,32 +40,34 @@ struct Origin {
 struct Block {
     #[serde(default, rename = "type")]
     kind: BlockKind,
-    text: Option<String>,
+    text: Option<Body>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-enum Content {
-    Text(String),
+enum Wording {
+    Text(Body),
     Blocks(Vec<Block>),
     Other(serde::de::IgnoredAny),
 }
 
 #[derive(Debug, Deserialize)]
-struct Message {
-    content: Option<Content>,
+#[serde(untagged)]
+enum Message {
+    Said { content: Wording },
+    Other(serde::de::IgnoredAny),
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Entry {
     #[serde(default, rename = "type")]
     kind: Kind,
-    uuid: Option<String>,
+    uuid: Option<Uuid>,
     #[serde(rename = "parentUuid")]
-    parent: Option<String>,
+    parent: Option<Uuid>,
     #[serde(rename = "sessionId")]
-    session: Option<String>,
-    timestamp: Option<String>,
+    session: Option<SessionId>,
+    timestamp: Option<Instant>,
     message: Option<Message>,
     origin: Option<Origin>,
 }
@@ -89,32 +91,49 @@ impl Kind {
     }
 }
 
-impl Content {
-    fn text(self) -> String {
+impl Block {
+    fn written(self) -> Option<Body> {
+        Some(self.kind).filter(|kind| matches!(kind, BlockKind::Text)).and(self.text)
+    }
+}
+
+impl Wording {
+    fn body(self) -> Body {
         match self {
-            Content::Text(text) => text,
-            Content::Blocks(blocks) => blocks
-                .into_iter()
-                .filter(|block| matches!(block.kind, BlockKind::Text))
-                .filter_map(|block| block.text)
-                .collect::<Vec<_>>()
-                .join("\n"),
-            Content::Other(_) => String::new(),
+            Wording::Text(text) => text,
+            Wording::Blocks(blocks) => Body::new(
+                blocks
+                    .into_iter()
+                    .filter_map(Block::written)
+                    .map(|text| text.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
+            Wording::Other(_) => Body::default(),
         }
     }
 }
 
-impl From<Entry> for Option<Record> {
-    fn from(entry: Entry) -> Option<Record> {
-        let author = entry.kind.authorship(entry.origin)?;
-        let text = entry.message.and_then(|message| message.content).map(Content::text).unwrap_or_default();
+impl Message {
+    fn body(self) -> Body {
+        match self {
+            Message::Said { content } => content.body(),
+            Message::Other(_) => Body::default(),
+        }
+    }
+}
+
+impl Entry {
+    pub fn record(self) -> Option<Record> {
+        let author = self.kind.authorship(self.origin)?;
+        let text = self.message.map_or_else(Body::default, Message::body);
         Some(Record {
-            uuid: Uuid::new(entry.uuid?),
-            parent: entry.parent.map(Uuid::new),
-            session: Uuid::new(entry.session?),
-            at: Instant::new(entry.timestamp?),
+            uuid: self.uuid?,
+            parent: self.parent,
+            session: self.session?,
+            at: self.timestamp?,
             author,
-            text: Body::new(text),
+            text,
         })
     }
 }

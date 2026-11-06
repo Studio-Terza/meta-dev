@@ -1,9 +1,12 @@
+use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::prop_assert_eq;
-use port_core::{Rooting, Run};
-use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Read, Record, Session, Transcripts};
+use laws::proptest::test_runner::TestCaseError;
+use port_core::{Calls, Rooting, Run};
+use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
+use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Instant, Read, Record, Session, Transcripts};
 
 const DIRECTORY: &str = "/projects/work";
 const SESSION: &str = "/projects/work/s1.jsonl";
@@ -43,6 +46,12 @@ impl Lines {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct Counted {
+    sessions: Calls,
+    reads: Calls,
+}
+
 struct Transcript(String);
 
 impl Transcript {
@@ -57,12 +66,12 @@ impl Transcript {
         ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY))
     }
 
-    fn read(&self, cursor: Cursor) -> Option<Read> {
-        let run = Run::root(Rooting::Shared).ok()?;
+    fn read(&self, cursor: Cursor) -> Result<Read, Box<dyn Error>> {
+        let run = Run::root(Rooting::Shared)?;
         let port = run.port(self.directory());
-        let sessions = Transcripts::sessions(&port).ok()?;
-        let read = sessions.first().map(|session| Transcripts::read_from(&port, session, cursor));
-        read?.ok()
+        let sessions = Transcripts::sessions(&port)?;
+        let session = sessions.first().ok_or("no session")?;
+        Ok(Transcripts::read_from(&port, session, cursor)?)
     }
 
     fn sessions(&self) -> Vec<Session> {
@@ -71,58 +80,96 @@ impl Transcript {
             .and_then(|run| Transcripts::sessions(&run.port(self.directory())).ok())
             .unwrap_or_default()
     }
+
+    fn calls(&self) -> Option<Counted> {
+        let run = Run::root(Rooting::Shared).ok()?;
+        let port = run.port(self.directory());
+        let sessions = Transcripts::sessions(&port).ok()?;
+        Transcripts::read_all(&port, &sessions).ok()?;
+        drop(port);
+        let measured = run.finish();
+        Some(Counted {
+            sessions: measured.snapshot().calls::<Sessions>(),
+            reads: measured.snapshot().calls::<ReadFrom>(),
+        })
+    }
 }
 
-fn authors(read: &Read) -> Vec<Authorship> {
-    read.records.iter().map(|record| record.author).collect()
-}
+struct Views;
 
-fn uuids(records: &[Record]) -> Vec<String> {
-    records.iter().map(|record| record.uuid.to_string()).collect()
+impl Views {
+    fn authors(read: Read) -> Vec<Authorship> {
+        read.into_iter().map(|record| record.author()).collect()
+    }
+
+    fn uuids(records: &[Record]) -> Vec<String> {
+        records.iter().map(|record| record.uuid().to_string()).collect()
+    }
+
+    fn texts(read: Read) -> Vec<String> {
+        read.into_iter().map(|record| record.text().to_string()).collect()
+    }
 }
 
 #[test]
-fn each_line_is_classified_by_who_wrote_it() {
+fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
-    let read = Transcript::holding(&text).read(Cursor::default());
+    let read = Transcript::holding(&text).read(Cursor::default())?;
     assert_eq!(
-        read.as_ref().map(authors),
-        Some(vec![Authorship::Owner, Authorship::Lead, Authorship::Bystander, Authorship::Bystander])
+        Views::authors(read),
+        [Authorship::Owner, Authorship::Lead, Authorship::Bystander, Authorship::Bystander]
     );
+    Ok(())
 }
 
 #[test]
-fn a_lead_record_keeps_only_its_text_blocks() {
-    let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default());
-    let texts: Vec<String> =
-        read.iter().flat_map(|read| read.records.iter()).map(|record| record.text.to_string()).collect();
-    assert_eq!(texts, ["first\nsecond"]);
+fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
+    let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default())?;
+    assert_eq!(Views::texts(read), ["first second"]);
+    Ok(())
 }
 
 #[test]
-fn a_partial_last_line_is_not_yielded() {
+fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
+    let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
+    let stamps: Vec<Instant> = read.into_iter().map(|record| record.stamp().clone()).collect();
+    assert_eq!(stamps, [Instant::new("2026-01-01T00:00:01Z".to_owned())]);
+    Ok(())
+}
+
+#[test]
+fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
     let whole = Lines::typed("1");
     let partial = Lines::answer("2");
     let cut = partial.chars().take(partial.len() / 2).collect::<String>();
-    let read = Transcript::holding(&format!("{whole}{cut}")).read(Cursor::default());
-    assert_eq!(read.as_ref().map(|read| uuids(&read.records)), Some(vec!["1".to_owned()]));
+    let read = Transcript::holding(&format!("{whole}{cut}")).read(Cursor::default())?;
+    let records: Vec<Record> = read.into_iter().collect();
+    assert_eq!(Views::uuids(&records), ["1"]);
+    Ok(())
 }
 
 #[test]
 fn a_session_is_listed_by_its_file_stem() {
     let sessions = Transcript::holding(&Lines::typed("1")).sessions();
-    assert_eq!(sessions.iter().map(|session| session.id().to_string()).collect::<Vec<_>>(), ["s1"]);
+    assert_eq!(sessions.iter().map(|session| session.stem().to_string()).collect::<Vec<_>>(), ["s1"]);
+}
+
+#[test]
+fn reading_all_sessions_counts_one_listing_and_one_read_per_session() {
+    let counted = Transcript::holding(&Lines::typed("1")).calls();
+    assert_eq!(counted, Some(Counted { sessions: Calls::new(1), reads: Calls::new(1) }));
 }
 
 laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..400, split, {
     let lines = [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4")];
     let text = lines.concat();
     let cut = split.min(text.len());
-    let empty = || Read { records: Vec::new(), cursor: Cursor::default() };
-    let first =
-        Transcript::holding(&text.chars().take(cut).collect::<String>()).read(Cursor::default()).unwrap_or_else(empty);
-    let second = Transcript::holding(&text).read(first.cursor).unwrap_or_else(empty);
-    let together: Vec<Record> = first.records.into_iter().chain(second.records).collect();
-    prop_assert_eq!(uuids(&together), ["1", "2", "3", "4"]);
+    let first = Transcript::holding(&text.chars().take(cut).collect::<String>())
+        .read(Cursor::default())
+        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let second =
+        Transcript::holding(&text).read(first.cursor()).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let together: Vec<Record> = first.into_iter().chain(second).collect();
+    prop_assert_eq!(Views::uuids(&together), ["1", "2", "3", "4"]);
 });

@@ -1,15 +1,17 @@
 use logos::Logos;
-use newtype::Newtype;
 
-use super::{Lexeme, Mark, Number, Position, Span};
+use super::Lexemes;
+use crate::message::lexeme::Lexeme;
+use crate::message::span::Position;
+use crate::message::{Mark, Number, Span};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Token {
+enum Token {
     #[token("\n")]
     Break,
     #[regex(r"[.?!]+[ \t]+")]
     Stop,
-    #[regex(r"\n[ \t]*[0-9]+[.)][ \t]+", numbered)]
+    #[regex(r"\n[ \t]*[0-9]+[.)][ \t]+", Token::numbered)]
     Numbered(usize),
     #[regex(r"\n[ \t]*[-*•][ \t]+")]
     Bulleted,
@@ -21,25 +23,29 @@ pub enum Token {
     Plain,
 }
 
-fn numbered(lexer: &logos::Lexer<'_, Token>) -> Option<usize> {
-    lexer.slice().chars().filter(char::is_ascii_digit).collect::<String>().parse().ok()
+impl Lexemes {
+    #[must_use]
+    pub fn scanned(text: &impl AsRef<str>) -> Vec<Lexeme> {
+        let sentinel = format!("\n{}", text.as_ref());
+        Token::lexer(&sentinel)
+            .spanned()
+            .filter(|(_, range)| range.end > 1)
+            .map(|(token, range)| {
+                Lexeme::new(
+                    token.unwrap_or(Token::Plain).mark(),
+                    Span::new(
+                        Position::new(range.start).without_sentinel(),
+                        Position::new(range.end).without_sentinel(),
+                    ),
+                )
+            })
+            .collect()
+    }
 }
 
 impl Token {
-    pub fn lexed(text: &str) -> Vec<Lexeme> {
-        let sentinel = format!("\n{text}");
-        Token::lexer(&sentinel)
-            .spanned()
-            .map(|(token, range)| (token.unwrap_or(Token::Plain), range))
-            .map(|(token, range)| Lexeme {
-                mark: token.mark(),
-                span: Span {
-                    start: Position::new(range.start.saturating_sub(1)),
-                    end: Position::new(range.end.saturating_sub(1)),
-                },
-            })
-            .filter(|lexeme| lexeme.span.start != lexeme.span.end)
-            .collect()
+    fn numbered(lexer: &logos::Lexer<'_, Token>) -> Option<usize> {
+        lexer.slice().chars().filter(char::is_ascii_digit).collect::<String>().parse().ok()
     }
 
     fn mark(self) -> Mark {
@@ -52,12 +58,5 @@ impl Token {
             Token::Uuid => Mark::Uuid,
             Token::Plain => Mark::Plain,
         }
-    }
-}
-
-impl Span {
-    #[must_use]
-    pub fn slice(self, text: &str) -> &str {
-        text.get(self.start.into_inner()..self.end.into_inner()).unwrap_or_default()
     }
 }

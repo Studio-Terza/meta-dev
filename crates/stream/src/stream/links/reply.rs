@@ -1,41 +1,33 @@
+mod answers;
+
 use transcript_ports::Authorship;
 
-use crate::{Anchor, MechanicalLink, Message, Relation};
+use crate::anchor::Anchor;
+use crate::{MechanicalLink, Message, Relation};
+use answers::Answers;
 
 pub struct Reply<'stream> {
-    from: &'stream Message,
-    to: &'stream Message,
+    replying: &'stream Message,
+    replied: &'stream Message,
 }
 
 impl<'stream> Reply<'stream> {
-    pub fn new(from: &'stream Message, to: &'stream Message) -> Reply<'stream> {
-        Reply { from, to }
+    pub fn new(replying: &'stream Message, replied: &'stream Message) -> Reply<'stream> {
+        Reply { replying, replied }
     }
 
     pub fn link(&self) -> MechanicalLink {
-        MechanicalLink {
-            from: Anchor::Message(self.from.record().uuid.clone()),
-            relation: Relation::RepliesTo,
-            to: Anchor::Message(self.to.record().uuid.clone()),
-        }
+        MechanicalLink::new(
+            Anchor::Message(self.replying.record().uuid().clone()),
+            Relation::RepliesTo,
+            Anchor::Message(self.replied.record().uuid().clone()),
+        )
     }
 
-    pub fn answers(&self) -> Vec<MechanicalLink> {
-        let asked = self.to.segments();
-        Some(self)
-            .filter(|reply| reply.from.record().author == Authorship::Owner)
-            .filter(|reply| reply.to.record().author == Authorship::Lead)
-            .into_iter()
-            .flat_map(|reply| reply.from.segments())
-            .filter_map(|answer| {
-                answer.form.number().and_then(|_| asked.iter().find(|item| item.form == answer.form)).map(|item| {
-                    MechanicalLink {
-                        from: Anchor::Segment(answer.id.clone()),
-                        relation: Relation::Answers,
-                        to: Anchor::Segment(item.id.clone()),
-                    }
-                })
-            })
-            .collect()
+    pub fn answers(&self) -> Answers {
+        let answering = Some(self.replying)
+            .filter(|reply| reply.record().author() == Authorship::Owner)
+            .filter(|_| self.replied.record().author() == Authorship::Lead);
+        Answers::new(answering.map(Message::segments).unwrap_or_default(), self.replied.segments())
     }
 }

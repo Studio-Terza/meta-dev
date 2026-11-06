@@ -5,7 +5,7 @@ struct Marks;
 
 impl Marks {
     fn of(text: &str) -> Vec<Mark> {
-        Lexemes::of(&text).into_iter().map(|lexeme| lexeme.mark).filter(|mark| *mark != Mark::Plain).collect()
+        Lexemes::scanned(&text).into_iter().map(|lexeme| lexeme.mark()).filter(|mark| *mark != Mark::Plain).collect()
     }
 }
 
@@ -23,6 +23,6 @@ laws::table!(
 );
 
 laws::law!(lexemes_tile_the_text_without_gaps, "[ -~\n\t•é]{0,60}", text, {
-    let rebuilt: String = Lexemes::of(&text).iter().map(|lexeme| lexeme.span.slice(&text)).collect();
+    let rebuilt: String = Lexemes::scanned(&text).iter().map(|lexeme| lexeme.span().slice(&text)).collect();
     prop_assert_eq!(rebuilt, text);
 });

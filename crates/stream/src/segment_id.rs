@@ -2,7 +2,7 @@ use std::fmt;
 
 use transcript_ports::Uuid;
 
-use crate::Ordinal;
+use crate::ordinal::Ordinal;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SegmentId {

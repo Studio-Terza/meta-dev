@@ -1,8 +1,10 @@
+mod segmenter;
+
 use grammar::message::Lexemes;
 use transcript_ports::Record;
 
-use crate::segmenter::Segmenter;
-use crate::{Ordinal, Segment, SegmentId};
+use crate::segment::Segment;
+use segmenter::Segmenter;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message(Record);
@@ -21,14 +23,6 @@ impl Message {
 
     #[must_use]
     pub fn segments(&self) -> Vec<Segment> {
-        Segmenter::parts(Lexemes::of(&self.0.text))
-            .into_iter()
-            .enumerate()
-            .map(|(position, part)| Segment {
-                id: SegmentId::new(self.0.uuid.clone(), Ordinal::new(position)),
-                range: part.span,
-                form: part.form,
-            })
-            .collect()
+        Segmenter::segments(Lexemes::scanned(self.0.text()), self.0.uuid())
     }
 }

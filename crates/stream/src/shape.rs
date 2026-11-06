@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::Form;
+use crate::form::Form;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
@@ -23,11 +23,11 @@ impl From<Form> for Shape {
 
 impl fmt::Display for Shape {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Shape::Sentence => "sentence",
-            Shape::Item => "item",
-            Shape::Bullet => "bullet",
-            Shape::Quote => "quote",
-        })
+        match self {
+            Shape::Sentence => formatter.write_str("sentence"),
+            Shape::Item => formatter.write_str("item"),
+            Shape::Bullet => formatter.write_str("bullet"),
+            Shape::Quote => formatter.write_str("quote"),
+        }
     }
 }
