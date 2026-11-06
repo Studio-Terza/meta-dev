@@ -8,7 +8,7 @@ const WRITTEN: &str = "mod m {\n    impl Clone for A {}\n}\nfn f() {\n    impl A
 const MIXED: &str = "#[derive(Debug)]\nstruct A;\nimpl Clone for A {}\n";
 
 const RENAMED: &str = "use std::{clone::Clone as Dup};\nimpl Dup for R {}\nimpl a::Dup for R {}\n";
-const MACROS: &str = "macro_rules! make {\n    ($t:ty, $u:ty) => {\n        impl<T> Clone for Wrapper<T> {}\n        impl PartialEq<$u> for $t {}\n        impl $t {\n            fn each() { for x in y {} }\n        }\n        mod inner {\n            impl Copy for Inner {}\n        }\n    };\n}\nfn f() {\n    other! {\n        impl Eq for Skipped {}\n    }\n}\n";
+const MACROS: &str = "macro_rules! make {\n    ($t:ty, $u:ty) => {\n        impl<T> Clone for Wrapper<T> {}\n        impl PartialEq<$u> for $t {}\n        impl $t {\n            fn each() { for x in y {} }\n        }\n        mod inner {\n            impl Inner {}\n            impl Copy for Inner {}\n            impl $tr for Inner {}\n        }\n    };\n}\nfn f() {\n    other! {\n        impl Eq for Skipped {}\n    }\n}\n";
 
 struct Expect;
 
@@ -84,6 +84,7 @@ fn only_macro_rules_bodies_yield_trait_impls_in_macros() {
             Expect::written("Wrapper", &["Clone"]),
             Expect::written("", &["PartialEq"]),
             Expect::written("Inner", &["Copy"]),
+            Expect::written("Inner", &[]),
         ]
     );
 }
