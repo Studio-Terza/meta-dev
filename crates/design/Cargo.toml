@@ -13,7 +13,7 @@ doctest = false
 console-ports = { path = "../console-ports" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
-logos.workspace = true
+grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 stream = { path = "../stream" }

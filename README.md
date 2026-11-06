@@ -31,7 +31,8 @@ manual_iteration, module_nesting, named_numbers, no_forwarders, no_numbers_in_bi
 no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starters, raw_resources, public_surface,
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
-effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run.
+effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run, owned_dependencies,
+effects_in_fillers, counted_calls.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
@@ -169,6 +170,18 @@ Everywhere else a test goes through the port's in-memory fake or a library API s
 and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
+`owned_dependencies`, `effects_in_fillers` and `counted_calls` (crate `lint-port-dependencies`) keep the port framework
+the only way to an effect. A crate owns a dependency by naming it in `[package.metadata.port] owns = ["logos"]` in its
+`Cargo.toml` (`grammar` owns `logos`). `owned_dependencies` then fails every other crate whose manifest depends on it, in
+`[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or their `[target.*]` forms, also when renamed with
+`package =`; it points at the manifest line and names the owner. There is no allow-list: a crate that needs the dependency
+calls the owner's API. `effects_in_fillers` judges a crate that declares a `#[port]` (or `#[port_core::port]`) trait: every
+effect site, in the vocabulary of `effects_in_ports`, must sit inside an `impl <Trait>Filler for ..` block of a port trait
+that crate declares, never in an inherent method, a free function or another trait impl. Test code is skipped as
+`effects_in_ports` skips it, and a crate with no `#[port]` trait is not judged. `counted_calls` fails the identifier
+`counted_call` anywhere in source, macro bodies included, outside `port-core` and `port-derive`; the code `#[port]`
+expands to is not source, so only the generated fillers count calls.
+
 `fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union
 whose name has the word `Fake`, `Stub`, `Mock`, `Spy` or `Dummy` among its camel-case words (`FakeClock`, `HTTPStub`, not
 `Fakery` or `Spyglass`) must implement a port: a trait whose path, read through the `use` items of its test target as
@@ -198,7 +211,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers` and `counted_calls` lints), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
 ## Query

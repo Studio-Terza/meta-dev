@@ -68,6 +68,11 @@ impl Name {
     }
 
     #[must_use]
+    pub fn suffixed(&self, ending: Word<'_>) -> Name {
+        Name([self.0.as_str(), ending.into_inner()].concat())
+    }
+
+    #[must_use]
     pub fn words(&self) -> Vec<Name> {
         let letters: Vec<char> = self.0.chars().collect();
         letters

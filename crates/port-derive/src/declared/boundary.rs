@@ -1,4 +1,4 @@
-use logos::Logos;
+use grammar::ident::Words;
 use quote::{ToTokens, format_ident};
 use syn::{Ident, LitStr};
 
@@ -6,35 +6,6 @@ use syn::{Ident, LitStr};
 pub enum Derivation {
     Filler,
     OpsModule,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Hump {
-    #[regex(r"[A-Z][^A-Z]*")]
-    Capitalized,
-    #[regex(r"[^A-Z]+")]
-    Leading,
-}
-
-#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
-enum Snake {
-    #[regex(r"[^_]+")]
-    Word,
-    #[token("_")]
-    Underscore,
-}
-
-impl Snake {
-    fn raised(piece: Result<Snake, ()>, written: &str) -> Vec<char> {
-        match piece {
-            Ok(Snake::Word) => Snake::capitalized(written),
-            Ok(Snake::Underscore) | Err(()) => Vec::new(),
-        }
-    }
-
-    fn capitalized(word: &str) -> Vec<char> {
-        word.chars().take(1).flat_map(char::to_uppercase).chain(word.chars().skip(1)).collect()
-    }
 }
 
 pub struct Spelling;
@@ -48,22 +19,11 @@ impl Spelling {
     }
 
     fn ops_module_text(caller: &Ident) -> String {
-        let text = caller.to_string();
-        let words: Vec<String> = Hump::lexer(&text)
-            .spanned()
-            .filter_map(|(_, range)| text.get(range))
-            .map(|word| word.chars().flat_map(char::to_lowercase).collect())
-            .collect();
-        format!("{}_ops", words.join("_"))
+        format!("{}_ops", Words::lowered_humps(&caller.to_string()).join("_"))
     }
 
     pub fn camel(method: &Ident) -> Ident {
-        let text = method.to_string();
-        let camel: String = Snake::lexer(&text)
-            .spanned()
-            .flat_map(|(piece, range)| Snake::raised(piece, text.get(range).unwrap_or_default()))
-            .collect();
-        Ident::new(&camel, method.span())
+        Ident::new(&Words::camel(&method.to_string()), method.span())
     }
 
     pub fn input(position: usize) -> Ident {

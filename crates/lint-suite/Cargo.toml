@@ -42,6 +42,7 @@ lint-no-test-only-api = { path = "../lint-no-test-only-api" }
 lint-clones = { path = "../lint-clones" }
 lint-paired-apis = { path = "../lint-paired-apis" }
 lint-port-batching = { path = "../lint-port-batching" }
+lint-port-dependencies = { path = "../lint-port-dependencies" }
 lint-paths = { path = "../lint-paths" }
 lint-placement = { path = "../lint-placement" }
 lint-primitive-boundary = { path = "../lint-primitive-boundary" }

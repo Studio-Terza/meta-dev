@@ -1,5 +1,7 @@
 use logos::Logos;
 
+use super::Letters;
+
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Letter {
     #[regex(r"[A-Za-z0-9]+")]
@@ -8,10 +10,8 @@ enum Letter {
     Replaced,
 }
 
-#[derive(Debug)]
-pub struct Letters;
-
 impl Letters {
+    #[must_use]
     pub fn slugged(text: &str) -> String {
         Letter::lexer(text)
             .spanned()

@@ -38,6 +38,7 @@ mod parallel_structures;
 mod paths;
 mod placement;
 mod port_batching;
+mod port_dependencies;
 mod primitive_boundary;
 mod private_fns;
 mod process_starters;
