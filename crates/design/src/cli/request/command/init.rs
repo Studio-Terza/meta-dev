@@ -55,7 +55,9 @@ impl Init {
         let root = found.map_or_else(|| Self::sown(store, &self.project), Ok)?;
         consumed
             .iter()
-            .map(|consumed| store.write(Linked::new(root, NodeRelation::Consumes, consumed.root)))
+            .map(|consumed| {
+                store.write(Linked::new(root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init)))
+            })
             .collect::<Result<Vec<Written>, _>>()?;
         lock.end()?;
         Ok(Initialised { root: Rooted { project: self.project, root }, consumed })

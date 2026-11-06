@@ -4,11 +4,12 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::{
-    Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Segment, Stage, Title,
+    Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Segment, Stage,
+    Supersession, Title,
 };
 use design_store::{
     Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot, Scope, SearchSegments,
-    SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema,
+    SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema, SupersededBy,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -249,7 +250,12 @@ impl Dag {
             .edges
             .iter()
             .map(|edge| {
-                Ok(store.write(Linked::new(Dag::id(edge.child), NodeRelation::Refines, Dag::id(edge.parent)))?)
+                Ok(store.write(Linked::new(
+                    Dag::id(edge.child),
+                    NodeRelation::Refines,
+                    Dag::id(edge.parent),
+                    Entered::Init.into(),
+                ))?)
             })
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         Ok(Written::total(nodes.into_iter().chain(links)))
@@ -358,7 +364,7 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eater = Projects::rooted(&store, "p")?;
     let consumed = Projects::rooted(&store, "q")?;
-    store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    store.write(Linked::new(eater, NodeRelation::Consumes, consumed, Entered::Init.into()))?;
     let shown = store.read(ShownNode::from(eater))?.ok_or("no consumer shown")?;
     let links: Vec<(NodeRelation, NodeId)> =
         shown.links().iter().map(|link| (link.relation(), link.target())).collect();
@@ -375,8 +381,8 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let parent = Projects::rooted(&store, "p")?;
     store.write(Dag::node(Facet::Project)?)?;
     let child = NodeId::new(parent.into_inner().saturating_add(1));
-    let first = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
-    let second = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
+    let first = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
+    let second = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
     assert!(first > Written::zero());
     assert_eq!(second, Written::zero());
     Ok(())
@@ -405,14 +411,21 @@ fn an_unknown_node_is_not_shown() -> Result<(), Box<dyn Error>> {
 struct Proposals;
 
 impl Proposals {
-    fn child(parent: NodeId, id: i64) -> Result<Directed, Box<dyn Error>> {
+    fn node(id: i64) -> Result<Node, Box<dyn Error>> {
         let entry = Entry::new("p".parse()?, Facet::Feature, Stage::Vague, Entered::Apply.into());
-        let node = Node::new(NodeId::new(id), entry).titled(Title::new(format!("child {id}")));
-        Ok(Directed::Proposed { node, parent })
+        Ok(Node::new(NodeId::new(id), entry).titled(Title::new(format!("child {id}"))))
+    }
+
+    fn child(parent: NodeId, id: i64) -> Result<Directed, Box<dyn Error>> {
+        Ok(Directed::Proposed { node: Proposals::node(id)?, parent })
+    }
+
+    fn superseded(old: i64, by: i64) -> Result<Directed, Box<dyn Error>> {
+        Ok(Directed::Superseded(Supersession::within(&Proposals::node(old)?, &Proposals::node(by)?)?))
     }
 
     fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
-        Ok(store.write(Directions::from(directed))?)
+        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), directed))?)
     }
 
     fn segment(message: &str, ordinal: usize) -> Segment {
@@ -465,12 +478,30 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
     Proposals::written(&store, vec![Proposals::child(root, 2)?, Proposals::child(root, 3)?])?;
-    Proposals::written(&store, vec![Directed::Superseded { old: NodeId::new(2), by: NodeId::new(3) }])?;
+    Proposals::written(&store, vec![Proposals::superseded(2, 3)?])?;
     let successor = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
-    let links: Vec<(NodeRelation, NodeId)> =
-        successor.links().iter().map(|link| (link.relation(), link.target())).collect();
-    assert_eq!(links, [(NodeRelation::Refines, root), (NodeRelation::Supersedes, NodeId::new(2))]);
+    let links: Vec<(NodeRelation, NodeId, Provenance)> =
+        successor.links().iter().map(|link| (link.relation(), link.target(), link.provenance())).collect();
+    let applied = Provenance::from(Entered::Apply);
+    assert_eq!(links, [(NodeRelation::Refines, root, applied), (NodeRelation::Supersedes, NodeId::new(2), applied)]);
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_some());
+    Ok(())
+}
+
+#[test]
+fn a_node_supersedes_itself_and_every_node_down_its_chain_and_no_other() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    let children = (2..=5).map(|id| Proposals::child(root, id)).collect::<Result<Vec<Directed>, Box<dyn Error>>>()?;
+    Proposals::written(&store, children)?;
+    Proposals::written(&store, vec![Proposals::superseded(2, 3)?, Proposals::superseded(3, 4)?])?;
+    let chain = |id: i64| -> Result<Vec<NodeId>, Box<dyn Error>> {
+        Ok(store.read(SupersededBy::from(NodeId::new(id)))?.into_iter().collect())
+    };
+    assert_eq!(chain(4)?, [2, 3, 4].map(NodeId::new));
+    assert_eq!(chain(3)?, [2, 3].map(NodeId::new));
+    assert_eq!(chain(5)?, [NodeId::new(5)]);
     Ok(())
 }
 

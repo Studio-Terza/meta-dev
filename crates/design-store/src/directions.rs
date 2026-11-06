@@ -1,10 +1,7 @@
 mod boundary;
 
-use design_model::{Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession};
 use port_core::Op;
-use store_ports::{StoreFailure, Written};
-
-use boundary::Annotating;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Directed {
@@ -12,16 +9,36 @@ pub enum Directed {
     Sensed { segment: Segment, sense: Sense },
     Related { source: Segment, target: Segment, relation: SegmentRelation },
     Proposed { node: Node, parent: NodeId },
-    Superseded { old: NodeId, by: NodeId },
+    Superseded(Supersession),
     Conversational { segment: Segment },
 }
 
-#[derive(Debug, Op)]
-pub struct Directions(Vec<Directed>);
+pub trait Directing {
+    type Output;
 
-impl From<Vec<Directed>> for Directions {
-    fn from(directed: Vec<Directed>) -> Directions {
-        Directions(directed)
+    fn placed(self, segment: &Segment, node: NodeId, relation: SpanRelation) -> Self::Output;
+
+    fn sensed(self, segment: &Segment, sense: Sense) -> Self::Output;
+
+    fn related(self, source: &Segment, target: &Segment, relation: SegmentRelation) -> Self::Output;
+
+    fn proposed(self, node: &Node, parent: NodeId) -> Self::Output;
+
+    fn superseded(self, supersession: Supersession) -> Self::Output;
+
+    fn conversational(self, segment: &Segment) -> Self::Output;
+}
+
+#[derive(Debug, Op)]
+pub struct Directions {
+    provenance: Provenance,
+    directed: Vec<Directed>,
+}
+
+impl Directions {
+    #[must_use]
+    pub fn new(provenance: Provenance, directed: Vec<Directed>) -> Directions {
+        Directions { provenance, directed }
     }
 }
 
@@ -33,7 +50,7 @@ impl Directed {
             | Directed::Sensed { segment, .. }
             | Directed::Conversational { segment } => vec![segment],
             Directed::Related { source, target, .. } => vec![source, target],
-            Directed::Proposed { .. } | Directed::Superseded { .. } => Vec::new(),
+            Directed::Proposed { .. } | Directed::Superseded(_) => Vec::new(),
         }
     }
 
@@ -44,19 +61,19 @@ impl Directed {
             Directed::Placed { .. }
             | Directed::Sensed { .. }
             | Directed::Related { .. }
-            | Directed::Superseded { .. }
+            | Directed::Superseded(_)
             | Directed::Conversational { .. } => None,
         }
     }
 
-    fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, StoreFailure> {
+    pub fn visited<D: Directing>(&self, directing: D) -> D::Output {
         match self {
-            Directed::Placed { segment, node, relation } => annotating.placed(segment, *node, *relation),
-            Directed::Sensed { segment, sense } => annotating.sensed(segment, *sense),
-            Directed::Related { source, target, relation } => annotating.related(source, target, *relation),
-            Directed::Proposed { node, parent } => annotating.proposed(node, *parent),
-            Directed::Superseded { old, by } => annotating.superseded(*old, *by),
-            Directed::Conversational { segment } => annotating.conversational(segment),
+            Directed::Placed { segment, node, relation } => directing.placed(segment, *node, *relation),
+            Directed::Sensed { segment, sense } => directing.sensed(segment, *sense),
+            Directed::Related { source, target, relation } => directing.related(source, target, *relation),
+            Directed::Proposed { node, parent } => directing.proposed(node, *parent),
+            Directed::Superseded(supersession) => directing.superseded(*supersession),
+            Directed::Conversational { segment } => directing.conversational(segment),
         }
     }
 }

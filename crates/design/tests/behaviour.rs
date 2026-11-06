@@ -649,7 +649,7 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
     let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
     assert!(consuming.contains("consumes n1 project meta-dev"));
-    assert!(Graph::shown(&store, "n2")?.contains("n2 demo project vague entered init\n  consumes n1\n"));
+    assert!(Graph::shown(&store, "n2")?.contains("n2 demo project vague entered init\n  consumes n1 entered init\n"));
     assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
     Ok(())
 }
@@ -824,7 +824,7 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
         "n4 demo feature vague entered apply \"echo\"",
         "  ancestor n1 demo project vague entered init",
         "  ancestor n2 demo feature vague entered apply \"apply\"",
-        "  refines n2",
+        "  refines n2 entered apply",
     ];
     assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
     assert_eq!(child.matches('\n').count(), wanted.len());
@@ -839,7 +839,7 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
-    assert!(applying.run(&["show", "n3"])?.contains("  supersedes n2\n"));
+    assert!(applying.run(&["show", "n3"])?.contains("  supersedes n2 entered apply\n"));
     assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague entered apply \"old\"\n"));
     let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
     assert!(placed.contains("written 1\n"));
@@ -880,6 +880,128 @@ fn an_unknown_reference_is_refused_and_nothing_is_written() -> Result<(), Failur
 }
 
 #[test]
+fn a_supersession_across_project_roots_is_refused_naming_both_nodes_and_nothing_is_written() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let run = Run::root();
+    let entry = Entry::new("other".parse()?, Facet::Project, Stage::Vague, Entered::Init.into());
+    run.port(applying.store.clone()).write(NewNode::from(entry))?;
+    assert!(matches!(applying.refused("supersede(n1, by(n2))"), Some(Failure::Unresolved(Unresolved::Straddling(_)))));
+    assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
+    assert_eq!(applying.run(&["show", "n2"])?.matches("supersedes").count(), 0);
+    Ok(())
+}
+
+impl Applying {
+    fn cyclic(&self, directives: &str) -> Option<Failure> {
+        self.applied("propose(new, refines(n1), feature, \"a\")\npropose(new, refines(n1), feature, \"b\")").ok();
+        self.applied(directives).err()
+    }
+}
+
+#[test]
+fn a_supersession_that_closes_a_cycle_or_names_one_node_twice_is_refused() -> Result<(), Failure> {
+    let refusals = [
+        "supersede(n2, by(n2))",
+        "supersede(n2, by(n3))\nsupersede(n3, by(n2))",
+        "supersede(n2, by(n3))\nsupersede(n3, by(n1))\nsupersede(n1, by(n2))",
+        "propose(new x, refines(n1), feature, \"c\")\nsupersede(n4, by(x))",
+    ]
+    .map(|directives| Applying::ready().ok().and_then(|applying| applying.cyclic(directives)));
+    assert!(matches!(
+        refusals,
+        [
+            Some(Failure::Misread(_)),
+            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
+            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
+            Some(Failure::Unresolved(Unresolved::Cyclic { .. })),
+        ]
+    ));
+    let applying = Applying::ready()?;
+    applying.cyclic("supersede(n2, by(n3))");
+    assert!(matches!(applying.cyclic("supersede(n3, by(n2))"), Some(Failure::Unresolved(Unresolved::Cyclic { .. }))));
+    assert!(applying.applied("propose(new, refines(n1), feature, \"d\")\nsupersede(n3, by(n6))").is_ok());
+    Ok(())
+}
+
+#[test]
+fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let answer = Applying::answer(0);
+    let directives = [
+        "propose(new x, refines(n1), feature, \"a\")".to_owned(),
+        "propose(new y, refines(x), feature, \"b\")".to_owned(),
+        "supersede(x, by(y))".to_owned(),
+        format!("place({answer}, y, defines)"),
+        format!("sense({answer}, decision, specific, firm, explicit)"),
+        format!("link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
+        format!("conversational({})", Applying::answer(1)),
+    ]
+    .join("\n");
+    applying.applied(&directives)?;
+    let message = applying.run(&["show", Applying::ANSWER])?;
+    let wanted = [
+        format!("  place {answer} defines n3 current entered apply"),
+        format!("  sense {answer} decision specific firm explicit current entered apply"),
+        format!("  link {answer} answers aaaaaaaa-0000-4000-8000-000000000002.0 current entered apply"),
+        format!("  conversational {} current entered apply", Applying::answer(1)),
+    ];
+    assert_eq!(Lines::missing(&message, &wanted), Vec::<&String>::new());
+    let node = applying.run(&["show", "n3"])?;
+    let wanted =
+        ["n3 demo feature vague entered apply \"b\"", "  refines n2 entered apply", "  supersedes n2 entered apply"];
+    assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
+    Ok(())
+}
+
+#[test]
+fn a_corrected_sense_supersedes_the_earlier_one_and_both_stay_stored() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let answer = Applying::answer(0);
+    applying.applied(&format!("sense({answer}, decision, specific, firm, explicit)"))?;
+    applying.applied(&format!("sense({answer}, opinion, general, tentative, implicit)"))?;
+    let shown = applying.run(&["show", Applying::ANSWER])?;
+    let wanted = [
+        format!("  sense {answer} decision specific firm explicit superseded entered apply"),
+        format!("  sense {answer} opinion general tentative implicit current entered apply"),
+    ];
+    assert_eq!(Lines::missing(&shown, &wanted), Vec::<&String>::new());
+    assert_eq!(shown.matches("  sense ").count(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let directives = [
+        "propose(new, refines(n1), feature, \"a\")".to_owned(),
+        "propose(new b, refines(n2), feature, \"b\")".to_owned(),
+        format!("place({}, n2, defines)", Applying::answer(0)),
+        format!("place({}, b, decides)", Applying::answer(1)),
+    ]
+    .join("\n");
+    let out = applying.applied(&directives)?;
+    assert!(out.contains("proposed n3 by propose(new b, refines(n2), feature, \"b\")\n"));
+    let shown = applying.run(&["show", Applying::ANSWER])?;
+    let wanted = [
+        format!("  place {} defines n2 current entered apply", Applying::answer(0)),
+        format!("  place {} decides n3 current entered apply", Applying::answer(1)),
+    ];
+    assert_eq!(Lines::missing(&shown, &wanted), Vec::<&String>::new());
+    let refusals = [
+        "place(aaaaaaaa-0000-4000-8000-000000000003.0, c, defines)",
+        "propose(new first, refines(n1), feature, \"again\")",
+    ]
+    .map(|directives| {
+        applying.applied(&format!("propose(new first, refines(n1), feature, \"x\")\n{directives}")).err()
+    });
+    assert!(matches!(
+        refusals,
+        [Some(Failure::Unresolved(Unresolved::Unbound(_))), Some(Failure::Unresolved(Unresolved::Rebound(_)))]
+    ));
+    Ok(())
+}
+
+#[test]
 fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("")?;
@@ -913,7 +1035,7 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
         "  ancestor n1 demo project vague entered init".to_owned(),
         format!("  ancestor n2 demo {facet} vague entered init"),
         format!("  child n5 demo {facet} vague entered init"),
-        "  refines n2".to_owned(),
+        "  refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
     prop_assert_eq!(missing, Vec::<&String>::new());
@@ -936,8 +1058,12 @@ impl Graph {
             .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Stage::Vague, Entered::Init.into());
                 let planted = port.write(NewNode::from(entry))?;
-                let linked =
-                    port.write(Linked::new(NodeId::new(child), NodeRelation::Refines, NodeId::new(*parent)))?;
+                let linked = port.write(Linked::new(
+                    NodeId::new(child),
+                    NodeRelation::Refines,
+                    NodeId::new(*parent),
+                    Entered::Init.into(),
+                ))?;
                 Ok(planted.plus(linked))
             })
             .collect::<Result<Vec<Written>, Failure>>()?;

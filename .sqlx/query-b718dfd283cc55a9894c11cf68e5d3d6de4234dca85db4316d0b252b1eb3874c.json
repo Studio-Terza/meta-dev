@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH RECURSIVE chain (id) AS (SELECT ?1 UNION SELECT node_edges.target FROM node_edges JOIN chain ON node_edges.source = chain.id WHERE node_edges.relation = ?2) SELECT id AS \"id!: i64\" FROM chain ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "target"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b718dfd283cc55a9894c11cf68e5d3d6de4234dca85db4316d0b252b1eb3874c"
+}

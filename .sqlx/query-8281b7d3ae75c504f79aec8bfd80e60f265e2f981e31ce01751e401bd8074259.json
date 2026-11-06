@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT message, ordinal, provenance FROM conversational WHERE message = ?1 ORDER BY ordinal",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversational",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "conversational",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "provenance",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversational",
+            "name": "provenance"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8281b7d3ae75c504f79aec8bfd80e60f265e2f981e31ce01751e401bd8074259"
+}

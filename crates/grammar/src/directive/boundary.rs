@@ -16,6 +16,8 @@ enum Token {
     Break,
     #[regex(r"[A-Za-z_][A-Za-z0-9_-]*", |lexer| lexer.slice().to_owned())]
     Word(String),
+    #[regex(r"new[ \t]+[A-Za-z_][A-Za-z0-9_-]*", Fresh::lexed)]
+    Fresh(Fresh),
     #[regex(r"[0-9a-f][0-9a-f-]{7,}\.(0|[1-9][0-9]*)", Cited::lexed)]
     Segment(Cited),
     #[regex(r#""([^"\\\r\n]|\\["\\])*""#, Quote::lexed)]
@@ -31,6 +33,14 @@ enum Escape {
 }
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Labelled {
+    #[regex(r"new[ \t]+")]
+    Keyword,
+    #[regex(r"[A-Za-z_][A-Za-z0-9_-]*")]
+    Label,
+}
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Unescaped {
     #[regex(r#"["\\]"#)]
     Special,
@@ -40,6 +50,9 @@ enum Unescaped {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Quote(String);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Fresh(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cited {
@@ -55,6 +68,7 @@ pub enum Piece {
     Break,
     End,
     Word(String),
+    Fresh(Fresh),
     Segment(Cited),
     Quoted(Quote),
     Stray(String),
@@ -159,6 +173,7 @@ impl Gathered {
             | Piece::Comma
             | Piece::End
             | Piece::Word(_)
+            | Piece::Fresh(_)
             | Piece::Segment(_)
             | Piece::Quoted(_)
             | Piece::Stray(_) => Gathered { open: self.open.into_iter().chain([lexed]).collect(), ..self },
@@ -180,6 +195,7 @@ impl Start {
             | Piece::Comma
             | Piece::End
             | Piece::Word(_)
+            | Piece::Fresh(_)
             | Piece::Segment(_)
             | Piece::Quoted(_)
             | Piece::Stray(_) => self,
@@ -197,6 +213,23 @@ impl Piece {
             | Piece::Comma
             | Piece::Break
             | Piece::End
+            | Piece::Fresh(_)
+            | Piece::Segment(_)
+            | Piece::Quoted(_)
+            | Piece::Stray(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn fresh(&self) -> Option<&Fresh> {
+        match self {
+            Piece::Fresh(label) => Some(label),
+            Piece::Open
+            | Piece::Close
+            | Piece::Comma
+            | Piece::Break
+            | Piece::End
+            | Piece::Word(_)
             | Piece::Segment(_)
             | Piece::Quoted(_)
             | Piece::Stray(_) => None,
@@ -213,6 +246,7 @@ impl Piece {
             | Piece::Break
             | Piece::End
             | Piece::Word(_)
+            | Piece::Fresh(_)
             | Piece::Quoted(_)
             | Piece::Stray(_) => None,
         }
@@ -228,6 +262,7 @@ impl Piece {
             | Piece::Break
             | Piece::End
             | Piece::Word(_)
+            | Piece::Fresh(_)
             | Piece::Segment(_)
             | Piece::Stray(_) => None,
         }
@@ -332,6 +367,24 @@ impl Unescaped {
     }
 }
 
+impl Fresh {
+    fn lexed(lexer: &Lexer<'_, Token>) -> Option<Fresh> {
+        let fresh = lexer.slice();
+        Labelled::lexer(fresh)
+            .spanned()
+            .filter_map(|(labelled, range)| Labelled::label(labelled, range))
+            .last()
+            .and_then(|range| fresh.get(range))
+            .map(|label| Fresh(label.to_owned()))
+    }
+}
+
+impl AsRef<str> for Fresh {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Token {
     fn piece(token: Result<Token, ()>, written: &str) -> Piece {
         match token {
@@ -340,9 +393,19 @@ impl Token {
             Ok(Token::Comma) => Piece::Comma,
             Ok(Token::Break) => Piece::Break,
             Ok(Token::Word(word)) => Piece::Word(word),
+            Ok(Token::Fresh(label)) => Piece::Fresh(label),
             Ok(Token::Segment(cited)) => Piece::Segment(cited),
             Ok(Token::Quoted(quote)) => Piece::Quoted(quote),
             Err(()) => Piece::Stray(written.to_owned()),
+        }
+    }
+}
+
+impl Labelled {
+    fn label(labelled: Result<Labelled, ()>, range: Range<usize>) -> Option<Range<usize>> {
+        match labelled {
+            Ok(Labelled::Label) => Some(range),
+            Ok(Labelled::Keyword) | Err(()) => None,
         }
     }
 }

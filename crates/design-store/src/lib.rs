@@ -1,3 +1,4 @@
+mod annotation;
 mod boundary;
 mod cursors;
 mod directions;
@@ -16,10 +17,12 @@ mod shown_message;
 mod shown_node;
 mod stored;
 mod stream_schema;
+mod superseded_by;
 
+pub use annotation::Annotation;
 pub use boundary::Hit;
 pub use cursors::Cursors;
-pub use directions::{Directed, Directions};
+pub use directions::{Directed, Directing, Directions};
 pub use earlier_lines::EarlierLines;
 pub use graph::{Linked, NewNode};
 use link::Link;
@@ -35,3 +38,4 @@ pub use shown_message::ShownMessage;
 pub use shown_node::ShownNode;
 pub use stored::Stored;
 pub use stream_schema::StreamSchema;
+pub use superseded_by::SupersededBy;

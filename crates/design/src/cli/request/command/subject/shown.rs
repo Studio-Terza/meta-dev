@@ -5,6 +5,7 @@ use store_ports::Store;
 use transcript_ports::{Body, Uuid};
 
 use crate::cli::failure::Failure;
+use crate::cli::rendering::Annotated;
 
 #[derive(Debug)]
 pub struct Shown(Stored);
@@ -32,6 +33,7 @@ impl fmt::Display for Shown {
         self.0.links().iter().try_for_each(|link| {
             let [source, target] = link.anchors();
             writeln!(formatter, "  link {source} {} {target}", link.relation())
-        })
+        })?;
+        self.0.annotations().iter().try_for_each(|annotation| writeln!(formatter, "  {}", Annotated::from(annotation)))
     }
 }

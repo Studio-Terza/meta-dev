@@ -16,6 +16,7 @@ pub struct Linked {
     source: NodeId,
     relation: NodeRelation,
     target: NodeId,
+    provenance: Provenance,
 }
 
 #[derive(Debug)]
@@ -43,6 +44,7 @@ pub(crate) struct RelativeRow {
 pub(crate) struct OutgoingRow {
     relation: String,
     target: i64,
+    provenance: String,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,8 +61,8 @@ impl From<Entry> for NewNode {
 
 impl Linked {
     #[must_use]
-    pub fn new(source: NodeId, relation: NodeRelation, target: NodeId) -> Linked {
-        Linked { source, relation, target }
+    pub fn new(source: NodeId, relation: NodeRelation, target: NodeId, provenance: Provenance) -> Linked {
+        Linked { source, relation, target, provenance }
     }
 
     fn refinement(self) -> Option<Refinement> {
@@ -109,11 +111,13 @@ impl Batch for Linked {
         let source = self.source.into_inner();
         let relation = self.relation.name();
         let target = self.target.into_inner();
+        let provenance = Entered::from(self.provenance).name();
         let edge = statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO node_edges (source, relation, target) VALUES (?1, ?2, ?3)",
+            "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
             source,
             relation,
-            target
+            target,
+            provenance
         ))?;
         let closed = self.refinement().map(|refinement| refinement.closed(statements)).transpose()?;
         Ok(edge.plus(closed.unwrap_or_default()))
@@ -154,12 +158,13 @@ impl TryFrom<OutgoingRow> for Link {
     type Error = sqlx::Error;
 
     fn try_from(row: OutgoingRow) -> Result<Link, sqlx::Error> {
-        Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target)))
+        let provenance = Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?);
+        Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target), provenance))
     }
 }
 
 impl NodeRow {
-    fn decoded<Column>(text: &str) -> Result<Column, sqlx::Error>
+    pub(crate) fn decoded<Column>(text: &str) -> Result<Column, sqlx::Error>
     where
         Column: FromStr<Err: Error + Send + Sync + 'static>,
     {
@@ -185,6 +190,17 @@ impl NodeRow {
             id
         ))?;
         Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
+    }
+
+    pub(crate) fn superseded_by(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
+        let id = id.into_inner();
+        let supersedes = NodeRelation::Supersedes.name();
+        let rows = statements.rows(sqlx::query!(
+            r#"WITH RECURSIVE chain (id) AS (SELECT ?1 UNION SELECT node_edges.target FROM node_edges JOIN chain ON node_edges.source = chain.id WHERE node_edges.relation = ?2) SELECT id AS "id!: i64" FROM chain ORDER BY id"#,
+            id,
+            supersedes
+        ))?;
+        Ok(rows.into_iter().map(|row| NodeId::new(row.id)).collect())
     }
 
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
@@ -236,7 +252,7 @@ impl OutgoingRow {
         let id = id.into_inner();
         let rows = statements.rows(sqlx::query_as!(
             OutgoingRow,
-            "SELECT relation, target FROM node_edges WHERE source = ?1 ORDER BY relation, target",
+            "SELECT relation, target, provenance FROM node_edges WHERE source = ?1 ORDER BY relation, target",
             id
         ))?;
         Ok(rows.into_iter().map(Link::try_from).collect::<Result<Vec<Link>, sqlx::Error>>()?)

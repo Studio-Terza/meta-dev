@@ -1,7 +1,7 @@
 use std::fmt;
 
-use design_model::{Entered, Node, NodeId};
-use design_store::Placed;
+use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation, Supersession};
+use design_store::{Annotation, Directing, Placed};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
 
@@ -15,6 +15,11 @@ pub struct Line<'node>(&'node Node);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Neighbourhood<'placed>(&'placed Placed);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Annotated<'annotation>(&'annotation Annotation);
+
+struct Writing<'out, 'formatter>(&'out mut fmt::Formatter<'formatter>);
 
 impl From<NodeId> for Id {
     fn from(id: NodeId) -> Id {
@@ -31,6 +36,12 @@ impl<'node> From<&'node Node> for Line<'node> {
 impl<'placed> From<&'placed Placed> for Neighbourhood<'placed> {
     fn from(placed: &'placed Placed) -> Neighbourhood<'placed> {
         Neighbourhood(placed)
+    }
+}
+
+impl<'annotation> From<&'annotation Annotation> for Annotated<'annotation> {
+    fn from(annotation: &'annotation Annotation) -> Annotated<'annotation> {
+        Annotated(annotation)
     }
 }
 
@@ -63,7 +74,59 @@ impl fmt::Display for Neighbourhood<'_> {
             .relatives()
             .iter()
             .try_for_each(|relative| writeln!(formatter, "  {} {}", relative.kin(), Line(relative.node())))?;
-        self.0.links().iter().try_for_each(|link| writeln!(formatter, "  {} {}", link.relation(), Id(link.target())))
+        self.0.links().iter().try_for_each(|link| {
+            writeln!(
+                formatter,
+                "  {} {} entered {}",
+                link.relation(),
+                Id(link.target()),
+                Entered::from(link.provenance())
+            )
+        })
+    }
+}
+
+impl fmt::Display for Annotated<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.directed().visited(Writing(&mut *formatter))?;
+        write!(formatter, " {} entered {}", self.0.standing(), Entered::from(self.0.provenance()))
+    }
+}
+
+impl Directing for Writing<'_, '_> {
+    type Output = fmt::Result;
+
+    fn placed(self, segment: &Segment, node: NodeId, relation: SpanRelation) -> fmt::Result {
+        write!(self.0, "place {} {relation} {}", SegmentRef::from(segment), Id(node))
+    }
+
+    fn sensed(self, segment: &Segment, sense: Sense) -> fmt::Result {
+        write!(
+            self.0,
+            "sense {} {} {} {} {}",
+            SegmentRef::from(segment),
+            sense.kind(),
+            sense.specificity(),
+            sense.confidence(),
+            sense.explicitness()
+        )
+    }
+
+    fn related(self, source: &Segment, target: &Segment, relation: SegmentRelation) -> fmt::Result {
+        write!(self.0, "link {} {relation} {}", SegmentRef::from(source), SegmentRef::from(target))
+    }
+
+    fn proposed(self, node: &Node, parent: NodeId) -> fmt::Result {
+        write!(self.0, "propose {} refines {}", Id(node.identity()), Id(parent))
+    }
+
+    fn superseded(self, supersession: Supersession) -> fmt::Result {
+        let [old, by] = supersession.ends();
+        write!(self.0, "supersede {} by {}", Id(old), Id(by))
+    }
+
+    fn conversational(self, segment: &Segment) -> fmt::Result {
+        write!(self.0, "conversational {}", SegmentRef::from(segment))
     }
 }
 

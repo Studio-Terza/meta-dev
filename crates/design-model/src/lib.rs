@@ -17,6 +17,8 @@ mod sense_kind;
 mod span_relation;
 mod specificity;
 mod stage;
+mod standing;
+mod supersession;
 mod title;
 
 pub use confidence::Confidence;
@@ -38,4 +40,6 @@ pub use sense_kind::SenseKind;
 pub use span_relation::SpanRelation;
 pub use specificity::Specificity;
 pub use stage::Stage;
+pub use standing::Standing;
+pub use supersession::{Straddling, Supersession};
 pub use title::Title;

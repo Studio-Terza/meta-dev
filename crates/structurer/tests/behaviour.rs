@@ -2,11 +2,12 @@ use design_model::{
     Confidence, Explicitness, Facet, NodeId, Ordinal, Prefix, SegmentRelation, Sense, SenseKind, SpanRelation,
     Specificity, Title,
 };
+use laws::proptest::option;
 use laws::proptest::prelude::prop_oneof;
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::Newtype;
-use structurer::{Directive, Directives, Misread};
+use structurer::{Directive, Directives, Label, Misread, NodeRef, Replacement};
 use strum::VariantArray;
 
 struct Generated;
@@ -17,8 +18,20 @@ impl Generated {
             .prop_map(|(prefix, ordinal)| structurer::SegmentRef::new(Prefix::new(prefix), Ordinal::new(ordinal)))
     }
 
-    fn node() -> impl Strategy<Value = NodeId> {
-        (0..i64::MAX).prop_map(NodeId::new)
+    fn label() -> impl Strategy<Value = Label> {
+        "[A-Za-z_][A-Za-z0-9_-]{0,8}".prop_filter_map("a node id is no label", |label| label.parse::<Label>().ok())
+    }
+
+    fn node() -> impl Strategy<Value = NodeRef> {
+        prop_oneof![
+            (0..i64::MAX).prop_map(|id| NodeRef::Stored(NodeId::new(id))),
+            Self::label().prop_map(NodeRef::Labelled)
+        ]
+    }
+
+    fn replacement() -> impl Strategy<Value = Replacement> {
+        (Self::node(), Self::node())
+            .prop_filter_map("a node never supersedes itself", |(old, by)| Replacement::new(old, by).ok())
     }
 
     fn sense() -> impl Strategy<Value = Sense> {
@@ -40,14 +53,30 @@ impl Generated {
             (Self::segment(), Self::sense()).prop_map(|(segment, sense)| Directive::Sense { segment, sense }),
             (Self::segment(), Self::segment(), select(SegmentRelation::VARIANTS))
                 .prop_map(|(source, target, relation)| Directive::Link { source, target, relation }),
-            (Self::node(), select(Facet::VARIANTS), "[^\r\n]{0,24}").prop_map(|(refines, facet, title)| {
-                Directive::Propose { refines, facet, title: Title::new(title) }
-            }),
-            (Self::node(), Self::node()).prop_map(|(old, by)| Directive::Supersede { old, by }),
+            (option::of(Self::label()), Self::node(), select(Facet::VARIANTS), "[^\r\n]{0,24}").prop_map(
+                |(fresh, refines, facet, title)| Directive::Propose { fresh, refines, facet, title: Title::new(title) }
+            ),
+            Self::replacement().prop_map(Directive::Supersede),
             Self::segment().prop_map(|segment| Directive::Conversational { segment }),
         ]
     }
 }
+
+laws::roundtrip!(
+    a_label_is_displayed_and_parsed_back,
+    Generated::label(),
+    |label: &Label| label.to_string(),
+    |text: &String| text.parse::<Label>().ok(),
+    Some
+);
+
+laws::roundtrip!(
+    a_node_ref_is_displayed_and_parsed_back,
+    Generated::node(),
+    |node: &NodeRef| node.to_string(),
+    |text: &String| text.parse::<NodeRef>().ok(),
+    Some
+);
 
 laws::roundtrip!(
     a_directive_is_displayed_and_parsed_back,
@@ -107,7 +136,8 @@ laws::table!(
         "place 85b287b3.0" => Spot::at(1, 7),
         "place(85b287b3.0, n1)" => Spot::at(1, 1),
         "place(n1, n1, defines)" => Spot::at(1, 7),
-        "place(85b287b3.0, x1, defines)" => Spot::at(1, 19),
+        "place(85b287b3.0, x1, defines)" => None,
+        "place(85b287b3.0, n01, defines)" => Spot::at(1, 19),
         "place(85b287b3.0, n1, define)" => Spot::at(1, 23),
         "place(85b287b3, n1, defines)" => Spot::at(1, 7),
         "propose(old, refines(n1), feature, \"t\")" => Spot::at(1, 9),
@@ -115,6 +145,13 @@ laws::table!(
         "propose(new, by(n1), feature, \"t\")" => Spot::at(1, 14),
         "propose(new, refines(n1), feature, title)" => Spot::at(1, 36),
         "supersede(n1, by(n2)) extra" => Spot::at(1, 23),
+        "supersede(n1, by(n1))" => Spot::at(1, 18),
+        "supersede(x, by(x))" => Spot::at(1, 17),
+        "supersede(x, by(n1))" => None,
+        "propose(new x, refines(n1), feature, \"t\")" => None,
+        "propose(new  x, refines(y), feature, \"t\")" => None,
+        "propose(new n2, refines(n1), feature, \"t\")" => Spot::at(1, 9),
+        "propose(x, refines(n1), feature, \"t\")" => Spot::at(1, 9),
         "conversational(85b287b3.0" => Spot::at(1, 26),
         "conversational(85b287b3.0)\n" => Spot::at(1, 27),
         "conversational()" => Spot::at(1, 16),

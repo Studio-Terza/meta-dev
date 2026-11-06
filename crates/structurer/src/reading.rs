@@ -1,11 +1,11 @@
 use std::str::FromStr;
 
-use design_model::{NodeId, Title};
+use design_model::Title;
 use grammar::directive::{Lexed, Line, Location, Piece};
 
 use crate::misread::Wanted;
-use crate::verb::Verb;
-use crate::{Directive, Misread, SegmentRef};
+use crate::verb::{By, New, Verb};
+use crate::{Directive, Label, Misread, NodeRef, Replacement, SegmentRef};
 
 #[derive(Debug)]
 pub(crate) struct Reader<'line> {
@@ -134,8 +134,21 @@ impl<'line> Term<'line> {
             .ok_or_else(|| Misread::expected(self.located(), wanted))
     }
 
-    pub(crate) fn node(&self) -> Result<NodeId, Misread> {
+    pub(crate) fn node(&self) -> Result<NodeRef, Misread> {
         self.named(Wanted::Node)
+    }
+
+    pub(crate) fn replaced_by(&self, by: &Term<'line>) -> Result<Replacement, Misread> {
+        let replacing = by.within::<By>(Wanted::By)?;
+        Replacement::new(self.node()?, replacing.node()?)
+            .map_err(|_itself| Misread::expected(replacing.located(), Wanted::Successor))
+    }
+
+    pub(crate) fn fresh(&self) -> Result<Option<Label>, Misread> {
+        let piece = self.atom().map(Lexed::piece);
+        let anonymous = piece.and_then(Piece::word).and_then(|word| word.parse::<New>().ok()).map(|New::New| None);
+        let labelled = piece.and_then(Piece::fresh).and_then(|label| label.as_ref().parse::<Label>().ok()).map(Some);
+        anonymous.or(labelled).ok_or_else(|| Misread::expected(self.located(), Wanted::New))
     }
 
     pub(crate) fn segment(&self) -> Result<SegmentRef, Misread> {
@@ -168,7 +181,7 @@ impl Shape {
             Piece::Close => Shape::Close,
             Piece::Comma => Shape::Comma,
             Piece::Word(_) => Shape::Word,
-            Piece::Segment(_) | Piece::Quoted(_) => Shape::Atom,
+            Piece::Fresh(_) | Piece::Segment(_) | Piece::Quoted(_) => Shape::Atom,
             Piece::Break | Piece::End | Piece::Stray(_) => Shape::Other,
         }
     }
@@ -206,6 +219,7 @@ impl Following {
             | Piece::Break
             | Piece::End
             | Piece::Word(_)
+            | Piece::Fresh(_)
             | Piece::Segment(_)
             | Piece::Quoted(_)
             | Piece::Stray(_) => Following::Other,

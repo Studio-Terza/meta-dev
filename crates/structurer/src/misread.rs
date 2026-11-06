@@ -17,7 +17,7 @@ pub enum Wanted {
     End,
     #[name("a segment, as in 85b287b3.0")]
     Segment,
-    #[name("a node id, as in n42")]
+    #[name("a node id, as in n42, or the label of a node proposed earlier in the file")]
     Node,
     #[name("a quoted title")]
     Title,
@@ -35,12 +35,14 @@ pub enum Wanted {
     Explicitness,
     #[name("a facet")]
     Facet,
-    #[name("new")]
+    #[name("new, or new and a label that is not a node id")]
     New,
     #[name("refines(<node>)")]
     Refines,
     #[name("by(<node>)")]
     By,
+    #[name("a node other than the one superseded")]
+    Successor,
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]

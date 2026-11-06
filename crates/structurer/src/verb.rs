@@ -29,7 +29,7 @@ pub enum Form {
     Sense,
     #[name("link(<segment>, <segment>, <segment-relation>)")]
     Link,
-    #[name("propose(new, refines(<node>), <facet>, \"<title>\")")]
+    #[name("propose(new [<label>], refines(<node>), <facet>, \"<title>\")")]
     Propose,
     #[name("supersede(<node>, by(<node>))")]
     Supersede,
@@ -96,16 +96,16 @@ impl Verb {
                 })
             }),
             Verb::Propose => call.exactly(self).and_then(|[new, refines, facet, title]: &[Term<'_>; _]| {
-                let New::New = new.named(Wanted::New)?;
                 Ok(Directive::Propose {
+                    fresh: new.fresh()?,
                     refines: refines.within::<Refines>(Wanted::Refines)?.node()?,
                     facet: facet.named(Wanted::Facet)?,
                     title: title.title()?,
                 })
             }),
-            Verb::Supersede => call.exactly(self).and_then(|[old, by]: &[Term<'_>; _]| {
-                Ok(Directive::Supersede { old: old.node()?, by: by.within::<By>(Wanted::By)?.node()? })
-            }),
+            Verb::Supersede => {
+                call.exactly(self).and_then(|[old, by]: &[Term<'_>; _]| old.replaced_by(by).map(Directive::Supersede))
+            }
             Verb::Conversational => call
                 .exactly(self)
                 .and_then(|[segment]: &[Term<'_>; _]| Ok(Directive::Conversational { segment: segment.segment()? })),

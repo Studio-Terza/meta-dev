@@ -5,13 +5,16 @@ use grammar::directive::Quote;
 use newtype::Newtype;
 
 use crate::verb::{By, New, Refines, Verb};
-use crate::{Directive, SegmentRef, Visit};
+use crate::{Bind, Directive, Label, NodeRef, SegmentRef, Visit};
 
 #[derive(Clone, Copy, Debug)]
 struct Id(NodeId);
 
 #[derive(Clone, Copy, Debug)]
 struct Quoted<'title>(&'title Title);
+
+#[derive(Clone, Copy, Debug)]
+struct Fresh<'label>(Option<&'label Label>);
 
 struct Rendering<'out, 'formatter>(&'out mut fmt::Formatter<'formatter>);
 
@@ -34,6 +37,37 @@ impl fmt::Display for Id {
     }
 }
 
+impl fmt::Display for Label {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_ref())
+    }
+}
+
+impl fmt::Display for NodeRef {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.bound(Rendering(formatter))
+    }
+}
+
+impl Bind for Rendering<'_, '_> {
+    type Output = fmt::Result;
+
+    fn stored(self, id: NodeId) -> fmt::Result {
+        write!(self.0, "{}", Id(id))
+    }
+
+    fn labelled(self, label: &Label) -> fmt::Result {
+        write!(self.0, "{label}")
+    }
+}
+
+impl fmt::Display for Fresh<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        New::New.fmt(formatter)?;
+        self.0.iter().try_for_each(|label| write!(formatter, " {label}"))
+    }
+}
+
 impl fmt::Display for Quoted<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&Quote::quoting(&self.0.to_string()))
@@ -49,8 +83,8 @@ impl fmt::Display for Directive {
 impl Visit for Rendering<'_, '_> {
     type Output = fmt::Result;
 
-    fn place(self, segment: &SegmentRef, node: NodeId, relation: SpanRelation) -> fmt::Result {
-        write!(self.0, "{}({segment}, {}, {relation})", Verb::Place, Id(node))
+    fn place(self, segment: &SegmentRef, node: &NodeRef, relation: SpanRelation) -> fmt::Result {
+        write!(self.0, "{}({segment}, {node}, {relation})", Verb::Place)
     }
 
     fn sense(self, segment: &SegmentRef, sense: Sense) -> fmt::Result {
@@ -69,20 +103,19 @@ impl Visit for Rendering<'_, '_> {
         write!(self.0, "{}({source}, {target}, {relation})", Verb::Link)
     }
 
-    fn propose(self, refines: NodeId, facet: Facet, title: &Title) -> fmt::Result {
+    fn propose(self, fresh: Option<&Label>, refines: &NodeRef, facet: Facet, title: &Title) -> fmt::Result {
         write!(
             self.0,
-            "{}({}, {}({}), {facet}, {})",
+            "{}({}, {}({refines}), {facet}, {})",
             Verb::Propose,
-            New::New,
+            Fresh(fresh),
             Refines::Refines,
-            Id(refines),
             Quoted(title)
         )
     }
 
-    fn supersede(self, old: NodeId, by: NodeId) -> fmt::Result {
-        write!(self.0, "{}({}, {}({}))", Verb::Supersede, Id(old), By::By, Id(by))
+    fn supersede(self, old: &NodeRef, by: &NodeRef) -> fmt::Result {
+        write!(self.0, "{}({old}, {}({by}))", Verb::Supersede, By::By)
     }
 
     fn converse(self, segment: &SegmentRef) -> fmt::Result {
