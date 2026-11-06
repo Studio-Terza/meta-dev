@@ -154,7 +154,15 @@ laws::table!(
         "\u{85}" => None,
         "\u{3000}\t" => None,
         "\u{a0}x" => Some("\u{a0}x".to_owned()),
-        "x\u{b}y" => Some("x\u{b}y".to_owned()),
+        "x\u{b}y" => None,
+        "x\u{c}y" => None,
+        "x\u{85}y" => None,
+        "x\u{2028}y" => None,
+        "x\u{2029}y" => None,
+        "x\ry" => None,
+        "x\u{2029}" => None,
+        "\u{85}x" => None,
+        "x\u{2007}y" => Some("x\u{2007}y".to_owned()),
     ]
 );
 

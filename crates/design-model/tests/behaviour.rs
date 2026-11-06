@@ -328,7 +328,7 @@ laws::roundtrip!(
 
 laws::law!(
     an_empty_blank_or_broken_line_is_neither_a_condition_nor_a_reason,
-    "[ \t]{0,4}|[a-z ]{0,6}[\r\n][a-z ]{0,6}",
+    "[ \t]{0,4}|[a-z ]{0,6}[\r\n\x0B\x0C\u{85}\u{2028}\u{2029}][a-z ]{0,6}",
     text,
     {
         prop_assert!(text.parse::<Condition>().is_err());
