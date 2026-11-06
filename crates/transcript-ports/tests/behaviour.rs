@@ -49,6 +49,12 @@ impl Lines {
         Self::entry("user", uuid, "{\"kind\":\"task-notification\"}", "\"finished\"")
     }
 
+    fn attached(attachment: &str) -> String {
+        format!(
+            "{{\"type\":\"attachment\",\"uuid\":\"8\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:08Z\",\"attachment\":{attachment}}}\n"
+        )
+    }
+
     fn system(uuid: &str, parent: &str) -> String {
         format!(
             "{{\"type\":\"system\",\"subtype\":\"turn_duration\",\"uuid\":\"{uuid}\",\"parentUuid\":\"{parent}\",\"sessionId\":\"s1\"}}\n"
@@ -139,6 +145,13 @@ impl Cases {
         let edges = transcript.read(Cursor::default()).map(Views::edges);
         said.into_iter().chain(edges).flatten().collect()
     }
+
+    fn attached(attachment: &&str) -> Vec<String> {
+        let transcript = Transcript::holding(&Lines::attached(attachment));
+        let said = transcript.read(Cursor::default()).map(Views::spoken);
+        let edges = transcript.read(Cursor::default()).map(Views::edges);
+        said.into_iter().chain(edges).flatten().collect()
+    }
 }
 
 struct Views;
@@ -158,6 +171,10 @@ impl Views {
 
     fn authors(read: Read) -> Vec<Authorship> {
         Self::records(read).into_iter().map(|record| record.author()).collect()
+    }
+
+    fn spoken(read: Read) -> Vec<String> {
+        Self::records(read).into_iter().map(|record| format!("{:?} {}", record.author(), record.text())).collect()
     }
 
     fn uuids(records: &[Record]) -> Vec<String> {
@@ -252,5 +269,15 @@ laws::table!(
         "[{\"type\":\"thinking\",\"thinking\":\"hmm\"}]" => ["7 after 1"],
         "[{\"type\":\"tool_use\",\"name\":\"Bash\"}]" => ["7 after 1"],
         "[{\"type\":\"text\",\"text\":\"said\"}]" => ["7"],
+    ]
+);
+
+laws::table!(
+    a_queued_command_is_heard_as_its_prompt_and_any_other_attachment_is_only_a_parent_edge,
+    Cases::attached,
+    [
+        "{\"type\":\"queued_command\",\"prompt\":\"typed while busy\",\"origin\":{\"kind\":\"human\"}}" => ["Owner typed while busy"],
+        "{\"type\":\"queued_command\",\"prompt\":\"finished\"}" => ["Bystander finished"],
+        "{\"type\":\"hook_success\",\"content\":\"ok\"}" => ["8 after 1"],
     ]
 );

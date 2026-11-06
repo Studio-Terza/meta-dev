@@ -7,6 +7,7 @@ use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Uuid};
 enum Kind {
     User,
     Assistant,
+    Attachment,
     #[default]
     #[serde(other)]
     Other,
@@ -30,7 +31,7 @@ enum BlockKind {
     Other,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct Origin {
     #[serde(default)]
     kind: OriginKind,
@@ -59,6 +60,17 @@ enum Message {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Attached {
+    QueuedCommand {
+        prompt: Option<Wording>,
+        origin: Option<Origin>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Entry {
     #[serde(default, rename = "type")]
     kind: Kind,
@@ -70,6 +82,12 @@ pub struct Entry {
     timestamp: Option<Instant>,
     message: Option<Message>,
     origin: Option<Origin>,
+    attachment: Option<Attached>,
+}
+
+struct Heard {
+    origin: OriginKind,
+    text: Option<Body>,
 }
 
 struct Spoken {
@@ -86,16 +104,29 @@ impl OriginKind {
     }
 }
 
-impl Kind {
-    fn spoken(self, origin: Option<&Origin>, text: Option<Body>) -> Option<Spoken> {
+impl Attached {
+    fn heard(self) -> Heard {
         match self {
-            Kind::Assistant => text.map(|text| Spoken { author: Authorship::Lead, text }),
-            Kind::User => text.map(|text| Spoken {
-                author: origin.map_or(Authorship::Bystander, |found| found.kind.authorship()),
-                text,
-            }),
+            Attached::QueuedCommand { prompt, origin } => {
+                Heard { origin: origin.unwrap_or_default().kind, text: prompt.and_then(Wording::body) }
+            }
+            Attached::Other => Heard { origin: OriginKind::Other, text: None },
+        }
+    }
+}
+
+impl Heard {
+    fn author(&self, kind: Kind) -> Option<Authorship> {
+        match kind {
+            Kind::Assistant => Some(Authorship::Lead),
+            Kind::User | Kind::Attachment => Some(self.origin.authorship()),
             Kind::Other => None,
         }
+    }
+
+    fn spoken(self, kind: Kind) -> Option<Spoken> {
+        let author = self.author(kind)?;
+        self.text.map(|text| Spoken { author, text })
     }
 }
 
@@ -132,9 +163,18 @@ impl Message {
 
 impl Entry {
     pub fn line(mut self) -> Option<Line> {
-        let text = self.message.take().and_then(Message::body);
-        let spoken = self.kind.spoken(self.origin.as_ref(), text);
+        let spoken = self.voice().spoken(self.kind);
         self.heard(spoken)
+    }
+
+    fn voice(&mut self) -> Heard {
+        match self.attachment.take() {
+            Some(attached) => attached.heard(),
+            None => Heard {
+                origin: self.origin.take().unwrap_or_default().kind,
+                text: self.message.take().and_then(Message::body),
+            },
+        }
     }
 
     fn heard(self, spoken: Option<Spoken>) -> Option<Line> {
