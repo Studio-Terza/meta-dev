@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::path::Path;
 
 use console_ports::Variables;
+use design::Streams;
 use design::{Cli, Failure};
 use file_ports::{Bytes, Files, Memory};
 use port_core::{Rooting, Run};
@@ -44,6 +45,16 @@ impl Session {
         let Wire { kind, origin } = speaker.wire();
         format!(
             "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":\"{content}\"}}}}\n"
+        )
+    }
+
+    fn answered() -> Session {
+        Session::working(
+            [
+                Session::line(Speaker::Owner, "o1", "null", "question"),
+                Session::line(Speaker::Lead, "l1", "\"o1\"", "answer"),
+            ]
+            .concat(),
         )
     }
 
@@ -93,14 +104,55 @@ fn ingest_counts_each_authorship_form_and_relation() -> Result<(), Failure> {
     Ok(())
 }
 
+struct Captured {
+    out: String,
+    err: String,
+}
+
+struct Rooted;
+
+impl Rooted {
+    fn streams(session: &Session, arguments: &[&str]) -> Captured {
+        let environment: Variables = [("HOME", HOME), ("PWD", "/work")]
+            .map(|(name, value)| (OsString::from(name), OsString::from(value)))
+            .into_iter()
+            .collect();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let _ = Cli::new(&environment, session.files()).rooted(
+            Rooting::Shared,
+            arguments.iter().map(OsString::from),
+            &mut Streams::new(&mut out, &mut err),
+        );
+        Captured { out: String::from_utf8(out).unwrap_or_default(), err: String::from_utf8(err).unwrap_or_default() }
+    }
+}
+
+#[test]
+fn a_rooted_run_writes_its_report_to_out() {
+    let captured = Rooted::streams(&Session::typical(), &["ingest"]);
+    assert!(captured.out.contains("authorship owner 2\n"));
+    assert_eq!(captured.err, "");
+}
+
+#[test]
+fn a_rooted_run_that_fails_writes_the_failure_to_err() {
+    let captured = Rooted::streams(&Session::typical(), &["show", "nobody"]);
+    assert_eq!(captured.out, "");
+    assert!(captured.err.contains("no message nobody"));
+}
+
+#[test]
+fn show_lists_the_links_that_touch_the_message() -> Result<(), Failure> {
+    let out = Invocation::output(&Session::answered(), &["show", "o1"])?;
+    assert!(out.contains("link l1 replies-to o1"));
+    let unrelated = Invocation::output(&Session::working(Session::typical().lines), &["show", "o2"])?;
+    assert_eq!(unrelated.matches("link").count(), 0);
+    Ok(())
+}
+
 #[test]
 fn ingest_counts_a_reply_once() -> Result<(), Failure> {
-    let lines = [
-        Session::line(Speaker::Owner, "o1", "null", "question"),
-        Session::line(Speaker::Lead, "l1", "\"o1\"", "answer"),
-    ]
-    .concat();
-    let out = Invocation::output(&Session::working(lines), &["ingest"])?;
+    let out = Invocation::output(&Session::answered(), &["ingest"])?;
     assert!(out.contains("relation replies-to 1\n"));
     Ok(())
 }
@@ -122,8 +174,10 @@ fn show_of_an_unknown_uuid_fails_naming_it() {
 #[test]
 fn the_workspace_flag_picks_the_projects_directory() -> Result<(), Failure> {
     let session = Session { directory: "/home/tester/.claude/projects/-other", lines: Session::typical().lines };
-    let out = Invocation::output(&session, &["ingest", "--workspace", "/other"])?;
-    assert!(out.contains("authorship owner 2\n"));
+    let after = Invocation::output(&session, &["ingest", "--workspace", "/other"])?;
+    let before = Invocation::output(&session, &["--workspace", "/other", "ingest"])?;
+    assert!(after.contains("authorship owner 2\n"));
+    assert_eq!(before, after);
     Ok(())
 }
 

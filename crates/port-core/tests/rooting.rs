@@ -17,3 +17,8 @@ fn a_sole_run_refuses_others_and_shared_runs_refuse_a_sole_one() {
     drop(second);
     assert!(Run::root(Rooting::Sole).is_ok());
 }
+
+#[test]
+fn a_refused_root_says_a_sole_run_is_the_reason() {
+    assert!(RootRefused.to_string().contains("sole run"));
+}

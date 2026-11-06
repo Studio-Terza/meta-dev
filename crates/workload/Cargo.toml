@@ -13,5 +13,8 @@ doctest = false
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 
+[dev-dependencies]
+laws = { path = "../laws" }
+
 [lints]
 workspace = true

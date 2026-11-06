@@ -150,6 +150,14 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
+    let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
+    let texts: Vec<String> = read.into_iter().map(|record| record.uuid().as_ref().to_owned()).collect();
+    assert_eq!(texts, ["abc"]);
+    Ok(())
+}
+
+#[test]
 fn a_session_is_listed_by_its_file_stem() {
     let sessions = Transcript::holding(&Lines::typed("1")).sessions();
     assert_eq!(sessions.iter().map(|session| session.stem().to_string()).collect::<Vec<_>>(), ["s1"]);

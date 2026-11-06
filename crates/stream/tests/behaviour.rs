@@ -6,7 +6,7 @@ use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Rooting, Run};
 use stream::{Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, ClaudeCodeDir, Transcripts};
+use transcript_ports::{Authorship, ClaudeCodeDir, Transcripts, Uuid};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
 const DIRECTORY: &str = "/projects/work";
@@ -143,6 +143,38 @@ impl Cases {
         Fixture::related(Relation::RepliesTo, &said)
     }
 }
+
+struct Touching;
+
+impl Touching {
+    fn linked(touched: &&str) -> Vec<String> {
+        Fixture::stream(&[
+            Say::new("o1", None, Authorship::Owner, "1. ask"),
+            Say::new("l1", Some("o1"), Authorship::Lead, "1. reply"),
+            Say::new("o2", Some("l1"), Authorship::Owner, "1. yes"),
+        ])
+        .map(|stream| {
+            stream
+                .links()
+                .iter()
+                .filter_map(|link| link.touching(&Uuid::new((*touched).to_owned())))
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+    }
+}
+
+laws::table!(
+    a_link_touches_the_messages_at_both_its_ends_and_their_segments,
+    Touching::linked,
+    [
+        "o1" => ["l1 replies-to o1"],
+        "o2" => ["o2 replies-to l1", "o2#0 answers l1#0"],
+        "l1" => ["l1 replies-to o1", "o2 replies-to l1", "o2#0 answers l1#0"],
+        "nobody" => Vec::<String>::new(),
+    ]
+);
 
 laws::law!(segments_tile_the_message_without_loss, "[ -~\n•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;

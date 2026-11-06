@@ -17,6 +17,15 @@ trait Transcripts {
     }
 }
 
+#[port]
+trait SessionCache {
+    fn clear(&self);
+}
+
+impl SessionCacheFiller for Memory {
+    fn clear(&self, _pass: Pass<'_, session_cache_ops::Clear>) {}
+}
+
 #[derive(Debug, Default)]
 struct Memory {
     sessions: Mutex<Vec<Session>>,
@@ -143,4 +152,9 @@ laws::law!(a_snapshot_lists_ops_in_name_order, any::<(bool, bool)>(), which, {
 fn op_names_are_the_module_path_then_the_trait_and_method() {
     assert_eq!(Tally::named::<transcripts_ops::Sessions>(), "laws::transcripts_ops::Transcripts::sessions");
     assert_eq!(Tally::named::<transcripts_ops::ReadFrom>(), "laws::transcripts_ops::Transcripts::read_from");
+}
+
+#[test]
+fn a_two_word_trait_names_its_ops_module_in_snake_case() {
+    assert_eq!(Tally::named::<session_cache_ops::Clear>(), "laws::session_cache_ops::SessionCache::clear");
 }
