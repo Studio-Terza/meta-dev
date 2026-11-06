@@ -1,4 +1,3 @@
-mod need;
 mod obligation;
 mod pair;
 
@@ -9,7 +8,6 @@ use crate::coverage::Coverage;
 use crate::subject::Subject;
 use lint_core::{Site, Violation};
 use lint_layout::{Name, Word, words};
-use need::Need;
 use obligation::Obligation;
 use pair::Pair;
 
@@ -23,7 +21,6 @@ pub(crate) struct Facets<'file> {
 impl<'file> Facets<'file> {
     const TRAIT_PAIRS: [[Word<'static>; 2]; 2] = [words!["Display", "FromStr"], words!["Serialize", "Deserialize"]];
     const METHOD_PAIR: [Word<'static>; 2] = words!["encode", "decode"];
-    const ORDERS: [Word<'static>; 2] = words!["Ord", "PartialEq"];
     const TO: Word<'static> = Word::new("to");
     const FROM: Word<'static> = Word::new("from");
 
@@ -61,28 +58,19 @@ impl<'file> Facets<'file> {
             .count();
         let unwitnessed =
             methods.iter().filter(|pair| roundtrips.iter().find_map(|mentions| pair.witnessed_by(mentions)).is_none());
-        let unspared = self.trait_needs().into_iter().skip(spare);
-        let law = Self::ORDERS.iter().find_map(|order| self.known(*order)).map(|_| Need::Law);
-        let unlawed = law.filter(|_| coverage.naming(subject).is_empty());
+        let unspared = Self::TRAIT_PAIRS
+            .iter()
+            .filter_map(|[left, right]| Some(Pair::new(self.known(*left)?, self.known(*right)?)))
+            .skip(spare);
         unwitnessed
             .copied()
-            .map(Need::Roundtrip)
             .chain(unspared)
-            .chain(unlawed)
-            .map(|need| Violation::new(self.site, Obligation::new(subject, need)))
+            .map(|pair| Violation::new(self.site, Obligation::new(subject, pair)))
             .collect()
     }
 
     fn known(&self, fact: Word<'_>) -> Option<&Name> {
         self.facts.get(&Name::from(fact))
-    }
-
-    fn trait_needs(&self) -> Vec<Need<'_>> {
-        Self::TRAIT_PAIRS
-            .iter()
-            .filter_map(|[left, right]| Some(Pair::new(self.known(*left)?, self.known(*right)?)))
-            .map(Need::Roundtrip)
-            .collect()
     }
 
     fn method_pairs(&self) -> BTreeSet<Pair<'_>> {
@@ -99,7 +87,7 @@ impl<'file> Facets<'file> {
             .iter()
             .filter_map(|fact| {
                 let words = fact.words();
-                words.first().filter(|first| **first == lead)?;
+                words.first().filter(|first| **first == Name::from(lead))?;
                 Some((words.into_iter().skip(1).collect(), fact))
             })
             .collect()

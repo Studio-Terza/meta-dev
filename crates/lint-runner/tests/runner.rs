@@ -54,16 +54,18 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl ModelLint for")?
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
     let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner = ["::report(readout.files())", "flows.report::<", "::dirty(&system)"]
-        .iter()
-        .map(|call| runner.matches(call).count())
-        .sum::<usize>();
+    let listed_by_the_runner =
+        ["::report(readout.files())", "flows.report::<", "::dirty(&system)", "ModelLint>::report"]
+            .iter()
+            .map(|call| runner.matches(call).count())
+            .sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&system)"]
@@ -546,7 +548,7 @@ fn a_library_outside_src_is_judged_and_named_by_its_root_file() -> Result<(), Bo
     root.write("code/lib.rs", &format!("pub mod a;\n{ring}"))?;
     root.write("code/a.rs", CHAIN_A)?;
     let named = format!("{}:1", root.at("code/lib.rs").display());
-    assert_eq!(root.crate_graph_lines()?, [named.as_str()]);
+    assert_eq!(root.crate_graph_lines()?, Lines::from([named.as_str()]));
     Ok(())
 }
 

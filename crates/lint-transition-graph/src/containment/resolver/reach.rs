@@ -47,7 +47,7 @@ impl<'place, 'found> Reach<'place, 'found> {
     fn head_of(&self, head: &Name) -> Head<'found> {
         Head::KEYWORDS
             .into_iter()
-            .find(|(keyword, _)| *head == *keyword)
+            .find(|(keyword, _)| *head == Name::from(*keyword))
             .map(|(_, kind)| kind)
             .or_else(|| self.place.scope().module_root(head).map(|_| Head::Local))
             .or_else(|| {

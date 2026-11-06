@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fmt;
 
 use crate::cli::command::step::seconds::Seconds;
@@ -17,12 +16,6 @@ impl Entry {
 
     pub(super) fn took(&self) -> Seconds {
         self.seconds
-    }
-}
-
-impl PartialOrd for Entry {
-    fn partial_cmp(&self, other: &Entry) -> Option<Ordering> {
-        self.seconds.partial_cmp(&other.seconds)
     }
 }
 

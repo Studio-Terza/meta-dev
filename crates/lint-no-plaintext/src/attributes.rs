@@ -42,7 +42,7 @@ impl Attributes {
     fn nested(meta: &Meta, name: Word<'_>) -> Vec<Meta> {
         meta.require_list()
             .ok()
-            .filter(|list| list.path.get_ident().is_some_and(|ident| Name::from(ident) == name))
+            .filter(|list| list.path.get_ident().is_some_and(|ident| Name::from(ident) == Name::from(name)))
             .and_then(|list| list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated).ok())
             .map(|parsed| parsed.into_iter().collect())
             .unwrap_or_default()

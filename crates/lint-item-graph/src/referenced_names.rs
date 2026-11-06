@@ -88,7 +88,7 @@ impl ReferencedNames {
     }
 
     fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
-        owner.filter(|owner| *owner != Self::UNNAMED).map_or_else(ReferencedNames::default, |owner| {
+        owner.filter(|owner| *owner != Name::from(Self::UNNAMED)).map_or_else(ReferencedNames::default, |owner| {
             Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
         })
     }

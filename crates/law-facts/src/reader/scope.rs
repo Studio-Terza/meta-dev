@@ -26,7 +26,7 @@ impl Scope {
 
     pub(crate) fn named(&self, written: &Name) -> Option<Name> {
         Some(written)
-            .filter(|name| **name != Self::SELF)
+            .filter(|name| **name != Name::from(Self::SELF))
             .map(|name| self.uses.import(name).map_or(name, Import::name))
             .or(self.self_type.as_ref())
             .cloned()

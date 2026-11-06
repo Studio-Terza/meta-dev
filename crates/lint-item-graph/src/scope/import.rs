@@ -28,13 +28,13 @@ impl<'file> Import<'file> {
         path.pop().map(|leaf| Import { leaf, path, original: leaf })
     }
 
-    pub fn names<Spelled: PartialEq<Ident>>(&self, name: &Spelled) -> Option<&Import<'file>> {
-        (*name == *self.leaf).then_some(self)
+    pub fn names(&self, name: &Name) -> Option<&Import<'file>> {
+        (*name == Name::from(self.leaf)).then_some(self)
     }
 
-    pub fn rooted_in(&self, local_roots: &BTreeSet<Name>) -> Option<&Import<'file>> {
+    pub fn rooted_in(&self, local_roots: &BTreeSet<Name>) -> Option<&'file Ident> {
         let root = self.path.first().copied().unwrap_or(self.original);
-        local_roots.iter().any(|local| *local == *root).then_some(self)
+        local_roots.get(&Name::from(root)).map(|_| root)
     }
 
     pub fn original(&self) -> &'file Ident {

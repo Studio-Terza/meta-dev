@@ -22,9 +22,8 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
         .iter()
         .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
         .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
-    let differences: Vec<String> =
-        outputs.iter().filter_map(|(fixture, output)| Corpus::difference(fixture, output)).collect();
-    assert_eq!(differences, Vec::<String>::new());
+    let drifted: Vec<String> = outputs.iter().flat_map(|(fixture, output)| Corpus::verify(fixture, output)).collect();
+    assert_eq!(drifted, Vec::<String>::new());
     let printed: Vec<&str> = outputs
         .iter()
         .flat_map(|(_, output)| Lines::from(output.as_str()))
@@ -72,14 +71,12 @@ impl Corpus {
     }
 
     fn lints() -> usize {
-        [
-            include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count(),
-            include_str!("../src/cli/mode/lints.rs").matches("flows.report::<").count(),
-            include_str!("../src/cli/mode/lints.rs").matches("::dirty(&system)").count(),
-            include_str!("../src/cli/mode.rs").matches("::report(files)").count(),
-        ]
-        .iter()
-        .sum()
+        let runner = include_str!("../src/cli/mode/lints.rs");
+        ["::report(readout.files())", "flows.report::<", "::dirty(&system)", "ModelLint>::report"]
+            .iter()
+            .map(|call| runner.matches(call).count())
+            .sum::<usize>()
+            + include_str!("../src/cli/mode.rs").matches("::report(files)").count()
     }
 
     fn is_violation(line: &str) -> bool {
@@ -97,8 +94,12 @@ impl Corpus {
             .filter(|fix| fix.chars().filter(|letter| letter.is_whitespace()).count() < fix.chars().count())
     }
 
-    fn difference(fixture: &Path, output: &str) -> Option<String> {
+    fn verify(fixture: &Path, output: &str) -> Vec<String> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        golden::golden!(format!("lints/{name}.txt"), output).err().map(|failure| format!("{failure:?}"))
+        golden::verdict!(format!("lints/{name}.txt"), output)
+            .err()
+            .into_iter()
+            .map(|failure| failure.to_string())
+            .collect()
     }
 }

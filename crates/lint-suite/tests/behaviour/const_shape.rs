@@ -9,10 +9,10 @@ const NESTED: &str = "pub struct A;\nconst _: () = {\n    impl A {\n        pub 
 fn non_test_modules_are_checked_and_const_context_stays_in_its_function() {
     let files = [Sources::file("a.rs", Text::new(NOT_TEST))];
     let report = ConstShape::report(&files);
-    assert_eq!(Sources::lines(&report), ["a.rs:3"]);
+    assert_eq!(Sources::lines(&report), Lines::from(["a.rs:3"]));
     let files = [Sources::file("a.rs", Text::new(NESTED))];
     let report = ConstShape::report(&files);
-    assert_eq!(Sources::lines(&report), ["a.rs:4"]);
+    assert_eq!(Sources::lines(&report), Lines::from(["a.rs:4"]));
 }
 
 const BOUNDARY_CAST: &str = "fn f(x: u8) -> u32 { x as u32 }\n";

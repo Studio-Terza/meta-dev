@@ -21,7 +21,6 @@ const UNIT_SHAPE: Source = Source::new(
     ),
 );
 
-const NONE: [&str; 0] = [];
 const NESTED: &str = "fn f() {\n    mod inner {\n        states::states! {\n            #[derive()]\n            mod door {\n                start Open { shut -> Shut, }\n                terminal Shut {}\n                state Lost {}\n            }\n        }\n    }\n}\n";
 const UNREACHABLE: &str = "states! {\n    mod door {\n        start Open { shut -> Shut }\n        state Ajar { shut -> Shut }\n        terminal Shut {}\n    }\n}\n";
 const NO_START: &str =
@@ -291,20 +290,20 @@ fn state_graph_rules_are_flagged() {
 }
 
 laws::table!(declared_graphs_that_hold_pass, Sources::flagged::<StateGraph>, [
-    [Source::new(Located::new("a.rs"), Text::new(IN_TEST_MODULE))] => NONE,
-    [Source::new(Located::new("x/tests/a.rs"), Text::new(UNREACHABLE))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(OTHER_MACRO))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(OTHER_RENAME))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(THE_DEFINITION))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(IN_TEST_MODULE))] => Lines::default(),
+    [Source::new(Located::new("x/tests/a.rs"), Text::new(UNREACHABLE))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_MACRO))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(OTHER_RENAME))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(THE_DEFINITION))] => Lines::default(),
 ]);
 
 laws::table!(declared_graphs_that_break_are_flagged, Sources::flagged::<StateGraph>, [
-    [Source::new(Located::new("a.rs"), Text::new(NESTED))] => ["a.rs:8", "a.rs:8"],
-    [Source::new(Located::new("a.rs"), Text::new(NO_START))] => ["a.rs:3", "a.rs:4"],
-    [Source::new(Located::new("a.rs"), Text::new(NO_TERMINAL))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(NOT_A_GRAPH))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => ["a.rs:5", "a.rs:5"],
-    [Source::new(Located::new("a.rs"), Text::new(GROUPED_ALIAS))] => ["a.rs:6", "a.rs:6"],
-    [Source::new(Located::new("a.rs"), Text::new(BEHIND_CFG_IF))] => ["a.rs:6", "a.rs:6"],
-    [Source::new(Located::new("a.rs"), Text::new(BEHIND_MACRO_RULES))] => ["a.rs:6", "a.rs:6"],
+    [Source::new(Located::new("a.rs"), Text::new(NESTED))] => Lines::from(["a.rs:8", "a.rs:8"]),
+    [Source::new(Located::new("a.rs"), Text::new(NO_START))] => Lines::from(["a.rs:3", "a.rs:4"]),
+    [Source::new(Located::new("a.rs"), Text::new(NO_TERMINAL))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(NOT_A_GRAPH))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(ALIASED))] => Lines::from(["a.rs:5", "a.rs:5"]),
+    [Source::new(Located::new("a.rs"), Text::new(GROUPED_ALIAS))] => Lines::from(["a.rs:6", "a.rs:6"]),
+    [Source::new(Located::new("a.rs"), Text::new(BEHIND_CFG_IF))] => Lines::from(["a.rs:6", "a.rs:6"]),
+    [Source::new(Located::new("a.rs"), Text::new(BEHIND_MACRO_RULES))] => Lines::from(["a.rs:6", "a.rs:6"]),
 ]);

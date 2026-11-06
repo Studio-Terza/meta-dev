@@ -30,7 +30,7 @@ impl<'file> Guards<'file> {
     pub fn scanned(files: &[&'file SourceFile]) -> Modules<'file> {
         let empty = Guards {
             path: Path::new(""),
-            module: Module::default(),
+            module: Module::UNPLACED,
             members: Members::default(),
             modules: Modules::default(),
         };
@@ -39,7 +39,7 @@ impl<'file> Guards<'file> {
             .fold(empty, |guards, file| {
                 let mut next = Guards { path: file.path(), module: Module::of_file(file), ..guards };
                 next.visit_file(file.syntax());
-                next.modules.file(mem::take(&mut next.module), mem::take(&mut next.members));
+                next.modules.file(mem::replace(&mut next.module, Module::UNPLACED), mem::take(&mut next.members));
                 next
             })
             .modules

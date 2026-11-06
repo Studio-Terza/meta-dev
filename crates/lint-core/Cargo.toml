@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+code-model = { path = "../code-model" }
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
 lint-placement = { path = "../lint-placement" }

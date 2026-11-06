@@ -33,7 +33,7 @@ impl<'file> ShapeIndex<'file> {
             owners: BTreeMap::new(),
             inners: Inners::gathered_from(files),
             homes: TypeHomes::declared_in(files),
-            home: Home::default(),
+            home: Home::NOWHERE,
             file: Path::new(""),
         };
         files.iter().fold(index, |index, file| index.reading(file))

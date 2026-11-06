@@ -4,4 +4,6 @@ report only, a paired API leaves the ending to every caller; write a guard whose
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 guard types are #[must_use]:
 src/unmarked.rs:1: Lock implements Drop; mark it #[must_use]
+a hand impl of a derivable std trait is prone to subtle bugs; derive it:
+src/no_drop.rs:2: hand impl of Clone for Plain; derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)
 fails

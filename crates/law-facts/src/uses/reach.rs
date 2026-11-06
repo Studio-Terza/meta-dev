@@ -12,7 +12,7 @@ impl Reach {
 
     pub(super) fn of_root(root: &Name) -> Reach {
         Some(root)
-            .filter(|root| Self::HOME_ROOTS.iter().all(|home_root| **root != *home_root))
+            .filter(|root| Self::HOME_ROOTS.iter().all(|home_root| **root != Name::from(*home_root)))
             .map_or(Reach::Home, |root| Reach::Crate(CrateName::from(root)))
     }
 

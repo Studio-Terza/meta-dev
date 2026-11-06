@@ -1,7 +1,6 @@
-use lint_fixtures::{Located, Source, Sources, Text};
+use lint_fixtures::{Lines, Located, Source, Sources, Text};
 use lint_raw_resources::RawResources;
 
-const NONE: [&str; 0] = [];
 const QUALIFIED: &str = "fn f() {\n    std::fs::remove_dir_all(\"x\");\n}\n";
 const FUNCTION_IMPORT: &str = "use std::env::temp_dir;\nfn f() {\n    temp_dir();\n}\n";
 const RENAMED: &str = "use std::mem::forget as leak;\nfn f(x: u8) {\n    leak(x);\n}\n";
@@ -28,31 +27,31 @@ const SIBLING_IMPORT: &str = "mod a {\n    pub use std::mem::forget;\n}\nmod b {
 const INLINE_OTHER: &str = "mod adapters {\n    fn f(x: u8) {\n        std::mem::forget(x);\n    }\n}\n";
 
 laws::table!(raw_calls_are_flagged, Sources::flagged::<RawResources>, [
-    [Source::new(Located::new("a.rs"), Text::new(FUNCTION_IMPORT))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(RENAMED))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(MODULE_RENAMED))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(GROUPED))] => ["a.rs:3", "a.rs:4", "a.rs:5"],
-    [Source::new(Located::new("a.rs"), Text::new(SELF_RENAMED))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(GLOB))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(AS_VALUE))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(IN_MACRO))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(IN_TEST_MODULE))] => ["a.rs:4"],
-    [Source::new(Located::new("x/tests/run.rs"), Text::new(QUALIFIED))] => ["x/tests/run.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(INLINE_OTHER))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(BARE_IN_PORTS))] => ["a.rs:5"],
-    [Source::new(Located::new("crates/x/src/ports.rs"), Text::new(QUALIFIED))] => ["crates/x/src/ports.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(RE_EXPORTED))] => ["a.rs:8"],
-    [Source::new(Located::new("a.rs"), Text::new(USE_AFTER))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(MACRO_GUARD))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(MACRO_RULES))] => ["a.rs:3"],
-    [Source::new(Located::new("a.rs"), Text::new(REPEAT_MACRO))] => ["a.rs:2"],
-    [Source::new(Located::new("a.rs"), Text::new(TYPE_ALIAS_CALL))] => ["a.rs:3"],
+    [Source::new(Located::new("a.rs"), Text::new(FUNCTION_IMPORT))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(RENAMED))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(MODULE_RENAMED))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(GROUPED))] => Lines::from(["a.rs:3", "a.rs:4", "a.rs:5"]),
+    [Source::new(Located::new("a.rs"), Text::new(SELF_RENAMED))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(GLOB))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(AS_VALUE))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(IN_MACRO))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(IN_TEST_MODULE))] => Lines::from(["a.rs:4"]),
+    [Source::new(Located::new("x/tests/run.rs"), Text::new(QUALIFIED))] => Lines::from(["x/tests/run.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(INLINE_OTHER))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(BARE_IN_PORTS))] => Lines::from(["a.rs:5"]),
+    [Source::new(Located::new("crates/x/src/ports.rs"), Text::new(QUALIFIED))] => Lines::from(["crates/x/src/ports.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(RE_EXPORTED))] => Lines::from(["a.rs:8"]),
+    [Source::new(Located::new("a.rs"), Text::new(USE_AFTER))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(MACRO_GUARD))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(MACRO_RULES))] => Lines::from(["a.rs:3"]),
+    [Source::new(Located::new("a.rs"), Text::new(REPEAT_MACRO))] => Lines::from(["a.rs:2"]),
+    [Source::new(Located::new("a.rs"), Text::new(TYPE_ALIAS_CALL))] => Lines::from(["a.rs:3"]),
 ]);
 
 laws::table!(other_calls_and_ports_are_not, Sources::flagged::<RawResources>, [
-    [Source::new(Located::new("a.rs"), Text::new(OWN_FORGET))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(INLINE_PORTS))] => NONE,
-    [Source::new(Located::new("a.rs"), Text::new(SIBLING_IMPORT))] => NONE,
-    [Source::new(Located::new("crates/x/src/ports/run.rs"), Text::new(GUARDED))] => NONE,
-    [Source::new(Located::new("crates/x/src/ports.rs"), Text::new(GUARDED))] => NONE,
+    [Source::new(Located::new("a.rs"), Text::new(OWN_FORGET))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(INLINE_PORTS))] => Lines::default(),
+    [Source::new(Located::new("a.rs"), Text::new(SIBLING_IMPORT))] => Lines::default(),
+    [Source::new(Located::new("crates/x/src/ports/run.rs"), Text::new(GUARDED))] => Lines::default(),
+    [Source::new(Located::new("crates/x/src/ports.rs"), Text::new(GUARDED))] => Lines::default(),
 ]);

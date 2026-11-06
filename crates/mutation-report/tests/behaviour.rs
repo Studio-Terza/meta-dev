@@ -120,7 +120,7 @@ fn the_report_lists_survivors_idle_tests_and_kills_that_no_golden_saw() -> Resul
     let checkout = Checkout::new()?;
     Shards::two(&checkout)?;
     assert_eq!(checkout.report(), Answer { exit: ExitCode::SUCCESS, err: String::new() });
-    golden::golden!("report.md", &checkout.markdown())?;
+    golden::golden!("report.md", &checkout.markdown());
     assert_eq!(
         checkout.json(),
         json!({
@@ -143,7 +143,7 @@ fn no_shards_gives_an_empty_report() -> Result<(), Box<dyn Error>> {
     checkout.write("shards/loose-file.json", "{}")?;
     checkout.write("bare/crates/empty/src/lib.rs", "")?;
     assert_eq!(checkout.report_of("shards", "bare").exit, ExitCode::SUCCESS);
-    golden::golden!("empty_report.md", &checkout.markdown())?;
+    golden::golden!("empty_report.md", &checkout.markdown());
     assert_eq!(checkout.field("mutants"), json!(0));
     Ok(())
 }
