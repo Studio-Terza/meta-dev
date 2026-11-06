@@ -61,6 +61,12 @@ const OTHER_TRAIT: &[Source] = &[Source::new(
         "#[port]\npub trait Store {\n    fn read(&self);\n}\npub struct Disk;\nimpl Default for Disk {\n    fn default() -> Disk {\n        std::fs::read(\"a\");\n        Disk\n    }\n}\n",
     ),
 )];
+const UNPORTED_FILLER: &[Source] = &[Source::new(
+    Located::new("crates/store-ports/src/lib.rs"),
+    Text::new(
+        "#[port]\npub trait Store {\n    fn read(&self);\n}\n#[deprecated]\npub trait Cache {\n    fn read(&self);\n}\npub struct Disk;\nimpl CacheFiller for Disk {\n    fn read(&self) {\n        std::fs::read(\"a\");\n    }\n}\n",
+    ),
+)];
 const IN_TESTS: &[Source] = &[Source::new(
     Located::new("crates/store-ports/src/lib.rs"),
     Text::new(
@@ -115,6 +121,7 @@ laws::table!(
         INHERENT => ["crates/store-ports/src/lib.rs:8"],
         FREE => ["crates/store-ports/src/load.rs:2"],
         OTHER_TRAIT => ["crates/store-ports/src/lib.rs:8"],
+        UNPORTED_FILLER => ["crates/store-ports/src/lib.rs:12"],
         IN_TESTS => Lines::default(),
         NO_PORT => Lines::default(),
     ]
