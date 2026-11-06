@@ -33,6 +33,12 @@ impl<'name> Key<'name> {
 }
 
 #[derive(Clone, Copy, Debug)]
+enum Sought<'name> {
+    Named(Key<'name>),
+    Unlisted,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(super) struct Keyed<'rows, Value> {
     key: Key<'rows>,
     value: Value,
@@ -96,7 +102,14 @@ impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
 }
 
 impl<'rows> Explicit<'rows> {
-    fn found(&self, key: Key<'_>, sight: Sight) -> View<'rows> {
+    fn found(&self, sought: Sought<'_>, sight: Sight) -> View<'rows> {
+        match sought {
+            Sought::Named(key) => self.named(key, sight),
+            Sought::Unlisted => View::ABSENT,
+        }
+    }
+
+    fn named(&self, key: Key<'_>, sight: Sight) -> View<'rows> {
         Layer::ORDER.iter().fold(View::ABSENT, |found, layer| found.or_else(|| layer.found(self, key, sight)))
     }
 }
@@ -120,8 +133,11 @@ impl<'rows> From<View<'rows>> for Exposed<'rows> {
 }
 
 impl<'rows> Exposed<'rows> {
-    fn found(&self, key: Key<'_>) -> View<'rows> {
-        self.names.get(&key).copied().unwrap_or(self.default)
+    fn found(&self, sought: Sought<'_>) -> View<'rows> {
+        match sought {
+            Sought::Named(key) => self.names.get(&key).copied().unwrap_or(self.default),
+            Sought::Unlisted => self.default,
+        }
     }
 }
 
@@ -137,8 +153,8 @@ impl<'rows> GlobView<'rows> {
         GlobView { id, visibility, exposed }
     }
 
-    fn found(&self, key: Key<'_>, sight: Sight) -> View<'rows> {
-        View::admitted(sight.admits(self.visibility), || self.exposed.found(key))
+    fn found(&self, sought: Sought<'_>, sight: Sight) -> View<'rows> {
+        View::admitted(sight.admits(self.visibility), || self.exposed.found(sought))
     }
 }
 
@@ -175,16 +191,17 @@ struct Level<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Level<'tables, 'rows> {
-    fn found(self, key: Key<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
-        let globbed = || self.globs(ignored).fold(View::ABSENT, |found, glob| found.union(glob.found(key, sight)));
-        self.explicit.found(key, sight).or_else(globbed)
+    fn found(self, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+        let globbed = || self.globs(ignored).fold(View::ABSENT, |found, glob| found.union(glob.found(sought, sight)));
+        self.explicit.found(sought, sight).or_else(globbed)
     }
 
     fn exposure(self, sight: Sight) -> Exposed<'rows> {
         let explicit = self.explicit.0.keys().map(|placed| placed.key);
         let globbed = self.globs(None).flat_map(|glob| glob.exposed.names.keys().copied());
         let keys: BTreeSet<Key<'rows>> = explicit.chain(globbed).collect();
-        keys.into_iter().map(|key| Keyed::new(key, self.found(key, sight, None))).collect()
+        let names = keys.into_iter().map(|key| (key, self.found(Sought::Named(key), sight, None))).collect();
+        Exposed { default: self.found(Sought::Unlisted, sight, None), names }
     }
 
     fn globs(self, ignored: Option<GlobId>) -> impl Iterator<Item = &'tables GlobView<'rows>> {
@@ -208,9 +225,9 @@ impl<'tables, 'rows> Names<'tables, 'rows> {
         rows.map(|((explicit, fixed), modules)| Level { explicit, fixed, modules })
     }
 
-    fn found(self, scope: ScopeId, key: Key<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+    fn found(self, scope: ScopeId, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
         match self.level(scope) {
-            Some(level) => level.found(key, sight, ignored),
+            Some(level) => level.found(sought, sight, ignored),
             None => View::CONFLICT,
         }
     }
@@ -247,6 +264,7 @@ impl<'rows> Tables<'rows> {
     }
 
     pub(super) fn found(&self, scope: ScopeId, key: Key<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
-        Names { explicit: &self.explicit, fixed: &self.fixed, modules: &self.modules }.found(scope, key, sight, ignored)
+        let names = Names { explicit: &self.explicit, fixed: &self.fixed, modules: &self.modules };
+        names.found(scope, Sought::Named(key), sight, ignored)
     }
 }

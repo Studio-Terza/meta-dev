@@ -41,6 +41,10 @@ const GLOB_BENEATH_IMPORT: &str =
 const GLOB_BENEATH_DECLARED: &str = "use std::fmt::*;\ntrait Debug {}\nimpl Debug for R {}\nimpl Display for R {}\n";
 const GLOB_THROUGH_GLOB: &str =
     "mod a {\n    pub mod b {\n        pub trait T {}\n    }\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_CARRIES_EXPANSION: &str = "mod hash {\n    array_impl!(1, 2);\n}\npub use hash::*;\nimpl Clone for R {}\n";
+const GLOB_CARRIES_EXPANSION_ABOVE: &str =
+    "pin_project! {\n    struct Limited {}\n}\nmod tests {\n    use super::*;\n    impl Debug for R {}\n}\n";
+const GLOB_CARRIES_EXTERNAL: &str = "mod rejection {\n    pub use axum_core::extract::rejection::*;\n}\nuse crate::rejection::*;\nimpl Clone for R {}\n";
 const DECLARED_KINDS: &str = "struct Clone;\nenum Eq {}\nunion Copy {\n    a: u8,\n}\ntype Default = u8;\ntrait Hash = Sized;\nimpl Clone for R {}\nimpl Eq for R {}\nimpl Copy for R {}\nimpl Default for R {}\nimpl Hash for R {}\n";
 
 const MACRO_CALL: &str = "make!();\nimpl Clone for R {}\n";
@@ -357,6 +361,12 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
     PATH_RESTRICTED => [Expect::krate(&["crate", "a", "T"])],
+]);
+
+laws::table!(a_glob_carries_the_hidden_names_of_its_module, |text: &&str| Read::resolved(text), [
+    GLOB_CARRIES_EXPANSION => [Expect::unknown(&["Clone"])],
+    GLOB_CARRIES_EXPANSION_ABOVE => [Expect::unknown(&["Debug"])],
+    GLOB_CARRIES_EXTERNAL => [Expect::unknown(&["Clone"])],
 ]);
 
 laws::table!(an_extern_crate_item_binds_its_name, |text: &&str| Read::resolved(text), [
