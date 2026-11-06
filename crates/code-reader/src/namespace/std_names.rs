@@ -32,8 +32,23 @@ impl StdGlob {
 
     fn exported(&self, module: &ItemPath, name: &Name) -> Globbed {
         match name.matches::<Whole>(self.names) {
-            Some(_) => Globbed::Present(Binding::Std(module.as_ref().iter().cloned().chain([name.clone()]).collect())),
+            Some(_) => Globbed::Present(Binding::Std(module.joined(name))),
             None => Globbed::Absent,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Table {
+    Prelude,
+    Derives,
+}
+
+impl Table {
+    fn names(self) -> &'static [Canonical] {
+        match self {
+            Table::Prelude => &StdNames::PRELUDE,
+            Table::Derives => &StdNames::DERIVES,
         }
     }
 }
@@ -82,6 +97,17 @@ impl StdNames {
         Canonical::new(Word::new("string"), Word::new("String")),
         Canonical::new(Word::new("string"), Word::new("ToString")),
         Canonical::new(Word::new("vec"), Word::new("Vec")),
+    ];
+    const DERIVES: [Canonical; 9] = [
+        Canonical::new(Word::new("clone"), Word::new("Clone")),
+        Canonical::new(Word::new("marker"), Word::new("Copy")),
+        Canonical::new(Word::new("fmt"), Word::new("Debug")),
+        Canonical::new(Word::new("default"), Word::new("Default")),
+        Canonical::new(Word::new("cmp"), Word::new("Eq")),
+        Canonical::new(Word::new("hash"), Word::new("Hash")),
+        Canonical::new(Word::new("cmp"), Word::new("Ord")),
+        Canonical::new(Word::new("cmp"), Word::new("PartialEq")),
+        Canonical::new(Word::new("cmp"), Word::new("PartialOrd")),
     ];
     const STD_GLOBS: [StdGlob; 4] = [
         StdGlob {
@@ -139,8 +165,8 @@ impl StdNames {
         first.matches::<Whole>(&Self::STD_ROOTS).map(|_| Binding::Std(ItemPath::from_iter([Name::from(Self::STD)])))
     }
 
-    pub(super) fn prelude(only: &Name) -> Option<&'static Canonical> {
-        Self::PRELUDE.iter().find(|canonical| only.matches::<Whole>(&[canonical.name]).is_some())
+    pub(super) fn canonical(table: Table, only: &Name) -> Option<&'static Canonical> {
+        table.names().iter().find(|canonical| only.matches::<Whole>(&[canonical.name]).is_some())
     }
 
     pub(super) fn globbed(module: &ItemPath, name: &Name) -> Globbed {

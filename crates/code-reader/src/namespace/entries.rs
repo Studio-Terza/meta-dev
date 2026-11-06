@@ -1,44 +1,101 @@
-use syn::{Ident, Item, ItemMacro, ItemUse, Stmt};
+use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Stmt, VisRestricted};
 
+use code_model::ItemPath;
 use lint_layout::Name;
 
+use super::anchor::Anchor;
 use super::binding::{Binding, Globbed};
 use super::boundary::ScopeId;
 use super::resolver::Walk;
-use super::use_path::UsePath;
+use super::use_path::{Leaf, UsePath};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Visibility {
     Private,
     Visible,
+    Restricted,
 }
 
 impl From<&syn::Visibility> for Visibility {
     fn from(visibility: &syn::Visibility) -> Visibility {
         match visibility {
             syn::Visibility::Inherited => Visibility::Private,
-            syn::Visibility::Public(_) | syn::Visibility::Restricted(_) => Visibility::Visible,
+            syn::Visibility::Public(_) => Visibility::Visible,
+            syn::Visibility::Restricted(restricted) => Visibility::from(restricted),
+        }
+    }
+}
+
+impl From<&VisRestricted> for Visibility {
+    fn from(restricted: &VisRestricted) -> Visibility {
+        restricted
+            .in_token
+            .map(|_| Visibility::Restricted)
+            .or_else(|| {
+                restricted.path.get_ident().map(Name::from).as_ref().and_then(Anchor::spelled).map(Visibility::from)
+            })
+            .unwrap_or(Visibility::Restricted)
+    }
+}
+
+impl Visibility {
+    fn seen(self, via: Via) -> Admission {
+        match self {
+            Visibility::Private => Admission::Hidden,
+            Visibility::Visible => Admission::Shown,
+            Visibility::Restricted => via.restricted(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Reach {
-    Inside,
-    Outside,
+pub(crate) enum Via {
+    Path,
+    Glob,
 }
 
-impl Reach {
-    const EVERY: [Visibility; 2] = [Visibility::Private, Visibility::Visible];
-    const PUBLIC: [Visibility; 1] = [Visibility::Visible];
-
-    pub(super) fn seen(self) -> &'static [Visibility] {
+impl Via {
+    fn restricted(self) -> Admission {
         match self {
-            Reach::Inside => &Self::EVERY,
-            Reach::Outside => &Self::PUBLIC,
+            Via::Path => Admission::Shown,
+            Via::Glob => Admission::Obscured,
+        }
+    }
+
+    pub(super) fn outside(self) -> Sight {
+        match self {
+            Via::Path => Sight::ByPath,
+            Via::Glob => Sight::ByGlob,
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Sight {
+    Inside,
+    ByPath,
+    ByGlob,
+}
+
+impl Sight {
+    fn admits(self, visibility: Visibility) -> Admission {
+        match self {
+            Sight::Inside => Admission::Shown,
+            Sight::ByPath => visibility.seen(Via::Path),
+            Sight::ByGlob => visibility.seen(Via::Glob),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Admission {
+    Hidden,
+    Shown,
+    Obscured,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ItemId(usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DeclaredKind {
@@ -48,11 +105,11 @@ pub(crate) enum DeclaredKind {
 }
 
 impl DeclaredKind {
-    fn bound(self, level: ScopeId, name: &Name) -> Binding {
+    fn bound(self, level: ScopeId, item: ItemId) -> Binding {
         match self {
             DeclaredKind::Module(module) => Binding::Module(module),
             DeclaredKind::OpaqueModule => Binding::Unknown,
-            DeclaredKind::Item => Binding::Item(level, name.clone()),
+            DeclaredKind::Item => Binding::Item(level, item),
         }
     }
 }
@@ -60,23 +117,34 @@ impl DeclaredKind {
 #[derive(Clone, Copy, Debug)]
 enum Tally {
     Zero,
-    One(DeclaredKind),
+    One(DeclaredKind, ItemId),
     Many,
+    Blurred,
 }
 
 impl Tally {
-    fn counted(self, kind: DeclaredKind) -> Tally {
-        match self {
-            Tally::Zero => Tally::One(kind),
-            Tally::One(_) | Tally::Many => Tally::Many,
+    fn admitted(self, admission: Admission, kind: DeclaredKind, item: ItemId) -> Tally {
+        match admission {
+            Admission::Hidden => self,
+            Admission::Shown => self.shown(kind, item),
+            Admission::Obscured => Tally::Blurred,
         }
     }
 
-    fn globbed(self, level: ScopeId, name: &Name) -> Globbed {
+    fn shown(self, kind: DeclaredKind, item: ItemId) -> Tally {
+        match self {
+            Tally::Zero => Tally::One(kind, item),
+            Tally::One(..) | Tally::Many => Tally::Many,
+            Tally::Blurred => Tally::Blurred,
+        }
+    }
+
+    fn globbed(self, level: ScopeId) -> Globbed {
         match self {
             Tally::Zero => Globbed::Absent,
-            Tally::One(kind) => Globbed::Present(kind.bound(level, name)),
+            Tally::One(kind, item) => Globbed::Present(kind.bound(level, item)),
             Tally::Many => Globbed::Present(Binding::Unknown),
+            Tally::Blurred => Globbed::Opaque,
         }
     }
 }
@@ -93,18 +161,6 @@ impl Declared {
         Declared { name, visibility, kind }
     }
 
-    fn of_item(item: &Item) -> Option<Declared> {
-        match item {
-            Item::Struct(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Enum(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Union(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Type(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Trait(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::TraitAlias(declared) => Some(Declared::named_item(&declared.ident, &declared.vis)),
-            _ => None,
-        }
-    }
-
     fn named_item(ident: &Ident, visibility: &syn::Visibility) -> Declared {
         Declared { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item }
     }
@@ -117,17 +173,10 @@ pub(crate) enum Imported {
 }
 
 impl Imported {
-    fn import(&self, visibility: Visibility) -> Option<Import> {
+    fn entries(self, visibility: Visibility) -> Entries {
         match self {
-            Imported::Named(name, path) => Some(Import { name: name.clone(), path: path.clone(), visibility }),
-            Imported::Glob(_) => None,
-        }
-    }
-
-    fn glob(&self, visibility: Visibility) -> Option<Glob> {
-        match self {
-            Imported::Named(..) => None,
-            Imported::Glob(path) => Some(Glob { source: GlobSource::Path(path.clone()), visibility }),
+            Imported::Named(name, path) => Entries::from(Import { name, path, visibility }),
+            Imported::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
         }
     }
 }
@@ -137,6 +186,48 @@ struct Import {
     name: Name,
     path: UsePath,
     visibility: Visibility,
+}
+
+#[derive(Debug)]
+struct Extern {
+    name: Name,
+    visibility: Visibility,
+    krate: Name,
+}
+
+impl Extern {
+    fn binding(declared: &ItemExternCrate) -> Option<Extern> {
+        declared
+            .rename
+            .iter()
+            .map(|(_, renamed)| renamed)
+            .chain([&declared.ident])
+            .next()
+            .map(Name::from)
+            .and_then(|name| Leaf::from(name).standalone())
+            .map(|name| Extern {
+                name,
+                visibility: Visibility::from(&declared.vis),
+                krate: Name::from(&declared.ident),
+            })
+    }
+
+    fn found(externs: &[Extern], name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
+        externs
+            .iter()
+            .filter(|external| external.name == *name)
+            .map(|external| {
+                Globbed::admitted(sight.admits(external.visibility), || Globbed::Present(external.bound(walk)))
+            })
+            .fold(Globbed::Absent, Globbed::joined)
+    }
+
+    fn bound(&self, walk: &Walk<'_>) -> Binding {
+        match Anchor::spelled(&self.krate) {
+            Some(Anchor::Module) => Binding::from(Anchor::Crate.anchored(walk.space().anchors(walk.scope()))),
+            _ => walk.space().global(&self.krate),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -162,26 +253,21 @@ struct Glob {
 
 impl Glob {
     const EXPANSION: Glob = Glob { source: GlobSource::Expansion, visibility: Visibility::Visible };
-
-    fn of_item(item: &Item) -> Option<Glob> {
-        match item {
-            Item::Macro(ItemMacro { ident: None, .. }) => Some(Glob::EXPANSION),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Default)]
 struct Declarations(Vec<Declared>);
 
 impl Declarations {
-    fn found(&self, level: ScopeId, name: &Name, seen: &[Visibility]) -> Globbed {
+    fn found(&self, level: ScopeId, name: &Name, sight: Sight) -> Globbed {
         self.0
             .iter()
-            .filter(|declared| declared.name == *name)
-            .filter(|declared| seen.contains(&declared.visibility))
-            .fold(Tally::Zero, |tally, declared| tally.counted(declared.kind))
-            .globbed(level, name)
+            .enumerate()
+            .filter(|(_, declared)| declared.name == *name)
+            .fold(Tally::Zero, |tally, (index, declared)| {
+                tally.admitted(sight.admits(declared.visibility), declared.kind, ItemId(index))
+            })
+            .globbed(level)
     }
 }
 
@@ -189,12 +275,13 @@ impl Declarations {
 struct Imports(Vec<Import>);
 
 impl Imports {
-    fn found(&self, name: &Name, seen: &[Visibility], walk: &Walk<'_>) -> Globbed {
+    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
         self.0
             .iter()
             .filter(|import| import.name == *name)
-            .filter(|import| seen.contains(&import.visibility))
-            .map(|import| Globbed::Present(walk.path(&import.path)))
+            .map(|import| {
+                Globbed::admitted(sight.admits(import.visibility), || Globbed::Present(walk.path(&import.path)))
+            })
             .fold(Globbed::Absent, Globbed::joined)
     }
 }
@@ -203,11 +290,10 @@ impl Imports {
 struct Globs(Vec<Glob>);
 
 impl Globs {
-    fn found(&self, name: &Name, seen: &[Visibility], walk: &Walk<'_>) -> Globbed {
+    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
         self.0
             .iter()
-            .filter(|glob| seen.contains(&glob.visibility))
-            .map(|glob| glob.source.globbed(name, walk))
+            .map(|glob| Globbed::admitted(sight.admits(glob.visibility), || glob.source.globbed(name, walk)))
             .fold(Globbed::Absent, Globbed::joined)
     }
 }
@@ -216,31 +302,64 @@ impl Globs {
 pub(crate) struct Entries {
     declared: Declarations,
     imports: Imports,
+    externs: Vec<Extern>,
     globs: Globs,
+}
+
+impl From<Declared> for Entries {
+    fn from(declared: Declared) -> Entries {
+        Entries { declared: Declarations(vec![declared]), ..Entries::default() }
+    }
+}
+
+impl From<Import> for Entries {
+    fn from(import: Import) -> Entries {
+        Entries { imports: Imports(vec![import]), ..Entries::default() }
+    }
+}
+
+impl From<Glob> for Entries {
+    fn from(glob: Glob) -> Entries {
+        Entries { globs: Globs(vec![glob]), ..Entries::default() }
+    }
+}
+
+impl From<Option<Extern>> for Entries {
+    fn from(external: Option<Extern>) -> Entries {
+        Entries { externs: external.into_iter().collect(), ..Entries::default() }
+    }
+}
+
+impl From<&ItemUse> for Entries {
+    fn from(used: &ItemUse) -> Entries {
+        let visibility = Visibility::from(&used.vis);
+        UsePath::imported(used)
+            .into_iter()
+            .map(|imported| imported.entries(visibility))
+            .fold(Entries::default(), Entries::merged)
+    }
+}
+
+impl From<&Item> for Entries {
+    fn from(item: &Item) -> Entries {
+        match item {
+            Item::Use(used) => Entries::from(used),
+            Item::ExternCrate(declared) => Entries::from(Extern::binding(declared)),
+            Item::Macro(ItemMacro { ident: None, .. }) => Entries::from(Glob::EXPANSION),
+            Item::Struct(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::Union(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::Type(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::Trait(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::TraitAlias(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            _ => Entries::default(),
+        }
+    }
 }
 
 impl Entries {
     pub(crate) fn of_items(items: &[Item]) -> Entries {
-        let uses: Vec<&ItemUse> = items.iter().filter_map(Entries::used).collect();
-        let imported: Vec<(Imported, Visibility)> = uses
-            .iter()
-            .flat_map(|used| {
-                UsePath::imported(used).into_iter().map(|imported| (imported, Visibility::from(&used.vis)))
-            })
-            .collect();
-        Entries {
-            declared: Declarations(items.iter().filter_map(Declared::of_item).collect()),
-            imports: Imports(
-                imported.iter().filter_map(|(imported, visibility)| imported.import(*visibility)).collect(),
-            ),
-            globs: Globs(
-                imported
-                    .iter()
-                    .filter_map(|(imported, visibility)| imported.glob(*visibility))
-                    .chain(items.iter().filter_map(Glob::of_item))
-                    .collect(),
-            ),
-        }
+        items.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
     }
 
     pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
@@ -252,37 +371,48 @@ impl Entries {
     }
 
     pub(super) fn found(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Globbed {
-        let seen = walk.seen(level);
+        let sight = walk.view(level);
         let at = walk.at_level(level);
-        self.declared
-            .found(level, name, seen)
-            .or_else(|| self.imports.found(name, seen, &at))
-            .or_else(|| self.globs.found(name, seen, &at))
+        let domain = walk.domain();
+        domain
+            .typed(|| self.declared.found(level, name, sight))
+            .or_else(|| self.imports.found(name, sight, &at))
+            .or_else(|| domain.typed(|| Extern::found(&self.externs, name, sight, &at)))
+            .or_else(|| self.globs.found(name, sight, &at))
+    }
+
+    pub(super) fn path_of(&self, item: ItemId, located: Option<ItemPath>) -> Option<ItemPath> {
+        let name = self.declared.0.get(item.0).map(|declared| &declared.name);
+        located.zip(name).map(|(path, name)| path.joined(name))
+    }
+
+    pub(super) fn within(&self, module: ScopeId, located: Option<ItemPath>) -> Option<ItemPath> {
+        let name = self
+            .declared
+            .0
+            .iter()
+            .find(|declared| declared.kind == DeclaredKind::Module(module))
+            .map(|declared| &declared.name);
+        located.zip(name).map(|(path, name)| path.joined(name))
+    }
+
+    pub(super) fn prelude(&self, name: &Name, walk: &Walk<'_>) -> Option<Binding> {
+        self.externs.iter().find(|external| external.name == *name).map(|external| external.bound(walk))
     }
 
     fn of_statement(statement: &Stmt) -> Entries {
         match statement {
-            Stmt::Item(item) => Entries::of_items(std::slice::from_ref(item)),
-            Stmt::Macro(_) => Entries::expanded(),
+            Stmt::Item(item) => Entries::from(item),
+            Stmt::Macro(_) => Entries::from(Glob::EXPANSION),
             Stmt::Local(_) | Stmt::Expr(..) => Entries::default(),
         }
-    }
-
-    fn expanded() -> Entries {
-        Entries { globs: Globs(vec![Glob::EXPANSION]), ..Entries::default() }
     }
 
     fn merged(mut self, other: Entries) -> Entries {
         self.declared.0.extend(other.declared.0);
         self.imports.0.extend(other.imports.0);
+        self.externs.extend(other.externs);
         self.globs.0.extend(other.globs.0);
         self
-    }
-
-    fn used(item: &Item) -> Option<&ItemUse> {
-        match item {
-            Item::Use(used) => Some(used),
-            _ => None,
-        }
     }
 }

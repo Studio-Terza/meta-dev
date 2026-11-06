@@ -1,6 +1,7 @@
 mod boundary;
 
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -11,7 +12,7 @@ use code_model::{Building, FileId, Found, Implementation, Model, Origin};
 use lint_layout::{LineNumber, Name};
 
 use crate::namespace::{
-    CrateForm, Declared, DeclaredKind, Entries, Namespace, Resolver, ScopeId, ScopeKind, UsePath, Visibility,
+    CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, ScopeId, ScopeKind, UsePath, Visibility,
 };
 use crate::planting::{Files, ReadFile};
 use boundary::SelfType;
@@ -20,7 +21,7 @@ use boundary::SelfType;
 struct Seat {
     file: FileId,
     scope: ScopeId,
-    children: PathBuf,
+    children: Rc<Path>,
 }
 
 #[derive(Debug)]
@@ -30,6 +31,7 @@ struct ImplRow {
     scope: ScopeId,
     subject: Name,
     implemented: Option<UsePath>,
+    domain: Domain,
     origin: Origin,
 }
 
@@ -41,6 +43,7 @@ impl ImplRow {
             scope: seat.scope,
             subject: SelfType::written(&block.self_ty),
             implemented: block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path)),
+            domain: Domain::Types,
             origin: Origin::Written,
         }
     }
@@ -52,12 +55,13 @@ impl ImplRow {
             scope: seat.scope,
             subject: Name::from(subject),
             implemented: Some(UsePath::from(path)),
+            domain: Domain::Macros,
             origin: Origin::Derived,
         }
     }
 
     fn built(self, resolver: &Resolver<'_>, mut building: Building) -> Building {
-        let implemented = self.implemented.map(|path| resolver.path_resolved(self.scope, &path));
+        let implemented = self.implemented.map(|path| resolver.path_resolved(self.scope, &path, self.domain));
         building.implementation(
             self.file,
             Found::new(self.line, Implementation::new(self.subject, implemented, self.origin)),
@@ -94,7 +98,7 @@ impl SlotForm {
 pub(crate) struct Slot {
     scope: ScopeId,
     name: Name,
-    children: PathBuf,
+    children: Rc<Path>,
     form: SlotForm,
     visibility: Visibility,
 }
@@ -117,7 +121,7 @@ impl Slot {
         Slot {
             scope: seat.scope,
             name: Name::from(&item.ident),
-            children: seat.children.clone(),
+            children: Rc::clone(&seat.children),
             form: SlotForm::from(item.attrs.as_slice()),
             visibility: Visibility::from(&item.vis),
         }
@@ -134,15 +138,14 @@ impl Lowered {
     pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<Name>, form: CrateForm) -> Vec<Slot> {
         let syntax = read.source().syntax();
         let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
-        let children = read.source().path().parent().map(Path::to_path_buf).unwrap_or_default();
+        let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
         self.lowered(Seat { file: read.file(), scope, children }, syntax)
     }
 
     pub(crate) fn planted(&mut self, slot: Slot, read: ReadFile<'_>) -> Vec<Slot> {
         let syntax = read.source().syntax();
-        let kind = ScopeKind::Module(slot.name.clone());
-        let scope = self.space.opened(slot.scope, kind, Entries::of_items(&syntax.items));
-        let children = slot.children.join(&slot.name);
+        let scope = self.space.opened(slot.scope, ScopeKind::Module, Entries::of_items(&syntax.items));
+        let children = Rc::from(slot.children.join(&slot.name));
         self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::Module(scope)));
         self.lowered(Seat { file: read.file(), scope, children }, syntax)
     }
@@ -181,7 +184,7 @@ struct Lowering<'low> {
 impl Lowering<'_> {
     const DERIVE: &'static str = "derive";
 
-    fn entered(&mut self, kind: ScopeKind, entries: Entries, children: PathBuf) -> Seat {
+    fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Rc<Path>) -> Seat {
         let scope = self.lowered.space.opened(self.here.scope, kind, entries);
         let inner = Seat { file: self.here.file, scope, children };
         std::mem::replace(&mut self.here, inner)
@@ -189,8 +192,8 @@ impl Lowering<'_> {
 
     fn module_visited(&mut self, item: &ItemMod, items: &[Item]) {
         let name = Name::from(&item.ident);
-        let outer =
-            self.entered(ScopeKind::Module(name.clone()), Entries::of_items(items), self.here.children.join(&name));
+        let children = Rc::from(self.here.children.join(&name));
+        let outer = self.entered(ScopeKind::Module, Entries::of_items(items), children);
         let module = Declared::new(name, Visibility::from(&item.vis), DeclaredKind::Module(self.here.scope));
         self.lowered.space.declare(outer.scope, module);
         visit::visit_item_mod(self, item);
@@ -220,7 +223,7 @@ impl<'ast> Visit<'ast> for Lowering<'_> {
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
-        let outer = self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children.clone());
+        let outer = self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), Rc::clone(&self.here.children));
         visit::visit_block(self, block);
         self.here = outer;
     }

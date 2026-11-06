@@ -44,7 +44,10 @@ const DIGEST_ROOT: &str = "mod digest;\nmod block;\n";
 const DIGEST: &str = "pub trait Hash {}\n";
 const BLOCK: &str = "use super::digest::*;\nstruct Block;\nimpl Hash for Block {}\n";
 
-const CASES: [Case; 25] = [
+const PRIVATE_GLOB: &str = "pub trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\npub struct R;\npub fn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
+const SELF_AS_CORE: &str = "extern crate self as core;\npub mod clone {\n    pub trait Clone {}\n}\npub struct R;\nimpl core::clone::Clone for R {}\n";
+
+const CASES: [Case; 27] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -178,6 +181,16 @@ const CASES: [Case; 25] = [
             Source::new(Located::new("src/digest.rs"), Text::new(DIGEST)),
             Source::new(Located::new("src/block.rs"), Text::new(BLOCK)),
         ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a trait behind a private import reached through a glob"),
+        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_GLOB))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a crate declared as core by extern crate self"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_AS_CORE))],
         Flagged::new(&[]),
     ),
 ];

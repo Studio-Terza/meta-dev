@@ -15,10 +15,9 @@ use lint_layout::Name;
 use anchor::Anchors;
 use binding::{Binding, Globbed};
 pub(crate) use boundary::ScopeId;
-use entries::Reach;
-pub(crate) use entries::{Declared, DeclaredKind, Entries, Visibility};
-pub(crate) use resolver::Resolver;
+pub(crate) use entries::{Declared, DeclaredKind, Entries, ItemId, Visibility};
 use resolver::Walk;
+pub(crate) use resolver::{Domain, Resolver};
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 use std_names::StdNames;
@@ -40,7 +39,7 @@ impl Namespace {
 
     pub(crate) fn opened(&mut self, parent: ScopeId, kind: ScopeKind, entries: Entries) -> ScopeId {
         let scope = ScopeId::after(&self.scopes);
-        let child = parent.row(&self.scopes).map(|row| kind.opened(row, scope, entries));
+        let child = parent.row(&self.scopes).map(|row| kind.opened(row, parent, scope, entries));
         self.scopes.extend(child);
         scope
     }
@@ -61,15 +60,24 @@ impl Namespace {
         scope.row(&self.scopes).map(ScopeRow::chain).unwrap_or_default()
     }
 
-    pub(super) fn located(&self, scope: ScopeId) -> ItemPath {
-        scope.row(&self.scopes).map(ScopeRow::located).cloned().unwrap_or_default()
+    pub(super) fn located(&self, scope: ScopeId) -> Option<ItemPath> {
+        scope.row(&self.scopes).map(ScopeRow::place).and_then(|place| place.located(self, scope))
     }
 
-    pub(super) fn reach(&self, level: ScopeId, from: ScopeId) -> Reach {
-        match from.row(&self.scopes).and_then(|row| row.ancestor(level)) {
-            Some(_) => Reach::Inside,
-            None => Reach::Outside,
-        }
+    pub(super) fn within(&self, above: ScopeId, scope: ScopeId) -> Option<ItemPath> {
+        above.row(&self.scopes).and_then(|row| row.entries().within(scope, self.located(above)))
+    }
+
+    pub(super) fn declared_path(&self, scope: ScopeId, item: ItemId) -> Option<ItemPath> {
+        scope.row(&self.scopes).and_then(|row| row.entries().path_of(item, self.located(scope)))
+    }
+
+    pub(super) fn prelude(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Option<Binding> {
+        level.row(&self.scopes).and_then(|row| row.entries().prelude(name, walk))
+    }
+
+    pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {
+        from.row(&self.scopes).and_then(|row| row.ancestor(level))
     }
 
     pub(super) fn level(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Globbed {
@@ -86,6 +94,6 @@ impl Namespace {
     pub(super) fn global(&self, first: &Name) -> Binding {
         StdNames::root(first)
             .or_else(|| self.workspace(first).map(Binding::Module))
-            .unwrap_or_else(|| Binding::External(ItemPath::from_iter([first.clone()])))
+            .unwrap_or_else(|| Binding::External(ItemPath::default().joined(first)))
     }
 }

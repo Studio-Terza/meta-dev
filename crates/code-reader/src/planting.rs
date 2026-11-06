@@ -52,6 +52,11 @@ impl<'read> Files<'read> {
         })
     }
 
+    fn rooted(self, lowered: &mut Lowered, root: ReadFile<'read>, name: Option<Name>) -> Files<'read> {
+        let slots = lowered.rooted(root, name, CrateForm::Planted);
+        self.filled(lowered, slots)
+    }
+
     fn slot_filled(&mut self, lowered: &mut Lowered, slot: Slot) {
         match slot.found(self) {
             Some(path) => self.planted_at(lowered, slot, &path),
@@ -82,12 +87,14 @@ impl<'read> CrateFiles<'read> {
     }
 
     fn planted(self, lowered: &mut Lowered) {
-        let name = self.name;
-        let remaining = self.root.into_iter().fold(self.files, |files, root| {
-            let slots = lowered.rooted(root, name.clone(), CrateForm::Planted);
-            files.filled(lowered, slots)
-        });
-        remaining.0.into_values().for_each(|island| lowered.island(island));
+        self.remaining(lowered).0.into_values().for_each(|island| lowered.island(island));
+    }
+
+    fn remaining(self, lowered: &mut Lowered) -> Files<'read> {
+        match self.root {
+            Some(root) => self.files.rooted(lowered, root, self.name),
+            None => self.files,
+        }
     }
 }
 

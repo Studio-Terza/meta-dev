@@ -46,6 +46,27 @@ const DISCARDED: &str =
     "use std::fmt::Debug as _;\nuse std::fmt::{self as shown};\nimpl Debug for R {}\nimpl shown::Debug for R {}\n";
 const ITEM_PATH: &str = "struct S;\nimpl S::T for R {}\nimpl Option::T for R {}\nimpl ::a::T for R {}\n";
 
+const GLOB_PRIVATE_SELF: &str = "trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\nfn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
+const GLOB_VISIBLE_CRATE: &str = "mod a {\n    pub(crate) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
+const GLOB_RESTRICTED: &str = "mod a {\n    pub(super) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
+const GLOB_RESTRICTED_IN: &str = "mod a {\n    pub(in crate) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
+const PATH_RESTRICTED: &str = "mod a {\n    pub(super) struct T;\n}\nimpl a::T for R {}\n";
+
+const EXTERN_SELF: &str =
+    "extern crate self as core;\nmod clone {\n    pub trait Clone {}\n}\nimpl core::clone::Clone for R {}\n";
+const EXTERN_SELF_NESTED: &str = "extern crate self as core;\nmod clone {\n    pub trait Clone {}\n}\nmod m {\n    impl core::clone::Clone for R {}\n}\n";
+const EXTERN_CORE: &str =
+    "extern crate core as c;\nextern crate alloc;\nimpl c::clone::Clone for R {}\nimpl alloc::fmt::Debug for R {}\n";
+const EXTERN_OTHER: &str =
+    "extern crate serde;\nextern crate serde as s;\nimpl serde::Serialize for R {}\nimpl s::Serialize for R {}\n";
+const EXTERN_DISCARDED: &str = "extern crate serde as _;\nimpl Clone for R {}\n";
+
+const DERIVE_SHADOWED: &str = "trait Clone {}\n#[derive(Clone, Debug)]\nstruct A;\n";
+const DERIVE_IMPORTED: &str =
+    "use serde::Serialize;\nuse std::fmt::Debug as Clone;\n#[derive(Serialize, Clone, Hash)]\nstruct A;\n";
+const DERIVE_UNLISTED: &str = "#[derive(Serialize)]\nstruct A;\n";
+const DERIVE_GLOBBED: &str = "use std::hash::*;\nuse other::*;\n#[derive(Hash, Debug)]\nstruct A;\n";
+
 const RENAMED_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "pub use std::clone::Clone as Dup;\nmod x;\n"),
     Fixture::new("src/x.rs", "use crate::Dup;\nimpl Dup for R {}\n"),
@@ -85,6 +106,14 @@ const WORKSPACE: [Fixture; 2] = [
     Fixture::new("crates/b/src/lib.rs", "impl a::Dup for R {}\nimpl ::a::Dup for R {}\n"),
 ];
 const ISLAND: [Fixture; 1] = [Fixture::new("src/x.rs", "trait T {}\nimpl crate::T for R {}\nimpl super::T for R {}\n")];
+const ISLAND_OWN: [Fixture; 1] = [Fixture::new(
+    "src/x.rs",
+    "trait T {}\nmod m {\n    pub trait U {}\n}\nimpl T for R {}\nimpl self::T for R {}\nimpl m::U for R {}\n",
+)];
+const ISLAND_BESIDE_ROOT: [Fixture; 2] = [
+    Fixture::new("src/lib.rs", "pub trait T {}\nimpl T for R {}\n"),
+    Fixture::new("src/x.rs", "trait T {}\nimpl T for R {}\n"),
+];
 const PATHED: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "#[path = \"y.rs\"]\nmod x;\nimpl x::T for R {}\n"),
     Fixture::new("src/x.rs", "pub trait T {}\n"),
@@ -285,6 +314,30 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_OPAQUE_FIRST => [Expect::unknown(&["Clone"])],
     GLOB_OPAQUE_LAST => [Expect::unknown(&["Debug"])],
     GLOB_CONFLICT => [Expect::unknown(&["Result"])],
+    GLOB_PRIVATE_SELF => [Expect::krate(&["crate", "Clone"])],
+    GLOB_VISIBLE_CRATE => [Expect::std(&["std", "fmt", "Debug"])],
+    GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
+    GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
+    PATH_RESTRICTED => [Expect::krate(&["crate", "a", "T"])],
+]);
+
+laws::table!(an_extern_crate_item_binds_its_name, |text: &&str| Read::resolved(text), [
+    EXTERN_SELF => [Expect::krate(&["crate", "clone", "Clone"])],
+    EXTERN_SELF_NESTED => [Expect::krate(&["crate", "clone", "Clone"])],
+    EXTERN_CORE => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "fmt", "Debug"])],
+    EXTERN_OTHER => [Expect::external(&["serde", "Serialize"]), Expect::external(&["serde", "Serialize"])],
+    EXTERN_DISCARDED => [Expect::std(&["std", "clone", "Clone"])],
+]);
+
+laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resolved(text), [
+    DERIVE_SHADOWED => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "fmt", "Debug"])],
+    DERIVE_IMPORTED => [
+        Expect::external(&["serde", "Serialize"]),
+        Expect::std(&["std", "fmt", "Debug"]),
+        Expect::std(&["std", "hash", "Hash"]),
+    ],
+    DERIVE_UNLISTED => [Expect::unknown(&["Serialize"])],
+    DERIVE_GLOBBED => [Expect::unknown(&["Hash"]), Expect::unknown(&["Debug"])],
 ]);
 
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [
@@ -307,6 +360,8 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
 
 laws::table!(a_path_through_an_unplanted_module_is_unknown, Read::across, [
     ISLAND => [Expect::unknown(&["crate", "T"]), Expect::unknown(&["super", "T"])],
+    ISLAND_OWN => [Expect::unknown(&["T"]), Expect::unknown(&["self", "T"]), Expect::unknown(&["m", "U"])],
+    ISLAND_BESIDE_ROOT => [Expect::krate(&["crate", "T"]), Expect::unknown(&["T"])],
     PATHED => [Expect::unknown(&["x", "T"])],
     TWO_CANDIDATES => [Expect::unknown(&["x", "T"])],
 ]);

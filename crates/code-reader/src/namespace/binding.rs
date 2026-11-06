@@ -3,14 +3,15 @@ use lint_layout::Name;
 
 use super::Namespace;
 use super::boundary::ScopeId;
+use super::entries::{Admission, ItemId, Via};
 use super::resolver::Walk;
-use super::std_names::StdNames;
+use super::std_names::{Canonical, StdNames};
 use super::use_path::UsePath;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Binding {
     Module(ScopeId),
-    Item(ScopeId, Name),
+    Item(ScopeId, ItemId),
     Std(ItemPath),
     External(ItemPath),
     Unknown,
@@ -20,17 +21,15 @@ impl Binding {
     pub(super) fn stepped(self, segment: &Name, walk: &Walk<'_>) -> Binding {
         match self {
             Binding::Module(module) => walk.entered(module, segment),
-            Binding::Std(path) => Binding::Std(path.as_ref().iter().cloned().chain([segment.clone()]).collect()),
-            Binding::External(path) => {
-                Binding::External(path.as_ref().iter().cloned().chain([segment.clone()]).collect())
-            }
+            Binding::Std(path) => Binding::Std(path.joined(segment)),
+            Binding::External(path) => Binding::External(path.joined(segment)),
             Binding::Item(..) | Binding::Unknown => Binding::Unknown,
         }
     }
 
     pub(super) fn globbed(self, name: &Name, walk: &Walk<'_>) -> Globbed {
         match self {
-            Binding::Module(module) => walk.member(module, name),
+            Binding::Module(module) => walk.member(module, name, Via::Glob),
             Binding::Std(path) => StdNames::globbed(&path, name),
             Binding::Item(..) | Binding::External(_) | Binding::Unknown => Globbed::Opaque,
         }
@@ -38,18 +37,32 @@ impl Binding {
 
     pub(super) fn resolved(self, space: &Namespace, written: &UsePath) -> Resolved {
         match self {
-            Binding::Module(module) => Resolved::Crate(space.located(module)),
-            Binding::Item(scope, name) => {
-                Resolved::Crate(space.located(scope).as_ref().iter().cloned().chain([name]).collect())
-            }
+            Binding::Module(module) => Binding::crate_or_unknown(space.located(module), written),
+            Binding::Item(scope, item) => Binding::crate_or_unknown(space.declared_path(scope, item), written),
             Binding::Std(path) => Resolved::Std(path),
             Binding::External(path) => Resolved::External(path),
             Binding::Unknown => Resolved::Unknown(written.written()),
         }
     }
 
+    fn crate_or_unknown(found: Option<ItemPath>, written: &UsePath) -> Resolved {
+        match found {
+            Some(path) => Resolved::Crate(path),
+            None => Resolved::Unknown(written.written()),
+        }
+    }
+
     fn agreed(self, other: &Binding) -> Binding {
         [self].into_iter().find(|binding| binding == other).unwrap_or(Binding::Unknown)
+    }
+}
+
+impl From<Option<&Canonical>> for Binding {
+    fn from(canonical: Option<&Canonical>) -> Binding {
+        match canonical {
+            Some(found) => Binding::Std(found.path()),
+            None => Binding::Unknown,
+        }
     }
 }
 
@@ -75,6 +88,14 @@ impl Globbed {
             Globbed::Absent => other,
             Globbed::Present(left) => other.met(left),
             Globbed::Opaque => Globbed::Opaque,
+        }
+    }
+
+    pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> Globbed) -> Globbed {
+        match admission {
+            Admission::Hidden => Globbed::Absent,
+            Admission::Shown => shown(),
+            Admission::Obscured => Globbed::Opaque,
         }
     }
 

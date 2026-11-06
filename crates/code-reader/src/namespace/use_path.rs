@@ -8,7 +8,7 @@ use super::anchor::Anchor;
 use super::binding::Binding;
 use super::entries::Imported;
 use super::resolver::Walk;
-use super::std_names::{Canonical, StdNames};
+use super::std_names::{Canonical, StdNames, Table};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Leading {
@@ -26,9 +26,9 @@ impl From<&Option<Token![::]>> for Leading {
 }
 
 impl Leading {
-    fn head(self, first: &Name, rest: &[Name]) -> Head {
+    fn head<'path>(self, first: &'path Name, rest: &[Name]) -> Head<'path> {
         match self {
-            Leading::Global => Head::Global(first.clone()),
+            Leading::Global => Head::Global(first),
             Leading::Relative => Head::relative(first, rest),
         }
     }
@@ -61,47 +61,61 @@ impl Shape {
 
     fn prelude(self, first: &Name) -> Option<ItemPath> {
         match self {
-            Shape::Single => StdNames::prelude(first).map(Canonical::path),
+            Shape::Single => StdNames::canonical(Table::Prelude, first).map(Canonical::path),
             Shape::Multiple => None,
+        }
+    }
+
+    fn derived(self, first: &Name, walk: &Walk<'_>, path: &UsePath) -> Binding {
+        match self {
+            Shape::Single => walk.macro_named(first),
+            Shape::Multiple => walk.path(path),
         }
     }
 
     fn unbound(self, first: &Name) -> Binding {
         match self {
             Shape::Single => Binding::Unknown,
-            Shape::Multiple => Binding::External(ItemPath::from_iter([first.clone()])),
+            Shape::Multiple => Binding::External(ItemPath::default().joined(first)),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum Head {
+pub(super) enum Head<'path> {
     Empty,
-    Global(Name),
+    Global(&'path Name),
     Anchored(Anchor),
-    Named(Name, Shape),
+    Named(&'path Name, Shape),
 }
 
-impl Head {
-    pub(super) fn started(self, walk: &Walk<'_>) -> Binding {
+impl Head<'_> {
+    pub(super) fn derived(self, walk: &Walk<'_>, path: &UsePath) -> Binding {
         match self {
-            Head::Empty => Binding::Unknown,
-            Head::Global(first) => walk.space().global(&first),
-            Head::Anchored(anchor) => Binding::from(anchor.anchored(walk.space().anchors(walk.scope()))),
-            Head::Named(first, shape) => walk.named(&first, shape),
+            Head::Named(first, shape) => shape.derived(first, walk, path),
+            Head::Empty | Head::Global(_) | Head::Anchored(_) => walk.path(path),
         }
     }
 
-    fn relative(first: &Name, rest: &[Name]) -> Head {
+    pub(super) fn started(self, walk: &Walk<'_>) -> Binding {
+        match self {
+            Head::Empty => Binding::Unknown,
+            Head::Global(first) => walk.space().global(first),
+            Head::Anchored(anchor) => Binding::from(anchor.anchored(walk.space().anchors(walk.scope()))),
+            Head::Named(first, shape) => walk.named(first, shape),
+        }
+    }
+
+    fn relative<'path>(first: &'path Name, rest: &[Name]) -> Head<'path> {
         match Anchor::spelled(first) {
             Some(anchor) => Head::Anchored(anchor),
-            None => Head::Named(first.clone(), Shape::from(rest)),
+            None => Head::Named(first, Shape::from(rest)),
         }
     }
 }
 
 #[derive(Debug)]
-enum Leaf {
+pub(super) enum Leaf {
     Itself,
     Discarded,
     Named(Name),
@@ -117,6 +131,13 @@ impl From<Name> for Leaf {
 }
 
 impl Leaf {
+    pub(super) fn standalone(self) -> Option<Name> {
+        match self {
+            Leaf::Named(name) => Some(name),
+            Leaf::Itself | Leaf::Discarded => None,
+        }
+    }
+
     fn path(self, prefix: &UsePath) -> Option<UsePath> {
         match self {
             Leaf::Itself => prefix.segments.last().map(|_| prefix.clone()),
@@ -148,7 +169,7 @@ impl UsePath {
         UsePath { leading: Leading::from(&used.leading_colon), segments: Vec::new() }.under(&used.tree)
     }
 
-    pub(super) fn head(&self) -> Head {
+    pub(super) fn head(&self) -> Head<'_> {
         match self.segments.split_first() {
             Some((first, rest)) => self.leading.head(first, rest),
             None => Head::Empty,

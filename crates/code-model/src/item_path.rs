@@ -19,6 +19,11 @@ impl AsRef<[Name]> for ItemPath {
 
 impl ItemPath {
     #[must_use]
+    pub fn joined(&self, segment: &Name) -> ItemPath {
+        self.segments.iter().chain([segment]).cloned().collect()
+    }
+
+    #[must_use]
     pub fn last(&self) -> Option<&Name> {
         self.segments.last()
     }

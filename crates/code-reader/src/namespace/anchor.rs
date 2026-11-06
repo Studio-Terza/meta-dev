@@ -1,6 +1,7 @@
 use lint_layout::{Name, Whole, Word};
 
 use super::boundary::ScopeId;
+use super::entries::Visibility;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Anchor {
@@ -30,6 +31,16 @@ impl Anchor {
     }
 }
 
+impl From<Anchor> for Visibility {
+    fn from(anchor: Anchor) -> Visibility {
+        match anchor {
+            Anchor::Crate => Visibility::Visible,
+            Anchor::Module => Visibility::Private,
+            Anchor::Super => Visibility::Restricted,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Anchors {
     module: Option<ScopeId>,
@@ -38,8 +49,8 @@ pub(crate) struct Anchors {
 }
 
 impl Anchors {
-    pub(super) fn rooted(root: ScopeId, planted: Option<ScopeId>) -> Anchors {
-        Anchors { module: Some(root), above: None, root: planted }
+    pub(super) fn rooted(root: ScopeId) -> Anchors {
+        Anchors { module: Some(root), above: None, root: Some(root) }
     }
 
     pub(super) fn nested(self, module: ScopeId) -> Anchors {
