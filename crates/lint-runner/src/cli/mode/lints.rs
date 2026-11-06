@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::iter;
 use std::thread::Scope;
 
@@ -7,7 +8,6 @@ use lint_hand_impls::HandImpls;
 
 use file_ports::Files;
 use lint_core::{Lint, ModelLint, Readout, Report};
-use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
@@ -57,7 +57,7 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Rendered, Shard, Slot, Workers};
+use crate::cli::boundary::{Helper, Helpers, Queue, Rendered, Slot, Workers};
 use crate::cli::{Outcome, Sources};
 
 #[derive(Debug)]
@@ -133,52 +133,61 @@ impl Lints {
         sources: &'scope Sources<F>,
     ) -> Helpers<'scope> {
         Workers::available()
-            .shards()
-            .skip(1)
-            .map(|shard| Helper::spawned(scope, move || Self::helped(sources, shard)).map_err(|_| shard))
+            .helpers()
+            .filter_map(|_| Helper::spawned(scope, move || Self::helped(sources)).ok())
             .collect()
     }
 
     #[must_use]
-    pub fn checked<'file>(readout: &'file Readout, helpers: Helpers<'_>) -> Outcome<'file> {
-        let mine = Self::sharded(readout, Shard::lead(helpers.len() + 1));
-        let mut rendered: Vec<Rendered> = iter::once(mine)
-            .chain(
-                helpers
-                    .into_iter()
-                    .map(|helper| helper.map_or_else(|shard| Self::sharded(readout, shard), Helper::joined)),
-            )
-            .flatten()
-            .collect();
-        let model = Reader::read(readout);
-        rendered
-            .extend(Workers::available().at_most(Self::QUERIES.len()).spread(|shard| Self::answered(&model, shard)));
+    pub fn checked<'file>(readout: &'file Readout, queue: &Queue, helpers: Helpers<'_>) -> Outcome<'file> {
+        let mine = Self::worked(readout, queue);
+        let mut rendered: Vec<Rendered> =
+            iter::once(mine).chain(helpers.into_iter().map(Helper::joined)).flatten().collect();
         rendered.sort_by_key(Rendered::slot);
         Outcome::from_rendered(rendered, readout.failures())
     }
 
-    fn answered(model: &Model, shard: Shard) -> Vec<Rendered> {
-        shard
-            .picks(&Self::QUERIES)
-            .filter_map(|(index, query)| {
-                query(model).dirty().map(|report| Rendered::render(Slot::Query(index), &report))
-            })
-            .collect()
+    fn helped(sources: &Sources<impl Files>) -> Vec<Rendered> {
+        Self::worked(&SourceFiles::read_staged(sources.files(), sources.stage()), sources.queue())
     }
 
-    fn helped(sources: &Sources<impl Files>, shard: Shard) -> Result<Vec<Rendered>, Failure> {
-        SourceFiles::read_all(sources.files(), sources.roots()).map(|own| Self::sharded(&own, shard))
-    }
-
-    fn sharded(readout: &Readout, shard: Shard) -> Vec<Rendered> {
-        shard
-            .picks(&Self::CHECKS)
-            .flat_map(|(index, check)| {
-                check(readout)
+    fn worked(readout: &Readout, queue: &Queue) -> Vec<Rendered> {
+        let jobs: Vec<Job> = Self::CHECKS
+            .into_iter()
+            .enumerate()
+            .map(|(index, check)| Job::Check { slot: Slot::Check(index), check })
+            .chain(
+                Self::QUERIES
                     .into_iter()
-                    .filter_map(Report::dirty)
-                    .map(move |report| Rendered::render(Slot::Check(index), &report))
-            })
-            .collect()
+                    .enumerate()
+                    .map(|(index, query)| Job::Query { slot: Slot::Query(index), query }),
+            )
+            .rev()
+            .collect();
+        let model = OnceCell::new();
+        queue.claimed(&jobs).flat_map(|job| job.done(readout, &model)).collect()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Job {
+    Check { slot: Slot, check: Check },
+    Query { slot: Slot, query: Query },
+}
+
+impl Job {
+    fn done(self, readout: &Readout, model: &OnceCell<Model>) -> Vec<Rendered> {
+        match self {
+            Job::Check { slot, check } => check(readout)
+                .into_iter()
+                .filter_map(Report::dirty)
+                .map(|report| Rendered::render(slot, &report))
+                .collect(),
+            Job::Query { slot, query } => query(model.get_or_init(|| Reader::read(readout)))
+                .dirty()
+                .map(|report| Rendered::render(slot, &report))
+                .into_iter()
+                .collect(),
+        }
     }
 }
