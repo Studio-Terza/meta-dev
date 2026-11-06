@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use syn::Type;
+use syn::{ReturnType, Type};
 
 use lint_layout::Name;
 
@@ -20,11 +20,14 @@ impl Described<'_> {
         }
     }
 
-    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> String {
+    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> Name {
         let texts: Vec<String> = items.map(|item| item.to_string()).collect();
-        texts.join(&separator.to_string())
+        Name::from(texts.join(&separator.to_string()).as_str())
     }
 }
+
+#[derive(Clone, Copy)]
+struct Returned<'ast>(&'ast ReturnType);
 
 #[derive(Clone, Copy)]
 enum Separator {
@@ -37,6 +40,15 @@ impl fmt::Display for Separator {
         match self {
             Separator::Comma => formatter.write_str(", "),
             Separator::Plus => formatter.write_str(" + "),
+        }
+    }
+}
+
+impl fmt::Display for Returned<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            ReturnType::Type(_, returned) => write!(formatter, " -> {}", Described(returned)),
+            ReturnType::Default => Ok(()),
         }
     }
 }
@@ -56,13 +68,12 @@ impl fmt::Display for Described<'_> {
                     Self::listed(Separator::Plus, object.bounds.iter().filter_map(Spelled::bound_of))
                 )
             }
-            Type::BareFn(function) => {
-                let inputs = Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty)));
-                match Spelled::returned_by(&function.output) {
-                    Some(returned) => write!(formatter, "fn({inputs}) -> {}", Described(returned)),
-                    None => write!(formatter, "fn({inputs})"),
-                }
-            }
+            Type::BareFn(function) => write!(
+                formatter,
+                "fn({}){}",
+                Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
+                Returned(&function.output)
+            ),
             Type::Ptr(pointer) => {
                 write!(formatter, "*{} {}", pointer.mutability.map_or("const", |_| "mut"), Described(&pointer.elem))
             }

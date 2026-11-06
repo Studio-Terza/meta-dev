@@ -39,6 +39,11 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
 
 struct Corpus;
 
+struct Copied {
+    path: PathBuf,
+    bytes: Bytes,
+}
+
 struct Violation<'line> {
     path: &'line str,
     at: usize,
@@ -51,19 +56,21 @@ impl Corpus {
         Some(name).filter(|name| *name == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
-    fn copied(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<(PathBuf, Bytes)>, FileFailure> {
+    fn copied(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
         match corpus.kind(found) {
             Kind::Directory => Self::copied_directory(corpus, found, target),
-            Kind::File | Kind::Link | Kind::Missing => Ok(vec![(target.to_path_buf(), corpus.read(found)?)]),
+            Kind::File | Kind::Link | Kind::Missing => {
+                Ok(vec![Copied { path: target.to_path_buf(), bytes: corpus.read(found)? }])
+            }
         }
     }
 
-    fn copied_directory(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<(PathBuf, Bytes)>, FileFailure> {
+    fn copied_directory(corpus: &Memory, found: &Path, target: &Path) -> Result<Vec<Copied>, FileFailure> {
         let inside = corpus
             .entries(found)?
             .iter()
             .map(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner))))
-            .collect::<Result<Vec<Vec<(PathBuf, Bytes)>>, FileFailure>>()?;
+            .collect::<Result<Vec<Vec<Copied>>, FileFailure>>()?;
         Ok(inside.into_iter().flatten().collect())
     }
 
@@ -72,9 +79,10 @@ impl Corpus {
             .entries(fixture)?
             .iter()
             .map(|found| Self::copied(corpus, found, Path::new(Self::renamed(found))))
-            .collect::<Result<Vec<Vec<(PathBuf, Bytes)>>, FileFailure>>()?
+            .collect::<Result<Vec<Vec<Copied>>, FileFailure>>()?
             .into_iter()
             .flatten()
+            .map(|copied| (copied.path, copied.bytes))
             .collect();
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
