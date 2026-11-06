@@ -11,7 +11,7 @@ impl Parallel {
         OnGraph::<ParallelStructures>::report(&[Sources::file("crates/x/src/lib.rs", Text::new(text))]).to_string()
     }
 
-    fn shown(pair: &[&str]) -> bool {
+    fn shown(pair: &[&str]) -> Vec<String> {
         Shown::by(pair, |files| OnGraph::<ParallelStructures>::report(files).to_string())
     }
 
@@ -131,9 +131,9 @@ laws::table!(
     the_parameters_count_every_place_where_any_member_differs_other_inputs_included,
     Parallel::shown,
     [
-        [THREE_WAYS, "3 types answer 2 moves alike under one renaming"] => true,
-        [THREE_WAYS, "one generic over 3 type parameters"] => true,
-        [RENAMED_INPUTS, "2 types answer 2 moves alike under one renaming"] => true,
-        [RENAMED_INPUTS, "one generic over 2 type parameters"] => true,
+        [THREE_WAYS, "3 types answer 2 moves alike under one renaming"] => vec!["3 types answer 2 moves alike under one renaming"],
+        [THREE_WAYS, "one generic over 3 type parameters"] => vec!["one generic over 3 type parameters"],
+        [RENAMED_INPUTS, "2 types answer 2 moves alike under one renaming"] => vec!["2 types answer 2 moves alike under one renaming"],
+        [RENAMED_INPUTS, "one generic over 2 type parameters"] => vec!["one generic over 2 type parameters"],
     ]
 );

@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use syn::{Type, TypeBareFn, TypeTraitObject, TypeTuple};
+use syn::{ReturnType, Type};
 
 use lint_layout::Name;
 
@@ -20,37 +20,16 @@ impl Described<'_> {
         }
     }
 
-    fn listed<Item: fmt::Display>(
-        formatter: &mut fmt::Formatter<'_>,
-        separator: Separator,
-        items: impl Iterator<Item = Item>,
-    ) -> fmt::Result {
-        items.enumerate().try_for_each(|(index, item)| {
-            (index > 0)
-                .then_some(separator)
-                .map_or(Ok(()), |between| write!(formatter, "{between}"))
-                .and_then(|()| write!(formatter, "{item}"))
-        })
+    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> Name {
+        let texts: Vec<String> = items.map(|item| item.to_string()).collect();
+        Name::from(texts.join(&separator.to_string()).as_str())
     }
 
-    fn tupled(formatter: &mut fmt::Formatter<'_>, tuple: &TypeTuple) -> fmt::Result {
-        formatter.write_str("(")?;
-        Self::listed(formatter, Separator::Comma, tuple.elems.iter().map(Described))?;
-        formatter.write_str(")")
-    }
-
-    fn object(formatter: &mut fmt::Formatter<'_>, object: &TypeTraitObject) -> fmt::Result {
-        formatter.write_str("dyn ")?;
-        let bounds = object.bounds.iter().filter_map(Spelled::bound_of);
-        Self::listed(formatter, Separator::Plus, bounds)
-    }
-
-    fn function(formatter: &mut fmt::Formatter<'_>, function: &TypeBareFn) -> fmt::Result {
-        formatter.write_str("fn(")?;
-        Self::listed(formatter, Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty)))?;
-        formatter.write_str(")")?;
-        Spelled::returned_by(&function.output)
-            .map_or(Ok(()), |returned| write!(formatter, " -> {}", Described(returned)))
+    fn returned(output: &ReturnType) -> Name {
+        match Spelled::returned_by(output) {
+            Some(returned) => Name::from(format!(" -> {}", Described(returned)).as_str()),
+            None => Name::from(""),
+        }
     }
 }
 
@@ -74,9 +53,22 @@ impl fmt::Display for Described<'_> {
         match self.0 {
             Type::Slice(slice) => write!(formatter, "[{}]", Described(&slice.elem)),
             Type::Array(array) => write!(formatter, "[{}; _]", Described(&array.elem)),
-            Type::Tuple(tuple) => Self::tupled(formatter, tuple),
-            Type::TraitObject(object) => Self::object(formatter, object),
-            Type::BareFn(function) => Self::function(formatter, function),
+            Type::Tuple(tuple) => {
+                write!(formatter, "({})", Self::listed(Separator::Comma, tuple.elems.iter().map(Described)))
+            }
+            Type::TraitObject(object) => {
+                write!(
+                    formatter,
+                    "dyn {}",
+                    Self::listed(Separator::Plus, object.bounds.iter().filter_map(Spelled::bound_of))
+                )
+            }
+            Type::BareFn(function) => write!(
+                formatter,
+                "fn({}){}",
+                Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
+                Self::returned(&function.output)
+            ),
             Type::Ptr(pointer) => {
                 write!(formatter, "*{} {}", pointer.mutability.map_or("const", |_| "mut"), Described(&pointer.elem))
             }

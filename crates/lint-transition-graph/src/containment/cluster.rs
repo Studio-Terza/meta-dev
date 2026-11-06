@@ -64,11 +64,35 @@ impl<'found> Cluster<'found> {
     }
 }
 
+#[derive(Debug)]
+enum Whereabouts<'found> {
+    Workspace,
+    Crate(&'found CrateName),
+    Module(&'found CrateName, Segments<'found>),
+}
+
+impl<'found> Whereabouts<'found> {
+    fn locating(cluster: &Cluster<'found>) -> Whereabouts<'found> {
+        match cluster.krate {
+            None => Whereabouts::Workspace,
+            Some(krate) => Whereabouts::within(krate, cluster.segments),
+        }
+    }
+
+    fn within(krate: &'found CrateName, segments: &'found [Name]) -> Whereabouts<'found> {
+        match segments.first() {
+            None => Whereabouts::Crate(krate),
+            Some(_) => Whereabouts::Module(krate, Segments(segments)),
+        }
+    }
+}
+
 impl fmt::Display for Cluster<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.krate {
-            None => write!(formatter, "the workspace"),
-            Some(krate) => Segments(self.segments).named_in(krate, formatter),
+        match Whereabouts::locating(self) {
+            Whereabouts::Workspace => write!(formatter, "the workspace"),
+            Whereabouts::Crate(krate) => write!(formatter, "crate {krate}"),
+            Whereabouts::Module(krate, segments) => write!(formatter, "{krate}::{segments}"),
         }
     }
 }
@@ -100,15 +124,6 @@ impl fmt::Display for Part<'_> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Segments<'found>(&'found [Name]);
-
-impl Segments<'_> {
-    fn named_in(self, krate: &CrateName, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.first() {
-            None => write!(formatter, "crate {krate}"),
-            Some(_) => write!(formatter, "{krate}::{self}"),
-        }
-    }
-}
 
 impl fmt::Display for Segments<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

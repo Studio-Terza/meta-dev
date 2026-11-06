@@ -27,16 +27,16 @@ laws::table!(
     effect_sites_are_counted_per_crate_and_listed_outside_ports,
     Shown::of::<EffectSites>,
     [
-        [EVERY_KIND, "crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2)"] => true,
-        [EVERY_KIND, "crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string"] => true,
-        [EVERY_KIND, "crates/x/src/lib.rs:14: stdio effect outside ports: calls println!"] => true,
-        [IN_PORTS, "crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1)"] => true,
-        [IN_PORTS, "lib.rs:3: files effect"] => false,
-        [IN_PORTS, "lib.rs:7: files effect outside ports: calls std::fs::write"] => true,
-        [PRINTED_IN_MODULES, "crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1)"] => true,
-        [PRINTED_IN_MODULES, "lib.rs:3: stdio effect outside ports: calls println!"] => true,
-        [IN_TESTS, "crate x"] => false,
-        [FOREIGN, "crate x"] => false,
+        [EVERY_KIND, "crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2)"] => vec!["crate x: 11 effect sites, 0 in ports, 11 outside ports (files 2, environment 1, clock 3, network 1, processes 1, randomness 1, stdio 2)"],
+        [EVERY_KIND, "crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string"] => vec!["crates/x/src/lib.rs:4: files effect outside ports: calls std::fs::read_to_string"],
+        [EVERY_KIND, "crates/x/src/lib.rs:14: stdio effect outside ports: calls println!"] => vec!["crates/x/src/lib.rs:14: stdio effect outside ports: calls println!"],
+        [IN_PORTS, "crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1)"] => vec!["crate x: 2 effect sites, 1 in ports, 1 outside ports (files 1)"],
+        [IN_PORTS, "lib.rs:3: files effect"] => Vec::<String>::new(),
+        [IN_PORTS, "lib.rs:7: files effect outside ports: calls std::fs::write"] => vec!["lib.rs:7: files effect outside ports: calls std::fs::write"],
+        [PRINTED_IN_MODULES, "crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1)"] => vec!["crate x: 2 effect sites, 1 in ports, 1 outside ports (stdio 1)"],
+        [PRINTED_IN_MODULES, "lib.rs:3: stdio effect outside ports: calls println!"] => vec!["lib.rs:3: stdio effect outside ports: calls println!"],
+        [IN_TESTS, "crate x"] => Vec::<String>::new(),
+        [FOREIGN, "crate x"] => Vec::<String>::new(),
     ]
 );
 

@@ -165,16 +165,20 @@ impl<'law, 'found, 'file> Shortfall<'law, 'found, 'file> {
 
 impl fmt::Display for Shortfall<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "law preserves! at {}: ", AsRef::<Site<'_>>::as_ref(self.law))?;
-        self.described(formatter)
-    }
-}
-
-impl Shortfall<'_, '_, '_> {
-    fn described(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.law.on_side(self.side) {
-            Some(route) => write!(formatter, "{route}, not an operation of {}", self.node),
-            None => write!(formatter, "{} names no operation of {}", self.side, self.node),
+            Some(route) => write!(
+                formatter,
+                "law preserves! at {}: {route}, not an operation of {}",
+                AsRef::<Site<'_>>::as_ref(self.law),
+                self.node
+            ),
+            None => write!(
+                formatter,
+                "law preserves! at {}: {} names no operation of {}",
+                AsRef::<Site<'_>>::as_ref(self.law),
+                self.side,
+                self.node
+            ),
         }
     }
 }

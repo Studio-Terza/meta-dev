@@ -1,3 +1,4 @@
+mod gathered;
 mod ignored;
 mod kept;
 
@@ -9,6 +10,7 @@ use lint_layout::Failure;
 use newtype::{Arbitrary, Newtype};
 
 use crate::survey::{Fact, Survey};
+use gathered::Gathered;
 use ignored::Ignored;
 use kept::Kept;
 
@@ -28,7 +30,7 @@ impl Directory {
         files: &impl Files,
         roots: &[PathBuf],
         ignored: &[Ignored],
-        found: impl Fn(&Kept<'_>, &Path, Vec<Directory>) -> Found,
+        found: impl Fn(&Gathered<'_>, &Path, Vec<Directory>) -> Found,
     ) -> Vec<Result<Found, Failure>> {
         let mut survey = Self::surveyed(files, roots, ignored, Survey::default());
         roots
@@ -37,7 +39,7 @@ impl Directory {
                 let kept = Kept::new(&survey, ignored);
                 let below = kept.preorder(kept.below(root));
                 let order: Vec<&Path> = iter::once(root.as_path()).chain(below.iter().map(AsRef::as_ref)).collect();
-                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, below)), Err)
+                survey.settled(&order).map(|settled| found(&Gathered::new(settled, ignored), root, below))
             })
             .collect()
     }
