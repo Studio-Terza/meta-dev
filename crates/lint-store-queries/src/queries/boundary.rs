@@ -26,7 +26,7 @@ impl Sql {
 
     fn literal(tree: TokenTree) -> Option<LitStr> {
         match tree {
-            TokenTree::Literal(literal) => syn::parse2(literal.into()).ok(),
+            TokenTree::Literal(literal) => syn::parse2(TokenTree::Literal(literal).into()).ok(),
             TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
         }
     }
