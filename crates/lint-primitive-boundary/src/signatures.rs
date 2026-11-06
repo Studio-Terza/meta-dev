@@ -30,10 +30,10 @@ struct TypeWalk<'walk, 'model> {
 impl TypeWalk<'_, '_> {
     fn spelled(&mut self, named: &Named<Sited>, written: &ItemPath, line: LineNumber) {
         let resolved: &Resolved = named.as_ref();
-        let lone = Lone::within(written);
+        let solo = Lone::within(written);
         let identity = self.lexicon.identity(resolved, written);
-        let direct = identity.and_then(|identity| identity.direct(lone));
-        let target = lone.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
+        let direct = identity.and_then(|identity| identity.direct(solo));
+        let target = solo.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
         let aliased = target.and_then(|target| self.aliased(target));
         self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, line }));
         named.each_inner_use(self);

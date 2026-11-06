@@ -106,13 +106,13 @@ impl<'model> Scope<'model> {
 
     pub fn function<'function>(&self, function: &'function Function) -> Option<&'function Function> {
         let own = Scope::own(*AsRef::<Region>::as_ref(function));
-        own.and_then(|_| Scope::unexempted(self.newtypes.edge(function), function))
+        own.and_then(|_| Scope::unexempted(self.newtypes.edge(function).as_ref(), function))
     }
 
     pub fn holding<'holding>(&self, holding: &'holding Holding) -> Option<&'holding Holding> {
         let own = Scope::own(*AsRef::<Region>::as_ref(holding));
         let checked = own.and_then(|_| Scope::CHECKED.iter().find(|held| **held == holding.held()));
-        checked.and_then(|_| Scope::unexempted(self.newtypes.newtype(holding.declares()), holding))
+        checked.and_then(|_| Scope::unexempted(self.newtypes.newtype(holding.declares()).as_ref(), holding))
     }
 
     pub fn call<'call>(&self, call: &'call Call, path: &Path) -> Option<&'call Call> {
@@ -120,7 +120,7 @@ impl<'model> Scope<'model> {
         let seat: &Seat = call.as_ref();
         let subject = seat.subject().and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref);
         let door = subject.and_then(|subject| self.doors.iter().find_map(|door| door.opening(path, subject)));
-        open.and_then(|_| Scope::unexempted(door, call))
+        open.and_then(|_| Scope::unexempted(door.as_ref(), call))
     }
 
     pub fn local_alias(&self, resolved: &Resolved, file: &Path) -> Option<&'model TypeRef> {
@@ -136,7 +136,7 @@ impl<'model> Scope<'model> {
         Scope::own(Region::new(region.reach(), region.zone(), Within::Own)).map(|_| region.within())
     }
 
-    fn unexempted<Exemption, Kept>(exemption: Option<Exemption>, kept: Kept) -> Option<Kept> {
+    fn unexempted<Exemption, Kept>(exemption: Option<&Exemption>, kept: Kept) -> Option<Kept> {
         match exemption {
             Some(_) => None,
             None => Some(kept),

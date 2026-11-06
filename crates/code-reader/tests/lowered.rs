@@ -4,7 +4,7 @@ use code_model::{
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
-use lint_layout::Name;
+use lint_layout::{Failure, Name};
 
 struct Read;
 
@@ -16,13 +16,16 @@ impl Read {
         }
     }
 
-    fn reaches(root: &str, module: &str) -> Vec<Reach> {
+    fn supported(root: &str, module: &str) -> Result<SourceFile, Failure> {
         let support = SourceFile::parse("src/support.rs", SourceText::new(module.to_owned()));
-        let parsed = support.and_then(|support| {
+        support.and_then(|support| {
             SourceFile::parse("src/lib.rs", SourceText::new(root.to_owned()))
                 .map(|root| root.with_test_modules(vec![support]))
-        });
-        match parsed {
+        })
+    }
+
+    fn reaches(root: &str, module: &str) -> Vec<Reach> {
+        match Read::supported(root, module) {
             Ok(file) => Reader::read_files(&[file])
                 .functions()
                 .map(|found| AsRef::<Region>::as_ref(found.entity()).reach())
