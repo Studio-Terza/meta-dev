@@ -62,9 +62,7 @@ impl Files for Memory {
     }
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
-        String::from_utf8(self.stored(path)?.into_inner())
-            .map(Text::new)
-            .map_err(|_| FileFailure::Failed(io::Error::from(io::ErrorKind::InvalidData)))
+        Text::try_from(&self.stored(path)?)
     }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {

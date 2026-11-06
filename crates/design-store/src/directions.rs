@@ -4,7 +4,7 @@ use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, Sp
 use port_core::Op;
 use store_ports::Written;
 
-use crate::Refusal;
+use crate::{Refusal, Unseen};
 
 use boundary::Annotating;
 pub(crate) use boundary::Columns;
@@ -22,13 +22,14 @@ pub enum Directed {
 #[derive(Debug, Op)]
 pub struct Directions {
     provenance: Provenance,
+    file: Unseen,
     directed: Vec<Directed>,
 }
 
 impl Directions {
     #[must_use]
-    pub fn new(provenance: Provenance, directed: Vec<Directed>) -> Directions {
-        Directions { provenance, directed }
+    pub fn new(provenance: Provenance, file: Unseen, directed: Vec<Directed>) -> Directions {
+        Directions { provenance, file, directed }
     }
 }
 

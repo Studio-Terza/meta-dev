@@ -215,7 +215,8 @@ impl Batch for Directions {
             .iter()
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
-        Ok(Written::total(written.into_iter()))
+        let recorded = self.file.written(annotating.provenance(), annotating.statements)?;
+        Ok(Written::total(written.into_iter().chain([recorded])))
     }
 }
 

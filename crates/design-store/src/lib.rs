@@ -1,5 +1,6 @@
 mod acyclic;
 mod annotation;
+mod applied_file;
 mod boundary;
 mod covered;
 mod cursors;
@@ -22,6 +23,7 @@ mod stream_schema;
 
 pub use acyclic::{Closes, Cycle, Refusal};
 pub use annotation::{Annotation, Remarking};
+pub use applied_file::{AppliedFile, AppliedId, Earlier, Seen, Sees, Unseen};
 pub use boundary::Hit;
 pub use covered::Covered;
 pub use cursors::Cursors;

@@ -8,8 +8,9 @@ use design_model::{
     SegmentRelation, Stage, Supersession, Title,
 };
 use design_store::{
-    Covered, Cycle, Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot, Refusal, Scope,
-    SearchSegments, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema,
+    AppliedFile, Covered, Cycle, Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot,
+    Refusal, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema,
+    Unseen,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -306,6 +307,13 @@ impl Ids {
             .map(|relative| relative.node().identity())
             .collect()
     }
+
+    fn earlier(seen: &Seen) -> Option<i64> {
+        match seen {
+            Seen::Before(earlier) => Some(earlier.identity().into_inner()),
+            Seen::Unseen(_) => None,
+        }
+    }
 }
 
 laws::law!(the_closure_holds_exactly_the_transitive_refinements, Dag::any(), dag, {
@@ -425,7 +433,17 @@ impl Proposals {
     }
 
     fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
-        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), directed))?)
+        let file = Proposals::unseen(store, &format!("{directed:?}"))?;
+        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), file, directed))?)
+    }
+
+    fn unseen(store: &Port<'_, Sqlite>, contents: &str) -> Result<Unseen, Box<dyn Error>> {
+        match store.read(AppliedFile::from(Bytes::from(contents)))? {
+            Seen::Unseen(unseen) => Ok(unseen),
+            Seen::Before(earlier) => {
+                Err(format!("{contents} was applied as file {}", earlier.identity().into_inner()).into())
+            }
+        }
     }
 
     fn segment(message: &str, ordinal: usize) -> Segment {
@@ -469,6 +487,29 @@ fn directions_are_written_whole_or_not_at_all() -> Result<(), Box<dyn Error>> {
     let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
     assert!(Proposals::written(&store, vec![Proposals::child(root, 2)?, stray]).is_err());
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_file_is_seen_once_its_directions_are_written_and_not_when_they_are_refused() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    let root = Projects::rooted(&store, "p")?;
+    let stray = Directed::Conversational { segment: Proposals::segment("nowhere", 0) };
+    let refused = Proposals::unseen(&store, "refused")?;
+    assert!(store.write(Directions::new(Provenance::from(Entered::Apply), refused, vec![stray])).is_err());
+    assert!(matches!(store.read(AppliedFile::from(Bytes::from("refused")))?, Seen::Unseen(_)));
+    let kept = Proposals::unseen(&store, "kept")?;
+    store.write(Directions::new(Provenance::from(Entered::Apply), kept, vec![Proposals::child(root, 2)?]))?;
+    let other = Proposals::unseen(&store, "other")?;
+    store.write(Directions::new(Provenance::from(Entered::Apply), other, Vec::new()))?;
+    let seen = [Bytes::from("kept"), Bytes::from("other"), Bytes::from("kept ")]
+        .map(|contents| store.read(AppliedFile::from(contents)).map(|seen| Ids::earlier(&seen)))
+        .into_iter()
+        .collect::<Result<Vec<Option<i64>>, _>>()?;
+    assert_eq!(seen, [Some(1), Some(2), None]);
     Ok(())
 }
 
@@ -571,13 +612,14 @@ impl Closed {
 }
 
 impl Ends {
-    fn linked(self, store: &Port<'_, Sqlite>, edge: Edge) -> Result<Written, Refusal> {
+    fn linked(self, store: &Port<'_, Sqlite>, edge: Edge, file: Unseen) -> Result<Written, Refusal> {
         match self {
             Ends::Nodes(relation) => {
                 store.write(Linked::new(Dag::id(edge.child), relation, Dag::id(edge.parent), Entered::Init.into()))
             }
             Ends::Segments(relation) => store.write(Directions::new(
                 Provenance::from(Entered::Apply),
+                file,
                 vec![Directed::Related {
                     source: Proposals::segment("o1", edge.child),
                     target: Proposals::segment("o1", edge.parent),
@@ -626,8 +668,17 @@ impl Probe {
             .map(|_node| Ok(store.write(Dag::node(Facet::Feature)?)?))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let ends = self.closed.ends();
-        self.edges.iter().map(|edge| ends.linked(&store, *edge)).collect::<Result<Vec<Written>, Refusal>>()?;
-        Probe::cyclic(ends.linked(&store, self.tried))
+        let mut files = (0..=self.edges.len())
+            .map(|nth| Proposals::unseen(&store, &nth.to_string()))
+            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?
+            .into_iter();
+        let tried = files.next().ok_or("no file for the tried edge")?;
+        self.edges
+            .iter()
+            .zip(files)
+            .map(|(edge, file)| ends.linked(&store, *edge, file))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        Probe::cyclic(ends.linked(&store, self.tried, tried))
     }
 
     fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, Box<dyn Error>> {

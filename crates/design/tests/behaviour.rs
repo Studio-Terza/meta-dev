@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, SegmentRelation, Stage};
-use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
+use design_store::{AppliedId, Linked, NewNode, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -807,7 +807,7 @@ fn apply_places_proposes_and_reports_the_owner_segments_it_leaves_uncovered() ->
         format!("applied sense({answer}, decision, specific, firm, explicit)"),
         format!("applied link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
         format!("uncovered {}", Applying::answer(1)),
-        "written 6".to_owned(),
+        "written 7".to_owned(),
     ];
     assert_eq!(Lines::missing(&out, &wanted), Vec::<&String>::new());
     assert_eq!(out.matches('\n').count(), wanted.len());
@@ -842,7 +842,7 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     assert!(applying.run(&["show", "n3"])?.contains("  supersedes n2 entered apply\n"));
     assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague entered apply \"old\"\n"));
     let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
-    assert!(placed.contains("written 1\n"));
+    assert!(placed.contains("written 2\n"));
     Ok(())
 }
 
@@ -919,7 +919,7 @@ fn a_supersession_that_closes_a_cycle_or_names_one_node_twice_is_refused() -> Re
     let applying = Applying::ready()?;
     applying.cyclic("supersede(n2, by(n3))");
     assert!(matches!(applying.cyclic("supersede(n3, by(n2))"), Some(Failure::Unresolved(Unresolved::Cyclic { .. }))));
-    assert!(applying.applied("propose(new, refines(n1), feature, \"d\")\nsupersede(n3, by(n6))").is_ok());
+    assert!(applying.applied("propose(new, refines(n1), feature, \"d\")\nsupersede(n3, by(n4))").is_ok());
     Ok(())
 }
 
@@ -1065,11 +1065,80 @@ fn a_node_proposed_in_a_file_is_placed_later_in_it_by_label_or_by_its_id() -> Re
 #[test]
 fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Result<(), Failure> {
     let applying = Applying::ready()?;
-    applying.applied("")?;
+    applying.files.create_directories(Path::new("/work/notes"))?;
+    applying.files.write(Path::new("/work/notes/directives"), Bytes::default())?;
     assert!(matches!(applying.run(&["apply", "directives"]), Err(Failure::Directives(_))));
     let lent = Cli::new(&Invocation::environment(), FakeLent::new(&applying.files), |_path| applying.store.clone())
         .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
     assert_eq!(lent, Outcome::Applied);
+    Ok(())
+}
+
+impl Applying {
+    fn rooted(&self, directives: Bytes) -> Result<Answered, Failure> {
+        self.files.create_directories(Path::new("/work/notes")).ok();
+        self.files.write(Path::new("/work/notes/directives"), directives).ok();
+        let mut out = Vec::new();
+        let outcome = Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone())
+            .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
+        Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
+    }
+
+    fn graph(&self) -> Result<[String; 2], Failure> {
+        Ok([self.run(&["show", "n1"])?, self.run(&["show", Applying::ANSWER])?])
+    }
+
+    fn twice() -> String {
+        let answer = Applying::answer(0);
+        format!(
+            "propose(new, refines(n1), feature, \"once\")\nplace({answer}, n2, defines)\nsense({answer}, decision, specific, firm, explicit)"
+        )
+    }
+}
+
+#[test]
+fn a_file_applied_twice_writes_nothing_the_second_time_and_names_the_earlier_apply() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let first = applying.rooted(Bytes::from(&Applying::twice()))?;
+    assert_eq!(first.outcome, Outcome::Applied);
+    let before = applying.graph()?;
+    let second = applying.rooted(Bytes::from(&Applying::twice()))?;
+    assert!(matches!(
+        &second.outcome,
+        Outcome::AlreadyApplied { earlier }
+            if earlier.identity() == AppliedId::new(1)
+                && earlier.stamp().to_string().len() == "2026-11-06T00:00:00Z".len()
+                && second.out == format!("already applied as file 1 at {}; nothing written\n", earlier.stamp())
+    ));
+    assert_eq!(applying.graph()?, before);
+    assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
+    Ok(())
+}
+
+#[test]
+fn a_file_one_byte_away_from_an_applied_one_applies() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    applying.rooted(Bytes::from(&Applying::twice()))?;
+    let changed = applying.rooted(Bytes::from(&format!("{}\n", Applying::twice())))?;
+    assert_eq!(changed.outcome, Outcome::Applied);
+    assert!(changed.out.contains("proposed n3 by propose(new, refines(n1), feature, \"once\")\n"));
+    assert_eq!(applying.run(&["show", "n1"])?.matches("  child ").count(), 2);
+    Ok(())
+}
+
+#[test]
+fn a_file_refused_in_resolution_is_refused_again_and_its_fix_applies() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let broken = format!("place({}, n9, defines)", Applying::answer(0));
+    let refusals = [(); 2].map(|()| applying.rooted(Bytes::from(&broken)).err());
+    assert!(matches!(
+        refusals,
+        [Some(Failure::Unresolved(Unresolved::Unplaced(_))), Some(Failure::Unresolved(Unresolved::Unplaced(_)))]
+    ));
+    let fixed = applying.rooted(Bytes::from(&format!("place({}, n1, defines)", Applying::answer(0))))?;
+    assert_eq!(fixed.outcome, Outcome::Applied);
+    assert!(applying.run(&["show", Applying::ANSWER])?.contains("defines n1 current entered apply\n"));
+    assert!(matches!(applying.rooted(Bytes::new(vec![0xff])), Err(Failure::Directives(_))));
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use design_model::Project;
-use file_ports::{Files, Text};
+use file_ports::{Bytes, Files};
 use local_config::Kept;
 use port_core::{Port, Run};
 use store_ports::Store;
@@ -31,8 +31,8 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
         self.run.port(self.located.transcripts(self.files))
     }
 
-    pub fn read(&self, path: &Path) -> Result<Text, Failure> {
-        self.files.read_text(&self.located.within(path)).map_err(Failure::Directives)
+    pub fn read(&self, path: &Path) -> Result<Bytes, Failure> {
+        self.files.read(&self.located.within(path)).map_err(Failure::Directives)
     }
 
     pub fn configured(&self, project: Project) -> Result<Kept, Failure> {

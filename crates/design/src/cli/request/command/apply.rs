@@ -1,19 +1,26 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+use std::io::Write;
 use std::path::Path;
 
 use design_model::{
     Entered, Entry, Facet, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment, SegmentRelation, Sense,
     SpanRelation, Stage, Straddling, Supersession, Title,
 };
-use design_store::{Closes, Covered, Cycle, Directed, Directions, NextNode, Prefixed, ShownNode, Spoken};
-use file_ports::Files;
+use design_store::{
+    AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Sees, ShownNode, Spoken,
+    Unseen,
+};
+use file_ports::{Files, Text};
 use newtype::Newtype;
 use store_ports::{Store, Written};
 use structurer::{Bind, Directive, Directives, Edge, Label, NodeRef, SegmentRef, Visit};
 use transcript_ports::{Authorship, Uuid};
 
+use super::Printed;
+use crate::Outcome;
 use crate::cli::failure::Failure;
-use crate::cli::rendering::Id;
+use crate::cli::rendering::{Id, Repeat};
 use crate::cli::request::Ground;
 
 #[derive(Debug, thiserror::Error)]
@@ -55,11 +62,20 @@ pub struct Echo {
 }
 
 #[derive(Debug)]
+pub enum Application {
+    Fresh(Applied),
+    Repeated(Earlier),
+}
+
+#[derive(Debug)]
 pub struct Applied {
     echoes: Vec<Echo>,
     uncovered: Vec<Segment>,
     written: Written,
 }
+
+#[derive(Debug)]
+struct Fresh<'ground, 'run, F: Files, S: Store>(&'ground Ground<'run, F, S>);
 
 #[derive(Debug)]
 struct Resolution<'store, S: Store> {
@@ -111,20 +127,63 @@ struct Heard {
     message: Vec<Spoken>,
 }
 
-impl Applied {
-    pub fn read<F: Files, S: Store>(ground: &Ground<'_, F, S>, path: &Path) -> Result<Applied, Failure> {
-        let directives: Directives = ground.read(path)?.as_ref().parse()?;
+impl Application {
+    pub fn read<F: Files, S: Store>(ground: &Ground<'_, F, S>, path: &Path) -> Result<Application, Failure> {
+        let contents = ground.read(path)?;
         let store = ground.store();
         let lock = store.lock()?;
+        let application = store.read(AppliedFile::from(contents))?.seen(Fresh(ground))?;
+        lock.end()?;
+        Ok(application)
+    }
+
+    pub(crate) fn reported(self, out: &mut impl Write) -> Result<Outcome, Failure> {
+        Printed::shown(out, &self).map(|_printed| Outcome::from(self))
+    }
+}
+
+impl fmt::Display for Application {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Application::Fresh(applied) => applied.fmt(formatter),
+            Application::Repeated(earlier) => Repeat::from(earlier).fmt(formatter),
+        }
+    }
+}
+
+impl<F: Files, S: Store> Sees for Fresh<'_, '_, F, S> {
+    type Output = Result<Application, Failure>;
+
+    fn before(self, earlier: Earlier) -> Result<Application, Failure> {
+        Ok(Application::Repeated(earlier))
+    }
+
+    fn unseen(self, unseen: Unseen) -> Result<Application, Failure> {
+        Applied::fresh(self.0, unseen).map(Application::Fresh)
+    }
+}
+
+impl From<Application> for Outcome {
+    fn from(application: Application) -> Outcome {
+        match application {
+            Application::Fresh(_applied) => Outcome::Applied,
+            Application::Repeated(earlier) => Outcome::AlreadyApplied { earlier },
+        }
+    }
+}
+
+impl Applied {
+    fn fresh<F: Files, S: Store>(ground: &Ground<'_, F, S>, unseen: Unseen) -> Result<Applied, Failure> {
+        let store = ground.store();
+        let text = Text::try_from(unseen.as_ref()).map_err(Failure::Directives)?;
+        let directives: Directives = text.as_ref().parse()?;
         let started = Folded { resolved: Vec::new(), batch: Batch::starting(store.read(NextNode)?) };
         let folded =
             directives.into_iter().try_fold(started, |folded, directive| folded.resolving(store, directive))?;
         let directed: Vec<Directed> =
             folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
-        let written = store.write(Directions::new(Provenance::from(Entered::Apply), directed))?;
-        let applied = Applied::covered(store, folded.resolved, written)?;
-        lock.end()?;
-        Ok(applied)
+        let written = store.write(Directions::new(Provenance::from(Entered::Apply), unseen, directed))?;
+        Applied::covered(store, folded.resolved, written)
     }
 
     fn covered<S: Store>(store: &S, resolved: Vec<Resolved>, written: Written) -> Result<Applied, Failure> {
