@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO edges (session, uuid, parent) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "15ab1ec7280765843ddda9f5e5bbd502ecd045b60b040966f3fc19cf2cb166e2"
+}

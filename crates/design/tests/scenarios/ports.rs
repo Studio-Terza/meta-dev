@@ -1,14 +1,16 @@
 use std::ffi::OsString;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Output;
 
 use e2e::ports::Home;
 use file_ports::Bytes;
+use grammar::slug::Letters;
 
 #[derive(Debug)]
 pub struct Design {
     home: Home,
+    workspace: PathBuf,
 }
 
 impl Design {
@@ -18,12 +20,24 @@ impl Design {
     );
 
     pub fn with_a_session_in_work() -> io::Result<Design> {
-        Home::holding(Path::new(".claude/projects/-work/s.jsonl"), &Bytes::from(Self::SESSION))
-            .map(|home| Design { home })
+        let home = Home::new()?;
+        let workspace = home.path().join("work");
+        let slug = Letters::slugged(&workspace.to_string_lossy());
+        let session = Path::new(".claude/projects").join(slug).join("s.jsonl");
+        home.holding(&session, &Bytes::from(Self::SESSION)).map(|home| Design { home, workspace })
     }
 
     pub fn run(&self, arguments: &[&str]) -> io::Result<Output> {
         let words: Vec<OsString> = arguments.iter().map(OsString::from).collect();
+        self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words)
+    }
+
+    pub fn in_work(&self, arguments: &[&str]) -> io::Result<Output> {
+        let words: Vec<OsString> = arguments
+            .iter()
+            .map(OsString::from)
+            .chain([OsString::from("--workspace"), self.workspace.clone().into_os_string()])
+            .collect();
         self.home.run(Path::new(env!("CARGO_BIN_EXE_design")), &words)
     }
 }

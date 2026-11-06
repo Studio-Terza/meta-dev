@@ -7,7 +7,8 @@ pub struct Skipped {
 }
 
 impl Skipped {
-    pub(crate) fn new(uuid: Uuid, parent: Option<Uuid>) -> Skipped {
+    #[must_use]
+    pub fn new(uuid: Uuid, parent: Option<Uuid>) -> Skipped {
         Skipped { uuid, parent }
     }
 

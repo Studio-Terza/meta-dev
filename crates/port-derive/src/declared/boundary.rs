@@ -1,4 +1,5 @@
 use grammar::ident::Words;
+use proc_macro2::Span;
 use quote::{ToTokens, format_ident};
 use syn::{Ident, LitStr};
 
@@ -6,6 +7,12 @@ use syn::{Ident, LitStr};
 pub enum Derivation {
     Filler,
     OpsModule,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Constant {
+    Name,
+    Release,
 }
 
 pub struct Spelling;
@@ -32,5 +39,19 @@ impl Spelling {
 
     pub fn method_path(caller: &impl ToTokens, method: &Ident) -> LitStr {
         LitStr::new(&format!("::{}::{method}", caller.to_token_stream()), method.span())
+    }
+
+    pub fn constant(constant: Constant) -> Ident {
+        match constant {
+            Constant::Name => Ident::new("NAME", Span::call_site()),
+            Constant::Release => Ident::new("RELEASE", Span::call_site()),
+        }
+    }
+
+    pub fn type_path(ident: &Ident, constant: Constant) -> LitStr {
+        match constant {
+            Constant::Name => LitStr::new(&format!("::{ident}"), ident.span()),
+            Constant::Release => LitStr::new(&format!("::{ident}::release"), ident.span()),
+        }
     }
 }

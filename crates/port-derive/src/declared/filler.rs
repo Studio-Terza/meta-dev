@@ -24,9 +24,11 @@ impl Rendered for Filler {
 impl Filler {
     fn required_item(method: &Method, ops: &OpsName) -> TokenStream {
         let name = method.name();
+        let generics = method.generics();
+        let bounds = &generics.where_clause;
         let pass = method.pass(ops);
         let parameters = method.parameters();
-        let output = method.output();
-        quote! { fn #name(&self, pass: #pass #(, #parameters)*) #output; }
+        let output = method.returned().filler_output(method.output());
+        quote! { fn #name #generics (&self, pass: #pass #(, #parameters)*) #output #bounds; }
     }
 }

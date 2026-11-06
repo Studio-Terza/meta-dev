@@ -22,12 +22,15 @@ impl Rendered for Delegation {
 impl Delegation {
     fn delegated_item(method: &Method) -> TokenStream {
         let name = method.name();
+        let generics = method.generics();
+        let bounds = &generics.where_clause;
         let parameters = method.parameters();
         let arguments = parameters.iter().map(Parameter::name);
         let output = method.output();
+        let counting = method.returned().counting();
         quote! {
-            fn #name(&self #(, #parameters)*) #output {
-                self.counted_call(|filler: &F, pass| filler.#name(pass #(, #arguments)*))
+            fn #name #generics (&self #(, #parameters)*) #output #bounds {
+                self.#counting(|filler: &F, pass| filler.#name(pass #(, #arguments)*))
             }
         }
     }

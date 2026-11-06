@@ -11,17 +11,20 @@ doctest = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
+design-store = { path = "../design-store" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
+store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 e2e = { path = "../../e2e" }
+laws = { path = "../laws" }
 
 [lints]
 workspace = true

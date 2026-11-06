@@ -1,6 +1,6 @@
 mod boundary;
 
-use crate::{Authorship, Body, Instant, SessionId, Uuid};
+use crate::{Authorship, Body, Instant, SessionId, Skipped, Uuid};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Record {
@@ -41,5 +41,12 @@ impl Record {
     #[must_use]
     pub fn text(&self) -> &Body {
         &self.text
+    }
+}
+
+impl Skipped {
+    #[must_use]
+    pub fn said(&self, session: SessionId, at: Instant, author: Authorship, text: Body) -> Record {
+        Record { uuid: self.uuid().clone(), parent: self.parent().cloned(), session, at, author, text }
     }
 }

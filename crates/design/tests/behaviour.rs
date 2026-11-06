@@ -1,10 +1,19 @@
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
 
+use std::path::PathBuf;
+use std::sync::Mutex;
+
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
+use design_store::{ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, Files, Memory};
-use port_core::Run;
+use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::test_runner::TestCaseError;
+use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
+use store_ports::{Busy, Sqlite, Store};
+use transcript_ports::Uuid;
 
 const HOME: &str = "/home/tester";
 
@@ -77,6 +86,49 @@ impl Session {
         )
     }
 
+    fn linked() -> Session {
+        Session::working(
+            [
+                Self::line(Speaker::Owner, Self::ASKED, "null", "what of aaaaaaaa-0000-4000-8000-000000000004"),
+                Self::line(
+                    Speaker::Lead,
+                    "aaaaaaaa-0000-4000-8000-000000000002",
+                    "\"aaaaaaaa-0000-4000-8000-000000000001\"",
+                    "1. a\\n2. b",
+                ),
+                Self::line(Speaker::Unheard, "b1", "\"aaaaaaaa-0000-4000-8000-000000000002\"", "result"),
+                Self::line(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000003", "\"b1\"", "1. yes\\n2. no"),
+                Self::line(
+                    Speaker::Lead,
+                    "aaaaaaaa-0000-4000-8000-000000000004",
+                    "\"aaaaaaaa-0000-4000-8000-000000000003\"",
+                    "see aaaaaaaa-0000-4000-8000-000000000001",
+                ),
+                Self::line(
+                    Speaker::Owner,
+                    "aaaaaaaa-0000-4000-8000-000000000005",
+                    "\"aaaaaaaa-0000-4000-8000-000000000004\"",
+                    "what of aaaaaaaa-0000-4000-8000-000000000004",
+                ),
+            ]
+            .concat(),
+        )
+    }
+
+    const ASKED: &str = "aaaaaaaa-0000-4000-8000-000000000001";
+
+    const SAID: [&str; 5] = [
+        Self::ASKED,
+        "aaaaaaaa-0000-4000-8000-000000000002",
+        "aaaaaaaa-0000-4000-8000-000000000003",
+        "aaaaaaaa-0000-4000-8000-000000000004",
+        "aaaaaaaa-0000-4000-8000-000000000005",
+    ];
+
+    fn prefix(&self, cut: usize) -> Session {
+        Session { directory: self.directory, lines: self.lines.chars().take(cut).collect() }
+    }
+
     fn files(&self) -> Memory {
         let memory = Memory::default();
         memory.create_directories(Path::new(self.directory)).ok();
@@ -88,15 +140,32 @@ impl Session {
 struct Invocation;
 
 impl Invocation {
-    fn output(session: &Session, arguments: &[&str]) -> Result<String, Failure> {
-        let environment: Variables = [("HOME", HOME), ("PWD", "/work")]
+    fn environment() -> Variables {
+        [("HOME", HOME), ("PWD", "/work")]
             .map(|(name, value)| (OsString::from(name), OsString::from(value)))
             .into_iter()
-            .collect();
+            .collect()
+    }
+
+    fn output(session: &Session, arguments: &[&str]) -> Result<String, Failure> {
+        Self::against(&Sqlite::in_memory::<StreamSchema>(), session, arguments)
+    }
+
+    fn against(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&environment, session.files()).report(&run, arguments.iter().map(OsString::from), &mut out)?;
+        Cli::new(&Self::environment(), session.files(), |_path| store.clone()).report(
+            &run,
+            arguments.iter().map(OsString::from),
+            &mut out,
+        )?;
         Ok(String::from_utf8(out).unwrap_or_default())
+    }
+
+    fn shown(session: &Session, uuid: &str) -> Result<String, Failure> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Self::against(&store, session, &["ingest"])?;
+        Self::against(&store, session, &["show", uuid])
     }
 }
 
@@ -125,6 +194,50 @@ fn ingest_counts_each_authorship_unrecognised_kind_form_and_relation() -> Result
     Ok(())
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Link {
+    source: String,
+    relation: String,
+    target: String,
+}
+
+struct Links;
+
+impl Links {
+    fn stored(store: &Sqlite) -> Result<BTreeSet<Link>, Failure> {
+        let run = Run::root();
+        let port = run.port(store.clone());
+        let shown = Session::SAID
+            .iter()
+            .map(|uuid| {
+                let uuid = Uuid::new((*uuid).to_owned());
+                port.read(ShownMessage::named(uuid.clone()))?.ok_or(Failure::Missing(uuid))
+            })
+            .collect::<Result<Vec<_>, Failure>>()?;
+        Ok(shown
+            .iter()
+            .flat_map(Stored::links)
+            .map(|link| {
+                let [source, target] = link.anchors();
+                Link { source: source.to_string(), relation: link.relation().to_string(), target: target.to_string() }
+            })
+            .collect())
+    }
+
+    fn whole(session: &Session) -> Result<BTreeSet<Link>, Failure> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Invocation::against(&store, session, &["ingest"])?;
+        Self::stored(&store)
+    }
+
+    fn split(session: &Session, cut: usize) -> Result<BTreeSet<Link>, Failure> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Invocation::against(&store, &session.prefix(cut), &["ingest"])?;
+        Invocation::against(&store, session, &["ingest"])?;
+        Self::stored(&store)
+    }
+}
+
 struct Answered {
     outcome: Outcome,
     out: String,
@@ -133,32 +246,30 @@ struct Answered {
 struct Rooted;
 
 impl Rooted {
-    fn outcome(session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
-        let environment: Variables = [("HOME", HOME), ("PWD", "/work")]
-            .map(|(name, value)| (OsString::from(name), OsString::from(value)))
-            .into_iter()
-            .collect();
+    fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
         let mut out = Vec::new();
-        let outcome = Cli::new(&environment, session.files()).rooted(arguments.iter().map(OsString::from), &mut out)?;
+        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone())
+            .rooted(arguments.iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 }
 
 #[test]
 fn a_rooted_run_writes_its_report_to_out_and_names_its_outcome() -> Result<(), Failure> {
-    let ingested = Rooted::outcome(&Session::typical(), &["ingest"])?;
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let ingested = Rooted::outcome(&store, &Session::typical(), &["ingest"])?;
     assert_eq!(ingested.outcome, Outcome::Ingested);
     assert!(ingested.out.contains("authorship owner 2\n"));
-    let shown = Rooted::outcome(&Session::answered(), &["show", "o1"])?;
+    let shown = Rooted::outcome(&store, &Session::typical(), &["show", "o1"])?;
     assert_eq!(shown.outcome, Outcome::Shown);
     Ok(())
 }
 
 #[test]
 fn show_lists_the_links_that_touch_the_message() -> Result<(), Failure> {
-    let out = Invocation::output(&Session::answered(), &["show", "o1"])?;
+    let out = Invocation::shown(&Session::answered(), "o1")?;
     assert!(out.contains("link l1 replies-to o1"));
-    let unrelated = Invocation::output(&Session::working(Session::typical().lines), &["show", "o2"])?;
+    let unrelated = Invocation::shown(&Session::typical(), "o2")?;
     assert_eq!(unrelated.matches("link").count(), 0);
     Ok(())
 }
@@ -171,8 +282,8 @@ fn ingest_counts_a_reply_once() -> Result<(), Failure> {
 }
 
 #[test]
-fn show_prints_a_message_by_uuid_from_the_live_transcript() -> Result<(), Failure> {
-    let out = Invocation::output(&Session::typical(), &["show", "o1"])?;
+fn show_prints_a_message_by_uuid_from_the_store() -> Result<(), Failure> {
+    let out = Invocation::shown(&Session::typical(), "o1")?;
     assert!(out.contains("o1 owner session s at 2026-01-01T00:00:00Z"));
     assert!(out.contains("0 item"));
     Ok(())
@@ -180,7 +291,7 @@ fn show_prints_a_message_by_uuid_from_the_live_transcript() -> Result<(), Failur
 
 #[test]
 fn show_of_an_unknown_uuid_fails_naming_it() {
-    let failed = Invocation::output(&Session::typical(), &["show", "nobody"]);
+    let failed = Invocation::shown(&Session::typical(), "nobody");
     assert!(matches!(failed, Err(Failure::Missing(_))));
 }
 
@@ -202,4 +313,140 @@ fn an_unknown_command_is_a_usage_failure() {
 #[test]
 fn a_workspace_flag_without_a_path_is_a_usage_failure() {
     assert!(matches!(Invocation::output(&Session::typical(), &["ingest", "--workspace"]), Err(Failure::Usage)));
+}
+
+#[test]
+fn show_reads_the_store_not_the_live_transcript() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let before = Invocation::against(&store, &Session::typical(), &["show", "o1"]);
+    assert!(matches!(before, Err(Failure::Missing(_))));
+}
+
+struct Opened {
+    paths: Vec<PathBuf>,
+    out: String,
+}
+
+impl Opened {
+    fn by(arguments: &[&str]) -> Result<Opened, Failure> {
+        let opened = Mutex::new(Vec::new());
+        let run = Run::root();
+        let mut out = Vec::new();
+        Cli::new(&Invocation::environment(), Session::typical().files(), |path: PathBuf| {
+            opened.lock().map(|mut paths| paths.push(path)).ok();
+            Sqlite::in_memory::<StreamSchema>()
+        })
+        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
+        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
+    }
+}
+
+#[test]
+fn the_store_lives_in_the_workspace_meta_directory() -> Result<(), Failure> {
+    assert_eq!(Opened::by(&["ingest"])?.paths, [PathBuf::from("/work/.meta/design.sqlite")]);
+    Ok(())
+}
+
+#[test]
+fn a_dry_run_ingest_prints_the_counts_and_leaves_the_workspace_store_absent() -> Result<(), Failure> {
+    let dry = Opened::by(&["ingest", "--dry-run"])?;
+    assert!(dry.out.contains("authorship owner 2\n"));
+    assert_eq!(dry.paths, Vec::<PathBuf>::new());
+    Ok(())
+}
+
+#[test]
+fn a_second_ingest_over_unchanged_transcripts_writes_nothing_new() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let first = Invocation::against(&store, &Session::answered(), &["ingest"])?;
+    let second = Invocation::against(&store, &Session::answered(), &["ingest"])?;
+    assert!(first.contains("written 8\n"));
+    assert!(second.contains("written 0\n"));
+    assert_eq!(second.matches("authorship").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn ingest_resumes_each_session_from_its_stored_cursor() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let first = Session::working(Session::line(Speaker::Owner, "o1", "null", "question"));
+    Invocation::against(&store, &first, &["ingest"])?;
+    let resumed = Invocation::against(&store, &Session::answered(), &["ingest"])?;
+    assert!(resumed.contains("authorship lead 1\n"));
+    assert_eq!(resumed.matches("authorship owner").count(), 0);
+    assert!(Invocation::against(&store, &Session::answered(), &["show", "l1"])?.contains("l1 lead session s"));
+    Ok(())
+}
+
+#[test]
+fn a_second_ingest_is_refused_while_the_store_lock_is_held() -> Result<(), Busy> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let holder = Run::root();
+    let port = holder.port(store.clone());
+    let held = port.lock()?;
+    let refused = Invocation::against(&store, &Session::answered(), &["ingest"]);
+    assert!(matches!(refused, Err(Failure::Busy(_))));
+    drop(held);
+    assert!(Invocation::against(&store, &Session::answered(), &["ingest"]).is_ok());
+    Ok(())
+}
+
+#[test]
+fn a_reply_appended_after_an_ingest_links_to_the_message_stored_before_it() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let asked = Session::line(Speaker::Owner, "o1", "null", "question");
+    let answered = Session::line(Speaker::Lead, "l1", "\"o1\"", "answer");
+    let thanked = Session::line(Speaker::Owner, "o2", "\"l1\"", "thanks");
+    Invocation::against(&store, &Session::working(asked.clone()), &["ingest"])?;
+    Invocation::against(&store, &Session::working([asked.clone(), answered.clone()].concat()), &["ingest"])?;
+    let shown = Invocation::against(&store, &Session::answered(), &["show", "o1"])?;
+    assert!(shown.contains("link l1 replies-to o1"));
+    let resumed = Invocation::against(&store, &Session::working([asked, answered, thanked].concat()), &["ingest"])?;
+    assert!(resumed.contains("relation replies-to 1\n"));
+    Ok(())
+}
+
+laws::law!(ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_whole, 0usize..1400, cut, {
+    let session = Session::linked();
+    let whole = Links::whole(&session).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let split = Links::split(&session, cut).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let relations: BTreeSet<&str> = whole.iter().map(|link| link.relation.as_str()).collect();
+    prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
+    prop_assert_eq!(split, whole);
+});
+
+#[derive(Debug, thiserror::Error)]
+#[error("the lock was already gone")]
+struct Gone;
+
+#[derive(Debug, Resource)]
+struct Broken;
+
+impl Release for Broken {
+    type Failure = Gone;
+
+    fn release(&mut self, _pass: Pass<'_, Released<Broken>>) -> Result<ReleaseReceipt, Gone> {
+        Err(Gone)
+    }
+}
+
+#[port]
+trait Locks {
+    fn lock(&self) -> Held<'_, Broken>;
+}
+
+struct Locker;
+
+impl LocksFiller for Locker {
+    fn lock(&self, _pass: Pass<'_, locks_ops::Lock>) -> Broken {
+        Broken
+    }
+}
+
+#[test]
+fn a_failed_command_keeps_the_release_failures_of_its_run() {
+    let run = Run::root();
+    drop(run.port(Locker).lock());
+    let settled = Failure::settled(Err(Failure::Usage), run.finish().settled());
+    assert!(matches!(settled, Err(Failure::Unreleased { command, .. }) if matches!(*command, Failure::Usage)));
 }

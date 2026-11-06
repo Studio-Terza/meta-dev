@@ -33,7 +33,7 @@ impl Lint for EffectsInFillers {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler blocks",
+                "in a crate that declares a #[port] trait, effects on files, environment, clock, network, processes, randomness and stdio happen only inside impl <Trait>Filler and impl Release blocks",
             ),
             EffectSites::crates(files)
                 .values()
@@ -48,7 +48,7 @@ impl Lint for CountedCalls {
     fn report(files: &[SourceFile]) -> Report<'_> {
         Report::new(
             Headline::new(
-                "counted_call is named only in port-core and port-derive, so every op is counted through a generated filler",
+                "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
             ),
             files.iter().filter_map(CountedNames::outside_port_core).flat_map(CountedNames::named).collect(),
         )

@@ -2,8 +2,11 @@ mod count;
 
 use std::fmt;
 
+use design_store::{Cursors, EarlierLines, SessionCursors, SessionRecords};
+use newtype::Counter;
+use store_ports::{Store, Written};
 use stream::{Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, Cursor, Kind, Session, SessionId, Transcripts, Unrecognised};
+use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unrecognised};
 
 use crate::cli::failure::Failure;
 use count::{Counts, Label};
@@ -15,24 +18,47 @@ struct ReadTo {
 }
 
 #[derive(Debug)]
+struct Ingested {
+    end: ReadTo,
+    stream: Stream,
+    written: Written,
+}
+
+#[derive(Debug)]
 pub struct Tally {
     ends: Vec<ReadTo>,
     authorship: Counts<Authorship>,
     unrecognised: Counts<Kind>,
     forms: Counts<Shape>,
     relations: Counts<Relation>,
+    written: Written,
 }
 
 #[derive(Debug)]
-pub struct Ingest;
+pub struct Ingest<'ports, T: Transcripts, S: Store> {
+    transcripts: &'ports T,
+    store: &'ports S,
+    cursors: Cursors,
+}
 
-impl Ingest {
-    pub fn read(port: &impl Transcripts) -> Result<Tally, Failure> {
-        let sessions = port.sessions()?;
-        let reads = port.read_all(&sessions)?;
-        let ends = sessions.iter().zip(&reads).map(|(session, read)| ReadTo::ending(session, read.cursor())).collect();
-        let streams: Vec<Stream> = reads.into_iter().map(|read| read.into_iter().collect()).collect();
-        Ok(Tally::counted(ends, &streams))
+impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
+    pub fn read(transcripts: &'ports T, store: &'ports S) -> Result<Tally, Failure> {
+        let lock = store.lock()?;
+        let ingest = Ingest { transcripts, store, cursors: store.read(SessionCursors)? };
+        let sessions = transcripts.sessions()?;
+        let ingested = sessions.iter().map(|session| ingest.session(session)).collect::<Result<Vec<_>, Failure>>()?;
+        lock.end()?;
+        Ok(Tally::counted(ingested))
+    }
+
+    fn session(&self, session: &Session) -> Result<Ingested, Failure> {
+        let read = self.transcripts.read_from(session, self.cursors.resuming(session.stem()))?;
+        let end = ReadTo::ending(session, read.cursor());
+        let lines: Vec<Line> = read.into_iter().collect();
+        let earlier = lines.first().map(|_| self.store.read(EarlierLines::within(end.session.clone()))).transpose()?;
+        let stream = earlier.unwrap_or_default().resumed(lines);
+        let written = self.store.write(SessionRecords::read(&end.session, end.cursor, &stream))?;
+        Ok(Ingested { end, stream, written })
     }
 }
 
@@ -43,14 +69,18 @@ impl ReadTo {
 }
 
 impl Tally {
-    fn counted(ends: Vec<ReadTo>, streams: &[Stream]) -> Tally {
+    fn counted(ingested: Vec<Ingested>) -> Tally {
+        let written = Written::total(ingested.iter().map(|session| session.written));
+        let (ends, streams): (Vec<ReadTo>, Vec<Stream>) =
+            ingested.into_iter().map(|session| (session.end, session.stream)).unzip();
         let messages = || streams.iter().flat_map(|stream| stream.as_ref().iter());
         Tally {
-            ends,
             authorship: messages().map(|message| message.record().author()).collect(),
             unrecognised: streams.iter().flat_map(Stream::unrecognised).map(Unrecognised::kind).cloned().collect(),
             forms: messages().flat_map(Message::segments).map(|segment| Shape::from(segment.form())).collect(),
             relations: streams.iter().flat_map(Stream::links).map(|link| link.relation()).collect(),
+            written,
+            ends,
         }
     }
 }
@@ -61,6 +91,7 @@ impl fmt::Display for Tally {
         self.authorship.lines(Label::AUTHORSHIP, formatter)?;
         self.unrecognised.lines(Label::UNRECOGNISED, formatter)?;
         self.forms.lines(Label::FORM, formatter)?;
-        self.relations.lines(Label::RELATION, formatter)
+        self.relations.lines(Label::RELATION, formatter)?;
+        writeln!(formatter, "{} {}", Label::WRITTEN, self.written.count())
     }
 }

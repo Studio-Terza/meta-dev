@@ -11,6 +11,8 @@ use quote::quote;
 use syn::parse::Nothing;
 use syn::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility, parse_quote};
 
+pub use boundary::{Constant, Spelling};
+
 use caller::Caller;
 use delegation::Delegation;
 use filler::Filler;
@@ -80,9 +82,8 @@ impl Declared {
     }
 
     fn parsed(item: ItemTrait) -> Declared {
-        let item = Self::sealed(item);
-        let methods =
-            item.items.iter().filter_map(Self::required).map(|function| Method::declared(&function.sig)).collect();
+        let mut item = Self::sealed(item);
+        let methods = item.items.iter_mut().filter_map(Self::required).map(Method::declared).collect();
         Declared {
             caller: CallerName::from(&item.ident),
             filler: FillerName::from(&item.ident),
@@ -99,9 +100,9 @@ impl Declared {
         item
     }
 
-    fn required(item: &TraitItem) -> Option<&TraitItemFn> {
+    fn required(item: &mut TraitItem) -> Option<&mut TraitItemFn> {
         match item {
-            TraitItem::Fn(function) => function.default.is_none().then_some(function),
+            TraitItem::Fn(function) => Some(function).filter(|function| function.default.is_none()),
             _ => None,
         }
     }
