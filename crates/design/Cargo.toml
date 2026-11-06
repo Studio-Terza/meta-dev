@@ -1,0 +1,30 @@
+[package]
+name = "design"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[[test]]
+name = "workloads"
+path = "tests/workloads/main.rs"
+harness = false
+
+[dependencies]
+console-ports = { path = "../console-ports" }
+file-ports = { path = "../file-ports" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+stream = { path = "../stream" }
+thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+workload = { path = "../workload" }
+
+[lints]
+workspace = true

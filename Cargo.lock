@@ -104,6 +104,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "design"
+version = "0.1.0"
+dependencies = [
+ "console-ports",
+ "file-ports",
+ "newtype",
+ "port-core",
+ "stream",
+ "thiserror",
+ "transcript-ports",
+ "workload",
+]
+
+[[package]]
 name = "e2e"
 version = "0.1.0"
 dependencies = [
@@ -1412,9 +1426,11 @@ dependencies = [
 name = "stream"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "grammar",
  "laws",
  "newtype",
+ "port-core",
  "transcript-ports",
 ]
 
@@ -1607,6 +1623,14 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+
+[[package]]
+name = "workload"
+version = "0.1.0"
+dependencies = [
+ "newtype",
+ "port-core",
+]
 
 [[package]]
 name = "workspace-metadata"
