@@ -32,7 +32,22 @@ const UNIMPORTED: &str =
     "struct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
 const GLOB_STD: &str = "use std::fmt::*;\nstruct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
 
-const CASES: [Case; 21] = [
+const RENAMING_ROOT: &str = "pub use std::clone::Clone as Dup;\nmod x;\npub struct R;\n";
+const RENAMED_ELSEWHERE: &str = "use crate::{Dup, R};\nimpl Dup for R {\n    fn clone(&self) -> R { R }\n}\n";
+const PARENT_GLOBBED: &str = "struct R;\nmod inner {\n    use super::*;\n    impl Clone for R {\n        fn clone(&self) -> R { R }\n    }\n}\n#[cfg(test)]\nmod tests;\n";
+const TESTS_GLOBBED: &str = "use super::*;\nimpl Default for R {\n    fn default() -> R { R }\n}\n";
+const SHAPES_ROOT: &str = "mod shapes;\nmod order;\n";
+const SHAPES: &str = "pub trait Shape {}\n";
+const ORDER: &str =
+    "use super::shapes::*;\nstruct B;\nimpl PartialEq for B {\n    fn eq(&self, _: &B) -> bool { true }\n}\n";
+const DIGEST_ROOT: &str = "mod digest;\nmod block;\n";
+const DIGEST: &str = "pub trait Hash {}\n";
+const BLOCK: &str = "use super::digest::*;\nstruct Block;\nimpl Hash for Block {}\n";
+
+const PRIVATE_GLOB: &str = "pub trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\npub struct R;\npub fn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
+const SELF_AS_CORE: &str = "extern crate self as core;\npub mod clone {\n    pub trait Clone {}\n}\npub struct R;\nimpl core::clone::Clone for R {}\n";
+
+const CASES: [Case; 27] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -133,6 +148,50 @@ const CASES: [Case; 21] = [
         Title::new("a trait reached through a std glob"),
         &[Source::new(Located::new("a.rs"), Text::new(GLOB_STD))],
         Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a trait renamed in another file"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(RENAMING_ROOT)),
+            Source::new(Located::new("src/x.rs"), Text::new(RENAMED_ELSEWHERE)),
+        ],
+        Flagged::new(&["src/x.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a prelude trait under a parent glob"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(PARENT_GLOBBED)),
+            Source::new(Located::new("src/tests.rs"), Text::new(TESTS_GLOBBED)),
+        ],
+        Flagged::new(&["src/lib.rs:4", "src/tests.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a prelude trait under a sibling glob that does not declare it"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(SHAPES_ROOT)),
+            Source::new(Located::new("src/shapes.rs"), Text::new(SHAPES)),
+            Source::new(Located::new("src/order.rs"), Text::new(ORDER)),
+        ],
+        Flagged::new(&["src/order.rs:3"]),
+    ),
+    Case::new(
+        Title::new("an own trait reached through a sibling glob"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(DIGEST_ROOT)),
+            Source::new(Located::new("src/digest.rs"), Text::new(DIGEST)),
+            Source::new(Located::new("src/block.rs"), Text::new(BLOCK)),
+        ],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a trait behind a private import reached through a glob"),
+        &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_GLOB))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a crate declared as core by extern crate self"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_AS_CORE))],
+        Flagged::new(&[]),
     ),
 ];
 
