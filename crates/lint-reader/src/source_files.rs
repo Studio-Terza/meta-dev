@@ -12,13 +12,20 @@ use std::path::{Path, PathBuf};
 use file_ports::Files;
 use lint_core::{Readout, SourceFile};
 use lint_layout::Failure;
-use lint_placement::CrateFile;
-use lint_roots::{Regrouped, Tree};
+use lint_placement::{CrateFile, Packages};
+use lint_roots::{Regrouped, Target, Tree};
 use modules::Modules;
 use scope::Scope;
 use shelf::Shelf;
 use staged::Staged;
 use test_modules::TestModules;
+
+#[derive(Debug)]
+pub struct Stage<'given> {
+    trees: Vec<Tree<'given>>,
+    staged: Vec<Vec<Staged>>,
+    packages: Packages,
+}
 
 #[derive(Debug)]
 pub struct SourceFiles<'tree> {
@@ -28,11 +35,15 @@ pub struct SourceFiles<'tree> {
 }
 
 impl<'tree> SourceFiles<'tree> {
-    pub fn read(files: &impl Files, root: &Path) -> Result<Readout, Failure> {
+    pub fn read(files: &(impl Files + Sync), root: &Path) -> Result<Readout, Failure> {
         SourceFiles::read_all(files, &[root.to_path_buf()])
     }
 
-    pub fn read_all(files: &impl Files, roots: &[PathBuf]) -> Result<Readout, Failure> {
+    pub fn read_all(files: &(impl Files + Sync), roots: &[PathBuf]) -> Result<Readout, Failure> {
+        SourceFiles::staged(files, roots).map(|stage| SourceFiles::read_staged(files, &stage))
+    }
+
+    pub fn staged<'given>(files: &(impl Files + Sync), roots: &'given [PathBuf]) -> Result<Stage<'given>, Failure> {
         let opened = Tree::open_many(files, roots);
         let shape: Vec<Vec<&Tree<'_>>> = opened.iter().map(|opened| opened.iter().collect()).collect();
         let staged = Regrouped::like(&shape, Staged::under(files, &shape.concat()));
@@ -43,19 +54,31 @@ impl<'tree> SourceFiles<'tree> {
             .collect::<Result<Vec<(Tree<'_>, Vec<Staged>)>, Failure>>()?
             .into_iter()
             .unzip();
-        let starts =
-            trees.iter().zip(&staged).flat_map(|(tree, staged)| staged.iter().flat_map(|staged| staged.starts(tree)));
+        let packages: Vec<&Path> = staged.iter().flatten().flat_map(Staged::targets).map(Target::package).collect();
+        Ok(Stage { packages: Packages::read(files, &packages), trees, staged })
+    }
+
+    #[must_use]
+    pub fn read_staged(files: &impl Files, stage: &'tree Stage<'tree>) -> Readout {
+        let starts = stage
+            .trees
+            .iter()
+            .zip(&stage.staged)
+            .flat_map(|(tree, staged)| staged.iter().flat_map(|staged| staged.starts(tree)));
         let started = SourceFiles {
             seen: BTreeSet::new(),
             readout: Readout::default(),
-            shelf: Shelf::stocked(files, &starts.collect::<Vec<_>>()),
+            shelf: Shelf::stocked(files, &stage.packages, &starts.collect::<Vec<_>>()),
         };
-        let read =
-            trees.iter().zip(staged).flat_map(|(tree, staged)| staged.into_iter().map(move |staged| (tree, staged)));
-        Ok(read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted())
+        let read = stage
+            .trees
+            .iter()
+            .zip(&stage.staged)
+            .flat_map(|(tree, staged)| staged.iter().map(move |staged| (tree, staged)));
+        read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted()
     }
 
-    fn tree(self, tree: &'tree Tree<'tree>, staged: Staged) -> SourceFiles<'tree> {
+    fn tree(self, tree: &'tree Tree<'tree>, staged: &Staged) -> SourceFiles<'tree> {
         let read = staged.targets().iter().fold(self, |reading, target| {
             target.files().iter().fold(reading, |reading, file| {
                 let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
@@ -63,7 +86,7 @@ impl<'tree> SourceFiles<'tree> {
                 reading.file(&scope, file, &children)
             })
         });
-        SourceFiles { readout: read.readout.with_repo_files(staged.into_repo_files()), ..read }
+        SourceFiles { readout: read.readout.with_repo_files(staged.repo_files().to_vec()), ..read }
     }
 
     fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {

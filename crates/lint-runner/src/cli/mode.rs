@@ -14,7 +14,7 @@ use lint_paired_apis::PairedApis;
 use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
-use super::boundary::Helpers;
+use super::boundary::{Helpers, Queue};
 use super::{Outcome, Sources};
 use elegance::Elegance;
 use lints::Lints;
@@ -75,20 +75,26 @@ impl Mode {
     pub(crate) fn outcome_of<'file>(
         &self,
         readout: &'file Readout,
+        queue: &Queue,
         helpers: Helpers<'_>,
         out: &mut impl Write,
     ) -> Outcome<'file> {
         match self {
-            Mode::Gate => Self::gated(readout, helpers, out),
+            Mode::Gate => Self::gated(readout, queue, helpers, out),
             Mode::Report => Self::reported(readout.files(), out),
             Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
         }
     }
 
-    fn gated<'file>(readout: &'file Readout, helpers: Helpers<'_>, out: &mut impl Write) -> Outcome<'file> {
+    fn gated<'file>(
+        readout: &'file Readout,
+        queue: &Queue,
+        helpers: Helpers<'_>,
+        out: &mut impl Write,
+    ) -> Outcome<'file> {
         let files = readout.files();
         write!(out, "{}{}{}", TestBudget::measured(files), PairedApis::report(files), Clones::report(files)).ok();
-        Lints::checked(readout, helpers)
+        Lints::checked(readout, queue, helpers)
     }
 
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {

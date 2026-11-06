@@ -180,7 +180,7 @@ fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn the_gate_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
+fn the_gate_lists_the_tree_once_and_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
     const MOST_READERS: usize = 4;
     let scratch = Scratch::package()?;
     scratch.write("src/lib.rs", CLEAN)?;
@@ -190,7 +190,8 @@ fn the_gate_reads_the_sources_once_per_worker() -> Result<(), Box<dyn Error>> {
     let gating = FakeCounted::new(&scratch.files, scratch.root.clone());
     let gate = Trees::flagged(&gating, &scratch.root, &[]);
     assert_eq!(gate.exit, ExitCode::SUCCESS);
-    assert_eq!(gating.listings(), reading.listings() * workers);
+    assert_eq!(gating.listings(), reading.listings());
+    assert_eq!(gating.sources(), reading.sources() * workers);
     Ok(())
 }
 

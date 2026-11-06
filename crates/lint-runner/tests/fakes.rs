@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -120,19 +121,26 @@ impl Files for FakeLinked<'_> {
     }
 }
 
+const SOURCE_EXTENSION: &str = "rs";
+
 pub struct FakeCounted<'memory> {
     memory: &'memory Memory,
     counted: PathBuf,
     listings: AtomicUsize,
+    sources: AtomicUsize,
 }
 
 impl FakeCounted<'_> {
     pub fn new(memory: &Memory, counted: PathBuf) -> FakeCounted<'_> {
-        FakeCounted { memory, counted, listings: AtomicUsize::new(0) }
+        FakeCounted { memory, counted, listings: AtomicUsize::new(0), sources: AtomicUsize::new(0) }
     }
 
     pub fn listings(&self) -> usize {
         self.listings.load(Ordering::SeqCst)
+    }
+
+    pub fn sources(&self) -> usize {
+        self.sources.load(Ordering::SeqCst)
     }
 }
 
@@ -142,6 +150,7 @@ impl Files for FakeCounted<'_> {
     }
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.sources.fetch_add(usize::from(path.extension() == Some(OsStr::new(SOURCE_EXTENSION))), Ordering::SeqCst);
         self.memory.read_text(path)
     }
 
