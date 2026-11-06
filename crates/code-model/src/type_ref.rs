@@ -58,8 +58,11 @@ impl Named<Resolved> {
         let declared = self.path.parameter().and_then(|name| {
             parameters.iter().enumerate().find(|(_, parameter)| AsRef::<Name>::as_ref(*parameter) == name)
         });
-        let bound = declared.and_then(|(at, parameter)| arguments.get(at).or(parameter.default()));
-        bound.cloned().unwrap_or_else(|| {
+        let bound = declared.and_then(|(at, parameter)| {
+            let given = arguments.get(at).cloned();
+            given.or_else(|| parameter.default().map(|default| default.substituted(&parameters[..at], arguments)))
+        });
+        bound.unwrap_or_else(|| {
             TypeRef::Named(Named {
                 path: self.path.clone(),
                 arguments: self.arguments.iter().map(|argument| argument.substituted(parameters, arguments)).collect(),

@@ -26,8 +26,10 @@ const SELF_OF_A_PLAIN_TYPE: &str = "struct Plain;\nimpl Plain {\n    fn again() 
 const DEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn p() -> Res<u8> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
 const GIVEN_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
 const UNDEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
+const SELF_DEFAULTED_ERROR: &str = "#[derive(Debug, thiserror::Error)]\nstruct Failure;\ntype Res<T, E = T> = Result<(), E>;\nfn f() -> Res<Failure> { Ok(()) }\n";
+const WHOLE_DEFAULTED_ERROR: &str = "#[derive(Debug, thiserror::Error)]\nstruct Failure;\ntype Maybe<T, O = Option<T>> = O;\nfn f() -> Maybe<Failure> { None }\n";
 
-const CASES: [Case; 25] = [
+const CASES: [Case; 27] = [
     Case::new(
         Title::new("free, nested, inherent and trait declaration functions"),
         &[Source::new(Located::new("a.rs"), Text::new(FORMS))],
@@ -149,6 +151,16 @@ const CASES: [Case; 25] = [
         Title::new("an alias default overridden at the use"),
         &[Source::new(Located::new("a.rs"), Text::new(GIVEN_ERROR))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an alias default naming an earlier parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_DEFAULTED_ERROR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("an alias default that is an option of an earlier parameter"),
+        &[Source::new(Located::new("a.rs"), Text::new(WHOLE_DEFAULTED_ERROR))],
+        Flagged::new(&["a.rs:4"]),
     ),
     Case::new(
         Title::new("an alias without a default"),

@@ -567,6 +567,10 @@ const DEFAULTED_ALIAS: &str =
 const GIVEN_ALIAS: &str =
     "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn f() -> Res<u8, bool> { todo!() }\n";
 const UNDEFAULTED_ALIAS: &str = "type Res<T, E> = Result<T, E>;\nfn f() -> Res<u8, bool> { todo!() }\n";
+const SELF_DEFAULTED_ALIAS: &str =
+    "struct Failure;\ntype Res<T, E = T> = Result<T, E>;\nfn f() -> Res<Failure> { todo!() }\n";
+const WHOLE_DEFAULTED_ALIAS: &str =
+    "struct Failure;\ntype Maybe<T, O = Option<T>> = O;\nfn f() -> Maybe<Failure> { todo!() }\n";
 const CHAINED_ALIAS: &str = "struct Failure;\ntype Outcome = Checked<()>;\ntype Checked<T> = Result<T, Failure>;\nfn f() -> Outcome { Ok(()) }\n";
 
 const SUBJECTS: &str = "#[derive(Debug)]\nstruct A;\nimpl<T> Clone for Wrap<T> {}\n";
@@ -641,6 +645,17 @@ laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Re
     DEFAULTED_ALIAS => [Expect::named(
         Expect::std(&["std", "result", "Result"]),
         vec![Expect::primitive(Primitive::Integer), Expect::named(Expect::item("Rejected", ItemKind::Struct), Vec::new())],
+    )],
+    SELF_DEFAULTED_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![
+            Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new()),
+            Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new()),
+        ],
+    )],
+    WHOLE_DEFAULTED_ALIAS => [Expect::named(
+        Expect::std(&["std", "option", "Option"]),
+        vec![Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new())],
     )],
     GIVEN_ALIAS => [Expect::named(
         Expect::std(&["std", "result", "Result"]),
