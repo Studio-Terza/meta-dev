@@ -90,9 +90,9 @@ impl Kind {
     fn spoken(self, origin: Option<&Origin>, text: Option<Body>) -> Option<Spoken> {
         match self {
             Kind::Assistant => text.map(|text| Spoken { author: Authorship::Lead, text }),
-            Kind::User => Some(Spoken {
+            Kind::User => text.map(|text| Spoken {
                 author: origin.map_or(Authorship::Bystander, |found| found.kind.authorship()),
-                text: text.unwrap_or_default(),
+                text,
             }),
             Kind::Other => None,
         }

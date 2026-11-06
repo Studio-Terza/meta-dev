@@ -174,10 +174,7 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
-    assert_eq!(
-        Views::authors(read),
-        [Authorship::Owner, Authorship::Lead, Authorship::Bystander, Authorship::Bystander]
-    );
+    assert_eq!(Views::authors(read), [Authorship::Owner, Authorship::Lead, Authorship::Bystander]);
     Ok(())
 }
 
@@ -245,7 +242,7 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
     let second =
         Transcript::holding(&text).read(first.cursor()).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
-    prop_assert_eq!(Views::uuids(&together), ["1", "2", "3", "4"]);
+    prop_assert_eq!(Views::uuids(&together), ["1", "2", "4"]);
 });
 
 laws::table!(
