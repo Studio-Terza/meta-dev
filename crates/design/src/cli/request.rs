@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use console_ports::Environment;
+use design_store::Scope;
 
 use super::failure::Failure;
 use command::Command;
@@ -26,6 +27,7 @@ struct Words {
     plain: Vec<OsString>,
     workspace: Option<PathBuf>,
     persistence: Persistence,
+    scope: Scope,
     expecting: Expecting,
 }
 
@@ -40,6 +42,7 @@ enum Expecting {
 enum Argument {
     Workspace,
     DryRun,
+    All,
     Plain(OsString),
 }
 
@@ -47,6 +50,7 @@ enum Argument {
 enum Flag {
     Workspace,
     DryRun,
+    All,
 }
 
 impl FromStr for Flag {
@@ -58,7 +62,8 @@ impl FromStr for Flag {
 }
 
 impl Flag {
-    const NAMED: [(&'static str, Flag); 2] = [("--workspace", Flag::Workspace), ("--dry-run", Flag::DryRun)];
+    const NAMED: [(&'static str, Flag); 3] =
+        [("--workspace", Flag::Workspace), ("--dry-run", Flag::DryRun), ("--all", Flag::All)];
 }
 
 impl From<OsString> for Argument {
@@ -66,6 +71,7 @@ impl From<OsString> for Argument {
         match argument.to_str().and_then(|word| word.parse::<Flag>().ok()) {
             Some(Flag::Workspace) => Argument::Workspace,
             Some(Flag::DryRun) => Argument::DryRun,
+            Some(Flag::All) => Argument::All,
             None => Argument::Plain(argument),
         }
     }
@@ -75,20 +81,27 @@ impl Argument {
     fn expectation(&self) -> Expecting {
         match self {
             Argument::Workspace => Expecting::Path,
-            Argument::DryRun | Argument::Plain(_) => Expecting::Word,
+            Argument::DryRun | Argument::All | Argument::Plain(_) => Expecting::Word,
         }
     }
 
     fn persistence(&self, current: Persistence) -> Persistence {
         match self {
             Argument::DryRun => Persistence::DryRun,
-            Argument::Workspace | Argument::Plain(_) => current,
+            Argument::Workspace | Argument::All | Argument::Plain(_) => current,
+        }
+    }
+
+    fn scope(&self, current: Scope) -> Scope {
+        match self {
+            Argument::All => Scope::Everyone,
+            Argument::Workspace | Argument::DryRun | Argument::Plain(_) => current,
         }
     }
 
     fn plain(self) -> Option<OsString> {
         match self {
-            Argument::Workspace | Argument::DryRun => None,
+            Argument::Workspace | Argument::DryRun | Argument::All => None,
             Argument::Plain(word) => Some(word),
         }
     }
@@ -110,6 +123,7 @@ impl Words {
         Words {
             expecting: argument.expectation(),
             persistence: argument.persistence(self.persistence),
+            scope: argument.scope(self.scope),
             plain: self.plain.into_iter().chain(argument.plain()).collect(),
             ..self
         }
@@ -122,7 +136,7 @@ impl TryFrom<Words> for Request {
     fn try_from(words: Words) -> Result<Request, Failure> {
         match words.expecting {
             Expecting::Path => Err(Failure::Usage),
-            Expecting::Word => Command::try_from(words.plain.as_slice()).map(|command| Request {
+            Expecting::Word => Command::spoken(&words.plain, words.scope).map(|command| Request {
                 command,
                 workspace: words.workspace,
                 persistence: words.persistence,
@@ -144,7 +158,7 @@ impl Request {
         self.persistence
     }
 
-    pub fn command(&self) -> &Command {
-        &self.command
+    pub fn command(self) -> Command {
+        self.command
     }
 }

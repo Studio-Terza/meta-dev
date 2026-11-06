@@ -2,4 +2,5 @@
 pub enum Outcome {
     Ingested,
     Shown,
+    Searched,
 }

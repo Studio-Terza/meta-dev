@@ -11,7 +11,7 @@ use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
-    #[error("usage: design [--workspace <dir>] [--dry-run] (ingest | show <uuid>)")]
+    #[error("usage: design [--workspace <dir>] [--dry-run] (ingest | show <uuid> | search [--all] <words...>)")]
     Usage,
     #[error("the environment does not name {0:?}")]
     Unset(OsString),

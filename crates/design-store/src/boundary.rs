@@ -1,8 +1,14 @@
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+
 use file_ports::Offset;
+use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype};
 use store_ports::{Statements, StoreFailure, Written};
 use stream::{MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
+
+use crate::Scope;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct Author(String);
@@ -45,6 +51,22 @@ pub struct LinkRow {
     target: String,
     source_message: String,
     target_message: String,
+}
+
+#[derive(Debug)]
+pub struct Hit {
+    id: i64,
+    uuid: String,
+    author: String,
+    at: String,
+    body: String,
+    rank: f64,
+}
+
+#[derive(Debug)]
+pub(crate) struct RankRow {
+    id: i64,
+    rank: f64,
 }
 
 #[derive(Debug)]
@@ -97,6 +119,12 @@ impl From<EdgeRow> for Skipped {
 impl From<&SegmentRow> for Body {
     fn from(segment: &SegmentRow) -> Body {
         Body::new(segment.body.clone())
+    }
+}
+
+impl From<&Hit> for Body {
+    fn from(hit: &Hit) -> Body {
+        Body::new(hit.body.clone())
     }
 }
 
@@ -207,6 +235,64 @@ impl LinkRow {
     #[must_use]
     pub fn relation(&self) -> RelationName {
         RelationName::new(self.relation.clone())
+    }
+}
+
+impl Hit {
+    pub(crate) fn matching(
+        term: &Term,
+        scope: Scope,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<Hit>, StoreFailure> {
+        let term = term.to_string();
+        let only = scope.only().map(|author| author.to_string());
+        statements.rows(sqlx::query_as!(
+            Hit,
+            r#"SELECT segments.rowid AS "id!: i64", messages.uuid, messages.author, messages.at, segments.body, segments_fts.rank AS "rank!: f64" FROM segments_fts JOIN segments ON segments.rowid = segments_fts.rowid JOIN messages ON messages.uuid = segments.message WHERE segments_fts MATCH ?1 AND (?2 IS NULL OR messages.author = ?2)"#,
+            term,
+            only
+        ))
+    }
+
+    pub(crate) fn within(self, rest: &[BTreeMap<i64, f64>]) -> Option<Hit> {
+        rest.iter()
+            .map(|ranks| ranks.get(&self.id).copied())
+            .sum::<Option<f64>>()
+            .map(|more| Hit { rank: self.rank + more, ..self })
+    }
+
+    pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
+        self.rank.total_cmp(&other.rank).then(self.id.cmp(&other.id))
+    }
+
+    #[must_use]
+    pub fn uuid(&self) -> Uuid {
+        Uuid::new(self.uuid.clone())
+    }
+
+    #[must_use]
+    pub fn author(&self) -> Author {
+        Author::new(self.author.clone())
+    }
+
+    #[must_use]
+    pub fn stamp(&self) -> Instant {
+        Instant::new(self.at.clone())
+    }
+}
+
+impl RankRow {
+    pub(crate) fn matching(term: &Term, statements: &mut Statements<'_>) -> Result<Vec<RankRow>, StoreFailure> {
+        let term = term.to_string();
+        statements.rows(sqlx::query_as!(
+            RankRow,
+            r#"SELECT rowid AS "id!: i64", rank AS "rank!: f64" FROM segments_fts WHERE segments_fts MATCH ?1"#,
+            term
+        ))
+    }
+
+    pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<i64, f64> {
+        rows.into_iter().map(|row| (row.id, row.rank)).collect()
     }
 }
 

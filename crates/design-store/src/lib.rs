@@ -1,14 +1,19 @@
 mod boundary;
 mod cursors;
 mod earlier_lines;
+mod scope;
+mod search_segments;
 mod session_cursors;
 mod session_records;
 mod shown_message;
 mod stored;
 mod stream_schema;
 
+pub use boundary::Hit;
 pub use cursors::Cursors;
 pub use earlier_lines::EarlierLines;
+pub use scope::Scope;
+pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;
 pub use session_records::SessionRecords;
 pub use shown_message::ShownMessage;
