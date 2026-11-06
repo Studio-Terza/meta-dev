@@ -11,6 +11,7 @@ const FIXTURES: &str = "tests/fixtures";
 const STORED_MANIFEST: &str = "manifest.toml";
 const MANIFEST: &str = "Cargo.toml";
 const SITE_END: &str = ": ";
+const LINE_START: &str = ":";
 const FIX_START: &str = "; ";
 
 #[test]
@@ -91,9 +92,14 @@ impl Corpus {
     }
 
     fn violation(line: &str) -> Option<Violation<'_>> {
-        let (site, said) = line.split_once(SITE_END)?;
-        let (path, at) = site.rsplit_once(':')?;
-        Some(Violation { path, at: at.parse().ok()?, said })
+        let (end, _) = line.match_indices(SITE_END).next()?;
+        let site = line.get(..end)?;
+        let (colon, _) = site.rmatch_indices(LINE_START).next()?;
+        Some(Violation {
+            path: site.get(..colon)?,
+            at: site.get(colon + LINE_START.len()..)?.parse().ok()?,
+            said: line.get(end + SITE_END.len()..)?,
+        })
     }
 
     fn fix_named(line: &str) -> Option<&str> {

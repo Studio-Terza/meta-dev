@@ -20,7 +20,12 @@ impl Duplicates {
     }
 
     fn shows(pair: &[&str]) -> Vec<String> {
-        Shown::by(pair, Self::reported)
+        Shown::by(pair, |files| {
+            [OnGraph::<OneEdge>::report(files), OnGraph::<DuplicateTransitions>::report(files)]
+                .iter()
+                .flat_map(Shown::lines)
+                .collect()
+        })
     }
 }
 

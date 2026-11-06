@@ -11,10 +11,6 @@ impl Parallel {
         OnGraph::<ParallelStructures>::report(&[Sources::file("crates/x/src/lib.rs", Text::new(text))]).to_string()
     }
 
-    fn shown(pair: &[&str]) -> Vec<String> {
-        Shown::by(pair, |files| OnGraph::<ParallelStructures>::report(files).to_string())
-    }
-
     fn structures(text: &&str) -> usize {
         Self::of(text).matches("alike under one renaming").count()
     }
@@ -129,7 +125,7 @@ fn a_first_type_whose_laws_differ_does_not_hide_the_others() {
 
 laws::table!(
     the_parameters_count_every_place_where_any_member_differs_other_inputs_included,
-    Parallel::shown,
+    Shown::of::<OnGraph<ParallelStructures>>,
     [
         [THREE_WAYS, "alike under one renaming"] => vec!["crates/x/src/lib.rs:1: 3 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:1, x::B at crates/x/src/lib.rs:2, x::C at crates/x/src/lib.rs:3; one generic over 3 type parameters covers them; write the shared structure once, as one generic type or trait over the types the renaming swaps, and make each member an instance of it; where they mean different things, give them moves of their own"],
         [RENAMED_INPUTS, "alike under one renaming"] => vec!["crates/x/src/lib.rs:1: 2 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:1, x::B at crates/x/src/lib.rs:2; one generic over 2 type parameters covers them; write the shared structure once, as one generic type or trait over the types the renaming swaps, and make each member an instance of it; where they mean different things, give them moves of their own"],
