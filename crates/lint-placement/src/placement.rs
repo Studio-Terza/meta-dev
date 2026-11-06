@@ -2,7 +2,7 @@ mod build_script;
 mod source_directory;
 mod target_directory;
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
@@ -70,10 +70,7 @@ impl Placement {
 
     #[must_use]
     pub fn executable_root<'file>(&self, file: &'file Path) -> Option<&'file Path> {
-        let plain = |path: &Path| path.components().filter(|part| *part != Component::CurDir).collect::<PathBuf>();
-        Some(file).filter(|file| {
-            self.role.roots(self.crate_root().directory(), file).iter().any(|root| plain(root) == plain(file))
-        })
+        Some(file).filter(|file| self.role.roots(self.crate_root().directory(), file).iter().any(|root| root == file))
     }
 
     #[must_use]
