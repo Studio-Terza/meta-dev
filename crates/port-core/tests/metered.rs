@@ -1,5 +1,5 @@
 use laws::law;
-use port_core::{Calls, Entry, Metered, Op, OpName};
+use port_core::{Calls, Entry, Op, OpName, Run, Snapshot};
 
 #[derive(Debug)]
 struct ReadSession;
@@ -37,50 +37,93 @@ impl Sessions for Lines {
 
 law!(every_call_is_counted_once_for_its_own_op, (0usize..16, 0usize..16), counts, {
     let (reads, writes) = counts;
-    let port = Metered::new(Lines(1));
-    port.tally().reset();
+    let port = Run::default().meter(Lines(1));
     (0..reads).for_each(|_| {
         port.call(Sessions::read_session);
     });
     (0..writes).for_each(|_| {
         port.call(Sessions::write_session);
     });
-    let tally = port.tally();
+    let tally = port.tally().snapshot();
     laws::proptest::prop_assert_eq!(
-        (tally.calls(ReadSession::NAME), tally.calls(WriteSession::NAME)),
+        (tally.calls::<ReadSession>(), tally.calls::<WriteSession>()),
         (Calls::new(reads), Calls::new(writes))
     );
 });
 
 #[test]
 fn a_call_returns_what_the_body_returns() {
-    let port = Metered::new(Lines(3));
+    let port = Run::default().meter(Lines(3));
     assert_eq!(port.call(Sessions::read_session), 3);
 }
 
 #[test]
 fn the_snapshot_lists_only_the_ops_that_were_called() {
-    let port = Metered::new(Lines(1));
+    let port = Run::default().meter(Lines(1));
     port.call(Sessions::write_session);
-    let names: Vec<OpName> = port.tally().snapshot().keys().copied().collect();
+    let names: Vec<OpName> = port.tally().snapshot().iter().map(|counted| counted.name()).collect();
     assert_eq!(names, vec![WriteSession::NAME]);
 }
 
 #[test]
-fn two_meters_of_one_port_count_into_one_tally() {
-    let first = Metered::new(Lines(1));
-    let second = Metered::new(Lines(2));
-    first.tally().reset();
+fn meters_of_one_run_share_a_tally_and_separate_runs_do_not() {
+    let run = Run::default();
+    let first = run.meter(Lines(1));
+    let second = run.meter(Lines(2));
+    let other_run = Run::default();
+    let other = other_run.meter(Lines(3));
     first.call(Sessions::read_session);
     second.call(Sessions::read_session);
-    assert_eq!(first.tally().calls(ReadSession::NAME), Calls::new(2));
-    assert_eq!(second.tally().calls(ReadSession::NAME), Calls::new(2));
+    assert_eq!(first.tally().snapshot().calls::<ReadSession>(), Calls::new(2));
+    assert_eq!(second.tally().snapshot().calls::<ReadSession>(), Calls::new(2));
+    assert_eq!(run.snapshot().calls::<ReadSession>(), Calls::new(2));
+    assert_eq!(other.tally().snapshot().calls::<ReadSession>(), Calls::new(0));
+    assert_eq!(other_run.snapshot().calls::<ReadSession>(), Calls::new(0));
 }
 
 #[test]
-fn a_reset_clears_the_tally() {
-    let port = Metered::new(Lines(1));
+fn calls_from_spawned_threads_are_counted() {
+    let run = Run::default();
+    let port = run.meter(Lines(1));
+    std::thread::scope(|scope| {
+        (0..4).for_each(|_| {
+            scope.spawn(|| port.call(Sessions::read_session));
+        });
+    });
+    assert_eq!(run.snapshot().calls::<ReadSession>(), Calls::new(4));
+}
+
+#[test]
+fn a_snapshot_does_not_change_after_it_is_taken() {
+    let run = Run::default();
+    let port = run.meter(Lines(1));
     port.call(Sessions::read_session);
-    port.tally().reset();
-    assert_eq!(port.tally().snapshot(), std::collections::BTreeMap::new());
+    let before: Snapshot = run.snapshot();
+    port.call(Sessions::read_session);
+    port.call(Sessions::write_session);
+    assert_eq!(before.calls::<ReadSession>(), Calls::new(1));
+    assert_eq!(before.calls::<WriteSession>(), Calls::new(0));
+    assert_eq!(before.iter().count(), 1);
+    assert_eq!(run.snapshot().calls::<ReadSession>(), Calls::new(2));
+}
+
+#[derive(Debug)]
+struct ListSessions;
+
+impl Op for ListSessions {
+    type Port = Lines;
+    const NAME: OpName = ReadSession::NAME;
+}
+
+#[test]
+fn ops_with_one_name_count_separately() {
+    let run = Run::default();
+    let port = run.meter(Lines(1));
+    port.call(Sessions::read_session);
+    port.call(|_, _entry: Entry<ListSessions>| ());
+    port.call(|_, _entry: Entry<ListSessions>| ());
+    let snapshot = run.snapshot();
+    assert_eq!(snapshot.calls::<ReadSession>(), Calls::new(1));
+    assert_eq!(snapshot.calls::<ListSessions>(), Calls::new(2));
+    assert_eq!(snapshot.iter().count(), 2);
 }

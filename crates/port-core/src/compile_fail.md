@@ -4,7 +4,7 @@ and must not compile. Stable rustdoc does not check the error codes, so they are
 A port method receives its entry from the meter:
 
 ```
-use port_core::{Entry, Metered, Op, OpName};
+use port_core::{Entry, Op, OpName, Run};
 
 struct Disk;
 
@@ -18,7 +18,7 @@ impl Op for Read {
 fn read(_entry: Entry<Read>) {}
 
 fn main() {
-    Metered::new(Disk).call(|_, entry| read(entry));
+    Run::default().meter(Disk).call(|_, entry| read(entry));
 }
 ```
 
@@ -88,7 +88,7 @@ fn main() {
 An entry for one port's op cannot be minted by the meter of another port:
 
 ```compile_fail,E0271
-use port_core::{Entry, Metered, Op, OpName};
+use port_core::{Entry, Op, OpName, Run};
 
 struct Disk;
 
@@ -111,7 +111,7 @@ A held resource cannot be built from an entry of another port's op:
 ```compile_fail,E0271
 use std::rc::Rc;
 
-use port_core::{Entry, Held, Metered, Op, OpName, ReleaseLog, Resource};
+use port_core::{Entry, Held, Op, OpName, ReleaseLog, Resource, Run};
 
 struct Disk;
 
@@ -137,6 +137,18 @@ impl Resource for Key {
 
 fn main() {
     let log = Rc::new(ReleaseLog::default());
-    let _held: Held<Key> = Metered::new(Disk).call(|_, entry: Entry<Read>| Held::new(entry, Key, &log));
+    let _held: Held<Key> = Run::default().meter(Disk).call(|_, entry: Entry<Read>| Held::new(entry, Key, &log));
+}
+```
+
+A meter cannot be made outside a run:
+
+```compile_fail
+use port_core::Metered;
+
+struct Disk;
+
+fn main() {
+    let _meter = Metered::new(Disk);
 }
 ```
