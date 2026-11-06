@@ -199,11 +199,9 @@ impl From<ConversationalRow> for Annotation {
     }
 }
 
-impl Annotation {
-    pub(crate) fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Annotation>, StoreFailure> {
-        let current = Standing::Current;
-        let superseded = Standing::Superseded;
-        let placed = statements.rows(store_ports::query!(
+impl PlacedRow {
+    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<PlacedRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
             PlacedRow,
             r#"
 SELECT
@@ -222,8 +220,15 @@ ORDER BY
   node
 "#,
             message: Uuid
-        ))?;
-        let sensed = statements.rows(store_ports::query!(
+        ))
+    }
+}
+
+impl SensedRow {
+    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<SensedRow>, StoreFailure> {
+        let current = Standing::Current;
+        let superseded = Standing::Superseded;
+        statements.rows(store_ports::query!(
             SensedRow,
             r#"
 SELECT
@@ -256,8 +261,13 @@ ORDER BY
             message: Uuid,
             superseded: Standing,
             current: Standing
-        ))?;
-        let related = statements.rows(store_ports::query!(
+        ))
+    }
+}
+
+impl RelatedRow {
+    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<RelatedRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
             RelatedRow,
             r#"
 SELECT
@@ -278,8 +288,13 @@ ORDER BY
   target_ordinal
 "#,
             message: Uuid
-        ))?;
-        let conversational = statements.rows(store_ports::query!(
+        ))
+    }
+}
+
+impl ConversationalRow {
+    fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<ConversationalRow>, StoreFailure> {
+        statements.rows(store_ports::query!(
             ConversationalRow,
             r#"
 SELECT
@@ -294,7 +309,16 @@ ORDER BY
   ordinal
 "#,
             message: Uuid
-        ))?;
+        ))
+    }
+}
+
+impl Annotation {
+    pub(crate) fn stored_for(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Annotation>, StoreFailure> {
+        let placed = PlacedRow::stored_for(message, statements)?;
+        let sensed = SensedRow::stored_for(message, statements)?;
+        let related = RelatedRow::stored_for(message, statements)?;
+        let conversational = ConversationalRow::stored_for(message, statements)?;
         let annotations = placed
             .into_iter()
             .map(Annotation::from)
