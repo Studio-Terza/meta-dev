@@ -1,16 +1,20 @@
 use proc_macro2::TokenStream;
 use syn::LitStr;
+use syn::parse::{Parse, ParseStream};
 
-use crate::expanded::Expanded;
+use crate::expanded::{Expanded, Expanding};
 
 #[derive(Debug)]
-pub struct Migrations;
+pub struct Migrations(Option<LitStr>);
 
-impl Migrations {
-    pub fn expanded(tokens: TokenStream) -> TokenStream {
-        syn::parse2::<Option<LitStr>>(tokens).map_or_else(
-            |error| error.to_compile_error(),
-            |path| Expanded::new(sqlx_macros_core::migrate::expand(path)).tokens(),
-        )
+impl Parse for Migrations {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Migrations> {
+        input.parse().map(Migrations)
+    }
+}
+
+impl Expanding for Migrations {
+    fn expansion(self) -> TokenStream {
+        Expanded::from(sqlx_macros_core::migrate::expand(self.0)).into()
     }
 }

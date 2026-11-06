@@ -8,7 +8,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{LitStr, Token, Type};
 
-use crate::expanded::Expanded;
+use crate::expanded::{Expanded, Expanding};
 use bound::Bound;
 
 #[derive(Debug)]
@@ -18,12 +18,8 @@ pub struct Query {
     bounds: Punctuated<Bound, Token![,]>,
 }
 
-impl Query {
-    pub fn expanded(tokens: TokenStream) -> TokenStream {
-        syn::parse2::<Query>(tokens).map_or_else(|error| error.to_compile_error(), Query::checked)
-    }
-
-    fn checked(self) -> TokenStream {
+impl Expanding for Query {
+    fn expansion(self) -> TokenStream {
         let Query { row, source, bounds } = self;
         let arguments = bounds.iter().map(Bound::raw);
         let written = quote!(source = #source, args = [#(#arguments),*]);
@@ -33,17 +29,19 @@ impl Query {
                 let read = Self::sqlx(quote!(#written, record = __Raw));
                 quote! {{
                     type __Raw = <#row as ::store_ports::Columns>::Raw;
-                    ::store_ports::Selected::<#row, _>::new(#read)
+                    (#read).try_map(<#row as ::store_ports::Columns>::decoded)
                 }}
             },
         )
     }
+}
 
+impl Query {
     fn sqlx(input: TokenStream) -> TokenStream {
         let expansion = syn::parse2::<QueryMacroInput>(input)
             .map_err(Box::from)
             .and_then(|input| expand_input(input, FOSS_DRIVERS));
-        Expanded::new(expansion).tokens()
+        Expanded::from(expansion).into()
     }
 
     fn row(input: ParseStream<'_>) -> syn::Result<Option<Type>> {

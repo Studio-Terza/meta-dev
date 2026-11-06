@@ -10,7 +10,7 @@ use super::Column;
 #[derive(Debug, thiserror::Error)]
 pub enum ColumnFailure {
     #[error("a stored number does not fit its column's type: {0}")]
-    Unfit(#[from] TryFromIntError),
+    Unfit(#[source] TryFromIntError),
     #[error("a stored spelling names nothing of its column's type: {0}")]
     Misspelled(#[source] Box<dyn Error + Send + Sync>),
     #[error("a stored column its row needs is null")]
@@ -125,7 +125,7 @@ impl Primitive for usize {
     }
 
     fn from_raw(raw: i64) -> Result<usize, ColumnFailure> {
-        Ok(usize::try_from(raw)?)
+        usize::try_from(raw).map_err(ColumnFailure::Unfit)
     }
 }
 
@@ -137,6 +137,6 @@ impl Primitive for u64 {
     }
 
     fn from_raw(raw: i64) -> Result<u64, ColumnFailure> {
-        Ok(u64::try_from(raw)?)
+        u64::try_from(raw).map_err(ColumnFailure::Unfit)
     }
 }
