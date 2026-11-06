@@ -1,4 +1,4 @@
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Display};
 use std::marker::PhantomData;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,15 +21,10 @@ pub trait Op {
     const NAME: OpName;
 }
 
+#[derive(Debug)]
 pub struct Pass<'call, O> {
     call: PhantomData<fn(&'call ()) -> &'call ()>,
     op: PhantomData<O>,
-}
-
-impl<O> Debug for Pass<'_, O> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("Pass")
-    }
 }
 
 impl<O> Pass<'_, O> {
