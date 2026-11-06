@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::str::FromStr;
 
+use port_core::Metered;
 use transcript_ports::{Transcripts, Uuid};
 
 use crate::cli::failure::Failure;
@@ -60,7 +61,7 @@ impl TryFrom<&[OsString]> for Command {
 }
 
 impl Command {
-    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<(), Failure> {
+    pub fn written(&self, port: &(impl Transcripts + Metered), out: &mut impl Write) -> Result<(), Failure> {
         match self {
             Command::Ingest => Ingest::read(port).and_then(|tally| Ok(write!(out, "{tally}")?)),
             Command::Show(uuid) => Shown::find(port, uuid).and_then(|shown| Ok(write!(out, "{shown}")?)),

@@ -9,7 +9,7 @@ mod ops;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::Nothing;
-use syn::{Attribute, Error, ItemTrait, TraitItem, Visibility};
+use syn::{ItemTrait, TraitItem, TraitItemFn, Visibility};
 
 use caller::Caller;
 use delegation::Delegation;
@@ -31,8 +31,7 @@ pub trait Rendered {
 }
 
 pub struct Declared {
-    attributes: Vec<Attribute>,
-    visibility: Visibility,
+    item: ItemTrait,
     caller: CallerName,
     filler: FillerName,
     ops: OpsName,
@@ -46,12 +45,10 @@ impl AsRef<[Method]> for Declared {
 }
 
 impl Declared {
-    const REFUSED: &'static str = "a #[port] trait has no generics, no supertraits and is neither unsafe nor auto";
-
     pub fn expanded(attributes: TokenStream, item: TokenStream) -> TokenStream {
         syn::parse2::<Nothing>(attributes)
             .and_then(|Nothing| syn::parse2::<ItemTrait>(item))
-            .and_then(Declared::parsed)
+            .map(Declared::parsed)
             .map_or_else(|error| error.to_compile_error(), |declared| Self::expansion(&declared))
     }
 
@@ -62,12 +59,12 @@ impl Declared {
         Delegation::rendered_after(self, &ops)
     }
 
-    pub fn attributes(&self) -> &[Attribute] {
-        &self.attributes
+    pub fn declared_trait(&self) -> &ItemTrait {
+        &self.item
     }
 
     pub fn visibility(&self) -> &Visibility {
-        &self.visibility
+        &self.item.vis
     }
 
     pub fn caller_name(&self) -> &CallerName {
@@ -82,42 +79,22 @@ impl Declared {
         &self.ops
     }
 
-    fn parsed(item: ItemTrait) -> syn::Result<Declared> {
-        Self::refuse_extras(&item)?;
-        let ItemTrait { attrs, vis, ident, items, .. } = item;
-        let methods = Self::methods_of(items)?;
-        Ok(Declared {
-            attributes: attrs,
-            visibility: vis,
-            caller: CallerName::from(&ident),
-            filler: FillerName::from(&ident),
-            ops: OpsName::from(&ident),
+    fn parsed(item: ItemTrait) -> Declared {
+        let methods =
+            item.items.iter().filter_map(Self::required).map(|function| Method::declared(&function.sig)).collect();
+        Declared {
+            caller: CallerName::from(&item.ident),
+            filler: FillerName::from(&item.ident),
+            ops: OpsName::from(&item.ident),
             methods,
-        })
+            item,
+        }
     }
 
-    fn refuse_extras(item: &ItemTrait) -> syn::Result<()> {
-        [
-            item.generics.params.is_empty(),
-            item.generics.where_clause.is_none(),
-            item.supertraits.is_empty(),
-            item.unsafety.is_none(),
-            item.auto_token.is_none(),
-        ]
-        .into_iter()
-        .all(std::convert::identity)
-        .then_some(())
-        .ok_or_else(|| Error::new_spanned(&item.ident, Self::REFUSED))
-    }
-
-    fn methods_of(items: Vec<TraitItem>) -> syn::Result<Vec<Method>> {
-        items.into_iter().map(Self::method_of).collect()
-    }
-
-    fn method_of(item: TraitItem) -> syn::Result<Method> {
+    fn required(item: &TraitItem) -> Option<&TraitItemFn> {
         match item {
-            TraitItem::Fn(function) => Method::declared(function),
-            other => Err(Error::new_spanned(other, "a #[port] trait holds methods only, no associated items")),
+            TraitItem::Fn(function) => function.default.is_none().then_some(function),
+            _ => None,
         }
     }
 }

@@ -1,50 +1,52 @@
 mod parameter;
-mod refusal;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, Block, Signature, TraitItemFn};
+use syn::{FnArg, Ident, ReturnType, Signature, Type};
 
 use super::boundary::Spelling;
 use super::names::OpsName;
 pub use parameter::Parameter;
-use refusal::Refusal;
 
 pub struct Method {
-    attributes: Vec<Attribute>,
-    signature: Signature,
-    provided: Option<Block>,
+    name: Ident,
     parameters: Vec<Parameter>,
+    output: ReturnType,
 }
 
 impl Method {
-    pub fn declared(item: TraitItemFn) -> syn::Result<Method> {
-        let TraitItemFn { attrs, sig, default, .. } = item;
-        Refusal::qualifiers(&sig)?;
-        Refusal::generics(&sig.generics)?;
-        Refusal::receiver(&sig.inputs)?;
-        let parameters = sig.inputs.iter().skip(1).map(Parameter::parsed).collect::<syn::Result<Vec<_>>>()?;
-        Ok(Method { attributes: attrs, signature: sig, provided: default, parameters })
+    pub fn declared(signature: &Signature) -> Method {
+        let parameters = signature
+            .inputs
+            .iter()
+            .filter_map(Self::typed)
+            .enumerate()
+            .map(|(position, tree)| Parameter::named(Spelling::input(position), tree))
+            .collect();
+        Method { name: signature.ident.clone(), parameters, output: signature.output.clone() }
     }
 
-    pub fn attributes(&self) -> &[Attribute] {
-        &self.attributes
+    fn typed(input: &FnArg) -> Option<&Type> {
+        match input {
+            FnArg::Typed(typed) => Some(&typed.ty),
+            FnArg::Receiver(_) => None,
+        }
     }
 
-    pub fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    pub fn provided(&self) -> Option<&Block> {
-        self.provided.as_ref()
+    pub fn name(&self) -> &Ident {
+        &self.name
     }
 
     pub fn parameters(&self) -> &[Parameter] {
         &self.parameters
     }
 
+    pub fn output(&self) -> &ReturnType {
+        &self.output
+    }
+
     pub fn pass(&self, ops: &OpsName) -> TokenStream {
-        let op = Spelling::camel(&self.signature.ident);
+        let op = Spelling::camel(&self.name);
         quote! { ::port_core::Pass<'_, #ops::#op> }
     }
 }

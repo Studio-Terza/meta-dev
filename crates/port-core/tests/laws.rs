@@ -155,6 +155,11 @@ fn op_names_are_the_module_path_then_the_trait_and_method() {
 }
 
 #[test]
-fn a_two_word_trait_names_its_ops_module_in_snake_case() {
-    assert_eq!(Tally::named::<session_cache_ops::Clear>(), "laws::session_cache_ops::SessionCache::clear");
+fn a_two_word_trait_names_its_ops_module_in_snake_case() -> Result<(), RootRefused> {
+    let run = Tally::shared()?;
+    let port = Tally::over(&run, Memory::default());
+    SessionCache::clear(Tally::metered(&port));
+    drop(port);
+    assert_eq!(Tally::names(run.finish().snapshot()), ["laws::session_cache_ops::SessionCache::clear"]);
+    Ok(())
 }

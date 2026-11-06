@@ -1,4 +1,4 @@
-use quote::ToTokens;
+use quote::{ToTokens, format_ident};
 use syn::{Ident, LitStr};
 
 #[derive(Clone, Copy, Debug)]
@@ -62,6 +62,10 @@ impl Spelling {
             .flat_map(|(case, letter)| case.applied(letter))
             .collect();
         Ident::new(&camel, method.span())
+    }
+
+    pub fn input(position: usize) -> Ident {
+        format_ident!("input{position}")
     }
 
     pub fn method_path(caller: &impl ToTokens, method: &Ident) -> LitStr {

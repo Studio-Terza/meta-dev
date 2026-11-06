@@ -2,6 +2,7 @@ mod count;
 
 use std::fmt;
 
+use port_core::Metered;
 use stream::{Message, Relation, Shape, Stream};
 use transcript_ports::{Authorship, Cursor, Session, SessionId, Transcripts};
 
@@ -26,7 +27,7 @@ pub struct Tally {
 pub struct Ingest;
 
 impl Ingest {
-    pub fn read(port: &impl Transcripts) -> Result<Tally, Failure> {
+    pub fn read(port: &(impl Transcripts + Metered)) -> Result<Tally, Failure> {
         let sessions = port.sessions()?;
         let reads = port.read_all(&sessions)?;
         let ends = sessions.iter().zip(&reads).map(|(session, read)| ReadTo::ending(session, read.cursor())).collect();

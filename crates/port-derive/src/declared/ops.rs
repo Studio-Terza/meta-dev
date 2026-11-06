@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Ident;
 
 use super::boundary::Spelling;
 use super::method::Method;
@@ -14,11 +13,7 @@ impl Rendered for Ops {
         let visibility = declared.visibility();
         let module = declared.ops_name();
         let caller = declared.caller_name();
-        let declarations = declared
-            .as_ref()
-            .iter()
-            .filter(|method| method.provided().is_none())
-            .map(|method| Self::op_declaration(&Spelling::camel(&method.signature().ident), caller, method));
+        let declarations = declared.as_ref().iter().map(|method| Self::op_declaration(caller, method));
         quote! {
             #visibility mod #module {
                 #(#declarations)*
@@ -28,8 +23,9 @@ impl Rendered for Ops {
 }
 
 impl Ops {
-    fn op_declaration(op: &Ident, caller: &CallerName, method: &Method) -> TokenStream {
-        let path = Spelling::method_path(caller, &method.signature().ident);
+    fn op_declaration(caller: &CallerName, method: &Method) -> TokenStream {
+        let op = Spelling::camel(method.name());
+        let path = Spelling::method_path(caller, method.name());
         quote! {
             #[derive(Debug)]
             pub struct #op;
