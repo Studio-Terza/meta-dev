@@ -4,6 +4,8 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
+use file_ports::Files;
+use transcript_ports::ClaudeCodeDir;
 
 use crate::cli::failure::Failure;
 use slug::Slug;
@@ -11,13 +13,33 @@ use slug::Slug;
 #[derive(Debug)]
 pub struct Projects;
 
+#[derive(Debug)]
+pub struct Located {
+    transcripts: PathBuf,
+    store: PathBuf,
+}
+
+impl Located {
+    pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
+        ClaudeCodeDir::new(files, self.transcripts.clone())
+    }
+
+    pub fn store<S>(self, opened: impl FnOnce(PathBuf) -> S) -> S {
+        opened(self.store)
+    }
+}
+
 impl Projects {
-    pub fn directory(environment: &impl Environment, workspace: Option<&Path>) -> Result<PathBuf, Failure> {
+    pub fn located(environment: &impl Environment, workspace: Option<&Path>) -> Result<Located, Failure> {
         let home = environment.variable(OsStr::new("HOME")).ok_or(Failure::Unset(OsString::from("HOME")))?;
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
         let chosen = Self::chosen(current, workspace).ok_or(Failure::Unset(OsString::from("PWD")))?;
-        let slug = Slug::try_from(Self::resolved(&chosen).as_path())?;
-        Ok(PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)))
+        let root = Self::resolved(&chosen);
+        let slug = Slug::try_from(root.as_path())?;
+        Ok(Located {
+            transcripts: PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)),
+            store: root.join(".meta").join("design.sqlite"),
+        })
     }
 
     fn chosen(current: Option<PathBuf>, workspace: Option<&Path>) -> Option<PathBuf> {

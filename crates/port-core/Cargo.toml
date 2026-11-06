@@ -11,6 +11,7 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 port-derive = { path = "../port-derive" }
+thiserror.workspace = true
 
 [dev-dependencies]
 laws = { path = "../laws" }

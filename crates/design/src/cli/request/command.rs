@@ -6,6 +6,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::str::FromStr;
 
+use store_ports::Store;
 use transcript_ports::{Transcripts, Uuid};
 
 use crate::Outcome;
@@ -63,13 +64,18 @@ impl TryFrom<&[OsString]> for Command {
 }
 
 impl Command {
-    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<Outcome, Failure> {
+    pub fn written(
+        &self,
+        transcripts: &impl Transcripts,
+        store: &impl Store,
+        out: &mut impl Write,
+    ) -> Result<Outcome, Failure> {
         match self {
-            Command::Ingest => {
-                Ingest::read(port).and_then(|tally| Printed::shown(out, &tally)).map(|_printed| Outcome::Ingested)
-            }
+            Command::Ingest => Ingest::read(transcripts, store)
+                .and_then(|tally| Printed::shown(out, &tally))
+                .map(|_printed| Outcome::Ingested),
             Command::Show(uuid) => {
-                Shown::find(port, uuid).and_then(|shown| Printed::shown(out, &shown)).map(|_printed| Outcome::Shown)
+                Shown::find(store, uuid).and_then(|shown| Printed::shown(out, &shown)).map(|_printed| Outcome::Shown)
             }
         }
     }

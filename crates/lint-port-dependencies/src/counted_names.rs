@@ -15,7 +15,7 @@ pub(crate) struct CountedNames;
 
 impl CountedNames {
     const COUNTING: [Word<'static>; 2] = words!["port_core", "port_derive"];
-    const COUNTED: [Word<'static>; 1] = words!["counted_call"];
+    const COUNTED: [Word<'static>; 2] = words!["counted_call", "counted_acquire"];
 
     pub(crate) fn outside_port_core(file: &SourceFile) -> Option<&SourceFile> {
         let name: &Name = file.placement().package().crate_name().borrow();

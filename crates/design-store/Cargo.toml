@@ -1,0 +1,28 @@
+[package]
+name = "design-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.port]
+owns = ["sqlx"]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+file-ports = { path = "../file-ports" }
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+sqlx.workspace = true
+store-ports = { path = "../store-ports" }
+stream = { path = "../stream" }
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

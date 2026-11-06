@@ -14,6 +14,7 @@ impl Label {
     pub const UNRECOGNISED: Label = Label("unrecognised");
     pub const FORM: Label = Label("form");
     pub const RELATION: Label = Label("relation");
+    pub const WRITTEN: Label = Label("written");
 }
 
 impl fmt::Display for Label {

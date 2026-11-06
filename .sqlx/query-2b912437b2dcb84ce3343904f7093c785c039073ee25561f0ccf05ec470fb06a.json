@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT session, read_to FROM cursors",
+  "describe": {
+    "columns": [
+      {
+        "name": "session",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "cursors",
+            "name": "session"
+          }
+        }
+      },
+      {
+        "name": "read_to",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "cursors",
+            "name": "read_to"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2b912437b2dcb84ce3343904f7093c785c039073ee25561f0ccf05ec470fb06a"
+}

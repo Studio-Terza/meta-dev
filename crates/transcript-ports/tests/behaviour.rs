@@ -96,7 +96,11 @@ impl Transcript {
         let run = Run::root();
         let port = run.port(self.directory());
         let sessions = Transcripts::sessions(&port).ok()?;
-        Transcripts::read_all(&port, &sessions).ok()?;
+        sessions
+            .iter()
+            .map(|session| Transcripts::read_from(&port, session, Cursor::default()))
+            .collect::<Result<Vec<_>, _>>()
+            .ok()?;
         drop(port);
         let measured = run.finish();
         Some(Counted {

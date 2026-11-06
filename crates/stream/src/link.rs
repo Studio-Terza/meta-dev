@@ -1,7 +1,5 @@
 use std::fmt;
 
-use transcript_ports::Uuid;
-
 use crate::Relation;
 use crate::anchor::Anchor;
 
@@ -13,6 +11,8 @@ pub struct MechanicalLink {
 }
 
 impl MechanicalLink {
+    pub const ENDS: usize = 2;
+
     pub(crate) fn new(source: Anchor, relation: Relation, target: Anchor) -> MechanicalLink {
         MechanicalLink { source, relation, target }
     }
@@ -23,8 +23,8 @@ impl MechanicalLink {
     }
 
     #[must_use]
-    pub fn touching(&self, message: &Uuid) -> Option<&MechanicalLink> {
-        [&self.source, &self.target].into_iter().find(|anchor| anchor.message() == message).map(|_| self)
+    pub fn anchors(&self) -> [&Anchor; Self::ENDS] {
+        [&self.source, &self.target]
     }
 }
 

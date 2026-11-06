@@ -9,6 +9,7 @@ use console_ports::Environment;
 
 use super::failure::Failure;
 use command::Command;
+use projects::Located;
 use projects::Projects;
 
 #[derive(Debug)]
@@ -118,8 +119,8 @@ impl Request {
         Request::try_from(arguments.fold(Words::default(), Words::taking))
     }
 
-    pub fn directory(&self, environment: &impl Environment) -> Result<PathBuf, Failure> {
-        Projects::directory(environment, self.workspace.as_deref().map(Path::new))
+    pub fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
+        Projects::located(environment, self.workspace.as_deref().map(Path::new))
     }
 
     pub fn command(&self) -> &Command {

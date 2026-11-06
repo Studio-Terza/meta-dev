@@ -6,7 +6,7 @@ use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 use stream::{Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, ClaudeCodeDir, Transcripts, Uuid};
+use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Transcripts, Uuid};
 
 const CITED: &str = "85b287b3-4d5e-4f60-8a9b-0c1d2e3f4a5b";
 const DIRECTORY: &str = "/projects/work";
@@ -109,7 +109,10 @@ impl Fixture {
         let run = Run::root();
         let port = run.port(ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY)));
         let sessions = Transcripts::sessions(&port)?;
-        let reads = Transcripts::read_all(&port, &sessions)?;
+        let reads = sessions
+            .iter()
+            .map(|session| Transcripts::read_from(&port, session, Cursor::default()))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(reads.into_iter().flatten().collect())
     }
 
@@ -213,7 +216,9 @@ impl Touching {
             stream
                 .links()
                 .iter()
-                .filter_map(|link| link.touching(&Uuid::new((*touched).to_owned())))
+                .filter(|link| {
+                    link.anchors().into_iter().any(|anchor| *anchor.message() == Uuid::new((*touched).to_owned()))
+                })
                 .map(ToString::to_string)
                 .collect()
         })

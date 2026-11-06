@@ -6,7 +6,7 @@ use syn::visit::{self, Visit};
 use syn::{Attribute, ItemImpl, ItemTrait};
 
 use lint_core::{Site, SourceFile};
-use lint_layout::{LineNumber, Name, UsePath, Word, words};
+use lint_layout::{LineNumber, Name, UsePath, Whole, Word, words};
 
 pub(super) struct Declarations<'file, 'ports> {
     file: &'file SourceFile,
@@ -19,6 +19,7 @@ impl<'file, 'ports> Declarations<'file, 'ports> {
     const PORT: [Word<'static>; 1] = words!["port"];
     const QUALIFIED: [Word<'static>; 2] = words!["port_core", "port"];
     const FILLER: Word<'static> = Word::new("Filler");
+    const RELEASE: [Word<'static>; 1] = words!["Release"];
 
     pub(super) fn ports(file: &'file SourceFile) -> BTreeSet<Name> {
         Declarations::walked(file, &BTreeSet::new()).declared
@@ -40,12 +41,10 @@ impl<'file, 'ports> Declarations<'file, 'ports> {
     }
 
     fn filled(&self, block: &ItemImpl) -> Option<Span> {
-        block
-            .trait_
-            .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
-            .filter(|last| self.ports.iter().any(|port| port.suffixed(Self::FILLER) == last.ident))
-            .map(|_| block.span())
+        let last = block.trait_.as_ref().and_then(|(_, path, _)| path.segments.last())?;
+        let filler = self.ports.iter().find(|port| port.suffixed(Self::FILLER) == last.ident).map(|_| ());
+        let release = Name::from(&last.ident).matches::<Whole>(&Self::RELEASE).map(|_| ());
+        filler.or(release).map(|()| block.span())
     }
 }
 

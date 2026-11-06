@@ -3,6 +3,8 @@ use std::io;
 use std::path::PathBuf;
 
 use file_ports::FileFailure;
+use port_core::ReleaseFailures;
+use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::{ReadFailure, Uuid};
 
 #[derive(Debug, thiserror::Error)]
@@ -19,6 +21,14 @@ pub enum Failure {
     Read(#[from] ReadFailure),
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
-    #[error("no message {0} in the transcripts")]
+    #[error("no message {0} in the design store; run design ingest first")]
     Missing(Uuid),
+    #[error("ingest was refused the design store lock: {0}")]
+    Busy(#[from] Busy),
+    #[error("the design store failed: {0}")]
+    Store(#[from] StoreFailure),
+    #[error("cannot release the design store lock: {0}")]
+    Unlock(#[from] Unlock),
+    #[error("a resource was not released cleanly: {0}")]
+    Released(#[from] ReleaseFailures),
 }

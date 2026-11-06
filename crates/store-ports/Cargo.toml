@@ -1,0 +1,30 @@
+[package]
+name = "store-ports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[package.metadata.port]
+owns = ["sqlx", "tokio"]
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+port-core = { path = "../port-core" }
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+design-store = { path = "../design-store" }
+file-ports = { path = "../file-ports" }
+laws = { path = "../laws" }
+tempfile.workspace = true
+transcript-ports = { path = "../transcript-ports" }
+
+[lints]
+workspace = true

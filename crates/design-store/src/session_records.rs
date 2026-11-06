@@ -1,0 +1,45 @@
+use newtype::Counter;
+use port_core::Op;
+use store_ports::{Batch, Statements, StoreFailure, Written};
+use stream::Stream;
+use transcript_ports::{Cursor, SessionId};
+
+use crate::boundary::{CursorRow, LinkRow, MessageRow, Row, SegmentRow};
+
+#[derive(Debug, Op)]
+pub struct SessionRecords {
+    messages: Vec<MessageRow>,
+    segments: Vec<SegmentRow>,
+    links: Vec<LinkRow>,
+    cursor: CursorRow,
+}
+
+impl SessionRecords {
+    #[must_use]
+    pub fn read(session: &SessionId, cursor: Cursor, stream: &Stream) -> SessionRecords {
+        let messages = stream.as_ref();
+        SessionRecords {
+            messages: messages.iter().map(MessageRow::from).collect(),
+            segments: messages.iter().flat_map(SegmentRow::within).collect(),
+            links: stream.links().iter().map(LinkRow::from).collect(),
+            cursor: CursorRow::reached(session, cursor),
+        }
+    }
+
+    fn all(rows: &[impl Row], statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let written = rows.iter().map(|row| row.written(statements)).collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+}
+
+impl Batch for SessionRecords {
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let written = [
+            Self::all(&self.messages, statements)?,
+            Self::all(&self.segments, statements)?,
+            Self::all(&self.links, statements)?,
+            self.cursor.written(statements)?,
+        ];
+        Ok(Written::total(written.into_iter()))
+    }
+}
