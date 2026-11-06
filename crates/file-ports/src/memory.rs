@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use newtype::Newtype;
 
-use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Text};
+use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
 use locked::Locked;
 use resolved::Resolved;
 
@@ -65,11 +65,6 @@ impl Files for Memory {
         String::from_utf8(self.stored(path)?.into_inner())
             .map(Text::new)
             .map_err(|_| FileFailure::Failed(io::Error::from(io::ErrorKind::InvalidData)))
-    }
-
-    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
-        let skipped = usize::try_from(offset.into_inner()).unwrap_or(usize::MAX);
-        self.stored(path).map(|bytes| Bytes::new(bytes.as_ref().iter().skip(skipped).copied().collect()))
     }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {

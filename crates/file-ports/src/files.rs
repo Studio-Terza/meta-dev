@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use newtype::Newtype;
+
 use crate::{Bytes, FileFailure, Kind, Offset, Size, Text};
 
 pub trait Files {
@@ -7,7 +9,10 @@ pub trait Files {
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure>;
 
-    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure>;
+    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
+        let skipped = usize::try_from(offset.into_inner()).unwrap_or(usize::MAX);
+        self.read(path).map(|bytes| Bytes::new(bytes.as_ref().iter().skip(skipped).copied().collect()))
+    }
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure>;
 
