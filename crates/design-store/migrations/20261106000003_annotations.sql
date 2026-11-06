@@ -16,7 +16,6 @@ CREATE TABLE span_edges (
     ordinal INTEGER NOT NULL,
     relation TEXT NOT NULL,
     node INTEGER NOT NULL REFERENCES nodes (id),
-    provenance TEXT NOT NULL,
     PRIMARY KEY (message, ordinal, relation, node),
     FOREIGN KEY (message, ordinal) REFERENCES segments (message, ordinal)
 ) STRICT;
@@ -29,7 +28,6 @@ CREATE TABLE segment_links (
     relation TEXT NOT NULL,
     target_message TEXT NOT NULL,
     target_ordinal INTEGER NOT NULL,
-    provenance TEXT NOT NULL,
     PRIMARY KEY (source_message, source_ordinal, relation, target_message, target_ordinal),
     FOREIGN KEY (source_message, source_ordinal) REFERENCES segments (message, ordinal),
     FOREIGN KEY (target_message, target_ordinal) REFERENCES segments (message, ordinal)
@@ -44,7 +42,6 @@ CREATE TABLE senses (
     specificity TEXT NOT NULL,
     confidence TEXT NOT NULL,
     explicitness TEXT NOT NULL,
-    provenance TEXT NOT NULL,
     PRIMARY KEY (message, ordinal),
     FOREIGN KEY (message, ordinal) REFERENCES segments (message, ordinal)
 ) STRICT;
@@ -52,7 +49,6 @@ CREATE TABLE senses (
 CREATE TABLE conversational (
     message TEXT NOT NULL,
     ordinal INTEGER NOT NULL,
-    provenance TEXT NOT NULL,
     PRIMARY KEY (message, ordinal),
     FOREIGN KEY (message, ordinal) REFERENCES segments (message, ordinal)
 ) STRICT;

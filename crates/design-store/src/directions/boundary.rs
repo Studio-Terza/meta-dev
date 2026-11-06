@@ -1,6 +1,4 @@
-use design_model::{
-    Entered, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation,
-};
+use design_model::{Node, NodeId, NodeRelation, Ordinal, Segment, SegmentRelation, Sense, SpanRelation};
 use newtype::{Counter, Newtype};
 use store_ports::{Batch, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
@@ -11,7 +9,6 @@ use crate::graph::NodeRow;
 
 #[derive(Debug)]
 pub(super) struct Annotating<'held, 'run> {
-    provenance: Provenance,
     statements: &'held mut Statements<'run>,
 }
 
@@ -32,9 +29,9 @@ impl From<&Segment> for Columns {
 
 impl Batch for Directions {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let mut annotating = Annotating { provenance: self.provenance, statements };
+        let mut annotating = Annotating { statements };
         let written = self
-            .directed
+            .0
             .iter()
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
@@ -43,10 +40,6 @@ impl Batch for Directions {
 }
 
 impl Annotating<'_, '_> {
-    fn provenance(&self) -> &'static str {
-        Entered::from(self.provenance).name()
-    }
-
     pub(super) fn placed(
         &mut self,
         segment: &Segment,
@@ -56,14 +49,12 @@ impl Annotating<'_, '_> {
         let Columns { message, ordinal } = Columns::from(segment);
         let node = node.into_inner();
         let relation = relation.name();
-        let provenance = self.provenance();
         self.statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance) VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node) VALUES (?1, ?2, ?3, ?4)",
             message,
             ordinal,
             relation,
-            node,
-            provenance
+            node
         ))
     }
 
@@ -73,16 +64,14 @@ impl Annotating<'_, '_> {
         let specificity = sense.specificity().name();
         let confidence = sense.confidence().name();
         let explicitness = sense.explicitness().name();
-        let provenance = self.provenance();
         self.statements.written(sqlx::query!(
-            "INSERT OR REPLACE INTO senses (message, ordinal, kind, specificity, confidence, explicitness, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT OR REPLACE INTO senses (message, ordinal, kind, specificity, confidence, explicitness) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             message,
             ordinal,
             kind,
             specificity,
             confidence,
-            explicitness,
-            provenance
+            explicitness
         ))
     }
 
@@ -95,15 +84,13 @@ impl Annotating<'_, '_> {
         let source = Columns::from(source);
         let target = Columns::from(target);
         let relation = relation.name();
-        let provenance = self.provenance();
         self.statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal) VALUES (?1, ?2, ?3, ?4, ?5)",
             source.message,
             source.ordinal,
             relation,
             target.message,
-            target.ordinal,
-            provenance
+            target.ordinal
         ))
     }
 
@@ -119,12 +106,10 @@ impl Annotating<'_, '_> {
 
     pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, StoreFailure> {
         let Columns { message, ordinal } = Columns::from(segment);
-        let provenance = self.provenance();
         self.statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO conversational (message, ordinal, provenance) VALUES (?1, ?2, ?3)",
+            "INSERT OR IGNORE INTO conversational (message, ordinal) VALUES (?1, ?2)",
             message,
-            ordinal,
-            provenance
+            ordinal
         ))
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR REPLACE INTO senses (message, ordinal, kind, specificity, confidence, explicitness) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "9215730d618bd006d2d3bc831bda4096814f54c1b37176a222fc8857bf40c639"
+}

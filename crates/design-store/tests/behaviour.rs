@@ -412,7 +412,7 @@ impl Proposals {
     }
 
     fn written(store: &Port<'_, Sqlite>, directed: Vec<Directed>) -> Result<Written, Box<dyn Error>> {
-        Ok(store.write(Directions::new(Provenance::from(Entered::Apply), directed))?)
+        Ok(store.write(Directions::from(directed))?)
     }
 
     fn segment(message: &str, ordinal: usize) -> Segment {

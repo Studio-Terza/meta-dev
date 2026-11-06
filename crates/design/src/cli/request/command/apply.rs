@@ -79,8 +79,9 @@ impl Applied {
         let started = Folded { resolved: Vec::new(), next: store.read(NextNode)? };
         let folded =
             directives.into_iter().try_fold(started, |folded, directive| folded.resolving(store, directive))?;
-        let directed = folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
-        let written = store.write(Directions::new(Provenance::from(Entered::Apply), directed))?;
+        let directed: Vec<Directed> =
+            folded.resolved.iter().map(|resolved| resolved.grounded.directed.clone()).collect();
+        let written = store.write(Directions::from(directed))?;
         lock.end()?;
         Ok(Applied::covered(folded.resolved, written))
     }

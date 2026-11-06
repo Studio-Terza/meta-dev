@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node) VALUES (?1, ?2, ?3, ?4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "daa965ae1f95e14efc9c1078cc27c62c12200b807738aac720c022fd424bbbc8"
+}

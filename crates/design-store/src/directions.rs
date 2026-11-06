@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
 use port_core::Op;
 use store_ports::{StoreFailure, Written};
 
@@ -17,15 +17,11 @@ pub enum Directed {
 }
 
 #[derive(Debug, Op)]
-pub struct Directions {
-    provenance: Provenance,
-    directed: Vec<Directed>,
-}
+pub struct Directions(Vec<Directed>);
 
-impl Directions {
-    #[must_use]
-    pub fn new(provenance: Provenance, directed: Vec<Directed>) -> Directions {
-        Directions { provenance, directed }
+impl From<Vec<Directed>> for Directions {
+    fn from(directed: Vec<Directed>) -> Directions {
+        Directions(directed)
     }
 }
 
