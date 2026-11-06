@@ -1,5 +1,4 @@
 use std::fmt;
-use std::io;
 use std::iter::Enumerate;
 use std::iter::{Skip, StepBy};
 use std::num::NonZeroUsize;
@@ -8,7 +7,6 @@ use std::slice::Iter;
 use std::thread::{self, Scope, ScopedJoinHandle};
 
 use lint_core::Report;
-use lint_layout::Failure;
 
 use super::stack_size::StackSize;
 
@@ -16,7 +14,6 @@ use super::stack_size::StackSize;
 pub(crate) enum Slot {
     Check(usize),
     Query(usize),
-    Failed,
 }
 
 #[derive(Debug)]
@@ -28,10 +25,6 @@ pub(crate) struct Rendered {
 impl Rendered {
     pub(crate) fn render(slot: Slot, report: &Report<'_>) -> Rendered {
         Rendered { slot, text: report.to_string() }
-    }
-
-    pub(crate) fn failed(failure: &Failure) -> Rendered {
-        Rendered { slot: Slot::Failed, text: format!("{failure}\n") }
     }
 
     pub(crate) fn slot(&self) -> Slot {
@@ -52,10 +45,6 @@ pub(crate) struct Shard {
 }
 
 impl Shard {
-    pub(crate) fn lead(width: usize) -> Shard {
-        Shard { first: 0, width }
-    }
-
     fn spawned<'scope>(
         self,
         scope: &'scope Scope<'scope, '_>,
@@ -110,26 +99,5 @@ impl Workers {
             let spread: Vec<Spread<'_>> = self.shards().map(|shard| shard.spawned(scope, &work)).collect();
             spread.into_iter().flat_map(Spread::rendered).collect()
         })
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Helper<'scope>(ScopedJoinHandle<'scope, Result<Vec<Rendered>, Failure>>);
-
-pub(crate) type Helpers<'scope> = Vec<Result<Helper<'scope>, Shard>>;
-
-impl<'scope> Helper<'scope> {
-    pub(crate) fn spawned<'env>(
-        scope: &'scope Scope<'scope, 'env>,
-        work: impl FnOnce() -> Result<Vec<Rendered>, Failure> + Send + 'scope,
-    ) -> io::Result<Helper<'scope>> {
-        StackSize::LINT.builder().spawn_scoped(scope, work).map(Helper)
-    }
-
-    pub(crate) fn joined(self) -> Vec<Rendered> {
-        self.0
-            .join()
-            .unwrap_or_else(|payload| resume_unwind(payload))
-            .unwrap_or_else(|failure| vec![Rendered::failed(&failure)])
     }
 }

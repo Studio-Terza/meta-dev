@@ -1,14 +1,8 @@
-use std::iter;
-use std::thread::Scope;
-
 use code_model::Model;
 use code_reader::Reader;
 use lint_hand_impls::HandImpls;
 
-use file_ports::Files;
 use lint_core::{Lint, ModelLint, Readout, Report};
-use lint_layout::Failure;
-use lint_reader::SourceFiles;
 
 use lint_arbitrary_newtypes::ArbitraryNewtypes;
 use lint_bool_methods::BoolMethods;
@@ -57,8 +51,8 @@ use lint_unconsumed_traits::UnconsumedTraits;
 use lint_vec_out_params::VecOutParams;
 use lint_workflow_run::WorkflowRun;
 
-use crate::cli::boundary::{Helper, Helpers, Rendered, Shard, Slot, Workers};
-use crate::cli::{Outcome, Sources};
+use crate::cli::Outcome;
+use crate::cli::boundary::{Rendered, Shard, Slot, Workers};
 
 #[derive(Debug)]
 pub struct Lints;
@@ -128,29 +122,19 @@ impl Lints {
 
     const QUERIES: [Query; 1] = [<HandImpls as ModelLint>::report];
 
-    pub fn started<'scope, F: Files + Sync>(
-        scope: &'scope Scope<'scope, '_>,
-        sources: &'scope Sources<F>,
-    ) -> Helpers<'scope> {
-        Workers::available()
-            .shards()
-            .skip(1)
-            .map(|shard| Helper::spawned(scope, move || Self::helped(sources, shard)).map_err(|_| shard))
-            .collect()
-    }
-
     #[must_use]
-    pub fn checked<'file>(readout: &'file Readout, helpers: Helpers<'_>) -> Outcome<'file> {
-        let mine = Self::sharded(readout, Shard::lead(helpers.len() + 1));
-        let mut rendered: Vec<Rendered> = iter::once(mine)
-            .chain(
-                helpers
-                    .into_iter()
-                    .map(|helper| helper.map_or_else(|shard| Self::sharded(readout, shard), Helper::joined)),
-            )
-            .flatten()
-            .collect();
+    pub fn checked(readout: &Readout) -> Outcome<'_> {
         let model = Reader::read(readout);
+        let mut rendered: Vec<Rendered> = Self::CHECKS
+            .iter()
+            .enumerate()
+            .flat_map(|(index, check)| {
+                check(readout)
+                    .into_iter()
+                    .filter_map(Report::dirty)
+                    .map(move |report| Rendered::render(Slot::Check(index), &report))
+            })
+            .collect();
         rendered
             .extend(Workers::available().at_most(Self::QUERIES.len()).spread(|shard| Self::answered(&model, shard)));
         rendered.sort_by_key(Rendered::slot);
@@ -162,22 +146,6 @@ impl Lints {
             .picks(&Self::QUERIES)
             .filter_map(|(index, query)| {
                 query(model).dirty().map(|report| Rendered::render(Slot::Query(index), &report))
-            })
-            .collect()
-    }
-
-    fn helped(sources: &Sources<impl Files>, shard: Shard) -> Result<Vec<Rendered>, Failure> {
-        SourceFiles::read_all(sources.files(), sources.roots()).map(|own| Self::sharded(&own, shard))
-    }
-
-    fn sharded(readout: &Readout, shard: Shard) -> Vec<Rendered> {
-        shard
-            .picks(&Self::CHECKS)
-            .flat_map(|(index, check)| {
-                check(readout)
-                    .into_iter()
-                    .filter_map(Report::dirty)
-                    .map(move |report| Rendered::render(Slot::Check(index), &report))
             })
             .collect()
     }

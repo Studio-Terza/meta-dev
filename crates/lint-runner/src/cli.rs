@@ -1,7 +1,6 @@
 mod boundary;
 mod mode;
 mod outcome;
-mod sources;
 mod stack_size;
 
 use std::ffi::OsString;
@@ -9,14 +8,14 @@ use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::thread;
 
 use file_ports::Files;
+use lint_core::Readout;
+use lint_layout::Failure;
 use lint_reader::SourceFiles;
 
 use mode::Mode;
 use outcome::Outcome;
-use sources::Sources;
 use stack_size::StackSize;
 
 #[derive(Debug)]
@@ -44,21 +43,17 @@ impl Cli {
         match self.mode.refusal() {
             Some(refused) => Self::refused(refused, err),
             None => StackSize::LINT
-                .ran(|| self.linted(&Sources::new(files, &self.roots), out, err))
+                .ran(|| self.linted(&SourceFiles::read_all(files, &self.roots), out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),
         }
     }
 
-    fn linted(&self, sources: &Sources<impl Files + Sync>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
-        thread::scope(|scope| {
-            let helpers = self.mode.helpers(scope, sources);
-            let read = SourceFiles::read_all(sources.files(), sources.roots());
-            let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, helpers, out));
-            let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
-            let written =
-                outcome.ok().as_ref().and_then(Outcome::violations).map(|violations| Self::written(violations, err));
-            refusal.or(written).unwrap_or(ExitCode::SUCCESS)
-        })
+    fn linted(&self, read: &Result<Readout, Failure>, out: &mut impl Write, err: &mut impl Write) -> ExitCode {
+        let outcome = read.as_ref().map(|readout| self.mode.outcome_of(readout, out));
+        let refusal = outcome.as_ref().err().map(|failure| Self::refused(failure, err));
+        let written =
+            outcome.ok().as_ref().and_then(Outcome::violations).map(|violations| Self::written(violations, err));
+        refusal.or(written).unwrap_or(ExitCode::SUCCESS)
     }
 
     fn refused(failure: &impl fmt::Display, err: &mut impl Write) -> ExitCode {
