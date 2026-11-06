@@ -3,22 +3,20 @@ mod sighting;
 use std::path::Path;
 
 use syn::visit::Visit;
-use syn::{ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod};
+use syn::{ExprCall, ExprMacro, ExprMethodCall, Ident, ItemImpl, ItemMod, Macro};
 
-use lint_core::Gate;
 use lint_core::SourceFile;
 use lint_core::Syntax;
-use lint_core::Violation;
-use lint_file::FileLint;
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::owner::Owner;
+use crate::reach::{Reach, Reached, Reaching};
 use sighting::Sighting;
 
-#[derive(Default)]
 pub struct TextSites {
     doors: Vec<Owner>,
     owner: Owner,
+    reach: Reach,
     found: Vec<Sighting>,
 }
 
@@ -36,11 +34,17 @@ impl TextSites {
     ];
     const PRODUCING: [Word<'static>; 2] = words!["to_string", "push_str"];
 
-    fn into_violations(self, path: &Path) -> Vec<Violation<'_>> {
+    pub fn reached(file: &SourceFile, reach: Reach) -> Vec<Reached<'_>> {
+        let mut sites = TextSites { doors: Vec::new(), owner: Owner::default(), reach, found: Vec::new() };
+        sites.visit_file(file.syntax());
+        sites.into_reached(file.path())
+    }
+
+    fn into_reached(self, path: &Path) -> Vec<Reached<'_>> {
         self.found
             .into_iter()
             .filter_map(|sighting| sighting.outside(&self.doors))
-            .map(|sighting| sighting.into_violation(path))
+            .map(|sighting| sighting.into_reached(path))
             .collect()
     }
 
@@ -54,7 +58,8 @@ impl TextSites {
 
     fn sighted(&mut self, ident: Option<Ident>) {
         let owner = self.owner.clone();
-        self.found.extend(ident.map(|ident| Sighting::new(owner, ident)));
+        let reach = self.reach;
+        self.found.extend(ident.map(|ident| Sighting::new(owner, reach, ident)));
     }
 
     fn text_constructor(call: &ExprCall) -> Option<Ident> {
@@ -68,17 +73,15 @@ impl TextSites {
     }
 }
 
-impl FileLint for TextSites {
-    fn violations(file: &SourceFile) -> Vec<Violation<'_>> {
-        let mut sites = TextSites::default();
-        sites.visit_file(file.syntax());
-        sites.into_violations(file.path())
+impl Reaching for TextSites {
+    fn reach(&mut self) -> &mut Reach {
+        &mut self.reach
     }
 }
 
 impl<'ast> Visit<'ast> for TextSites {
     fn visit_item_mod(&mut self, module: &'ast ItemMod) {
-        Gate::BOUNDARY.enter_outside(module, || syn::visit::visit_item_mod(self, module));
+        self.entered(module, |sites| syn::visit::visit_item_mod(sites, module));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
@@ -101,6 +104,11 @@ impl<'ast> Visit<'ast> for TextSites {
     fn visit_expr_macro(&mut self, expr: &'ast ExprMacro) {
         self.sighted(expr.mac.path.get_ident().filter(|ident| *ident == "format").cloned());
         syn::visit::visit_expr_macro(self, expr);
+    }
+
+    fn visit_macro(&mut self, invocation: &'ast Macro) {
+        self.expanded(invocation);
+        syn::visit::visit_macro(self, invocation);
     }
 
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {

@@ -1,7 +1,30 @@
 use crate::finding::Finding;
+use crate::reach::{Reach, Reached};
+use lint_core::Site;
+use lint_core::Violation;
 use lint_layout::UsePath;
 use lint_layout::{Name, Whole, Word, words};
 
+#[derive(Clone, Debug)]
+pub struct Spelled {
+    reach: Reach,
+    spelling: Spelling,
+}
+
+impl Spelled {
+    pub fn read(spelled: &UsePath, reach: Reach) -> Option<Spelled> {
+        Spelling::read(spelled).map(|spelling| Spelled { reach, spelling }).or_else(|| {
+            Spelling::in_primitive_module(spelled)
+                .map(|primitive| Spelled { reach: Reach::Widened, spelling: Spelling::Primitive(primitive) })
+        })
+    }
+
+    pub fn reached(self, site: Site<'_>, context: Name) -> Reached<'_> {
+        Reached::new(self.reach, Violation::new(site, self.spelling.into_finding(context)))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Spelling {
     Primitive(Name),
     Wire(UsePath),
@@ -14,6 +37,7 @@ impl Spelling {
     ];
     const OWNED: [&'static [Word<'static>]; 2] =
         [&words!["std", "string", "String"], &words!["alloc", "string", "String"]];
+    const PRIMITIVE_MODULES: [&'static [Word<'static>]; 2] = [&words!["core", "primitive"], &words!["std", "primitive"]];
     const WIRE_TYPES: [&'static [Word<'static>]; 9] = [
         &words!["serde_json", "Value"],
         &words!["toml", "Value"],
@@ -26,7 +50,7 @@ impl Spelling {
         &words!["core", "any", "Any"],
     ];
 
-    pub fn read(spelled: &UsePath) -> Option<Spelling> {
+    fn read(spelled: &UsePath) -> Option<Spelling> {
         spelled
             .segments()
             .split_first()
@@ -38,13 +62,27 @@ impl Spelling {
                         .find_map(|owned| spelled.spells(owned))
                         .and_then(|owned| owned.segments().last().cloned())
                 },
-                |(single, _)| single.matches::<Whole>(&Self::PRIMITIVES).map(|_| single.clone()),
+                |(single, _)| Self::primitive(single),
             )
             .map(Spelling::Primitive)
             .or_else(|| Self::WIRE_TYPES.iter().find_map(|wire| spelled.spells(wire)).cloned().map(Spelling::Wire))
     }
 
-    pub fn into_finding(self, context: Name) -> Finding {
+    fn in_primitive_module(spelled: &UsePath) -> Option<Name> {
+        spelled
+            .segments()
+            .split_last()
+            .and_then(|(last, module)| {
+                let module: UsePath = module.iter().cloned().collect();
+                Self::PRIMITIVE_MODULES.iter().find_map(|primitive| module.spells(primitive)).and_then(|_| Self::primitive(last))
+            })
+    }
+
+    fn primitive(name: &Name) -> Option<Name> {
+        name.matches::<Whole>(&Self::PRIMITIVES).map(|_| name.clone())
+    }
+
+    fn into_finding(self, context: Name) -> Finding {
         match self {
             Spelling::Primitive(primitive) => Finding::BarePrimitive { primitive, context },
             Spelling::Wire(wire) => Finding::WireForm { wire, context },

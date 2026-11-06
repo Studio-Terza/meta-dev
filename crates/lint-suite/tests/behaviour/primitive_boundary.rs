@@ -1,4 +1,4 @@
-use lint_primitive_boundary::PrimitiveBoundary;
+use lint_primitive_boundary::{PrimitiveBoundary, WidenedPrimitiveBoundary};
 
 use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
 
@@ -47,6 +47,14 @@ const INLINE_TEXT: &str = "mod inner {\n    pub fn f(x: Name) {\n        x.trim(
 const DOOR: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\n";
 const DOOR_AND_HELPER: &str = "struct A;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
 const DOOR_AND_OTHER_TYPE: &str = "struct A;\nstruct B;\nimpl fmt::Display for A {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{}\", format!(\"x\"))\n    }\n}\nimpl B {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n";
+const TEXT_PARAMETER: &str = "fn f(x: &str) {}\n";
+const COLLECTION_NEWTYPE: &str = "struct Names(Vec<String>);\nimpl Names {\n    fn new(names: Vec<String>) -> Names {\n        Names(names)\n    }\n}\n";
+const ALIASED_BYTE: &str = "type A = u8;\nfn f(x: A) {}\n";
+const PRIMITIVE_MODULES: &str = "fn f(x: core::primitive::u8, y: std::primitive::bool) {}\n";
+const PROJECTED: &str = "struct A;\nimpl Tr for A {\n    type X = u8;\n}\nfn f(x: <A as Tr>::X) {}\n";
+const IN_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\n";
+const OPAQUE_MACRO: &str = "fn f() {\n    m!(x: &str);\n}\n";
+const ASSOCIATED: &str = "trait T {\n    type X: AsRef<str>;\n    const N: usize;\n}\n";
 
 const CASES: [Case; 47] = [
     Case::new(
@@ -278,7 +286,108 @@ const CASES: [Case; 47] = [
     ),
 ];
 
+const WIDENED: [Case; 18] = [
+    Case::new(
+        Title::new("a test file's signature"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(TEXT_PARAMETER))],
+        Flagged::new(&["x/tests/a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("text handling in a test file"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(INLINE_TEXT))],
+        Flagged::new(&["x/tests/a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a cfg(test) module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a support module file"),
+        &[
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SUPPORT_MODULE)),
+            Source::new(Located::new("crates/x/src/fixtures.rs"), Text::new(BARE)),
+        ],
+        Flagged::new(&["crates/x/src/fixtures.rs:1", "crates/x/src/fixtures.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a one-field struct of a collection and its constructor"),
+        &[Source::new(Located::new("a.rs"), Text::new(COLLECTION_NEWTYPE))],
+        Flagged::new(&["a.rs:1", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a type alias of a primitive"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_BYTE))],
+        Flagged::new(&["a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("constants and statics"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONSTANT))],
+        Flagged::new(&["a.rs:1", "a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("associated types and consts of a trait"),
+        &[Source::new(Located::new("a.rs"), Text::new(ASSOCIATED))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("primitives spelled through core and std"),
+        &[Source::new(Located::new("a.rs"), Text::new(PRIMITIVE_MODULES))],
+        Flagged::new(&["a.rs:1", "a.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a projection that resolves to a primitive"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROJECTED))],
+        Flagged::new(&["a.rs:5"]),
+    ),
+    Case::new(
+        Title::new("items inside a macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(IN_MACRO))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a macro body that is not items or a type"),
+        &[Source::new(Located::new("a.rs"), Text::new(OPAQUE_MACRO))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a boundary module in a test file"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(INLINE_BOUNDARY))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a trait impl in a test file"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(TRAIT_METHOD))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a newtype and its edges in a test file"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(NEWTYPE_EDGES))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a boundary module file"),
+        &[Source::new(Located::new("crates/x/src/boundary/mask.rs"), Text::new(CONSTANT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("what the gate blocks is not listed again"),
+        &[Source::new(Located::new("a.rs"), Text::new(BARE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an alias of a qualified path"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
+        Flagged::new(&[]),
+    ),
+];
+
 #[test]
 fn primitives_outside_a_boundary_are_flagged() {
     assert_eq!(Sources::mismatches::<PrimitiveBoundary>(&CASES), Lines::default());
+}
+
+#[test]
+fn primitives_the_gate_does_not_yet_block_are_listed() {
+    assert_eq!(Sources::mismatches::<WidenedPrimitiveBoundary>(&WIDENED), Lines::default());
 }

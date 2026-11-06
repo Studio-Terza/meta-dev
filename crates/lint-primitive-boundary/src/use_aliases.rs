@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 
 use syn::visit::Visit;
-use syn::{ItemType, ItemUse, Path, UseTree};
+use syn::{ItemType, ItemUse, Path, TypePath, UseTree};
+
+use crate::reach::Reach;
+use crate::spelling::Spelled;
 
 use lint_core::Syntax;
 use lint_layout::Name;
@@ -17,7 +20,14 @@ impl UseAliases {
         aliases
     }
 
-    pub fn resolve(&self, path: &Path) -> UsePath {
+    pub fn spelled(&self, path: &TypePath, reach: Reach) -> Option<Spelled> {
+        match &path.qself {
+            None => Spelled::read(&self.resolve(&path.path), reach),
+            Some(_) => None,
+        }
+    }
+
+    fn resolve(&self, path: &Path) -> UsePath {
         self.rerooted(UsePath::from(path))
     }
 

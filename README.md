@@ -59,10 +59,15 @@ type, generics and bounds, nested in `Option`, `Vec`, slices, references or clos
 field only inside a module named `boundary` or a crate whose name ends in the word `boundary`. Allowed everywhere: a newtype
 (a struct with one unnamed field) and its own `new`, `try_new` and `into_inner` with one input, and trait impls, since the
 trait fixes the signature (`Display`, `FromStr`, `From`, `TryFrom`, `Debug`, `Hash`, `Ord` and the like); the trait
-declaration is read instead. A unit return is not flagged, nor are consts, statics and types inside bodies. Wire forms such
+declaration is read instead. A unit return is not flagged, nor are types inside bodies. Wire forms such
 as `serde_json::Value` and `toml::Value` are flagged the same way. Text handling (`trim`, `format!`, `to_string` and the like)
 is allowed in a door impl (`FromStr`, `TryFrom`, `Display`, `AsRef`, `Borrow`, `Deref`), on a type that has one, and in a
 boundary. The message names the fix: take and return a domain type, or move the code into a module named `boundary`.
+The same rule also reads the code the gate does not block yet: files under `tests`, `examples` and `benches`,
+support and `#[cfg(test)]` modules, the items or type a macro body parses as, type aliases, consts, statics and
+associated types, `core::primitive::u8` and `<T as Trait>::X` spellings, and one-field structs of a collection or
+`Option` (`struct Names(Vec<String>)`). Those findings print under `--report` as `primitive_boundary widened`, apart
+from the blocking ones, until fix passes clear them and they join the gate.
 
 `unconsumed_traits` refuses a local trait with methods that nothing in shipped code consumes: no bound (generic, where
 clause or supertrait), no `impl Trait` or `dyn Trait`, and no call to one of its provided methods. Delete the trait and
