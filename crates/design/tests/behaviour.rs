@@ -1,14 +1,13 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
 use design_store::{ShownMessage, Stored, StreamSchema};
-use file_ports::{Bytes, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
@@ -137,11 +136,68 @@ impl Session {
     }
 }
 
+#[derive(Debug)]
+struct FakeLent<'memory> {
+    memory: &'memory Memory,
+}
+
+impl FakeLent<'_> {
+    fn new(memory: &Memory) -> FakeLent<'_> {
+        FakeLent { memory }
+    }
+}
+
+impl Files for FakeLent<'_> {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.memory.read(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.memory.read_text(path)
+    }
+
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        self.memory.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        self.memory.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        self.memory.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        self.memory.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        self.memory.entries(directory)
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        self.memory.canonical(path)
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        self.memory.kind(path)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.memory.size(path)
+    }
+}
+
 struct Invocation;
 
 impl Invocation {
     fn environment() -> Variables {
-        [("HOME", HOME), ("PWD", "/work")]
+        Invocation::at("/work")
+    }
+
+    fn at(directory: &str) -> Variables {
+        [("HOME", HOME), ("PWD", directory)]
             .map(|(name, value)| (OsString::from(name), OsString::from(value)))
             .into_iter()
             .collect()
@@ -152,9 +208,13 @@ impl Invocation {
     }
 
     fn against(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, Failure> {
+        Self::within(store, session.files(), arguments)
+    }
+
+    fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), session.files(), |_path| store.clone()).report(
+        Cli::new(&Self::environment(), files, |_path| store.clone()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -329,10 +389,14 @@ struct Opened {
 
 impl Opened {
     fn by(arguments: &[&str]) -> Result<Opened, Failure> {
+        Opened::from("/work", Session::typical().files(), arguments)
+    }
+
+    fn from(directory: &str, files: impl Files, arguments: &[&str]) -> Result<Opened, Failure> {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::environment(), Session::typical().files(), |path: PathBuf| {
+        Cli::new(&Invocation::at(directory), files, |path: PathBuf| {
             opened.lock().map(|mut paths| paths.push(path)).ok();
             Sqlite::in_memory::<StreamSchema>()
         })
@@ -532,4 +596,153 @@ fn a_failed_command_keeps_the_release_failures_of_its_run() {
     drop(run.port(Locker).lock());
     let settled = Failure::settled(Err(Failure::Usage), run.finish().settled());
     assert!(matches!(settled, Err(Failure::Unreleased { command, .. }) if matches!(*command, Failure::Usage)));
+}
+
+struct Graph;
+
+impl Graph {
+    fn init(store: &Sqlite, arguments: &[&str]) -> Result<String, Failure> {
+        Invocation::against(store, &Session::typical(), &[&["init"], arguments].concat())
+    }
+
+    fn shown(store: &Sqlite, node: &str) -> Result<String, Failure> {
+        Invocation::against(store, &Session::typical(), &["show", node])
+    }
+}
+
+#[test]
+fn init_plants_the_project_root_in_the_workspace_store() -> Result<(), Failure> {
+    let opened = Opened::by(&["init", "demo"])?;
+    assert_eq!(opened.paths, [PathBuf::from("/work/.meta/design.sqlite")]);
+    assert!(opened.out.contains("root n1 project demo"));
+    Ok(())
+}
+
+#[test]
+fn a_rooted_init_names_its_outcome() -> Result<(), Failure> {
+    let initialised = Rooted::outcome(&Sqlite::in_memory::<StreamSchema>(), &Session::typical(), &["init", "demo"])?;
+    assert_eq!(initialised.outcome, Outcome::Initialised);
+    Ok(())
+}
+
+#[test]
+fn a_second_init_changes_nothing() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let first = Graph::init(&store, &["demo"])?;
+    let before = Graph::shown(&store, "n1")?;
+    let second = Graph::init(&store, &["demo"])?;
+    assert_eq!(second, first);
+    assert_eq!(Graph::shown(&store, "n1")?, before);
+    assert!(matches!(Graph::shown(&store, "n2"), Err(Failure::Unplaced(_))));
+    Ok(())
+}
+
+#[test]
+fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Graph::init(&store, &["meta-dev"])?;
+    Graph::init(&store, &["demo"])?;
+    assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
+    let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
+    assert!(consuming.contains("consumes n1 project meta-dev"));
+    assert!(Graph::shown(&store, "n2")?.contains("n2 demo project vague entered init\n  consumes n1\n"));
+    assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn init_consuming_a_project_without_a_root_fails_and_plants_nothing() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes", "nowhere"]), Err(Failure::Unrooted(_))));
+    assert!(matches!(Graph::shown(&store, "n1"), Err(Failure::Unplaced(_))));
+}
+
+#[test]
+fn init_refuses_a_project_consuming_itself_and_plants_nothing() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Graph::init(&store, &["demo"])?;
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes", "demo"]), Err(Failure::SelfConsuming(_))));
+    assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_misnumbered_node_id_is_refused_as_a_node_id_not_looked_up_as_a_message() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::shown(&store, "n001"), Err(Failure::Unnumbered(_))));
+    assert!(matches!(Graph::shown(&store, "n99999999999999999999"), Err(Failure::Unnumbered(_))));
+}
+
+#[test]
+fn only_ingest_has_a_dry_run() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let refused = [
+        Graph::init(&store, &["demo", "--dry-run"]),
+        Graph::shown(&store, "--dry-run"),
+        Invocation::against(&store, &Session::typical(), &["show", "o1", "--dry-run"]),
+        Invocation::against(&store, &Session::typical(), &["search", "thanks", "--dry-run"]),
+        Invocation::against(&store, &Session::typical(), &["--dry-run", "ingest"]),
+        Invocation::against(&store, &Session::typical(), &["ingest", "--dry-run", "--dry-run"]),
+    ];
+    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+}
+
+#[test]
+fn init_without_a_project_or_a_consumed_name_is_a_usage_failure() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::init(&store, &[]), Err(Failure::Usage)));
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes"]), Err(Failure::Usage)));
+}
+
+#[test]
+fn show_of_an_unknown_node_fails_naming_it() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::shown(&store, "n7"), Err(Failure::Unplaced(_))));
+}
+
+struct Repository {
+    files: Memory,
+}
+
+impl Repository {
+    fn at(root: &str) -> Repository {
+        let files = Session::typical().files();
+        files.create_directories(&Path::new(root).join(".git")).ok();
+        Repository { files }
+    }
+
+    fn opened(&self, directory: &str, arguments: &[&str]) -> Result<Vec<PathBuf>, TestCaseError> {
+        Opened::from(directory, FakeLent::new(&self.files), arguments)
+            .map(|opened| opened.paths)
+            .map_err(|failure| TestCaseError::fail(failure.to_string()))
+    }
+}
+
+laws::law!(
+    init_from_a_subdirectory_records_the_workspace_at_the_repository_root,
+    "[a-z]{1,6}(/[a-z]{1,6}){0,2}",
+    below,
+    {
+        let repository = Repository::at("/work");
+        let inside = format!("/work/{below}");
+        repository.opened(&inside, &["init", "demo", "--workspace", "/ws"])?;
+        prop_assert_eq!(repository.files.kind(Path::new("/work/.meta/local.toml")), Kind::File);
+        prop_assert_eq!(repository.files.kind(&Path::new(&inside).join(".meta")), Kind::Missing);
+        prop_assert_eq!(repository.opened(&inside, &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+        prop_assert_eq!(repository.opened("/work", &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+    }
+);
+
+laws::law!(the_workspace_flag_overrides_the_recorded_workspace, "/[a-z]{1,6}", flagged, {
+    let repository = Repository::at("/work");
+    repository.opened("/work", &["init", "demo", "--workspace", "/ws"])?;
+    let opened = repository.opened("/work", &["search", "thanks", "--workspace", &flagged])?;
+    prop_assert_eq!(opened, [Path::new(&flagged).join(".meta/design.sqlite")]);
+});
+
+#[test]
+fn without_a_repository_or_a_recorded_workspace_the_working_directory_is_the_workspace() -> Result<(), Failure> {
+    let opened = Opened::from("/work/sub", Session::typical().files(), &["search", "thanks"])?;
+    assert_eq!(opened.paths, [PathBuf::from("/work/sub/.meta/design.sqlite")]);
+    Ok(())
 }

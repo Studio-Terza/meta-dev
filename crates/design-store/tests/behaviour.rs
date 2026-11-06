@@ -1,11 +1,15 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use design_store::{Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage, StreamSchema};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Project, Stage};
+use design_store::{
+    Linked, NewNode, ProjectRoot, Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage, ShownNode,
+    StreamSchema,
+};
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
 use newtype::Counter;
-use port_core::Run;
+use port_core::{Port, Run};
 use store_ports::{Sqlite, Store, Written};
 use stream::Stream;
 use transcript_ports::{Body, ClaudeCodeDir, Cursor, SessionId, Transcripts, Uuid};
@@ -184,5 +188,64 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
     let lines = [Said::owner("o1", 1, "omega"), Said::lead("l1", "omega")];
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Owner)?, ["o1 owner 2026-01-01T00:00:01Z omega"]);
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Everyone)?.len(), 2);
+    Ok(())
+}
+
+struct Projects;
+
+impl Projects {
+    fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, Box<dyn Error>> {
+        let project: Project = name.parse()?;
+        store.write(NewNode::from(Entry::new(project.clone(), Facet::Project, Stage::Vague, Entered::Init.into())))?;
+        Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?)
+    }
+}
+
+#[test]
+fn a_project_root_is_found_by_its_project_alone() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    Projects::rooted(&store, "q")?;
+    let rooted = Projects::rooted(&store, "p")?;
+    assert_eq!(rooted, NodeId::new(2));
+    assert_eq!(store.read(ProjectRoot::from("r".parse::<Project>()?))?, None);
+    Ok(())
+}
+
+#[test]
+fn a_consumes_link_is_listed_from_its_source_only() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let eater = Projects::rooted(&store, "p")?;
+    let consumed = Projects::rooted(&store, "q")?;
+    store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    let shown = store.read(ShownNode::from(eater))?.ok_or("no consumer shown")?;
+    let links: Vec<(NodeRelation, NodeId)> =
+        shown.links().iter().map(|link| (link.relation(), link.target())).collect();
+    assert_eq!(links, [(NodeRelation::Consumes, consumed)]);
+    assert_eq!(shown.node().identity(), eater);
+    assert_eq!(store.read(ShownNode::from(consumed))?.ok_or("no consumed shown")?.links(), []);
+    Ok(())
+}
+
+#[test]
+fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let eater = Projects::rooted(&store, "p")?;
+    let consumed = Projects::rooted(&store, "q")?;
+    let first = store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    let second = store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    assert!(first > Written::zero());
+    assert_eq!(second, Written::zero());
+    Ok(())
+}
+
+#[test]
+fn an_unknown_node_is_not_shown() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    Projects::rooted(&store, "p")?;
+    assert!(store.read(ShownNode::from(NodeId::new(99)))?.is_none());
     Ok(())
 }

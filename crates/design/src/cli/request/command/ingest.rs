@@ -42,7 +42,7 @@ pub struct Ingest<'ports, T: Transcripts, S: Store> {
 }
 
 impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
-    pub fn read(transcripts: &'ports T, store: &'ports S) -> Result<Tally, Failure> {
+    pub fn read(store: &'ports S, transcripts: &'ports T) -> Result<Tally, Failure> {
         let lock = store.lock()?;
         let ingest = Ingest { transcripts, store, cursors: store.read(SessionCursors)? };
         let sessions = transcripts.sessions()?;

@@ -1,4 +1,5 @@
 mod failure;
+mod rendering;
 mod request;
 
 use std::ffi::OsString;
@@ -13,7 +14,7 @@ use store_ports::Sqlite;
 use crate::Outcome;
 
 pub use failure::Failure;
-use request::Request;
+use request::{Ground, Request};
 
 #[derive(Debug)]
 pub struct Cli<'environment, E: Environment, F: Files, O> {
@@ -46,9 +47,8 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
         O: FnOnce(PathBuf) -> Sqlite,
     {
         let request = Request::parsed(arguments)?;
-        let located = request.located(self.environment)?;
-        let transcripts = run.port(located.transcripts(self.files));
-        let store = run.port(request.persistence().store(located, self.opened));
-        request.command().written(&transcripts, &store, out)
+        let located = request.located(self.environment, &self.files)?;
+        let store = run.port(request.opened(&located, self.opened));
+        request.command().written(Ground::new(run, self.files, located, &store), out)
     }
 }

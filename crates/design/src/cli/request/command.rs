@@ -1,29 +1,35 @@
 mod ingest;
+mod init;
 mod printed;
 mod search;
-mod shown;
+mod subject;
 
-use std::ffi::OsString;
 use std::io::Write;
+use std::path::PathBuf;
 use std::str::FromStr;
 
+use design_model::Project;
 use design_store::Scope;
+use file_ports::Files;
 use grammar::search::Terms;
-use store_ports::Store;
-use transcript_ports::{Transcripts, Uuid};
+use store_ports::{Sqlite, Store};
 
+use super::persistence::Persistence;
+use super::{Ground, Token};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use ingest::Ingest;
+use init::Init;
 use printed::Printed;
 use search::Search;
-use shown::Shown;
+use subject::Subject;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
-    Ingest,
-    Show(Uuid),
+    Ingest(Persistence),
+    Show(Subject),
     Search(Terms, Scope),
+    Init(Init),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,6 +37,7 @@ enum Verb {
     Ingest,
     Show,
     Search,
+    Init,
 }
 
 impl FromStr for Verb {
@@ -42,53 +49,62 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 3] = [("ingest", Verb::Ingest), ("show", Verb::Show), ("search", Verb::Search)];
+    const NAMED: [(&'static str, Verb); 4] =
+        [("ingest", Verb::Ingest), ("show", Verb::Show), ("search", Verb::Search), ("init", Verb::Init)];
 
-    fn command(self, rest: &[OsString], scope: Scope) -> Result<Command, Failure> {
+    fn command(self, rest: &[Token], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
         match self {
-            Verb::Ingest => Ok(Command::Ingest),
-            Verb::Show => rest
-                .first()
-                .and_then(|word| word.to_str())
-                .ok_or(Failure::Usage)
-                .map(|uuid| Command::Show(Uuid::new(uuid.to_owned()))),
+            Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
+            Verb::Show => Token::only(rest).and_then(Subject::try_from).map(Command::Show),
             Verb::Search => rest
                 .iter()
-                .map(|word| word.to_str())
+                .map(Token::text)
                 .collect::<Option<Vec<&str>>>()
                 .and_then(Terms::lexed)
                 .ok_or(Failure::Usage)
                 .map(|terms| Command::Search(terms, scope)),
+            Verb::Init => Token::only(rest)
+                .and_then(|word| Ok(word.parse::<Project>()?))
+                .and_then(|project| Init::new(project, consumes))
+                .map(Command::Init),
         }
     }
 }
 
 impl Command {
-    pub fn spoken(words: &[OsString], scope: Scope) -> Result<Command, Failure> {
+    pub fn spoken(words: &[Token], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
         words
             .first()
-            .and_then(|word| word.to_str())
+            .and_then(Token::text)
             .ok_or(Failure::Usage)
             .and_then(str::parse::<Verb>)
-            .and_then(|verb| verb.command(words.get(1..).unwrap_or_default(), scope))
+            .and_then(|verb| verb.command(words.get(1..).unwrap_or_default(), scope, consumes))
     }
 
-    pub fn written(
+    pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+        match self {
+            Command::Ingest(persistence) => persistence.opened(path, opened),
+            Command::Show(_) | Command::Search(..) | Command::Init(_) => opened(path),
+        }
+    }
+
+    pub fn written<F: Files, S: Store>(
         self,
-        transcripts: &impl Transcripts,
-        store: &impl Store,
+        ground: Ground<'_, F, S>,
         out: &mut impl Write,
     ) -> Result<Outcome, Failure> {
         match self {
-            Command::Ingest => Ingest::read(transcripts, store)
+            Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
                 .and_then(|tally| Printed::shown(out, &tally))
                 .map(|_printed| Outcome::Ingested),
-            Command::Show(uuid) => {
-                Shown::find(store, &uuid).and_then(|shown| Printed::shown(out, &shown)).map(|_printed| Outcome::Shown)
-            }
-            Command::Search(terms, scope) => Search::found(store, terms, scope)
+            Command::Show(subject) => subject.shown(ground.store(), out).map(|_printed| Outcome::Shown),
+            Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .and_then(|search| Printed::shown(out, &search))
                 .map(|_printed| Outcome::Searched),
+            Command::Init(init) => init
+                .planted(&ground)
+                .and_then(|initialised| Printed::shown(out, &initialised))
+                .map(|_printed| Outcome::Initialised),
         }
     }
 }

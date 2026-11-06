@@ -13,6 +13,7 @@ test = false
 doctest = false
 
 [dependencies]
+design-model = { path = "../design-model" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
@@ -21,9 +22,6 @@ sqlx.workspace = true
 store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 transcript-ports = { path = "../transcript-ports" }
-
-[dev-dependencies]
-laws = { path = "../laws" }
 
 [lints]
 workspace = true
