@@ -45,9 +45,11 @@ const DIGEST: &str = "pub trait Hash {}\n";
 const BLOCK: &str = "use super::digest::*;\nstruct Block;\nimpl Hash for Block {}\n";
 
 const PRIVATE_GLOB: &str = "pub trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\npub struct R;\npub fn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
+const ASSERTED_BODY: &str =
+    "struct R;\nfn f() {\n    assert!(true);\n    impl Clone for R {\n        fn clone(&self) -> R { R }\n    }\n}\n";
 const SELF_AS_CORE: &str = "extern crate self as core;\npub mod clone {\n    pub trait Clone {}\n}\npub struct R;\nimpl core::clone::Clone for R {}\n";
 
-const CASES: [Case; 27] = [
+const CASES: [Case; 28] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -187,6 +189,11 @@ const CASES: [Case; 27] = [
         Title::new("a trait behind a private import reached through a glob"),
         &[Source::new(Located::new("a.rs"), Text::new(PRIVATE_GLOB))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an impl beside an assert in a function body"),
+        &[Source::new(Located::new("a.rs"), Text::new(ASSERTED_BODY))],
+        Flagged::new(&["a.rs:4"]),
     ),
     Case::new(
         Title::new("a crate declared as core by extern crate self"),

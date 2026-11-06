@@ -29,9 +29,9 @@ impl<'read> ReadFile<'read> {
         self.file
     }
 
-    fn named(self) -> Option<Name> {
+    fn named(self) -> Option<&'read Name> {
         match self.source.placement().role() {
-            Role::LibraryRoot => Some(Borrow::<Name>::borrow(self.source.placement().package().crate_name()).clone()),
+            Role::LibraryRoot => Some(Borrow::<Name>::borrow(self.source.placement().package().crate_name())),
             Role::BinaryRoot | Role::Target | Role::Other => None,
         }
     }
@@ -45,26 +45,26 @@ impl<'read> Files<'read> {
         self.0.get(path).copied()
     }
 
-    fn filled(self, lowered: &mut Lowered, slots: Vec<Slot>) -> Files<'read> {
+    fn filled(self, lowered: &mut Lowered<'read>, slots: Vec<Slot>) -> Files<'read> {
         slots.into_iter().fold(self, |mut files, slot| {
             files.slot_filled(lowered, slot);
             files
         })
     }
 
-    fn rooted(self, lowered: &mut Lowered, root: ReadFile<'read>, name: Option<Name>) -> Files<'read> {
+    fn rooted(self, lowered: &mut Lowered<'read>, root: ReadFile<'read>, name: Option<&'read Name>) -> Files<'read> {
         let slots = lowered.rooted(root, name, CrateForm::Planted);
         self.filled(lowered, slots)
     }
 
-    fn slot_filled(&mut self, lowered: &mut Lowered, slot: Slot) {
+    fn slot_filled(&mut self, lowered: &mut Lowered<'read>, slot: Slot) {
         match slot.found(self) {
             Some(path) => self.planted_at(lowered, slot, &path),
             None => lowered.opaque(slot),
         }
     }
 
-    fn planted_at(&mut self, lowered: &mut Lowered, slot: Slot, path: &Path) {
+    fn planted_at(&mut self, lowered: &mut Lowered<'read>, slot: Slot, path: &Path) {
         let child = self.0.remove(path);
         let slots = child.map(|child| lowered.planted(slot, child)).unwrap_or_default();
         *self = std::mem::take(self).filled(lowered, slots);
@@ -75,7 +75,7 @@ impl<'read> Files<'read> {
 struct CrateFiles<'read> {
     root: Option<ReadFile<'read>>,
     files: Files<'read>,
-    name: Option<Name>,
+    name: Option<&'read Name>,
 }
 
 impl<'read> CrateFiles<'read> {
@@ -86,11 +86,11 @@ impl<'read> CrateFiles<'read> {
         CrateFiles { name: root.and_then(ReadFile::named), root, files: Files(files) }
     }
 
-    fn planted(self, lowered: &mut Lowered) {
+    fn planted(self, lowered: &mut Lowered<'read>) {
         self.remaining(lowered).0.into_values().for_each(|island| lowered.island(island));
     }
 
-    fn remaining(self, lowered: &mut Lowered) -> Files<'read> {
+    fn remaining(self, lowered: &mut Lowered<'read>) -> Files<'read> {
         match self.root {
             Some(root) => self.files.rooted(lowered, root, self.name),
             None => self.files,
@@ -113,7 +113,7 @@ impl<'read> Planting<'read> {
         Planting { crates: grouped.into_iter().map(|(crate_file, files)| CrateFiles::new(crate_file, files)).collect() }
     }
 
-    pub(crate) fn lowered(self) -> Lowered {
+    pub(crate) fn lowered(self) -> Lowered<'read> {
         self.crates.into_iter().fold(Lowered::default(), |mut lowered, krate| {
             krate.planted(&mut lowered);
             lowered

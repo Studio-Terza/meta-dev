@@ -32,11 +32,29 @@ const GLOB_ITSELF: &str =
 const GLOB_OPAQUE_FIRST: &str = "use other::*;\nuse std::hash::*;\nimpl Clone for R {}\n";
 const GLOB_OPAQUE_LAST: &str = "use std::fmt::*;\nuse other::*;\nimpl Debug for R {}\n";
 const GLOB_CONFLICT: &str = "use std::fmt::*;\nuse std::io::*;\nimpl Result for R {}\n";
+const GLOB_MODULES_CONFLICT: &str =
+    "mod a {\n    pub trait T {}\n}\nmod b {\n    pub trait T {}\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_MODULES_AGREE: &str =
+    "mod a {\n    pub trait T {}\n}\nmod b {\n    pub use super::a::T;\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_BENEATH_IMPORT: &str =
+    "mod a {\n    pub trait Clone {}\n}\nuse a::*;\nuse std::clone::Clone;\nimpl Clone for R {}\n";
+const GLOB_BENEATH_DECLARED: &str = "use std::fmt::*;\ntrait Debug {}\nimpl Debug for R {}\nimpl Display for R {}\n";
+const GLOB_THROUGH_GLOB: &str =
+    "mod a {\n    pub mod b {\n        pub trait T {}\n    }\n}\nuse a::*;\nuse b::*;\nimpl T for R {}\n";
+const GLOB_CARRIES_EXPANSION: &str = "mod hash {\n    array_impl!(1, 2);\n}\npub use hash::*;\nimpl Clone for R {}\n";
+const GLOB_CARRIES_EXPANSION_ABOVE: &str =
+    "pin_project! {\n    struct Limited {}\n}\nmod tests {\n    use super::*;\n    impl Debug for R {}\n}\n";
+const GLOB_CARRIES_EXTERNAL: &str = "mod rejection {\n    pub use axum_core::extract::rejection::*;\n}\nuse crate::rejection::*;\nimpl Clone for R {}\n";
 const DECLARED_KINDS: &str = "struct Clone;\nenum Eq {}\nunion Copy {\n    a: u8,\n}\ntype Default = u8;\ntrait Hash = Sized;\nimpl Clone for R {}\nimpl Eq for R {}\nimpl Copy for R {}\nimpl Default for R {}\nimpl Hash for R {}\n";
 
 const MACRO_CALL: &str = "make!();\nimpl Clone for R {}\n";
 const MACRO_STATEMENT: &str = "fn f() {\n    make!();\n    impl Clone for R {}\n}\n";
 const MACRO_DEFINED: &str = "macro_rules! make {\n    () => {};\n}\nimpl Clone for R {}\n";
+const MACRO_DEFINED_CALLED: &str = "macro_rules! make {\n    () => {};\n}\nmake!();\nimpl Clone for R {}\n";
+const MACRO_ASSERT: &str = "struct R;\nfn f() {\n    assert!(true);\n    impl Clone for R {}\n}\n";
+const MACRO_STD_STATEMENTS: &str =
+    "fn f() {\n    println!(\"a\");\n    let v = vec![1];\n    debug_assert_eq!(v, v);\n    impl Clone for R {}\n}\n";
+const MACRO_PATHED_STATEMENT: &str = "fn f() {\n    std::println!(\"a\");\n    impl Clone for R {}\n}\n";
 const BLOCK_CHAIN: &str = "fn f() {\n    use std::fmt::Debug as Show;\n    {\n        impl Show for R {}\n    }\n    mod m {\n        impl Show for R {}\n    }\n}\n";
 const BLOCK_SUPER: &str = "use std::clone::Clone as Dup;\nfn f() {\n    use std::fmt::Debug as Dup;\n    mod m {\n        impl super::Dup for R {}\n    }\n}\n";
 const CFG_ALTERNATIVES: &str = "#[cfg(unix)]\ntrait Clone {}\n#[cfg(windows)]\ntrait Clone {}\nimpl Clone for R {}\n";
@@ -102,6 +120,22 @@ const CYCLE: [Fixture; 3] = [
     Fixture::new("src/lib.rs", "mod a;\nmod b;\n"),
     Fixture::new("src/a.rs", "pub use crate::b::X;\n"),
     Fixture::new("src/b.rs", "pub use crate::a::X;\nimpl X for R {}\n"),
+];
+const RE_EXPORT_CYCLE: [Fixture; 11] = [
+    Fixture::new(
+        "src/lib.rs",
+        "pub trait Mark {}\nmod m0;\nmod m1;\nmod m2;\nmod m3;\nmod m4;\nmod m5;\nmod m6;\nmod m7;\nmod m8;\nmod m9;\npub use m0::*;\npub use m1::*;\npub use m2::*;\npub use m3::*;\npub use m4::*;\npub use m5::*;\npub use m6::*;\npub use m7::*;\npub use m8::*;\npub use m9::*;\n",
+    ),
+    Fixture::new("src/m0.rs", "pub use super::*;\n"),
+    Fixture::new("src/m1.rs", "pub use super::*;\n"),
+    Fixture::new("src/m2.rs", "pub use super::*;\n"),
+    Fixture::new("src/m3.rs", "pub use super::*;\n"),
+    Fixture::new("src/m4.rs", "pub use super::*;\n"),
+    Fixture::new("src/m5.rs", "pub use super::*;\n"),
+    Fixture::new("src/m6.rs", "pub use super::*;\n"),
+    Fixture::new("src/m7.rs", "pub use super::*;\n"),
+    Fixture::new("src/m8.rs", "pub use super::*;\n"),
+    Fixture::new("src/m9.rs", "pub use super::*;\nimpl Mark for R {}\nimpl Clone for R {}\n"),
 ];
 const WORKSPACE: [Fixture; 2] = [
     Fixture::new("crates/a/src/lib.rs", "pub use std::clone::Clone as Dup;\n"),
@@ -317,11 +351,22 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_OPAQUE_FIRST => [Expect::unknown(&["Clone"])],
     GLOB_OPAQUE_LAST => [Expect::unknown(&["Debug"])],
     GLOB_CONFLICT => [Expect::unknown(&["Result"])],
+    GLOB_MODULES_CONFLICT => [Expect::unknown(&["T"])],
+    GLOB_MODULES_AGREE => [Expect::krate(&["crate", "a", "T"])],
+    GLOB_BENEATH_IMPORT => [Expect::std(&["std", "clone", "Clone"])],
+    GLOB_BENEATH_DECLARED => [Expect::krate(&["crate", "Debug"]), Expect::std(&["std", "fmt", "Display"])],
+    GLOB_THROUGH_GLOB => [Expect::krate(&["crate", "a", "b", "T"])],
     GLOB_PRIVATE_SELF => [Expect::krate(&["crate", "Clone"])],
     GLOB_VISIBLE_CRATE => [Expect::std(&["std", "fmt", "Debug"])],
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
     PATH_RESTRICTED => [Expect::krate(&["crate", "a", "T"])],
+]);
+
+laws::table!(a_glob_carries_the_hidden_names_of_its_module, |text: &&str| Read::resolved(text), [
+    GLOB_CARRIES_EXPANSION => [Expect::unknown(&["Clone"])],
+    GLOB_CARRIES_EXPANSION_ABOVE => [Expect::unknown(&["Debug"])],
+    GLOB_CARRIES_EXTERNAL => [Expect::unknown(&["Clone"])],
 ]);
 
 laws::table!(an_extern_crate_item_binds_its_name, |text: &&str| Read::resolved(text), [
@@ -347,6 +392,13 @@ laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| 
     MACRO_CALL => [Expect::unknown(&["Clone"])],
     MACRO_STATEMENT => [Expect::unknown(&["Clone"])],
     MACRO_DEFINED => [Expect::std(&["std", "clone", "Clone"])],
+    MACRO_DEFINED_CALLED => [Expect::unknown(&["Clone"])],
+    MACRO_PATHED_STATEMENT => [Expect::unknown(&["Clone"])],
+]);
+
+laws::table!(a_std_statement_macro_hides_nothing, |text: &&str| Read::resolved(text), [
+    MACRO_ASSERT => [Expect::std(&["std", "clone", "Clone"])],
+    MACRO_STD_STATEMENTS => [Expect::std(&["std", "clone", "Clone"])],
 ]);
 
 laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
@@ -357,6 +409,7 @@ laws::table!(a_path_resolves_across_the_files_of_its_crate, Read::across, [
     PRIVATE_IMPORT => [Expect::std(&["std", "hash", "Hash"]), Expect::unknown(&["Hash"])],
     REEXPORTED => [Expect::std(&["std", "fmt", "Debug"]), Expect::unknown(&["crate", "b", "Hidden"])],
     CYCLE => [Expect::unknown(&["X"])],
+    RE_EXPORT_CYCLE => [Expect::krate(&["crate", "Mark"]), Expect::std(&["std", "clone", "Clone"])],
     WORKSPACE => [Expect::std(&["std", "clone", "Clone"]), Expect::std(&["std", "clone", "Clone"])],
     NESTED_FILES => [Expect::krate(&["crate", "Mark"]), Expect::krate(&["crate", "Mark"])],
 ]);

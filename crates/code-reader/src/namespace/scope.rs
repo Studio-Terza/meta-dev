@@ -5,6 +5,7 @@ use lint_layout::Name;
 
 use super::Namespace;
 use super::anchor::{Anchor, Anchors};
+use super::binding::Locating;
 use super::boundary::ScopeId;
 use super::entries::Entries;
 

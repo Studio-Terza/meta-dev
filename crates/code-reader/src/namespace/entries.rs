@@ -1,15 +1,20 @@
 use std::collections::BTreeMap;
 
-use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Stmt, VisRestricted};
+use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Macro, Stmt, StmtMacro, VisRestricted};
 
 use code_model::ItemPath;
 use lint_layout::Name;
 
+use super::Namespace;
 use super::anchor::Anchor;
-use super::binding::{Binding, Globbed};
-use super::boundary::ScopeId;
-use super::resolver::{Domain, Search, Walk};
+use super::binding::Binding;
+use super::boundary::{GlobId, ScopeId};
+use super::resolver::{Resolution, Resolver};
+use super::settling::{ScopeSettling, Seed, Target};
+use super::std_names::{Expansion, StdNames};
+use super::tables::{Domain, Explicit, GlobView, Key, Keyed, Layer, ModuleGlob, Row};
 use super::use_path::{Leaf, UsePath};
+use super::view::View;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Visibility {
@@ -58,7 +63,7 @@ pub(crate) enum Sight {
 }
 
 impl Sight {
-    fn admits(self, visibility: Visibility) -> Admission {
+    pub(super) fn admits(self, visibility: Visibility) -> Admission {
         match self {
             Sight::Inside => Admission::Shown,
             Sight::ByPath => visibility.seen(Admission::Shown),
@@ -97,41 +102,6 @@ impl DeclaredKind {
             DeclaredKind::Module(module) => Binding::Module(module),
             DeclaredKind::OpaqueModule => Binding::Unknown,
             DeclaredKind::Item => Binding::Item(level, item),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Tally {
-    Zero,
-    One(DeclaredKind, ItemId),
-    Many,
-    Blurred,
-}
-
-impl Tally {
-    fn admitted(self, admission: Admission, kind: DeclaredKind, item: ItemId) -> Tally {
-        match admission {
-            Admission::Hidden => self,
-            Admission::Shown => self.shown(kind, item),
-            Admission::Obscured => Tally::Blurred,
-        }
-    }
-
-    fn shown(self, kind: DeclaredKind, item: ItemId) -> Tally {
-        match self {
-            Tally::Zero => Tally::One(kind, item),
-            Tally::One(..) | Tally::Many => Tally::Many,
-            Tally::Blurred => Tally::Blurred,
-        }
-    }
-
-    fn globbed(self, level: ScopeId) -> Globbed {
-        match self {
-            Tally::Zero => Globbed::Absent,
-            Tally::One(kind, item) => Globbed::Present(kind.bound(level, item)),
-            Tally::Many => Globbed::Present(Binding::Unknown),
-            Tally::Blurred => Globbed::Opaque,
         }
     }
 }
@@ -175,6 +145,13 @@ struct Import {
     visibility: Visibility,
 }
 
+impl Import {
+    fn rows<'rows>(&'rows self, resolution: &'rows Resolution) -> impl Iterator<Item = Keyed<'rows, Row<'rows>>> {
+        let row = Row::new(Layer::Imported, self.visibility, View::from(resolution));
+        Key::every(&self.name).map(move |key| Keyed::new(key, row))
+    }
+}
+
 #[derive(Debug)]
 struct Extern {
     visibility: Visibility,
@@ -198,21 +175,10 @@ impl Extern {
             .collect()
     }
 
-    fn found(externs: &BTreeMap<Name, Vec<Extern>>, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
-        externs
-            .get(name)
-            .into_iter()
-            .flatten()
-            .map(|external| {
-                Globbed::admitted(sight.admits(external.visibility), || Globbed::Present(external.bound(walk)))
-            })
-            .fold(Globbed::Absent, Globbed::joined)
-    }
-
-    fn bound(&self, walk: &Walk<'_>) -> Binding {
+    fn bound(&self, space: &Namespace, scope: ScopeId) -> Binding {
         match Anchor::spelled(&self.krate) {
-            Some(Anchor::Module) => Binding::from(Anchor::Crate.anchored(walk.space().anchors(walk.scope()))),
-            _ => walk.space().global(&self.krate),
+            Some(Anchor::Module) => Binding::from(Anchor::Crate.anchored(space.anchors(scope))),
+            _ => space.global(&self.krate),
         }
     }
 }
@@ -224,10 +190,17 @@ enum GlobSource {
 }
 
 impl GlobSource {
-    fn globbed(&self, name: &Name, walk: &Walk<'_>, domain: Domain) -> Globbed {
+    fn unsettled(&self) -> Target {
         match self {
-            GlobSource::Path(path) => walk.expanding(path).globbed(walk, path, name, domain),
-            GlobSource::Expansion => Globbed::Opaque,
+            GlobSource::Path(_) => Target::Waiting,
+            GlobSource::Expansion => Target::Opaque,
+        }
+    }
+
+    fn target(&self, resolver: &Resolver<'_, '_>, scope: ScopeId, glob: GlobId) -> Target {
+        match self {
+            GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
+            GlobSource::Expansion => Target::Opaque,
         }
     }
 }
@@ -243,71 +216,43 @@ impl Glob {
 }
 
 #[derive(Debug, Default)]
-struct Declarations(Vec<Declared>);
-
-impl Declarations {
-    fn found(&self, level: ScopeId, name: &Name, sight: Sight) -> Globbed {
-        self.0
-            .iter()
-            .enumerate()
-            .filter(|(_, declared)| declared.name == *name)
-            .fold(Tally::Zero, |tally, (index, declared)| {
-                tally.admitted(sight.admits(declared.visibility), declared.kind, ItemId(index))
-            })
-            .globbed(level)
-    }
-}
-
-#[derive(Debug, Default)]
-struct Imports(Vec<Import>);
-
-impl Imports {
-    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
-        self.0
-            .iter()
-            .filter(|import| import.name == *name)
-            .map(|import| {
-                Globbed::admitted(sight.admits(import.visibility), || Globbed::Present(walk.path(&import.path)))
-            })
-            .fold(Globbed::Absent, Globbed::joined)
-    }
-}
-
-#[derive(Debug, Default)]
-struct Globs(Vec<Glob>);
-
-impl Globs {
-    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>, domain: Domain) -> Globbed {
-        self.0
-            .iter()
-            .map(|glob| Globbed::admitted(sight.admits(glob.visibility), || glob.source.globbed(name, walk, domain)))
-            .fold(Globbed::Absent, Globbed::joined)
-    }
-}
-
-#[derive(Debug, Default)]
 pub(crate) struct Entries {
-    declared: Declarations,
-    imports: Imports,
+    declared: Vec<Declared>,
+    imports: Vec<Import>,
     externs: BTreeMap<Name, Vec<Extern>>,
-    globs: Globs,
+    globs: Vec<Glob>,
 }
 
 impl From<Declared> for Entries {
     fn from(declared: Declared) -> Entries {
-        Entries { declared: Declarations(vec![declared]), ..Entries::default() }
+        Entries { declared: vec![declared], imports: Vec::new(), externs: BTreeMap::new(), globs: Vec::new() }
     }
 }
 
 impl From<Import> for Entries {
     fn from(import: Import) -> Entries {
-        Entries { imports: Imports(vec![import]), ..Entries::default() }
+        Entries { declared: Vec::new(), imports: vec![import], externs: BTreeMap::new(), globs: Vec::new() }
     }
 }
 
 impl From<Glob> for Entries {
     fn from(glob: Glob) -> Entries {
-        Entries { globs: Globs(vec![glob]), ..Entries::default() }
+        Entries { declared: Vec::new(), imports: Vec::new(), externs: BTreeMap::new(), globs: vec![glob] }
+    }
+}
+
+impl From<&ItemExternCrate> for Entries {
+    fn from(declared: &ItemExternCrate) -> Entries {
+        Entries { declared: Vec::new(), imports: Vec::new(), externs: Extern::keyed(declared), globs: Vec::new() }
+    }
+}
+
+impl From<&Macro> for Entries {
+    fn from(invoked: &Macro) -> Entries {
+        match StdNames::expansion(invoked) {
+            Expansion::Statement => Entries::default(),
+            Expansion::Items => Entries::from(Glob::EXPANSION),
+        }
     }
 }
 
@@ -325,8 +270,8 @@ impl From<&Item> for Entries {
     fn from(item: &Item) -> Entries {
         match item {
             Item::Use(used) => Entries::from(used),
-            Item::ExternCrate(declared) => Entries { externs: Extern::keyed(declared), ..Entries::default() },
-            Item::Macro(ItemMacro { ident: None, .. }) => Entries::from(Glob::EXPANSION),
+            Item::ExternCrate(declared) => Entries::from(declared),
+            Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
             Item::Struct(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
             Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
             Item::Union(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
@@ -338,61 +283,111 @@ impl From<&Item> for Entries {
     }
 }
 
+impl From<&Stmt> for Entries {
+    fn from(statement: &Stmt) -> Entries {
+        match statement {
+            Stmt::Item(item) => Entries::from(item),
+            Stmt::Macro(StmtMacro { mac, .. }) => Entries::from(mac),
+            Stmt::Local(_) | Stmt::Expr(..) => Entries::default(),
+        }
+    }
+}
+
 impl Entries {
     pub(crate) fn of_items(items: &[Item]) -> Entries {
         items.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
     }
 
     pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
-        statements.iter().map(Entries::of_statement).fold(Entries::default(), Entries::merged)
+        statements.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
     }
 
     pub(super) fn declare(&mut self, declared: Declared) {
-        self.declared.0.push(declared);
-    }
-
-    pub(super) fn found(&self, level: ScopeId, name: &Name, search: &Search<'_>) -> Globbed {
-        let sight = search.sight(level);
-        let importer = search.importer(level);
-        let domain = search.domain();
-        Globbed::typed(domain, || self.declared.found(level, name, sight))
-            .or_else(|| self.imports.found(name, sight, &importer))
-            .or_else(|| Globbed::typed(domain, || Extern::found(&self.externs, name, sight, &importer)))
-            .or_else(|| self.globs.found(name, sight, &importer, domain))
+        self.declared.push(declared);
     }
 
     pub(super) fn path_of(&self, item: ItemId, located: Option<ItemPath>) -> Option<ItemPath> {
-        let name = self.declared.0.get(item.0).map(|declared| &declared.name);
+        let name = self.declared.get(item.0).map(|declared| &declared.name);
         located.zip(name).map(|(path, name)| path.joined(name))
     }
 
     pub(super) fn within(&self, module: ScopeId, located: Option<ItemPath>) -> Option<ItemPath> {
         let name = self
             .declared
-            .0
             .iter()
             .find(|declared| declared.kind == DeclaredKind::Module(module))
             .map(|declared| &declared.name);
         located.zip(name).map(|(path, name)| path.joined(name))
     }
 
-    pub(super) fn prelude(&self, name: &Name, walk: &Walk<'_>) -> Option<Binding> {
-        self.externs.get(name).and_then(|externs| externs.first()).map(|external| external.bound(walk))
+    pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {
+        self.externs.get(name).and_then(|externs| externs.first()).map(|external| external.bound(space, root))
     }
 
-    fn of_statement(statement: &Stmt) -> Entries {
-        match statement {
-            Stmt::Item(item) => Entries::from(item),
-            Stmt::Macro(_) => Entries::from(Glob::EXPANSION),
-            Stmt::Local(_) | Stmt::Expr(..) => Entries::default(),
-        }
+    pub(super) fn seeds(&self, scope: ScopeId, space: &Namespace) -> Vec<Seed<'_>> {
+        let declared = self.declared.iter().enumerate().map(|(index, declared)| {
+            Seed::new(
+                Key::new(Domain::Types, &declared.name),
+                Layer::Declared,
+                declared.visibility,
+                declared.kind.bound(scope, ItemId(index)),
+            )
+        });
+        let externs = self.externs.iter().flat_map(|(name, externs)| {
+            externs.iter().map(move |external| {
+                Seed::new(
+                    Key::new(Domain::Types, name),
+                    Layer::Extern,
+                    external.visibility,
+                    external.bound(space, scope),
+                )
+            })
+        });
+        declared.chain(externs).collect()
+    }
+
+    pub(super) fn unsettled(&self) -> ScopeSettling {
+        ScopeSettling::new(
+            self.imports.iter().map(|_| Resolution::Waiting).collect(),
+            self.globs.iter().map(|glob| glob.source.unsettled()).collect(),
+        )
+    }
+
+    pub(super) fn settled(&self, scope: ScopeId, resolver: &Resolver<'_, '_>) -> ScopeSettling {
+        ScopeSettling::new(
+            self.imports.iter().map(|import| resolver.path(&import.path, scope)).collect(),
+            self.globs
+                .iter()
+                .zip(GlobId::ids(&self.globs))
+                .map(|(glob, id)| glob.source.target(resolver, scope, id))
+                .collect(),
+        )
+    }
+
+    pub(super) fn explicit<'rows>(
+        &'rows self,
+        seeds: &'rows [Seed<'rows>],
+        imports: &'rows [Resolution],
+    ) -> Explicit<'rows> {
+        let imported = self.imports.iter().zip(imports).flat_map(|(import, resolution)| import.rows(resolution));
+        seeds.iter().map(Seed::row).chain(imported).collect()
+    }
+
+    pub(super) fn fixed<'rows>(&self, targets: &'rows [Target]) -> Vec<GlobView<'rows>> {
+        let globs = self.globs.iter().zip(GlobId::ids(&self.globs)).zip(targets);
+        globs.filter_map(|((glob, id), target)| target.fixed(id, glob.visibility)).collect()
+    }
+
+    pub(super) fn modules<'rows>(&self, targets: &'rows [Target]) -> Vec<ModuleGlob<'rows>> {
+        let globs = self.globs.iter().zip(GlobId::ids(&self.globs)).zip(targets);
+        globs.filter_map(|((glob, id), target)| target.module(id, glob.visibility)).collect()
     }
 
     fn merged(mut self, other: Entries) -> Entries {
-        self.declared.0.extend(other.declared.0);
-        self.imports.0.extend(other.imports.0);
+        self.declared.extend(other.declared);
+        self.imports.extend(other.imports);
         other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));
-        self.globs.0.extend(other.globs.0);
+        self.globs.extend(other.globs);
         self
     }
 }

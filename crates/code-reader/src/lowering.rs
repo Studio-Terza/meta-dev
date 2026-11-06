@@ -12,7 +12,8 @@ use code_model::{Building, FileId, Found, Implementation, Model, Origin};
 use lint_layout::{LineNumber, Name};
 
 use crate::namespace::{
-    CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, ScopeId, ScopeKind, UsePath, Visibility,
+    CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, ScopeId, ScopeKind, Seeds, UsePath,
+    Visibility,
 };
 use crate::planting::{Files, ReadFile};
 use boundary::SelfType;
@@ -60,7 +61,7 @@ impl ImplRow {
         }
     }
 
-    fn built(self, resolver: &Resolver<'_>, mut building: Building) -> Building {
+    fn built(self, resolver: &Resolver<'_, '_>, mut building: Building) -> Building {
         let implemented = self.implemented.map(|path| resolver.path_resolved(self.scope, &path, self.domain));
         building.implementation(
             self.file,
@@ -129,13 +130,13 @@ impl Slot {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Lowered {
-    space: Namespace,
+pub(crate) struct Lowered<'read> {
+    space: Namespace<'read>,
     rows: Vec<ImplRow>,
 }
 
-impl Lowered {
-    pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<Name>, form: CrateForm) -> Vec<Slot> {
+impl<'read> Lowered<'read> {
+    pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
         let syntax = read.source().syntax();
         let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
         let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
@@ -163,7 +164,10 @@ impl Lowered {
     }
 
     pub(crate) fn built(self, building: Building) -> Model {
-        let resolver = Resolver::new(&self.space);
+        let seeds = Seeds::from(&self.space);
+        let settled = seeds.settled();
+        let tables = seeds.tables(&settled);
+        let resolver = Resolver::new(&self.space, &tables);
         self.rows.into_iter().fold(building, |building, row| row.built(&resolver, building)).built()
     }
 
@@ -175,13 +179,13 @@ impl Lowered {
 }
 
 #[derive(Debug)]
-struct Lowering<'low> {
-    lowered: &'low mut Lowered,
+struct Lowering<'low, 'read> {
+    lowered: &'low mut Lowered<'read>,
     here: Seat,
     slots: Vec<Slot>,
 }
 
-impl Lowering<'_> {
+impl Lowering<'_, '_> {
     const DERIVE: &'static str = "derive";
 
     fn entered(&mut self, kind: ScopeKind, entries: Entries, children: Rc<Path>) -> Seat {
@@ -214,7 +218,7 @@ impl Lowering<'_> {
     }
 }
 
-impl<'ast> Visit<'ast> for Lowering<'_> {
+impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_mod(&mut self, item: &'ast ItemMod) {
         match &item.content {
             Some((_, items)) => self.module_visited(item, items),

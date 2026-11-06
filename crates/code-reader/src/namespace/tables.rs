@@ -1,0 +1,291 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use lint_layout::Name;
+
+use super::boundary::{GlobId, Lattice, ScopeId};
+use super::entries::{Sight, Visibility};
+use super::view::View;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Domain {
+    Types,
+    Macros,
+}
+
+impl Domain {
+    const ALL: [Domain; 2] = [Domain::Types, Domain::Macros];
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Key<'name> {
+    domain: Domain,
+    name: &'name Name,
+}
+
+impl<'name> Key<'name> {
+    pub(super) fn new(domain: Domain, name: &'name Name) -> Key<'name> {
+        Key { domain, name }
+    }
+
+    pub(super) fn every(name: &'name Name) -> impl Iterator<Item = Key<'name>> {
+        Domain::ALL.into_iter().map(move |domain| Key { domain, name })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Sought<'name> {
+    Named(Key<'name>),
+    Unlisted,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Keyed<'rows, Value> {
+    key: Key<'rows>,
+    value: Value,
+}
+
+impl<'rows, Value> Keyed<'rows, Value> {
+    pub(super) fn new(key: Key<'rows>, value: Value) -> Keyed<'rows, Value> {
+        Keyed { key, value }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum Layer {
+    Declared,
+    Imported,
+    Extern,
+}
+
+impl Layer {
+    const ORDER: [Layer; 3] = [Layer::Declared, Layer::Imported, Layer::Extern];
+
+    fn found<'rows>(self, explicit: &Explicit<'rows>, key: Key<'_>, sight: Sight) -> View<'rows> {
+        let rows = explicit.0.get(&Placed { key, layer: self }).map(Vec::as_slice).unwrap_or_default();
+        rows.iter().fold(View::ABSENT, |found, row| found.union(row.seen(sight)))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Placed<'name> {
+    key: Key<'name>,
+    layer: Layer,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Row<'rows> {
+    layer: Layer,
+    visibility: Visibility,
+    view: View<'rows>,
+}
+
+impl<'rows> Row<'rows> {
+    pub(super) fn new(layer: Layer, visibility: Visibility, view: View<'rows>) -> Row<'rows> {
+        Row { layer, visibility, view }
+    }
+
+    fn seen(self, sight: Sight) -> View<'rows> {
+        View::admitted(sight.admits(self.visibility), || self.view)
+    }
+}
+
+#[derive(Debug, Default)]
+pub(super) struct Explicit<'rows>(BTreeMap<Placed<'rows>, Vec<Row<'rows>>>);
+
+impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
+    fn from_iter<Rows: IntoIterator<Item = Keyed<'rows, Row<'rows>>>>(rows: Rows) -> Explicit<'rows> {
+        Explicit(rows.into_iter().fold(BTreeMap::new(), |mut placed: BTreeMap<Placed<'rows>, Vec<Row<'rows>>>, row| {
+            placed.entry(Placed { key: row.key, layer: row.value.layer }).or_default().push(row.value);
+            placed
+        }))
+    }
+}
+
+impl<'rows> Explicit<'rows> {
+    fn found(&self, sought: Sought<'_>, sight: Sight) -> View<'rows> {
+        match sought {
+            Sought::Named(key) => self.named(key, sight),
+            Sought::Unlisted => View::ABSENT,
+        }
+    }
+
+    fn named(&self, key: Key<'_>, sight: Sight) -> View<'rows> {
+        Layer::ORDER.iter().fold(View::ABSENT, |found, layer| found.or_else(|| layer.found(self, key, sight)))
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(super) struct Exposed<'rows> {
+    default: View<'rows>,
+    names: BTreeMap<Key<'rows>, View<'rows>>,
+}
+
+impl<'rows> FromIterator<Keyed<'rows, View<'rows>>> for Exposed<'rows> {
+    fn from_iter<Views: IntoIterator<Item = Keyed<'rows, View<'rows>>>>(views: Views) -> Exposed<'rows> {
+        Exposed { default: View::ABSENT, names: views.into_iter().map(|keyed| (keyed.key, keyed.value)).collect() }
+    }
+}
+
+impl<'rows> From<View<'rows>> for Exposed<'rows> {
+    fn from(default: View<'rows>) -> Exposed<'rows> {
+        Exposed { default, names: BTreeMap::new() }
+    }
+}
+
+impl<'rows> Exposed<'rows> {
+    fn joined(&self, computed: &Exposed<'rows>) -> Exposed<'rows> {
+        let keys: BTreeSet<Key<'rows>> = self.names.keys().chain(computed.names.keys()).copied().collect();
+        let names = keys
+            .into_iter()
+            .map(|key| (key, self.found(Sought::Named(key)).union(computed.found(Sought::Named(key)))))
+            .collect();
+        Exposed { default: self.default.union(computed.default), names }
+    }
+
+    fn found(&self, sought: Sought<'_>) -> View<'rows> {
+        match sought {
+            Sought::Named(key) => self.names.get(&key).copied().unwrap_or(self.default),
+            Sought::Unlisted => self.default,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct GlobView<'rows> {
+    id: GlobId,
+    visibility: Visibility,
+    exposed: Exposed<'rows>,
+}
+
+impl<'rows> GlobView<'rows> {
+    pub(super) fn new(id: GlobId, visibility: Visibility, exposed: Exposed<'rows>) -> GlobView<'rows> {
+        GlobView { id, visibility, exposed }
+    }
+
+    fn found(&self, sought: Sought<'_>, sight: Sight) -> View<'rows> {
+        View::admitted(sight.admits(self.visibility), || self.exposed.found(sought))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ModuleGlob<'rows> {
+    glob: GlobView<'rows>,
+    module: ScopeId,
+    sight: Sight,
+}
+
+impl<'rows> ModuleGlob<'rows> {
+    pub(super) fn new(glob: GlobView<'rows>, module: ScopeId, sight: Sight) -> ModuleGlob<'rows> {
+        ModuleGlob { glob, module, sight }
+    }
+
+    fn exposing(&self, names: Names<'_, 'rows>) -> ModuleGlob<'rows> {
+        ModuleGlob {
+            glob: GlobView {
+                id: self.glob.id,
+                visibility: self.glob.visibility,
+                exposed: names.exposure(self.module, self.sight),
+            },
+            module: self.module,
+            sight: self.sight,
+        }
+    }
+}
+
+impl<'rows> Lattice for ModuleGlob<'rows> {
+    fn joined(&self, computed: ModuleGlob<'rows>) -> ModuleGlob<'rows> {
+        ModuleGlob {
+            glob: GlobView {
+                id: self.glob.id,
+                visibility: self.glob.visibility,
+                exposed: self.glob.exposed.joined(&computed.glob.exposed),
+            },
+            module: self.module,
+            sight: self.sight,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Level<'tables, 'rows> {
+    explicit: &'tables Explicit<'rows>,
+    fixed: &'tables [GlobView<'rows>],
+    modules: &'tables [ModuleGlob<'rows>],
+}
+
+impl<'tables, 'rows> Level<'tables, 'rows> {
+    fn found(self, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+        let globbed = || self.globs(ignored).fold(View::ABSENT, |found, glob| found.union(glob.found(sought, sight)));
+        self.explicit.found(sought, sight).or_else(globbed)
+    }
+
+    fn exposure(self, sight: Sight) -> Exposed<'rows> {
+        let explicit = self.explicit.0.keys().map(|placed| placed.key);
+        let globbed = self.globs(None).flat_map(|glob| glob.exposed.names.keys().copied());
+        let keys: BTreeSet<Key<'rows>> = explicit.chain(globbed).collect();
+        let names = keys.into_iter().map(|key| (key, self.found(Sought::Named(key), sight, None))).collect();
+        Exposed { default: self.found(Sought::Unlisted, sight, None), names }
+    }
+
+    fn globs(self, ignored: Option<GlobId>) -> impl Iterator<Item = &'tables GlobView<'rows>> {
+        self.fixed
+            .iter()
+            .chain(self.modules.iter().map(|module| &module.glob))
+            .filter(move |glob| Some(glob.id) != ignored)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Names<'tables, 'rows> {
+    explicit: &'tables [Explicit<'rows>],
+    fixed: &'tables [Vec<GlobView<'rows>>],
+    modules: &'tables [Vec<ModuleGlob<'rows>>],
+}
+
+impl<'tables, 'rows> Names<'tables, 'rows> {
+    fn level(self, scope: ScopeId) -> Option<Level<'tables, 'rows>> {
+        let rows = scope.row(self.explicit).zip(scope.row(self.fixed)).zip(scope.row(self.modules));
+        rows.map(|((explicit, fixed), modules)| Level { explicit, fixed, modules })
+    }
+
+    fn found(self, scope: ScopeId, sought: Sought<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+        match self.level(scope) {
+            Some(level) => level.found(sought, sight, ignored),
+            None => View::CONFLICT,
+        }
+    }
+
+    fn exposure(self, scope: ScopeId, sight: Sight) -> Exposed<'rows> {
+        match self.level(scope) {
+            Some(level) => level.exposure(sight),
+            None => Exposed::from(View::CONFLICT),
+        }
+    }
+
+    fn exposed(self) -> Vec<Vec<ModuleGlob<'rows>>> {
+        self.modules.iter().map(|globs| globs.iter().map(|glob| glob.exposing(self)).collect()).collect()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Tables<'rows> {
+    explicit: Vec<Explicit<'rows>>,
+    fixed: Vec<Vec<GlobView<'rows>>>,
+    modules: Vec<Vec<ModuleGlob<'rows>>>,
+}
+
+impl<'rows> Tables<'rows> {
+    pub(super) fn new(
+        explicit: Vec<Explicit<'rows>>,
+        fixed: Vec<Vec<GlobView<'rows>>>,
+        modules: Vec<Vec<ModuleGlob<'rows>>>,
+    ) -> Tables<'rows> {
+        let modules = modules.settled(|modules| Names { explicit: &explicit, fixed: &fixed, modules }.exposed());
+        Tables { explicit, fixed, modules }
+    }
+
+    pub(super) fn found(&self, scope: ScopeId, key: Key<'_>, sight: Sight, ignored: Option<GlobId>) -> View<'rows> {
+        let names = Names { explicit: &self.explicit, fixed: &self.fixed, modules: &self.modules };
+        names.found(scope, Sought::Named(key), sight, ignored)
+    }
+}
