@@ -1,0 +1,42 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(input_tokens), 0) AS \"input!: i64\", COALESCE(SUM(output_tokens), 0) AS \"output!: i64\", COALESCE(SUM(cache_written_tokens), 0) AS \"cache_written!: i64\", COALESCE(SUM(cache_read_tokens), 0) AS \"cache_read!: i64\" FROM runs WHERE job = ?1",
+  "describe": {
+    "columns": [
+      {
+        "name": "input!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "output!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "cache_written!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "cache_read!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d60856f821c76d65ec00a1240abf95118cbf1fd416078749ddc0dac8786f001e"
+}

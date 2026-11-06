@@ -1,6 +1,6 @@
 use std::fmt;
 
-use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
 use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
@@ -70,7 +70,7 @@ impl fmt::Display for Line<'_> {
             entry.project(),
             entry.facet(),
             entry.stage(),
-            Entered::from(entry.provenance())
+            entry.provenance()
         )?;
         self.0.title().iter().try_for_each(|title| write!(formatter, " {:?}", title.to_string()))
     }
@@ -84,13 +84,7 @@ impl fmt::Display for Neighbourhood<'_> {
             .iter()
             .try_for_each(|relative| writeln!(formatter, "  {} {}", relative.kin(), Line(relative.node())))?;
         self.0.links().iter().try_for_each(|link| {
-            writeln!(
-                formatter,
-                "  {} {} entered {}",
-                link.relation(),
-                Id(link.target()),
-                Entered::from(link.provenance())
-            )
+            writeln!(formatter, "  {} {} entered {}", link.relation(), Id(link.target()), link.provenance())
         })
     }
 }
@@ -98,7 +92,7 @@ impl fmt::Display for Neighbourhood<'_> {
 impl fmt::Display for Annotated<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.remark().visited(Writing(&mut *formatter))?;
-        write!(formatter, " {} entered {}", self.0.standing(), Entered::from(self.0.provenance()))
+        write!(formatter, " {} entered {}", self.0.standing(), self.0.provenance())
     }
 }
 

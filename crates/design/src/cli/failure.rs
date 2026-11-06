@@ -2,15 +2,16 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use design_model::{NodeId, Project, Unnamed, Unnumbered};
+use design_model::{JobId, NodeId, Project, Unnamed, Unnumbered};
 use design_store::Refusal;
+use dispatch_ports::{DispatchFailure, Unkilled};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::{ReadFailure, Uuid};
 
-use structurer::Misread;
+use structurer::{Lapse, Misread};
 
 use super::rendering::Id;
 use super::request::Unresolved;
@@ -19,7 +20,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -58,6 +59,12 @@ pub enum Failure {
     Store(#[from] StoreFailure),
     #[error("cannot release the design store lock: {0}")]
     Unlock(#[from] Unlock),
+    #[error("the structuring agent could not be run: {0}")]
+    Dispatch(#[from] DispatchFailure),
+    #[error("{0}")]
+    Unkilled(#[from] Unkilled),
+    #[error("FLAILED: job {job} failed twice, the second time because {lapse}; structure halted, triage it")]
+    Flailed { job: JobId, lapse: Lapse },
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
@@ -74,6 +81,13 @@ impl From<Refusal> for Failure {
 }
 
 impl Failure {
+    pub(crate) fn refusal(self) -> Result<Lapse, Failure> {
+        match self {
+            Failure::Unresolved(unresolved) => Ok(Lapse::Refused(Box::new(unresolved))),
+            other => Err(other),
+        }
+    }
+
     pub fn settled(
         outcome: Result<Outcome, Failure>,
         released: Result<Snapshot, ReleaseFailures>,

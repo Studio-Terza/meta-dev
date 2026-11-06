@@ -1,4 +1,5 @@
 mod command;
+mod crew;
 mod ground;
 mod persistence;
 mod projects;
@@ -16,6 +17,7 @@ use store_ports::Sqlite;
 use super::failure::Failure;
 use command::Command;
 pub use command::{Applied, Unresolved};
+pub use crew::Crew;
 pub use ground::Ground;
 use persistence::Persistence;
 use projects::Located;

@@ -1,6 +1,8 @@
+mod attempt;
 mod directive;
 mod directives;
 mod edge;
+mod job;
 mod misread;
 mod node_ref;
 mod proposal;
@@ -9,9 +11,11 @@ mod rendering;
 mod segment_ref;
 mod verb;
 
+pub use attempt::{Attempt, Lapse, Reading};
 pub use directive::{Directive, Visit};
 pub use directives::Directives;
 pub use edge::Edge;
+pub use job::{Job, Said};
 pub use misread::Misread;
 pub use node_ref::{Bind, Label, NodeRef};
 pub use proposal::Proposal;

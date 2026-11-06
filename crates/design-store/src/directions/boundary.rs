@@ -1,5 +1,5 @@
 use design_model::{
-    Entered, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Standing,
+    Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Standing,
     Supersession,
 };
 use newtype::{Counter, Newtype};
@@ -23,15 +23,15 @@ struct Linking<'ends> {
     source: &'ends Segment,
     target: &'ends Segment,
     relation: SegmentRelation,
-    provenance: &'static str,
+    provenance: &'ends str,
 }
 
 #[derive(Debug)]
-struct LinkColumns {
+struct LinkColumns<'provenance> {
     source: Columns,
     relation: &'static str,
     target: Columns,
-    provenance: &'static str,
+    provenance: &'provenance str,
 }
 
 #[derive(Debug)]
@@ -84,8 +84,13 @@ impl Columns {
         Ok(Segment::new(Uuid::new(self.message), Ordinal::new(ordinal)))
     }
 
-    fn provenance(text: &str) -> Result<Provenance, sqlx::Error> {
-        Ok(Provenance::from(NodeRow::decoded::<Entered>(text)?))
+    pub(crate) fn assigned(self, job: i64, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(sqlx::query!(
+            "INSERT OR IGNORE INTO job_segments (job, message, ordinal) VALUES (?1, ?2, ?3)",
+            job,
+            self.message,
+            self.ordinal
+        ))
     }
 
     pub(crate) fn rowid(self, statements: &mut Statements<'_>) -> Result<i64, StoreFailure> {
@@ -115,7 +120,7 @@ impl TryFrom<PlacedRow> for Annotation {
         let segment = Columns { message: row.message, ordinal: row.ordinal }.segment()?;
         let remark =
             Remark::Placed { segment, node: NodeId::new(row.node), relation: NodeRow::decoded(&row.relation)? };
-        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, Standing::Current))
+        Ok(Annotation::new(remark, NodeRow::decoded::<Provenance>(&row.provenance)?, Standing::Current))
     }
 }
 
@@ -131,7 +136,7 @@ impl TryFrom<SensedRow> for Annotation {
             NodeRow::decoded(&row.explicitness)?,
         );
         let remark = Remark::Sensed { segment, sense };
-        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, NodeRow::decoded(&row.standing)?))
+        Ok(Annotation::new(remark, NodeRow::decoded::<Provenance>(&row.provenance)?, NodeRow::decoded(&row.standing)?))
     }
 }
 
@@ -142,7 +147,7 @@ impl TryFrom<RelatedRow> for Annotation {
         let source = Columns { message: row.source_message, ordinal: row.source_ordinal }.segment()?;
         let target = Columns { message: row.target_message, ordinal: row.target_ordinal }.segment()?;
         let remark = Remark::Related { source, target, relation: NodeRow::decoded(&row.relation)? };
-        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, Standing::Current))
+        Ok(Annotation::new(remark, NodeRow::decoded::<Provenance>(&row.provenance)?, Standing::Current))
     }
 }
 
@@ -153,7 +158,7 @@ impl TryFrom<ConversationalRow> for Annotation {
         let segment = Columns { message: row.message, ordinal: row.ordinal }.segment()?;
         Ok(Annotation::new(
             Remark::Conversational { segment },
-            Columns::provenance(&row.provenance)?,
+            NodeRow::decoded::<Provenance>(&row.provenance)?,
             Standing::Current,
         ))
     }
@@ -215,16 +220,13 @@ impl Batch for Directions {
             .iter()
             .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, Refusal>>()?;
-        let recorded = self.file.written(annotating.provenance(), annotating.statements)?;
+        let provenance = annotating.provenance.to_string();
+        let recorded = self.file.written(&provenance, annotating.statements)?;
         Ok(Written::total(written.into_iter().chain([recorded])))
     }
 }
 
 impl Annotating<'_, '_> {
-    fn provenance(&self) -> &'static str {
-        Entered::from(self.provenance).name()
-    }
-
     pub(super) fn placed(
         &mut self,
         segment: &Segment,
@@ -234,7 +236,7 @@ impl Annotating<'_, '_> {
         let Columns { message, ordinal } = Columns::from(segment);
         let node = node.into_inner();
         let relation = relation.name();
-        let provenance = self.provenance();
+        let provenance = self.provenance.to_string();
         Ok(self.statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO span_edges (message, ordinal, relation, node, provenance) VALUES (?1, ?2, ?3, ?4, ?5)",
             message,
@@ -251,7 +253,7 @@ impl Annotating<'_, '_> {
         let specificity = sense.specificity().name();
         let confidence = sense.confidence().name();
         let explicitness = sense.explicitness().name();
-        let provenance = self.provenance();
+        let provenance = self.provenance.to_string();
         Ok(self.statements.written(sqlx::query!(
             "INSERT INTO senses (message, ordinal, kind, specificity, confidence, explicitness, provenance, supersedes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, (SELECT earlier.id FROM senses AS earlier WHERE earlier.message = ?1 AND earlier.ordinal = ?2 AND NOT EXISTS (SELECT 1 FROM senses AS later WHERE later.supersedes = earlier.id)))",
             message,
@@ -270,7 +272,8 @@ impl Annotating<'_, '_> {
         target: &Segment,
         relation: SegmentRelation,
     ) -> Result<Written, Refusal> {
-        Linking { source, target, relation, provenance: self.provenance() }.closed(self.statements)
+        let provenance = self.provenance.to_string();
+        Linking { source, target, relation, provenance: &provenance }.closed(self.statements)
     }
 
     pub(super) fn proposed(&mut self, node: &Node, parent: NodeId) -> Result<Written, Refusal> {
@@ -287,7 +290,7 @@ impl Annotating<'_, '_> {
 
     pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, Refusal> {
         let Columns { message, ordinal } = Columns::from(segment);
-        let provenance = self.provenance();
+        let provenance = self.provenance.to_string();
         Ok(self.statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO conversational (message, ordinal, provenance) VALUES (?1, ?2, ?3)",
             message,
@@ -309,8 +312,8 @@ impl Linking<'_> {
     }
 }
 
-impl From<Linking<'_>> for LinkColumns {
-    fn from(linking: Linking<'_>) -> LinkColumns {
+impl<'ends> From<Linking<'ends>> for LinkColumns<'ends> {
+    fn from(linking: Linking<'ends>) -> LinkColumns<'ends> {
         LinkColumns {
             source: Columns::from(linking.source),
             relation: linking.relation.name(),
@@ -320,7 +323,7 @@ impl From<Linking<'_>> for LinkColumns {
     }
 }
 
-impl LinkColumns {
+impl LinkColumns<'_> {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO segment_links (source_message, source_ordinal, relation, target_message, target_ordinal, provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",

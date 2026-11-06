@@ -4,14 +4,16 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::{
-    Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Segment,
-    SegmentRelation, Stage, Supersession, Title,
+    Entered, Entry, Facet, JobId, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, RunId,
+    Segment, SegmentRelation, Stage, Supersession, Title,
 };
 use design_store::{
-    AppliedFile, Covered, Cycle, Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot,
-    Refusal, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema,
-    Unseen,
+    AppliedFile, ContextNodes, Covered, Cycle, Directed, Directions, JobClosed, JobOpened, JobState, Linked, LiveRuns,
+    NewNode, NextJob, NextNode, NextRun, Placed, Prefixed, ProjectRoot, Refusal, RunEnded, RunSpawned, RunState, Scope,
+    SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode, SpentOn, StreamSchema, Unseen,
+    Unstructured,
 };
+use dispatch_ports::{Deadline, Pid, Spawned, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
@@ -722,4 +724,97 @@ fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
     let refused = Closed::ALL
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
     assert_eq!(refused, Closed::ALL.map(|closed| Some(closed.ends().cycle(Probe::closing()))));
+}
+
+struct Runs;
+
+impl Runs {
+    fn spawned(pid: u32, deadline: i64) -> Spawned {
+        let started = "Fri Nov  6 01:16:00 2026".parse::<Started>().ok();
+        Spawned::new(Pid::new(pid), started, Deadline::new(Wall::new(deadline)))
+    }
+
+    fn usage(counts: [u64; 4]) -> Usage {
+        let [input, output, cache_written, cache_read] = counts.map(Tokens::new);
+        Usage::new(input, output, cache_written, cache_read)
+    }
+}
+
+#[test]
+fn an_owner_segment_is_unstructured_until_an_annotation_names_it() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    let [asked, answered, said] =
+        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
+    let unstructured = || -> Result<Vec<Segment>, Box<dyn Error>> {
+        let unplaced = store.read(Unstructured)?;
+        Ok(unplaced.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect())
+    };
+    let first = store.read(Unstructured)?.first().map(|unplaced| AsRef::<Body>::as_ref(unplaced).to_string());
+    assert_eq!(first.as_deref(), Some("1. go"));
+    assert_eq!(unstructured()?, [asked.clone(), answered.clone()]);
+    Proposals::written(&store, vec![Directed::Conversational { segment: asked }])?;
+    assert_eq!(unstructured()?, std::slice::from_ref(&answered));
+    Proposals::written(
+        &store,
+        vec![Directed::Related { source: said, target: answered, relation: SegmentRelation::Answers }],
+    )?;
+    assert_eq!(unstructured()?, []);
+    Ok(())
+}
+
+#[test]
+fn a_spawned_run_is_live_until_it_ends_and_its_job_is_charged_its_usage() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    assert_eq!((store.read(NextJob)?, store.read(NextRun)?), (JobId::new(1), RunId::new(1)));
+    let job = JobId::new(1);
+    let opened = store.write(JobOpened::new(job, vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)]))?;
+    assert_eq!(opened, Written::new(3));
+    store.write(RunSpawned::new(RunId::new(1), job, Runs::spawned(42, 100)))?;
+    store.write(RunSpawned::new(RunId::new(2), job, Runs::spawned(43, 200)))?;
+    let live: Vec<(RunId, Spawned)> =
+        store.read(LiveRuns)?.iter().map(|stored| (stored.identity(), stored.spawned().clone())).collect();
+    assert_eq!(live, [(RunId::new(1), Runs::spawned(42, 100)), (RunId::new(2), Runs::spawned(43, 200))]);
+    assert_eq!((store.read(NextJob)?, store.read(NextRun)?), (JobId::new(2), RunId::new(3)));
+    let ended = [
+        store.write(RunEnded::new(RunId::new(1), RunState::Finished, Some(Runs::usage([11, 7, 3, 5]))))?,
+        store.write(RunEnded::new(RunId::new(2), RunState::Overdue, None))?,
+        store.write(JobClosed::new(job, JobState::Applied))?,
+    ];
+    assert_eq!(ended, [Written::new(1); 3]);
+    assert_eq!(store.read(LiveRuns)?, []);
+    assert_eq!(store.read(SpentOn::from(job))?, Runs::usage([11, 7, 3, 5]));
+    assert_eq!(store.read(SpentOn::from(JobId::new(9)))?, Usage::default());
+    Ok(())
+}
+
+#[test]
+fn context_lists_the_project_roots_first_then_the_newest_nodes() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    Projects::rooted(&store, "q")?;
+    Proposals::written(&store, vec![Proposals::child(root, 3)?, Proposals::child(root, 4)?])?;
+    let listed: Vec<NodeId> = store.read(ContextNodes)?.iter().map(Node::identity).collect();
+    assert_eq!(listed, [2, 1, 4, 3].map(NodeId::new));
+    Ok(())
+}
+
+#[test]
+fn an_agent_provenance_is_kept_on_what_it_wrote() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    let agent = Provenance::Agent(RunId::new(7));
+    let unseen = Proposals::unseen(&store, "agent")?;
+    store.write(Directions::new(agent, unseen, vec![Proposals::child(root, 2)?]))?;
+    let child = store.read(ShownNode::from(NodeId::new(2)))?.ok_or("no child")?;
+    let links: Vec<Provenance> = child.links().iter().map(|link| link.provenance()).collect();
+    assert_eq!(links, [agent]);
+    Ok(())
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE runs SET state = ?2, input_tokens = ?3, output_tokens = ?4, cache_written_tokens = ?5, cache_read_tokens = ?6 WHERE id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "354bdeb390789c4288d91481a5018368390c48bf02c0710a8eb61c45dadcd58e"
+}

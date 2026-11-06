@@ -1,6 +1,8 @@
 use grammar::ident::Words;
+use grammar::lstart::Stamp;
 use grammar::message::{Depth, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
+use grammar::provenance::Agents;
 use grammar::search::Terms;
 use grammar::slug::Letters;
 use laws::proptest::prelude::prop_assert_eq;
@@ -101,5 +103,35 @@ laws::table!(
         "n" => Spelled::Unspelled,
         "42" => Spelled::Unspelled,
         "n42x" => Spelled::Unspelled,
+    ]
+);
+
+laws::table!(
+    a_process_start_time_is_read_as_two_words_and_five_numbers,
+    |text: &&'static str| Stamp::read(text).map(|stamp| (stamp.words(), stamp.numbers())),
+    [
+        "Fri Nov  6 01:16:00 2026    \n" => Some((["Fri", "Nov"], [6, 1, 16, 0, 2026])),
+        "Wed Sep 30 22:11:39 2026" => Some((["Wed", "Sep"], [30, 22, 11, 39, 2026])),
+        "Fri Nov  6 01:16 2026" => None,
+        "Fri Nov  6 01:16:00" => None,
+        "Fri Nov  6 01:16:00 2026 2027" => None,
+        "fri Nov  6 01:16:00 2026" => None,
+        "Fri Nov  6 01:16:00 99999" => None,
+        "" => None,
+    ]
+);
+
+laws::table!(
+    an_agent_provenance_is_read_as_its_run_number,
+    |text: &&str| Agents::numbered(text),
+    [
+        "agent 7" => Some(7),
+        "agent -3" => Some(-3),
+        "agent 0" => Some(0),
+        "agent" => None,
+        "agent x" => None,
+        "agent 7 " => None,
+        "apply" => None,
+        "agent 99999999999999999999" => None,
     ]
 );

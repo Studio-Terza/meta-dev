@@ -13,6 +13,7 @@ doctest = false
 console-ports = { path = "../console-ports" }
 design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
+dispatch-ports = { path = "../dispatch-ports" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
@@ -28,6 +29,7 @@ transcript-ports = { path = "../transcript-ports" }
 [dev-dependencies]
 e2e = { path = "../../e2e" }
 laws = { path = "../laws" }
+serde_json.workspace = true
 strum.workspace = true
 
 [lints]

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO job_segments (job, message, ordinal) VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "de1eafe3dd43a09cf6b6338ba58267afc0cf655adc894d103b977dc32b323918"
+}

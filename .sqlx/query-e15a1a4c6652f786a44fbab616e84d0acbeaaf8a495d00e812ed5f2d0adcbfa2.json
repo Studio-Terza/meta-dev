@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT segments.message, segments.ordinal, segments.body FROM segments JOIN messages ON messages.uuid = segments.message WHERE messages.author = ?1 AND NOT EXISTS (SELECT 1 FROM span_edges WHERE span_edges.message = segments.message AND span_edges.ordinal = segments.ordinal) AND NOT EXISTS (SELECT 1 FROM senses WHERE senses.message = segments.message AND senses.ordinal = segments.ordinal) AND NOT EXISTS (SELECT 1 FROM conversational WHERE conversational.message = segments.message AND conversational.ordinal = segments.ordinal) AND NOT EXISTS (SELECT 1 FROM segment_links WHERE (segment_links.source_message = segments.message AND segment_links.source_ordinal = segments.ordinal) OR (segment_links.target_message = segments.message AND segment_links.target_ordinal = segments.ordinal)) ORDER BY messages.at, segments.message, segments.ordinal",
+  "describe": {
+    "columns": [
+      {
+        "name": "message",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "body",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e15a1a4c6652f786a44fbab616e84d0acbeaaf8a495d00e812ed5f2d0adcbfa2"
+}

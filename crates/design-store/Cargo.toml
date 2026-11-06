@@ -14,6 +14,7 @@ doctest = false
 
 [dependencies]
 design-model = { path = "../design-model" }
+dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 named-derive = { path = "../named-derive" }

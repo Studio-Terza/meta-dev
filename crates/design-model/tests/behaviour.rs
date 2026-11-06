@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use design_model::{
-    Confidence, Entered, Explicitness, Facet, Kin, NodeId, NodeRelation, Project, Provenance, SegmentRelation,
+    Confidence, Entered, Explicitness, Facet, Kin, NodeId, NodeRelation, Project, Provenance, RunId, SegmentRelation,
     SenseKind, SpanRelation, Specificity, Stage,
 };
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
@@ -106,11 +106,25 @@ fn every_way_of_entering_is_displayed_as_its_name_and_parsed_back_from_it() {
 }
 
 #[test]
-fn every_way_of_entering_survives_becoming_a_provenance() {
-    let recovered: Vec<Entered> =
-        Entered::VARIANTS.iter().map(|entered| Entered::from(Provenance::from(*entered))).collect();
-    assert_eq!(recovered, Entered::VARIANTS);
+fn every_way_of_entering_survives_becoming_a_provenance_and_its_text() {
+    let recovered: Vec<Option<Provenance>> =
+        Entered::VARIANTS.iter().map(|entered| Provenance::from(*entered).to_string().parse().ok()).collect();
+    let expected: Vec<Option<Provenance>> =
+        Entered::VARIANTS.iter().map(|entered| Some(Provenance::from(*entered))).collect();
+    assert_eq!(recovered, expected);
 }
+
+laws::roundtrip!(
+    an_agent_provenance_is_displayed_and_parsed_back,
+    laws::proptest::arbitrary::any::<RunId>(),
+    |run: &RunId| Provenance::Agent(*run).to_string(),
+    |text: &String| text.parse::<Provenance>().ok(),
+    |run: RunId| Some(Provenance::Agent(run))
+);
+
+laws::law!(a_provenance_never_reads_from_other_words, "[a-z]{0,8}( [a-z]{1,3})?", text, {
+    prop_assert!(text.parse::<Provenance>().ok().is_none_or(|provenance| matches!(provenance, Provenance::Lead(_))));
+});
 
 #[test]
 fn a_word_naming_no_variant_is_refused() {

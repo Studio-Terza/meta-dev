@@ -3,6 +3,7 @@ mod ingest;
 mod init;
 mod printed;
 mod search;
+mod structure;
 mod subject;
 
 use std::io::Write;
@@ -10,12 +11,13 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use design_store::Scope;
+use dispatch_ports::{Clock, Dispatch};
 use file_ports::Files;
 use grammar::search::Terms;
 use store_ports::{Sqlite, Store};
 
 use super::persistence::Persistence;
-use super::{Ground, Token};
+use super::{Crew, Ground, Token};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 pub use apply::{Application, Applied, Unresolved};
@@ -23,6 +25,7 @@ use ingest::Ingest;
 use init::Init;
 use printed::Printed;
 use search::Search;
+use structure::Structure;
 use subject::Subject;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,6 +35,7 @@ pub enum Command {
     Search(Terms, Scope),
     Init(Init),
     Apply(PathBuf),
+    Structure,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,6 +45,7 @@ enum Verb {
     Search,
     Init,
     Apply,
+    Structure,
 }
 
 impl FromStr for Verb {
@@ -52,12 +57,13 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 5] = [
+    const NAMED: [(&'static str, Verb); 6] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
+        ("structure", Verb::Structure),
     ];
 
     fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
@@ -73,6 +79,7 @@ impl Verb {
                 .map(|terms| Command::Search(terms, scope)),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
+            Verb::Structure => rest.first().map_or(Ok(Command::Structure), |_extra| Err(Failure::Usage)),
         }
     }
 }
@@ -90,13 +97,16 @@ impl Command {
     pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opened),
-            Command::Show(_) | Command::Search(..) | Command::Init(_) | Command::Apply(_) => opened(path),
+            Command::Show(_) | Command::Search(..) | Command::Init(_) | Command::Apply(_) | Command::Structure => {
+                opened(path)
+            }
         }
     }
 
-    pub fn written<F: Files, S: Store>(
+    pub fn written<F: Files, S: Store, D: Dispatch, C: Clock>(
         self,
         ground: Ground<'_, F, S>,
+        crew: &Crew<'_, D, C>,
         out: &mut impl Write,
     ) -> Result<Outcome, Failure> {
         match self {
@@ -112,6 +122,9 @@ impl Command {
                 .and_then(|initialised| Printed::shown(out, &initialised))
                 .map(|_printed| Outcome::Initialised),
             Command::Apply(path) => Application::read(&ground, &path).and_then(|application| application.reported(out)),
+            Command::Structure => {
+                Structure::new(&ground, crew).worked().and_then(|structured| structured.reported(out))
+            }
         }
     }
 }

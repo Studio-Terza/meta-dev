@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use console_ports::Environment;
+use dispatch_ports::{ClockFiller, DispatchFiller};
 use file_ports::Files;
 use port_core::Run;
 use store_ports::Sqlite;
@@ -15,18 +16,36 @@ use crate::Outcome;
 
 pub use failure::Failure;
 pub use request::Unresolved;
-use request::{Ground, Request};
+use request::{Crew, Ground, Request};
 
 #[derive(Debug)]
-pub struct Cli<'environment, E: Environment, F: Files, O> {
+pub struct Agents<D, C> {
+    dispatch: D,
+    clock: C,
+}
+
+#[derive(Debug)]
+pub struct Cli<'environment, E: Environment, F: Files, O, D, C> {
     environment: &'environment E,
     files: F,
     opened: O,
+    agents: Agents<D, C>,
 }
 
-impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
-    pub fn new(environment: &'environment E, files: F, opened: O) -> Cli<'environment, E, F, O> {
-        Cli { environment, files, opened }
+impl<D: DispatchFiller, C: ClockFiller> Agents<D, C> {
+    pub fn new(dispatch: D, clock: C) -> Agents<D, C> {
+        Agents { dispatch, clock }
+    }
+}
+
+impl<'environment, E: Environment, F: Files, O, D: DispatchFiller, C: ClockFiller> Cli<'environment, E, F, O, D, C> {
+    pub fn new(
+        environment: &'environment E,
+        files: F,
+        opened: O,
+        agents: Agents<D, C>,
+    ) -> Cli<'environment, E, F, O, D, C> {
+        Cli { environment, files, opened, agents }
     }
 
     pub fn rooted(self, arguments: impl Iterator<Item = OsString>, out: &mut impl Write) -> Result<Outcome, Failure>
@@ -50,6 +69,8 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
         let request = Request::parsed(arguments)?;
         let located = request.located(self.environment, &self.files)?;
         let store = run.port(request.opened(&located, self.opened));
-        request.command().written(Ground::new(run, self.files, located, &store), out)
+        let dispatch = run.port(self.agents.dispatch);
+        let clock = run.port(self.agents.clock);
+        request.command().written(Ground::new(run, self.files, located, &store), &Crew::new(&dispatch, &clock), out)
     }
 }

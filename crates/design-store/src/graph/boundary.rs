@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::str::FromStr;
 
-use design_model::{Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Project, Provenance, Title};
+use design_model::{Entry, Facet, Kin, Node, NodeId, NodeRelation, Project, Provenance, Title};
 use newtype::Newtype;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
@@ -20,12 +20,12 @@ pub struct Linked {
     provenance: Provenance,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct EdgeColumns {
     source: i64,
     relation: &'static str,
     target: i64,
-    provenance: &'static str,
+    provenance: String,
 }
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ impl From<Linked> for EdgeColumns {
             source: linked.source.into_inner(),
             relation: linked.relation.name(),
             target: linked.target.into_inner(),
-            provenance: Entered::from(linked.provenance).name(),
+            provenance: linked.provenance.to_string(),
         }
     }
 }
@@ -100,7 +100,7 @@ impl Batch for NewNode {
         let project = entry.project().to_string();
         let facet = entry.facet().name();
         let stage = entry.stage().name();
-        let provenance = Entered::from(entry.provenance()).name();
+        let provenance = entry.provenance().to_string();
         statements.written(sqlx::query!(
             "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
             project,
@@ -133,7 +133,7 @@ impl TryFrom<NodeRow> for Node {
             NodeRow::decoded(&row.project)?,
             NodeRow::decoded(&row.facet)?,
             NodeRow::decoded(&row.stage)?,
-            Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?),
+            NodeRow::decoded::<Provenance>(&row.provenance)?,
         );
         Ok(row.title.map(Title::new).into_iter().fold(Node::new(NodeId::new(row.id), entry), Node::titled))
     }
@@ -159,7 +159,7 @@ impl TryFrom<OutgoingRow> for Link {
     type Error = sqlx::Error;
 
     fn try_from(row: OutgoingRow) -> Result<Link, sqlx::Error> {
-        let provenance = Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?);
+        let provenance = NodeRow::decoded::<Provenance>(&row.provenance)?;
         Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target), provenance))
     }
 }
@@ -193,6 +193,17 @@ impl NodeRow {
         Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
     }
 
+    pub(crate) fn context(statements: &mut Statements<'_>, limit: i64) -> Result<Vec<Node>, StoreFailure> {
+        let project = Facet::Project.name();
+        let rows = statements.rows(sqlx::query_as!(
+            NodeRow,
+            "SELECT id, project, facet, stage, provenance, title FROM nodes ORDER BY facet = ?1 DESC, id DESC LIMIT ?2",
+            project,
+            limit
+        ))?;
+        Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
+    }
+
     pub(crate) fn next(statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
         let rows = statements.rows(sqlx::query!(r#"SELECT COALESCE(MAX(id), 0) + 1 AS "next!: i64" FROM nodes"#))?;
         Ok(rows.into_iter().map(|row| NodeId::new(row.next)).collect())
@@ -204,7 +215,7 @@ impl NodeRow {
         let project = entry.project().to_string();
         let facet = entry.facet().name();
         let stage = entry.stage().name();
-        let provenance = Entered::from(entry.provenance()).name();
+        let provenance = entry.provenance().to_string();
         let title = node.title().map(ToString::to_string);
         statements.written(sqlx::query!(
             "INSERT INTO nodes (id, project, facet, stage, provenance, title) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",

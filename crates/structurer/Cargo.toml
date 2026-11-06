@@ -11,14 +11,16 @@ doctest = false
 
 [dependencies]
 design-model = { path = "../design-model" }
+dispatch-ports = { path = "../dispatch-ports" }
 grammar = { path = "../grammar" }
 named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
+strum.workspace = true
 thiserror.workspace = true
+transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 laws = { path = "../laws" }
-strum.workspace = true
 
 [lints]
 workspace = true

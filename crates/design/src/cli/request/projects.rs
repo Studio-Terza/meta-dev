@@ -5,6 +5,7 @@ use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
 use design_model::Project;
+use dispatch_ports::Scratch;
 use file_ports::{Files, Kind};
 use local_config::LocalConfig;
 use transcript_ports::ClaudeCodeDir;
@@ -26,6 +27,7 @@ pub struct Located {
 impl Located {
     const META: &'static str = ".meta";
     const STORE: &'static str = "design.sqlite";
+    const AGENTS: &'static str = "agents";
 
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
@@ -33,6 +35,10 @@ impl Located {
 
     pub fn store(&self) -> PathBuf {
         self.workspace.join(Self::META).join(Self::STORE)
+    }
+
+    pub fn scratch(&self) -> Scratch {
+        Scratch::from(self.workspace.join(Self::META).join(Self::AGENTS))
     }
 
     pub fn configured(&self, project: Project) -> LocalConfig {

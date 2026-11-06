@@ -12,6 +12,7 @@ mod placed;
 mod prefixed;
 mod project_root;
 mod relative;
+mod runs;
 mod scope;
 mod search_segments;
 mod session_cursors;
@@ -35,6 +36,10 @@ pub use placed::Placed;
 pub use prefixed::{NextNode, Prefixed, Spoken};
 pub use project_root::ProjectRoot;
 use relative::Relative;
+pub use runs::{
+    ContextNodes, JobClosed, JobOpened, JobState, LiveRuns, NextJob, NextRun, RunEnded, RunSpawned, RunState, SpentOn,
+    StoredRun, Unplaced, Unstructured,
+};
 pub use scope::Scope;
 pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;

@@ -5,18 +5,27 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use console_ports::Variables;
-use design::{Cli, Failure, Outcome, Unresolved};
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, NewNode, ShownMessage, Stored, StreamSchema};
+use design::{Agents, Cli, Failure, Jobs, Outcome, Unresolved};
+use design_model::{Entered, Entry, Facet, JobId, NodeId, NodeRelation, Segment, SegmentRelation, Stage};
+use design_store::{
+    AppliedId, JobOpened, Linked, NewNode, NextRun, RunSpawned, ShownMessage, Stored, StreamSchema, Unplaced,
+    Unstructured,
+};
+use dispatch_ports::{AgentRun, Deadline, Pause, Pid, Spawned, Wall, dispatch_ops};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::Counter;
-use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
+use port_core::{Calls, Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, Snapshot, port};
 use store_ports::{Busy, Sqlite, Store, Written};
+use structurer::{Directive, Directives, Lapse, SegmentRef};
 use strum::VariantArray;
 use transcript_ports::Uuid;
+
+mod agents;
+
+use agents::{Idle, Script, Scripted, Stopwatch};
 
 const HOME: &str = "/home/tester";
 
@@ -218,7 +227,7 @@ impl Invocation {
     fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), files, |_path| store.clone()).report(
+        Cli::new(&Self::environment(), files, |_path| store.clone(), Idle::agents()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -312,7 +321,7 @@ struct Rooted;
 impl Rooted {
     fn outcome(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<Answered, Failure> {
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone())
+        let outcome = Cli::new(&Invocation::environment(), session.files(), |_path| store.clone(), Idle::agents())
             .rooted(arguments.iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
@@ -400,10 +409,15 @@ impl Opened {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::at(directory), files, |path: PathBuf| {
-            opened.lock().map(|mut paths| paths.push(path)).ok();
-            Sqlite::in_memory::<StreamSchema>()
-        })
+        Cli::new(
+            &Invocation::at(directory),
+            files,
+            |path: PathBuf| {
+                opened.lock().map(|mut paths| paths.push(path)).ok();
+                Sqlite::in_memory::<StreamSchema>()
+            },
+            Idle::agents(),
+        )
         .report(&run, arguments.iter().map(OsString::from), &mut out)?;
         Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
     }
@@ -1068,8 +1082,13 @@ fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Re
     applying.files.create_directories(Path::new("/work/notes"))?;
     applying.files.write(Path::new("/work/notes/directives"), Bytes::default())?;
     assert!(matches!(applying.run(&["apply", "directives"]), Err(Failure::Directives(_))));
-    let lent = Cli::new(&Invocation::environment(), FakeLent::new(&applying.files), |_path| applying.store.clone())
-        .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
+    let lent = Cli::new(
+        &Invocation::environment(),
+        FakeLent::new(&applying.files),
+        |_path| applying.store.clone(),
+        Idle::agents(),
+    )
+    .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
     assert_eq!(lent, Outcome::Applied);
     Ok(())
 }
@@ -1079,8 +1098,13 @@ impl Applying {
         self.files.create_directories(Path::new("/work/notes")).ok();
         self.files.write(Path::new("/work/notes/directives"), directives).ok();
         let mut out = Vec::new();
-        let outcome = Cli::new(&Invocation::environment(), FakeLent::new(&self.files), |_path| self.store.clone())
-            .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
+        let outcome = Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            |_path| self.store.clone(),
+            Idle::agents(),
+        )
+        .rooted(["apply", "notes/directives"].iter().map(OsString::from), &mut out)?;
         Ok(Answered { outcome, out: String::from_utf8(out).unwrap_or_default() })
     }
 
@@ -1199,4 +1223,168 @@ impl Graph {
             .collect::<Result<Vec<Written>, Failure>>()?;
         Ok(Written::total(written.into_iter()))
     }
+}
+
+struct Structuring {
+    store: Sqlite,
+    files: Memory,
+}
+
+struct Structured {
+    answered: Result<Outcome, Failure>,
+    out: String,
+    snapshot: Snapshot,
+}
+
+impl Structuring {
+    const GARBLED: &str = "place(";
+
+    fn ready() -> Result<Structuring, Failure> {
+        let structuring = Structuring { store: Sqlite::in_memory::<StreamSchema>(), files: Session::linked().files() };
+        Invocation::within(&structuring.store, FakeLent::new(&structuring.files), &["ingest"])?;
+        Invocation::within(&structuring.store, FakeLent::new(&structuring.files), &["init", "demo"])?;
+        Ok(structuring)
+    }
+
+    fn empty() -> Structuring {
+        Structuring { store: Sqlite::in_memory::<StreamSchema>(), files: Session::linked().files() }
+    }
+
+    fn structured(&self, scripted: &Scripted, clock: Stopwatch) -> Structured {
+        let run = Run::root();
+        let mut out = Vec::new();
+        let answered = Cli::new(
+            &Invocation::environment(),
+            FakeLent::new(&self.files),
+            |_path| self.store.clone(),
+            Agents::new(scripted.clone(), clock),
+        )
+        .report(&run, [OsString::from("structure")].into_iter(), &mut out);
+        let snapshot = run.finish().snapshot().clone();
+        Structured { answered, out: String::from_utf8(out).unwrap_or_default(), snapshot }
+    }
+
+    fn unstructured(&self) -> Result<Vec<Unplaced>, Failure> {
+        let run = Run::root();
+        Ok(run.port(self.store.clone()).read(Unstructured)?)
+    }
+
+    fn covering(&self, taken: usize) -> Result<String, Failure> {
+        Ok(self
+            .unstructured()?
+            .iter()
+            .take(taken)
+            .map(|unplaced| {
+                Directive::Conversational { segment: SegmentRef::from(AsRef::<Segment>::as_ref(unplaced)) }.to_string()
+            })
+            .collect::<Vec<String>>()
+            .join("\n"))
+    }
+
+    fn stale(&self, pid: u32, deadline: i64) -> Result<Written, Failure> {
+        let run = Run::root();
+        let store = run.port(self.store.clone());
+        let job = JobId::new(i64::from(pid));
+        let next = store.read(NextRun)?;
+        let spawned = Spawned::new(Pid::new(pid), Scripted::started(6), Deadline::new(Wall::new(deadline)));
+        store.write(JobOpened::new(job, Vec::new()))?;
+        Ok(store.write(RunSpawned::new(next, job, spawned))?)
+    }
+}
+
+#[test]
+fn a_deadline_passed_during_a_sleep_kills_the_run_on_the_next_check() -> Result<(), Failure> {
+    let structuring = Structuring::ready()?;
+    let scripted = Scripted::replying([Script::Hang, Script::Hang]);
+    let structured = structuring.structured(&scripted, Stopwatch::sleeping(Pause::new(3600)));
+    assert!(matches!(structured.answered, Err(Failure::Flailed { lapse: Lapse::Overdue, .. })));
+    assert_eq!(structured.snapshot.calls::<dispatch_ops::Output>(), Calls::new(2));
+    assert_eq!(structured.snapshot.calls::<Released<AgentRun>>(), Calls::new(2));
+    assert_eq!(Lines::missing(&structured.out, &["job 1 run 1 overdue", "job 1 run 2 overdue"]), Vec::<&&str>::new());
+    Ok(())
+}
+
+#[test]
+fn a_kill_is_a_failure_retried_once_with_the_kill_in_its_prompt() -> Result<(), Failure> {
+    let structuring = Structuring::ready()?;
+    let scripted = Scripted::replying([Script::Hang, Script::Reply(structuring.covering(usize::MAX)?)]);
+    let structured = structuring.structured(&scripted, Stopwatch::awake());
+    assert_eq!(structured.answered?, Outcome::Structured(Jobs::new(1)));
+    let overdue = Lapse::Overdue.to_string();
+    let prompts = scripted.prompts();
+    assert_eq!(prompts.iter().map(|prompt| prompt.as_ref().contains(&overdue)).collect::<Vec<_>>(), [false, true]);
+    assert_eq!(Lines::missing(&structured.out, &["job 1 run 1 overdue", "job 1 applied"]), Vec::<&&str>::new());
+    Ok(())
+}
+
+#[test]
+fn a_misread_reply_is_retried_once_with_its_misread_in_the_prompt_then_flails() -> Result<(), Failure> {
+    let structuring = Structuring::ready()?;
+    let garbled = Script::Reply(Structuring::GARBLED.to_owned());
+    let scripted = Scripted::replying([garbled.clone(), garbled]);
+    let before = structuring.unstructured()?;
+    let structured = structuring.structured(&scripted, Stopwatch::awake());
+    assert!(matches!(structured.answered, Err(Failure::Flailed { lapse: Lapse::Misread(_), .. })));
+    let misread = Structuring::GARBLED.parse::<Directives>().err().map(|misread| Lapse::from(misread).to_string());
+    let prompts = scripted.prompts();
+    let carried: Vec<bool> =
+        prompts.iter().map(|prompt| misread.iter().any(|misread| prompt.as_ref().contains(misread))).collect();
+    assert_eq!(carried, [false, true]);
+    assert_eq!(structuring.unstructured()?, before);
+    let spent = "job 1 usage input 22 output 14 cache-written 6 cache-read 10";
+    assert_eq!(Lines::missing(&structured.out, &[spent]), Vec::<&&str>::new());
+    Ok(())
+}
+
+#[test]
+fn an_applied_reply_is_entered_by_its_agent_run_and_its_usage_reported() -> Result<(), Failure> {
+    let structuring = Structuring::ready()?;
+    let scripted = Scripted::replying([Script::Reply(structuring.covering(usize::MAX)?)]);
+    let structured = structuring.structured(&scripted, Stopwatch::awake());
+    assert_eq!(structured.answered?, Outcome::Structured(Jobs::new(1)));
+    let run = "job 1 run 1 finished usage input 11 output 7 cache-written 3 cache-read 5";
+    let job = "job 1 usage input 11 output 7 cache-written 3 cache-read 5";
+    assert_eq!(Lines::missing(&structured.out, &[run, job, "job 1 applied"]), Vec::<&&str>::new());
+    let shown = Invocation::within(&structuring.store, FakeLent::new(&structuring.files), &["show", Session::ASKED])?;
+    assert!(shown.contains("conversational aaaaaaaa-0000-4000-8000-000000000001.0 current entered agent 1\n"));
+    Ok(())
+}
+
+#[test]
+fn the_unstructured_owner_segments_shrink_by_what_a_structure_covers() -> Result<(), Failure> {
+    let structuring = Structuring::ready()?;
+    let before = structuring.unstructured()?;
+    let scripted = Scripted::replying([Script::Reply(structuring.covering(2)?)]);
+    structuring.structured(&scripted, Stopwatch::awake()).answered?;
+    assert_eq!(structuring.unstructured()?, before.get(2..).unwrap_or_default());
+    assert_eq!(before.len(), 4);
+    Ok(())
+}
+
+#[test]
+fn a_restart_kills_a_stored_run_past_its_deadline_and_spares_one_within_it() -> Result<(), Failure> {
+    let structuring = Structuring::empty();
+    structuring.stale(4242, Stopwatch::EPOCH - 10)?;
+    structuring.stale(4343, Stopwatch::EPOCH + 10)?;
+    let scripted =
+        Scripted::default().running(Pid::new(4242), Scripted::started(6)).running(Pid::new(4343), Scripted::started(6));
+    let first = structuring.structured(&scripted, Stopwatch::awake());
+    assert_eq!(first.answered?, Outcome::Structured(Jobs::new(0)));
+    structuring.structured(&scripted, Stopwatch::awake()).answered?;
+    assert_eq!(scripted.killed(), [Pid::new(4242)]);
+    assert_eq!(Lines::missing(&first.out, &["reaped run 1 past its deadline: killed"]), Vec::<&&str>::new());
+    Ok(())
+}
+
+#[test]
+fn a_reused_pid_with_another_start_time_is_not_killed() -> Result<(), Failure> {
+    let structuring = Structuring::empty();
+    structuring.stale(4242, Stopwatch::EPOCH - 10)?;
+    let scripted = Scripted::default().running(Pid::new(4242), Scripted::started(7));
+    let structured = structuring.structured(&scripted, Stopwatch::awake());
+    structured.answered?;
+    assert_eq!(scripted.killed(), Vec::<Pid>::new());
+    let gone = "reaped run 1 past its deadline: its process is gone";
+    assert_eq!(Lines::missing(&structured.out, &[gone]), Vec::<&&str>::new());
+    Ok(())
 }

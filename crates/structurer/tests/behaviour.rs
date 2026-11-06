@@ -1,13 +1,15 @@
 use design_model::{
-    Confidence, Explicitness, Facet, NodeId, Ordinal, Prefix, SegmentRelation, Sense, SenseKind, SpanRelation,
-    Specificity, Title,
+    Confidence, Entered, Entry, Explicitness, Facet, JobId, Node, NodeId, Ordinal, Prefix, Project, Provenance,
+    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Title,
 };
-use laws::proptest::prelude::prop_oneof;
+use dispatch_ports::Reply;
+use laws::proptest::prelude::{prop_assert, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::Newtype;
-use structurer::{Directive, Directives, Edge, Label, Misread, NodeRef, Proposal};
+use structurer::{Attempt, Directive, Directives, Edge, Job, Label, Lapse, Misread, NodeRef, Proposal, Reading, Said};
 use strum::VariantArray;
+use transcript_ports::Body;
 
 struct Generated;
 
@@ -191,3 +193,88 @@ laws::table!(
         "propose(new, refines(n1), feature, \"é \\\" ü\")\nsupersede(n1)" => Spot::at(2, 1),
     ]
 );
+
+struct Jobs;
+
+#[derive(Clone, Debug)]
+struct Spoken {
+    segment: structurer::SegmentRef,
+    text: String,
+}
+
+impl Jobs {
+    fn one(segments: Vec<Said>) -> Job {
+        let project = "demo".parse::<Project>().ok();
+        let entry =
+            project.map(|project| Entry::new(project, Facet::Project, Stage::Vague, Provenance::from(Entered::Init)));
+        let context = entry.into_iter().map(|entry| Node::new(NodeId::new(1), entry)).collect();
+        Job::new(JobId::new(1), segments, context)
+    }
+
+    fn said() -> impl Strategy<Value = Vec<Spoken>> {
+        laws::proptest::collection::vec((Generated::segment(), "[a-z ]{0,24}"), 1..5)
+            .prop_map(|pairs| pairs.into_iter().map(|(segment, text)| Spoken { segment, text }).collect())
+    }
+
+    fn reply(text: &str) -> Reply {
+        Reply::new(text.to_owned())
+    }
+}
+
+laws::law!(a_prompt_lists_every_segment_of_its_job_with_its_words_and_its_context_nodes, Jobs::said(), pairs, {
+    let listed: Vec<String> =
+        pairs.iter().map(|spoken| format!("\n{} \"{}\"\n", spoken.segment, spoken.text)).collect();
+    let said = pairs.into_iter().map(|spoken| Said::new(spoken.segment, Body::new(spoken.text))).collect();
+    let prompt = Jobs::one(said).prompt(&Attempt::First);
+    let text: &str = prompt.as_ref();
+    prop_assert!(listed.iter().all(|line| text.contains(line.as_str())));
+    prop_assert!(text.contains("\nn1 demo project vague\n"));
+});
+
+#[test]
+fn a_prompt_names_every_form_and_every_choice_of_the_grammar() {
+    let prompt = Jobs::one(Vec::new()).prompt(&Attempt::First);
+    let text: &str = prompt.as_ref();
+    let forms = ["place(", "sense(", "link(", "propose(", "supersede(", "conversational("];
+    let unnamed: Vec<String> = forms
+        .iter()
+        .map(ToString::to_string)
+        .chain(SpanRelation::VARIANTS.iter().map(ToString::to_string))
+        .chain(SegmentRelation::VARIANTS.iter().map(ToString::to_string))
+        .chain(SenseKind::VARIANTS.iter().map(ToString::to_string))
+        .chain(Specificity::VARIANTS.iter().map(ToString::to_string))
+        .chain(Confidence::VARIANTS.iter().map(ToString::to_string))
+        .chain(Explicitness::VARIANTS.iter().map(ToString::to_string))
+        .chain(Facet::VARIANTS.iter().map(ToString::to_string))
+        .filter(|name| text.matches(name.as_str()).next().is_none())
+        .collect();
+    assert_eq!(unnamed, Vec::<String>::new());
+}
+
+#[test]
+fn a_retry_prompt_is_the_first_prompt_with_the_lapse_appended() {
+    let job = Jobs::one(Vec::new());
+    let first = job.prompt(&Attempt::First);
+    let retry = job.prompt(&Attempt::Retry(Lapse::Overdue));
+    let first: &str = first.as_ref();
+    let retry: &str = retry.as_ref();
+    assert_eq!(retry.get(..first.len()), Some(first));
+    assert!(retry.contains(&Lapse::Overdue.to_string()));
+    assert_eq!(first.matches(&Lapse::Overdue.to_string()).count(), 0);
+}
+
+#[test]
+fn a_first_attempt_lapses_into_a_retry_and_a_retry_lapses_into_a_flail() {
+    assert!(matches!(Attempt::First.lapsed(Lapse::Overdue), Reading::Again(Attempt::Retry(Lapse::Overdue))));
+    assert!(matches!(Attempt::Retry(Lapse::Overdue).lapsed(Lapse::Overdue), Reading::Flailed(Lapse::Overdue)));
+}
+
+#[test]
+fn a_reply_of_directives_is_parsed_within_its_attempt_and_any_other_reply_lapses() {
+    let parsed = Attempt::First.read(&Jobs::reply("conversational(85b287b3.0)"));
+    assert!(matches!(parsed, Reading::Parsed { attempt: Attempt::First, .. }));
+    let misread = Attempt::First.read(&Jobs::reply("place("));
+    assert!(matches!(misread, Reading::Again(Attempt::Retry(Lapse::Misread(_)))));
+    let flailed = Attempt::Retry(Lapse::Overdue).read(&Jobs::reply("place("));
+    assert!(matches!(flailed, Reading::Flailed(Lapse::Misread(_))));
+}

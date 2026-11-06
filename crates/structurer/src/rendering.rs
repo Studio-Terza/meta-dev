@@ -1,11 +1,32 @@
 use std::fmt;
+use std::iter;
 
-use design_model::{Facet, NodeId, Ordinal, Prefix, Segment, SegmentRelation, Sense, SpanRelation, Title};
+use design_model::{
+    Confidence, Explicitness, Facet, Node, NodeId, Ordinal, Prefix, Segment, SegmentRelation, Sense, SenseKind,
+    SpanRelation, Specificity, Title,
+};
+use dispatch_ports::Prompt;
 use grammar::directive::Quote;
 use newtype::Newtype;
+use strum::VariantArray;
 
-use crate::verb::{By, New, Refines, Verb};
-use crate::{Bind, Directive, Label, NodeRef, SegmentRef, Visit};
+use crate::verb::{By, Form, New, Refines, Verb};
+use crate::{Attempt, Bind, Directive, Job, Label, NodeRef, Said, SegmentRef, Visit};
+
+#[derive(Clone, Copy, Debug)]
+struct Briefing<'job> {
+    job: &'job Job,
+    attempt: &'job Attempt,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Choices<Choice: 'static>(&'static [Choice]);
+
+#[derive(Clone, Copy, Debug)]
+struct Context<'node>(&'node Node);
+
+#[derive(Clone, Copy, Debug)]
+struct Listed<'said>(&'said Said);
 
 #[derive(Clone, Copy, Debug)]
 struct Id(NodeId);
@@ -120,5 +141,65 @@ impl Visit for Rendering<'_, '_> {
 
     fn converse(self, segment: &SegmentRef) -> fmt::Result {
         write!(self.0, "{}({segment})", Verb::Conversational)
+    }
+}
+
+impl Briefing<'_> {
+    const FORMS: [Form; 6] =
+        [Form::Place, Form::Sense, Form::Link, Form::Propose, Form::Supersede, Form::Conversational];
+    const ROLE: &'static str = "You structure a project owner's words into a design graph. Reply with directive lines only: one directive per line, with no prose, no numbering and no code fences.";
+    const COVERAGE: &'static str = "Give every segment listed below at least one directive. Mark chatter conversational. Otherwise place the segment on the node it is about, proposing a new node that refines the closest listed node when none fits, and sense it. A segment is written exactly as listed, its message id, a dot and its index; a node is n and its number, or the label of a node proposed earlier in your reply.";
+}
+
+impl fmt::Display for Briefing<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(formatter, "{}", Self::ROLE)?;
+        writeln!(formatter)?;
+        Self::FORMS.iter().try_for_each(|form| writeln!(formatter, "{form}"))?;
+        writeln!(formatter)?;
+        writeln!(formatter, "span-relation: {}", Choices(SpanRelation::VARIANTS))?;
+        writeln!(formatter, "segment-relation: {}", Choices(SegmentRelation::VARIANTS))?;
+        writeln!(formatter, "kind: {}", Choices(SenseKind::VARIANTS))?;
+        writeln!(formatter, "specificity: {}", Choices(Specificity::VARIANTS))?;
+        writeln!(formatter, "confidence: {}", Choices(Confidence::VARIANTS))?;
+        writeln!(formatter, "explicitness: {}", Choices(Explicitness::VARIANTS))?;
+        writeln!(formatter, "facet: {}", Choices(Facet::VARIANTS))?;
+        writeln!(formatter)?;
+        writeln!(formatter, "{}", Self::COVERAGE)?;
+        writeln!(formatter)?;
+        writeln!(formatter, "Segments:")?;
+        self.job.segments().iter().try_for_each(|said| writeln!(formatter, "{}", Listed(said)))?;
+        writeln!(formatter)?;
+        writeln!(formatter, "Nodes:")?;
+        self.job.context().iter().try_for_each(|node| writeln!(formatter, "{}", Context(node)))?;
+        write!(formatter, "{}", self.attempt)
+    }
+}
+
+impl<Choice: fmt::Display> fmt::Display for Choices<Choice> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let separators = iter::once("").chain(iter::repeat(" | "));
+        self.0.iter().zip(separators).try_for_each(|(choice, separator)| write!(formatter, "{separator}{choice}"))
+    }
+}
+
+impl fmt::Display for Listed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", self.0.segment(), Quote::quoting(self.0.body().as_ref()))
+    }
+}
+
+impl fmt::Display for Context<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entry = self.0.entry();
+        write!(formatter, "{} {} {} {}", Id(self.0.identity()), entry.project(), entry.facet(), entry.stage())?;
+        self.0.title().iter().try_for_each(|title| write!(formatter, " {}", Quoted(title)))
+    }
+}
+
+impl Job {
+    #[must_use]
+    pub fn prompt(&self, attempt: &Attempt) -> Prompt {
+        Prompt::from(&Briefing { job: self, attempt })
     }
 }
