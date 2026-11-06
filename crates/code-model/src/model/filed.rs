@@ -16,8 +16,10 @@ impl<Entity> Filed<Entity> {
         Filed { file, found }
     }
 
-    pub(crate) fn file(&self) -> FileId {
-        self.file
+    pub(crate) fn sorted(rows: Vec<Filed<Entity>>) -> Vec<Filed<Entity>> {
+        let mut sorted = rows;
+        sorted.sort_by_key(|filed| filed.file);
+        sorted
     }
 
     pub(crate) fn placed<'model>(&'model self, files: &'model [FileModel]) -> Option<Placed<'model, &'model Entity>> {

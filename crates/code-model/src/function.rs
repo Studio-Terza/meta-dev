@@ -1,5 +1,6 @@
 use lint_layout::Name;
 
+use crate::region::{Region, Seat};
 use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -9,6 +10,7 @@ pub enum Owner {
     TraitDecl,
     TraitImpl,
     Nested,
+    Foreign,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,20 +37,51 @@ impl Output {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Input {
+    Receiver,
+    Typed(TypeRef),
+}
+
+impl Input {
+    fn typed(&self) -> Option<&TypeRef> {
+        match self {
+            Input::Typed(ty) => Some(ty),
+            Input::Receiver => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Signature {
+    inputs: Vec<Input>,
     output: Output,
+    constraints: Vec<TypeRef>,
 }
 
 impl From<Output> for Signature {
     fn from(output: Output) -> Signature {
-        Signature { output }
+        Signature { inputs: Vec::new(), output, constraints: Vec::new() }
     }
 }
 
 impl Signature {
     #[must_use]
+    pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Signature {
+        Signature { inputs, output, constraints }
+    }
+
+    #[must_use]
     pub fn output(&self) -> &Output {
         &self.output
+    }
+
+    #[must_use]
+    pub fn inputs(&self) -> &[Input] {
+        &self.inputs
+    }
+
+    pub fn written(&self) -> impl Iterator<Item = &TypeRef> {
+        self.constraints.iter().chain(self.inputs.iter().filter_map(Input::typed)).chain(self.output.written())
     }
 }
 
@@ -58,19 +91,25 @@ pub struct Function {
     owner: Owner,
     entry: Entry,
     signature: Signature,
+    seat: Seat,
 }
 
 impl Function {
     #[must_use]
     pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Function {
-        Function { name, owner, entry, signature }
+        Function { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None) }
+    }
+
+    #[must_use]
+    pub fn seated(self, seat: Seat) -> Function {
+        Function { name: self.name, owner: self.owner, entry: self.entry, signature: self.signature, seat }
     }
 
     #[must_use]
     pub fn signed_here(&self) -> Option<&Signature> {
         match self.owner {
             Owner::Free | Owner::Inherent | Owner::TraitDecl | Owner::Nested => Some(&self.signature),
-            Owner::TraitImpl => None,
+            Owner::TraitImpl | Owner::Foreign => None,
         }
     }
 
@@ -83,8 +122,30 @@ impl Function {
     }
 
     #[must_use]
+    pub fn entry(&self) -> Entry {
+        self.entry
+    }
+
+    #[must_use]
     pub fn signature(&self) -> &Signature {
         &self.signature
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> Owner {
+        self.owner
+    }
+}
+
+impl AsRef<Seat> for Function {
+    fn as_ref(&self) -> &Seat {
+        &self.seat
+    }
+}
+
+impl AsRef<Region> for Function {
+    fn as_ref(&self) -> &Region {
+        self.seat.as_ref()
     }
 }
 

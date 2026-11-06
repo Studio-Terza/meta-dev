@@ -198,7 +198,7 @@ impl UsePath {
         }
     }
 
-    pub(super) fn written(&self) -> ItemPath {
+    pub(crate) fn written(&self) -> ItemPath {
         self.segments.iter().cloned().collect()
     }
 

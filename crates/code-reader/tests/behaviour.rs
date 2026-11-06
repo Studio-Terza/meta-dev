@@ -1,9 +1,9 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Output, Owner, Primitive, Resolved, Signature, TypeRef,
+    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
-use lint_layout::Name;
+use lint_layout::{LineNumber, Name};
 
 const DERIVED: &str = "#[derive(Clone,\n    Debug)]\nstruct A;\n#[derive(PartialEq)]\nenum B {\n    C,\n}\n#[derive(Copy)]\nunion D {\n    e: u8,\n}\n";
 const WRITTEN: &str = "mod m {\n    impl Clone for A {}\n}\nfn f() {\n    impl A {}\n}\n";
@@ -203,7 +203,26 @@ impl Seen {
     }
 
     fn typed(model: &Model, ty: TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |resolved| Seen::of(model, resolved))
+        ty.mapped(&mut |sited: Sited| Seen::of(model, AsRef::<Resolved>::as_ref(&sited).clone()))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Formed {
+    name: Name,
+    owner: Owner,
+    entry: Entry,
+    output: Option<TypeRef<Seen>>,
+}
+
+impl Formed {
+    fn of(model: &Model, function: &Function) -> Formed {
+        Formed {
+            name: AsRef::<Name>::as_ref(function).clone(),
+            owner: function.owner(),
+            entry: function.entry(),
+            output: Read::written(function).map(|ty| Seen::typed(model, ty)),
+        }
     }
 }
 
@@ -252,12 +271,16 @@ impl Expect {
         Expect::named(Seen::Resolved(Resolved::Param(Name::from(name))), Vec::new())
     }
 
-    fn function(name: &str, owner: Owner, entry: Entry, output: Output) -> Function {
-        Function::new(Name::from(name), owner, entry, Signature::from(output))
+    fn function(name: &str, owner: Owner, entry: Entry, output: Option<TypeRef<Seen>>) -> Formed {
+        Formed { name: Name::from(name), owner, entry, output }
     }
 
-    fn returning(primitive: Primitive) -> Output {
-        Output::Written(TypeRef::Named(Named::new(Resolved::Primitive(primitive), Vec::new())))
+    fn projected(subject: TypeRef<Seen>, item: &str, line: usize) -> TypeRef<Seen> {
+        TypeRef::Projected(Box::new(Projection::new(subject, None, Name::from(item), LineNumber::from(line))))
+    }
+
+    fn returning(primitive: Primitive) -> Option<TypeRef<Seen>> {
+        Some(Expect::primitive(primitive))
     }
 }
 
@@ -309,13 +332,15 @@ impl Read {
         model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type().clone())).collect()
     }
 
-    fn entries(fixtures: &[Fixture]) -> Vec<Function> {
+    fn entries(fixtures: &[Fixture]) -> Vec<Formed> {
         let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
-        Reader::read_files(&files).functions().map(|found| found.entity().clone()).collect()
+        let model = Reader::read_files(&files);
+        model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
-    fn functions(text: &str) -> Vec<Function> {
-        Reader::read_files(&[Read::file("a.rs", text)]).functions().map(|found| found.entity().clone()).collect()
+    fn functions(text: &str) -> Vec<Formed> {
+        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
     fn outputs(text: &str) -> Vec<TypeRef<Seen>> {
@@ -582,17 +607,17 @@ fn every_function_is_read_with_its_owner_entry_and_output() {
     assert_eq!(
         Read::functions(FORMS),
         [
-            Expect::function("free", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("free", Owner::Free, Entry::Called, None),
             Expect::function("inherent", Owner::Inherent, Entry::Called, Expect::returning(Primitive::Bool)),
             Expect::function("declared", Owner::TraitDecl, Entry::Called, Expect::returning(Primitive::Integer)),
             Expect::function("declared", Owner::TraitImpl, Entry::Called, Expect::returning(Primitive::Integer)),
-            Expect::function("outer", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("outer", Owner::Free, Entry::Called, None),
             Expect::function("nested", Owner::Nested, Entry::Called, Expect::returning(Primitive::Char)),
-            Expect::function("inner", Owner::Inherent, Entry::Called, Output::Implicit),
-            Expect::function("checked", Owner::Free, Entry::Test, Output::Implicit),
-            Expect::function("awaited", Owner::Free, Entry::Test, Output::Implicit),
-            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
-            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("inner", Owner::Inherent, Entry::Called, None),
+            Expect::function("checked", Owner::Free, Entry::Test, None),
+            Expect::function("awaited", Owner::Free, Entry::Test, None),
+            Expect::function("main", Owner::Free, Entry::Called, None),
+            Expect::function("main", Owner::Free, Entry::Called, None),
         ]
     );
 }
@@ -605,9 +630,9 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
     SELF_TRAIT_DECL => [Expect::param("Self")],
     SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
-    SELF_PROJECTED => [TypeRef::Opaque],
+    SELF_PROJECTED => [Expect::projected(Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()), "Out", 3)],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [TypeRef::Opaque],
+    PROJECTED => [Expect::projected(Expect::param("Self"), "Out", 3)],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";
@@ -681,11 +706,11 @@ const BINARY_CHILD_MAIN: [Fixture; 2] =
     [Fixture::new("src/main.rs", "mod m;\n"), Fixture::new("src/m.rs", "fn main() {}\n")];
 
 laws::table!(only_the_main_of_a_binary_crate_root_is_the_entry, Read::entries, [
-    BINARY_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
-    BINARY_LISTED_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
-    LIBRARY_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
-    ISLAND_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
-    BINARY_CHILD_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
+    BINARY_MAIN => [Expect::function("main", Owner::Free, Entry::Main, None)],
+    BINARY_LISTED_MAIN => [Expect::function("main", Owner::Free, Entry::Main, None)],
+    LIBRARY_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
+    ISLAND_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
+    BINARY_CHILD_MAIN => [Expect::function("main", Owner::Free, Entry::Called, None)],
 ]);
 
 #[test]

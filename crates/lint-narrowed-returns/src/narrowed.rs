@@ -1,4 +1,4 @@
-use code_model::{ItemPath, Model, Named, Output, Primitive, Resolved, TypeRef};
+use code_model::{ItemPath, Model, Named, Output, Primitive, Resolved, Sited, TypeRef};
 use lint_layout::{Word, words};
 
 use crate::error_types::ErrorTypes;
@@ -41,7 +41,7 @@ impl Narrowed {
         }
     }
 
-    fn named(errors: &ErrorTypes, named: &Named<Resolved>) -> Option<Narrowed> {
+    fn named(errors: &ErrorTypes, named: &Named<Sited>) -> Option<Narrowed> {
         let path: &Resolved = named.as_ref();
         let flag = path.primitive().into_iter().find(|primitive| *primitive == Primitive::Bool).map(|_| Narrowed::Flag);
         flag.or_else(|| {

@@ -27,7 +27,7 @@ pub(crate) use resolving::Resolving;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 pub(crate) use settling::Seeds;
-pub(crate) use std_names::StdNames;
+pub(crate) use std_names::{Expansion, StdNames};
 pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
 
