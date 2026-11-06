@@ -27,9 +27,15 @@ struct Rooted {
     root: NodeId,
 }
 
+#[derive(Clone, Debug)]
+struct Found {
+    project: Project,
+    root: Resolved,
+}
+
 #[derive(Debug)]
 enum Root {
-    Found(Project, Resolved),
+    Found(Found),
     Sown(Node<Vague>),
 }
 
@@ -70,18 +76,18 @@ impl Init {
     }
 
     fn plan(self, store: &impl Store) -> Result<Plan, Failure> {
-        let consumed = self.consumes.map(|project| Rooted::found(store, project)).transpose()?;
+        let consumed = self.consumes.map(|project| Found::rooted(store, project)).transpose()?;
         let root = Root::resolved(store, self.project)?;
         let rooted = root.rooted();
-        let planting = consumed.iter().fold(root.planting(), |planting, (_, resolved)| planting.consuming(*resolved));
-        Ok(Plan { planting, initialised: Initialised { root: rooted, consumed: consumed.map(|(rooted, _)| rooted) } })
+        let planting = consumed.iter().fold(root.planting(), |planting, found| planting.consuming(found.root));
+        Ok(Plan { planting, initialised: Initialised { root: rooted, consumed: consumed.as_ref().map(Rooted::from) } })
     }
 }
 
 impl Root {
     fn resolved(store: &impl Store, project: Project) -> Result<Root, Failure> {
         match store.read(ProjectRoot::from(project.clone()))? {
-            Some(root) => Ok(Root::Found(project, root)),
+            Some(root) => Ok(Root::Found(Found { project, root })),
             None => Ok(Root::Sown(Node::new(
                 store.read(NextNode)?,
                 Entry::new(project, Facet::Project, Provenance::from(Entered::Init)),
@@ -91,23 +97,29 @@ impl Root {
 
     fn rooted(&self) -> Rooted {
         match self {
-            Root::Found(project, root) => Rooted { project: project.clone(), root: root.identity() },
+            Root::Found(found) => Rooted::from(found),
             Root::Sown(node) => Rooted { project: node.entry().project().clone(), root: node.identity() },
         }
     }
 
     fn planting(self) -> Planting {
         match self {
-            Root::Found(_, root) => Planting::found(root),
+            Root::Found(found) => Planting::found(found.root),
             Root::Sown(node) => Planting::sown(node),
         }
     }
 }
 
-impl Rooted {
-    fn found(store: &impl Store, project: Project) -> Result<(Rooted, Resolved), Failure> {
+impl Found {
+    fn rooted(store: &impl Store, project: Project) -> Result<Found, Failure> {
         let root = store.read(ProjectRoot::from(project.clone()))?.ok_or_else(|| Failure::Unrooted(project.clone()))?;
-        Ok((Rooted { project, root: root.identity() }, root))
+        Ok(Found { project, root })
+    }
+}
+
+impl From<&Found> for Rooted {
+    fn from(found: &Found) -> Rooted {
+        Rooted { project: found.project.clone(), root: found.root.identity() }
     }
 }
 
