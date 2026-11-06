@@ -2,13 +2,13 @@ mod build_script;
 mod source_directory;
 mod target_directory;
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::crate_file::CrateFile;
 use crate::crate_root::CrateRoot;
 use crate::module_path::ModulePath;
 use crate::package_root::PackageRoot;
+use crate::packages::Packages;
 use crate::role::Role;
 use build_script::BuildScript;
 use file_ports::Files;
@@ -37,27 +37,15 @@ impl Placement {
 
     #[must_use]
     pub fn within(files: &impl Files, package: &Path, file: &Path) -> Placement {
-        Self::within_many(files, &[package], &[file])
-            .pop()
-            .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
+        Packages::read(files, &[package]).placed(package, file)
     }
 
-    #[must_use]
-    pub fn within_many(files: &impl Files, packages: &[&Path], paths: &[&Path]) -> Vec<Placement> {
-        let distinct: Vec<&Path> = packages.iter().copied().collect::<BTreeSet<&Path>>().into_iter().collect();
-        let roots: BTreeMap<&Path, PackageRoot> =
-            distinct.iter().copied().zip(PackageRoot::read_many(files, &distinct)).collect();
-        packages
-            .iter()
-            .zip(paths)
-            .map(|(package, file)| {
-                file.strip_prefix(package)
-                    .ok()
-                    .zip(roots.get(package).cloned())
-                    .and_then(|(inside, root)| Self::in_package(root, package, inside))
-                    .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
-            })
-            .collect()
+    pub(crate) fn placed(root: Option<&PackageRoot>, package: &Path, file: &Path) -> Placement {
+        file.strip_prefix(package)
+            .ok()
+            .zip(root.cloned())
+            .and_then(|(inside, root)| Self::in_package(root, package, inside))
+            .unwrap_or_else(|| Self::unplaced(CrateRoot::new(file.to_path_buf())))
     }
 
     #[must_use]
