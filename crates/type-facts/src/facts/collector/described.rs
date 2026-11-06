@@ -52,13 +52,10 @@ impl fmt::Display for Separator {
 
 impl<Item: fmt::Display> fmt::Display for Listed<Item> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.items.split_first() {
-            Some((first, rest)) => {
-                write!(formatter, "{first}")?;
-                rest.iter().try_for_each(|item| write!(formatter, "{}{item}", self.separator))
-            }
-            None => Ok(()),
-        }
+        self.items.split_first().into_iter().try_for_each(|(first, rest)| {
+            write!(formatter, "{first}")?;
+            rest.iter().try_for_each(|item| write!(formatter, "{}{item}", self.separator))
+        })
     }
 }
 
