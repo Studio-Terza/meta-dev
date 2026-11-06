@@ -4,17 +4,6 @@ use crate::type_ref::TypeRef;
 pub enum Reach {
     Shipped,
     Test,
-    MacroBody,
-}
-
-impl Reach {
-    #[must_use]
-    pub fn definite(self) -> Option<Reach> {
-        match self {
-            Reach::Shipped | Reach::Test => Some(self),
-            Reach::MacroBody => None,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

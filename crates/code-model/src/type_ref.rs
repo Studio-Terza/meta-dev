@@ -1,4 +1,4 @@
-use lint_layout::{LineNumber, Name};
+use lint_layout::Name;
 
 use crate::item::AliasParameter;
 use crate::model::Aliases;
@@ -18,22 +18,14 @@ impl Steps {
 
 pub trait TypeUses {
     fn named(&mut self, named: &Named<Sited>);
-
-    fn projected(&mut self, projection: &Projection<Sited>);
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Access {
-    Shared,
-    Exclusive,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeRef<Bound = Sited> {
     Named(Named<Bound>),
     Tuple(Vec<TypeRef<Bound>>),
-    Reference(Referenced<Bound>),
-    Pointer(Referenced<Bound>),
+    Reference(Box<TypeRef<Bound>>),
+    Pointer(Box<TypeRef<Bound>>),
     Slice(Box<TypeRef<Bound>>),
     Array(Arrayed<Bound>),
     Bounded(Bounds<Bound>),
@@ -47,12 +39,6 @@ pub struct Named<Bound> {
     path: Bound,
     arguments: Vec<TypeRef<Bound>>,
     bindings: Vec<TypeRef<Bound>>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Referenced<Bound> {
-    access: Access,
-    pointee: Box<TypeRef<Bound>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,8 +56,6 @@ pub struct Bounds<Bound> {
 pub struct Projection<Bound> {
     subject: TypeRef<Bound>,
     interface: Option<Named<Bound>>,
-    item: Name,
-    line: LineNumber,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -139,7 +123,7 @@ impl Named<Sited> {
         }
     }
 
-    pub(crate) fn expansion(&self, aliases: &Aliases) -> Option<TypeRef> {
+    fn expansion(&self, aliases: &Aliases) -> Option<TypeRef> {
         aliases.aliasing(self.path.as_ref()).map(|alias| alias.expansion(&self.arguments))
     }
 
@@ -156,27 +140,6 @@ impl Named<Sited> {
             arguments: TypeRef::each_expanded(&self.arguments, aliases, steps)?,
             bindings: TypeRef::each_expanded(&self.bindings, aliases, steps)?,
         })
-    }
-}
-
-impl<Bound> Referenced<Bound> {
-    #[must_use]
-    pub fn new(access: Access, pointee: TypeRef<Bound>) -> Referenced<Bound> {
-        Referenced { access, pointee: Box::new(pointee) }
-    }
-
-    fn mapped<Into>(self, resolve: &mut impl FnMut(Bound) -> Into) -> Referenced<Into> {
-        Referenced { access: self.access, pointee: Box::new(self.pointee.mapped(resolve)) }
-    }
-}
-
-impl Referenced<Sited> {
-    fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> Referenced<Sited> {
-        Referenced { access: self.access, pointee: Box::new(self.pointee.substituted(parameters, arguments)) }
-    }
-
-    fn expanded(&self, aliases: &Aliases, steps: Steps) -> Option<Referenced<Sited>> {
-        Some(Referenced { access: self.access, pointee: Box::new(self.pointee.expanded(aliases, steps)?) })
     }
 }
 
@@ -250,49 +213,20 @@ impl Bounds<Sited> {
 
 impl<Bound> Projection<Bound> {
     #[must_use]
-    pub fn new(
-        subject: TypeRef<Bound>,
-        interface: Option<Named<Bound>>,
-        item: Name,
-        line: LineNumber,
-    ) -> Projection<Bound> {
-        Projection { subject, interface, item, line }
-    }
-
-    #[must_use]
-    pub fn subject(&self) -> &TypeRef<Bound> {
-        &self.subject
-    }
-
-    #[must_use]
-    pub fn interface(&self) -> Option<&Named<Bound>> {
-        self.interface.as_ref()
+    pub fn new(subject: TypeRef<Bound>, interface: Option<Named<Bound>>) -> Projection<Bound> {
+        Projection { subject, interface }
     }
 
     fn mapped<Into>(self, resolve: &mut impl FnMut(Bound) -> Into) -> Projection<Into> {
         Projection {
             subject: self.subject.mapped(resolve),
             interface: self.interface.map(|interface| interface.mapped(resolve)),
-            item: self.item,
-            line: self.line,
         }
     }
 }
 
-impl<Bound> AsRef<Name> for Projection<Bound> {
-    fn as_ref(&self) -> &Name {
-        &self.item
-    }
-}
-
-impl<Bound> AsRef<LineNumber> for Projection<Bound> {
-    fn as_ref(&self) -> &LineNumber {
-        &self.line
-    }
-}
-
 impl Projection<Sited> {
-    pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
+    fn each_use(&self, uses: &mut impl TypeUses) {
         self.subject.each_use(uses);
         self.interface.iter().fold(uses, |uses, interface| {
             uses.named(interface);
@@ -304,8 +238,6 @@ impl Projection<Sited> {
         Projection {
             subject: self.subject.substituted(parameters, arguments),
             interface: self.interface.as_ref().map(|interface| interface.each_substituted(parameters, arguments)),
-            item: self.item.clone(),
-            line: self.line,
         }
     }
 
@@ -317,12 +249,7 @@ impl Projection<Sited> {
             .collect::<Option<Vec<Named<Sited>>>>()?
             .into_iter()
             .next();
-        Some(Projection {
-            subject: self.subject.expanded(aliases, steps)?,
-            interface,
-            item: self.item.clone(),
-            line: self.line,
-        })
+        Some(Projection { subject: self.subject.expanded(aliases, steps)?, interface })
     }
 }
 
@@ -362,8 +289,8 @@ impl<Bound> TypeRef<Bound> {
         match self {
             TypeRef::Named(named) => TypeRef::Named(named.mapped(resolve)),
             TypeRef::Tuple(elements) => TypeRef::Tuple(TypeRef::each_mapped(elements, resolve)),
-            TypeRef::Reference(referenced) => TypeRef::Reference(referenced.mapped(resolve)),
-            TypeRef::Pointer(referenced) => TypeRef::Pointer(referenced.mapped(resolve)),
+            TypeRef::Reference(pointee) => TypeRef::Reference(Box::new(pointee.mapped(resolve))),
+            TypeRef::Pointer(pointee) => TypeRef::Pointer(Box::new(pointee.mapped(resolve))),
             TypeRef::Slice(element) => TypeRef::Slice(Box::new(element.mapped(resolve))),
             TypeRef::Array(arrayed) => TypeRef::Array(arrayed.mapped(resolve)),
             TypeRef::Bounded(bounds) => TypeRef::Bounded(bounds.mapped(resolve)),
@@ -423,23 +350,14 @@ impl<Bound> TypeRef<Bound> {
 }
 
 impl TypeRef {
-    #[must_use]
-    pub fn dereferenced(&self) -> &TypeRef {
-        match self {
-            TypeRef::Reference(referenced) => referenced.pointee.dereferenced(),
-            other => other,
-        }
-    }
-
     pub fn each_use(&self, uses: &mut impl TypeUses) {
         match self {
             TypeRef::Named(named) => uses.named(named),
             TypeRef::Tuple(elements) => TypeRef::each_used(elements, uses),
-            TypeRef::Reference(referenced) | TypeRef::Pointer(referenced) => referenced.pointee.each_use(uses),
-            TypeRef::Slice(element) => element.each_use(uses),
+            TypeRef::Reference(element) | TypeRef::Pointer(element) | TypeRef::Slice(element) => element.each_use(uses),
             TypeRef::Array(arrayed) => arrayed.each_use(uses),
             TypeRef::Bounded(bounds) => bounds.each_use(uses),
-            TypeRef::Projected(projection) => uses.projected(projection),
+            TypeRef::Projected(projection) => projection.each_use(uses),
             TypeRef::Function(callable) => callable.each_use(uses),
             TypeRef::Opaque => (),
         }
@@ -450,8 +368,8 @@ impl TypeRef {
         match self {
             TypeRef::Named(named) => named.substituted(parameters, arguments),
             TypeRef::Tuple(elements) => TypeRef::Tuple(TypeRef::each_substituted(elements, parameters, arguments)),
-            TypeRef::Reference(referenced) => TypeRef::Reference(referenced.substituted(parameters, arguments)),
-            TypeRef::Pointer(referenced) => TypeRef::Pointer(referenced.substituted(parameters, arguments)),
+            TypeRef::Reference(pointee) => TypeRef::Reference(Box::new(pointee.substituted(parameters, arguments))),
+            TypeRef::Pointer(pointee) => TypeRef::Pointer(Box::new(pointee.substituted(parameters, arguments))),
             TypeRef::Slice(element) => TypeRef::Slice(Box::new(element.substituted(parameters, arguments))),
             TypeRef::Array(arrayed) => TypeRef::Array(arrayed.substituted(parameters, arguments)),
             TypeRef::Bounded(bounds) => TypeRef::Bounded(bounds.substituted(parameters, arguments)),
@@ -467,8 +385,8 @@ impl TypeRef {
         match self {
             TypeRef::Named(named) => named.expanded(aliases, steps),
             TypeRef::Tuple(elements) => TypeRef::each_expanded(elements, aliases, steps).map(TypeRef::Tuple),
-            TypeRef::Reference(referenced) => referenced.expanded(aliases, steps).map(TypeRef::Reference),
-            TypeRef::Pointer(referenced) => referenced.expanded(aliases, steps).map(TypeRef::Pointer),
+            TypeRef::Reference(pointee) => pointee.expanded(aliases, steps).map(Box::new).map(TypeRef::Reference),
+            TypeRef::Pointer(pointee) => pointee.expanded(aliases, steps).map(Box::new).map(TypeRef::Pointer),
             TypeRef::Slice(element) => element.expanded(aliases, steps).map(Box::new).map(TypeRef::Slice),
             TypeRef::Array(arrayed) => arrayed.expanded(aliases, steps).map(TypeRef::Array),
             TypeRef::Bounded(bounds) => bounds.expanded(aliases, steps).map(TypeRef::Bounded),

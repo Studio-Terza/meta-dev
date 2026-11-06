@@ -1,8 +1,7 @@
-use code_model::{ItemPath, Named, Primitive, Resolved, Sited, TypeRef};
+use code_model::{ItemPath, Resolved};
 use lint_layout::{Name, Whole, Word, words};
 
 use crate::finding::Finding;
-use crate::legacy::Legacy;
 
 #[derive(Clone, Debug)]
 pub enum Identity {
@@ -12,10 +11,24 @@ pub enum Identity {
 }
 
 impl Identity {
-    pub fn rerooted(&self) -> Legacy {
+    pub fn direct(self, lone: Option<Lone<'_>>) -> Option<Identity> {
+        match lone.and_then(Lone::primitive) {
+            Some(_) => Some(self),
+            None => self.pathed(),
+        }
+    }
+
+    pub fn aliased(self, written: &ItemPath) -> Option<Identity> {
+        match Lone::within(written) {
+            Some(lone) => lone.primitive().map(|_| self),
+            None => self.pathed(),
+        }
+    }
+
+    fn pathed(self) -> Option<Identity> {
         match self {
-            Identity::Primitive(_) => Legacy::Ineligible,
-            Identity::Owned | Identity::Wire(_) => Legacy::Eligible,
+            Identity::Primitive(_) => None,
+            Identity::Owned | Identity::Wire(_) => Some(self),
         }
     }
 
@@ -39,25 +52,8 @@ impl<'path> Lone<'path> {
         segments.first().xor(segments.get(1)).map(|word| Lone { word })
     }
 
-    pub fn legacy(written: &ItemPath) -> Legacy {
-        match Lone::within(written) {
-            Some(_) => Legacy::Eligible,
-            None => Legacy::Ineligible,
-        }
-    }
-
-    pub fn primitive(self) -> Legacy {
-        match self.word.matches::<Whole>(&Lexicon::PRIMITIVE_WORDS) {
-            Some(_) => Legacy::Eligible,
-            None => Legacy::Ineligible,
-        }
-    }
-
-    pub fn primitive_or_rerooted(self, identity: &Identity) -> Legacy {
-        match self.word.matches::<Whole>(&Lexicon::PRIMITIVE_WORDS) {
-            Some(_) => Legacy::Eligible,
-            None => identity.rerooted(),
-        }
+    pub fn primitive(self) -> Option<Lone<'path>> {
+        self.word.matches::<Whole>(&Lexicon::PRIMITIVE_WORDS).map(|_| self)
     }
 
     fn builtin(self) -> Option<Identity> {
@@ -83,9 +79,6 @@ pub struct Lexicon {
     owned: ItemPath,
     owned_spellings: Vec<ItemPath>,
     wires: Vec<Wire>,
-    holders: Vec<ItemPath>,
-    doors: Vec<ItemPath>,
-    string_from: ItemPath,
 }
 
 impl Lexicon {
@@ -101,9 +94,8 @@ impl Lexicon {
         "bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize",
         "f32", "f64"
     ];
-    const CORE_ANY: [Word<'static>; 3] = words!["core", "any", "Any"];
-    const STRING_FROM: [Word<'static>; 2] = words!["String", "from"];
     const ANY: [Word<'static>; 3] = words!["std", "any", "Any"];
+    const CORE_ANY: [Word<'static>; 3] = words!["core", "any", "Any"];
     const WIRE_CRATES: [&'static [Word<'static>]; 7] = [
         &words!["serde_json", "Value"],
         &words!["toml", "Value"],
@@ -112,20 +104,6 @@ impl Lexicon {
         &words!["bigdecimal", "BigDecimal"],
         &words!["num_bigint", "BigInt"],
         &words!["num_bigint", "BigUint"],
-    ];
-    const HOLDERS: [&'static [Word<'static>]; 4] = [
-        &words!["std", "boxed", "Box"],
-        &words!["std", "sync", "Arc"],
-        &words!["std", "rc", "Rc"],
-        &words!["std", "borrow", "Cow"],
-    ];
-    const DOORS: [&'static [Word<'static>]; 6] = [
-        &words!["std", "str", "FromStr"],
-        &words!["std", "convert", "TryFrom"],
-        &words!["std", "fmt", "Display"],
-        &words!["std", "convert", "AsRef"],
-        &words!["std", "borrow", "Borrow"],
-        &words!["std", "ops", "Deref"],
     ];
     pub const DOOR_WORDS: [Word<'static>; 6] = words!["FromStr", "TryFrom", "Display", "AsRef", "Borrow", "Deref"];
 
@@ -138,9 +116,6 @@ impl Lexicon {
                 .map(|wire| Wire::rooted(wire, Resolved::External))
                 .chain([Wire::rooted(&Lexicon::ANY, Resolved::Std), Wire::rooted(&Lexicon::CORE_ANY, Resolved::Std)])
                 .collect(),
-            holders: Lexicon::HOLDERS.iter().map(|holder| holder.iter().copied().collect()).collect(),
-            doors: Lexicon::DOORS.iter().map(|door| door.iter().copied().collect()).collect(),
-            string_from: Lexicon::STRING_FROM.into_iter().collect(),
         }
     }
 
@@ -158,30 +133,5 @@ impl Lexicon {
         let owned = self.owned_spellings.iter().find(|owned| *owned == written).map(|_| Identity::Owned);
         let wire = self.wires.iter().find(|wire| wire.path == *written).map(|wire| Identity::Wire(wire.path.clone()));
         builtin.or(owned).or(wire)
-    }
-
-    pub fn shared_str<'named>(&self, named: &'named Named<Sited>) -> Option<&'named Named<Sited>> {
-        let resolved: &Resolved = named.as_ref();
-        let holder = resolved.std().into_iter().find(|path| self.holders.contains(path));
-        let arguments = named.arguments();
-        let held = arguments.first().xor(arguments.get(1)).and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref);
-        let text = held.and_then(Resolved::primitive).into_iter().find(|primitive| *primitive == Primitive::Str);
-        holder.and(text).map(|_| named)
-    }
-
-    pub fn string_from(&self, written: &ItemPath) -> Legacy {
-        match [written].into_iter().find(|written| **written == self.string_from) {
-            Some(_) => Legacy::Eligible,
-            None => Legacy::Ineligible,
-        }
-    }
-
-    pub fn owned_type<'ty>(&self, ty: &'ty TypeRef) -> Option<&'ty TypeRef> {
-        let resolved = ty.named().map(AsRef::<Resolved>::as_ref);
-        resolved.and_then(Resolved::std).into_iter().find(|path| **path == self.owned).map(|_| ty)
-    }
-
-    pub fn door<'path>(&'path self, interface: &Sited) -> Option<&'path ItemPath> {
-        AsRef::<Resolved>::as_ref(interface).std().and_then(|path| self.doors.iter().find(|door| *door == path))
     }
 }

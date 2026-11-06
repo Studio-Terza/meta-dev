@@ -1,10 +1,10 @@
 use code_model::{
-    Access, Arrayed, Bounds, Callable, Callee, Held, ItemPath, MacroCall, Named, Owner, PathCall, Position, Primitive,
-    Projection, Reach, Referenced, Region, Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
+    Arrayed, Bounds, Callable, Callee, Held, ItemPath, MacroCall, Named, Owner, Primitive, Projection, Reach, Region,
+    Resolved, Seat, Sited, Spelling, TypeRef, Within, Zone,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
-use lint_layout::{LineNumber, Name};
+use lint_layout::Name;
 
 struct Read;
 
@@ -13,6 +13,21 @@ impl Read {
         match SourceFile::parse("a.rs", SourceText::new(text.to_owned())) {
             Ok(file) => Reader::read_files(&[file]),
             Err(failure) => unreachable!("the source parses: {failure}"),
+        }
+    }
+
+    fn reaches(root: &str, module: &str) -> Vec<Reach> {
+        let support = SourceFile::parse("src/support.rs", SourceText::new(module.to_owned()));
+        let parsed = support.and_then(|support| {
+            SourceFile::parse("src/lib.rs", SourceText::new(root.to_owned()))
+                .map(|root| root.with_test_modules(vec![support]))
+        });
+        match parsed {
+            Ok(file) => Reader::read_files(&[file])
+                .functions()
+                .map(|found| AsRef::<Region>::as_ref(found.entity()).reach())
+                .collect(),
+            Err(failure) => unreachable!("the sources parse: {failure}"),
         }
     }
 
@@ -46,7 +61,6 @@ impl Read {
                 name: AsRef::<Name>::as_ref(found.entity()).to_string(),
                 held: found.entity().held(),
                 declares: found.entity().declares().and_then(|item| model.declared(item)).map(|_| Declares::Item),
-                slotted: found.entity().slot().map(|_| Declares::Item),
             })
             .collect()
     }
@@ -55,7 +69,6 @@ impl Read {
         let model = Read::model(text);
         model
             .functions()
-            .everywhere()
             .map(|found| {
                 let region: &Region = found.entity().as_ref();
                 PlacedRow {
@@ -96,20 +109,15 @@ struct HeldRow {
     name: String,
     held: Held,
     declares: Option<Declares>,
-    slotted: Option<Declares>,
 }
 
 impl HeldRow {
     fn new(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: None, slotted: None }
+        HeldRow { name: name.to_owned(), held, declares: None }
     }
 
     fn declaring(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: Some(Declares::Item), slotted: None }
-    }
-
-    fn slotted(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: None, slotted: Some(Declares::Item) }
+        HeldRow { name: name.to_owned(), held, declares: Some(Declares::Item) }
     }
 }
 
@@ -166,12 +174,8 @@ impl Expect {
         Resolved::Std(Expect::path(segments))
     }
 
-    fn referenced(access: Access, pointee: TypeRef<Resolved>) -> TypeRef<Resolved> {
-        TypeRef::Reference(Referenced::new(access, pointee))
-    }
-
-    fn sited(segments: &[&str], line: usize) -> Spelling {
-        Spelling::Written(Expect::path(segments), LineNumber::from(line))
+    fn referenced(pointee: TypeRef<Resolved>) -> TypeRef<Resolved> {
+        TypeRef::Reference(Box::new(pointee))
     }
 
     fn call(site: &str, callee: Callee, reach: Reach) -> CalledRow {
@@ -180,7 +184,6 @@ impl Expect {
 }
 
 const REFERENCE: &str = "fn f(x: &u8) {}\n";
-const EXCLUSIVE: &str = "fn f(x: &mut u8) {}\n";
 const POINTER: &str = "fn f(x: *const u8) {}\n";
 const SLICE: &str = "fn f(x: &[u8]) {}\n";
 const ARRAY: &str = "fn f(x: [u8; 4]) {}\n";
@@ -193,17 +196,16 @@ const BARE_FUNCTION: &str = "fn f(x: fn(u8) -> bool) {}\n";
 const MACRO_TYPE: &str = "fn f(x: m!()) {}\n";
 
 laws::table!(a_type_is_lowered_into_its_structured_form, |text: &&str| Read::written(text), [
-    REFERENCE => [Expect::referenced(Access::Shared, Expect::integer())],
-    EXCLUSIVE => [Expect::referenced(Access::Exclusive, Expect::integer())],
-    POINTER => [TypeRef::Pointer(Referenced::new(Access::Shared, Expect::integer()))],
-    SLICE => [Expect::referenced(Access::Shared, TypeRef::Slice(Box::new(Expect::integer())))],
+    REFERENCE => [Expect::referenced(Expect::integer())],
+    POINTER => [TypeRef::Pointer(Box::new(Expect::integer()))],
+    SLICE => [Expect::referenced(TypeRef::Slice(Box::new(Expect::integer())))],
     ARRAY => [TypeRef::Array(Arrayed::new(Expect::integer(), Vec::new()))],
     MEASURED => [TypeRef::Array(Arrayed::new(Expect::integer(), vec![Expect::integer()]))],
     IMPLEMENTING => [TypeRef::Bounded(Bounds::from(vec![Named::new(
         Expect::std(&["std", "convert", "Into"]),
         vec![Expect::integer()],
     )]))],
-    DYNAMIC => [Expect::referenced(Access::Shared, TypeRef::Bounded(Bounds::from(vec![Named::bound(
+    DYNAMIC => [Expect::referenced(TypeRef::Bounded(Bounds::from(vec![Named::bound(
         Expect::std(&["std", "ops", "Fn"]),
         vec![Expect::primitive(Primitive::Char)],
         vec![Expect::primitive(Primitive::Bool)],
@@ -216,8 +218,6 @@ laws::table!(a_type_is_lowered_into_its_structured_form, |text: &&str| Read::wri
     QUALIFIED => [TypeRef::Projected(Box::new(Projection::new(
         Expect::named(Resolved::Unknown(Expect::path(&["S"])), Vec::new()),
         Some(Named::new(Resolved::Unknown(Expect::path(&["T"])), Vec::new())),
-        Name::from("X"),
-        LineNumber::from(1),
     )))],
     BARE_FUNCTION => [TypeRef::Function(Callable::new(vec![Expect::integer()], Expect::primitive(Primitive::Bool)))],
     MACRO_TYPE => [TypeRef::Opaque],
@@ -246,32 +246,19 @@ fn a_signature_reads_its_generic_constraints_inputs_and_output() {
     );
 }
 
-const SPELLED: &str = "fn f(x: core::primitive::u8, y: u8) {}\n";
 const SELF_SPELLED: &str = "struct S;\nimpl S {\n    fn f() -> Self {\n        S\n    }\n}\n";
 
 #[test]
-fn a_qualified_primitive_resolves_like_the_bare_one_and_keeps_its_spelling() {
-    let integer = Resolved::Primitive(Primitive::Integer);
-    assert_eq!(
-        Read::spelt(SPELLED),
-        [
-            Sited::new(integer.clone(), Expect::sited(&["core", "primitive", "u8"], 1)),
-            Sited::new(integer, Expect::sited(&["u8"], 1)),
-        ]
-    );
-}
-
-#[test]
-fn self_keeps_its_spelling_and_line() {
+fn self_is_not_a_written_spelling() {
     let spelt = Read::spelt(SELF_SPELLED);
     let spellings: Vec<&Spelling> = spelt.iter().map(AsRef::<Spelling>::as_ref).collect();
-    assert_eq!(spellings, [&Spelling::SelfType(LineNumber::from(3))]);
+    assert_eq!(spellings, [&Spelling::Implied]);
 }
 
-const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\nstatic S: u8 = 1;\nunsafe extern \"C\" {\n    static F: u8;\n}\ntype A = u8;\ntrait T {\n    type X: Into<u8>;\n    const N: u8;\n}\nimpl T for Count {\n    type X = u8;\n    const N: u8 = 1;\n}\n";
+const HOLDINGS: &str = "struct Pair<T = u8>(T, u8);\nstruct Count(usize);\nenum E<T = u8> {\n    A(u8),\n    B { b: u8 },\n}\nunion U {\n    a: u8,\n}\nconst C: u8 = 1;\ntype A = u8;\n";
 
 #[test]
-fn every_item_that_holds_a_type_is_read_with_its_kind() {
+fn every_field_struct_parameter_and_alias_is_read_with_its_kind() {
     assert_eq!(
         Read::held(HOLDINGS),
         [
@@ -282,14 +269,7 @@ fn every_item_that_holds_a_type_is_read_with_its_kind() {
             HeldRow::new("A", Held::EnumField),
             HeldRow::new("b", Held::EnumField),
             HeldRow::new("a", Held::UnionField),
-            HeldRow::new("C", Held::Const),
-            HeldRow::new("S", Held::Static),
-            HeldRow::new("F", Held::Static),
             HeldRow::declaring("A", Held::Alias),
-            HeldRow::new("X", Held::AssociatedType),
-            HeldRow::new("N", Held::AssociatedConst),
-            HeldRow::slotted("X", Held::AssociatedType),
-            HeldRow::slotted("N", Held::AssociatedConst),
         ]
     );
 }
@@ -303,7 +283,6 @@ fn every_function_carries_its_reach_zone_and_enclosure() {
         [
             PlacedRow::new("shipped", Owner::Free, Reach::Shipped),
             PlacedRow::new("tested", Owner::Free, Reach::Test),
-            PlacedRow::new("expanded", Owner::Free, Reach::MacroBody),
             PlacedRow::new("parsed", Owner::Free, Reach::Shipped).zoned(Zone::Boundary),
             PlacedRow::new("foreign", Owner::Foreign, Reach::Shipped),
             PlacedRow::new("clone", Owner::TraitImpl, Reach::Shipped).inside(Within::TraitImpl),
@@ -315,31 +294,21 @@ fn every_function_carries_its_reach_zone_and_enclosure() {
 const CALLED: &str = "fn f(x: Name) {\n    x.trim();\n    String::from(\"a\");\n    format!(\"{}\", x.len());\n    let y = format!(\"b\");\n}\n";
 
 #[test]
-fn every_call_is_read_with_std_macro_arguments_at_macro_body_reach() {
-    let owner = TypeRef::Named(Named::new(
-        Sited::new(Expect::std(&["std", "string", "String"]), Expect::sited(&["String"], 3)),
-        Vec::new(),
-    ));
+fn every_method_path_and_expression_macro_call_is_read() {
     assert_eq!(
         Read::called(CALLED),
         [
             Expect::call("a.rs:2", Callee::Method(Name::from("trim")), Reach::Shipped),
-            Expect::call(
-                "a.rs:3",
-                Callee::Path(PathCall::new(Expect::path(&["String", "from"]), owner)),
-                Reach::Shipped
-            ),
-            Expect::call(
-                "a.rs:4",
-                Callee::Macro(MacroCall::new(Expect::path(&["format"]), Position::Statement)),
-                Reach::Shipped
-            ),
-            Expect::call("a.rs:4", Callee::Method(Name::from("len")), Reach::MacroBody),
-            Expect::call(
-                "a.rs:5",
-                Callee::Macro(MacroCall::new(Expect::path(&["format"]), Position::Expression)),
-                Reach::Shipped
-            ),
+            Expect::call("a.rs:3", Callee::Path(Expect::path(&["String", "from"])), Reach::Shipped),
+            Expect::call("a.rs:5", Callee::Macro(MacroCall::from(Expect::path(&["format"]))), Reach::Shipped),
         ]
     );
+}
+
+const SUPPORTED: &str = "pub fn root() {}\n#[cfg(test)]\nmod support;\n";
+const SUPPORT: &str = "pub fn helper() {}\n";
+
+#[test]
+fn a_test_module_file_is_read_at_test_reach() {
+    assert_eq!(Read::reaches(SUPPORTED, SUPPORT), [Reach::Shipped, Reach::Test]);
 }

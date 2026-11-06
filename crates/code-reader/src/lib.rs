@@ -6,7 +6,7 @@ use code_model::{Building, Model};
 use lint_core::{Readout, SourceFile};
 
 use lowering::Lowered;
-use planting::{Planting, ReadFile};
+use planting::{Listed, Planting, ReadFile};
 
 #[derive(Debug)]
 pub struct Reader;
@@ -22,8 +22,11 @@ impl Reader {
         let mut building = Building::default();
         let read: Vec<ReadFile<'_>> = files
             .iter()
-            .flat_map(|file| std::iter::once(file).chain(file.test_modules()))
-            .map(|source| ReadFile::new(source, building.file(source.path().to_path_buf())))
+            .flat_map(|file| {
+                std::iter::once(Listed::from(file))
+                    .chain(file.test_modules().iter().map(|module| Listed::from(module).tested()))
+            })
+            .map(|listed| listed.read(&mut building))
             .collect();
         let lowered: Lowered<'_> = Planting::new(&read).lowered();
         lowered.built(building)

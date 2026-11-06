@@ -1,146 +1,100 @@
-mod walk;
-
 use std::path::Path;
 
-use code_model::{Function, Held, Holding, ItemId, Model, Named, Owner, Region, Resolved, Seat, Sited, TypeRef, Zone};
-use lint_layout::{Name, Whole, Word, words};
+use code_model::{ItemPath, Model, Named, Resolved, Site, Sited, Spelling, TypeRef, TypeUses};
+use lint_core::Violation;
+use lint_layout::{LineNumber, Name};
 
-use crate::judged::{Judged, Scope};
-use crate::legacy::Legacy;
-use crate::lexicon::Lexicon;
-use crate::lookups::Lookups;
-use walk::TypeWalk;
+use crate::lexicon::{Identity, Lexicon, Lone};
+use crate::scope::Scope;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Wrapped {
-    Bare,
-    Composite,
+#[derive(Debug)]
+struct Candidate {
+    identity: Identity,
+    line: LineNumber,
 }
 
-impl From<Option<&Named<Sited>>> for Wrapped {
-    fn from(shared: Option<&Named<Sited>>) -> Wrapped {
-        match shared {
-            Some(_) => Wrapped::Bare,
-            None => Wrapped::Composite,
-        }
+#[derive(Debug)]
+struct Signed<'model> {
+    site: Site<'model>,
+    found: Vec<Violation<'model>>,
+}
+
+#[derive(Debug)]
+struct TypeWalk<'walk, 'model> {
+    lexicon: &'walk Lexicon,
+    scope: &'walk Scope<'model>,
+    file: &'walk Path,
+    found: Vec<Candidate>,
+}
+
+impl TypeWalk<'_, '_> {
+    fn spelled(&mut self, named: &Named<Sited>, written: &ItemPath, line: LineNumber) {
+        let resolved: &Resolved = named.as_ref();
+        let lone = Lone::within(written);
+        let identity = self.lexicon.identity(resolved, written);
+        let direct = identity.and_then(|identity| identity.direct(lone));
+        let target = lone.and(self.scope.local_alias(resolved, self.file)).and_then(TypeRef::named);
+        let aliased = target.and_then(|target| self.aliased(target));
+        self.found.extend(direct.into_iter().chain(aliased).map(|identity| Candidate { identity, line }));
+        named.each_inner_use(self);
+    }
+
+    fn aliased(&self, target: &Named<Sited>) -> Option<Identity> {
+        let written = AsRef::<Spelling>::as_ref(AsRef::<Sited>::as_ref(target)).written();
+        written.and_then(|written| {
+            self.lexicon.identity(target.as_ref(), written).and_then(|identity| identity.aliased(written))
+        })
     }
 }
 
-impl Wrapped {
-    fn wrapping(lexicon: &Lexicon, ty: &TypeRef) -> Wrapped {
-        match ty.dereferenced().named() {
-            Some(named) => Wrapped::of_named(lexicon, named),
-            None => Wrapped::Composite,
-        }
-    }
-
-    fn of_named(lexicon: &Lexicon, named: &Named<Sited>) -> Wrapped {
-        match named.arguments().first() {
-            Some(_) => Wrapped::from(lexicon.shared_str(named)),
-            None => Wrapped::Bare,
-        }
-    }
-
-    fn kept(self, holding: &Holding) -> Option<&Holding> {
-        match self {
-            Wrapped::Bare => None,
-            Wrapped::Composite => Some(holding),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Holdings;
-
-impl Holdings {
-    fn legacy(held: Held) -> Legacy {
-        match held {
-            Held::StructField | Held::EnumField | Held::UnionField | Held::StructParameter => Legacy::Eligible,
-            Held::NewtypeField
-            | Held::EnumParameter
-            | Held::UnionParameter
-            | Held::Const
-            | Held::Static
-            | Held::Alias
-            | Held::AssociatedType
-            | Held::AssociatedConst => Legacy::Ineligible,
-        }
-    }
-
-    fn kept<'holding>(lexicon: &Lexicon, holding: &'holding Holding) -> Option<&'holding Holding> {
-        match holding.held() {
-            Held::NewtypeField => Wrapped::wrapping(lexicon, holding.as_ref()).kept(holding),
-            Held::StructField
-            | Held::EnumField
-            | Held::UnionField
-            | Held::StructParameter
-            | Held::EnumParameter
-            | Held::UnionParameter
-            | Held::Const
-            | Held::Static
-            | Held::Alias
-            | Held::AssociatedType
-            | Held::AssociatedConst => Some(holding),
-        }
+impl TypeUses for TypeWalk<'_, '_> {
+    fn named(&mut self, named: &Named<Sited>) {
+        let spelling: &Spelling = AsRef::<Sited>::as_ref(named).as_ref();
+        spelling.written().zip(spelling.line()).into_iter().fold(self, |walk, (written, line)| {
+            walk.spelled(named, written, line);
+            walk
+        });
     }
 }
 
 #[derive(Debug)]
 pub struct Signatures<'read, 'model> {
     lexicon: &'read Lexicon,
-    lookups: &'read Lookups<'model>,
+    scope: &'read Scope<'model>,
 }
 
 impl<'read, 'model> Signatures<'read, 'model> {
-    const EDGES: [Word<'static>; 3] = words!["new", "try_new", "into_inner"];
-
-    pub fn new(lexicon: &'read Lexicon, lookups: &'read Lookups<'model>) -> Signatures<'read, 'model> {
-        Signatures { lexicon, lookups }
+    pub fn new(lexicon: &'read Lexicon, scope: &'read Scope<'model>) -> Signatures<'read, 'model> {
+        Signatures { lexicon, scope }
     }
 
-    pub fn judged(&self, model: &'model Model) -> Vec<Judged<'model>> {
-        let functions = model
-            .functions()
-            .everywhere()
-            .filter(|placed| placed.entity().owner() != Owner::TraitImpl)
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).zone() == Zone::Open)
-            .flat_map(|placed| self.function_judged(placed.entity(), placed.site().path()));
-        let holdings = model
-            .holdings()
-            .filter(|placed| AsRef::<Region>::as_ref(placed.entity()).zone() == Zone::Open)
-            .filter_map(|placed| Holdings::kept(self.lexicon, placed.entity()).map(|_| placed))
-            .flat_map(|placed| self.holding_judged(placed.entity(), placed.site().path()));
-        functions.chain(holdings).collect()
+    pub fn found(&self, model: &'model Model) -> Vec<Violation<'model>> {
+        let functions = model.functions().map(|placed| {
+            let function = self.scope.function(placed.entity());
+            let types = function.into_iter().flat_map(|function| function.signature().written());
+            Signed { site: placed.site(), found: self.walked(placed.site().path(), placed.entity().as_ref(), types) }
+        });
+        let holdings = model.holdings().map(|placed| {
+            let holding = self.scope.holding(placed.entity());
+            let types = holding.into_iter().map(AsRef::<TypeRef>::as_ref);
+            Signed { site: placed.site(), found: self.walked(placed.site().path(), placed.entity().as_ref(), types) }
+        });
+        let mut signed: Vec<Signed<'model>> = functions.chain(holdings).collect();
+        signed.sort_by(|left, right| left.site.cmp(&right.site));
+        signed.into_iter().flat_map(|signed| signed.found).collect()
     }
 
-    fn function_judged(&self, function: &'model Function, path: &'model Path) -> Vec<Judged<'model>> {
-        let region: Region = *AsRef::<Region>::as_ref(function);
-        let eligible = Legacy::of_within(region.within()).both(Legacy::unless(self.edge(function, region).as_ref()));
-        let candidates = TypeWalk::walked(self.lexicon, self.lookups, path, function.signature().written());
-        Scope::new(path, region, eligible, function.as_ref()).judged(candidates)
-    }
-
-    fn holding_judged(&self, holding: &'model Holding, path: &'model Path) -> Vec<Judged<'model>> {
-        let region: Region = *AsRef::<Region>::as_ref(holding);
-        let newtype = self.lookups.newtype(holding.declares(), region.reach());
-        let eligible = Legacy::of_within(region.within())
-            .both(Holdings::legacy(holding.held()))
-            .both(Legacy::unless(newtype.as_ref()));
-        let candidates =
-            TypeWalk::walked(self.lexicon, self.lookups, path, [AsRef::<TypeRef>::as_ref(holding)].into_iter());
-        Scope::new(path, region, eligible, holding.as_ref()).judged(candidates)
-    }
-
-    fn edge(&self, function: &Function, region: Region) -> Option<ItemId> {
-        let inherent = [function.owner()].into_iter().find(|owner| *owner == Owner::Inherent);
-        let inputs = function.signature().inputs();
-        let alone = inputs.first().xor(inputs.get(1));
-        let name: &Name = function.as_ref();
-        let edge = name.matches::<Whole>(&Self::EDGES);
-        let seat: &Seat = function.as_ref();
-        let item =
-            seat.subject().and_then(TypeRef::named).map(AsRef::<Resolved>::as_ref).and_then(Resolved::crate_item);
-        let newtype = self.lookups.newtype(item, region.reach());
-        inherent.and(alone).and(edge).and(newtype)
+    fn walked<'ty>(
+        &self,
+        file: &'model Path,
+        context: &Name,
+        types: impl Iterator<Item = &'ty TypeRef>,
+    ) -> Vec<Violation<'model>> {
+        let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file, found: Vec::new() };
+        types.for_each(|ty| ty.each_use(&mut walk));
+        walk.found
+            .into_iter()
+            .map(|found| Violation::new(Site::new(file, found.line), found.identity.finding(context.clone())))
+            .collect()
     }
 }

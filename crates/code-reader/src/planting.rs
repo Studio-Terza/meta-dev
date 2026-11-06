@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use code_model::FileId;
+use code_model::{Building, FileId, Reach};
 use lint_core::SourceFile;
 use lint_layout::Name;
 use lint_placement::Role;
@@ -11,14 +11,44 @@ use crate::lowering::{Lowered, Slot};
 use crate::namespace::CrateForm;
 
 #[derive(Clone, Copy, Debug)]
+pub(crate) struct Listed<'read> {
+    source: &'read SourceFile,
+    reach: Reach,
+}
+
+impl<'read> From<&'read SourceFile> for Listed<'read> {
+    fn from(source: &'read SourceFile) -> Listed<'read> {
+        Listed { source, reach: Listed::reach_of(source) }
+    }
+}
+
+impl<'read> Listed<'read> {
+    pub(crate) fn tested(self) -> Listed<'read> {
+        Listed { source: self.source, reach: Reach::Test }
+    }
+
+    fn reach_of(source: &SourceFile) -> Reach {
+        match source.shipped() {
+            Some(_) => Reach::Shipped,
+            None => Reach::Test,
+        }
+    }
+
+    pub(crate) fn read(self, building: &mut Building) -> ReadFile<'read> {
+        ReadFile { source: self.source, file: building.file(self.source.path().to_path_buf()), reach: self.reach }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct ReadFile<'read> {
     source: &'read SourceFile,
     file: FileId,
+    reach: Reach,
 }
 
 impl<'read> ReadFile<'read> {
-    pub(crate) fn new(source: &'read SourceFile, file: FileId) -> ReadFile<'read> {
-        ReadFile { source, file }
+    pub(crate) fn reach(self) -> Reach {
+        self.reach
     }
 
     pub(crate) fn source(self) -> &'read SourceFile {

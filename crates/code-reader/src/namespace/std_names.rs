@@ -128,7 +128,7 @@ impl Listed {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Expansion {
+pub(super) enum Expansion {
     Statement,
     Items,
 }
@@ -154,7 +154,6 @@ pub(crate) struct StdNames;
 impl StdNames {
     const STD: Word<'static> = Word::new("std");
     const STD_ROOTS: [Word<'static>; 3] = words!["std", "core", "alloc"];
-    const PRIMITIVE_MODULE: [Word<'static>; 2] = words!["std", "primitive"];
     const PRELUDE: [Canonical; 37] = [
         Canonical::new(Word::new("marker"), Word::new("Copy")),
         Canonical::new(Word::new("marker"), Word::new("Send")),
@@ -319,18 +318,6 @@ impl StdNames {
         Self::PRIMITIVES.iter().find(|row| only.matches::<Whole>(&[row.word]).is_some()).map(|row| row.primitive)
     }
 
-    pub(super) fn stepped(module: &ItemPath, segment: &Name) -> Binding {
-        match Self::primitive_within(module, segment) {
-            Some(primitive) => Binding::Primitive(primitive),
-            None => Binding::Std(module.joined(segment)),
-        }
-    }
-
-    fn primitive_within(module: &ItemPath, segment: &Name) -> Option<Primitive> {
-        let primitives: ItemPath = Self::PRIMITIVE_MODULE.into_iter().collect();
-        [module].into_iter().find(|module| **module == primitives).and_then(|_| Self::primitive(segment))
-    }
-
     pub(super) fn root(first: &Name) -> Option<Binding> {
         first.matches::<Whole>(&Self::STD_ROOTS).map(|_| Binding::Std(ItemPath::from_iter([Name::from(Self::STD)])))
     }
@@ -343,7 +330,7 @@ impl StdNames {
         Self::STD_GLOBS.iter().find(|glob| glob.path() == *module).map(|glob| glob.listed(module))
     }
 
-    pub(crate) fn expansion(invoked: &Macro) -> Expansion {
+    pub(super) fn expansion(invoked: &Macro) -> Expansion {
         match invoked.path.get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::STATEMENT_MACROS)) {
             Some(_) => Expansion::Statement,
             None => Expansion::Items,

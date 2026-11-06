@@ -10,9 +10,7 @@ use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::Item;
 use crate::placed::Placed;
-use crate::region::Region;
-use crate::sited::Sited;
-use crate::type_ref::{Named, Steps, TypeRef};
+use crate::type_ref::{Steps, TypeRef};
 pub use building::Building;
 pub(crate) use declarations::{Aliases, Declarations};
 pub(crate) use file_model::FileModel;
@@ -28,33 +26,10 @@ pub struct Model {
     declarations: Declarations,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Admitted {
-    Definite,
-    Every,
-}
-
-impl Admitted {
-    fn admits<'model>(self, placed: Placed<'model, &'model Function>) -> Option<Placed<'model, &'model Function>> {
-        match self {
-            Admitted::Definite => Model::definite(placed),
-            Admitted::Every => Some(placed),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Functions<'model> {
     files: &'model [FileModel],
     rows: std::slice::Iter<'model, Filed<Function>>,
-    admitted: Admitted,
-}
-
-impl<'model> Functions<'model> {
-    #[must_use]
-    pub fn everywhere(self) -> Functions<'model> {
-        Functions { files: self.files, rows: self.rows, admitted: Admitted::Every }
-    }
 }
 
 impl<'model> Iterator for Functions<'model> {
@@ -62,8 +37,7 @@ impl<'model> Iterator for Functions<'model> {
 
     fn next(&mut self) -> Option<Placed<'model, &'model Function>> {
         let files = self.files;
-        let admitted = self.admitted;
-        self.rows.find_map(|filed| filed.placed(files).and_then(|placed| admitted.admits(placed)))
+        self.rows.find_map(|filed| filed.placed(files))
     }
 }
 
@@ -113,18 +87,14 @@ impl<'model> Iterator for Calls<'model> {
 }
 
 impl Model {
-    pub fn implementations(&self) -> impl Iterator<Item = Placed<'_, &Implementation>> {
-        self.every_implementation().filter_map(Model::definite)
-    }
-
     #[must_use]
-    pub fn every_implementation(&self) -> Implementations<'_> {
+    pub fn implementations(&self) -> Implementations<'_> {
         Implementations { files: &self.files, rows: self.implementations.iter() }
     }
 
     #[must_use]
     pub fn functions(&self) -> Functions<'_> {
-        Functions { files: &self.files, rows: self.functions.iter(), admitted: Admitted::Definite }
+        Functions { files: &self.files, rows: self.functions.iter() }
     }
 
     #[must_use]
@@ -145,16 +115,5 @@ impl Model {
     #[must_use]
     pub fn expanded(&self, ty: &TypeRef) -> TypeRef {
         ty.expanded(self.declarations.aliases(), Steps::LIMIT).unwrap_or_else(|| ty.clone())
-    }
-
-    #[must_use]
-    pub fn aliased(&self, named: &Named<Sited>) -> Option<TypeRef> {
-        named.expansion(self.declarations.aliases())
-    }
-
-    fn definite<'model, Entity: AsRef<Region>>(
-        placed: Placed<'model, &'model Entity>,
-    ) -> Option<Placed<'model, &'model Entity>> {
-        placed.entity().as_ref().reach().definite().map(|_| placed)
     }
 }

@@ -6,7 +6,6 @@ use super::entries::{DeclaredId, Sight};
 use super::items::ItemIds;
 use super::resolver::Resolution;
 use super::settling::Target;
-use super::std_names::StdNames;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Binding {
@@ -22,7 +21,7 @@ impl Binding {
     pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
         match self {
             Binding::Module(module) => entered(module),
-            Binding::Std(path) => Resolution::Bound(StdNames::stepped(&path, segment)),
+            Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
             Binding::External(path) => Resolution::Bound(Binding::External(path.joined(segment))),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
         }

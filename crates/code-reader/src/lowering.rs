@@ -1,7 +1,6 @@
 mod boundary;
 mod calls;
 mod held;
-mod modules;
 mod regions;
 mod seat;
 mod signature;
@@ -13,14 +12,12 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 use syn::{
-    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, File, ForeignItemFn, ForeignItemStatic, Ident,
-    ImplItemConst, ImplItemFn, ImplItemType, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemMacro, ItemMod, ItemStatic,
-    ItemStruct, ItemTrait, ItemType, ItemUnion, Signature as SynSignature, StmtMacro, Token, TraitItemConst,
-    TraitItemFn, TraitItemType,
+    Attribute, Block, ExprCall, ExprMacro, ExprMethodCall, File, ForeignItemFn, Ident, ImplItemFn, ItemEnum, ItemFn,
+    ItemImpl, ItemMod, ItemStruct, ItemTrait, ItemType, ItemUnion, Signature as SynSignature, Token, TraitItemFn,
 };
 
 use code_model::{
-    Alias, Building, Entry, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Position, Region,
+    Alias, Building, Entry, Function, Held, Implementation, Model, Named, Origin, Output, Owner, Region,
     Seat as Seated, Signature, Sited, Spelling, Subject, TypeRef,
 };
 use lint_layout::{LineNumber, Name, TestMarks, Whole, Word, words};
@@ -76,29 +73,6 @@ impl Enclosure {
         match self {
             Enclosure::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
             Enclosure::Module | Enclosure::Body | Enclosure::Impl(_) | Enclosure::Trait | Enclosure::Foreign => None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-enum Mode {
-    #[default]
-    Source,
-    Expansion,
-}
-
-impl Mode {
-    fn declared(self, ident: &Ident) -> Option<UsePath> {
-        match self {
-            Mode::Source => Some(UsePath::from(ident)),
-            Mode::Expansion => None,
-        }
-    }
-
-    fn aliased(self, row: AliasRow) -> Option<AliasRow> {
-        match self {
-            Mode::Source => Some(row),
-            Mode::Expansion => None,
         }
     }
 }
@@ -307,7 +281,7 @@ impl<'read> Lowered<'read> {
         let syntax = read.source().syntax();
         let scope = self.space.opened(slot.scope, ScopeKind::Module, Entries::of_items(&syntax.items));
         let children = Rc::from(slot.children.join(&slot.name));
-        let region = Regions::joined(slot.region, Regions::of_file(read.source()));
+        let region = Regions::joined(slot.region, Regions::of_file(read));
         self.space.declare(slot.scope, Declared::new(slot.name, slot.visibility, DeclaredKind::Module(scope)));
         self.lowered(Seat::new(read.file(), scope, children), Context::outermost(region), Enclosure::Module, syntax)
     }
@@ -351,20 +325,13 @@ impl<'read> Lowered<'read> {
         let syntax = read.source().syntax();
         let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
         let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
-        let context = Context::outermost(Regions::of_file(read.source()));
+        let context = Context::outermost(Regions::of_file(read));
         self.lowered(Seat::new(read.file(), scope, children), context, enclosure, syntax)
     }
 
     fn lowered(&mut self, seat: Seat, context: Context, enclosure: Enclosure, syntax: &File) -> Vec<Slot> {
-        let mut lowering = Lowering {
-            lowered: self,
-            here: seat,
-            enclosure,
-            generics: InScope::outside(),
-            slots: Vec::new(),
-            context,
-            mode: Mode::Source,
-        };
+        let mut lowering =
+            Lowering { lowered: self, here: seat, enclosure, generics: InScope::outside(), slots: Vec::new(), context };
         lowering.visit_file(syntax);
         lowering.slots
     }
@@ -378,7 +345,6 @@ struct Lowering<'low, 'read> {
     generics: InScope,
     slots: Vec<Slot>,
     context: Context,
-    mode: Mode,
 }
 
 impl Lowering<'_, '_> {
@@ -429,17 +395,16 @@ impl Lowering<'_, '_> {
 
 impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_mod(&mut self, item: &'ast ItemMod) {
-        match self.mode {
-            Mode::Source => self.module_entered(item),
-            Mode::Expansion => self.module_expanded(self.context.within_module(item), item),
+        match &item.content {
+            Some((_, items)) => self.module_visited(item, items),
+            None => self.slots.push(Slot::new(&self.here, self.context.region(), item)),
         }
     }
 
     fn visit_block(&mut self, block: &'ast Block) {
-        match self.mode {
-            Mode::Source => self.block_scoped(block),
-            Mode::Expansion => visit::visit_block(self, block),
-        }
+        let outer = self.entered(ScopeKind::Block, Entries::of_block(&block.stmts), self.here.children());
+        visit::visit_block(self, block);
+        self.here = outer;
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
@@ -486,20 +451,19 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_type(&mut self, item: &'ast ItemType) {
         let generics = InScope::outside().extended(&item.generics);
         let target = generics.lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::Alias), Link::from(self.mode.declared(&item.ident)), target.clone());
-        let row = AliasRow {
+        self.hold(Holder::named(&item.ident, Held::Alias), Link::Declares(UsePath::from(&item.ident)), target.clone());
+        self.lowered.aliases.push(AliasRow {
             scope: self.here.scope(),
             name: UsePath::from(&item.ident),
             parameters: generics.declarations(&item.generics),
             target,
-        };
-        self.lowered.aliases.extend(self.mode.aliased(row));
+        });
         visit::visit_item_type(self, item);
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         self.derived(&item.attrs, &item.ident);
-        let link = Link::from(self.mode.declared(&item.ident));
+        let link = Link::Declares(UsePath::from(&item.ident));
         self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
         self.struct_held(item, &self.generics.extended(&item.generics), link);
         visit::visit_item_struct(self, item);
@@ -508,8 +472,6 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
-        let link = Link::from(self.mode.declared(&item.ident));
-        self.parameters(&Holder::named(&item.ident, Held::EnumParameter), &item.generics, &link);
         item.variants.iter().fold(&mut *self, |lowering, variant| {
             lowering.fields_held(&Holder::named(&variant.ident, Held::EnumField), variant.fields.iter(), &scope);
             lowering
@@ -520,59 +482,8 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
         self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
-        let link = Link::from(self.mode.declared(&item.ident));
-        self.parameters(&Holder::named(&item.ident, Held::UnionParameter), &item.generics, &link);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), item.fields.named.iter(), &scope);
         visit::visit_item_union(self, item);
-    }
-
-    fn visit_item_const(&mut self, item: &'ast ItemConst) {
-        self.hold(Holder::named(&item.ident, Held::Const), Link::Free, self.generics.lowered(&item.ty));
-        visit::visit_item_const(self, item);
-    }
-
-    fn visit_item_static(&mut self, item: &'ast ItemStatic) {
-        self.hold(Holder::named(&item.ident, Held::Static), Link::Free, self.generics.lowered(&item.ty));
-        visit::visit_item_static(self, item);
-    }
-
-    fn visit_foreign_item_static(&mut self, item: &'ast ForeignItemStatic) {
-        self.hold(Holder::named(&item.ident, Held::Static), Link::Free, self.generics.lowered(&item.ty));
-        visit::visit_foreign_item_static(self, item);
-    }
-
-    fn visit_trait_item_type(&mut self, item: &'ast TraitItemType) {
-        let scope = self.generics.extended(&item.generics);
-        let bounded = item.bounds.first().map(|_| scope.bounded(item.bounds.iter()));
-        let defaults = item.default.iter().map(|(_, ty)| scope.lowered(ty));
-        bounded.into_iter().chain(defaults).for_each(|ty| {
-            self.hold(Holder::named(&item.ident, Held::AssociatedType), self.context.slot(), ty);
-        });
-        visit::visit_trait_item_type(self, item);
-    }
-
-    fn visit_trait_item_const(&mut self, item: &'ast TraitItemConst) {
-        self.hold(
-            Holder::named(&item.ident, Held::AssociatedConst),
-            self.context.slot(),
-            self.generics.lowered(&item.ty),
-        );
-        visit::visit_trait_item_const(self, item);
-    }
-
-    fn visit_impl_item_type(&mut self, item: &'ast ImplItemType) {
-        let ty = self.generics.extended(&item.generics).lowered(&item.ty);
-        self.hold(Holder::named(&item.ident, Held::AssociatedType), self.context.slot(), ty);
-        visit::visit_impl_item_type(self, item);
-    }
-
-    fn visit_impl_item_const(&mut self, item: &'ast ImplItemConst) {
-        self.hold(
-            Holder::named(&item.ident, Held::AssociatedConst),
-            self.context.slot(),
-            self.generics.lowered(&item.ty),
-        );
-        visit::visit_impl_item_const(self, item);
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast ExprMethodCall) {
@@ -586,17 +497,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     }
 
     fn visit_expr_macro(&mut self, expr: &'ast ExprMacro) {
-        self.macro_called(&expr.mac, Position::Expression);
+        self.macro_called(&expr.mac);
         visit::visit_expr_macro(self, expr);
-    }
-
-    fn visit_stmt_macro(&mut self, stmt: &'ast StmtMacro) {
-        self.macro_called(&stmt.mac, Position::Statement);
-        visit::visit_stmt_macro(self, stmt);
-    }
-
-    fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
-        self.expanded(&item.mac);
-        visit::visit_item_macro(self, item);
     }
 }

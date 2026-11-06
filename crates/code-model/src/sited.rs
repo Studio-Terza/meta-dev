@@ -6,7 +6,6 @@ use crate::resolved::Resolved;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Spelling {
     Written(ItemPath, LineNumber),
-    SelfType(LineNumber),
     Implied,
 }
 
@@ -15,14 +14,14 @@ impl Spelling {
     pub fn written(&self) -> Option<&ItemPath> {
         match self {
             Spelling::Written(path, _) => Some(path),
-            Spelling::SelfType(_) | Spelling::Implied => None,
+            Spelling::Implied => None,
         }
     }
 
     #[must_use]
     pub fn line(&self) -> Option<LineNumber> {
         match self {
-            Spelling::Written(_, line) | Spelling::SelfType(line) => Some(*line),
+            Spelling::Written(_, line) => Some(*line),
             Spelling::Implied => None,
         }
     }

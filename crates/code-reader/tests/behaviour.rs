@@ -3,7 +3,7 @@ use code_model::{
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
-use lint_layout::{LineNumber, Name};
+use lint_layout::Name;
 
 const DERIVED: &str = "#[derive(Clone,\n    Debug)]\nstruct A;\n#[derive(PartialEq)]\nenum B {\n    C,\n}\n#[derive(Copy)]\nunion D {\n    e: u8,\n}\n";
 const WRITTEN: &str = "mod m {\n    impl Clone for A {}\n}\nfn f() {\n    impl A {}\n}\n";
@@ -275,8 +275,8 @@ impl Expect {
         Formed { name: Name::from(name), owner, entry, output }
     }
 
-    fn projected(subject: TypeRef<Seen>, item: &str, line: usize) -> TypeRef<Seen> {
-        TypeRef::Projected(Box::new(Projection::new(subject, None, Name::from(item), LineNumber::from(line))))
+    fn projected(subject: TypeRef<Seen>) -> TypeRef<Seen> {
+        TypeRef::Projected(Box::new(Projection::new(subject, None)))
     }
 }
 
@@ -626,9 +626,9 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
     SELF_TRAIT_DECL => [Expect::param("Self")],
     SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
-    SELF_PROJECTED => [Expect::projected(Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()), "Out", 3)],
+    SELF_PROJECTED => [Expect::projected(Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()))],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [Expect::projected(Expect::param("Self"), "Out", 3)],
+    PROJECTED => [Expect::projected(Expect::param("Self"))],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";

@@ -2,54 +2,22 @@ use lint_layout::Name;
 
 use crate::item_path::ItemPath;
 use crate::region::{Region, Seat};
-use crate::type_ref::TypeRef;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Position {
-    Expression,
-    Statement,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PathCall {
-    written: ItemPath,
-    owner: TypeRef,
-}
-
-impl PathCall {
-    #[must_use]
-    pub fn new(written: ItemPath, owner: TypeRef) -> PathCall {
-        PathCall { written, owner }
-    }
-}
-
-impl AsRef<ItemPath> for PathCall {
-    fn as_ref(&self) -> &ItemPath {
-        &self.written
-    }
-}
-
-impl AsRef<TypeRef> for PathCall {
-    fn as_ref(&self) -> &TypeRef {
-        &self.owner
-    }
+pub enum Callee {
+    Method(Name),
+    Path(ItemPath),
+    Macro(MacroCall),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MacroCall {
     written: ItemPath,
-    position: Position,
 }
 
-impl MacroCall {
-    #[must_use]
-    pub fn new(written: ItemPath, position: Position) -> MacroCall {
-        MacroCall { written, position }
-    }
-
-    #[must_use]
-    pub fn position(&self) -> Position {
-        self.position
+impl From<ItemPath> for MacroCall {
+    fn from(written: ItemPath) -> MacroCall {
+        MacroCall { written }
     }
 }
 
@@ -57,13 +25,6 @@ impl AsRef<ItemPath> for MacroCall {
     fn as_ref(&self) -> &ItemPath {
         &self.written
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Callee {
-    Method(Name),
-    Path(PathCall),
-    Macro(MacroCall),
 }
 
 impl Callee {
@@ -76,9 +37,9 @@ impl Callee {
     }
 
     #[must_use]
-    pub fn path(&self) -> Option<&PathCall> {
+    pub fn path(&self) -> Option<&ItemPath> {
         match self {
-            Callee::Path(call) => Some(call),
+            Callee::Path(written) => Some(written),
             Callee::Method(_) | Callee::Macro(_) => None,
         }
     }

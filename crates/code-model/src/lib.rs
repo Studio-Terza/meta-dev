@@ -16,10 +16,10 @@ mod sited;
 mod type_ref;
 
 pub use boundary::{FileId, ItemId};
-pub use call::{Call, Callee, MacroCall, PathCall, Position};
+pub use call::{Call, Callee, MacroCall};
 pub use found::Found;
 pub use function::{Entry, Function, Input, Output, Owner, Signature};
-pub use holding::{Held, Holding, Slot};
+pub use holding::{Held, Holding};
 pub use implementation::{Implementation, Origin, Subject};
 pub use item::{Alias, AliasParameter, Item, ItemKind};
 pub use item_path::ItemPath;
@@ -30,4 +30,4 @@ pub use region::{Reach, Region, Seat, Within, Zone};
 pub use resolved::Resolved;
 pub use site::Site;
 pub use sited::{Sited, Spelling};
-pub use type_ref::{Access, Arrayed, Bounds, Callable, Named, Projection, Referenced, TypeRef, TypeUses};
+pub use type_ref::{Arrayed, Bounds, Callable, Named, Projection, TypeRef, TypeUses};

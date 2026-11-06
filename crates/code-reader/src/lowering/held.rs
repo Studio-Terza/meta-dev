@@ -1,7 +1,7 @@
 use syn::spanned::Spanned;
 use syn::{Attribute, Field, Generics, Ident, ItemStruct};
 
-use code_model::{Building, Held, Holding, ItemId, Slot};
+use code_model::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;
 use lint_layout::{LineNumber, Name};
 
@@ -37,59 +37,16 @@ impl Holder {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct SlotRow {
-    subject: TypeRef<Written>,
-    interface: Option<Written>,
-}
-
-impl SlotRow {
-    pub(super) fn new(subject: TypeRef<Written>, interface: Option<Written>) -> SlotRow {
-        SlotRow { subject, interface }
-    }
-
-    fn built(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Slot {
-        let interface = self.interface.map(|interface| interface.sited(resolving, scope));
-        Slot::new(Written::typed(self.subject, resolving, scope), interface)
-    }
-}
-
-#[derive(Clone, Debug)]
 pub(super) enum Link {
     Free,
     Declares(UsePath),
-    Slot(SlotRow),
-}
-
-impl From<Option<UsePath>> for Link {
-    fn from(declared: Option<UsePath>) -> Link {
-        match declared {
-            Some(name) => Link::Declares(name),
-            None => Link::Free,
-        }
-    }
-}
-
-impl From<Option<SlotRow>> for Link {
-    fn from(slot: Option<SlotRow>) -> Link {
-        match slot {
-            Some(slot) => Link::Slot(slot),
-            None => Link::Free,
-        }
-    }
 }
 
 impl Link {
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
         match self {
             Link::Declares(name) => resolving.path(scope, name, Domain::Types).crate_item(),
-            Link::Free | Link::Slot(_) => None,
-        }
-    }
-
-    fn slotted(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<Slot> {
-        match self {
-            Link::Slot(slot) => Some(slot.built(resolving, scope)),
-            Link::Free | Link::Declares(_) => None,
+            Link::Free => None,
         }
     }
 }
@@ -107,9 +64,8 @@ impl Built for HoldingRow {
     fn built(self, resolving: &Resolving<'_, '_, '_>, building: Building) -> Building {
         let scope = self.located.scope();
         let declares = self.link.declares(resolving, scope);
-        let slot = self.link.slotted(resolving, scope);
         let holding = Holding::new(self.holder.name, self.holder.held, Written::typed(self.ty, resolving, scope))
-            .placed(self.region, declares, slot);
+            .placed(self.region, declares);
         self.located.holding(building, holding)
     }
 }
