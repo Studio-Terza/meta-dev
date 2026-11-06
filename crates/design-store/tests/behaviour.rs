@@ -9,8 +9,8 @@ use design_model::{
 };
 use design_store::{
     AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
-    Refusal, Resolved, Resolving, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage,
-    ShownNode, StreamSchema, Unseen,
+    Refusal, RelationName, Resolved, Resolving, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
+    ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -24,7 +24,7 @@ use port_core::{Port, Run};
 use store_ports::{Sqlite, Store, Written};
 use stream::Stream;
 use strum::VariantArray;
-use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, SessionId, Transcripts, Uuid};
+use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
 
@@ -70,15 +70,18 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
     let message = shown.message();
     assert_eq!(
         [
-            message.uuid().to_string(),
-            message.author().to_string(),
-            message.session().to_string(),
-            message.stamp().to_string()
+            AsRef::<Uuid>::as_ref(message).to_string(),
+            AsRef::<Authorship>::as_ref(message).to_string(),
+            AsRef::<SessionId>::as_ref(message).to_string(),
+            AsRef::<Instant>::as_ref(message).to_string()
         ],
         ["o1", "owner", "s", "2026-01-01T00:00:00Z"]
     );
-    let segments: Vec<String> =
-        shown.segments().iter().map(|segment| format!("{} {}", segment.ordinal(), segment.shape())).collect();
+    let segments: Vec<String> = shown
+        .segments()
+        .iter()
+        .map(|segment| format!("{} {}", segment.ordinal(), AsRef::<ShapeName>::as_ref(segment)))
+        .collect();
     assert_eq!(segments, ["0 item", "1 item"]);
     let first = shown.segments().first().map(Body::from).ok_or("no segment")?;
     assert_eq!(first.to_string(), "1. go");
@@ -87,7 +90,7 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
         .iter()
         .map(|link| {
             let [source, target] = link.anchors();
-            format!("{source} {} {target}", link.relation())
+            format!("{source} {} {target}", AsRef::<RelationName>::as_ref(link))
         })
         .collect();
     assert_eq!(links, ["l1 replies-to o1"]);
@@ -143,7 +146,12 @@ impl Said {
         let hits = store.read(SearchSegments::matching(terms, scope))?;
         Ok(hits
             .iter()
-            .map(|hit| format!("{} {} {} {}", hit.uuid(), hit.author(), hit.stamp(), Body::from(hit)))
+            .map(|hit| {
+                let uuid: &Uuid = hit.as_ref();
+                let author: &Authorship = hit.as_ref();
+                let stamp: &Instant = hit.as_ref();
+                format!("{uuid} {author} {stamp} {}", Body::from(hit))
+            })
             .collect())
     }
 }

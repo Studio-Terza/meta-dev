@@ -421,8 +421,8 @@ VALUES
         let planted = NodeRow::proposed(node, self.statements)?;
         let child = Resolved::read(node.identity(), self.statements)?;
         let parent = Resolved::read(parent, self.statements)?;
-        let linked =
-            Linked::new(child, NodeRelation::Refines, parent, Provenance::from(self.provenance)).written(self.statements)?;
+        let linked = Linked::new(child, NodeRelation::Refines, parent, Provenance::from(self.provenance))
+            .written(self.statements)?;
         Ok(planted.plus(linked))
     }
 

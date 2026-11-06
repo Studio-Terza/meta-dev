@@ -7,7 +7,9 @@ use std::sync::Mutex;
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
+use design_store::{
+    AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema,
+};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;

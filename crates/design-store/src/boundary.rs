@@ -181,7 +181,6 @@ ORDER BY
         ))?;
         Ok(rows.into_iter().map(Record::from).collect())
     }
-
 }
 
 impl SegmentRow {
@@ -223,7 +222,6 @@ ORDER BY
     pub fn ordinal(&self) -> Ordinal {
         self.ordinal
     }
-
 }
 
 impl LinkRow {
@@ -252,7 +250,6 @@ ORDER BY
     pub fn anchors(&self) -> [AnchorName; 2] {
         [self.source.clone(), self.target.clone()]
     }
-
 }
 
 impl Hit {

@@ -18,7 +18,10 @@ impl<'run> Statements<'run> {
         Statements { connection, runtime }
     }
 
-    pub fn rows<Row, Mapper, Arguments>(&mut self, query: Map<'_, Sqlite, Mapper, Arguments>) -> Result<Vec<Row>, StoreFailure>
+    pub fn rows<Row, Mapper, Arguments>(
+        &mut self,
+        query: Map<'_, Sqlite, Mapper, Arguments>,
+    ) -> Result<Vec<Row>, StoreFailure>
     where
         Row: Columns + Send + Unpin,
         Mapper: FnMut(SqliteRow) -> Result<Row, sqlx::Error> + Send,
@@ -27,7 +30,10 @@ impl<'run> Statements<'run> {
         Ok(self.runtime.block_on(query.fetch_all(&mut *self.connection))?)
     }
 
-    pub fn one<Row, Mapper, Arguments>(&mut self, query: Map<'_, Sqlite, Mapper, Arguments>) -> Result<Row, StoreFailure>
+    pub fn one<Row, Mapper, Arguments>(
+        &mut self,
+        query: Map<'_, Sqlite, Mapper, Arguments>,
+    ) -> Result<Row, StoreFailure>
     where
         Row: Columns + Send + Unpin,
         Mapper: FnMut(SqliteRow) -> Result<Row, sqlx::Error> + Send,
