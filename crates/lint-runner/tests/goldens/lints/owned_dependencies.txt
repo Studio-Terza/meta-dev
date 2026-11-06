@@ -3,7 +3,7 @@ design: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 grammar: 0 tests in 1 files, 0 of 0 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
-a dependency some crate owns through [package.metadata.port] owns is depended on only by its owners, in dependencies and dev-dependencies alike:
+a dependency some crate owns through [package.metadata.port] owns has that one owner and is depended on by no other crate, in dependencies and dev-dependencies alike:
 design/Cargo.toml:5: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency
 design/Cargo.toml:8: depends on logos, which crate grammar owns; depend on the owning crate and call its API instead of the owned dependency
 fails
