@@ -26,10 +26,24 @@ impl Reach {
         }
     }
 
-    fn of_role(file: &SourceFile) -> Reach {
+    pub fn of_role(file: &SourceFile) -> Reach {
         match file.shipped() {
             Some(_) => Reach::Blocking,
             None => Reach::Widened,
+        }
+    }
+
+    pub fn sees(self, declared: Reach) -> Option<Reach> {
+        match self {
+            Reach::Widened => Some(declared),
+            Reach::Blocking => declared.blocking(),
+        }
+    }
+
+    fn blocking(self) -> Option<Reach> {
+        match self {
+            Reach::Blocking => Some(self),
+            Reach::Widened => None,
         }
     }
 

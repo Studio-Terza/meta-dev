@@ -18,6 +18,7 @@ use crate::owner::Owner;
 use crate::reach::{Reach, Reached, Reaching};
 use lint_core::Site;
 use lint_core::SourceFile;
+use lint_core::Syntax;
 use lint_core::Walk;
 use lint_layout::LineNumber;
 use lint_layout::Name;
@@ -57,7 +58,12 @@ impl<'declared, 'file> SignatureSites<'declared, 'file> {
     fn inherent(&mut self, walk: Walk, item: &ItemImpl) {
         match walk {
             Walk::Entered => syn::visit::visit_item_impl(self, item),
-            Walk::Skipped => {}
+            Walk::Skipped => {
+                item.items
+                    .iter()
+                    .filter_map(Syntax::impl_type)
+                    .for_each(|associated| self.visit_impl_item_type(associated));
+            }
         }
     }
 
@@ -91,7 +97,7 @@ impl<'ast> Visit<'ast> for SignatureSites<'_, '_> {
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        match self.declared.edge(&self.owner, item) {
+        match self.declared.edge(&self.owner, item, self.reach) {
             Some(Wrapped::Bare) => self.visit_block(&item.block),
             Some(Wrapped::Composite) => self.edged(item),
             None => syn::visit::visit_impl_item_fn(self, item),

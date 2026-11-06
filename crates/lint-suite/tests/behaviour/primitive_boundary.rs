@@ -54,9 +54,21 @@ const PRIMITIVE_MODULES: &str = "fn f(x: core::primitive::u8, y: std::primitive:
 const PROJECTED: &str = "struct A;\nimpl Tr for A {\n    type X = u8;\n}\nfn f(x: <A as Tr>::X) {}\n";
 const IN_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\n";
 const OPAQUE_MACRO: &str = "fn f() {\n    m!(x: &str);\n}\n";
+const TEST_NEWTYPE: &str = "pub struct Id(u64);\n";
+const SHIPPED_CONSTRUCTOR: &str =
+    "pub struct Id {\n    v: V,\n}\nimpl Id {\n    pub fn new(v: u64) -> Id {\n        g(v)\n    }\n}\n";
+const CHOSEN: &str = "pub struct A;\nimpl core::str::FromStr for A {\n    type Err = String;\n    fn from_str(t: &str) -> Result<A, String> {\n        g(t)\n    }\n}\n";
 const ASSOCIATED: &str = "trait T {\n    type X: AsRef<str>;\n    const N: usize;\n}\n";
 
-const CASES: [Case; 47] = [
+const CASES: [Case; 48] = [
+    Case::new(
+        Title::new("a shipped constructor beside a same-named newtype in a test file"),
+        &[
+            Source::new(Located::new("crates/x/tests/a.rs"), Text::new(TEST_NEWTYPE)),
+            Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SHIPPED_CONSTRUCTOR)),
+        ],
+        Flagged::new(&["crates/x/src/lib.rs:5"]),
+    ),
     Case::new(
         Title::new("test module"),
         &[Source::new(Located::new("a.rs"), Text::new(TEST_MODULE))],
@@ -286,7 +298,12 @@ const CASES: [Case; 47] = [
     ),
 ];
 
-const WIDENED: [Case; 18] = [
+const WIDENED: [Case; 19] = [
+    Case::new(
+        Title::new("an associated type chosen in a trait impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(CHOSEN))],
+        Flagged::new(&["a.rs:3"]),
+    ),
     Case::new(
         Title::new("a test file's signature"),
         &[Source::new(Located::new("x/tests/a.rs"), Text::new(TEXT_PARAMETER))],
@@ -338,7 +355,7 @@ const WIDENED: [Case; 18] = [
     Case::new(
         Title::new("a projection that resolves to a primitive"),
         &[Source::new(Located::new("a.rs"), Text::new(PROJECTED))],
-        Flagged::new(&["a.rs:5"]),
+        Flagged::new(&["a.rs:3", "a.rs:5"]),
     ),
     Case::new(
         Title::new("items inside a macro"),

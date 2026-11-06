@@ -38,10 +38,7 @@ pub struct Projection {
 
 impl Projection {
     pub fn of_member(owner: &Owner, interface: Option<&PathSegment>, member: &ImplItem) -> Option<Projection> {
-        match member {
-            ImplItem::Type(associated) => Self::of_type(owner, interface, associated),
-            _ => None,
-        }
+        Syntax::impl_type(member).and_then(|associated| Self::of_type(owner, interface, associated))
     }
 
     pub fn slot(&self) -> &Slot {
