@@ -1,5 +1,6 @@
 use lint_layout::Name;
 
+use crate::item::AliasParameter;
 use crate::model::Aliases;
 use crate::resolved::Resolved;
 
@@ -53,12 +54,11 @@ impl<Bound> AsRef<Bound> for Named<Bound> {
 }
 
 impl Named<Resolved> {
-    fn substituted(&self, parameters: &[Name], arguments: &[TypeRef]) -> TypeRef {
-        let bound = self
-            .path
-            .parameter()
-            .and_then(|name| parameters.iter().position(|parameter| parameter == name))
-            .and_then(|at| arguments.get(at));
+    fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> TypeRef {
+        let declared = self.path.parameter().and_then(|name| {
+            parameters.iter().enumerate().find(|(_, parameter)| AsRef::<Name>::as_ref(*parameter) == name)
+        });
+        let bound = declared.and_then(|(at, parameter)| arguments.get(at).or(parameter.default()));
         bound.cloned().unwrap_or_else(|| {
             TypeRef::Named(Named {
                 path: self.path.clone(),
@@ -108,7 +108,7 @@ impl<Bound> TypeRef<Bound> {
 
 impl TypeRef {
     #[must_use]
-    pub fn substituted(&self, parameters: &[Name], arguments: &[TypeRef]) -> TypeRef {
+    pub fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> TypeRef {
         match self {
             TypeRef::Named(named) => named.substituted(parameters, arguments),
             TypeRef::Tuple(elements) => {

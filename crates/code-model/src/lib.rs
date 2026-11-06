@@ -17,7 +17,7 @@ pub use building::Building;
 pub use found::Found;
 pub use function::{Entry, Function, Output, Owner, Signature};
 pub use implementation::{Implementation, Origin, Subject};
-pub use item::{Alias, Item, ItemKind};
+pub use item::{Alias, AliasParameter, Item, ItemKind};
 pub use item_path::ItemPath;
 pub use model::Model;
 pub use placed::Placed;

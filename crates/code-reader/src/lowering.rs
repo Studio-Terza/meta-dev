@@ -24,11 +24,12 @@ use crate::namespace::{
 };
 use crate::planting::{Files, ReadFile};
 use boundary::SelfType;
-use signature::{InScope, Written};
+use signature::{DeclaredParameter, InScope, Written};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 enum Enclosure {
-    Root,
+    BinaryRoot,
+    #[default]
     Module,
     Body,
     Impl(Owner),
@@ -47,7 +48,7 @@ impl Enclosure {
 
     fn owner(self) -> Owner {
         match self {
-            Enclosure::Root | Enclosure::Module => Owner::Free,
+            Enclosure::BinaryRoot | Enclosure::Module => Owner::Free,
             Enclosure::Body => Owner::Nested,
             Enclosure::Impl(owner) => owner,
             Enclosure::Trait => Owner::TraitDecl,
@@ -60,7 +61,7 @@ impl Enclosure {
 
     fn main(self, name: &Name) -> Option<Entry> {
         match self {
-            Enclosure::Root => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
+            Enclosure::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
             Enclosure::Module | Enclosure::Body | Enclosure::Impl(_) | Enclosure::Trait => None,
         }
     }
@@ -88,13 +89,13 @@ struct ImplRow {
 impl ImplRow {
     const DERIVE: &'static str = "derive";
 
-    fn written(seat: &Seat, block: &ItemImpl, generics: &InScope) -> ImplRow {
+    fn written(seat: &Seat, block: &ItemImpl, ty: TypeRef<Written>) -> ImplRow {
         ImplRow {
             file: seat.file,
             line: LineNumber::from(block.impl_token.span),
             scope: seat.scope,
             subject: SelfType::written(&block.self_ty),
-            ty: generics.lowered(&block.self_ty),
+            ty,
             implemented: block.trait_.as_ref().map(|(_, path, _)| UsePath::from(path)),
             domain: Domain::Types,
             origin: Origin::Written,
@@ -166,14 +167,16 @@ impl FnRow {
 struct AliasRow {
     scope: ScopeId,
     name: UsePath,
-    parameters: Vec<Name>,
+    parameters: Vec<DeclaredParameter>,
     target: TypeRef<Written>,
 }
 
 impl AliasRow {
     fn built(self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
         let declared = resolving.path(self.scope, &self.name, Domain::Types).crate_item();
-        let alias = Alias::new(self.parameters, Written::typed(self.target, resolving, self.scope));
+        let parameters =
+            self.parameters.into_iter().map(|parameter| parameter.resolved(resolving, self.scope)).collect();
+        let alias = Alias::new(parameters, Written::typed(self.target, resolving, self.scope));
         declared.into_iter().zip([alias]).for_each(|(item, alias)| building.alias(item, alias));
         building
     }
@@ -247,10 +250,26 @@ pub(crate) struct Lowered<'read> {
 
 impl<'read> Lowered<'read> {
     pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
+        let enclosure = read
+            .source()
+            .placement()
+            .executable_root(read.source().located().within(read.source().path()))
+            .map(|_| Enclosure::BinaryRoot)
+            .unwrap_or_default();
+        self.root_lowered(read, name, form, enclosure)
+    }
+
+    fn root_lowered(
+        &mut self,
+        read: ReadFile<'_>,
+        name: Option<&'read Name>,
+        form: CrateForm,
+        enclosure: Enclosure,
+    ) -> Vec<Slot> {
         let syntax = read.source().syntax();
         let scope = self.space.planted(form, name, Entries::of_items(&syntax.items));
         let children = Rc::from(read.source().path().parent().unwrap_or_else(|| Path::new("")));
-        self.lowered(Seat { file: read.file(), scope, children }, Enclosure::Root, syntax)
+        self.lowered(Seat { file: read.file(), scope, children }, enclosure, syntax)
     }
 
     pub(crate) fn planted(&mut self, slot: Slot, read: ReadFile<'_>) -> Vec<Slot> {
@@ -266,7 +285,7 @@ impl<'read> Lowered<'read> {
     }
 
     pub(crate) fn island(&mut self, read: ReadFile<'_>) {
-        let slots = self.rooted(read, None, CrateForm::Island);
+        let slots = self.root_lowered(read, None, CrateForm::Island, Enclosure::Module);
         slots.into_iter().fold(self, |lowered, slot| {
             lowered.opaque(slot);
             lowered
@@ -287,7 +306,7 @@ impl<'read> Lowered<'read> {
 
     fn lowered(&mut self, seat: Seat, enclosure: Enclosure, syntax: &File) -> Vec<Slot> {
         let mut lowering =
-            Lowering { lowered: self, here: seat, enclosure, generics: InScope::default(), slots: Vec::new() };
+            Lowering { lowered: self, here: seat, enclosure, generics: InScope::outside(), slots: Vec::new() };
         lowering.visit_file(syntax);
         lowering.slots
     }
@@ -360,13 +379,15 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let generics = self.generics.extended(&block.generics);
-        self.lowered.rows.push(ImplRow::written(&self.here, block, &generics));
+        let declared = self.generics.extended(&block.generics);
+        let subject = declared.lowered(&block.self_ty);
+        let generics = declared.subject(subject.clone());
+        self.lowered.rows.push(ImplRow::written(&self.here, block, subject));
         self.enclosed(Enclosure::of_impl(block), generics, |lowering| visit::visit_item_impl(lowering, block));
     }
 
     fn visit_item_trait(&mut self, item: &'ast ItemTrait) {
-        let generics = self.generics.extended(&item.generics);
+        let generics = self.generics.subjectless().extended(&item.generics);
         self.enclosed(Enclosure::Trait, generics, |lowering| visit::visit_item_trait(lowering, item));
     }
 
@@ -386,11 +407,11 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     }
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
-        let generics = InScope::default().extended(&item.generics);
+        let generics = InScope::outside().extended(&item.generics);
         self.lowered.aliases.push(AliasRow {
             scope: self.here.scope,
             name: UsePath::from(&item.ident),
-            parameters: generics.parameters(),
+            parameters: generics.declarations(&item.generics),
             target: generics.lowered(&item.ty),
         });
         visit::visit_item_type(self, item);
