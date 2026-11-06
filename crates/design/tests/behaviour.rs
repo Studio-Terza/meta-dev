@@ -839,8 +839,18 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     let applying = Applying::ready()?;
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
-    assert!(applying.run(&["show", "n3"])?.contains("  supersedes n2 entered apply\n"));
-    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague entered apply \"old\"\n"));
+    let root = "  ancestor n1 demo project vague entered init";
+    let refines = "  refines n1 entered apply";
+    let wanted = [
+        ("n2", vec!["n2 demo feature vague entered apply \"old\"", root, refines]),
+        ("n3", vec!["n3 demo feature vague entered apply \"new\"", root, refines, "  supersedes n2 entered apply"]),
+    ];
+    wanted.iter().try_for_each(|(node, lines)| {
+        let shown = applying.run(&["show", node])?;
+        assert_eq!(Lines::missing(&shown, lines), Vec::<&&str>::new());
+        assert_eq!(shown.matches('\n').count(), lines.len());
+        Ok::<(), Failure>(())
+    })?;
     let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
     assert!(placed.contains("written 2\n"));
     Ok(())

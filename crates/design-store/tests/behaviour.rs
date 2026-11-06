@@ -316,20 +316,9 @@ impl Ids {
     }
 }
 
-laws::law!(the_closure_holds_exactly_the_transitive_refinements, Dag::any(), dag, {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    dag.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    (0..dag.facets.len()).try_for_each(|node| {
-        let placed = store
-            .read(ShownNode::from(Dag::id(node)))
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?
-            .ok_or_else(|| TestCaseError::fail("a planted node is not shown"))?;
-        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), dag.ancestors(node));
-        prop_assert_eq!(Ids::kin(&placed, Kin::Child), dag.children(node));
-        prop_assert_eq!(placed.node().entry().facet(), dag.facets.get(node).copied().unwrap_or(Facet::Project));
-        Ok(())
-    })?;
+laws::law!(a_node_s_kin_are_exactly_its_transitive_refinements_whatever_else_is_closed, Mixed::any(), mixed, {
+    let shown = mixed.shown().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(shown, mixed.wanted());
 });
 
 struct Projects;
@@ -645,17 +634,17 @@ impl Ends {
 
 impl Probe {
     fn any() -> impl Strategy<Value = Probe> {
-        let edges = vec((0..ENDS, 0..ENDS), 0..10).prop_map(|pairs| {
+        (select(Closed::ALL.to_vec()), Probe::edges(), 0..ENDS, 0..ENDS)
+            .prop_map(|(closed, edges, child, parent)| Probe { closed, edges, tried: Edge { child, parent } })
+    }
+
+    fn edges() -> impl Strategy<Value = Vec<Edge>> {
+        vec((0..ENDS, 0..ENDS), 0..10).prop_map(|pairs| {
             pairs
                 .into_iter()
                 .filter(|(first, second)| first != second)
                 .map(|(first, second)| Edge { child: first.max(second), parent: first.min(second) })
                 .collect()
-        });
-        (select(Closed::ALL.to_vec()), edges, 0..ENDS, 0..ENDS).prop_map(|(closed, edges, child, parent)| Probe {
-            closed,
-            edges,
-            tried: Edge { child, parent },
         })
     }
 
@@ -722,4 +711,68 @@ fn an_edge_reversing_a_written_path_is_refused_for_every_acyclic_relation() {
     let refused = Closed::ALL
         .map(|closed| Probe { closed, edges: Probe::chain(), tried: Probe::closing() }.refused().ok().flatten());
     assert_eq!(refused, Closed::ALL.map(|closed| Some(closed.ends().cycle(Probe::closing()))));
+}
+
+#[derive(Clone, Debug)]
+struct Mixed {
+    dag: Dag,
+    closed: Closed,
+    edges: Vec<Edge>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Shown {
+    ancestors: Vec<NodeId>,
+    children: Vec<NodeId>,
+    facet: Facet,
+}
+
+impl Mixed {
+    fn any() -> impl Strategy<Value = Mixed> {
+        let others: Vec<Closed> = Closed::ALL.into_iter().filter(|closed| *closed != Closed::Refines).collect();
+        (Dag::any(), select(others), Probe::edges()).prop_map(|(dag, closed, edges)| {
+            let ends = dag.facets.len().min(ENDS);
+            Mixed { dag, closed, edges: edges.into_iter().filter(|edge| edge.child < ends).collect() }
+        })
+    }
+
+    fn shown(&self) -> Result<Vec<Shown>, Box<dyn Error>> {
+        let Recorded { records, .. } = Recorded::of(SEGMENTED)?;
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(records)?;
+        self.dag.planted(&store)?;
+        let ends = self.closed.ends();
+        let files = (0..self.edges.len())
+            .map(|nth| Proposals::unseen(&store, &nth.to_string()))
+            .collect::<Result<Vec<Unseen>, Box<dyn Error>>>()?;
+        self.edges
+            .iter()
+            .zip(files)
+            .map(|(edge, file)| ends.linked(&store, *edge, file))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        (0..self.dag.facets.len())
+            .map(|node| {
+                let placed = store.read(ShownNode::from(Dag::id(node)))?.ok_or("a planted node is not shown")?;
+                Ok(Shown {
+                    ancestors: Ids::kin(&placed, Kin::Ancestor),
+                    children: Ids::kin(&placed, Kin::Child),
+                    facet: placed.node().entry().facet(),
+                })
+            })
+            .collect()
+    }
+
+    fn wanted(&self) -> Vec<Shown> {
+        self.dag
+            .facets
+            .iter()
+            .enumerate()
+            .map(|(node, facet)| Shown {
+                ancestors: self.dag.ancestors(node),
+                children: self.dag.children(node),
+                facet: *facet,
+            })
+            .collect()
+    }
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS \"kin!: String\", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id",
+  "query": "SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS \"kin!: String\", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id",
   "describe": {
     "columns": [
       {
@@ -77,7 +77,7 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       true,
@@ -89,5 +89,5 @@
       true
     ]
   },
-  "hash": "2a4b964907e7c5ecf51319e33b5de025c203faba67d8f4270fcf472e1302eb67"
+  "hash": "903faed0da8bdaab64fa77322a9612f192f4248efc197adb1f7763c7465e6b0d"
 }

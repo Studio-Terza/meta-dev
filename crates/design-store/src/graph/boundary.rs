@@ -6,7 +6,7 @@ use newtype::Newtype;
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
 
-use crate::acyclic::{Closing, Refines, Refusal, Supersedes};
+use crate::acyclic::{Acyclic, Closing, Refines, Refusal, Supersedes};
 use crate::{Link, Relative};
 
 #[derive(Clone, Debug, Op)]
@@ -219,16 +219,21 @@ impl NodeRow {
 }
 
 impl RelativeRow {
-    pub(crate) fn around(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Relative>, StoreFailure> {
+    pub(crate) fn around<R: Acyclic<End = NodeId>>(
+        id: NodeId,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<Relative>, StoreFailure> {
         let id = id.into_inner();
         let ancestor = Kin::Ancestor.name();
         let child = Kin::Child.name();
+        let relation = R::CLOSED.name();
         let rows = statements.rows(sqlx::query_as!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
             id,
             ancestor,
-            child
+            child,
+            relation
         ))?;
         Ok(rows.into_iter().map(Relative::try_from).collect::<Result<Vec<Relative>, sqlx::Error>>()?)
     }
