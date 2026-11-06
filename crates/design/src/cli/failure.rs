@@ -12,7 +12,7 @@ use transcript_ports::{ReadFailure, Uuid};
 
 use structurer::Misread;
 
-use super::rendering::Id;
+use super::rendering::{Edge, Id};
 use super::request::Unresolved;
 use crate::Outcome;
 
@@ -58,7 +58,7 @@ pub enum Failure {
     Unstated(#[from] Unstated),
     #[error("{} is {stage}, and that command does not start from {stage}; nothing was written", Id::from(*node))]
     Misstaged { node: NodeId, stage: Stage },
-    #[error("{edge} would have a core node depend on a secondary one; nothing was written")]
+    #[error("{} would have a core node depend on a secondary one; nothing was written", Edge::from(*edge))]
     Inverted { edge: NodeEdge },
     #[error("the design store lock was refused: {0}")]
     Busy(#[from] Busy),

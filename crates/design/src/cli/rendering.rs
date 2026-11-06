@@ -1,6 +1,6 @@
 use std::fmt;
 
-use design_model::{AnyNode, AnyStage, Entered, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{AnyNode, AnyStage, Entered, NodeEdge, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
 use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
@@ -9,6 +9,9 @@ use super::request::Applied;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Id(NodeId);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Edge(NodeEdge);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Line<'node>(&'node AnyNode);
@@ -30,6 +33,12 @@ struct Writing<'out, 'formatter>(&'out mut fmt::Formatter<'formatter>);
 impl From<NodeId> for Id {
     fn from(id: NodeId) -> Id {
         Id(id)
+    }
+}
+
+impl From<NodeEdge> for Edge {
+    fn from(edge: NodeEdge) -> Edge {
+        Edge(edge)
     }
 }
 
@@ -60,6 +69,12 @@ impl<'earlier> From<&'earlier Earlier> for Repeat<'earlier> {
 impl fmt::Display for Id {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "n{}", self.0.into_inner())
+    }
+}
+
+impl fmt::Display for Edge {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {} {}", Id(self.0.source()), self.0.relation(), Id(self.0.target()))
     }
 }
 
