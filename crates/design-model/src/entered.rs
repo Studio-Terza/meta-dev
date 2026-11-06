@@ -7,4 +7,6 @@ pub enum Entered {
     Init,
     #[name("apply")]
     Apply,
+    #[name("role")]
+    Role,
 }

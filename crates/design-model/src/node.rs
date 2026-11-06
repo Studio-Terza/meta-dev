@@ -1,6 +1,7 @@
 use crate::lifecycle::{Live, Refinable};
 use crate::{
-    AnyStage, Artifact, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal, Title, Vague,
+    AnyStage, Artifact, Casting, Condition, Dropped, Entry, Misstaged, NodeId, Reason, Refining, Role, Terminal, Title,
+    Vague,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -8,7 +9,7 @@ pub struct Node<S> {
     identity: NodeId,
     entry: Entry,
     title: Option<Title>,
-    role: Role,
+    casting: Casting,
     stage: S,
 }
 
@@ -17,7 +18,8 @@ pub type AnyNode = Node<AnyStage>;
 impl Node<Vague> {
     #[must_use]
     pub fn new(identity: NodeId, entry: Entry) -> Node<Vague> {
-        Node { identity, entry, title: None, role: Role::Core, stage: Vague }
+        let casting = Casting::new(Role::Core, entry.provenance());
+        Node { identity, entry, title: None, casting, stage: Vague }
     }
 }
 
@@ -44,14 +46,14 @@ impl Node<Live> {
 
 impl AnyNode {
     #[must_use]
-    pub fn loaded(identity: NodeId, entry: Entry, role: Role, stage: AnyStage) -> AnyNode {
-        Node { identity, entry, title: None, role, stage }
+    pub fn loaded(identity: NodeId, entry: Entry, casting: Casting, stage: AnyStage) -> AnyNode {
+        Node { identity, entry, title: None, casting, stage }
     }
 
     pub fn narrowed<S: TryFrom<AnyStage, Error = AnyStage>>(self) -> Result<Node<S>, Misstaged> {
-        let Node { identity, entry, title, role, stage } = self;
+        let Node { identity, entry, title, casting, stage } = self;
         S::try_from(stage)
-            .map(|stage| Node { identity, entry, title, role, stage })
+            .map(|stage| Node { identity, entry, title, casting, stage })
             .map_err(|stage| Misstaged::new(identity, stage.stage()))
     }
 }
@@ -59,8 +61,8 @@ impl AnyNode {
 impl<S: Into<AnyStage>> Node<S> {
     #[must_use]
     pub fn any(self) -> AnyNode {
-        let Node { identity, entry, title, role, stage } = self;
-        Node { identity, entry, title, role, stage: stage.into() }
+        let Node { identity, entry, title, casting, stage } = self;
+        Node { identity, entry, title, casting, stage: stage.into() }
     }
 }
 
@@ -87,7 +89,12 @@ impl<S> Node<S> {
 
     #[must_use]
     pub fn role(&self) -> Role {
-        self.role
+        self.casting.role()
+    }
+
+    #[must_use]
+    pub fn casting(&self) -> Casting {
+        self.casting
     }
 
     #[must_use]
@@ -96,7 +103,7 @@ impl<S> Node<S> {
     }
 
     fn staged<T>(self, stage: T) -> Node<T> {
-        let Node { identity, entry, title, role, stage: _ } = self;
-        Node { identity, entry, title, role, stage }
+        let Node { identity, entry, title, casting, stage: _ } = self;
+        Node { identity, entry, title, casting, stage }
     }
 }

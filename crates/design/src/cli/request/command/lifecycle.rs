@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use design_model::{NodeId, Role, Transition};
+use design_model::{Casting, Entered, NodeId, Provenance, Role, Transition};
 use design_store::{Cast, Restaged};
 use store_ports::Store;
 
@@ -81,7 +81,7 @@ impl Recast {
     pub fn written(self, store: &impl Store, out: &mut impl Write) -> Result<Outcome, Failure> {
         let lock = store.lock()?;
         Found::find(store, self.node)?;
-        store.write(Cast::new(self.node, self.role))?;
+        store.write(Cast::new(self.node, Casting::new(self.role, Provenance::from(Entered::Role))))?;
         let shown = Found::find(store, self.node)?;
         lock.end()?;
         Printed::shown(out, &Neighbourhood::from(shown.placed()))?;

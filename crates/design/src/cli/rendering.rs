@@ -111,7 +111,9 @@ impl fmt::Display for Neighbourhood<'_> {
                 Id(link.target()),
                 Entered::from(link.provenance())
             )
-        })
+        })?;
+        let casting = self.0.node().casting();
+        writeln!(formatter, "  role {} entered {}", casting.role(), Entered::from(casting.provenance()))
     }
 }
 

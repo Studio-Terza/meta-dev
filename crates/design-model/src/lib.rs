@@ -1,5 +1,6 @@
 mod artifact;
 mod artifact_kind;
+mod casting;
 mod confidence;
 mod entered;
 mod entry;
@@ -30,6 +31,7 @@ mod transition;
 
 pub use artifact::{Artifact, Unspecified};
 pub use artifact_kind::ArtifactKind;
+pub use casting::Casting;
 pub use confidence::Confidence;
 pub use entered::Entered;
 pub use entry::Entry;

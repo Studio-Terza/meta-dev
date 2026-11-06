@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS \"kin!: String\", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id",
+  "query": "SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS \"kin!: String\", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.role_provenance, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id",
   "describe": {
     "columns": [
       {
@@ -87,8 +87,19 @@
         }
       },
       {
-        "name": "artifact",
+        "name": "role_provenance",
         "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role_provenance"
+          }
+        }
+      },
+      {
+        "name": "artifact",
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -99,7 +110,7 @@
       },
       {
         "name": "condition",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -110,7 +121,7 @@
       },
       {
         "name": "reason",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -132,10 +143,11 @@
       false,
       true,
       false,
+      false,
       true,
       true,
       true
     ]
   },
-  "hash": "3607cc4c9acf122756bd13b1bb3fa7e4c93cc5f6d8012a20b910f16fab5dc749"
+  "hash": "9d2fcca713fe62d800bdf6132935d4f5851688f713b9c25fdfc48052d4dc01af"
 }

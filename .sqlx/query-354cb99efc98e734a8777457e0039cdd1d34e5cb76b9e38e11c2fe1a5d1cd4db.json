@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, project, facet, stage, provenance, title, role, artifact, condition, reason FROM nodes WHERE id = ?1",
+  "query": "SELECT id, project, facet, stage, provenance, title, role, role_provenance, artifact, condition, reason FROM nodes WHERE id = ?1",
   "describe": {
     "columns": [
       {
@@ -81,8 +81,19 @@
         }
       },
       {
-        "name": "artifact",
+        "name": "role_provenance",
         "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role_provenance"
+          }
+        }
+      },
+      {
+        "name": "artifact",
+        "ordinal": 8,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "condition",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "reason",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -125,10 +136,11 @@
       false,
       true,
       false,
+      false,
       true,
       true,
       true
     ]
   },
-  "hash": "c91b3edeea552dba3e4abd73c22c6a67c50c335fa90a89394dd9a718f6a34171"
+  "hash": "354cb99efc98e734a8777457e0039cdd1d34e5cb76b9e38e11c2fe1a5d1cd4db"
 }

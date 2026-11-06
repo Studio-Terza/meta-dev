@@ -827,6 +827,7 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
         "  ancestor n1 demo project vague core entered init",
         "  ancestor n2 demo feature vague core entered apply \"apply\"",
         "  refines n2 entered apply",
+        "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
     assert_eq!(child.matches('\n').count(), wanted.len());
@@ -843,11 +844,18 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     applying.applied("supersede(n2, by(n3))")?;
     let root = "  ancestor n1 demo project vague core entered init";
     let refines = "  refines n1 entered apply";
+    let cast = "  role core entered apply";
     let wanted = [
-        ("n2", vec!["n2 demo feature vague core entered apply \"old\"", root, refines]),
+        ("n2", vec!["n2 demo feature vague core entered apply \"old\"", root, refines, cast]),
         (
             "n3",
-            vec!["n3 demo feature vague core entered apply \"new\"", root, refines, "  supersedes n2 entered apply"],
+            vec![
+                "n3 demo feature vague core entered apply \"new\"",
+                root,
+                refines,
+                "  supersedes n2 entered apply",
+                cast,
+            ],
         ),
     ];
     wanted.iter().try_for_each(|(node, lines)| {
@@ -1375,6 +1383,7 @@ fn show_renders_a_terminal_node_with_its_artifact_and_condition() -> Result<(), 
         "  condition \"every comment is refused\"",
         "  ancestor n1 demo project vague core entered init",
         "  refines n1 entered apply",
+        "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
@@ -1392,6 +1401,7 @@ fn a_dropped_node_stays_resolvable_with_its_reason() -> Result<(), Failure> {
         "  reason \"folded into n1\"",
         "  ancestor n1 demo project vague core entered init",
         "  refines n1 entered apply",
+        "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
     assert_eq!(shown.matches('\n').count(), wanted.len());
@@ -1434,7 +1444,9 @@ fn a_core_node_never_depends_on_a_secondary_one_and_the_refusal_names_the_edge()
     assert_eq!(applying.outcome(&["role", "n2", "secondary"])?, Outcome::Recast(Role::Secondary));
     let parent = applying.run(&["role", "n1", "core"]);
     assert!(matches!(parent, Err(Failure::Inverted { edge: refused }) if refused == edge));
-    assert!(applying.run(&["show", "n1"])?.contains("n1 demo project vague secondary entered init"));
+    let parent = applying.run(&["show", "n1"])?;
+    assert!(parent.contains("n1 demo project vague secondary entered init\n"));
+    assert!(parent.contains("  role secondary entered role\n"));
     Ok(())
 }
 

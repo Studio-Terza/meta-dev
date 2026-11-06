@@ -4,8 +4,8 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::{
-    AnyNode, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance,
-    Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    AnyNode, Casting, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project,
+    Provenance, Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
     AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
@@ -923,7 +923,7 @@ impl Changes {
 impl Change {
     fn written(self, store: &Port<'_, Sqlite>) -> Result<Written, Refusal> {
         match self {
-            Change::Cast(node, role) => store.write(Cast::new(Dag::id(node), role)),
+            Change::Cast(node, role) => store.write(Cast::new(Dag::id(node), Casting::new(role, Entered::Role.into()))),
             Change::Refined(edge) => store.write(Linked::new(
                 Dag::id(edge.child),
                 NodeRelation::Refines,
@@ -996,14 +996,14 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eating = Projects::rooted(&store, "p")?;
     let consumed = Projects::rooted(&store, "q")?;
-    store.write(Cast::new(consumed, Role::Secondary))?;
+    store.write(Cast::new(consumed, Casting::new(Role::Secondary, Entered::Role.into())))?;
     let refused =
         Changes::inverted(store.write(Linked::new(eating, NodeRelation::Consumes, consumed, Entered::Init.into())))?;
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     assert_eq!(store.read(ShownNode::from(eating))?.ok_or("no eating")?.links().len(), 0);
-    store.write(Cast::new(eating, Role::Secondary))?;
+    store.write(Cast::new(eating, Casting::new(Role::Secondary, Entered::Role.into())))?;
     store.write(Linked::new(eating, NodeRelation::Consumes, consumed, Entered::Init.into()))?;
-    let refused = Changes::inverted(store.write(Cast::new(eating, Role::Core)))?;
+    let refused = Changes::inverted(store.write(Cast::new(eating, Casting::new(Role::Core, Entered::Role.into()))))?;
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }

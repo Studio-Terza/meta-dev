@@ -2,8 +2,8 @@ use std::error::Error;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, AnyStage, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance,
-    Reason, Refining, Role, Stage, Staging, Terminal, Title, Vague,
+    AnyNode, AnyStage, Casting, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Project,
+    Provenance, Reason, Refining, Stage, Staging, Terminal, Title, Vague,
 };
 use newtype::{Counter, Newtype};
 use port_core::Op;
@@ -24,7 +24,7 @@ pub struct Restaged(AnyNode);
 #[derive(Clone, Copy, Debug, Op)]
 pub struct Cast {
     node: NodeId,
-    role: Role,
+    casting: Casting,
 }
 
 #[derive(Clone, Copy, Debug, Op)]
@@ -52,6 +52,7 @@ pub(crate) struct NodeRow {
     provenance: String,
     title: Option<String>,
     role: String,
+    role_provenance: String,
     artifact: Option<String>,
     condition: Option<String>,
     reason: Option<String>,
@@ -67,6 +68,7 @@ pub(crate) struct RelativeRow {
     provenance: String,
     title: Option<String>,
     role: String,
+    role_provenance: String,
     artifact: Option<String>,
     condition: Option<String>,
     reason: Option<String>,
@@ -111,8 +113,8 @@ impl From<AnyNode> for Restaged {
 
 impl Cast {
     #[must_use]
-    pub fn new(node: NodeId, role: Role) -> Cast {
-        Cast { node, role }
+    pub fn new(node: NodeId, casting: Casting) -> Cast {
+        Cast { node, casting }
     }
 }
 
@@ -201,8 +203,14 @@ impl Batch for Cast {
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         let id = self.node.into_inner();
-        let role = self.role.name();
-        let written = statements.written(sqlx::query!("UPDATE nodes SET role = ?2 WHERE id = ?1", id, role))?;
+        let role = self.casting.role().name();
+        let provenance = Entered::from(self.casting.provenance()).name();
+        let written = statements.written(sqlx::query!(
+            "UPDATE nodes SET role = ?2, role_provenance = ?3 WHERE id = ?1",
+            id,
+            role,
+            provenance
+        ))?;
         LeaningRow::upheld(self.node, statements).map(|_upheld| written)
     }
 }
@@ -272,7 +280,11 @@ impl TryFrom<NodeRow> for AnyNode {
         );
         let columns =
             StageColumns { stage: row.stage, artifact: row.artifact, condition: row.condition, reason: row.reason };
-        let node = AnyNode::loaded(NodeId::new(row.id), entry, NodeRow::decoded(&row.role)?, columns.try_into()?);
+        let casting = Casting::new(
+            NodeRow::decoded(&row.role)?,
+            Provenance::from(NodeRow::decoded::<Entered>(&row.role_provenance)?),
+        );
+        let node = AnyNode::loaded(NodeId::new(row.id), entry, casting, columns.try_into()?);
         Ok(row.title.map(Title::new).into_iter().fold(node, Node::titled))
     }
 }
@@ -289,6 +301,7 @@ impl TryFrom<RelativeRow> for Relative {
             provenance: row.provenance,
             title: row.title,
             role: row.role,
+            role_provenance: row.role_provenance,
             artifact: row.artifact,
             condition: row.condition,
             reason: row.reason,
@@ -329,7 +342,7 @@ impl NodeRow {
         let id = id.into_inner();
         let rows = statements.rows(sqlx::query_as!(
             NodeRow,
-            "SELECT id, project, facet, stage, provenance, title, role, artifact, condition, reason FROM nodes WHERE id = ?1",
+            "SELECT id, project, facet, stage, provenance, title, role, role_provenance, artifact, condition, reason FROM nodes WHERE id = ?1",
             id
         ))?;
         Ok(rows.into_iter().map(AnyNode::try_from).collect::<Result<Vec<AnyNode>, sqlx::Error>>()?)
@@ -349,15 +362,17 @@ impl NodeRow {
         let provenance = Entered::from(entry.provenance()).name();
         let title = node.title().map(ToString::to_string);
         let role = node.role().name();
+        let cast = Entered::from(node.casting().provenance()).name();
         statements.written(sqlx::query!(
-            "INSERT INTO nodes (id, project, facet, stage, provenance, title, role) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO nodes (id, project, facet, stage, provenance, title, role, role_provenance) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             id,
             project,
             facet,
             stage,
             provenance,
             title,
-            role
+            role,
+            cast
         ))
     }
 }
@@ -373,7 +388,7 @@ impl RelativeRow {
         let relation = R::CLOSED.name();
         let rows = statements.rows(sqlx::query_as!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title, nodes.role, nodes.role_provenance, nodes.artifact, nodes.condition, nodes.reason FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE closure.relation = ?4 AND ((closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1)) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
             id,
             ancestor,
             child,
