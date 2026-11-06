@@ -1,6 +1,6 @@
 use lint_layout::Name;
 
-use crate::trait_path::TraitPath;
+use crate::resolved::Resolved;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
@@ -11,13 +11,13 @@ pub enum Origin {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Implementation {
     subject: Name,
-    implemented: Option<TraitPath>,
+    implemented: Option<Resolved>,
     origin: Origin,
 }
 
 impl Implementation {
     #[must_use]
-    pub fn new(subject: Name, implemented: Option<TraitPath>, origin: Origin) -> Implementation {
+    pub fn new(subject: Name, implemented: Option<Resolved>, origin: Origin) -> Implementation {
         Implementation { subject, implemented, origin }
     }
 
@@ -30,7 +30,7 @@ impl Implementation {
     }
 
     #[must_use]
-    pub fn implemented(&self) -> Option<&TraitPath> {
+    pub fn implemented(&self) -> Option<&Resolved> {
         self.implemented.as_ref()
     }
 

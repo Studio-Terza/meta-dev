@@ -14,6 +14,6 @@ pub struct MandatoryLaws;
 impl Lint for MandatoryLaws {
     fn report(files: &[SourceFile]) -> Report<'_> {
         let coverage = Coverage::read_all(files);
-        Report::new(Headline::new("conversions and orders have laws"), Facts::read_all(files).unmet(&coverage))
+        Report::new(Headline::new("conversions have roundtrip laws"), Facts::read_all(files).unmet(&coverage))
     }
 }

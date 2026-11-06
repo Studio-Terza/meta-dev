@@ -33,7 +33,7 @@ impl HandImpls {
 
     fn flagged<'model>(found: Placed<'model, &'model Implementation>) -> Option<Violation<'model>> {
         let implementation = found.entity().written()?;
-        let derivable = implementation.implemented()?.last()?.matches::<Whole>(&Self::DERIVABLE)?;
+        let derivable = implementation.implemented()?.std()?.last()?.matches::<Whole>(&Self::DERIVABLE)?;
         Some(Violation::new(found.site(), Finding::new(derivable, implementation.subject())))
     }
 }

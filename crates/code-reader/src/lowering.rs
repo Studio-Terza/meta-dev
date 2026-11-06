@@ -1,37 +1,39 @@
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{Attribute, File, ItemEnum, ItemImpl, ItemMacro, ItemStruct, ItemUnion, Path, Token};
+use syn::{
+    Attribute, Block, File, Item, ItemEnum, ItemImpl, ItemMacro, ItemMod, ItemStruct, ItemUnion, Path, Stmt, Token,
+};
 
-use code_model::{Found, Implementation, Origin, TraitPath};
+use code_model::{Found, Implementation, Origin};
 use lint_core::SourceFile;
 use lint_layout::{LineNumber, Name};
 
 mod macro_impls;
-mod renames;
+mod scopes;
 
 use macro_impls::MacroImpls;
-use renames::Renames;
+use scopes::{Reach, Scopes};
 
-#[derive(Debug, Default)]
-pub(crate) struct Lowering<'ast> {
+#[derive(Debug)]
+pub(crate) struct Lowering {
     found: Vec<Found<Implementation>>,
-    renames: Renames<'ast>,
+    scopes: Scopes,
 }
 
-impl<'ast> Lowering<'ast> {
+impl Lowering {
     const DERIVE: &'static str = "derive";
 
-    pub(crate) fn lowered(file: &'ast SourceFile) -> Vec<Found<Implementation>> {
+    pub(crate) fn lowered(file: &SourceFile) -> Vec<Found<Implementation>> {
         let syntax: &File = file.syntax();
-        let mut lowering = Lowering { found: Vec::new(), renames: Renames::in_file(syntax) };
+        let mut lowering = Lowering { found: Vec::new(), scopes: Scopes::new(&syntax.items) };
         lowering.visit_file(syntax);
         lowering.found
     }
 
-    fn trait_path(&self, path: &Path) -> TraitPath {
-        match path.get_ident() {
-            Some(ident) => TraitPath::from_iter([self.renames.resolved(ident)]),
-            None => path.segments.iter().map(|segment| Name::from(&segment.ident)).collect(),
+    fn declared(statement: &Stmt) -> Option<&Item> {
+        match statement {
+            Stmt::Item(item) => Some(item),
+            _ => None,
         }
     }
 
@@ -44,7 +46,7 @@ impl<'ast> Lowering<'ast> {
             .map(|path| {
                 Found::new(
                     LineNumber::from(path.segments.first().map_or(subject.span(), |first| first.ident.span())),
-                    Implementation::new(Name::from(subject), Some(self.trait_path(&path)), Origin::Derived),
+                    Implementation::new(Name::from(subject), Some(self.scopes.resolved(&path)), Origin::Derived),
                 )
             })
             .collect();
@@ -52,17 +54,29 @@ impl<'ast> Lowering<'ast> {
     }
 }
 
-impl<'ast> Visit<'ast> for Lowering<'ast> {
+impl<'ast> Visit<'ast> for Lowering {
+    fn visit_item_mod(&mut self, item: &'ast ItemMod) {
+        self.scopes.enter(Reach::Module, item.content.iter().flat_map(|(_, items)| items));
+        visit::visit_item_mod(self, item);
+        self.scopes.leave();
+    }
+
+    fn visit_block(&mut self, block: &'ast Block) {
+        self.scopes.enter(Reach::Block, block.stmts.iter().filter_map(Self::declared));
+        visit::visit_block(self, block);
+        self.scopes.leave();
+    }
+
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
         let subject = Name::of_type(&block.self_ty).unwrap_or_default();
-        let implemented = block.trait_.as_ref().map(|(_, path, _)| self.trait_path(path));
+        let implemented = block.trait_.as_ref().map(|(_, path, _)| self.scopes.resolved(path));
         let line = LineNumber::from(block.impl_token.span);
         self.found.push(Found::new(line, Implementation::new(subject, implemented, Origin::Written)));
         visit::visit_item_impl(self, block);
     }
 
     fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
-        self.found.extend(MacroImpls::in_macro(&item.mac));
+        self.found.extend(MacroImpls::in_macro(&item.mac, &self.scopes));
         visit::visit_item_macro(self, item);
     }
 

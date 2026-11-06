@@ -17,7 +17,16 @@ const MACRO_OUTSIDE: &str = "macro_rules! make {\n    ($t:ty) => {\n        impl
 const QUALIFIED: &str =
     "use std::clone::Clone as Dup;\nmod a {\n    pub trait Dup {}\n}\nstruct R;\nimpl a::Dup for R {}\n";
 
-const CASES: [Case; 11] = [
+const OWN_TRAIT: &str = "mod digest {\n    pub trait Hash {\n        fn digest(&self) -> u64;\n    }\n}\nuse digest::Hash;\nstruct Block;\nimpl Hash for Block {\n    fn digest(&self) -> u64 { 0 }\n}\n";
+const DECLARED_HERE: &str = "trait Hash {}\nstruct Block;\nimpl Hash for Block {}\n";
+const SCOPED_RENAME: &str = "mod a {\n    use std::clone::Clone as Dup;\n}\nmod b {\n    pub trait Dup {}\n    pub struct R;\n    impl Dup for R {}\n}\n";
+const CORE_IMPORT: &str = "use core::fmt::Debug;\nstruct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { Ok(()) }\n}\n";
+const FULL_PATH: &str =
+    "struct R;\nimpl std::hash::Hash for R {\n    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}\n}\n";
+const OTHER_CRATE: &str = "struct R;\nimpl other_crate::Clone for R {\n    fn clone(&self) -> R { R }\n}\n";
+const BLOCK_IMPORT: &str = "struct R;\nfn f() {\n    use std::clone::Clone as Dup;\n    impl Dup for R {\n        fn clone(&self) -> R { R }\n    }\n}\n";
+
+const CASES: [Case; 18] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -68,6 +77,41 @@ const CASES: [Case; 11] = [
         Title::new("a qualified path to a different trait sharing a rename"),
         &[Source::new(Located::new("a.rs"), Text::new(QUALIFIED))],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an own trait sharing a derivable name"),
+        &[Source::new(Located::new("a.rs"), Text::new(OWN_TRAIT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an own trait declared in the same scope"),
+        &[Source::new(Located::new("a.rs"), Text::new(DECLARED_HERE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a rename in a sibling module"),
+        &[Source::new(Located::new("a.rs"), Text::new(SCOPED_RENAME))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a trait imported from core"),
+        &[Source::new(Located::new("a.rs"), Text::new(CORE_IMPORT))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a full std path"),
+        &[Source::new(Located::new("a.rs"), Text::new(FULL_PATH))],
+        Flagged::new(&["a.rs:2"]),
+    ),
+    Case::new(
+        Title::new("a derivable name in another crate"),
+        &[Source::new(Located::new("a.rs"), Text::new(OTHER_CRATE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a rename inside a function body"),
+        &[Source::new(Located::new("a.rs"), Text::new(BLOCK_IMPORT))],
+        Flagged::new(&["a.rs:4"]),
     ),
 ];
 

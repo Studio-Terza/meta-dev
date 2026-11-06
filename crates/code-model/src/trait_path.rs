@@ -11,6 +11,12 @@ impl FromIterator<Name> for TraitPath {
     }
 }
 
+impl AsRef<[Name]> for TraitPath {
+    fn as_ref(&self) -> &[Name] {
+        &self.segments
+    }
+}
+
 impl TraitPath {
     #[must_use]
     pub fn last(&self) -> Option<&Name> {

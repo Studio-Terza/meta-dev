@@ -7,6 +7,7 @@ use syn::parse::ParseStream;
 use code_model::{Found, Implementation, Origin, TraitPath};
 use lint_layout::{LineNumber, Name};
 
+use super::scopes::Scopes;
 use lexeme::{Lexeme, Mark};
 
 #[derive(Debug)]
@@ -20,28 +21,29 @@ impl MacroImpls {
     const OPEN: char = '<';
     const CLOSE: char = '>';
 
-    pub(super) fn in_macro(found: &Macro) -> Vec<Found<Implementation>> {
+    pub(super) fn in_macro(found: &Macro, scopes: &Scopes) -> Vec<Found<Implementation>> {
         Some(found)
             .filter(|found| found.path.is_ident(Self::MACRO_RULES))
             .and_then(|found| found.parse_body_with(|input: ParseStream<'_>| input.parse::<TokenStream>()).ok())
-            .map(|body| Self::written(&body.into_iter().map(Lexeme::from).collect::<Vec<Lexeme>>()))
+            .map(|body| Self::written(&body.into_iter().map(Lexeme::from).collect::<Vec<Lexeme>>(), scopes))
             .unwrap_or_default()
     }
 
-    fn written(lexemes: &[Lexeme]) -> Vec<Found<Implementation>> {
+    fn written(lexemes: &[Lexeme], scopes: &Scopes) -> Vec<Found<Implementation>> {
         lexemes
             .iter()
             .enumerate()
-            .flat_map(|(at, lexeme)| lexeme.found(lexemes.get(at + 1..).unwrap_or_default()))
+            .flat_map(|(at, lexeme)| lexeme.found(lexemes.get(at + 1..).unwrap_or_default(), scopes))
             .collect()
     }
 
-    fn header(rest: &[Lexeme], keyword: &Ident) -> Option<Found<Implementation>> {
+    fn header(rest: &[Lexeme], keyword: &Ident, scopes: &Scopes) -> Option<Found<Implementation>> {
         let end = rest.iter().position(|lexeme| lexeme.delimiter() == Some(Delimiter::Brace)).unwrap_or(rest.len());
         let header = rest.get(..end)?;
         let at = header.iter().position(|lexeme| lexeme.word().is_some_and(|ident| *ident == Self::FOR))?;
         let subject = Self::subject(header.get(at + 1..)?);
-        let implementation = Implementation::new(subject, Some(Self::path(header.get(..at)?)), Origin::Written);
+        let implementation =
+            Implementation::new(subject, Some(scopes.scoped(&Self::path(header.get(..at)?))), Origin::Written);
         Some(Found::new(LineNumber::from(keyword.span()), implementation))
     }
 

@@ -2,6 +2,7 @@ use proc_macro2::{Delimiter, Ident, Punct, TokenTree};
 
 use code_model::{Found, Implementation};
 
+use super::super::scopes::Scopes;
 use super::MacroImpls;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,14 +72,14 @@ impl Lexeme {
         }
     }
 
-    pub(super) fn found(&self, rest: &[Lexeme]) -> Vec<Found<Implementation>> {
+    pub(super) fn found(&self, rest: &[Lexeme], scopes: &Scopes) -> Vec<Found<Implementation>> {
         match self {
             Lexeme::Word(ident) => Some(ident)
                 .filter(|ident| **ident == MacroImpls::IMPL)
-                .and_then(|ident| MacroImpls::header(rest, ident))
+                .and_then(|ident| MacroImpls::header(rest, ident, scopes))
                 .into_iter()
                 .collect(),
-            Lexeme::Group { children, .. } => MacroImpls::written(children),
+            Lexeme::Group { children, .. } => MacroImpls::written(children, scopes),
             Lexeme::Punctuation(_) | Lexeme::Other => Vec::new(),
         }
     }
