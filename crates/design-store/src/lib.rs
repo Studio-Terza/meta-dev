@@ -19,10 +19,10 @@ mod stored;
 mod stream_schema;
 mod superseded_by;
 
-pub use annotation::Annotation;
+pub use annotation::{Annotation, Remarking};
 pub use boundary::Hit;
 pub use cursors::Cursors;
-pub use directions::{Directed, Directing, Directions};
+pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
 pub use graph::{Linked, NewNode};
 use link::Link;

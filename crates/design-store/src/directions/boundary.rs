@@ -6,7 +6,8 @@ use newtype::{Counter, Newtype};
 use store_ports::{Batch, Statements, StoreFailure, Written};
 use transcript_ports::Uuid;
 
-use super::{Directed, Directing, Directions};
+use super::Directions;
+use crate::annotation::Remark;
 use crate::graph::NodeRow;
 use crate::{Annotation, Linked};
 
@@ -76,9 +77,9 @@ impl TryFrom<PlacedRow> for Annotation {
 
     fn try_from(row: PlacedRow) -> Result<Annotation, sqlx::Error> {
         let segment = Columns { message: row.message, ordinal: row.ordinal }.segment()?;
-        let directed =
-            Directed::Placed { segment, node: NodeId::new(row.node), relation: NodeRow::decoded(&row.relation)? };
-        Ok(Annotation::new(directed, Columns::provenance(&row.provenance)?, Standing::Current))
+        let remark =
+            Remark::Placed { segment, node: NodeId::new(row.node), relation: NodeRow::decoded(&row.relation)? };
+        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, Standing::Current))
     }
 }
 
@@ -93,8 +94,8 @@ impl TryFrom<SensedRow> for Annotation {
             NodeRow::decoded(&row.confidence)?,
             NodeRow::decoded(&row.explicitness)?,
         );
-        let directed = Directed::Sensed { segment, sense };
-        Ok(Annotation::new(directed, Columns::provenance(&row.provenance)?, NodeRow::decoded(&row.standing)?))
+        let remark = Remark::Sensed { segment, sense };
+        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, NodeRow::decoded(&row.standing)?))
     }
 }
 
@@ -104,8 +105,8 @@ impl TryFrom<RelatedRow> for Annotation {
     fn try_from(row: RelatedRow) -> Result<Annotation, sqlx::Error> {
         let source = Columns { message: row.source_message, ordinal: row.source_ordinal }.segment()?;
         let target = Columns { message: row.target_message, ordinal: row.target_ordinal }.segment()?;
-        let directed = Directed::Related { source, target, relation: NodeRow::decoded(&row.relation)? };
-        Ok(Annotation::new(directed, Columns::provenance(&row.provenance)?, Standing::Current))
+        let remark = Remark::Related { source, target, relation: NodeRow::decoded(&row.relation)? };
+        Ok(Annotation::new(remark, Columns::provenance(&row.provenance)?, Standing::Current))
     }
 }
 
@@ -115,7 +116,7 @@ impl TryFrom<ConversationalRow> for Annotation {
     fn try_from(row: ConversationalRow) -> Result<Annotation, sqlx::Error> {
         let segment = Columns { message: row.message, ordinal: row.ordinal }.segment()?;
         Ok(Annotation::new(
-            Directed::Conversational { segment },
+            Remark::Conversational { segment },
             Columns::provenance(&row.provenance)?,
             Standing::Current,
         ))
@@ -174,7 +175,7 @@ impl Batch for Directions {
         let written = self
             .directed
             .iter()
-            .map(|directed| directed.visited(&mut annotating))
+            .map(|directed| directed.written(&mut annotating))
             .collect::<Result<Vec<Written>, StoreFailure>>()?;
         Ok(Written::total(written.into_iter()))
     }
@@ -184,12 +185,13 @@ impl Annotating<'_, '_> {
     fn provenance(&self) -> &'static str {
         Entered::from(self.provenance).name()
     }
-}
 
-impl Directing for &mut Annotating<'_, '_> {
-    type Output = Result<Written, StoreFailure>;
-
-    fn placed(self, segment: &Segment, node: NodeId, relation: SpanRelation) -> Result<Written, StoreFailure> {
+    pub(super) fn placed(
+        &mut self,
+        segment: &Segment,
+        node: NodeId,
+        relation: SpanRelation,
+    ) -> Result<Written, StoreFailure> {
         let Columns { message, ordinal } = Columns::from(segment);
         let node = node.into_inner();
         let relation = relation.name();
@@ -204,7 +206,7 @@ impl Directing for &mut Annotating<'_, '_> {
         ))
     }
 
-    fn sensed(self, segment: &Segment, sense: Sense) -> Result<Written, StoreFailure> {
+    pub(super) fn sensed(&mut self, segment: &Segment, sense: Sense) -> Result<Written, StoreFailure> {
         let Columns { message, ordinal } = Columns::from(segment);
         let kind = sense.kind().name();
         let specificity = sense.specificity().name();
@@ -223,7 +225,12 @@ impl Directing for &mut Annotating<'_, '_> {
         ))
     }
 
-    fn related(self, source: &Segment, target: &Segment, relation: SegmentRelation) -> Result<Written, StoreFailure> {
+    pub(super) fn related(
+        &mut self,
+        source: &Segment,
+        target: &Segment,
+        relation: SegmentRelation,
+    ) -> Result<Written, StoreFailure> {
         let source = Columns::from(source);
         let target = Columns::from(target);
         let relation = relation.name();
@@ -239,19 +246,19 @@ impl Directing for &mut Annotating<'_, '_> {
         ))
     }
 
-    fn proposed(self, node: &Node, parent: NodeId) -> Result<Written, StoreFailure> {
+    pub(super) fn proposed(&mut self, node: &Node, parent: NodeId) -> Result<Written, StoreFailure> {
         let planted = NodeRow::proposed(node, self.statements)?;
         let linked =
             Linked::new(node.identity(), NodeRelation::Refines, parent, self.provenance).written(self.statements)?;
         Ok(planted.plus(linked))
     }
 
-    fn superseded(self, supersession: Supersession) -> Result<Written, StoreFailure> {
+    pub(super) fn superseded(&mut self, supersession: Supersession) -> Result<Written, StoreFailure> {
         let [old, by] = supersession.ends();
         Linked::new(by, NodeRelation::Supersedes, old, self.provenance).written(self.statements)
     }
 
-    fn conversational(self, segment: &Segment) -> Result<Written, StoreFailure> {
+    pub(super) fn conversational(&mut self, segment: &Segment) -> Result<Written, StoreFailure> {
         let Columns { message, ordinal } = Columns::from(segment);
         let provenance = self.provenance();
         self.statements.written(sqlx::query!(

@@ -1,7 +1,7 @@
 use std::fmt;
 
-use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation, Supersession};
-use design_store::{Annotation, Directing, Placed};
+use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_store::{Annotation, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
 
@@ -88,12 +88,12 @@ impl fmt::Display for Neighbourhood<'_> {
 
 impl fmt::Display for Annotated<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.directed().visited(Writing(&mut *formatter))?;
+        self.0.remark().visited(Writing(&mut *formatter))?;
         write!(formatter, " {} entered {}", self.0.standing(), Entered::from(self.0.provenance()))
     }
 }
 
-impl Directing for Writing<'_, '_> {
+impl Remarking for Writing<'_, '_> {
     type Output = fmt::Result;
 
     fn placed(self, segment: &Segment, node: NodeId, relation: SpanRelation) -> fmt::Result {
@@ -114,15 +114,6 @@ impl Directing for Writing<'_, '_> {
 
     fn related(self, source: &Segment, target: &Segment, relation: SegmentRelation) -> fmt::Result {
         write!(self.0, "link {} {relation} {}", SegmentRef::from(source), SegmentRef::from(target))
-    }
-
-    fn proposed(self, node: &Node, parent: NodeId) -> fmt::Result {
-        write!(self.0, "propose {} refines {}", Id(node.identity()), Id(parent))
-    }
-
-    fn superseded(self, supersession: Supersession) -> fmt::Result {
-        let [old, by] = supersession.ends();
-        write!(self.0, "supersede {} by {}", Id(old), Id(by))
     }
 
     fn conversational(self, segment: &Segment) -> fmt::Result {
