@@ -11,11 +11,12 @@ use std::str::FromStr;
 use console_ports::Environment;
 use design_store::Scope;
 use file_ports::Files;
+use grammar::flag::Flags;
 use store_ports::Sqlite;
 
 use super::failure::Failure;
-use command::Command;
 pub use command::{Applied, Unresolved};
+use command::{Command, Verb};
 pub use ground::Ground;
 use persistence::Persistence;
 use projects::Located;
@@ -30,6 +31,7 @@ pub struct Request {
 
 #[derive(Debug, Default)]
 struct Words {
+    verb: Option<Verb>,
     spoken: Vec<Token>,
     workspace: Option<PathBuf>,
     scope: Scope,
@@ -46,14 +48,11 @@ enum Expecting {
 
 #[derive(Debug)]
 enum Argument {
-    Workspace,
-    DryRun,
-    All,
-    Valued(Valued),
+    Flag(Flag),
     Plain(OsString),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Flag {
     Workspace,
     DryRun,
@@ -79,67 +78,84 @@ impl Flag {
         ("--condition", Flag::Valued(Valued::Condition)),
         ("--reason", Flag::Valued(Valued::Reason)),
     ];
-}
 
-impl From<OsString> for Argument {
-    fn from(argument: OsString) -> Argument {
-        match argument.to_str().and_then(|word| word.parse::<Flag>().ok()) {
-            Some(Flag::Workspace) => Argument::Workspace,
-            Some(Flag::DryRun) => Argument::DryRun,
-            Some(Flag::All) => Argument::All,
-            Some(Flag::Valued(valued)) => Argument::Valued(valued),
-            None => Argument::Plain(argument),
-        }
+    fn owned(self, verb: Option<Verb>) -> Result<Flag, Failure> {
+        [Flag::Workspace]
+            .iter()
+            .chain(verb.map_or(&[][..], Verb::options))
+            .find(|owned| **owned == self)
+            .copied()
+            .ok_or(Failure::Usage)
     }
-}
 
-impl Argument {
-    fn expectation(&self) -> Expecting {
+    fn expectation(self) -> Expecting {
         match self {
-            Argument::Workspace => Expecting::Path,
-            Argument::Valued(valued) => Expecting::Value(*valued),
-            Argument::DryRun | Argument::All | Argument::Plain(_) => Expecting::Word,
+            Flag::Workspace => Expecting::Path,
+            Flag::Valued(valued) => Expecting::Value(valued),
+            Flag::DryRun | Flag::All => Expecting::Word,
         }
     }
 
-    fn scope(&self, current: Scope) -> Scope {
+    fn scope(self, current: Scope) -> Scope {
         match self {
-            Argument::All => Scope::Everyone,
-            Argument::Workspace | Argument::DryRun | Argument::Valued(_) | Argument::Plain(_) => current,
+            Flag::All => Scope::Everyone,
+            Flag::Workspace | Flag::DryRun | Flag::Valued(_) => current,
         }
     }
 
     fn token(self) -> Option<Token> {
         match self {
-            Argument::Workspace | Argument::All | Argument::Valued(_) => None,
-            Argument::DryRun => Some(Token::Persisted(Persistence::DryRun)),
-            Argument::Plain(word) => Some(Token::Word(word)),
+            Flag::Workspace | Flag::All | Flag::Valued(_) => None,
+            Flag::DryRun => Some(Token::Persisted(Persistence::DryRun)),
+        }
+    }
+}
+
+impl TryFrom<OsString> for Argument {
+    type Error = Failure;
+
+    fn try_from(argument: OsString) -> Result<Argument, Failure> {
+        match argument.to_str().and_then(Flags::spelled) {
+            Some(flag) => flag.parse().map(Argument::Flag),
+            None => Ok(Argument::Plain(argument)),
         }
     }
 }
 
 impl Words {
-    fn taking(self, argument: OsString) -> Words {
+    fn taking(self, argument: OsString) -> Result<Words, Failure> {
         match self.expecting {
-            Expecting::Path => self.placed(PathBuf::from(argument)),
-            Expecting::Value(valued) => Words {
+            Expecting::Path => {
+                Ok(Words { workspace: Some(PathBuf::from(argument)), expecting: Expecting::Word, ..self })
+            }
+            Expecting::Value(valued) => Ok(Words {
                 spoken: self.spoken.into_iter().chain([Token::Valued(valued, argument)]).collect(),
                 expecting: Expecting::Word,
                 ..self
-            },
-            Expecting::Word => self.worded(Argument::from(argument)),
+            }),
+            Expecting::Word => Argument::try_from(argument).and_then(|argument| self.worded(argument)),
         }
     }
 
-    fn placed(self, path: PathBuf) -> Words {
-        Words { workspace: Some(path), expecting: Expecting::Word, ..self }
+    fn worded(self, argument: Argument) -> Result<Words, Failure> {
+        match argument {
+            Argument::Flag(flag) => flag.owned(self.verb).map(|flag| self.flagged(flag)),
+            Argument::Plain(word) => self.said(Token::Word(word)),
+        }
     }
 
-    fn worded(self, argument: Argument) -> Words {
+    fn said(self, word: Token) -> Result<Words, Failure> {
+        match self.verb {
+            None => word.text().ok_or(Failure::Usage)?.parse().map(|verb| Words { verb: Some(verb), ..self }),
+            Some(_) => Ok(Words { spoken: self.spoken.into_iter().chain([word]).collect(), ..self }),
+        }
+    }
+
+    fn flagged(self, flag: Flag) -> Words {
         Words {
-            expecting: argument.expectation(),
-            scope: argument.scope(self.scope),
-            spoken: self.spoken.into_iter().chain(argument.token()).collect(),
+            expecting: flag.expectation(),
+            scope: flag.scope(self.scope),
+            spoken: self.spoken.into_iter().chain(flag.token()).collect(),
             ..self
         }
     }
@@ -151,15 +167,18 @@ impl TryFrom<Words> for Request {
     fn try_from(words: Words) -> Result<Request, Failure> {
         match words.expecting {
             Expecting::Path | Expecting::Value(_) => Err(Failure::Usage),
-            Expecting::Word => Command::spoken(&words.spoken, words.scope)
+            Expecting::Word => words
+                .verb
+                .ok_or(Failure::Usage)
+                .and_then(|verb| verb.command(&words.spoken, words.scope))
                 .map(|command| Request { command, workspace: words.workspace }),
         }
     }
 }
 
 impl Request {
-    pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
-        Request::try_from(arguments.fold(Words::default(), Words::taking))
+    pub fn parsed(mut arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+        arguments.try_fold(Words::default(), Words::taking).and_then(Request::try_from)
     }
 
     pub fn located(&self, environment: &impl Environment, files: &impl Files) -> Result<Located, Failure> {

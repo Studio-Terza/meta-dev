@@ -1,4 +1,5 @@
 use grammar::artifact::Artifacts;
+use grammar::flag::Flags;
 use grammar::ident::Words;
 use grammar::line::Unbroken;
 use grammar::message::{Depth, Lexemes, Mark, Number};
@@ -146,5 +147,29 @@ laws::table!(
         "a\nb" => None,
         "a\r\n" => None,
         "\na" => None,
+        "\u{b}" => None,
+        "\u{c}" => None,
+        "\u{a0}" => None,
+        "\u{2028}" => None,
+        "\u{85}" => None,
+        "\u{3000}\t" => None,
+        "\u{a0}x" => Some("\u{a0}x".to_owned()),
+        "x\u{b}y" => Some("x\u{b}y".to_owned()),
+    ]
+);
+
+laws::table!(
+    a_word_led_by_two_dashes_is_spelled_as_a_flag,
+    |text: &&str| Flags::spelled(text).map(str::to_owned),
+    [
+        "--reason" => Some("--reason".to_owned()),
+        "--" => Some("--".to_owned()),
+        "---x" => Some("---x".to_owned()),
+        "--no such" => Some("--no such".to_owned()),
+        "-r" => None,
+        "demo" => None,
+        "a--b" => None,
+        " --reason" => None,
+        "" => None,
     ]
 );

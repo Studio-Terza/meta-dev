@@ -16,7 +16,7 @@ use grammar::search::Terms;
 use store_ports::{Sqlite, Store};
 
 use super::persistence::Persistence;
-use super::{Ground, Token};
+use super::{Flag, Ground, Token, Valued};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 pub use apply::{Application, Applied, Unresolved};
@@ -39,7 +39,7 @@ pub enum Command {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Verb {
+pub enum Verb {
     Ingest,
     Show,
     Search,
@@ -71,7 +71,18 @@ impl Verb {
         ("role", Verb::Role),
     ];
 
-    fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
+    pub fn options(self) -> &'static [Flag] {
+        match self {
+            Verb::Ingest => &[Flag::DryRun],
+            Verb::Search => &[Flag::All],
+            Verb::Init => &[Flag::Valued(Valued::Consumes)],
+            Verb::Move(Moving::Specify) => &[Flag::Valued(Valued::Artifact), Flag::Valued(Valued::Condition)],
+            Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
+            Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role => &[],
+        }
+    }
+
+    pub fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
         match self {
             Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
             Verb::Show => Token::only(rest).and_then(Subject::try_from).map(Command::Show),
@@ -91,15 +102,6 @@ impl Verb {
 }
 
 impl Command {
-    pub fn spoken(words: &[Token], scope: Scope) -> Result<Command, Failure> {
-        words
-            .first()
-            .and_then(Token::text)
-            .ok_or(Failure::Usage)
-            .and_then(str::parse::<Verb>)
-            .and_then(|verb| verb.command(words.get(1..).unwrap_or_default(), scope))
-    }
-
     pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opened),

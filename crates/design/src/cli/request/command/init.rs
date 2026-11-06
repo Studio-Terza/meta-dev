@@ -1,9 +1,9 @@
 use std::fmt;
 
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Project, Provenance};
-use design_store::{Linked, NewNode, ProjectRoot};
+use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance, Role, Vague};
+use design_store::{Linked, NextNode, Planting, ProjectRoot, Refusal, ShownNode};
 use file_ports::Files;
-use store_ports::{Store, Written};
+use store_ports::Store;
 
 use crate::cli::failure::Failure;
 use crate::cli::rendering::Id;
@@ -21,10 +21,23 @@ pub struct Initialised {
     consumed: Option<Rooted>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Rooted {
     project: Project,
     root: NodeId,
+    role: Role,
+}
+
+#[derive(Debug)]
+enum Root {
+    Found(Rooted),
+    Sown(Node<Vague>),
+}
+
+#[derive(Debug)]
+struct Plan {
+    initialised: Initialised,
+    planting: Planting,
 }
 
 impl TryFrom<&[Token]> for Init {
@@ -50,31 +63,65 @@ impl Init {
     pub fn planted<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Initialised, Failure> {
         let store = ground.store();
         let lock = store.lock()?;
-        let consumed = self.consumes.map(|project| Rooted::found(store, project)).transpose()?;
-        ground.configured(self.project.clone())?;
-        let found = store.read(ProjectRoot::from(self.project.clone()))?;
-        let root = found.map_or_else(|| Self::sown(store, &self.project), Ok)?;
-        consumed
-            .iter()
-            .map(|consumed| {
-                store.write(Linked::new(root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init)))
-            })
-            .collect::<Result<Vec<Written>, _>>()?;
+        let plan = self.plan(store)?;
+        store.write(plan.planting)?;
+        ground.configured(plan.initialised.root.project.clone())?;
         lock.end()?;
-        Ok(Initialised { root: Rooted { project: self.project, root }, consumed })
+        Ok(plan.initialised)
     }
 
-    fn sown(store: &impl Store, project: &Project) -> Result<NodeId, Failure> {
-        let entry = Entry::new(project.clone(), Facet::Project, Provenance::from(Entered::Init));
-        store.write(NewNode::from(entry))?;
-        store.read(ProjectRoot::from(project.clone()))?.ok_or_else(|| Failure::Unrooted(project.clone()))
+    fn plan(self, store: &impl Store) -> Result<Plan, Failure> {
+        let consumed = self.consumes.map(|project| Rooted::found(store, project)).transpose()?;
+        let sown = Root::resolved(store, self.project)?;
+        let root = sown.rooted();
+        let linked = consumed.iter().map(|consumed| root.consuming(consumed)).next().transpose()?;
+        Ok(Plan { planting: Planting::new(sown.sown(), linked), initialised: Initialised { root, consumed } })
+    }
+}
+
+impl Root {
+    fn resolved(store: &impl Store, project: Project) -> Result<Root, Failure> {
+        match store.read(ProjectRoot::from(project.clone()))? {
+            Some(root) => Rooted::placed(store, project, root).map(Root::Found),
+            None => Ok(Root::Sown(Node::new(
+                store.read(NextNode)?,
+                Entry::new(project, Facet::Project, Provenance::from(Entered::Init)),
+            ))),
+        }
+    }
+
+    fn rooted(&self) -> Rooted {
+        match self {
+            Root::Found(rooted) => rooted.clone(),
+            Root::Sown(node) => {
+                Rooted { project: node.entry().project().clone(), root: node.identity(), role: node.role() }
+            }
+        }
+    }
+
+    fn sown(self) -> Option<Node<Vague>> {
+        match self {
+            Root::Found(_) => None,
+            Root::Sown(node) => Some(node),
+        }
     }
 }
 
 impl Rooted {
     fn found(store: &impl Store, project: Project) -> Result<Rooted, Failure> {
         let root = store.read(ProjectRoot::from(project.clone()))?;
-        root.map(|root| Rooted { project: project.clone(), root }).ok_or(Failure::Unrooted(project))
+        root.ok_or_else(|| Failure::Unrooted(project.clone())).and_then(|root| Rooted::placed(store, project, root))
+    }
+
+    fn placed(store: &impl Store, project: Project, root: NodeId) -> Result<Rooted, Failure> {
+        let placed = store.read(ShownNode::from(root))?.ok_or(Failure::Unplaced(root))?;
+        Ok(Rooted { project, root, role: placed.node().role() })
+    }
+
+    fn consuming(&self, consumed: &Rooted) -> Result<Linked, Failure> {
+        let edge = NodeEdge::new(self.root, NodeRelation::Consumes, consumed.root);
+        edge.upheld(self.role, consumed.role).map_err(Refusal::from)?;
+        Ok(Linked::new(self.root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init)))
     }
 }
 

@@ -6,8 +6,8 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
-use design_model::{Entered, Entry, Facet, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, NewNode, ShownMessage, Stored, StreamSchema};
+use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
+use design_store::{AppliedId, Linked, Planting, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -899,7 +899,7 @@ fn a_supersession_across_project_roots_is_refused_naming_both_nodes_and_nothing_
     let applying = Applying::ready()?;
     let run = Run::root();
     let entry = Entry::new("other".parse()?, Facet::Project, Entered::Init.into());
-    run.port(applying.store.clone()).write(NewNode::from(entry))?;
+    run.port(applying.store.clone()).write(Planting::new(Some(Node::new(NodeId::new(2), entry)), None))?;
     assert!(matches!(applying.refused("supersede(n1, by(n2))"), Some(Failure::Unresolved(Unresolved::Straddling(_)))));
     assert!(matches!(applying.run(&["show", "n3"]), Err(Failure::Unplaced(_))));
     assert_eq!(applying.run(&["show", "n2"])?.matches("supersedes").count(), 0);
@@ -1205,7 +1205,7 @@ impl Graph {
             .zip(parents)
             .map(|(child, parent)| {
                 let entry = Entry::new("demo".parse()?, facet, Entered::Init.into());
-                let planted = port.write(NewNode::from(entry))?;
+                let planted = port.write(Planting::new(Some(Node::new(NodeId::new(child), entry)), None))?;
                 let linked = port.write(Linked::new(
                     NodeId::new(child),
                     NodeRelation::Refines,
@@ -1447,3 +1447,220 @@ fn a_proposal_is_core_even_under_a_secondary_parent() -> Result<(), Failure> {
     assert_eq!(applying.outcome(&["role", "n1", "core"])?, Outcome::Recast(Role::Core));
     Ok(())
 }
+
+struct Workspace {
+    store: Sqlite,
+    files: Memory,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Unplanted {
+    Inverted,
+    Unrooted,
+}
+
+struct Replanted {
+    refused: Option<Unplanted>,
+    unplaced: Option<NodeId>,
+    config: Kind,
+    out: String,
+}
+
+impl Unplanted {
+    fn consumed(self, workspace: &Workspace) -> Result<&'static str, Failure> {
+        match self {
+            Unplanted::Inverted => workspace.run("/p", &["role", "n1", "secondary"]).map(|_recast| "p"),
+            Unplanted::Unrooted => Ok("nowhere"),
+        }
+    }
+
+    fn seen(refused: Result<String, Failure>) -> Option<Unplanted> {
+        match refused {
+            Err(Failure::Inverted { .. }) => Some(Unplanted::Inverted),
+            Err(Failure::Unrooted(_)) => Some(Unplanted::Unrooted),
+            _other => None,
+        }
+    }
+
+    fn unplaced(shown: Result<String, Failure>) -> Option<NodeId> {
+        match shown {
+            Err(Failure::Unplaced(node)) => Some(node),
+            _other => None,
+        }
+    }
+}
+
+impl Workspace {
+    fn split() -> Workspace {
+        let files = Session::typical().files();
+        files.create_directories(Path::new("/p/.git")).ok();
+        files.create_directories(Path::new("/q/.git")).ok();
+        Workspace { store: Sqlite::in_memory::<StreamSchema>(), files }
+    }
+
+    fn run(&self, directory: &str, arguments: &[&str]) -> Result<String, Failure> {
+        let run = Run::root();
+        let mut out = Vec::new();
+        Cli::new(&Invocation::at(directory), FakeLent::new(&self.files), |_path| self.store.clone()).report(
+            &run,
+            arguments.iter().map(OsString::from),
+            &mut out,
+        )?;
+        Ok(String::from_utf8(out).unwrap_or_default())
+    }
+
+    fn replanted(unplanted: Unplanted) -> Result<Replanted, Failure> {
+        let workspace = Workspace::split();
+        workspace.run("/p", &["init", "p"])?;
+        let consumed = unplanted.consumed(&workspace)?;
+        let refused = Unplanted::seen(workspace.run("/q", &["init", "q", "--consumes", consumed]));
+        let unplaced = Unplanted::unplaced(workspace.run("/q", &["show", "n2"]));
+        let config = workspace.files.kind(Path::new("/q/.meta/local.toml"));
+        let replanted = workspace.run("/q", &["init", "q"])?;
+        Ok(Replanted { refused, unplaced, config, out: replanted })
+    }
+}
+
+laws::law!(
+    a_refused_init_plants_no_node_and_keeps_no_local_config_and_a_later_init_succeeds,
+    select(vec![Unplanted::Inverted, Unplanted::Unrooted]),
+    unplanted,
+    {
+        let replanted = Workspace::replanted(unplanted).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        prop_assert_eq!(replanted.refused, Some(unplanted));
+        prop_assert_eq!(replanted.unplaced, Some(NodeId::new(2)));
+        prop_assert_eq!(replanted.config, Kind::Missing);
+        prop_assert_eq!(replanted.out, "root n2 project q\n");
+    }
+);
+
+#[derive(Clone, Copy, Debug)]
+enum Spoken {
+    Ingest,
+    Show,
+    Search,
+    Init,
+    Apply,
+    Refine,
+    Specify,
+    Reopen,
+    Drop,
+    Role,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Foreign(Spoken, &'static str);
+
+#[derive(Debug, PartialEq, Eq)]
+enum Parsed {
+    Usage,
+    Otherwise,
+}
+
+impl Spoken {
+    fn words(self) -> &'static [&'static str] {
+        match self {
+            Spoken::Ingest => &["ingest"],
+            Spoken::Show => &["show"],
+            Spoken::Search => &["search"],
+            Spoken::Init => &["init"],
+            Spoken::Apply => &["apply"],
+            Spoken::Refine => &["refine"],
+            Spoken::Specify => &["specify", "--artifact", "lint:x", "--condition", "it holds"],
+            Spoken::Reopen => &["reopen"],
+            Spoken::Drop => &["drop", "--reason", "folded"],
+            Spoken::Role => &["role", "n1"],
+        }
+    }
+
+    fn missing(self) -> &'static str {
+        match self {
+            Spoken::Ingest | Spoken::Init => "demo",
+            Spoken::Show | Spoken::Refine | Spoken::Specify | Spoken::Reopen | Spoken::Drop => "n1",
+            Spoken::Search => "thanks",
+            Spoken::Apply => "notes/directives",
+            Spoken::Role => "core",
+        }
+    }
+}
+
+impl Foreign {
+    fn parsed(&self) -> Parsed {
+        let Foreign(spoken, flag) = *self;
+        let arguments = [spoken.words(), &[flag, spoken.missing()]].concat();
+        Some(Invocation::output(&Session::typical(), &arguments))
+            .filter(|parsed| matches!(parsed, Err(Failure::Usage)))
+            .map_or(Parsed::Otherwise, |_usage| Parsed::Usage)
+    }
+}
+
+laws::table!(
+    each_command_refuses_every_flag_it_does_not_own_as_usage_never_as_a_positional,
+    Foreign::parsed,
+    [
+        Foreign(Spoken::Ingest, "--all") => Parsed::Usage,
+        Foreign(Spoken::Ingest, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Ingest, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Ingest, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Ingest, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Ingest, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Show, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Show, "--all") => Parsed::Usage,
+        Foreign(Spoken::Show, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Show, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Show, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Show, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Show, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Search, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Search, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Search, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Search, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Search, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Search, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Init, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Init, "--all") => Parsed::Usage,
+        Foreign(Spoken::Init, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Init, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Init, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Init, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--all") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Apply, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--all") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Refine, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Specify, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Specify, "--all") => Parsed::Usage,
+        Foreign(Spoken::Specify, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Specify, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Specify, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--all") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Reopen, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--all") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Drop, "--frobnicate") => Parsed::Usage,
+        Foreign(Spoken::Role, "--dry-run") => Parsed::Usage,
+        Foreign(Spoken::Role, "--all") => Parsed::Usage,
+        Foreign(Spoken::Role, "--consumes") => Parsed::Usage,
+        Foreign(Spoken::Role, "--artifact") => Parsed::Usage,
+        Foreign(Spoken::Role, "--condition") => Parsed::Usage,
+        Foreign(Spoken::Role, "--reason") => Parsed::Usage,
+        Foreign(Spoken::Role, "--frobnicate") => Parsed::Usage,
+    ]
+);

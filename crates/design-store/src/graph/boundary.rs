@@ -5,7 +5,7 @@ use design_model::{
     AnyNode, AnyStage, Dropped, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance,
     Reason, Refining, Role, Stage, Staging, Terminal, Title, Vague,
 };
-use newtype::Newtype;
+use newtype::{Counter, Newtype};
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
 
@@ -13,7 +13,10 @@ use crate::acyclic::{Acyclic, Closing, Refines, Refusal, Supersedes};
 use crate::{Link, Relative};
 
 #[derive(Clone, Debug, Op)]
-pub struct NewNode(Entry);
+pub struct Planting {
+    sown: Option<Node<Vague>>,
+    linked: Option<Linked>,
+}
 
 #[derive(Clone, Debug, Op)]
 pub struct Restaged(AnyNode);
@@ -93,9 +96,10 @@ pub(crate) struct OutgoingRow {
     provenance: String,
 }
 
-impl From<Entry> for NewNode {
-    fn from(entry: Entry) -> NewNode {
-        NewNode(entry)
+impl Planting {
+    #[must_use]
+    pub fn new(sown: Option<Node<Vague>>, linked: Option<Linked>) -> Planting {
+        Planting { sown, linked }
     }
 }
 
@@ -143,22 +147,21 @@ impl EdgeColumns {
     }
 }
 
-impl Batch for NewNode {
-    type Failure = StoreFailure;
+impl Batch for Planting {
+    type Failure = Refusal;
 
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        let entry = self.0;
-        let project = entry.project().to_string();
-        let facet = entry.facet().name();
-        let stage = Stage::Vague.name();
-        let provenance = Entered::from(entry.provenance()).name();
-        statements.written(sqlx::query!(
-            "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
-            project,
-            facet,
-            stage,
-            provenance
-        ))
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        let sown = self
+            .sown
+            .iter()
+            .map(|node| NodeRow::proposed(node, statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        let linked = self
+            .linked
+            .into_iter()
+            .map(|linked| linked.written(statements))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        Ok(Written::total(sown.into_iter().chain(linked)))
     }
 }
 

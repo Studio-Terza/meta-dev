@@ -2,7 +2,7 @@ use logos::Logos;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 enum Spelling {
-    #[regex(r"[ \t]*[^ \t\r\n][^\r\n]*", allow_greedy = true)]
+    #[regex(r"[^\P{White_Space}\r\n]*[^\p{White_Space}][^\r\n]*", allow_greedy = true)]
     Line,
 }
 

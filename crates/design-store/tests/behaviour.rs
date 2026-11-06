@@ -8,7 +8,7 @@ use design_model::{
     Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot,
+    AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
     Refusal, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode,
     StreamSchema, Unseen,
 };
@@ -237,15 +237,19 @@ impl Dag {
         NodeId::new(i64::try_from(node).unwrap_or(i64::MAX).saturating_add(1))
     }
 
-    fn node(facet: Facet) -> Result<NewNode, Box<dyn Error>> {
-        Ok(NewNode::from(Entry::new("p".parse()?, facet, Provenance::from(Entered::Init))))
+    fn node(store: &Port<'_, Sqlite>, facet: Facet) -> Result<Planting, Box<dyn Error>> {
+        Dag::planting(store, Entry::new("p".parse()?, facet, Provenance::from(Entered::Init)))
+    }
+
+    fn planting(store: &Port<'_, Sqlite>, entry: Entry) -> Result<Planting, Box<dyn Error>> {
+        Ok(Planting::new(Some(Node::new(store.read(NextNode)?, entry)), None))
     }
 
     fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
         let nodes = self
             .facets
             .iter()
-            .map(|facet| Ok(store.write(Dag::node(*facet)?)?))
+            .map(|facet| Ok(store.write(Dag::node(store, *facet)?)?))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let links = self
             .edges
@@ -326,7 +330,7 @@ struct Projects;
 impl Projects {
     fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, Box<dyn Error>> {
         let project: Project = name.parse()?;
-        store.write(NewNode::from(Entry::new(project.clone(), Facet::Project, Entered::Init.into())))?;
+        store.write(Dag::planting(store, Entry::new(project.clone(), Facet::Project, Entered::Init.into()))?)?;
         Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?)
     }
 }
@@ -346,8 +350,8 @@ impl Projects {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         Projects::rooted(&store, "q")?;
-        store.write(Dag::node(facet)?)?;
-        store.write(NewNode::from(Entry::new("p".parse()?, Facet::Project, Entered::Init.into())))?;
+        store.write(Dag::node(&store, facet)?)?;
+        store.write(Dag::planting(&store, Entry::new("p".parse()?, Facet::Project, Entered::Init.into()))?)?;
         Ok([
             store.read(ProjectRoot::from("p".parse::<Project>()?))?,
             store.read(ProjectRoot::from("r".parse::<Project>()?))?,
@@ -376,7 +380,7 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let parent = Projects::rooted(&store, "p")?;
-    store.write(Dag::node(Facet::Project)?)?;
+    store.write(Dag::node(&store, Facet::Project)?)?;
     let child = NodeId::new(parent.into_inner().saturating_add(1));
     let first = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
     let second = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
@@ -654,7 +658,7 @@ impl Probe {
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         store.write(records)?;
         (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(Facet::Feature)?)?))
+            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let ends = self.closed.ends();
         let mut files = (0..=self.edges.len())
@@ -888,7 +892,7 @@ impl Changes {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         (0..ENDS)
-            .map(|_node| Ok(store.write(Dag::node(Facet::Feature)?)?))
+            .map(|_node| Ok(store.write(Dag::node(&store, Facet::Feature)?)?))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let refused = self
             .0
