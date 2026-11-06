@@ -1,18 +1,19 @@
-use crate::trait_path::TraitPath;
+use crate::item_path::ItemPath;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Resolved {
-    Std(TraitPath),
-    Crate(TraitPath),
-    External(TraitPath),
+    Std(ItemPath),
+    Crate(ItemPath),
+    External(ItemPath),
+    Unknown(ItemPath),
 }
 
 impl Resolved {
     #[must_use]
-    pub fn std(&self) -> Option<&TraitPath> {
+    pub fn std(&self) -> Option<&ItemPath> {
         match self {
             Resolved::Std(path) => Some(path),
-            Resolved::Crate(_) | Resolved::External(_) => None,
+            Resolved::Crate(_) | Resolved::External(_) | Resolved::Unknown(_) => None,
         }
     }
 }

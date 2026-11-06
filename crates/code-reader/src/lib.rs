@@ -1,9 +1,12 @@
 mod lowering;
+mod namespace;
+mod planting;
 
-use code_model::Model;
+use code_model::{Building, Model};
 use lint_core::{Readout, SourceFile};
 
-use lowering::Lowering;
+use lowering::Lowered;
+use planting::{Planting, ReadFile};
 
 #[derive(Debug)]
 pub struct Reader;
@@ -16,9 +19,13 @@ impl Reader {
 
     #[must_use]
     pub fn read_files(files: &[SourceFile]) -> Model {
-        files
+        let mut building = Building::default();
+        let read: Vec<ReadFile<'_>> = files
             .iter()
             .flat_map(|file| std::iter::once(file).chain(file.test_modules()))
-            .fold(Model::default(), |model, file| model.with_file(file.path().to_path_buf(), Lowering::lowered(file)))
+            .map(|source| ReadFile::new(source, building.file(source.path().to_path_buf())))
+            .collect();
+        let lowered: Lowered = Planting::new(&read).lowered();
+        lowered.built(building)
     }
 }

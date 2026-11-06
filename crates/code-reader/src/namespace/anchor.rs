@@ -1,0 +1,48 @@
+use lint_layout::{Name, Whole, Word};
+
+use super::boundary::ScopeId;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Anchor {
+    Crate,
+    Module,
+    Super,
+}
+
+impl Anchor {
+    pub(super) const CRATE: Word<'static> = Word::new("crate");
+    const WORDS: [Word<'static>; 3] = [Self::CRATE, Word::new("self"), Word::new("super")];
+    const ANCHORS: [Anchor; 3] = [Anchor::Crate, Anchor::Module, Anchor::Super];
+
+    pub(super) fn spelled(first: &Name) -> Option<Anchor> {
+        Self::WORDS
+            .iter()
+            .zip(Self::ANCHORS)
+            .find_map(|(word, anchor)| first.matches::<Whole>(&[*word]).map(|_| anchor))
+    }
+
+    pub(super) fn anchored(self, anchors: Anchors) -> Option<ScopeId> {
+        match self {
+            Anchor::Crate => anchors.root,
+            Anchor::Module => anchors.module,
+            Anchor::Super => anchors.above,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Anchors {
+    module: Option<ScopeId>,
+    above: Option<ScopeId>,
+    root: Option<ScopeId>,
+}
+
+impl Anchors {
+    pub(super) fn rooted(root: ScopeId, planted: Option<ScopeId>) -> Anchors {
+        Anchors { module: Some(root), above: None, root: planted }
+    }
+
+    pub(super) fn nested(self, module: ScopeId) -> Anchors {
+        Anchors { module: Some(module), above: self.module, root: self.root }
+    }
+}
