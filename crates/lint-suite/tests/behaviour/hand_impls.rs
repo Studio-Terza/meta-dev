@@ -26,7 +26,14 @@ const FULL_PATH: &str =
 const OTHER_CRATE: &str = "struct R;\nimpl other_crate::Clone for R {\n    fn clone(&self) -> R { R }\n}\n";
 const BLOCK_IMPORT: &str = "struct R;\nfn f() {\n    use std::clone::Clone as Dup;\n    impl Dup for R {\n        fn clone(&self) -> R { R }\n    }\n}\n";
 
-const CASES: [Case; 18] = [
+const GLOB_CRATE: &str =
+    "use crate::shapes::*;\nstruct R;\nimpl Hash for R {\n    fn hash<H>(&self, _: &mut H) {}\n}\n";
+const SELF_IMPORT: &str = "use std::fmt::{self};\nstruct R;\nimpl fmt::Debug for R {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { Ok(()) }\n}\n";
+const UNIMPORTED: &str =
+    "struct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
+const GLOB_STD: &str = "use std::fmt::*;\nstruct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
+
+const CASES: [Case; 22] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -112,6 +119,26 @@ const CASES: [Case; 18] = [
         Title::new("a rename inside a function body"),
         &[Source::new(Located::new("a.rs"), Text::new(BLOCK_IMPORT))],
         Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a trait reached through a crate glob"),
+        &[Source::new(Located::new("a.rs"), Text::new(GLOB_CRATE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a module imported as self"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_IMPORT))],
+        Flagged::new(&["a.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a non-prelude trait with no import"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNIMPORTED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a trait reached through a std glob"),
+        &[Source::new(Located::new("a.rs"), Text::new(GLOB_STD))],
+        Flagged::new(&["a.rs:3"]),
     ),
 ];
 

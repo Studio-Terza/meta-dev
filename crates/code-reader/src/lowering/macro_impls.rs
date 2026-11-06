@@ -8,7 +8,7 @@ use code_model::{Found, Implementation, Origin, TraitPath};
 use lint_layout::{LineNumber, Name};
 
 use super::scopes::Scopes;
-use lexeme::{Lexeme, Mark};
+use lexeme::{Depth, Lexeme, Mark};
 
 #[derive(Debug)]
 pub(super) struct MacroImpls;
@@ -20,12 +20,13 @@ impl MacroImpls {
     const METAVARIABLE: char = '$';
     const OPEN: char = '<';
     const CLOSE: char = '>';
+    const DASH: char = '-';
 
     pub(super) fn in_macro(found: &Macro, scopes: &Scopes) -> Vec<Found<Implementation>> {
         Some(found)
             .filter(|found| found.path.is_ident(Self::MACRO_RULES))
             .and_then(|found| found.parse_body_with(|input: ParseStream<'_>| input.parse::<TokenStream>()).ok())
-            .map(|body| Self::written(&body.into_iter().map(Lexeme::from).collect::<Vec<Lexeme>>(), scopes))
+            .map(|body| Self::written(&Lexeme::sequence(body), scopes))
             .unwrap_or_default()
     }
 
@@ -40,7 +41,13 @@ impl MacroImpls {
     fn header(rest: &[Lexeme], keyword: &Ident, scopes: &Scopes) -> Option<Found<Implementation>> {
         let end = rest.iter().position(|lexeme| lexeme.delimiter() == Some(Delimiter::Brace)).unwrap_or(rest.len());
         let header = rest.get(..end)?;
-        let at = header.iter().position(|lexeme| lexeme.word().is_some_and(|ident| *ident == Self::FOR))?;
+        let at = header
+            .iter()
+            .zip(Lexeme::depths(header))
+            .enumerate()
+            .filter(|(_, (_, depth))| *depth == Depth::Outer)
+            .find(|(_, (lexeme, _))| lexeme.word().is_some_and(|ident| *ident == Self::FOR))
+            .map(|(at, _)| at)?;
         let subject = Self::subject(header.get(at + 1..)?);
         let implementation =
             Implementation::new(subject, Some(scopes.scoped(&Self::path(header.get(..at)?))), Origin::Written);
@@ -59,17 +66,14 @@ impl MacroImpls {
     fn path(lexemes: &[Lexeme]) -> TraitPath {
         lexemes
             .iter()
+            .zip(Lexeme::depths(lexemes))
             .enumerate()
-            .filter(|(at, _)| {
-                let before: Vec<Mark> = lexemes.get(..*at).unwrap_or_default().iter().map(Lexeme::mark).collect();
-                before.iter().filter(|mark| **mark == Mark::Opening).count()
-                    <= before.iter().filter(|mark| **mark == Mark::Closing).count()
-            })
+            .filter(|(_, (_, depth))| *depth == Depth::Outer)
             .filter(|(at, _)| {
                 at.checked_sub(1).and_then(|previous| lexemes.get(previous)).map(Lexeme::mark)
                     != Some(Mark::Metavariable)
             })
-            .filter_map(|(_, lexeme)| lexeme.word().map(Name::from))
+            .filter_map(|(_, (lexeme, _))| lexeme.word().map(Name::from))
             .collect()
     }
 }

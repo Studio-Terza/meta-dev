@@ -13,17 +13,16 @@ impl Root {
     pub(super) const CRATE: Word<'static> = Word::new("crate");
     const STD_ROOTS: [Word<'static>; 3] = words!["std", "core", "alloc"];
     const CRATE_ROOTS: [Word<'static>; 3] = words!["crate", "self", "super"];
-    pub(super) const PRELUDE: [[Word<'static>; 3]; 9] = [
+    pub(super) const PRELUDE: [[Word<'static>; 3]; 7] = [
         words!["std", "clone", "Clone"],
         words!["std", "marker", "Copy"],
-        words!["std", "fmt", "Debug"],
         words!["std", "default", "Default"],
         words!["std", "cmp", "Eq"],
         words!["std", "cmp", "PartialEq"],
         words!["std", "cmp", "Ord"],
         words!["std", "cmp", "PartialOrd"],
-        words!["std", "hash", "Hash"],
     ];
+    pub(super) const IMPORTED: [[Word<'static>; 3]; 2] = [words!["std", "fmt", "Debug"], words!["std", "hash", "Hash"]];
 
     pub(super) fn rooted(segments: &[Name]) -> Resolved {
         match segments.split_first().map(|(first, rest)| (Root::from(first), rest)) {

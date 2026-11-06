@@ -49,7 +49,21 @@ impl Scopes {
         let visible = self.open.get(start..).unwrap_or_default();
         let named = first.and_then(|first| visible.iter().rev().find_map(|scope| scope.meaning(first)));
         let only = segments.split_first().filter(|(_, rest)| rest.is_empty()).map(|(only, _)| only);
+        let globs: Vec<&[Name]> = visible.iter().flat_map(Scope::globs).map(Vec::as_slice).collect();
+        let globbed = only.and_then(|only| Self::globbed(only, &globs));
         let prelude = only.and_then(|only| Root::PRELUDE.iter().find(|[.., last]| *only == Name::from(*last)));
-        named.or_else(|| prelude.map(|canonical| Meaning::Prelude(canonical))).unwrap_or(Meaning::Written)
+        named.or(globbed).or_else(|| prelude.map(|canonical| Meaning::Prelude(canonical))).unwrap_or(Meaning::Written)
+    }
+
+    fn globbed(only: &Name, globs: &[&[Name]]) -> Option<Meaning<'static>> {
+        let canonical = Root::PRELUDE.iter().chain(&Root::IMPORTED).find(|[.., last]| *only == Name::from(*last))?;
+        let (_, module) = canonical.split_last()?;
+        let home = Resolved::Std(module.iter().copied().map(Name::from).collect());
+        let rooted: Vec<Resolved> = globs.iter().map(|glob| Root::rooted(glob)).collect();
+        rooted
+            .iter()
+            .find(|glob| **glob == home)
+            .map(|_| Meaning::Prelude(canonical))
+            .or_else(|| rooted.iter().find(|glob| glob.std().is_none()).map(|_| Meaning::Written))
     }
 }

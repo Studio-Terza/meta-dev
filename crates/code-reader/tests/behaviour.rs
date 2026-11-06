@@ -19,6 +19,14 @@ const DERIVES: &str = "#[derive(Clone, serde::Serialize)]\nstruct A;\n";
 const MACRO_SCOPE: &str = "mod m {\n    use std::fmt::Debug as Show;\n    macro_rules! make {\n        () => { impl Show for R {} };\n    }\n}\n";
 const MACROS: &str = "macro_rules! make {\n    ($t:ty, $u:ty) => {\n        impl<T> Clone for Wrapper<T> {}\n        impl PartialEq<$u> for $t {}\n        impl $t {\n            fn each() { for x in y {} }\n        }\n        mod inner {\n            impl Inner {}\n            impl Copy for Inner {}\n            impl $tr for Inner {}\n        }\n    };\n}\nfn f() {\n    other! {\n        impl Eq for Skipped {}\n    }\n}\n";
 
+const GLOB_DECLARED: &str = "trait Clone {}\nmod tests {\n    use super::*;\n    impl Clone for R {}\n}\n";
+const GLOB_CRATE: &str = "use crate::shapes::*;\nimpl Hash for R {}\n";
+const GLOB_STD: &str =
+    "use std::fmt::*;\nuse core::hash::*;\nimpl Debug for R {}\nimpl Hash for R {}\nimpl Clone for R {}\n";
+const SELF_IMPORT: &str = "use std::fmt::{self, Write};\nimpl fmt::Debug for R {}\n";
+const ARROW: &str = "macro_rules! m {\n    () => { impl<F: Fn() -> u8> Clone for W<F> {} };\n}\n";
+const HIGHER_RANKED: &str = "macro_rules! m {\n    () => { impl<F: for<'a> Fn(&'a u8)> Clone for W<F> {} };\n}\n";
+
 struct Expect;
 
 impl Expect {
@@ -152,4 +160,17 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
     SHADOWED => [Expect::krate(&["crate", "Clone"])],
     DERIVES => [Expect::std(&["std", "clone", "Clone"]), Expect::external(&["serde", "Serialize"])],
     MACRO_SCOPE => [Expect::std(&["std", "fmt", "Debug"])],
+]);
+
+laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| Read::resolved(text), [
+    GLOB_DECLARED => [Expect::external(&["Clone"])],
+    GLOB_CRATE => [Expect::external(&["Hash"])],
+    GLOB_STD => [
+        Expect::std(&["std", "fmt", "Debug"]),
+        Expect::std(&["std", "hash", "Hash"]),
+        Expect::std(&["std", "clone", "Clone"]),
+    ],
+    SELF_IMPORT => [Expect::std(&["std", "fmt", "Debug"])],
+    ARROW => [Expect::std(&["std", "clone", "Clone"])],
+    HIGHER_RANKED => [Expect::std(&["std", "clone", "Clone"])],
 ]);
