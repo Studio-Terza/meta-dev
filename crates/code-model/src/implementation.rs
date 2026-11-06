@@ -16,10 +16,10 @@ pub enum Subject {
 
 impl Subject {
     #[must_use]
-    pub fn sigil(&self) -> &'static str {
+    pub fn metavariable(&self) -> Option<&Name> {
         match self {
-            Subject::Named(_) => "",
-            Subject::Metavariable(_) => "$",
+            Subject::Named(_) => None,
+            Subject::Metavariable(name) => Some(name),
         }
     }
 }

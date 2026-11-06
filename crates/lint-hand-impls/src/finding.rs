@@ -26,12 +26,9 @@ impl lint_core::Finding for Finding<'_> {
 
 impl fmt::Display for Finding<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "hand impl of {} for {}{}",
-            self.derivable,
-            self.subject.sigil(),
-            AsRef::<Name>::as_ref(self.subject)
-        )
+        match self.subject.metavariable() {
+            Some(name) => write!(formatter, "hand impl of {} for ${name}", self.derivable),
+            None => write!(formatter, "hand impl of {} for {}", self.derivable, AsRef::<Name>::as_ref(self.subject)),
+        }
     }
 }
