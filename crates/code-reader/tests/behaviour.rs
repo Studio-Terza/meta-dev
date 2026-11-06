@@ -1,4 +1,4 @@
-use code_model::{Implementation, Origin};
+use code_model::{Implementation, Origin, Subject};
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
 use lint_layout::Name;
@@ -14,11 +14,15 @@ struct Expect;
 
 impl Expect {
     fn written(subject: &str, path: &[&str]) -> Implementation {
-        Implementation::new(
-            Name::from(subject),
-            Some(path.iter().map(|segment| Name::from(*segment)).collect()),
-            Origin::Written,
-        )
+        Expect::of(Subject::Named(Name::from(subject)), path)
+    }
+
+    fn metavariable(subject: &str, path: &[&str]) -> Implementation {
+        Expect::of(Subject::Metavariable(Name::from(subject)), path)
+    }
+
+    fn of(subject: Subject, path: &[&str]) -> Implementation {
+        Implementation::new(subject, Some(path.iter().map(|segment| Name::from(*segment)).collect()), Origin::Written)
     }
 }
 
@@ -72,7 +76,7 @@ fn each_implementation_is_placed_in_its_own_file() {
 fn a_renamed_trait_is_read_as_its_original() {
     assert_eq!(
         Read::implementations(&[Read::file("a.rs", RENAMED)]),
-        [Expect::written("R", &["Clone"]), Expect::written("R", &["a", "Clone"]),]
+        [Expect::written("R", &["Clone"]), Expect::written("R", &["a", "Dup"]),]
     );
 }
 
@@ -82,7 +86,7 @@ fn only_macro_rules_bodies_yield_trait_impls_in_macros() {
         Read::implementations(&[Read::file("a.rs", MACROS)]),
         [
             Expect::written("Wrapper", &["Clone"]),
-            Expect::written("", &["PartialEq"]),
+            Expect::metavariable("t", &["PartialEq"]),
             Expect::written("Inner", &["Copy"]),
             Expect::written("Inner", &[]),
         ]

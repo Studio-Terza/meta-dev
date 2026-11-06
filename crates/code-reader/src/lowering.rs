@@ -2,7 +2,7 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{Attribute, File, ItemEnum, ItemImpl, ItemMacro, ItemStruct, ItemUnion, Path, Token};
 
-use code_model::{Found, Implementation, Origin, TraitPath};
+use code_model::{Found, Implementation, Origin, Subject, TraitPath};
 use lint_core::SourceFile;
 use lint_layout::{LineNumber, Name};
 
@@ -29,16 +29,10 @@ impl<'ast> Lowering<'ast> {
     }
 
     fn trait_path(&self, path: &Path) -> TraitPath {
-        let length = path.segments.len();
-        path.segments
-            .iter()
-            .enumerate()
-            .map(|(at, segment)| {
-                (at + 1 == length)
-                    .then_some(&segment.ident)
-                    .map_or_else(|| Name::from(&segment.ident), |ident| self.renames.resolved(ident))
-            })
-            .collect()
+        match path.get_ident() {
+            Some(ident) => TraitPath::from_iter([self.renames.resolved(ident)]),
+            None => path.segments.iter().map(|segment| Name::from(&segment.ident)).collect(),
+        }
     }
 
     fn derived(&mut self, attributes: &[Attribute], subject: &syn::Ident) {
@@ -50,7 +44,11 @@ impl<'ast> Lowering<'ast> {
             .map(|path| {
                 Found::new(
                     LineNumber::from(path.segments.first().map_or(subject.span(), |first| first.ident.span())),
-                    Implementation::new(Name::from(subject), Some(self.trait_path(&path)), Origin::Derived),
+                    Implementation::new(
+                        Subject::Named(Name::from(subject)),
+                        Some(self.trait_path(&path)),
+                        Origin::Derived,
+                    ),
                 )
             })
             .collect();
@@ -60,7 +58,7 @@ impl<'ast> Lowering<'ast> {
 
 impl<'ast> Visit<'ast> for Lowering<'ast> {
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let subject = Name::of_type(&block.self_ty).unwrap_or_default();
+        let subject = Subject::Named(Name::of_type(&block.self_ty).unwrap_or_default());
         let implemented = block.trait_.as_ref().map(|(_, path, _)| self.trait_path(path));
         let line = LineNumber::from(block.impl_token.span);
         self.found.push(Found::new(line, Implementation::new(subject, implemented, Origin::Written)));

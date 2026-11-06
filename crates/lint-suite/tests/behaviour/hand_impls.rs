@@ -14,7 +14,10 @@ const ALIASED_OUTSIDE: &str = "use std::fmt::Display as Shown;\nstruct R;\nimpl 
 const MACRO_BANNED: &str = "macro_rules! make {\n    ($t:ty) => {\n        impl Clone for $t {\n            fn clone(&self) -> $t { *self }\n        }\n    };\n}\n";
 const MACRO_OUTSIDE: &str = "macro_rules! make {\n    ($t:ty) => {\n        impl Display for $t {\n            fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n        }\n    };\n}\n";
 
-const CASES: [Case; 10] = [
+const QUALIFIED: &str =
+    "use std::clone::Clone as Dup;\nmod a {\n    pub trait Dup {}\n}\nstruct R;\nimpl a::Dup for R {}\n";
+
+const CASES: [Case; 11] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -59,6 +62,11 @@ const CASES: [Case; 10] = [
     Case::new(
         Title::new("an impl outside the ban in a macro_rules body"),
         &[Source::new(Located::new("a.rs"), Text::new(MACRO_OUTSIDE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a qualified path to a different trait sharing a rename"),
+        &[Source::new(Located::new("a.rs"), Text::new(QUALIFIED))],
         Flagged::new(&[]),
     ),
 ];

@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, Ident, TokenStream};
 use syn::Macro;
 use syn::parse::ParseStream;
 
-use code_model::{Found, Implementation, Origin, TraitPath};
+use code_model::{Found, Implementation, Origin, Subject, TraitPath};
 use lint_layout::{LineNumber, Name};
 
 use lexeme::{Lexeme, Mark};
@@ -40,9 +40,20 @@ impl MacroImpls {
         let end = rest.iter().position(|lexeme| lexeme.delimiter() == Some(Delimiter::Brace)).unwrap_or(rest.len());
         let header = rest.get(..end)?;
         let at = header.iter().position(|lexeme| lexeme.word().is_some_and(|ident| *ident == Self::FOR))?;
-        let subject = header.get(at + 1).and_then(Lexeme::word).map_or_else(Name::default, Name::from);
+        let subject = Self::subject(header.get(at + 1..)?);
         let implementation = Implementation::new(subject, Some(Self::path(header.get(..at)?)), Origin::Written);
         Some(Found::new(LineNumber::from(keyword.span()), implementation))
+    }
+
+    fn subject(after: &[Lexeme]) -> Subject {
+        after
+            .first()
+            .filter(|lexeme| lexeme.mark() == Mark::Metavariable)
+            .and_then(|_| after.get(1))
+            .and_then(Lexeme::word)
+            .map(|ident| Subject::Metavariable(Name::from(ident)))
+            .or_else(|| after.first().and_then(Lexeme::word).map(|ident| Subject::Named(Name::from(ident))))
+            .unwrap_or_else(|| Subject::Named(Name::default()))
     }
 
     fn path(lexemes: &[Lexeme]) -> TraitPath {
