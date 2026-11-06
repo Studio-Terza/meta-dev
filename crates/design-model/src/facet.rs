@@ -5,4 +5,8 @@ use strum::VariantArray;
 pub enum Facet {
     #[name("project")]
     Project,
+    #[name("feature")]
+    Feature,
+    #[name("smell")]
+    Smell,
 }

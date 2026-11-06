@@ -9,13 +9,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use console_ports::Environment;
-use design_model::Project;
 use design_store::Scope;
 use file_ports::Files;
 use store_ports::Sqlite;
 
 use super::failure::Failure;
 use command::Command;
+pub use command::{Applied, Unresolved};
 pub use ground::Ground;
 use persistence::Persistence;
 use projects::Located;
@@ -32,7 +32,6 @@ pub struct Request {
 struct Words {
     spoken: Vec<Token>,
     workspace: Option<PathBuf>,
-    consumes: Option<OsString>,
     scope: Scope,
     expecting: Expecting,
 }
@@ -120,7 +119,11 @@ impl Words {
     fn taking(self, argument: OsString) -> Words {
         match self.expecting {
             Expecting::Path => self.placed(PathBuf::from(argument)),
-            Expecting::Project => Words { consumes: Some(argument), expecting: Expecting::Word, ..self },
+            Expecting::Project => Words {
+                spoken: self.spoken.into_iter().chain([Token::Consumes(argument)]).collect(),
+                expecting: Expecting::Word,
+                ..self
+            },
             Expecting::Word => self.worded(Argument::from(argument)),
         }
     }
@@ -137,12 +140,6 @@ impl Words {
             ..self
         }
     }
-
-    fn consumed(consumes: Option<OsString>) -> Result<Option<Project>, Failure> {
-        consumes
-            .map(|word| word.into_string().map_err(|_unreadable| Failure::Usage).and_then(|text| Ok(text.parse()?)))
-            .transpose()
-    }
 }
 
 impl TryFrom<Words> for Request {
@@ -151,7 +148,7 @@ impl TryFrom<Words> for Request {
     fn try_from(words: Words) -> Result<Request, Failure> {
         match words.expecting {
             Expecting::Path | Expecting::Project => Err(Failure::Usage),
-            Expecting::Word => Command::spoken(&words.spoken, words.scope, Words::consumed(words.consumes)?)
+            Expecting::Word => Command::spoken(&words.spoken, words.scope)
                 .map(|command| Request { command, workspace: words.workspace }),
         }
     }

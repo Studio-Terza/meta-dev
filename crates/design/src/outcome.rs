@@ -4,4 +4,5 @@ pub enum Outcome {
     Shown,
     Searched,
     Initialised,
+    Applied,
 }

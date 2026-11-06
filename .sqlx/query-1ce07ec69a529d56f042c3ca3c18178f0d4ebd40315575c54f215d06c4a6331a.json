@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "1ce07ec69a529d56f042c3ca3c18178f0d4ebd40315575c54f215d06c4a6331a"
+}

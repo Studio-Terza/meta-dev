@@ -1,49 +1,49 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, project, facet, stage, provenance FROM nodes WHERE id = ?1",
+  "query": "SELECT message, ordinal, relation, node, provenance FROM span_edges WHERE message = ?1 ORDER BY ordinal, relation, node",
   "describe": {
     "columns": [
       {
-        "name": "id",
+        "name": "message",
         "ordinal": 0,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "nodes",
-            "name": "id"
-          }
-        }
-      },
-      {
-        "name": "project",
-        "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "nodes",
-            "name": "project"
+            "table": "span_edges",
+            "name": "message"
           }
         }
       },
       {
-        "name": "facet",
+        "name": "ordinal",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "span_edges",
+            "name": "ordinal"
+          }
+        }
+      },
+      {
+        "name": "relation",
         "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "nodes",
-            "name": "facet"
+            "table": "span_edges",
+            "name": "relation"
           }
         }
       },
       {
-        "name": "stage",
+        "name": "node",
         "ordinal": 3,
-        "type_info": "Text",
+        "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "nodes",
-            "name": "stage"
+            "table": "span_edges",
+            "name": "node"
           }
         }
       },
@@ -53,7 +53,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "nodes",
+            "table": "span_edges",
             "name": "provenance"
           }
         }
@@ -70,5 +70,5 @@
       false
     ]
   },
-  "hash": "9d2560ff8a37a3c74f6cd5639c8fba6c361534e7697c505abee4656645807413"
+  "hash": "15a254693dc0f240bcfc2760cd3e772c0f748ee79e3800dffc2cc9f89b7a093f"
 }

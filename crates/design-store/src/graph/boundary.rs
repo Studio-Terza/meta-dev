@@ -1,12 +1,12 @@
 use std::error::Error;
 use std::str::FromStr;
 
-use design_model::{Entered, Entry, Facet, Node, NodeId, NodeRelation, Project, Provenance};
-use newtype::Newtype;
+use design_model::{Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Project, Provenance, Title};
+use newtype::{Counter, Newtype};
 use port_core::Op;
 use store_ports::{Batch, Statements, StoreFailure, Written};
 
-use crate::Link;
+use crate::{Link, Relative};
 
 #[derive(Clone, Debug, Op)]
 pub struct NewNode(Entry);
@@ -16,6 +16,7 @@ pub struct Linked {
     source: NodeId,
     relation: NodeRelation,
     target: NodeId,
+    provenance: Provenance,
 }
 
 #[derive(Debug)]
@@ -25,12 +26,31 @@ pub(crate) struct NodeRow {
     facet: String,
     stage: String,
     provenance: String,
+    title: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct RelativeRow {
+    kin: String,
+    id: i64,
+    project: String,
+    facet: String,
+    stage: String,
+    provenance: String,
+    title: Option<String>,
 }
 
 #[derive(Debug)]
 pub(crate) struct OutgoingRow {
     relation: String,
     target: i64,
+    provenance: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Refinement {
+    child: i64,
+    parent: i64,
 }
 
 impl From<Entry> for NewNode {
@@ -41,8 +61,27 @@ impl From<Entry> for NewNode {
 
 impl Linked {
     #[must_use]
-    pub fn new(source: NodeId, relation: NodeRelation, target: NodeId) -> Linked {
-        Linked { source, relation, target }
+    pub fn new(source: NodeId, relation: NodeRelation, target: NodeId, provenance: Provenance) -> Linked {
+        Linked { source, relation, target, provenance }
+    }
+
+    fn refinement(self) -> Option<Refinement> {
+        match self.relation {
+            NodeRelation::Refines => {
+                Some(Refinement { child: self.source.into_inner(), parent: self.target.into_inner() })
+            }
+            NodeRelation::Supersedes | NodeRelation::Consumes => None,
+        }
+    }
+}
+
+impl Refinement {
+    fn closed(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(sqlx::query!(
+            "INSERT INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2 ON CONFLICT (ancestor, descendant) DO UPDATE SET depth = excluded.depth WHERE excluded.depth < closure.depth",
+            self.parent,
+            self.child
+        ))
     }
 }
 
@@ -53,13 +92,17 @@ impl Batch for NewNode {
         let facet = entry.facet().name();
         let stage = entry.stage().name();
         let provenance = Entered::from(entry.provenance()).name();
-        statements.written(sqlx::query!(
+        let node = statements.written(sqlx::query!(
             "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
             project,
             facet,
             stage,
             provenance
-        ))
+        ))?;
+        let reflexive = statements.written(sqlx::query!(
+            "INSERT INTO closure (ancestor, descendant, depth) VALUES (last_insert_rowid(), last_insert_rowid(), 0)"
+        ))?;
+        Ok(node.plus(reflexive))
     }
 }
 
@@ -68,12 +111,16 @@ impl Batch for Linked {
         let source = self.source.into_inner();
         let relation = self.relation.name();
         let target = self.target.into_inner();
-        statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO node_edges (source, relation, target) VALUES (?1, ?2, ?3)",
+        let provenance = Entered::from(self.provenance).name();
+        let edge = statements.written(sqlx::query!(
+            "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
             source,
             relation,
-            target
-        ))
+            target,
+            provenance
+        ))?;
+        let closed = self.refinement().map(|refinement| refinement.closed(statements)).transpose()?;
+        Ok(edge.plus(closed.unwrap_or_default()))
     }
 }
 
@@ -87,7 +134,23 @@ impl TryFrom<NodeRow> for Node {
             NodeRow::decoded(&row.stage)?,
             Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?),
         );
-        Ok(Node::new(NodeId::new(row.id), entry))
+        Ok(row.title.map(Title::new).into_iter().fold(Node::new(NodeId::new(row.id), entry), Node::titled))
+    }
+}
+
+impl TryFrom<RelativeRow> for Relative {
+    type Error = sqlx::Error;
+
+    fn try_from(row: RelativeRow) -> Result<Relative, sqlx::Error> {
+        let node = NodeRow {
+            id: row.id,
+            project: row.project,
+            facet: row.facet,
+            stage: row.stage,
+            provenance: row.provenance,
+            title: row.title,
+        };
+        Ok(Relative::new(NodeRow::decoded(&row.kin)?, Node::try_from(node)?))
     }
 }
 
@@ -95,12 +158,13 @@ impl TryFrom<OutgoingRow> for Link {
     type Error = sqlx::Error;
 
     fn try_from(row: OutgoingRow) -> Result<Link, sqlx::Error> {
-        Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target)))
+        let provenance = Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?);
+        Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target), provenance))
     }
 }
 
 impl NodeRow {
-    fn decoded<Column>(text: &str) -> Result<Column, sqlx::Error>
+    pub(crate) fn decoded<Column>(text: &str) -> Result<Column, sqlx::Error>
     where
         Column: FromStr<Err: Error + Send + Sync + 'static>,
     {
@@ -122,10 +186,64 @@ impl NodeRow {
         let id = id.into_inner();
         let rows = statements.rows(sqlx::query_as!(
             NodeRow,
-            "SELECT id, project, facet, stage, provenance FROM nodes WHERE id = ?1",
+            "SELECT id, project, facet, stage, provenance, title FROM nodes WHERE id = ?1",
             id
         ))?;
         Ok(rows.into_iter().map(Node::try_from).collect::<Result<Vec<Node>, sqlx::Error>>()?)
+    }
+
+    pub(crate) fn superseded_by(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
+        let id = id.into_inner();
+        let supersedes = NodeRelation::Supersedes.name();
+        let rows = statements.rows(sqlx::query!(
+            r#"WITH RECURSIVE chain (id) AS (SELECT ?1 UNION SELECT node_edges.target FROM node_edges JOIN chain ON node_edges.source = chain.id WHERE node_edges.relation = ?2) SELECT id AS "id!: i64" FROM chain ORDER BY id"#,
+            id,
+            supersedes
+        ))?;
+        Ok(rows.into_iter().map(|row| NodeId::new(row.id)).collect())
+    }
+
+    pub(crate) fn next(statements: &mut Statements<'_>) -> Result<Vec<NodeId>, StoreFailure> {
+        let rows = statements.rows(sqlx::query!(r#"SELECT COALESCE(MAX(id), 0) + 1 AS "next!: i64" FROM nodes"#))?;
+        Ok(rows.into_iter().map(|row| NodeId::new(row.next)).collect())
+    }
+
+    pub(crate) fn proposed(node: &Node, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        let id = node.identity().into_inner();
+        let entry = node.entry();
+        let project = entry.project().to_string();
+        let facet = entry.facet().name();
+        let stage = entry.stage().name();
+        let provenance = Entered::from(entry.provenance()).name();
+        let title = node.title().map(ToString::to_string);
+        let planted = statements.written(sqlx::query!(
+            "INSERT INTO nodes (id, project, facet, stage, provenance, title) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            id,
+            project,
+            facet,
+            stage,
+            provenance,
+            title
+        ))?;
+        let reflexive = statements
+            .written(sqlx::query!("INSERT INTO closure (ancestor, descendant, depth) VALUES (?1, ?1, 0)", id))?;
+        Ok(planted.plus(reflexive))
+    }
+}
+
+impl RelativeRow {
+    pub(crate) fn around(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Relative>, StoreFailure> {
+        let id = id.into_inner();
+        let ancestor = Kin::Ancestor.name();
+        let child = Kin::Child.name();
+        let rows = statements.rows(sqlx::query_as!(
+            RelativeRow,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance, nodes.title FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
+            id,
+            ancestor,
+            child
+        ))?;
+        Ok(rows.into_iter().map(Relative::try_from).collect::<Result<Vec<Relative>, sqlx::Error>>()?)
     }
 }
 
@@ -134,7 +252,7 @@ impl OutgoingRow {
         let id = id.into_inner();
         let rows = statements.rows(sqlx::query_as!(
             OutgoingRow,
-            "SELECT relation, target FROM node_edges WHERE source = ?1 ORDER BY relation, target",
+            "SELECT relation, target, provenance FROM node_edges WHERE source = ?1 ORDER BY relation, target",
             id
         ))?;
         Ok(rows.into_iter().map(Link::try_from).collect::<Result<Vec<Link>, sqlx::Error>>()?)

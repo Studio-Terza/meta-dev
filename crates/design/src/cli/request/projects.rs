@@ -20,6 +20,7 @@ pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,
     repo: PathBuf,
+    working: PathBuf,
 }
 
 impl Located {
@@ -41,6 +42,10 @@ impl Located {
     pub fn repo(&self) -> &Path {
         &self.repo
     }
+
+    pub fn within(&self, path: &Path) -> PathBuf {
+        Projects::resolved(&self.working.join(path))
+    }
 }
 
 impl Projects {
@@ -53,7 +58,8 @@ impl Projects {
     ) -> Result<Located, Failure> {
         let home = environment.variable(OsStr::new("HOME")).ok_or(Failure::Unset(OsString::from("HOME")))?;
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
-        let repo = Self::repository(files, &Self::resolved(&current.clone().unwrap_or_default()));
+        let working = Self::resolved(&current.clone().unwrap_or_default());
+        let repo = Self::repository(files, &working);
         let recorded = LocalConfig::found(files, &repo)?.map(|config| config.workspace().to_path_buf());
         let chosen = workspace
             .map(|workspace| current.clone().unwrap_or_default().join(workspace))
@@ -66,6 +72,7 @@ impl Projects {
             transcripts: PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)),
             workspace: root,
             repo,
+            working,
         })
     }
 

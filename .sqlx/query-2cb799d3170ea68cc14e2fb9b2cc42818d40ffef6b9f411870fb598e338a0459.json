@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT message AS \"message!: String\", ordinal AS \"ordinal!: i64\" FROM (SELECT message, ordinal FROM span_edges WHERE message = ?1 UNION SELECT message, ordinal FROM senses WHERE message = ?1 UNION SELECT message, ordinal FROM conversational WHERE message = ?1 UNION SELECT source_message, source_ordinal FROM segment_links WHERE source_message = ?1 UNION SELECT target_message, target_ordinal FROM segment_links WHERE target_message = ?1) ORDER BY ordinal",
+  "describe": {
+    "columns": [
+      {
+        "name": "message!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "target_message"
+          }
+        }
+      },
+      {
+        "name": "ordinal!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segment_links",
+            "name": "target_ordinal"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2cb799d3170ea68cc14e2fb9b2cc42818d40ffef6b9f411870fb598e338a0459"
+}

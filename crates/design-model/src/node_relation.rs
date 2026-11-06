@@ -3,6 +3,10 @@ use strum::VariantArray;
 
 #[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NodeRelation {
+    #[name("refines")]
+    Refines,
+    #[name("supersedes")]
+    Supersedes,
     #[name("consumes")]
     Consumes,
 }

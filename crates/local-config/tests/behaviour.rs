@@ -77,7 +77,9 @@ laws::law!(a_repository_kept_for_one_project_refuses_another, (Configs::any(), C
 fn a_kept_config_leaves_the_meta_directory_ignored_by_git() -> Result<(), Box<dyn Error>> {
     let memory = Memory::default();
     LocalConfig::new("demo".parse()?, PathBuf::from("/ws")).kept(&memory, Path::new(REPO))?;
-    assert!(memory.read(&Path::new(REPO).join(".meta/.gitignore")).is_ok());
+    let ignored = memory.read_text(&Path::new(REPO).join(".meta/.gitignore"))?;
+    let rules: String = ignored.as_ref().chars().filter(|character| *character != '\n').collect();
+    assert_eq!(rules, "*");
     Ok(())
 }
 

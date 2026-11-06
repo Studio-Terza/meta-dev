@@ -14,6 +14,7 @@ use store_ports::Sqlite;
 use crate::Outcome;
 
 pub use failure::Failure;
+pub use request::Unresolved;
 use request::{Ground, Request};
 
 #[derive(Debug)]

@@ -1,0 +1,20 @@
+use named_derive::Named;
+use strum::VariantArray;
+
+#[derive(Named, VariantArray, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SenseKind {
+    #[name("decision")]
+    Decision,
+    #[name("opinion")]
+    Opinion,
+    #[name("question")]
+    Question,
+    #[name("instruction")]
+    Instruction,
+    #[name("control")]
+    Control,
+    #[name("remark")]
+    Remark,
+    #[name("smell")]
+    Smell,
+}

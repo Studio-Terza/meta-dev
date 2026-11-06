@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2 ON CONFLICT (ancestor, descendant) DO UPDATE SET depth = excluded.depth WHERE excluded.depth < closure.depth",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a4d46c673408994a88cf633ddee8b3eb46e71b2858f68f417743e31f5589b2d1"
+}

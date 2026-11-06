@@ -1,3 +1,4 @@
+use crate::Annotation;
 use crate::boundary::{LinkRow, MessageRow, SegmentRow};
 
 #[derive(Debug)]
@@ -5,11 +6,17 @@ pub struct Stored {
     message: MessageRow,
     segments: Vec<SegmentRow>,
     links: Vec<LinkRow>,
+    annotations: Vec<Annotation>,
 }
 
 impl Stored {
-    pub(crate) fn new(message: MessageRow, segments: Vec<SegmentRow>, links: Vec<LinkRow>) -> Stored {
-        Stored { message, segments, links }
+    pub(crate) fn new(
+        message: MessageRow,
+        segments: Vec<SegmentRow>,
+        links: Vec<LinkRow>,
+        annotations: Vec<Annotation>,
+    ) -> Stored {
+        Stored { message, segments, links, annotations }
     }
 
     #[must_use]
@@ -25,5 +32,10 @@ impl Stored {
     #[must_use]
     pub fn links(&self) -> &[LinkRow] {
         &self.links
+    }
+
+    #[must_use]
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.annotations
     }
 }
