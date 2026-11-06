@@ -16,9 +16,15 @@ pub use file_ports::{Disk, Files, Memory};
 #[macro_export]
 macro_rules! golden {
     ($name:expr, $actual:expr $(,)?) => {
+        $crate::verdict!($name, $actual).unwrap_or_else(|failure| panic!("{failure}"))
+    };
+}
+
+#[macro_export]
+macro_rules! verdict {
+    ($name:expr, $actual:expr $(,)?) => {
         $crate::Golden::in_package(env!("CARGO_MANIFEST_DIR"), $name)
             .and_then(|golden| golden.verify(&$crate::Process, &$crate::Disk, $crate::Output::new($actual)))
-            .unwrap_or_else(|failure| panic!("{failure}"))
     };
 }
 

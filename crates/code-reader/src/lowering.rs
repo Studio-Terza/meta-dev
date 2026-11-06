@@ -8,9 +8,11 @@ use code_model::{Found, Implementation, Origin};
 use lint_core::SourceFile;
 use lint_layout::{LineNumber, Name};
 
+mod boundary;
 mod macro_impls;
 mod scopes;
 
+use boundary::SelfType;
 use macro_impls::MacroImpls;
 use scopes::{Reach, Scopes};
 
@@ -68,7 +70,7 @@ impl<'ast> Visit<'ast> for Lowering {
     }
 
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let subject = Name::of_type(&block.self_ty).unwrap_or_default();
+        let subject = SelfType::written(&block.self_ty);
         let implemented = block.trait_.as_ref().map(|(_, path, _)| self.scopes.resolved(path));
         let line = LineNumber::from(block.impl_token.span);
         self.found.push(Found::new(line, Implementation::new(subject, implemented, Origin::Written)));

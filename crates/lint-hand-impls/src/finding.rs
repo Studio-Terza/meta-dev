@@ -18,7 +18,7 @@ impl<'model> Finding<'model> {
 impl lint_core::Finding for Finding<'_> {
     fn fix(&self) -> Fix {
         Fix::new(
-            "derive it; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)",
+            "derive it; where derive can't apply (a trait object, a foreign wrapper), replace the impl with a named method; answer a special need with a type (a redacting wrapper, field order, a key type, a named constructor)",
         )
     }
 }

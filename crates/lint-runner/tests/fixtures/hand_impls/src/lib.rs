@@ -16,3 +16,21 @@ impl From<u8> for Held {
         Held(value)
     }
 }
+pub trait Shape {}
+impl Shape for Held {}
+impl std::fmt::Debug for dyn Shape {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("shape")
+    }
+}
+impl Clone for Box<dyn Shape> {
+    fn clone(&self) -> Box<dyn Shape> {
+        Box::new(Held(0))
+    }
+}
+pub struct Pair<T>(T);
+impl<T: Copy, const N: usize> Clone for Pair<[T; N]> {
+    fn clone(&self) -> Pair<[T; N]> {
+        Pair(self.0)
+    }
+}
