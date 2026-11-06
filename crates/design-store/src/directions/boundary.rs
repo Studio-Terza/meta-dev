@@ -18,7 +18,7 @@ pub(super) struct Annotating<'held, 'run> {
 }
 
 #[derive(Debug)]
-struct Columns {
+pub(crate) struct Columns {
     message: String,
     ordinal: i64,
 }
@@ -69,6 +69,33 @@ impl Columns {
 
     fn provenance(text: &str) -> Result<Provenance, sqlx::Error> {
         Ok(Provenance::from(NodeRow::decoded::<Entered>(text)?))
+    }
+
+    pub(crate) fn covered(message: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<Segment>, StoreFailure> {
+        let message = message.to_string();
+        let rows = statements.rows(sqlx::query_as!(
+            Columns,
+            r#"SELECT message AS "message!: String", ordinal AS "ordinal!: i64" FROM (SELECT message, ordinal FROM span_edges WHERE message = ?1 UNION SELECT message, ordinal FROM senses WHERE message = ?1 UNION SELECT message, ordinal FROM conversational WHERE message = ?1 UNION SELECT source_message, source_ordinal FROM segment_links WHERE source_message = ?1 UNION SELECT target_message, target_ordinal FROM segment_links WHERE target_message = ?1) ORDER BY ordinal"#,
+            message
+        ))?;
+        Ok(rows.into_iter().map(Columns::segment).collect::<Result<Vec<Segment>, sqlx::Error>>()?)
+    }
+
+    pub(crate) fn ordered(
+        from: &Segment,
+        relation: SegmentRelation,
+        statements: &mut Statements<'_>,
+    ) -> Result<Vec<Segment>, StoreFailure> {
+        let Columns { message, ordinal } = Columns::from(from);
+        let relation = relation.name();
+        let rows = statements.rows(sqlx::query_as!(
+            Columns,
+            r#"WITH RECURSIVE chain (message, ordinal) AS (SELECT ?1, ?2 UNION SELECT segment_links.target_message, segment_links.target_ordinal FROM segment_links JOIN chain ON segment_links.source_message = chain.message AND segment_links.source_ordinal = chain.ordinal WHERE segment_links.relation = ?3) SELECT message AS "message!: String", ordinal AS "ordinal!: i64" FROM chain ORDER BY message, ordinal"#,
+            message,
+            ordinal,
+            relation
+        ))?;
+        Ok(rows.into_iter().map(Columns::segment).collect::<Result<Vec<Segment>, sqlx::Error>>()?)
     }
 }
 

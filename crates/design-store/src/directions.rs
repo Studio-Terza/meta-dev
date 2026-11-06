@@ -5,6 +5,7 @@ use port_core::Op;
 use store_ports::{StoreFailure, Written};
 
 use boundary::Annotating;
+pub(crate) use boundary::Columns;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Directed {
@@ -30,17 +31,6 @@ impl Directions {
 }
 
 impl Directed {
-    #[must_use]
-    pub fn segments(&self) -> Vec<&Segment> {
-        match self {
-            Directed::Placed { segment, .. }
-            | Directed::Sensed { segment, .. }
-            | Directed::Conversational { segment } => vec![segment],
-            Directed::Related { source, target, .. } => vec![source, target],
-            Directed::Proposed { .. } | Directed::Superseded(_) => Vec::new(),
-        }
-    }
-
     #[must_use]
     pub fn proposed(&self) -> Option<NodeId> {
         match self {

@@ -4,15 +4,15 @@ use design_model::{Facet, SegmentRelation, Sense, SpanRelation, Title};
 use grammar::directive::Pieces;
 
 use crate::reading::Reader;
-use crate::{Label, Misread, NodeRef, Replacement, SegmentRef};
+use crate::{Edge, Label, Misread, NodeRef, Proposal, SegmentRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Directive {
     Place { segment: SegmentRef, node: NodeRef, relation: SpanRelation },
     Sense { segment: SegmentRef, sense: Sense },
-    Link { source: SegmentRef, target: SegmentRef, relation: SegmentRelation },
-    Propose { fresh: Option<Label>, refines: NodeRef, facet: Facet, title: Title },
-    Supersede(Replacement),
+    Link { edge: Edge<SegmentRef>, relation: SegmentRelation },
+    Propose { proposal: Proposal, facet: Facet, title: Title },
+    Supersede(Edge<NodeRef>),
     Conversational { segment: SegmentRef },
 }
 
@@ -37,11 +37,9 @@ impl Directive {
         match self {
             Directive::Place { segment, node, relation } => visitor.place(segment, node, *relation),
             Directive::Sense { segment, sense } => visitor.sense(segment, *sense),
-            Directive::Link { source, target, relation } => visitor.link(source, target, *relation),
-            Directive::Propose { fresh, refines, facet, title } => {
-                visitor.propose(fresh.as_ref(), refines, *facet, title)
-            }
-            Directive::Supersede(replacement) => replacement.visited(visitor),
+            Directive::Link { edge, relation } => edge.ends(|source, target| visitor.link(source, target, *relation)),
+            Directive::Propose { proposal, facet, title } => proposal.visited(visitor, *facet, title),
+            Directive::Supersede(edge) => edge.ends(|old, by| visitor.supersede(old, by)),
             Directive::Conversational { segment } => visitor.converse(segment),
         }
     }

@@ -90,15 +90,13 @@ impl Verb {
             }
             Verb::Link => call.exactly(self).and_then(|[source, target, relation]: &[Term<'_>; _]| {
                 Ok(Directive::Link {
-                    source: source.segment()?,
-                    target: target.segment()?,
+                    edge: target.ending(source.segment()?, target.segment()?)?,
                     relation: relation.named(Wanted::SegmentRelation)?,
                 })
             }),
             Verb::Propose => call.exactly(self).and_then(|[new, refines, facet, title]: &[Term<'_>; _]| {
                 Ok(Directive::Propose {
-                    fresh: new.fresh()?,
-                    refines: refines.within::<Refines>(Wanted::Refines)?.node()?,
+                    proposal: refines.within::<Refines>(Wanted::Refines)?.proposal(new.fresh()?)?,
                     facet: facet.named(Wanted::Facet)?,
                     title: title.title()?,
                 })

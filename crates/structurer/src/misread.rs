@@ -41,8 +41,8 @@ pub enum Wanted {
     Refines,
     #[name("by(<node>)")]
     By,
-    #[name("a node other than the one superseded")]
-    Successor,
+    #[name("an end other than the first, as nothing relates to itself")]
+    Distinct,
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]

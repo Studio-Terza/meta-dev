@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Stage};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, SegmentRelation, Stage};
 use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
@@ -921,6 +921,67 @@ fn a_supersession_that_closes_a_cycle_or_names_one_node_twice_is_refused() -> Re
     assert!(matches!(applying.cyclic("supersede(n3, by(n2))"), Some(Failure::Unresolved(Unresolved::Cyclic { .. }))));
     assert!(applying.applied("propose(new, refines(n1), feature, \"d\")\nsupersede(n3, by(n6))").is_ok());
     Ok(())
+}
+
+#[test]
+fn a_segment_covered_by_an_earlier_apply_is_not_reported_uncovered() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let first = applying.applied(&format!("conversational({})", Applying::answer(0)))?;
+    assert!(first.contains(&format!("uncovered {}\n", Applying::answer(1))));
+    let second = applying.applied(&format!("sense({}, decision, specific, firm, explicit)", Applying::answer(1)))?;
+    assert_eq!(second.matches("uncovered").count(), 0);
+    Ok(())
+}
+
+impl Applying {
+    fn linked(&self, relation: &str, ends: &[[usize; 2]]) -> Result<String, Failure> {
+        let lines: Vec<String> = ends
+            .iter()
+            .map(|[source, target]| {
+                format!("link({}, {}, {relation})", Applying::answer(*source), Applying::answer(*target))
+            })
+            .collect();
+        self.applied(&lines.join("\n"))
+    }
+}
+
+#[test]
+fn a_segment_supersession_or_correction_that_closes_a_cycle_is_refused() {
+    let refusals = [["supersedes", "corrects"], ["corrects", "corrects"]].map(|[first, second]| {
+        Applying::ready().ok().and_then(|applying| {
+            applying.linked(first, &[[0, 1]]).ok();
+            applying.linked(second, &[[1, 0]]).err()
+        })
+    });
+    assert!(matches!(refusals, [None, Some(Failure::Unresolved(Unresolved::Circular { .. }))]));
+    let ordered = ["supersedes", "corrects"]
+        .map(|relation| Applying::ready().ok().and_then(|applying| applying.linked(relation, &[[0, 1], [1, 0]]).err()));
+    assert!(matches!(
+        ordered,
+        [
+            Some(Failure::Unresolved(Unresolved::Circular { .. })),
+            Some(Failure::Unresolved(Unresolved::Circular { .. }))
+        ]
+    ));
+    let mutual = ["answers", "refers-to"]
+        .map(|relation| Applying::ready().ok().map(|applying| applying.linked(relation, &[[0, 1], [1, 0]]).is_ok()));
+    assert_eq!(mutual, [Some(true), Some(true)]);
+}
+
+#[test]
+fn a_segment_linked_to_itself_under_another_spelling_is_refused_for_every_relation() {
+    let refusals: Vec<Option<Failure>> = SegmentRelation::VARIANTS
+        .iter()
+        .map(|relation| {
+            let said = Session::line(Speaker::Owner, "cccccccc-0000-4000-8000-000000000001", "null", "alone");
+            let applying =
+                Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Session::working(said).files() };
+            applying.run(&["ingest"]).ok();
+            applying.applied(&format!("link(cccccccc.0, cccccccc-0000.0, {relation})")).err()
+        })
+        .collect();
+    assert_eq!(refusals.len(), SegmentRelation::VARIANTS.len());
+    assert!(refusals.iter().all(|refused| matches!(refused, Some(Failure::Unresolved(Unresolved::Looped(_))))));
 }
 
 #[test]

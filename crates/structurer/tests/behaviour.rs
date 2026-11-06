@@ -2,12 +2,11 @@ use design_model::{
     Confidence, Explicitness, Facet, NodeId, Ordinal, Prefix, SegmentRelation, Sense, SenseKind, SpanRelation,
     Specificity, Title,
 };
-use laws::proptest::option;
 use laws::proptest::prelude::prop_oneof;
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use newtype::Newtype;
-use structurer::{Directive, Directives, Label, Misread, NodeRef, Replacement};
+use structurer::{Directive, Directives, Edge, Label, Misread, NodeRef, Proposal};
 use strum::VariantArray;
 
 struct Generated;
@@ -29,9 +28,23 @@ impl Generated {
         ]
     }
 
-    fn replacement() -> impl Strategy<Value = Replacement> {
+    fn replacement() -> impl Strategy<Value = Edge<NodeRef>> {
         (Self::node(), Self::node())
-            .prop_filter_map("a node never supersedes itself", |(old, by)| Replacement::new(old, by).ok())
+            .prop_filter_map("a node never supersedes itself", |(old, by)| Edge::new(old, by).ok())
+    }
+
+    fn link() -> impl Strategy<Value = Edge<structurer::SegmentRef>> {
+        (Self::segment(), Self::segment())
+            .prop_filter_map("a segment never links to itself", |(source, target)| Edge::new(source, target).ok())
+    }
+
+    fn proposal() -> impl Strategy<Value = Proposal> {
+        prop_oneof![
+            Self::node().prop_map(Proposal::Anonymous),
+            (Self::label(), Self::node())
+                .prop_filter_map("a node never refines itself", |(label, refines)| Edge::new(label, refines).ok())
+                .prop_map(Proposal::Labelled)
+        ]
     }
 
     fn sense() -> impl Strategy<Value = Sense> {
@@ -51,11 +64,10 @@ impl Generated {
             (Self::segment(), Self::node(), select(SpanRelation::VARIANTS))
                 .prop_map(|(segment, node, relation)| Directive::Place { segment, node, relation }),
             (Self::segment(), Self::sense()).prop_map(|(segment, sense)| Directive::Sense { segment, sense }),
-            (Self::segment(), Self::segment(), select(SegmentRelation::VARIANTS))
-                .prop_map(|(source, target, relation)| Directive::Link { source, target, relation }),
-            (option::of(Self::label()), Self::node(), select(Facet::VARIANTS), "[^\r\n]{0,24}").prop_map(
-                |(fresh, refines, facet, title)| Directive::Propose { fresh, refines, facet, title: Title::new(title) }
-            ),
+            (Self::link(), select(SegmentRelation::VARIANTS))
+                .prop_map(|(edge, relation)| Directive::Link { edge, relation }),
+            (Self::proposal(), select(Facet::VARIANTS), "[^\r\n]{0,24}")
+                .prop_map(|(proposal, facet, title)| Directive::Propose { proposal, facet, title: Title::new(title) }),
             Self::replacement().prop_map(Directive::Supersede),
             Self::segment().prop_map(|segment| Directive::Conversational { segment }),
         ]
@@ -148,6 +160,12 @@ laws::table!(
         "supersede(n1, by(n1))" => Spot::at(1, 18),
         "supersede(x, by(x))" => Spot::at(1, 17),
         "supersede(x, by(n1))" => None,
+        "link(85b287b3.0, 85b287b3.0, answers)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, refers-to)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, supersedes)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.0, corrects)" => Spot::at(1, 18),
+        "link(85b287b3.0, 85b287b3.1, corrects)" => None,
+        "propose(new x, refines(x), feature, \"t\")" => Spot::at(1, 24),
         "propose(new x, refines(n1), feature, \"t\")" => None,
         "propose(new  x, refines(y), feature, \"t\")" => None,
         "propose(new n2, refines(n1), feature, \"t\")" => Spot::at(1, 9),

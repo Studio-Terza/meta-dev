@@ -5,7 +5,7 @@ use grammar::directive::{Lexed, Line, Location, Piece};
 
 use crate::misread::Wanted;
 use crate::verb::{By, New, Verb};
-use crate::{Directive, Label, Misread, NodeRef, Replacement, SegmentRef};
+use crate::{Directive, Edge, Label, Misread, NodeRef, Proposal, SegmentRef};
 
 #[derive(Debug)]
 pub(crate) struct Reader<'line> {
@@ -138,10 +138,28 @@ impl<'line> Term<'line> {
         self.named(Wanted::Node)
     }
 
-    pub(crate) fn replaced_by(&self, by: &Term<'line>) -> Result<Replacement, Misread> {
+    pub(crate) fn replaced_by(&self, by: &Term<'line>) -> Result<Edge<NodeRef>, Misread> {
         let replacing = by.within::<By>(Wanted::By)?;
-        Replacement::new(self.node()?, replacing.node()?)
-            .map_err(|_itself| Misread::expected(replacing.located(), Wanted::Successor))
+        replacing.ending(self.node()?, replacing.node()?)
+    }
+
+    pub(crate) fn ending<Source: Clone, Target: From<Source> + PartialEq>(
+        &self,
+        source: Source,
+        target: Target,
+    ) -> Result<Edge<Source, Target>, Misread> {
+        Edge::new(source, target).map_err(|_looped| Misread::expected(self.located(), Wanted::Distinct))
+    }
+
+    pub(crate) fn proposal(&self, fresh: Option<Label>) -> Result<Proposal, Misread> {
+        self.node().and_then(|refines| self.refined(fresh, refines))
+    }
+
+    pub(crate) fn refined(&self, fresh: Option<Label>, refines: NodeRef) -> Result<Proposal, Misread> {
+        match fresh {
+            None => Ok(Proposal::Anonymous(refines)),
+            Some(label) => self.ending(label, refines).map(Proposal::Labelled),
+        }
     }
 
     pub(crate) fn fresh(&self) -> Result<Option<Label>, Misread> {

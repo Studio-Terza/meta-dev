@@ -4,12 +4,12 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::{
-    Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Segment, Stage,
-    Supersession, Title,
+    Entered, Entry, Facet, Kin, Node, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Segment,
+    SegmentRelation, Stage, Supersession, Title,
 };
 use design_store::{
-    Directed, Directions, Linked, NewNode, NextNode, Placed, Prefixed, ProjectRoot, Scope, SearchSegments,
-    SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema, SupersededBy,
+    Covered, Directed, Directions, Linked, NewNode, NextNode, Ordered, Placed, Prefixed, ProjectRoot, Scope,
+    SearchSegments, SessionCursors, SessionRecords, ShownMessage, ShownNode, StreamSchema, SupersededBy,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -520,5 +520,58 @@ fn a_prefix_finds_every_segment_of_the_messages_it_starts() -> Result<(), Box<dy
     assert_eq!(heard("o1")?, owner);
     assert_eq!(heard("l1")?, [(Proposals::segment("l1", 0), Authorship::Lead)]);
     assert_eq!(heard("1")?, []);
+    Ok(())
+}
+
+#[test]
+fn a_message_is_covered_where_any_annotation_names_its_segments() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    let [asked, answered, said] =
+        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
+    let covered = |messages: &[&str]| -> Result<Vec<Segment>, Box<dyn Error>> {
+        let messages = messages.iter().map(|message| Uuid::new((*message).to_owned()));
+        Ok(store.read(messages.collect::<Covered>())?.into_iter().collect())
+    };
+    assert_eq!(covered(&["o1", "l1"])?, []);
+    let related =
+        Directed::Related { source: said.clone(), target: answered.clone(), relation: SegmentRelation::Answers };
+    Proposals::written(&store, vec![Directed::Conversational { segment: asked.clone() }, related])?;
+    assert_eq!(covered(&["o1"])?, [asked.clone(), answered.clone()]);
+    assert_eq!(covered(&["l1"])?, std::slice::from_ref(&said));
+    assert_eq!(covered(&["o1", "l1"])?, [said, asked, answered]);
+    Ok(())
+}
+
+#[test]
+fn a_segment_reaches_itself_and_every_segment_down_its_chain_of_one_relation() -> Result<(), Box<dyn Error>> {
+    let Recorded { records, .. } = Recorded::session()?;
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(records)?;
+    let [asked, answered, said] =
+        [("o1", 0), ("o1", 1), ("l1", 0)].map(|(message, ordinal)| Proposals::segment(message, ordinal));
+    let link = |source: &Segment, target: &Segment, relation| Directed::Related {
+        source: source.clone(),
+        target: target.clone(),
+        relation,
+    };
+    Proposals::written(
+        &store,
+        vec![
+            link(&said, &answered, SegmentRelation::Supersedes),
+            link(&answered, &asked, SegmentRelation::Supersedes),
+            link(&asked, &said, SegmentRelation::Corrects),
+        ],
+    )?;
+    let reached = |relation, from: &Segment| -> Result<Vec<Segment>, Box<dyn Error>> {
+        Ok(store.read(Ordered::along(relation, from.clone()))?.into_iter().collect())
+    };
+    assert_eq!(reached(SegmentRelation::Supersedes, &said)?, [said.clone(), asked.clone(), answered.clone()]);
+    assert_eq!(reached(SegmentRelation::Supersedes, &answered)?, [asked.clone(), answered.clone()]);
+    assert_eq!(reached(SegmentRelation::Corrects, &asked)?, [said.clone(), asked.clone()]);
+    assert_eq!(reached(SegmentRelation::Answers, &said)?, [said]);
     Ok(())
 }

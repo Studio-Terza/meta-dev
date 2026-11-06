@@ -1,10 +1,12 @@
 mod annotation;
 mod boundary;
+mod covered;
 mod cursors;
 mod directions;
 mod earlier_lines;
 mod graph;
 mod link;
+mod ordered;
 mod placed;
 mod prefixed;
 mod project_root;
@@ -21,11 +23,13 @@ mod superseded_by;
 
 pub use annotation::{Annotation, Remarking};
 pub use boundary::Hit;
+pub use covered::Covered;
 pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
 pub use graph::{Linked, NewNode};
 use link::Link;
+pub use ordered::Ordered;
 pub use placed::Placed;
 pub use prefixed::{NextNode, Prefixed, Spoken};
 pub use project_root::ProjectRoot;
