@@ -7,15 +7,15 @@ use transcript_ports::{ReadFailure, Uuid};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
-    #[error("usage: design ingest [--workspace <dir>] | design show <uuid> [--workspace <dir>]")]
+    #[error("usage: design [--workspace <dir>] (ingest | show <uuid>)")]
     Usage,
     #[error("the environment does not name {0:?}")]
     Unset(OsString),
     #[error("the workspace path {0:?} is not text")]
     Unreadable(PathBuf),
-    #[error("{0}")]
+    #[error("cannot reach the transcripts: {0}")]
     Files(#[from] FileFailure),
-    #[error("{0}")]
+    #[error("cannot read the transcripts: {0}")]
     Read(#[from] ReadFailure),
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),

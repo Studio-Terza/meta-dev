@@ -1,7 +1,8 @@
 use console_ports::Process;
-use design::{Cli, Failure};
+use design::{Cli, Failure, Outcome};
+use exit::Exit;
 use file_ports::Disk;
 
-fn main() -> Result<(), Failure> {
-    Process::answer(|arguments, out, _err| Cli::new(&Process, Disk).rooted(arguments.into_iter(), out)).map(drop)
+fn main() -> Exit<Outcome, Failure> {
+    Exit::from(Process::answer(|arguments, out, _err| Cli::new(&Process, Disk).rooted(arguments.into_iter(), out)))
 }

@@ -108,6 +108,8 @@ name = "design"
 version = "0.1.0"
 dependencies = [
  "console-ports",
+ "e2e",
+ "exit",
  "file-ports",
  "logos",
  "newtype",
@@ -125,6 +127,7 @@ dependencies = [
  "console-ports",
  "file-ports",
  "serde_json",
+ "tempfile",
  "toml",
 ]
 
@@ -161,6 +164,10 @@ dependencies = [
  "libc",
  "windows-sys",
 ]
+
+[[package]]
+name = "exit"
+version = "0.1.0"
 
 [[package]]
 name = "fastrand"

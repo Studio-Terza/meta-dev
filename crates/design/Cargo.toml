@@ -11,6 +11,7 @@ doctest = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
+exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 logos.workspace = true
 newtype = { path = "../newtype" }
@@ -18,6 +19,9 @@ port-core = { path = "../port-core" }
 stream = { path = "../stream" }
 thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+e2e = { path = "../../e2e" }
 
 [lints]
 workspace = true
