@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
 
@@ -6,10 +7,13 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
-use design_store::StreamSchema;
+use design_store::{ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, Files, Memory};
-use port_core::Run;
+use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::test_runner::TestCaseError;
+use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store};
+use transcript_ports::Uuid;
 
 const HOME: &str = "/home/tester";
 
@@ -82,6 +86,49 @@ impl Session {
         )
     }
 
+    fn linked() -> Session {
+        Session::working(
+            [
+                Self::line(Speaker::Owner, Self::ASKED, "null", "what of aaaaaaaa-0000-4000-8000-000000000004"),
+                Self::line(
+                    Speaker::Lead,
+                    "aaaaaaaa-0000-4000-8000-000000000002",
+                    "\"aaaaaaaa-0000-4000-8000-000000000001\"",
+                    "1. a\\n2. b",
+                ),
+                Self::line(Speaker::Unheard, "b1", "\"aaaaaaaa-0000-4000-8000-000000000002\"", "result"),
+                Self::line(Speaker::Owner, "aaaaaaaa-0000-4000-8000-000000000003", "\"b1\"", "1. yes\\n2. no"),
+                Self::line(
+                    Speaker::Lead,
+                    "aaaaaaaa-0000-4000-8000-000000000004",
+                    "\"aaaaaaaa-0000-4000-8000-000000000003\"",
+                    "see aaaaaaaa-0000-4000-8000-000000000001",
+                ),
+                Self::line(
+                    Speaker::Owner,
+                    "aaaaaaaa-0000-4000-8000-000000000005",
+                    "\"aaaaaaaa-0000-4000-8000-000000000004\"",
+                    "what of aaaaaaaa-0000-4000-8000-000000000004",
+                ),
+            ]
+            .concat(),
+        )
+    }
+
+    const ASKED: &str = "aaaaaaaa-0000-4000-8000-000000000001";
+
+    const SAID: [&str; 5] = [
+        Self::ASKED,
+        "aaaaaaaa-0000-4000-8000-000000000002",
+        "aaaaaaaa-0000-4000-8000-000000000003",
+        "aaaaaaaa-0000-4000-8000-000000000004",
+        "aaaaaaaa-0000-4000-8000-000000000005",
+    ];
+
+    fn prefix(&self, cut: usize) -> Session {
+        Session { directory: self.directory, lines: self.lines.chars().take(cut).collect() }
+    }
+
     fn files(&self) -> Memory {
         let memory = Memory::default();
         memory.create_directories(Path::new(self.directory)).ok();
@@ -145,6 +192,50 @@ fn ingest_counts_each_authorship_unrecognised_kind_form_and_relation() -> Result
     assert!(out.contains("form item 1\n"));
     assert!(out.contains("form sentence 2\n"));
     Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Link {
+    source: String,
+    relation: String,
+    target: String,
+}
+
+struct Links;
+
+impl Links {
+    fn stored(store: &Sqlite) -> Result<BTreeSet<Link>, Failure> {
+        let run = Run::root();
+        let port = run.port(store.clone());
+        let shown = Session::SAID
+            .iter()
+            .map(|uuid| {
+                let uuid = Uuid::new((*uuid).to_owned());
+                port.read(ShownMessage::named(uuid.clone()))?.ok_or(Failure::Missing(uuid))
+            })
+            .collect::<Result<Vec<_>, Failure>>()?;
+        Ok(shown
+            .iter()
+            .flat_map(Stored::links)
+            .map(|link| {
+                let [source, target] = link.anchors();
+                Link { source: source.to_string(), relation: link.relation().to_string(), target: target.to_string() }
+            })
+            .collect())
+    }
+
+    fn whole(session: &Session) -> Result<BTreeSet<Link>, Failure> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Invocation::against(&store, session, &["ingest"])?;
+        Self::stored(&store)
+    }
+
+    fn split(session: &Session, cut: usize) -> Result<BTreeSet<Link>, Failure> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Invocation::against(&store, &session.prefix(cut), &["ingest"])?;
+        Invocation::against(&store, session, &["ingest"])?;
+        Self::stored(&store)
+    }
 }
 
 struct Answered {
@@ -249,7 +340,7 @@ fn a_second_ingest_over_unchanged_transcripts_writes_nothing_new() -> Result<(),
     let store = Sqlite::in_memory::<StreamSchema>();
     let first = Invocation::against(&store, &Session::answered(), &["ingest"])?;
     let second = Invocation::against(&store, &Session::answered(), &["ingest"])?;
-    assert!(first.contains("written 6\n"));
+    assert!(first.contains("written 8\n"));
     assert!(second.contains("written 0\n"));
     assert_eq!(second.matches("authorship").count(), 0);
     Ok(())
@@ -278,4 +369,64 @@ fn a_second_ingest_is_refused_while_the_store_lock_is_held() -> Result<(), Busy>
     drop(held);
     assert!(Invocation::against(&store, &Session::answered(), &["ingest"]).is_ok());
     Ok(())
+}
+
+#[test]
+fn a_reply_appended_after_an_ingest_links_to_the_message_stored_before_it() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let asked = Session::line(Speaker::Owner, "o1", "null", "question");
+    let answered = Session::line(Speaker::Lead, "l1", "\"o1\"", "answer");
+    let thanked = Session::line(Speaker::Owner, "o2", "\"l1\"", "thanks");
+    Invocation::against(&store, &Session::working(asked.clone()), &["ingest"])?;
+    Invocation::against(&store, &Session::working([asked.clone(), answered.clone()].concat()), &["ingest"])?;
+    let shown = Invocation::against(&store, &Session::answered(), &["show", "o1"])?;
+    assert!(shown.contains("link l1 replies-to o1"));
+    let resumed = Invocation::against(&store, &Session::working([asked, answered, thanked].concat()), &["ingest"])?;
+    assert!(resumed.contains("relation replies-to 1\n"));
+    Ok(())
+}
+
+laws::law!(ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_whole, 0usize..1400, cut, {
+    let session = Session::linked();
+    let whole = Links::whole(&session).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let split = Links::split(&session, cut).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let relations: BTreeSet<&str> = whole.iter().map(|link| link.relation.as_str()).collect();
+    prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
+    prop_assert_eq!(split, whole);
+});
+
+#[derive(Debug, thiserror::Error)]
+#[error("the lock was already gone")]
+struct Gone;
+
+#[derive(Debug, Resource)]
+struct Broken;
+
+impl Release for Broken {
+    type Failure = Gone;
+
+    fn release(&mut self, _pass: Pass<'_, Released<Broken>>) -> Result<ReleaseReceipt, Gone> {
+        Err(Gone)
+    }
+}
+
+#[port]
+trait Locks {
+    fn lock(&self) -> Held<'_, Broken>;
+}
+
+struct Locker;
+
+impl LocksFiller for Locker {
+    fn lock(&self, _pass: Pass<'_, locks_ops::Lock>) -> Broken {
+        Broken
+    }
+}
+
+#[test]
+fn a_failed_command_keeps_the_release_failures_of_its_run() {
+    let run = Run::root();
+    drop(run.port(Locker).lock());
+    let settled = Failure::settled(Err(Failure::Usage), run.finish().settled());
+    assert!(matches!(settled, Err(Failure::Unreleased { command, .. }) if matches!(*command, Failure::Usage)));
 }

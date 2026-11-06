@@ -37,8 +37,7 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
     {
         let run = Run::root();
         let outcome = self.report(&run, arguments, out);
-        let settled = run.finish().settled();
-        outcome.and_then(|outcome| settled.map(|_snapshot| outcome).map_err(Failure::from))
+        Failure::settled(outcome, run.finish().settled())
     }
 
     pub fn report<S: StoreFiller>(

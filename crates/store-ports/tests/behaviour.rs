@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use design_store::{SessionCursors, StreamSchema};
 use file_ports::Offset;
 use port_core::{Op, Run};
-use store_ports::{Batch, Busy, Query, Sqlite, Statements, Store, StoreFailure, Written};
+use store_ports::{Batch, Busy, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use tempfile::TempDir;
 use transcript_ports::{Cursor, SessionId};
 
@@ -76,7 +76,7 @@ fn reopening_a_store_keeps_its_rows_and_runs_no_migration_again() -> Result<(), 
     let reopened = run.port(place.opened());
     let cursors = reopened.read(SessionCursors)?;
     assert_eq!(cursors.resuming(&SessionId::new("s".to_owned())), Cursor::new(Offset::new(7)));
-    assert_eq!(reopened.read(Applied)?.len(), 1);
+    assert_eq!(reopened.read(Applied)?.len(), StreamSchema::migrator().iter().count());
     Ok(())
 }
 

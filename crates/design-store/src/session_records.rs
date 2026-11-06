@@ -4,13 +4,14 @@ use store_ports::{Batch, Statements, StoreFailure, Written};
 use stream::Stream;
 use transcript_ports::{Cursor, SessionId};
 
-use crate::boundary::{CursorRow, LinkRow, MessageRow, Row, SegmentRow};
+use crate::boundary::{CursorRow, EdgeRow, LinkRow, MessageRow, Row, SegmentRow};
 
 #[derive(Debug, Op)]
 pub struct SessionRecords {
     messages: Vec<MessageRow>,
     segments: Vec<SegmentRow>,
     links: Vec<LinkRow>,
+    edges: Vec<EdgeRow>,
     cursor: CursorRow,
 }
 
@@ -22,6 +23,11 @@ impl SessionRecords {
             messages: messages.iter().map(MessageRow::from).collect(),
             segments: messages.iter().flat_map(SegmentRow::within).collect(),
             links: stream.links().iter().map(LinkRow::from).collect(),
+            edges: messages
+                .iter()
+                .map(|message| EdgeRow::said(session, message))
+                .chain(stream.skipped().iter().map(|skipped| EdgeRow::skipped(session, skipped)))
+                .collect(),
             cursor: CursorRow::reached(session, cursor),
         }
     }
@@ -38,6 +44,7 @@ impl Batch for SessionRecords {
             Self::all(&self.messages, statements)?,
             Self::all(&self.segments, statements)?,
             Self::all(&self.links, statements)?,
+            Self::all(&self.edges, statements)?,
             self.cursor.written(statements)?,
         ];
         Ok(Written::total(written.into_iter()))

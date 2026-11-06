@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
@@ -443,4 +444,18 @@ laws::table!(
         "total_tokens_reminder" => ["8 after 1"],
         "ultrathink_effort" => ["8 after 1"],
     ]
+);
+
+laws::roundtrip!(
+    an_authorship_is_read_back_from_its_display,
+    select(vec![Authorship::Owner, Authorship::Lead]),
+    |author: &Authorship| author.to_string(),
+    |name: &String| name.parse::<Authorship>().ok(),
+    Some,
+);
+
+laws::table!(
+    a_name_of_neither_party_is_no_authorship,
+    |name: &&str| name.parse::<Authorship>().ok(),
+    ["human" => None, "" => None],
 );

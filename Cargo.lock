@@ -250,6 +250,7 @@ dependencies = [
  "exit",
  "file-ports",
  "grammar",
+ "laws",
  "newtype",
  "port-core",
  "store-ports",

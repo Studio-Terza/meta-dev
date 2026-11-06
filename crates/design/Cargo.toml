@@ -24,6 +24,7 @@ transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 e2e = { path = "../../e2e" }
+laws = { path = "../laws" }
 
 [lints]
 workspace = true

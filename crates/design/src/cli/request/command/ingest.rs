@@ -2,11 +2,11 @@ mod count;
 
 use std::fmt;
 
-use design_store::{Cursors, SessionCursors, SessionRecords};
+use design_store::{Cursors, EarlierLines, SessionCursors, SessionRecords};
 use newtype::Counter;
 use store_ports::{Store, Written};
 use stream::{Message, Relation, Shape, Stream};
-use transcript_ports::{Authorship, Cursor, Kind, Session, SessionId, Transcripts, Unrecognised};
+use transcript_ports::{Authorship, Cursor, Kind, Line, Session, SessionId, Transcripts, Unrecognised};
 
 use crate::cli::failure::Failure;
 use count::{Counts, Label};
@@ -54,7 +54,9 @@ impl<'ports, T: Transcripts, S: Store> Ingest<'ports, T, S> {
     fn session(&self, session: &Session) -> Result<Ingested, Failure> {
         let read = self.transcripts.read_from(session, self.cursors.resuming(session.stem()))?;
         let end = ReadTo::ending(session, read.cursor());
-        let stream: Stream = read.into_iter().collect();
+        let lines: Vec<Line> = read.into_iter().collect();
+        let earlier = lines.first().map(|_| self.store.read(EarlierLines::within(end.session.clone()))).transpose()?;
+        let stream = earlier.unwrap_or_default().resumed(lines);
         let written = self.store.write(SessionRecords::read(&end.session, end.cursor, &stream))?;
         Ok(Ingested { end, stream, written })
     }

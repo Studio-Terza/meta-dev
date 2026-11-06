@@ -3,9 +3,11 @@ use std::io;
 use std::path::PathBuf;
 
 use file_ports::FileFailure;
-use port_core::ReleaseFailures;
+use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::{ReadFailure, Uuid};
+
+use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
@@ -31,4 +33,25 @@ pub enum Failure {
     Unlock(#[from] Unlock),
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
+    #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
+    Unreleased { command: Box<Failure>, released: ReleaseFailures },
+}
+
+impl Failure {
+    pub fn settled(
+        outcome: Result<Outcome, Failure>,
+        released: Result<Snapshot, ReleaseFailures>,
+    ) -> Result<Outcome, Failure> {
+        match outcome {
+            Ok(outcome) => released.map(|_snapshot| outcome).map_err(Failure::Released),
+            Err(command) => Err(Failure::unreleasing(command, released)),
+        }
+    }
+
+    fn unreleasing(command: Failure, released: Result<Snapshot, ReleaseFailures>) -> Failure {
+        match released {
+            Ok(_snapshot) => command,
+            Err(released) => Failure::Unreleased { command: Box::new(command), released },
+        }
+    }
 }

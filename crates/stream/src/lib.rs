@@ -1,4 +1,5 @@
 mod anchor;
+mod earlier;
 mod form;
 mod link;
 mod message;
@@ -9,6 +10,7 @@ mod segment_id;
 mod shape;
 mod stream;
 
+pub use earlier::Earlier;
 pub use link::MechanicalLink;
 pub use message::Message;
 pub use relation::Relation;

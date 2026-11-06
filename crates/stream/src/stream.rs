@@ -1,20 +1,33 @@
 mod links;
 
-use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised};
+use std::collections::BTreeSet;
 
-use crate::{MechanicalLink, Message};
+use newtype::{Arbitrary, Display, Newtype};
+use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised, Uuid};
+
+use crate::{Earlier, MechanicalLink, Message};
 use links::Links;
+
+#[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Earliest(usize);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Resumed {
+    messages: Earliest,
+    skipped: Earliest,
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Stream {
     messages: Vec<Message>,
     skipped: Vec<Skipped>,
     unrecognised: Vec<Unrecognised>,
+    resumed: Resumed,
 }
 
 impl FromIterator<Line> for Stream {
     fn from_iter<Lines: IntoIterator<Item = Line>>(lines: Lines) -> Stream {
-        lines.into_iter().fold(Stream::default(), |stream, line| line.gathered(stream))
+        Earlier::default().resumed(lines)
     }
 }
 
@@ -38,14 +51,29 @@ impl Gather for Stream {
 
 impl AsRef<[Message]> for Stream {
     fn as_ref(&self) -> &[Message] {
-        &self.messages
+        self.messages.get(self.resumed.messages.into_inner()..).unwrap_or_default()
     }
 }
 
 impl Stream {
+    pub(crate) fn after(messages: Vec<Message>, skipped: Vec<Skipped>) -> Stream {
+        let resumed = Resumed { messages: Earliest::new(messages.len()), skipped: Earliest::new(skipped.len()) };
+        Stream { messages, skipped, unrecognised: Vec::new(), resumed }
+    }
+
     #[must_use]
     pub fn links(&self) -> Vec<MechanicalLink> {
-        Links::over(&self.messages, &self.skipped).all()
+        let fresh: BTreeSet<&Uuid> = self.as_ref().iter().map(|message| message.record().uuid()).collect();
+        Links::over(&self.messages, &self.skipped)
+            .all()
+            .into_iter()
+            .filter(|link| link.anchors().iter().any(|anchor| fresh.contains(anchor.message())))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn skipped(&self) -> &[Skipped] {
+        self.skipped.get(self.resumed.skipped.into_inner()..).unwrap_or_default()
     }
 
     #[must_use]

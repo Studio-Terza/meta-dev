@@ -2,7 +2,7 @@ use file_ports::Offset;
 use newtype::{Arbitrary, Display, Newtype};
 use store_ports::{Statements, StoreFailure, Written};
 use stream::{MechanicalLink, Message, Shape};
-use transcript_ports::{Body, Cursor, Instant, SessionId, Uuid};
+use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct Author(String);
@@ -48,6 +48,13 @@ pub struct LinkRow {
 }
 
 #[derive(Debug)]
+pub(crate) struct EdgeRow {
+    session: String,
+    uuid: String,
+    parent: Option<String>,
+}
+
+#[derive(Debug)]
 pub(crate) struct CursorRow {
     session: String,
     read_to: i64,
@@ -64,6 +71,26 @@ impl From<&Message> for MessageRow {
             author: record.author().to_string(),
             body: record.text().to_string(),
         }
+    }
+}
+
+impl TryFrom<MessageRow> for Record {
+    type Error = sqlx::Error;
+
+    fn try_from(row: MessageRow) -> Result<Record, sqlx::Error> {
+        let author: Authorship = row.author.parse().map_err(|unvoiced| sqlx::Error::Decode(Box::new(unvoiced)))?;
+        Ok(Skipped::new(Uuid::new(row.uuid), row.parent.map(Uuid::new)).said(
+            SessionId::new(row.session),
+            Instant::new(row.at),
+            author,
+            Body::new(row.body),
+        ))
+    }
+}
+
+impl From<EdgeRow> for Skipped {
+    fn from(row: EdgeRow) -> Skipped {
+        Skipped::new(Uuid::new(row.uuid), row.parent.map(Uuid::new))
     }
 }
 
@@ -94,6 +121,16 @@ impl MessageRow {
             "SELECT uuid, session, parent, at, author, body FROM messages WHERE uuid = ?1",
             uuid
         ))
+    }
+
+    pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {
+        let session = session.to_string();
+        let rows = statements.rows(sqlx::query_as!(
+            MessageRow,
+            "SELECT messages.uuid, messages.session, messages.parent, messages.at, messages.author, messages.body FROM edges JOIN messages ON messages.uuid = edges.uuid WHERE edges.session = ?1 ORDER BY edges.rowid",
+            session
+        ))?;
+        Ok(rows.into_iter().map(Record::try_from).collect::<Result<Vec<Record>, sqlx::Error>>()?)
     }
 
     #[must_use]
@@ -173,6 +210,35 @@ impl LinkRow {
     }
 }
 
+impl EdgeRow {
+    pub(crate) fn said(session: &SessionId, message: &Message) -> EdgeRow {
+        let record = message.record();
+        EdgeRow {
+            session: session.to_string(),
+            uuid: record.uuid().to_string(),
+            parent: record.parent().map(ToString::to_string),
+        }
+    }
+
+    pub(crate) fn skipped(session: &SessionId, skipped: &Skipped) -> EdgeRow {
+        EdgeRow {
+            session: session.to_string(),
+            uuid: skipped.uuid().to_string(),
+            parent: skipped.parent().map(ToString::to_string),
+        }
+    }
+
+    pub(crate) fn passing(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Skipped>, StoreFailure> {
+        let session = session.to_string();
+        let rows = statements.rows(sqlx::query_as!(
+            EdgeRow,
+            "SELECT session, uuid, parent FROM edges WHERE session = ?1 AND uuid NOT IN (SELECT uuid FROM messages) ORDER BY rowid",
+            session
+        ))?;
+        Ok(rows.into_iter().map(Skipped::from).collect())
+    }
+}
+
 impl CursorRow {
     pub(crate) fn reached(session: &SessionId, cursor: Cursor) -> CursorRow {
         CursorRow {
@@ -229,6 +295,17 @@ impl Row for LinkRow {
             self.target,
             self.source_message,
             self.target_message
+        ))
+    }
+}
+
+impl Row for EdgeRow {
+    fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(sqlx::query!(
+            "INSERT OR IGNORE INTO edges (session, uuid, parent) VALUES (?1, ?2, ?3)",
+            self.session,
+            self.uuid,
+            self.parent
         ))
     }
 }
