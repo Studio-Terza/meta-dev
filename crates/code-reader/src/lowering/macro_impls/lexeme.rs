@@ -13,6 +13,9 @@ pub(super) enum Mark {
     Closing,
     Metavariable,
     Dash,
+    Equals,
+    Arrow,
+    Semicolon,
     Word,
     Group,
     #[default]
@@ -20,24 +23,42 @@ pub(super) enum Mark {
 }
 
 impl Mark {
-    const PUNCTUATION: [(char, Mark); 4] = [
+    const PUNCTUATION: [(char, Mark); 6] = [
         (MacroImpls::OPEN, Mark::Opening),
         (MacroImpls::CLOSE, Mark::Closing),
         (MacroImpls::METAVARIABLE, Mark::Metavariable),
         (MacroImpls::DASH, Mark::Dash),
+        (MacroImpls::EQUALS, Mark::Equals),
+        (MacroImpls::SEMICOLON, Mark::Semicolon),
     ];
 
     fn after(self, dash: Dash) -> Mark {
         match self {
             Mark::Closing => dash.closing(),
-            Mark::Opening | Mark::Metavariable | Mark::Dash | Mark::Word | Mark::Group | Mark::Other => self,
+            Mark::Opening
+            | Mark::Metavariable
+            | Mark::Dash
+            | Mark::Equals
+            | Mark::Arrow
+            | Mark::Semicolon
+            | Mark::Word
+            | Mark::Group
+            | Mark::Other => self,
         }
     }
 
     fn joint(self) -> Dash {
         match self {
             Mark::Dash => Dash::Joint,
-            Mark::Opening | Mark::Closing | Mark::Metavariable | Mark::Word | Mark::Group | Mark::Other => Dash::Apart,
+            Mark::Equals => Dash::Fat,
+            Mark::Opening
+            | Mark::Closing
+            | Mark::Metavariable
+            | Mark::Arrow
+            | Mark::Semicolon
+            | Mark::Word
+            | Mark::Group
+            | Mark::Other => Dash::Apart,
         }
     }
 }
@@ -70,6 +91,7 @@ impl From<Ordering> for Depth {
 #[derive(Clone, Copy, Debug)]
 enum Dash {
     Joint,
+    Fat,
     Apart,
 }
 
@@ -77,6 +99,7 @@ impl Dash {
     fn closing(self) -> Mark {
         match self {
             Dash::Joint => Mark::Other,
+            Dash::Fat => Mark::Arrow,
             Dash::Apart => Mark::Closing,
         }
     }
@@ -151,6 +174,13 @@ impl Lexeme {
     pub(super) fn delimiter(&self) -> Option<Delimiter> {
         match self {
             Lexeme::Group { delimiter, .. } => Some(*delimiter),
+            Lexeme::Word(_) | Lexeme::Punctuation(_) | Lexeme::Other => None,
+        }
+    }
+
+    pub(super) fn children(&self) -> Option<&[Lexeme]> {
+        match self {
+            Lexeme::Group { children, .. } => Some(children),
             Lexeme::Word(_) | Lexeme::Punctuation(_) | Lexeme::Other => None,
         }
     }

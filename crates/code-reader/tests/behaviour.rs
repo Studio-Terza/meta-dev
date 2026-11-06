@@ -25,6 +25,7 @@ const GLOB_STD: &str =
     "use std::fmt::*;\nuse core::hash::*;\nimpl Debug for R {}\nimpl Hash for R {}\nimpl Clone for R {}\n";
 const SELF_IMPORT: &str = "use std::fmt::{self, Write};\nimpl fmt::Debug for R {}\n";
 const ARROW: &str = "macro_rules! m {\n    () => { impl<F: Fn() -> u8> Clone for W<F> {} };\n}\n";
+const MATCHER: &str = "macro_rules! m {\n    (impl Clone for $t:ty) => { impl Shown for $t {} };\n}\n";
 const HIGHER_RANKED: &str = "macro_rules! m {\n    () => { impl<F: for<'a> Fn(&'a u8)> Clone for W<F> {} };\n}\n";
 
 struct Expect;
@@ -173,4 +174,5 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     SELF_IMPORT => [Expect::std(&["std", "fmt", "Debug"])],
     ARROW => [Expect::std(&["std", "clone", "Clone"])],
     HIGHER_RANKED => [Expect::std(&["std", "clone", "Clone"])],
+    MATCHER => [Expect::external(&["Shown"])],
 ]);

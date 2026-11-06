@@ -151,7 +151,8 @@ impl Lints {
             .flatten()
             .collect();
         let model = Reader::read(readout);
-        rendered.extend(Workers::available().spread(|shard| Self::answered(&model, shard)));
+        rendered
+            .extend(Workers::available().at_most(Self::QUERIES.len()).spread(|shard| Self::answered(&model, shard)));
         rendered.sort_by_key(Rendered::slot);
         Outcome::from_rendered(rendered, readout.failures())
     }

@@ -1,3 +1,4 @@
+mod arms;
 mod lexeme;
 
 use proc_macro2::{Delimiter, Ident, TokenStream};
@@ -8,6 +9,7 @@ use code_model::{Found, Implementation, Origin, TraitPath};
 use lint_layout::{LineNumber, Name};
 
 use super::scopes::Scopes;
+use arms::Arms;
 use lexeme::{Depth, Lexeme, Mark};
 
 #[derive(Debug)]
@@ -21,12 +23,21 @@ impl MacroImpls {
     const OPEN: char = '<';
     const CLOSE: char = '>';
     const DASH: char = '-';
+    const EQUALS: char = '=';
+    const SEMICOLON: char = ';';
 
     pub(super) fn in_macro(found: &Macro, scopes: &Scopes) -> Vec<Found<Implementation>> {
         Some(found)
             .filter(|found| found.path.is_ident(Self::MACRO_RULES))
             .and_then(|found| found.parse_body_with(|input: ParseStream<'_>| input.parse::<TokenStream>()).ok())
-            .map(|body| Self::written(&Lexeme::sequence(body), scopes))
+            .map(Lexeme::sequence)
+            .map(|lexemes| {
+                Arms::transcribed(&lexemes)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .flat_map(|transcriber| Self::written(transcriber.lexemes(), scopes))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
