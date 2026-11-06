@@ -1,17 +1,16 @@
-use crate::{Facet, Project, Provenance, Stage};
+use crate::{Facet, Project, Provenance};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     project: Project,
     facet: Facet,
-    stage: Stage,
     provenance: Provenance,
 }
 
 impl Entry {
     #[must_use]
-    pub fn new(project: Project, facet: Facet, stage: Stage, provenance: Provenance) -> Entry {
-        Entry { project, facet, stage, provenance }
+    pub fn new(project: Project, facet: Facet, provenance: Provenance) -> Entry {
+        Entry { project, facet, provenance }
     }
 
     #[must_use]
@@ -22,11 +21,6 @@ impl Entry {
     #[must_use]
     pub fn facet(&self) -> Facet {
         self.facet
-    }
-
-    #[must_use]
-    pub fn stage(&self) -> Stage {
-        self.stage
     }
 
     #[must_use]

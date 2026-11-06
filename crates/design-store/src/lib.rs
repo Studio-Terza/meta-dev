@@ -29,7 +29,7 @@ pub use covered::Covered;
 pub use cursors::Cursors;
 pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
-pub use graph::{Linked, NewNode};
+pub use graph::{Cast, Linked, Planting, Restaged};
 use link::Link;
 pub use placed::Placed;
 pub use prefixed::{NextNode, Prefixed, Spoken};

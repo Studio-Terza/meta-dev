@@ -1,13 +1,13 @@
-use design_model::{Kin, Node};
+use design_model::{AnyNode, Kin};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Relative {
     kin: Kin,
-    node: Node,
+    node: AnyNode,
 }
 
 impl Relative {
-    pub(crate) fn new(kin: Kin, node: Node) -> Relative {
+    pub(crate) fn new(kin: Kin, node: AnyNode) -> Relative {
         Relative { kin, node }
     }
 
@@ -17,7 +17,7 @@ impl Relative {
     }
 
     #[must_use]
-    pub fn node(&self) -> &Node {
+    pub fn node(&self) -> &AnyNode {
         &self.node
     }
 }

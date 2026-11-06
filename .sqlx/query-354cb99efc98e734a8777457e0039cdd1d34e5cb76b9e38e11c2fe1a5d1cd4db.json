@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, project, facet, stage, provenance, title FROM nodes WHERE id = ?1",
+  "query": "SELECT id, project, facet, stage, provenance, title, role, role_provenance, artifact, condition, reason FROM nodes WHERE id = ?1",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,61 @@
             "name": "title"
           }
         }
+      },
+      {
+        "name": "role",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "name": "role_provenance",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "role_provenance"
+          }
+        }
+      },
+      {
+        "name": "artifact",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "artifact"
+          }
+        }
+      },
+      {
+        "name": "condition",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "condition"
+          }
+        }
+      },
+      {
+        "name": "reason",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "nodes",
+            "name": "reason"
+          }
+        }
       }
     ],
     "parameters": {
@@ -79,8 +134,13 @@
       false,
       false,
       false,
+      true,
+      false,
+      false,
+      true,
+      true,
       true
     ]
   },
-  "hash": "2ea28e580ec5c8b85ede72a92033e882f1a110ab2d36b88c16a2e174e10b1150"
+  "hash": "354cb99efc98e734a8777457e0039cdd1d34e5cb76b9e38e11c2fe1a5d1cd4db"
 }

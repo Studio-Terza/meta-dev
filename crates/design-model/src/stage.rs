@@ -5,4 +5,10 @@ use strum::VariantArray;
 pub enum Stage {
     #[name("vague")]
     Vague,
+    #[name("refining")]
+    Refining,
+    #[name("terminal")]
+    Terminal,
+    #[name("dropped")]
+    Dropped,
 }

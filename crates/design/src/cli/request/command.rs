@@ -1,6 +1,7 @@
 mod apply;
 mod ingest;
 mod init;
+mod lifecycle;
 mod printed;
 mod search;
 mod subject;
@@ -15,12 +16,13 @@ use grammar::search::Terms;
 use store_ports::{Sqlite, Store};
 
 use super::persistence::Persistence;
-use super::{Ground, Token};
+use super::{Flag, Ground, Token, Valued};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 pub use apply::{Application, Applied, Unresolved};
 use ingest::Ingest;
 use init::Init;
+use lifecycle::{Move, Moving, Recast};
 use printed::Printed;
 use search::Search;
 use subject::Subject;
@@ -32,15 +34,19 @@ pub enum Command {
     Search(Terms, Scope),
     Init(Init),
     Apply(PathBuf),
+    Move(Move),
+    Recast(Recast),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Verb {
+pub enum Verb {
     Ingest,
     Show,
     Search,
     Init,
     Apply,
+    Move(Moving),
+    Role,
 }
 
 impl FromStr for Verb {
@@ -52,15 +58,31 @@ impl FromStr for Verb {
 }
 
 impl Verb {
-    const NAMED: [(&'static str, Verb); 5] = [
+    const NAMED: [(&'static str, Verb); 10] = [
         ("ingest", Verb::Ingest),
         ("show", Verb::Show),
         ("search", Verb::Search),
         ("init", Verb::Init),
         ("apply", Verb::Apply),
+        ("refine", Verb::Move(Moving::Refine)),
+        ("specify", Verb::Move(Moving::Specify)),
+        ("reopen", Verb::Move(Moving::Reopen)),
+        ("drop", Verb::Move(Moving::Drop)),
+        ("role", Verb::Role),
     ];
 
-    fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
+    pub fn options(self) -> &'static [Flag] {
+        match self {
+            Verb::Ingest => &[Flag::DryRun],
+            Verb::Search => &[Flag::All],
+            Verb::Init => &[Flag::Valued(Valued::Consumes)],
+            Verb::Move(Moving::Specify) => &[Flag::Valued(Valued::Artifact), Flag::Valued(Valued::Condition)],
+            Verb::Move(Moving::Drop) => &[Flag::Valued(Valued::Reason)],
+            Verb::Show | Verb::Apply | Verb::Move(Moving::Refine | Moving::Reopen) | Verb::Role => &[],
+        }
+    }
+
+    pub fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
         match self {
             Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
             Verb::Show => Token::only(rest).and_then(Subject::try_from).map(Command::Show),
@@ -73,24 +95,22 @@ impl Verb {
                 .map(|terms| Command::Search(terms, scope)),
             Verb::Init => Init::try_from(rest).map(Command::Init),
             Verb::Apply => Token::only(rest).map(PathBuf::from).map(Command::Apply),
+            Verb::Move(moving) => Move::read(moving, rest).map(Command::Move),
+            Verb::Role => Recast::read(rest).map(Command::Recast),
         }
     }
 }
 
 impl Command {
-    pub fn spoken(words: &[Token], scope: Scope) -> Result<Command, Failure> {
-        words
-            .first()
-            .and_then(Token::text)
-            .ok_or(Failure::Usage)
-            .and_then(str::parse::<Verb>)
-            .and_then(|verb| verb.command(words.get(1..).unwrap_or_default(), scope))
-    }
-
     pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
         match self {
             Command::Ingest(persistence) => persistence.opened(path, opened),
-            Command::Show(_) | Command::Search(..) | Command::Init(_) | Command::Apply(_) => opened(path),
+            Command::Show(_)
+            | Command::Search(..)
+            | Command::Init(_)
+            | Command::Apply(_)
+            | Command::Move(_)
+            | Command::Recast(_) => opened(path),
         }
     }
 
@@ -112,6 +132,8 @@ impl Command {
                 .and_then(|initialised| Printed::shown(out, &initialised))
                 .map(|_printed| Outcome::Initialised),
             Command::Apply(path) => Application::read(&ground, &path).and_then(|application| application.reported(out)),
+            Command::Move(moving) => moving.written(ground.store(), out),
+            Command::Recast(recast) => recast.written(ground.store(), out),
         }
     }
 }

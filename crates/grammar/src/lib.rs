@@ -1,5 +1,8 @@
+pub mod artifact;
 pub mod directive;
+pub mod flag;
 pub mod ident;
+pub mod line;
 pub mod message;
 pub mod node;
 pub mod project;

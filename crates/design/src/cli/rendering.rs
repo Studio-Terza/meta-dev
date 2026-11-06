@@ -1,6 +1,9 @@
 use std::fmt;
 
-use design_model::{Entered, Node, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{
+    AnyNode, AnyStage, Dropped, Entered, NodeEdge, NodeId, Segment, SegmentRelation, Sense, SpanRelation, Staging,
+    Terminal,
+};
 use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
@@ -11,7 +14,13 @@ use super::request::Applied;
 pub struct Id(NodeId);
 
 #[derive(Clone, Copy, Debug)]
-pub struct Line<'node>(&'node Node);
+pub struct Edge(NodeEdge);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Line<'node>(&'node AnyNode);
+
+#[derive(Clone, Copy, Debug)]
+struct Details<'stage>(&'stage AnyStage);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Neighbourhood<'placed>(&'placed Placed);
@@ -30,8 +39,14 @@ impl From<NodeId> for Id {
     }
 }
 
-impl<'node> From<&'node Node> for Line<'node> {
-    fn from(node: &'node Node) -> Line<'node> {
+impl From<NodeEdge> for Edge {
+    fn from(edge: NodeEdge) -> Edge {
+        Edge(edge)
+    }
+}
+
+impl<'node> From<&'node AnyNode> for Line<'node> {
+    fn from(node: &'node AnyNode) -> Line<'node> {
         Line(node)
     }
 }
@@ -60,16 +75,24 @@ impl fmt::Display for Id {
     }
 }
 
+impl fmt::Display for Edge {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let [source, target] = self.0.ends();
+        write!(formatter, "{} {} {}", Id(source), self.0.relation(), Id(target))
+    }
+}
+
 impl fmt::Display for Line<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let entry = self.0.entry();
         write!(
             formatter,
-            "{} {} {} {} entered {}",
+            "{} {} {} {} {} entered {}",
             Id(self.0.identity()),
             entry.project(),
             entry.facet(),
-            entry.stage(),
+            self.0.stage().stage(),
+            self.0.casting().role(),
             Entered::from(entry.provenance())
         )?;
         self.0.title().iter().try_for_each(|title| write!(formatter, " {:?}", title.to_string()))
@@ -79,19 +102,35 @@ impl fmt::Display for Line<'_> {
 impl fmt::Display for Neighbourhood<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "{}", Line(self.0.node()))?;
+        write!(formatter, "{}", Details(self.0.node().stage()))?;
         self.0
             .relatives()
             .iter()
             .try_for_each(|relative| writeln!(formatter, "  {} {}", relative.kin(), Line(relative.node())))?;
         self.0.links().iter().try_for_each(|link| {
-            writeln!(
-                formatter,
-                "  {} {} entered {}",
-                link.relation(),
-                Id(link.target()),
-                Entered::from(link.provenance())
-            )
-        })
+            writeln!(formatter, "  {} entered {}", Edge(link.edge()), Entered::from(link.provenance()))
+        })?;
+        let casting = self.0.node().casting();
+        writeln!(formatter, "  role {} entered {}", casting.role(), Entered::from(casting.provenance()))
+    }
+}
+
+impl fmt::Display for Details<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.staged(Writing(formatter)).unwrap_or(Ok(()))
+    }
+}
+
+impl Staging for Writing<'_, '_> {
+    type Output = fmt::Result;
+
+    fn terminal(self, terminal: &Terminal) -> fmt::Result {
+        writeln!(self.0, "  artifact {}", terminal.artifact())?;
+        writeln!(self.0, "  condition {:?}", terminal.condition().to_string())
+    }
+
+    fn dropped(self, dropped: &Dropped) -> fmt::Result {
+        writeln!(self.0, "  reason {:?}", dropped.reason().to_string())
     }
 }
 

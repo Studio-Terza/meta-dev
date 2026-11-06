@@ -1,6 +1,6 @@
 mod boundary;
 
-use design_model::{NodeId, NodeRelation, Segment, SegmentRelation};
+use design_model::{Inversion, NodeId, NodeRelation, Segment, SegmentRelation};
 use named_derive::Named;
 use store_ports::{Statements, StoreFailure};
 
@@ -28,6 +28,8 @@ pub enum Cycle {
 pub enum Refusal {
     #[error("the edge would close a cycle of its relation")]
     Cyclic(Cycle),
+    #[error("{0}")]
+    Inverted(#[from] Inversion),
     #[error("{0}")]
     Store(#[from] StoreFailure),
 }

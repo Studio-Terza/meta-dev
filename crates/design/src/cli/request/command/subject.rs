@@ -10,7 +10,7 @@ use transcript_ports::Uuid;
 use super::printed::Printed;
 use crate::cli::failure::Failure;
 use crate::cli::rendering::Neighbourhood;
-use placed::Found;
+pub use placed::Found;
 use shown::Shown;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

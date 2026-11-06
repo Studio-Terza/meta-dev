@@ -4,8 +4,8 @@ use std::io::Write;
 use std::path::Path;
 
 use design_model::{
-    Entered, Entry, Facet, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment, SegmentRelation, Sense,
-    SpanRelation, Stage, Straddling, Supersession, Title,
+    AnyNode, Entered, Entry, Facet, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment, SegmentRelation,
+    Sense, SpanRelation, Straddling, Supersession, Title, Vague,
 };
 use design_store::{
     AppliedFile, Closes, Covered, Cycle, Directed, Directions, Earlier, NextNode, Prefixed, Sees, ShownNode, Spoken,
@@ -87,7 +87,7 @@ struct Resolution<'store, S: Store> {
 struct Batch {
     next: NodeId,
     labels: BTreeMap<Label, NodeId>,
-    proposed: BTreeMap<NodeId, Node>,
+    proposed: BTreeMap<NodeId, AnyNode>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -99,7 +99,7 @@ struct Labels<'batch>(&'batch BTreeMap<Label, NodeId>);
 #[derive(Debug)]
 enum Effect {
     Unchanged,
-    Proposed { node: Node, fresh: Option<Label> },
+    Proposed { node: Node<Vague>, fresh: Option<Label> },
 }
 
 #[derive(Debug)]
@@ -247,7 +247,7 @@ impl Batch {
             Effect::Proposed { node, fresh } => Batch {
                 next: NodeId::new(node.identity().into_inner().saturating_add(1)),
                 labels: self.labels.into_iter().chain(fresh.clone().map(|label| (label, node.identity()))).collect(),
-                proposed: self.proposed.into_iter().chain([(node.identity(), node.clone())]).collect(),
+                proposed: self.proposed.into_iter().chain([(node.identity(), node.clone().any())]).collect(),
             },
             Effect::Unchanged => self,
         }
@@ -286,12 +286,12 @@ impl<S: Store> Resolution<'_, S> {
         Ok(Heard { segment, message: spoken })
     }
 
-    fn node(&self, reference: &NodeRef) -> Result<Node, Failure> {
+    fn node(&self, reference: &NodeRef) -> Result<AnyNode, Failure> {
         let id = reference.bound(Labels(&self.batch.labels))?;
         self.batch.proposed.get(&id).cloned().map_or_else(|| self.stored(id), Ok)
     }
 
-    fn stored(&self, id: NodeId) -> Result<Node, Failure> {
+    fn stored(&self, id: NodeId) -> Result<AnyNode, Failure> {
         let placed = self.store.read(ShownNode::from(id))?;
         Ok(placed.map(|placed| placed.node().clone()).ok_or(Unresolved::Unplaced(id))?)
     }
@@ -365,8 +365,8 @@ impl<S: Store> Visit for &Resolution<'_, S> {
     ) -> Result<Grounded, Failure> {
         let fresh = fresh.map(|label| self.batch.unbound(label)).transpose()?;
         let parent = self.node(refines)?;
-        let entry = Entry::new(parent.entry().project().clone(), facet, Stage::Vague, Provenance::from(Entered::Apply));
-        let node = Node::new(self.batch.next, entry).titled(title.clone());
+        let entry = Entry::new(parent.entry().project().clone(), facet, Provenance::from(Entered::Apply));
+        let node = Node::proposed(self.batch.next, entry, parent.casting()).titled(title.clone());
         let effect = Effect::Proposed { node: node.clone(), fresh };
         Ok(Grounded { directed: Directed::Proposed { node, parent: parent.identity() }, heard: Vec::new(), effect })
     }

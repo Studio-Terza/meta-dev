@@ -1,4 +1,7 @@
+use grammar::artifact::Artifacts;
+use grammar::flag::Flags;
 use grammar::ident::Words;
+use grammar::line::Unbroken;
 use grammar::message::{Depth, Lexemes, Mark, Number};
 use grammar::node::{Ids, Spelled};
 use grammar::search::Terms;
@@ -101,5 +104,80 @@ laws::table!(
         "n" => Spelled::Unspelled,
         "42" => Spelled::Unspelled,
         "n42x" => Spelled::Unspelled,
+    ]
+);
+
+struct Spellings;
+
+impl Spellings {
+    fn artifact(text: &str) -> Option<[String; 2]> {
+        Artifacts::spelled(text).map(|spelled| spelled.joined(|kind, name| [kind.to_owned(), name.to_owned()]))
+    }
+}
+
+laws::table!(
+    an_artifact_is_spelled_as_a_lowercase_kind_a_colon_and_a_name,
+    |text: &&str| Spellings::artifact(text),
+    [
+        "lint:no-comments" => Some(["lint".to_owned(), "no-comments".to_owned()]),
+        "behaviour:tests::a_law" => Some(["behaviour".to_owned(), "tests::a_law".to_owned()]),
+        "tool:crates/design.rs" => Some(["tool".to_owned(), "crates/design.rs".to_owned()]),
+        "Lint:x" => None,
+        "lint" => None,
+        "lint:" => None,
+        ":x" => None,
+        "lint:x y" => None,
+        "lint :x" => None,
+        "lint: x" => None,
+        "lint:-x" => None,
+        "" => None,
+    ]
+);
+
+laws::table!(
+    one_unbroken_line_with_a_visible_character_is_spelled_whole,
+    |text: &&str| Unbroken::spelled(text).map(str::to_owned),
+    [
+        "a condition" => Some("a condition".to_owned()),
+        "  padded " => Some("  padded ".to_owned()),
+        "\tx" => Some("\tx".to_owned()),
+        "" => None,
+        "  " => None,
+        "\t" => None,
+        "a\nb" => None,
+        "a\r\n" => None,
+        "\na" => None,
+        "\u{b}" => None,
+        "\u{c}" => None,
+        "\u{a0}" => None,
+        "\u{2028}" => None,
+        "\u{85}" => None,
+        "\u{3000}\t" => None,
+        "\u{a0}x" => Some("\u{a0}x".to_owned()),
+        "x\u{b}y" => None,
+        "x\u{c}y" => None,
+        "x\u{85}y" => None,
+        "x\u{2028}y" => None,
+        "x\u{2029}y" => None,
+        "x\ry" => None,
+        "x\u{2029}" => None,
+        "\u{85}x" => None,
+        "x\u{2007}y" => Some("x\u{2007}y".to_owned()),
+    ]
+);
+
+laws::table!(
+    a_word_led_by_two_dashes_is_spelled_as_a_flag,
+    |text: &&str| Flags::spelled(text).map(str::to_owned),
+    [
+        "--reason" => Some("--reason".to_owned()),
+        "--" => Some("--".to_owned()),
+        "---x" => Some("---x".to_owned()),
+        "--no such" => Some("--no such".to_owned()),
+        "-r" => None,
+        "demo" => None,
+        "a--b" => None,
+        " --reason" => None,
+        "" => None,
     ]
 );

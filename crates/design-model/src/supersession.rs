@@ -24,7 +24,7 @@ pub struct Straddling {
 }
 
 impl Supersession {
-    pub fn within(old: &Node, by: &Node) -> Result<Supersession, Straddling> {
+    pub fn within<Old, By>(old: &Node<Old>, by: &Node<By>) -> Result<Supersession, Straddling> {
         let straddling = Straddling {
             old: old.identity(),
             old_project: old.entry().project().clone(),

@@ -1,4 +1,4 @@
 mod boundary;
 
-pub use boundary::{Linked, NewNode};
-pub(crate) use boundary::{NodeRow, OutgoingRow, RelativeRow};
+pub use boundary::{Cast, Linked, Planting, Restaged};
+pub(crate) use boundary::{EdgeRow, NodeRow, RelativeRow};

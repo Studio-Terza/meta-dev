@@ -4,7 +4,7 @@ use store_ports::{Query, Statements, StoreFailure};
 
 use crate::Placed;
 use crate::acyclic::Refines;
-use crate::graph::{NodeRow, OutgoingRow, RelativeRow};
+use crate::graph::{EdgeRow, NodeRow, RelativeRow};
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct ShownNode(NodeId);
@@ -21,7 +21,7 @@ impl Query for ShownNode {
     fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Placed>, StoreFailure> {
         let nodes = NodeRow::named(self.0, statements)?;
         let relatives = RelativeRow::around::<Refines>(self.0, statements)?;
-        let links = OutgoingRow::from_node(self.0, statements)?;
+        let links = EdgeRow::links(self.0, statements)?;
         Ok(nodes.into_iter().next().map(|node| Placed::new(node, relatives, links)))
     }
 }

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::Token;
+pub use boundary::{Shaped, Token, Valued};
