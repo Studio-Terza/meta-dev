@@ -8,10 +8,17 @@ pub enum Failure {
     Ran(Box<dyn std::fmt::Debug>),
     Exceeded { scale: Scale, name: OpName, limit: Calls, calls: Calls },
     Superlinear { name: OpName, base: Calls, scaled: Calls, factor: Scale },
+    Written(std::io::Error),
 }
 
 impl From<RootRefused> for Failure {
     fn from(refused: RootRefused) -> Failure {
         Failure::Refused(refused)
+    }
+}
+
+impl From<std::io::Error> for Failure {
+    fn from(error: std::io::Error) -> Failure {
+        Failure::Written(error)
     }
 }

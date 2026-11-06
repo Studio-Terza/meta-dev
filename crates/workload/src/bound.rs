@@ -1,6 +1,6 @@
 use port_core::{Calls, Op, OpName, Snapshot};
 
-use crate::{Failure, Scale};
+use crate::{Failure, Scale, Within};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Bound {
@@ -14,10 +14,11 @@ impl Bound {
         Bound { name: O::NAME, limit }
     }
 
-    pub fn checked(self, snapshot: &Snapshot, scale: Scale) -> Result<(), Failure> {
+    pub fn checked(self, snapshot: &Snapshot, scale: Scale) -> Result<Within, Failure> {
         let calls = snapshot.named(self.name);
         Some(calls)
-            .filter(|made| *made > self.limit)
-            .map_or(Ok(()), |made| Err(Failure::Exceeded { scale, name: self.name, limit: self.limit, calls: made }))
+            .filter(|made| *made <= self.limit)
+            .map(|made| Within::new(self.name, made, self.limit))
+            .ok_or(Failure::Exceeded { scale, name: self.name, limit: self.limit, calls })
     }
 }

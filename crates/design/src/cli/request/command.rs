@@ -8,6 +8,7 @@ use std::str::FromStr;
 use transcript_ports::{Transcripts, Uuid};
 
 use crate::cli::failure::Failure;
+use crate::cli::printed::Printed;
 use ingest::Ingest;
 use shown::Shown;
 
@@ -60,10 +61,10 @@ impl TryFrom<&[OsString]> for Command {
 }
 
 impl Command {
-    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<(), Failure> {
+    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<Printed, Failure> {
         match self {
-            Command::Ingest => Ingest::read(port).and_then(|tally| Ok(write!(out, "{tally}")?)),
-            Command::Show(uuid) => Shown::find(port, uuid).and_then(|shown| Ok(write!(out, "{shown}")?)),
+            Command::Ingest => Ingest::read(port).and_then(|tally| Printed::shown(out, &tally)),
+            Command::Show(uuid) => Shown::find(port, uuid).and_then(|shown| Printed::shown(out, &shown)),
         }
     }
 }

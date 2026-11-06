@@ -1,34 +1,38 @@
 use std::marker::PhantomData;
 
-use port_core::{Rooting, Run, Snapshot};
+use port_core::{Rooting, Run};
 
-use crate::{Failure, Scale, Workload};
+use crate::{Bounded, Failure, Growth, Scale, Verified, Workload};
 
 #[derive(Debug)]
 pub struct Harness<W>(PhantomData<W>);
 
 impl<W: Workload> Harness<W> {
-    pub fn verified() -> Result<(), Failure> {
-        let measured = Scale::ALL
-            .into_iter()
-            .map(|scale| Self::measured(scale).map(|snapshot| (scale, snapshot)))
-            .collect::<Result<Vec<_>, Failure>>()?;
-        measured.iter().skip(1).try_for_each(|(scale, snapshot)| {
-            measured.first().map_or(Ok(()), |(_, base)| Self::growth(base, snapshot, *scale))
-        })
+    pub fn verified() -> Result<Verified<W>, Failure> {
+        let runs = Scale::ALL.into_iter().map(Self::bounded).collect::<Result<Vec<_>, Failure>>()?;
+        let growths = runs
+            .split_first()
+            .map_or(Ok(Vec::new()), |(base, scaled)| scaled.iter().map(|run| Self::growth(base, run)).collect())?;
+        Ok(Verified::new(runs, growths))
     }
 
-    fn measured(scale: Scale) -> Result<Snapshot, Failure> {
+    fn bounded(scale: Scale) -> Result<Bounded<W::Done>, Failure> {
         let run = Run::root(Rooting::Sole)?;
-        W::run(&run, W::fixture(scale)).map_err(|failure| Failure::Ran(Box::new(failure)))?;
+        let done = W::run(&run, W::fixture(scale)).map_err(|failure| Failure::Ran(Box::new(failure)))?;
         let snapshot = run.finish().snapshot().clone();
-        W::bounds(scale).into_iter().try_for_each(|bound| bound.checked(&snapshot, scale))?;
-        Ok(snapshot)
+        let within =
+            W::bounds(scale).into_iter().map(|bound| bound.checked(&snapshot, scale)).collect::<Result<_, _>>()?;
+        Ok(Bounded::new(scale, done, snapshot, within))
     }
 
-    fn growth(base: &Snapshot, scaled: &Snapshot, factor: Scale) -> Result<(), Failure> {
-        scaled.iter().try_for_each(|counted| {
-            W::CLASS.admits(counted.name(), base.named(counted.name()), counted.calls(), factor)
-        })
+    fn growth(base: &Bounded<W::Done>, scaled: &Bounded<W::Done>) -> Result<Growth, Failure> {
+        scaled
+            .snapshot()
+            .iter()
+            .map(|counted| {
+                W::CLASS.admits(counted.name(), base.snapshot().named(counted.name()), counted.calls(), scaled.scale())
+            })
+            .collect::<Result<_, _>>()
+            .map(|admitted| Growth::new(W::CLASS, scaled.scale(), admitted))
     }
 }

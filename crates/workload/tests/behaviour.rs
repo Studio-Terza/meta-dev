@@ -44,15 +44,17 @@ impl Steady {
         scale.count().saturating_mul(2)
     }
 
-    fn ticked(run: &Run, ticks: usize) {
+    fn ticked(run: &Run, ticks: usize) -> usize {
         let port = run.port(Books);
         (0..ticks).for_each(|_| Ledger::tick(&port));
         Ledger::tock(&port);
+        ticks
     }
 }
 
 impl Workload for Steady {
     type Fixture = usize;
+    type Done = usize;
     type Failure = Infallible;
     type Scaled = ledger_ops::Tick;
     type Listed = ledger_ops::Tock;
@@ -67,14 +69,14 @@ impl Workload for Steady {
         Calls::new(Steady::ticks(scale))
     }
 
-    fn run(run: &Run, ticks: usize) -> Result<(), Infallible> {
-        Steady::ticked(run, ticks);
-        Ok(())
+    fn run(run: &Run, ticks: usize) -> Result<usize, Infallible> {
+        Ok(Steady::ticked(run, ticks))
     }
 }
 
 impl Workload for Greedy {
     type Fixture = usize;
+    type Done = usize;
     type Failure = Infallible;
     type Scaled = ledger_ops::Tick;
     type Listed = ledger_ops::Tock;
@@ -89,14 +91,14 @@ impl Workload for Greedy {
         Calls::new(Steady::ticks(scale))
     }
 
-    fn run(run: &Run, ticks: usize) -> Result<(), Infallible> {
-        Steady::ticked(run, ticks);
-        Ok(())
+    fn run(run: &Run, ticks: usize) -> Result<usize, Infallible> {
+        Ok(Steady::ticked(run, ticks))
     }
 }
 
 impl Workload for Quadratic {
     type Fixture = usize;
+    type Done = usize;
     type Failure = Infallible;
     type Scaled = ledger_ops::Tick;
     type Listed = ledger_ops::Tock;
@@ -111,9 +113,8 @@ impl Workload for Quadratic {
         Calls::new(usize::MAX)
     }
 
-    fn run(run: &Run, ticks: usize) -> Result<(), Infallible> {
-        Steady::ticked(run, ticks);
-        Ok(())
+    fn run(run: &Run, ticks: usize) -> Result<usize, Infallible> {
+        Ok(Steady::ticked(run, ticks))
     }
 
     fn bounds(_scale: Scale) -> Vec<Bound> {
@@ -123,6 +124,7 @@ impl Workload for Quadratic {
 
 impl Workload for Broken {
     type Fixture = ();
+    type Done = usize;
     type Failure = Calls;
     type Scaled = ledger_ops::Tick;
     type Listed = ledger_ops::Tock;
@@ -135,7 +137,7 @@ impl Workload for Broken {
         Calls::zero()
     }
 
-    fn run(_run: &Run, _fixture: ()) -> Result<(), Calls> {
+    fn run(_run: &Run, _fixture: ()) -> Result<usize, Calls> {
         Err(Calls::zero())
     }
 }

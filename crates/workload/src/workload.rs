@@ -4,6 +4,7 @@ use crate::{Bound, Complexity, Scale};
 
 pub trait Workload {
     type Fixture;
+    type Done: std::fmt::Display;
     type Failure: std::fmt::Debug + 'static;
     type Scaled: Op;
     type Listed: Op;
@@ -14,7 +15,7 @@ pub trait Workload {
 
     fn inputs(scale: Scale) -> Calls;
 
-    fn run(run: &Run, fixture: Self::Fixture) -> Result<(), Self::Failure>;
+    fn run(run: &Run, fixture: Self::Fixture) -> Result<Self::Done, Self::Failure>;
 
     #[must_use]
     fn bounds(scale: Scale) -> Vec<Bound> {

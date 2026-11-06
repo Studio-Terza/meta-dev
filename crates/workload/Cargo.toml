@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+console-ports = { path = "../console-ports" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 

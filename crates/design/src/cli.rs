@@ -1,4 +1,5 @@
 mod failure;
+mod printed;
 mod request;
 mod streams;
 
@@ -12,6 +13,7 @@ use port_core::{Rooting, Run};
 use transcript_ports::ClaudeCodeDir;
 
 pub use failure::Failure;
+pub use printed::Printed;
 use request::Request;
 pub use streams::Streams;
 
@@ -38,7 +40,7 @@ impl<'environment, E: Environment, F: Files> Cli<'environment, E, F> {
             run.finish();
             reported
         });
-        outcome.map_or_else(|failure| streams.refused(&failure), |()| ExitCode::SUCCESS)
+        outcome.map_or_else(|failure| streams.refused(&failure), |_printed| ExitCode::SUCCESS)
     }
 
     pub fn report(
@@ -46,7 +48,7 @@ impl<'environment, E: Environment, F: Files> Cli<'environment, E, F> {
         run: &Run,
         arguments: impl Iterator<Item = OsString>,
         out: &mut impl Write,
-    ) -> Result<(), Failure> {
+    ) -> Result<Printed, Failure> {
         let request = Request::parsed(arguments)?;
         let directory = request.directory(self.environment)?;
         let port = run.port(ClaudeCodeDir::new(self.files, directory));
