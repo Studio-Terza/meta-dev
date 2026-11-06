@@ -22,20 +22,4 @@ impl Line {
             Line::Skipped(skipped) => into.skipped(skipped),
         }
     }
-
-    #[must_use]
-    pub fn said(self) -> Option<Record> {
-        match self {
-            Line::Said(record) => Some(record),
-            Line::Skipped(_) => None,
-        }
-    }
-
-    #[must_use]
-    pub fn skipped(self) -> Option<Skipped> {
-        match self {
-            Line::Said(_) => None,
-            Line::Skipped(skipped) => Some(skipped),
-        }
-    }
 }

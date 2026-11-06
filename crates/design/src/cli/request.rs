@@ -3,6 +3,7 @@ mod projects;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use console_ports::Environment;
 
@@ -36,9 +37,29 @@ enum Argument {
     Plain(OsString),
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Flag {
+    Workspace,
+}
+
+impl FromStr for Flag {
+    type Err = Failure;
+
+    fn from_str(name: &str) -> Result<Flag, Failure> {
+        Self::NAMED.iter().find(|(known, _)| *known == name).map(|(_, flag)| *flag).ok_or(Failure::Usage)
+    }
+}
+
+impl Flag {
+    const NAMED: [(&'static str, Flag); 1] = [("--workspace", Flag::Workspace)];
+}
+
 impl From<OsString> for Argument {
     fn from(argument: OsString) -> Argument {
-        Some(argument).filter(|word| **word != *"--workspace").map_or(Argument::Workspace, Argument::Plain)
+        match argument.to_str().and_then(|word| word.parse::<Flag>().ok()) {
+            Some(Flag::Workspace) => Argument::Workspace,
+            None => Argument::Plain(argument),
+        }
     }
 }
 

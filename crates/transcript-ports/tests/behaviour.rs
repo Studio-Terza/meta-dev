@@ -6,7 +6,9 @@ use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
-use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Instant, Line, Read, Record, Session, Transcripts};
+use transcript_ports::{
+    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Read, Record, Session, Skipped, Transcripts,
+};
 
 const DIRECTORY: &str = "/projects/work";
 const SESSION: &str = "/projects/work/s1.jsonl";
@@ -98,16 +100,41 @@ impl Transcript {
     }
 }
 
+#[derive(Default)]
+struct Gathered {
+    records: Vec<Record>,
+    skipped: Vec<Skipped>,
+}
+
+impl Gather for Gathered {
+    fn said(mut self, record: Record) -> Gathered {
+        self.records.push(record);
+        self
+    }
+
+    fn skipped(mut self, skipped: Skipped) -> Gathered {
+        self.skipped.push(skipped);
+        self
+    }
+}
+
+impl From<Read> for Gathered {
+    fn from(read: Read) -> Gathered {
+        read.into_iter().fold(Gathered::default(), |gathered, line| line.gathered(gathered))
+    }
+}
+
 struct Views;
 
 impl Views {
     fn records(read: Read) -> Vec<Record> {
-        read.into_iter().filter_map(Line::said).collect()
+        Gathered::from(read).records
     }
 
     fn edges(read: Read) -> Vec<String> {
-        read.into_iter()
-            .filter_map(Line::skipped)
+        Gathered::from(read)
+            .skipped
+            .into_iter()
             .filter_map(|skipped| skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid())))
             .collect()
     }
@@ -174,7 +201,7 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
-    let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().as_ref().to_owned()).collect();
+    let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().to_string()).collect();
     assert_eq!(texts, ["abc"]);
     Ok(())
 }

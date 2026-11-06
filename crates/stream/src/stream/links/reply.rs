@@ -11,6 +11,11 @@ pub struct Reply<'stream> {
     replied: &'stream Message,
 }
 
+struct OwnerReply<'stream> {
+    replying: &'stream Message,
+    replied: &'stream Message,
+}
+
 impl<'stream> Reply<'stream> {
     pub fn new(replying: &'stream Message, replied: &'stream Message) -> Reply<'stream> {
         Reply { replying, replied }
@@ -25,9 +30,18 @@ impl<'stream> Reply<'stream> {
     }
 
     pub fn answers(&self) -> Answers {
-        let answering = Some(self.replying)
-            .filter(|reply| reply.record().author() == Authorship::Owner)
-            .filter(|_| self.replied.record().author() == Authorship::Lead);
-        Answers::new(answering.map(Message::segments).unwrap_or_default(), self.replied.segments())
+        match self.replying.record().author() {
+            Authorship::Owner => OwnerReply { replying: self.replying, replied: self.replied }.answers(),
+            Authorship::Lead | Authorship::Bystander => Answers::default(),
+        }
+    }
+}
+
+impl OwnerReply<'_> {
+    fn answers(&self) -> Answers {
+        match self.replied.record().author() {
+            Authorship::Lead => Answers::between(self.replying, self.replied),
+            Authorship::Owner | Authorship::Bystander => Answers::default(),
+        }
     }
 }

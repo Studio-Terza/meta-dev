@@ -1,8 +1,11 @@
+mod boundary;
+
 use std::path::{Path, PathBuf};
 
 use newtype::{Arbitrary, Newtype};
 
 use crate::cli::failure::Failure;
+use boundary::Letters;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Slug(String);
@@ -14,9 +17,7 @@ impl TryFrom<&Path> for Slug {
         workspace
             .to_str()
             .ok_or_else(|| Failure::Unreadable(workspace.to_path_buf()))
-            .map(|text| {
-                text.chars().map(|letter| Some(letter).filter(char::is_ascii_alphanumeric).unwrap_or('-')).collect()
-            })
+            .map(Letters::slugged)
             .map(Slug::new)
     }
 }

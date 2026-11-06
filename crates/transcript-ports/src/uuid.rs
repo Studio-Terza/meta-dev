@@ -11,12 +11,9 @@ impl TryFrom<String> for Uuid {
     type Error = Blank;
 
     fn try_from(text: String) -> Result<Uuid, Blank> {
-        Some(text).filter(|named| named.chars().next().is_some()).map(Uuid::new).ok_or(Blank)
-    }
-}
-
-impl AsRef<str> for Uuid {
-    fn as_ref(&self) -> &str {
-        &self.0
+        match text.chars().next() {
+            Some(_) => Ok(Uuid::new(text)),
+            None => Err(Blank),
+        }
     }
 }

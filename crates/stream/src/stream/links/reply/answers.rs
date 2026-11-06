@@ -1,27 +1,33 @@
-use crate::anchor::Anchor;
-use crate::segment::Segment;
-use crate::{MechanicalLink, Relation};
+mod numbered_list;
 
+use crate::anchor::Anchor;
+use crate::{MechanicalLink, Message, Relation};
+use numbered_list::{Item, NumberedList};
+
+#[derive(Debug, Default)]
 pub struct Answers {
-    answers: Vec<Segment>,
-    asked: Vec<Segment>,
+    answers: Vec<Item>,
+    asked: NumberedList,
 }
 
 impl Answers {
-    pub fn new(answers: Vec<Segment>, asked: Vec<Segment>) -> Answers {
-        Answers { answers, asked }
+    pub fn between(replying: &Message, replied: &Message) -> Answers {
+        Answers {
+            answers: replying.segments().into_iter().filter_map(Item::top_level).collect(),
+            asked: replied.segments().into_iter().collect(),
+        }
     }
 
     pub fn links(&self) -> Vec<MechanicalLink> {
         self.answers.iter().filter_map(|answer| self.aligned(answer)).collect()
     }
 
-    fn aligned(&self, answer: &Segment) -> Option<MechanicalLink> {
-        answer.form().number().and_then(|_| self.asked.iter().find(|item| item.form() == answer.form())).map(|item| {
+    fn aligned(&self, answer: &Item) -> Option<MechanicalLink> {
+        self.asked.numbered(answer.number()).map(|item| {
             MechanicalLink::new(
-                Anchor::Segment(answer.identity().clone()),
+                Anchor::Segment(answer.segment().identity().clone()),
                 Relation::Answers,
-                Anchor::Segment(item.identity().clone()),
+                Anchor::Segment(item.segment().identity().clone()),
             )
         })
     }

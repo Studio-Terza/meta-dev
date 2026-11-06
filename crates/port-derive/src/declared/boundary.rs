@@ -1,3 +1,4 @@
+use logos::Logos;
 use quote::{ToTokens, format_ident};
 use syn::{Ident, LitStr};
 
@@ -7,22 +8,32 @@ pub enum Derivation {
     OpsModule,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Case {
-    Raise,
-    Keep,
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Hump {
+    #[regex(r"[A-Z][^A-Z]*")]
+    Capitalized,
+    #[regex(r"[^A-Z]+")]
+    Leading,
 }
 
-impl Case {
-    fn after(letter: char) -> Case {
-        Some(letter).filter(|next| *next == '_').map_or(Case::Keep, |_| Case::Raise)
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
+enum Snake {
+    #[regex(r"[^_]+")]
+    Word,
+    #[token("_")]
+    Underscore,
+}
+
+impl Snake {
+    fn raised(piece: Result<Snake, ()>, written: &str) -> Vec<char> {
+        match piece {
+            Ok(Snake::Word) => Snake::capitalized(written),
+            Ok(Snake::Underscore) | Err(()) => Vec::new(),
+        }
     }
 
-    fn applied(self, letter: char) -> Vec<char> {
-        match self {
-            Case::Raise => letter.to_uppercase().collect(),
-            Case::Keep => vec![letter],
-        }
+    fn capitalized(word: &str) -> Vec<char> {
+        word.chars().take(1).flat_map(char::to_uppercase).chain(word.chars().skip(1)).collect()
     }
 }
 
@@ -37,29 +48,20 @@ impl Spelling {
     }
 
     fn ops_module_text(caller: &Ident) -> String {
-        let snake: String = caller
-            .to_string()
-            .chars()
-            .enumerate()
-            .flat_map(|(position, letter)| {
-                let separator = (position > 0).then_some(letter).filter(|next| next.is_uppercase()).map(|_| '_');
-                separator.into_iter().chain(letter.to_lowercase())
-            })
+        let text = caller.to_string();
+        let words: Vec<String> = Hump::lexer(&text)
+            .spanned()
+            .filter_map(|(_, range)| text.get(range))
+            .map(|word| word.chars().flat_map(char::to_lowercase).collect())
             .collect();
-        format!("{snake}_ops")
+        format!("{}_ops", words.join("_"))
     }
 
     pub fn camel(method: &Ident) -> Ident {
-        let camel: String = method
-            .to_string()
-            .chars()
-            .scan(Case::Raise, |case, letter| {
-                let current = *case;
-                *case = Case::after(letter);
-                Some((current, letter))
-            })
-            .filter(|(_, letter)| *letter != '_')
-            .flat_map(|(case, letter)| case.applied(letter))
+        let text = method.to_string();
+        let camel: String = Snake::lexer(&text)
+            .spanned()
+            .flat_map(|(piece, range)| Snake::raised(piece, text.get(range).unwrap_or_default()))
             .collect();
         Ident::new(&camel, method.span())
     }

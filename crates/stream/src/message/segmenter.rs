@@ -47,7 +47,7 @@ impl Fill {
     fn marked(mark: Mark) -> Fill {
         match mark {
             Mark::Break => Fill::Blank,
-            Mark::Stop | Mark::Numbered(_) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Fill::Written,
+            Mark::Stop | Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Fill::Written,
         }
     }
 
@@ -70,7 +70,7 @@ impl Form {
     fn stopping(self) -> Ending {
         match self {
             Form::Sentence => Ending::Close,
-            Form::Item(_) | Form::Bullet | Form::Quote => Ending::Continue,
+            Form::Item(..) | Form::Bullet | Form::Quote => Ending::Continue,
         }
     }
 }
@@ -94,7 +94,7 @@ impl Open {
         match mark {
             Mark::Break => self.fill.breaking(),
             Mark::Stop => self.part.form.stopping(),
-            Mark::Numbered(_) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Ending::Continue,
+            Mark::Numbered(..) | Mark::Bulleted | Mark::Quoted | Mark::Uuid | Mark::Plain => Ending::Continue,
         }
     }
 

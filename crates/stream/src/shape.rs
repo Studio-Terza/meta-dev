@@ -14,7 +14,7 @@ impl From<Form> for Shape {
     fn from(form: Form) -> Shape {
         match form {
             Form::Sentence => Shape::Sentence,
-            Form::Item(_) => Shape::Item,
+            Form::Item(..) => Shape::Item,
             Form::Bullet => Shape::Bullet,
             Form::Quote => Shape::Quote,
         }

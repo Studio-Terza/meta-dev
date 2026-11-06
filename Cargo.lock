@@ -109,6 +109,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "file-ports",
+ "logos",
  "newtype",
  "port-core",
  "stream",
@@ -1212,7 +1213,7 @@ dependencies = [
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
- "laws",
+ "logos",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

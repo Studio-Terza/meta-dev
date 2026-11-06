@@ -93,7 +93,10 @@ impl Kind {
 
 impl Block {
     fn written(self) -> Option<Body> {
-        Some(self.kind).filter(|kind| matches!(kind, BlockKind::Text)).and(self.text)
+        match self.kind {
+            BlockKind::Text => self.text,
+            BlockKind::Other => None,
+        }
     }
 }
 

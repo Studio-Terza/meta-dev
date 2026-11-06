@@ -1,21 +1,18 @@
 mod failure;
-mod printed;
 mod request;
-mod streams;
 
 use std::ffi::OsString;
 use std::io::Write;
-use std::process::ExitCode;
 
 use console_ports::Environment;
 use file_ports::Files;
 use port_core::Run;
 use transcript_ports::ClaudeCodeDir;
 
+use crate::Outcome;
+
 pub use failure::Failure;
-use printed::Printed;
 use request::Request;
-pub use streams::Streams;
 
 #[derive(Debug)]
 pub struct Cli<'environment, E: Environment, F: Files> {
@@ -28,16 +25,11 @@ impl<'environment, E: Environment, F: Files> Cli<'environment, E, F> {
         Cli { environment, files }
     }
 
-    #[must_use]
-    pub fn rooted(
-        self,
-        arguments: impl Iterator<Item = OsString>,
-        streams: &mut Streams<impl Write, impl Write>,
-    ) -> ExitCode {
+    pub fn rooted(self, arguments: impl Iterator<Item = OsString>, out: &mut impl Write) -> Result<Outcome, Failure> {
         let run = Run::root();
-        let outcome = self.report(&run, arguments, streams.out());
+        let outcome = self.report(&run, arguments, out);
         run.finish();
-        outcome.map_or_else(|failure| streams.refused(&failure), |_printed| ExitCode::SUCCESS)
+        outcome
     }
 
     pub fn report(
@@ -45,7 +37,7 @@ impl<'environment, E: Environment, F: Files> Cli<'environment, E, F> {
         run: &Run,
         arguments: impl Iterator<Item = OsString>,
         out: &mut impl Write,
-    ) -> Result<Printed, Failure> {
+    ) -> Result<Outcome, Failure> {
         let request = Request::parsed(arguments)?;
         let directory = request.directory(self.environment)?;
         let port = run.port(ClaudeCodeDir::new(self.files, directory));

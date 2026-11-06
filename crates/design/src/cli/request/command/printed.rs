@@ -3,7 +3,7 @@ use std::io::Write;
 
 use newtype::{Arbitrary, Newtype};
 
-use super::failure::Failure;
+use crate::cli::failure::Failure;
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Printed(usize);

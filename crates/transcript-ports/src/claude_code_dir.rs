@@ -1,5 +1,7 @@
+mod extension;
+
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use file_ports::{FileFailure, Files};
 use newtype::Newtype;
@@ -7,6 +9,7 @@ use port_core::Pass;
 
 use crate::transcripts::{TranscriptsFiller, transcripts_ops};
 use crate::{Cursor, Read, ReadFailure, Session, SessionId};
+use extension::Extension;
 
 #[derive(Debug)]
 pub struct ClaudeCodeDir<F: Files> {
@@ -20,9 +23,10 @@ impl<F: Files> ClaudeCodeDir<F> {
     }
 
     fn session_at(path: PathBuf) -> Option<Session> {
-        Some(path.as_path())
-            .filter(|file| file.extension() == Some(OsStr::new("jsonl")))
-            .and_then(Path::file_stem)
+        path.extension()
+            .and_then(OsStr::to_str)
+            .and_then(|named| named.parse::<Extension>().ok())
+            .and(path.file_stem())
             .map(|stem| SessionId::new(stem.to_string_lossy().into_owned()))
             .map(|id| Session::found(id, path))
     }

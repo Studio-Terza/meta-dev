@@ -1,9 +1,9 @@
-use grammar::message::{Mark, Number};
+use grammar::message::{Depth, Mark, Number};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Form {
     Sentence,
-    Item(Number),
+    Item(Number, Depth),
     Bullet,
     Quote,
 }
@@ -11,7 +11,7 @@ pub enum Form {
 impl Form {
     pub(crate) fn opened_by(mark: Mark) -> Option<Form> {
         match mark {
-            Mark::Numbered(number) => Some(Form::Item(number)),
+            Mark::Numbered(number, depth) => Some(Form::Item(number, depth)),
             Mark::Bulleted => Some(Form::Bullet),
             Mark::Quoted => Some(Form::Quote),
             Mark::Break | Mark::Stop | Mark::Uuid | Mark::Plain => None,
@@ -20,10 +20,10 @@ impl Form {
 }
 
 impl Form {
-    pub(crate) fn number(self) -> Option<Number> {
+    pub(crate) fn top_level_number(self) -> Option<Number> {
         match self {
-            Form::Item(number) => Some(number),
-            Form::Sentence | Form::Bullet | Form::Quote => None,
+            Form::Item(number, Depth::Top) => Some(number),
+            Form::Item(_, Depth::Nested) | Form::Sentence | Form::Bullet | Form::Quote => None,
         }
     }
 }

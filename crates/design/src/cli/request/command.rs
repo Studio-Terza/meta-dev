@@ -1,4 +1,5 @@
 mod ingest;
+mod printed;
 mod shown;
 
 use std::ffi::OsString;
@@ -7,9 +8,10 @@ use std::str::FromStr;
 
 use transcript_ports::{Transcripts, Uuid};
 
+use crate::Outcome;
 use crate::cli::failure::Failure;
-use crate::cli::printed::Printed;
 use ingest::Ingest;
+use printed::Printed;
 use shown::Shown;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,10 +63,14 @@ impl TryFrom<&[OsString]> for Command {
 }
 
 impl Command {
-    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<Printed, Failure> {
+    pub fn written(&self, port: &impl Transcripts, out: &mut impl Write) -> Result<Outcome, Failure> {
         match self {
-            Command::Ingest => Ingest::read(port).and_then(|tally| Printed::shown(out, &tally)),
-            Command::Show(uuid) => Shown::find(port, uuid).and_then(|shown| Printed::shown(out, &shown)),
+            Command::Ingest => {
+                Ingest::read(port).and_then(|tally| Printed::shown(out, &tally)).map(|_printed| Outcome::Ingested)
+            }
+            Command::Show(uuid) => {
+                Shown::find(port, uuid).and_then(|shown| Printed::shown(out, &shown)).map(|_printed| Outcome::Shown)
+            }
         }
     }
 }

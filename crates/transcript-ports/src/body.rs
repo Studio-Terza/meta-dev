@@ -13,7 +13,10 @@ impl TryFrom<String> for Body {
     type Error = Nul;
 
     fn try_from(text: String) -> Result<Body, Nul> {
-        Some(text).filter(|written| written.chars().all(|letter| letter != '\0')).map(Body::new).ok_or(Nul)
+        match text.chars().find(|letter| *letter == '\0') {
+            Some(_) => Err(Nul),
+            None => Ok(Body::new(text)),
+        }
     }
 }
 

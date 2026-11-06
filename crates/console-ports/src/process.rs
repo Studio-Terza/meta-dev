@@ -1,7 +1,6 @@
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Stderr, Stdout};
-use std::process::ExitCode;
 
 use crate::Environment;
 
@@ -9,7 +8,7 @@ use crate::Environment;
 pub struct Process;
 
 impl Process {
-    pub fn answer(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> ExitCode) -> ExitCode {
+    pub fn answer<Answer>(respond: impl FnOnce(Vec<OsString>, &mut Stdout, &mut Stderr) -> Answer) -> Answer {
         respond(env::args_os().skip(1).collect(), &mut io::stdout(), &mut io::stderr())
     }
 }

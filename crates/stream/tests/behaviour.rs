@@ -209,6 +209,9 @@ laws::table!(
         Exchange { asked: "1. a\n2. b", replied: "2. no" } => ["owner#0 answers lead#1"],
         Exchange { asked: "1. a", replied: "3. none" } => Vec::<String>::new(),
         Exchange { asked: "a question?", replied: "1. yes" } => Vec::<String>::new(),
+        Exchange { asked: "Findings:\n1. a\n2. b\n\nQuestions:\n1. c\n2. d", replied: "1. yes" } => ["owner#0 answers lead#4"],
+        Exchange { asked: "Intro\n  2. nested\n1. a\n2. b", replied: "2. no" } => ["owner#0 answers lead#3"],
+        Exchange { asked: "1. a\n  1. sub\n2. b", replied: "1. yes\n2. no" } => ["owner#0 answers lead#0", "owner#1 answers lead#2"],
     ]
 );
 

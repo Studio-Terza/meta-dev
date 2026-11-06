@@ -11,6 +11,9 @@ impl TryFrom<String> for SessionId {
     type Error = Blank;
 
     fn try_from(text: String) -> Result<SessionId, Blank> {
-        Some(text).filter(|named| named.chars().next().is_some()).map(SessionId::new).ok_or(Blank)
+        match text.chars().next() {
+            Some(_) => Ok(SessionId::new(text)),
+            None => Err(Blank),
+        }
     }
 }

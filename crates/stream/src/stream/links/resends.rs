@@ -10,21 +10,21 @@ pub struct Resends;
 
 impl Resends {
     pub fn links(messages: &[Message]) -> Vec<MechanicalLink> {
-        let mut first: BTreeMap<(Authorship, &Body), &Uuid> = BTreeMap::new();
         messages
             .iter()
             .map(Message::record)
             .filter(|record| *record.text() != Body::default())
-            .filter_map(|record| {
-                let earliest = *first.entry((record.author(), record.text())).or_insert(record.uuid());
-                Some(earliest).filter(|earlier| *earlier != record.uuid()).map(|earlier| {
-                    MechanicalLink::new(
-                        Anchor::Message(record.uuid().clone()),
-                        Relation::Resends,
-                        Anchor::Message(earlier.clone()),
-                    )
-                })
+            .fold(BTreeMap::<(Authorship, &Body), Vec<&Uuid>>::new(), |mut sent, record| {
+                sent.entry((record.author(), record.text())).or_default().push(record.uuid());
+                sent
             })
+            .values()
+            .filter_map(|uuids| uuids.split_first())
+            .flat_map(|(first, later)| later.iter().map(|resent| Resends::link(resent, first)))
             .collect()
+    }
+
+    fn link(resent: &Uuid, first: &Uuid) -> MechanicalLink {
+        MechanicalLink::new(Anchor::Message(resent.clone()), Relation::Resends, Anchor::Message(first.clone()))
     }
 }
