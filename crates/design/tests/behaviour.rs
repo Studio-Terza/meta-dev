@@ -1727,3 +1727,45 @@ laws::table!(
         Foreign(Spoken::Role, "--frobnicate") => Parsed::Usage,
     ]
 );
+
+struct Rendered;
+
+impl Rendered {
+    fn applied(workspace: &Workspace, directives: &str) -> Result<String, Failure> {
+        workspace.files.write(Path::new("/q/directives"), Bytes::from(directives)).ok();
+        workspace.run("/q", &["apply", "directives"])
+    }
+
+    fn tree() -> Result<String, Box<dyn std::error::Error>> {
+        let workspace = Workspace::split();
+        workspace.run("/p", &["init", "upstream"])?;
+        workspace.run("/q", &["init", "demo", "--consumes", "upstream"])?;
+        Rendered::applied(
+            &workspace,
+            "propose(new, refines(n2), feature, \"old\")\npropose(new, refines(n2), feature, \"new\")\npropose(new, refines(n2), feature, \"spare\")",
+        )?;
+        Rendered::applied(&workspace, "supersede(n3, by(n4))")?;
+        workspace.run("/q", &["refine", "n3"])?;
+        workspace.run("/q", &["refine", "n4"])?;
+        workspace.run(
+            "/q",
+            &["specify", "n4", "--artifact", "lint:no-comments", "--condition", "every comment is refused"],
+        )?;
+        workspace.run("/q", &["role", "n5", "secondary"])?;
+        Rendered::applied(&workspace, "propose(new, refines(n5), smell, \"inherited\")")?;
+        workspace.run("/q", &["drop", "n5", "--reason", "folded into n4"])?;
+        let refused = workspace.run("/q", &["role", "n2", "secondary"]).err().map(|failure| format!("{failure}\n"));
+        let shown = ["n1", "n2", "n3", "n4", "n5", "n6"]
+            .iter()
+            .map(|node| workspace.run("/q", &["show", node]).map(|out| format!("design show {node}\n{out}")))
+            .collect::<Result<String, Failure>>()?;
+        Ok(format!("{shown}design role n2 secondary\n{}", refused.unwrap_or_default()))
+    }
+}
+
+#[test]
+fn show_renders_every_stage_edge_and_role_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
+    let rendered = Rendered::tree()?;
+    golden::golden!("show.txt", &rendered)?;
+    Ok(())
+}

@@ -250,6 +250,7 @@ dependencies = [
  "e2e",
  "exit",
  "file-ports",
+ "golden",
  "grammar",
  "laws",
  "local-config",
