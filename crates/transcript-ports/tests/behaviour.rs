@@ -121,14 +121,21 @@ impl Gather for Gathered {
     }
 
     fn skipped(mut self, skipped: Skipped) -> Gathered {
-        self.classes.extend(skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid())));
+        self.classes.extend(Gathered::edge(&skipped));
         self.skipped.push(skipped);
         self
     }
 
     fn unrecognised(mut self, unrecognised: Unrecognised) -> Gathered {
         self.classes.push(format!("unrecognised {}", unrecognised.kind()));
+        self.classes.extend(unrecognised.passing().as_ref().and_then(Gathered::edge));
         self
+    }
+}
+
+impl Gathered {
+    fn edge(skipped: &Skipped) -> Option<String> {
+        skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid()))
     }
 }
 
@@ -287,13 +294,13 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
 
 laws::law!(an_unknown_record_kind_is_unrecognised_and_never_a_message, "[a-z]{1,8}-unheard", kind, {
     let line = Lines::shaped(&kind, r#""origin":{"kind":"human"},"message":{"model":"claude","content":"hi"}"#);
-    prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}")]);
+    prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}"), "8 after 1".to_owned()]);
 });
 
 laws::law!(an_unknown_block_in_a_lead_record_is_unrecognised, "[a-z]{1,8}_unheard", block, {
     let fields =
         format!(r#""message":{{"model":"claude","content":[{{"type":"text","text":"said"}},{{"type":"{block}"}}]}}"#);
-    prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}")]);
+    prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}"), "8 after 1".to_owned()]);
 });
 
 laws::table!(
@@ -322,7 +329,7 @@ laws::table!(
         "summary" => ["8 after 1"],
         "system" => ["8 after 1"],
         "tools-used" => ["8 after 1"],
-        "brand-new-kind" => ["unrecognised brand-new-kind"],
+        "brand-new-kind" => ["unrecognised brand-new-kind", "8 after 1"],
     ]
 );
 
@@ -352,8 +359,9 @@ laws::table!(
         r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}"# => ["8 after 1"],
         r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"# => ["8 after 1"],
-        r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"# => ["unrecognised brand-new-kind"],
-        r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"# => ["unrecognised document"],
+        r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"# => ["unrecognised brand-new-kind", "8 after 1"],
+        r#""origin":{"kind":"brand-new-kind"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["unrecognised brand-new-kind", "8 after 1"],
+        r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"# => ["unrecognised document", "8 after 1"],
     ]
 );
 
@@ -371,7 +379,7 @@ laws::table!(
         r#""isApiErrorMessage":true,"message":{"model":"claude","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
         r#""isSidechain":true,"isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
         r#""message":{"model":"<synthetic>","content":[{"type":"text","text":"No response requested."}]}"# => ["8 after 1"],
-        r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"# => ["unrecognised server_tool_use"],
+        r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"# => ["unrecognised server_tool_use", "8 after 1"],
     ]
 );
 
@@ -385,8 +393,8 @@ laws::table!(
         r#"{"type":"queued_command","prompt":"go","origin":{"kind":"coordinator"}}"# => ["8 after 1"],
         r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"# => ["8 after 1"],
         r#"{"type":"queued_command","prompt":"finished"}"# => ["8 after 1"],
-        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"# => ["unrecognised brand-new-kind"],
-        r#"{"type":"brand_new_attachment"}"# => ["unrecognised brand_new_attachment"],
+        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"# => ["unrecognised brand-new-kind", "8 after 1"],
+        r#"{"type":"brand_new_attachment"}"# => ["unrecognised brand_new_attachment", "8 after 1"],
     ]
 );
 

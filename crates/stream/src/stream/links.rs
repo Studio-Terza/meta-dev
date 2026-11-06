@@ -1,30 +1,29 @@
+mod chain;
 mod reply;
 mod resends;
+mod turn;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use grammar::message::{Lexemes, Mark};
-use transcript_ports::{Skipped, Uuid};
+use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;
 use crate::segment::Segment;
 use crate::{MechanicalLink, Message, Relation};
+use chain::Chain;
 use reply::Reply;
 use resends::Resends;
+use turn::Turn;
 
 pub struct Links<'stream> {
     messages: &'stream [Message],
-    known: BTreeMap<&'stream Uuid, &'stream Message>,
-    skipped: BTreeMap<&'stream Uuid, &'stream Uuid>,
+    chain: Chain<'stream>,
 }
 
 impl<'stream> Links<'stream> {
     pub fn over(messages: &'stream [Message], skipped: &'stream [Skipped]) -> Links<'stream> {
-        Links {
-            messages,
-            known: messages.iter().map(|message| (message.record().uuid(), message)).collect(),
-            skipped: skipped.iter().filter_map(|line| line.parent().map(|parent| (line.uuid(), parent))).collect(),
-        }
+        Links { messages, chain: Chain::over(messages, skipped) }
     }
 
     pub fn all(&self) -> Vec<MechanicalLink> {
@@ -32,23 +31,25 @@ impl<'stream> Links<'stream> {
         let links: BTreeSet<MechanicalLink> = replies
             .iter()
             .map(Reply::link)
-            .chain(replies.iter().flat_map(|reply| reply.answers().links()))
+            .chain(self.turns().iter().flat_map(|turn| turn.answers().links()))
             .chain(self.messages.iter().flat_map(|message| self.cites(message)))
             .chain(Resends::links(self.messages))
             .collect();
         links.into_iter().collect()
     }
 
-    fn parent(&self, message: &Message) -> Option<&'stream Message> {
-        std::iter::successors(message.record().parent(), |uuid| self.skipped.get(*uuid).copied())
-            .take(self.skipped.len().saturating_add(1))
-            .find_map(|uuid| self.known.get(uuid).copied())
-    }
-
     fn replies(&self) -> Vec<Reply<'stream>> {
         self.messages
             .iter()
-            .filter_map(|message| self.parent(message).map(|replied| Reply::new(message, replied)))
+            .filter_map(|message| self.chain.parent(message).map(|replied| Reply::new(message, replied)))
+            .collect()
+    }
+
+    fn turns(&self) -> Vec<Turn<'stream>> {
+        self.messages
+            .iter()
+            .filter(|message| message.record().author() == Authorship::Owner)
+            .map(|owner| self.chain.turn(owner))
             .collect()
     }
 
@@ -63,12 +64,12 @@ impl<'stream> Links<'stream> {
             .filter(|lexeme| matches!(lexeme.mark(), Mark::Uuid))
             .map(|lexeme| Uuid::new(lexeme.span().slice(text.as_ref()).to_owned()))
             .filter(|cited| cited != message.record().uuid())
-            .filter(|cited| self.known.contains_key(cited))
-            .map(|cited| {
+            .filter_map(|cited| self.chain.known(&cited))
+            .map(|known| {
                 MechanicalLink::new(
                     Anchor::Segment(segment.identity().clone()),
                     Relation::Cites,
-                    Anchor::Message(cited),
+                    Anchor::Message(known.record().uuid().clone()),
                 )
             })
             .collect()

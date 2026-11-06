@@ -37,8 +37,8 @@ impl Wire {
 }
 
 struct Exchange<'said> {
-    asked: &'said str,
-    replied: &'said str,
+    led: &'said [Turn],
+    replied: &'static str,
 }
 
 #[derive(Clone, Copy)]
@@ -54,6 +54,12 @@ const OWNER: Turn = Turn::Said(Authorship::Owner, "words");
 const LEAD: Turn = Turn::Said(Authorship::Lead, "words");
 const ASKS: Turn = Turn::Said(Authorship::Lead, "1. a\n2. b");
 const ANSWERS: Turn = Turn::Said(Authorship::Owner, "1. yes\n2. no");
+
+impl Turn {
+    const fn lead(text: &'static str) -> Turn {
+        Turn::Said(Authorship::Lead, text)
+    }
+}
 
 struct Say<'said> {
     uuid: &'said str,
@@ -125,13 +131,9 @@ struct Cases;
 
 impl Cases {
     fn answers(exchange: &Exchange<'_>) -> Vec<String> {
-        Fixture::related(
-            Relation::Answers,
-            &[
-                Say::new("lead", None, Authorship::Lead, exchange.asked),
-                Say::new("owner", Some("lead"), Authorship::Owner, exchange.replied),
-            ],
-        )
+        let turns: Vec<Turn> =
+            exchange.led.iter().copied().chain([Turn::Said(Authorship::Owner, exchange.replied)]).collect();
+        Fixture::related(Relation::Answers, &Self::chained(&Self::ids(&turns), &turns))
     }
 
     fn cites(text: &&str) -> Vec<String> {
@@ -174,16 +176,23 @@ impl Cases {
             .unwrap_or_default()
     }
 
-    fn replies(chain: &[Turn]) -> Vec<String> {
-        let ids: Vec<String> = (0..chain.len()).map(|position| format!("m{position}")).collect();
-        let said: Vec<Say<'_>> = ids
-            .iter()
+    fn ids(chain: &[Turn]) -> Vec<String> {
+        (0..chain.len()).map(|position| format!("m{position}")).collect()
+    }
+
+    fn chained<'said>(ids: &'said [String], chain: &[Turn]) -> Vec<Say<'said>> {
+        ids.iter()
             .zip(chain)
             .enumerate()
             .map(|(position, (id, turn))| {
                 Say::turn(id, position.checked_sub(1).and_then(|before| ids.get(before)).map(String::as_str), *turn)
             })
-            .collect();
+            .collect()
+    }
+
+    fn replies(chain: &[Turn]) -> Vec<String> {
+        let ids = Self::ids(chain);
+        let said = Self::chained(&ids, chain);
         [Relation::RepliesTo, Relation::Answers]
             .into_iter()
             .flat_map(|relation| Fixture::related(relation, &said))
@@ -230,16 +239,22 @@ laws::law!(segments_tile_the_message_without_loss, "[ -~\n•]{0,80}", text, {
 });
 
 laws::table!(
-    numbered_answers_align_with_the_numbered_items_they_reply_to,
+    numbered_answers_align_with_the_last_numbered_list_of_the_lead_turn,
     Cases::answers,
     [
-        Exchange { asked: "1. a\n2. b", replied: "1. yes\n2. no" } => ["owner#0 answers lead#0", "owner#1 answers lead#1"],
-        Exchange { asked: "1. a\n2. b", replied: "2. no" } => ["owner#0 answers lead#1"],
-        Exchange { asked: "1. a", replied: "3. none" } => Vec::<String>::new(),
-        Exchange { asked: "a question?", replied: "1. yes" } => Vec::<String>::new(),
-        Exchange { asked: "Findings:\n1. a\n2. b\n\nQuestions:\n1. c\n2. d", replied: "1. yes" } => ["owner#0 answers lead#4"],
-        Exchange { asked: "Intro\n  2. nested\n1. a\n2. b", replied: "2. no" } => ["owner#0 answers lead#3"],
-        Exchange { asked: "1. a\n  1. sub\n2. b", replied: "1. yes\n2. no" } => ["owner#0 answers lead#0", "owner#1 answers lead#2"],
+        Exchange { led: &[ASKS], replied: "1. yes\n2. no" } => ["m1#0 answers m0#0", "m1#1 answers m0#1"],
+        Exchange { led: &[ASKS], replied: "2. no" } => ["m1#0 answers m0#1"],
+        Exchange { led: &[Turn::lead("1. a")], replied: "3. none" } => Vec::<String>::new(),
+        Exchange { led: &[Turn::lead("a question?")], replied: "1. yes" } => Vec::<String>::new(),
+        Exchange { led: &[Turn::lead("Findings:\n1. a\n2. b\n\nQuestions:\n1. c\n2. d")], replied: "1. yes" } => ["m1#0 answers m0#4"],
+        Exchange { led: &[Turn::lead("Intro\n  2. nested\n1. a\n2. b")], replied: "2. no" } => ["m1#0 answers m0#3"],
+        Exchange { led: &[Turn::lead("1. a\n  1. sub\n2. b")], replied: "1. yes\n2. no" } => ["m1#0 answers m0#0", "m1#1 answers m0#2"],
+        Exchange { led: &[ASKS, Turn::Acts, Turn::lead("Which do you want?")], replied: "1. yes\n2. no" } => ["m3#0 answers m0#0", "m3#1 answers m0#1"],
+        Exchange { led: &[ASKS, LEAD, Turn::Notice, LEAD, LEAD], replied: "2. no" } => ["m5#0 answers m0#1"],
+        Exchange { led: &[LEAD, ASKS, LEAD], replied: "1. yes" } => ["m3#0 answers m1#0"],
+        Exchange { led: &[Turn::lead("1. x\n2. y"), Turn::Acts, ASKS, LEAD], replied: "1. yes" } => ["m4#0 answers m2#0"],
+        Exchange { led: &[Turn::lead("**1. a**\nwhy\n**2. b**\nhow")], replied: "2. no" } => ["m1#0 answers m0#2"],
+        Exchange { led: &[ASKS, OWNER, LEAD], replied: "1. yes" } => Vec::<String>::new(),
     ]
 );
 
@@ -281,6 +296,8 @@ laws::table!(
         [ASKS, Turn::System, ANSWERS][..]
             => ["m2 replies-to m0", "m2#0 answers m0#0", "m2#1 answers m0#1"],
         [OWNER, Turn::Acts, LEAD][..] => ["m2 replies-to m0"],
+        [OWNER, ASKS, Turn::Unheard, ANSWERS][..]
+            => ["m1 replies-to m0", "m3 replies-to m1", "m3#0 answers m1#0", "m3#1 answers m1#1"],
         [LEAD][..] => Vec::<String>::new(),
     ]
 );

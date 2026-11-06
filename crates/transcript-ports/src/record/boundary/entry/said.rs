@@ -11,6 +11,8 @@ pub trait Hears {
     fn text(self, text: Body) -> Line;
 
     fn silence(self) -> Line;
+
+    fn unrecognised(self, unrecognised: Unrecognised) -> Line;
 }
 
 impl Said {
@@ -18,7 +20,7 @@ impl Said {
         match self {
             Said::Text(text) => by.text(text),
             Said::Silent => by.silence(),
-            Said::Unrecognised(unrecognised) => Line::Unrecognised(unrecognised),
+            Said::Unrecognised(unrecognised) => by.unrecognised(unrecognised),
         }
     }
 

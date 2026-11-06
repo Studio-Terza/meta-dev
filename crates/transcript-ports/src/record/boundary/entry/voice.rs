@@ -45,14 +45,14 @@ impl Origin {
     fn spoke(self, stamp: Stamp, text: Body) -> Line {
         match self {
             Origin::Known(source) => source.spoke(stamp, text),
-            Origin::Unknown(unrecognised) => Line::Unrecognised(unrecognised),
+            Origin::Unknown(unrecognised) => stamp.unrecognised(unrecognised),
         }
     }
 
     fn silent(self, stamp: Stamp) -> Line {
         match self {
             Origin::Known(_) => Line::Skipped(Skipped::from(stamp)),
-            Origin::Unknown(unrecognised) => Line::Unrecognised(unrecognised),
+            Origin::Unknown(unrecognised) => stamp.unrecognised(unrecognised),
         }
     }
 }
@@ -76,5 +76,9 @@ impl Hears for Listener {
             Some(origin) => origin.silent(self.stamp),
             None => Line::Skipped(Skipped::from(self.stamp)),
         }
+    }
+
+    fn unrecognised(self, unrecognised: Unrecognised) -> Line {
+        self.stamp.unrecognised(unrecognised)
     }
 }

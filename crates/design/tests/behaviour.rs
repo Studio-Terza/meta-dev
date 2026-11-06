@@ -108,6 +108,13 @@ fn ingest_prints_no_unrecognised_line_when_every_record_is_recognised() -> Resul
 }
 
 #[test]
+fn a_relative_workspace_is_resolved_against_the_working_directory() -> Result<(), Failure> {
+    let out = Invocation::output(&Session::answered(), &["ingest", "--workspace", "."])?;
+    assert!(out.contains("authorship owner 1\n"));
+    Ok(())
+}
+
+#[test]
 fn ingest_counts_each_authorship_unrecognised_kind_form_and_relation() -> Result<(), Failure> {
     let out = Invocation::output(&Session::typical(), &["ingest"])?;
     assert!(out.contains("authorship owner 2\n"));

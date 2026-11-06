@@ -11,7 +11,7 @@ enum Token {
     Break,
     #[regex(r"[.?!]+[ \t]+")]
     Stop,
-    #[regex(r"\n[0-9]+[.)][ \t]+", Token::numbered)]
+    #[regex(r"\n(\*\*)?[0-9]+[.)](\*\*)?[ \t]+", Token::numbered)]
     Numbered(usize),
     #[regex(r"\n[ \t]+[0-9]+[.)][ \t]+", Token::numbered)]
     Nested(usize),

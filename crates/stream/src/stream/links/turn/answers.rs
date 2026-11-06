@@ -11,11 +11,8 @@ pub struct Answers {
 }
 
 impl Answers {
-    pub fn between(replying: &Message, replied: &Message) -> Answers {
-        Answers {
-            answers: replying.segments().into_iter().filter_map(Item::top_level).collect(),
-            asked: replied.segments().into_iter().collect(),
-        }
+    pub fn between(replying: &Message, asked: NumberedList) -> Answers {
+        Answers { answers: replying.segments().into_iter().filter_map(Item::top_level).collect(), asked }
     }
 
     pub fn links(&self) -> Vec<MechanicalLink> {

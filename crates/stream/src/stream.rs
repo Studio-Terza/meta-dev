@@ -30,6 +30,7 @@ impl Gather for Stream {
     }
 
     fn unrecognised(mut self, unrecognised: Unrecognised) -> Stream {
+        self.skipped.extend(unrecognised.passing());
         self.unrecognised.push(unrecognised);
         self
     }

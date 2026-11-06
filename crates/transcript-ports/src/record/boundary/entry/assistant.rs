@@ -106,6 +106,10 @@ impl Hears for Answer {
     fn silence(self) -> Line {
         Line::Skipped(Skipped::from(self.stamp))
     }
+
+    fn unrecognised(self, unrecognised: Unrecognised) -> Line {
+        self.stamp.unrecognised(unrecognised)
+    }
 }
 
 impl Message {

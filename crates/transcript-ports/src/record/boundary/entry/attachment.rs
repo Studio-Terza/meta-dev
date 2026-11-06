@@ -76,7 +76,7 @@ impl Classified for Attached {
     fn line(self) -> Line {
         match self.attachment {
             Annex::Known(carried) => carried.line(self.stamp),
-            Annex::Unknown(unrecognised) => Line::Unrecognised(unrecognised),
+            Annex::Unknown(unrecognised) => self.stamp.unrecognised(unrecognised),
         }
     }
 }

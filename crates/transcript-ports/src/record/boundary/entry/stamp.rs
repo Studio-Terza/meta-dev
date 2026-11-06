@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Uuid};
+use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Unrecognised, Uuid};
 
 #[derive(Clone, Copy, Debug)]
 struct Side;
@@ -49,6 +49,10 @@ impl Stamp {
             None => Line::Said(Main(self).voiced(author, text)),
             Some(Side) => Line::Skipped(Skipped::from(self)),
         }
+    }
+
+    pub fn unrecognised(self, unrecognised: Unrecognised) -> Line {
+        Line::Unrecognised(unrecognised.within(self.uuid, self.parent))
     }
 }
 
