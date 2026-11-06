@@ -6,6 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
 
+use code_reader::Reader;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
@@ -98,7 +99,8 @@ impl Mode {
     }
 
     fn reported(files: &[SourceFile], out: &mut impl Write) -> Outcome<'static> {
-        Elegance::reports(files).iter().try_for_each(|report| write!(out, "{report}")).ok();
+        let model = Reader::read_files(files);
+        Elegance::reports(files, &model).iter().try_for_each(|report| write!(out, "{report}")).ok();
         Outcome::Clean
     }
 

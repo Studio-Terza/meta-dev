@@ -10,3 +10,16 @@ impl FileId {
         rows.get(self.0)
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ItemId(usize);
+
+impl ItemId {
+    pub(crate) fn next<Row>(rows: &[Row]) -> ItemId {
+        ItemId(rows.len())
+    }
+
+    pub(crate) fn index(self) -> usize {
+        self.0
+    }
+}

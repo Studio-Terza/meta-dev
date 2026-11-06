@@ -47,7 +47,7 @@ impl Determinacy {
     fn or_else<'rows>(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
         match self {
             Determinacy::Determined => next(),
-            Determinacy::Weak => View::UNEXPANDED,
+            Determinacy::Weak => View::UNEXPANDED.union(next()),
             Determinacy::Strong => View::WAITING,
         }
     }

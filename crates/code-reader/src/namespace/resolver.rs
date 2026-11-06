@@ -1,6 +1,5 @@
 use std::iter;
 
-use code_model::Resolved;
 use lint_layout::Name;
 
 use super::Namespace;
@@ -108,10 +107,6 @@ pub(crate) struct Resolver<'tables, 'rows> {
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
     pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Resolver<'tables, 'rows> {
         Resolver { space, tables, ignored: None }
-    }
-
-    pub(crate) fn path_resolved(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
-        path.bound(domain, self, scope).forced().resolved(self.space, path.written())
     }
 
     pub(super) fn path(&self, path: &UsePath, viewer: ScopeId) -> Resolution {

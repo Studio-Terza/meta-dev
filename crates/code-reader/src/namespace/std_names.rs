@@ -1,6 +1,6 @@
 use syn::Macro;
 
-use code_model::ItemPath;
+use code_model::{Alias, Building, ItemPath, Named, Primitive, Resolved, TypeRef};
 use lint_layout::{Name, Whole, Word, words};
 
 use super::binding::Binding;
@@ -20,6 +20,78 @@ impl Canonical {
 
     pub(super) fn path(&self) -> ItemPath {
         [StdNames::STD, self.module, self.name].map(Name::from).into_iter().collect()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PrimitiveName {
+    word: Word<'static>,
+    primitive: Primitive,
+}
+
+impl PrimitiveName {
+    const fn new(word: Word<'static>, primitive: Primitive) -> PrimitiveName {
+        PrimitiveName { word, primitive }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum OkSide {
+    Unit,
+    Parameter,
+}
+
+impl OkSide {
+    fn parameters(self) -> Vec<Name> {
+        match self {
+            OkSide::Unit => Vec::new(),
+            OkSide::Parameter => vec![Name::from(StdAlias::PARAMETER)],
+        }
+    }
+
+    fn side(self) -> TypeRef {
+        match self {
+            OkSide::Unit => TypeRef::Tuple(Vec::new()),
+            OkSide::Parameter => {
+                TypeRef::Named(Named::new(Resolved::Param(Name::from(StdAlias::PARAMETER)), Vec::new()))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ErrSide {
+    Path(&'static [Word<'static>]),
+    Opaque,
+}
+
+impl ErrSide {
+    fn side(self) -> TypeRef {
+        match self {
+            ErrSide::Path(words) => {
+                TypeRef::Named(Named::new(Resolved::Std(words.iter().copied().collect()), Vec::new()))
+            }
+            ErrSide::Opaque => TypeRef::Opaque,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct StdAlias {
+    alias: &'static [Word<'static>],
+    ok: OkSide,
+    err: ErrSide,
+}
+
+impl StdAlias {
+    const PARAMETER: Word<'static> = Word::new("T");
+    const RESULT: [Word<'static>; 3] = words!["std", "result", "Result"];
+
+    fn declared(self, mut building: Building) -> Building {
+        let result = Resolved::Std(Self::RESULT.into_iter().collect());
+        let target = TypeRef::Named(Named::new(result, vec![self.ok.side(), self.err.side()]));
+        building.std_alias(self.alias.iter().copied().collect(), Alias::new(self.ok.parameters(), target));
+        building
     }
 }
 
@@ -77,7 +149,7 @@ impl Table {
 }
 
 #[derive(Debug)]
-pub(super) struct StdNames;
+pub(crate) struct StdNames;
 
 impl StdNames {
     const STD: Word<'static> = Word::new("std");
@@ -131,6 +203,38 @@ impl StdNames {
         Canonical::new(Word::new("cmp"), Word::new("Ord")),
         Canonical::new(Word::new("cmp"), Word::new("PartialEq")),
         Canonical::new(Word::new("cmp"), Word::new("PartialOrd")),
+    ];
+    const PRIMITIVES: [PrimitiveName; 17] = [
+        PrimitiveName::new(Word::new("bool"), Primitive::Bool),
+        PrimitiveName::new(Word::new("char"), Primitive::Char),
+        PrimitiveName::new(Word::new("str"), Primitive::Str),
+        PrimitiveName::new(Word::new("i8"), Primitive::Integer),
+        PrimitiveName::new(Word::new("i16"), Primitive::Integer),
+        PrimitiveName::new(Word::new("i32"), Primitive::Integer),
+        PrimitiveName::new(Word::new("i64"), Primitive::Integer),
+        PrimitiveName::new(Word::new("i128"), Primitive::Integer),
+        PrimitiveName::new(Word::new("isize"), Primitive::Integer),
+        PrimitiveName::new(Word::new("u8"), Primitive::Integer),
+        PrimitiveName::new(Word::new("u16"), Primitive::Integer),
+        PrimitiveName::new(Word::new("u32"), Primitive::Integer),
+        PrimitiveName::new(Word::new("u64"), Primitive::Integer),
+        PrimitiveName::new(Word::new("u128"), Primitive::Integer),
+        PrimitiveName::new(Word::new("usize"), Primitive::Integer),
+        PrimitiveName::new(Word::new("f32"), Primitive::Float),
+        PrimitiveName::new(Word::new("f64"), Primitive::Float),
+    ];
+    const STD_ALIASES: [StdAlias; 3] = [
+        StdAlias {
+            alias: &words!["std", "fmt", "Result"],
+            ok: OkSide::Unit,
+            err: ErrSide::Path(&words!["std", "fmt", "Error"]),
+        },
+        StdAlias {
+            alias: &words!["std", "io", "Result"],
+            ok: OkSide::Parameter,
+            err: ErrSide::Path(&words!["std", "io", "Error"]),
+        },
+        StdAlias { alias: &words!["std", "thread", "Result"], ok: OkSide::Parameter, err: ErrSide::Opaque },
     ];
     const STATEMENT_MACROS: [Word<'static>; 20] = words![
         "assert",
@@ -205,6 +309,14 @@ impl StdNames {
             names: &words!["Eq", "Ord", "PartialEq", "PartialOrd", "Ordering", "Reverse"],
         },
     ];
+
+    pub(crate) fn aliased(building: Building) -> Building {
+        Self::STD_ALIASES.iter().fold(building, |building, alias| alias.declared(building))
+    }
+
+    pub(super) fn primitive(only: &Name) -> Option<Primitive> {
+        Self::PRIMITIVES.iter().find(|row| only.matches::<Whole>(&[row.word]).is_some()).map(|row| row.primitive)
+    }
 
     pub(super) fn root(first: &Name) -> Option<Binding> {
         first.matches::<Whole>(&Self::STD_ROOTS).map(|_| Binding::Std(ItemPath::from_iter([Name::from(Self::STD)])))

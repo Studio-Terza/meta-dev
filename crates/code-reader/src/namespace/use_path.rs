@@ -1,6 +1,6 @@
-use syn::{ItemUse, Path, Token, UseTree};
+use syn::{Ident, ItemUse, Path, Token, UseTree};
 
-use code_model::ItemPath;
+use code_model::{ItemPath, Primitive};
 use lint_layout::{Name, Whole, Word, words};
 
 use super::Namespace;
@@ -53,11 +53,21 @@ impl From<&[Name]> for Shape {
 
 impl Shape {
     pub(super) fn fallback(self, first: &Name, prelude: Option<Binding>, space: &Namespace) -> Outer {
-        let known = prelude
+        let known = self
+            .primitive(first)
+            .map(Binding::Primitive)
+            .or(prelude)
             .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
             .or_else(|| self.prelude(first).map(Binding::Std));
         Outer::known_or(known, || self.unbound(first))
+    }
+
+    fn primitive(self, first: &Name) -> Option<Primitive> {
+        match self {
+            Shape::Single => StdNames::primitive(first),
+            Shape::Multiple => None,
+        }
     }
 
     fn prelude(self, first: &Name) -> Option<ItemPath> {
@@ -213,6 +223,12 @@ impl UsePath {
             .map(|(path, bound)| Imported::Named(bound, path))
             .into_iter()
             .collect()
+    }
+}
+
+impl From<&Ident> for UsePath {
+    fn from(ident: &Ident) -> UsePath {
+        UsePath { leading: Leading::Relative, segments: vec![Name::from(ident)] }
     }
 }
 

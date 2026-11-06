@@ -597,6 +597,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-narrowed-returns"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
+]
+
+[[package]]
 name = "lint-no-comments"
 version = "0.1.0"
 dependencies = [
@@ -878,6 +887,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-comments",
  "lint-no-early-exits",
  "lint-no-forwarders",
@@ -963,6 +973,7 @@ dependencies = [
  "lint-module-nesting",
  "lint-named-lifetimes",
  "lint-named-numbers",
+ "lint-narrowed-returns",
  "lint-no-early-exits",
  "lint-no-forwarders",
  "lint-no-free-fns",
