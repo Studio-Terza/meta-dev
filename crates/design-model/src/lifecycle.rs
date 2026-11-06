@@ -43,10 +43,6 @@ pub enum Settled {
 pub trait Staging {
     type Output;
 
-    fn vague(self, vague: &Vague) -> Self::Output;
-
-    fn refining(self, refining: &Refining) -> Self::Output;
-
     fn terminal(self, terminal: &Terminal) -> Self::Output;
 
     fn dropped(self, dropped: &Dropped) -> Self::Output;
@@ -102,12 +98,11 @@ impl AnyStage {
         }
     }
 
-    pub fn staged<S: Staging>(&self, staging: S) -> S::Output {
+    pub fn staged<S: Staging>(&self, staging: S) -> Option<S::Output> {
         match self {
-            AnyStage::Vague(vague) => staging.vague(vague),
-            AnyStage::Refining(refining) => staging.refining(refining),
-            AnyStage::Terminal(terminal) => staging.terminal(terminal),
-            AnyStage::Dropped(dropped) => staging.dropped(dropped),
+            AnyStage::Vague(_) | AnyStage::Refining(_) => None,
+            AnyStage::Terminal(terminal) => Some(staging.terminal(terminal)),
+            AnyStage::Dropped(dropped) => Some(staging.dropped(dropped)),
         }
     }
 }

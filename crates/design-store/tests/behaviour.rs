@@ -900,7 +900,7 @@ impl Changes {
             .map(|change| Changes::inverted(change.written(&store)))
             .collect::<Result<Vec<Option<NodeEdge>>, Box<dyn Error>>>()?;
         let roles = (0..ENDS)
-            .map(|node| Ok(Staging::stored(&store, Dag::id(node))?.role()))
+            .map(|node| Ok(Staging::stored(&store, Dag::id(node))?.casting().role()))
             .collect::<Result<Vec<Role>, Box<dyn Error>>>()?;
         Ok(Settled { refused, roles })
     }

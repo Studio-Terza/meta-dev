@@ -85,6 +85,6 @@ impl Recast {
         let shown = Found::find(store, self.node)?;
         lock.end()?;
         Printed::shown(out, &Neighbourhood::from(shown.placed()))?;
-        Ok(Outcome::Recast(shown.placed().node().role()))
+        Ok(Outcome::Recast(shown.placed().node().casting().role()))
     }
 }

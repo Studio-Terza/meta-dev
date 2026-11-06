@@ -1,6 +1,9 @@
 use std::fmt;
 
-use design_model::{AnyNode, AnyStage, Entered, NodeEdge, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
+use design_model::{
+    AnyNode, AnyStage, Dropped, Entered, NodeEdge, NodeId, Segment, SegmentRelation, Sense, SpanRelation, Staging,
+    Terminal,
+};
 use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
@@ -74,7 +77,8 @@ impl fmt::Display for Id {
 
 impl fmt::Display for Edge {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{} {} {}", Id(self.0.source()), self.0.relation(), Id(self.0.target()))
+        let [source, target] = self.0.ends();
+        write!(formatter, "{} {} {}", Id(source), self.0.relation(), Id(target))
     }
 }
 
@@ -88,7 +92,7 @@ impl fmt::Display for Line<'_> {
             entry.project(),
             entry.facet(),
             self.0.stage().stage(),
-            self.0.role(),
+            self.0.casting().role(),
             Entered::from(entry.provenance())
         )?;
         self.0.title().iter().try_for_each(|title| write!(formatter, " {:?}", title.to_string()))
@@ -119,14 +123,20 @@ impl fmt::Display for Neighbourhood<'_> {
 
 impl fmt::Display for Details<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            AnyStage::Terminal(terminal) => {
-                writeln!(formatter, "  artifact {}", terminal.artifact())?;
-                writeln!(formatter, "  condition {:?}", terminal.condition().to_string())
-            }
-            AnyStage::Dropped(dropped) => writeln!(formatter, "  reason {:?}", dropped.reason().to_string()),
-            AnyStage::Vague(_) | AnyStage::Refining(_) => Ok(()),
-        }
+        self.0.staged(Writing(formatter)).unwrap_or(Ok(()))
+    }
+}
+
+impl Staging for Writing<'_, '_> {
+    type Output = fmt::Result;
+
+    fn terminal(self, terminal: &Terminal) -> fmt::Result {
+        writeln!(self.0, "  artifact {}", terminal.artifact())?;
+        writeln!(self.0, "  condition {:?}", terminal.condition().to_string())
+    }
+
+    fn dropped(self, dropped: &Dropped) -> fmt::Result {
+        writeln!(self.0, "  reason {:?}", dropped.reason().to_string())
     }
 }
 

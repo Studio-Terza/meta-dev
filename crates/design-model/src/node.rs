@@ -88,11 +88,6 @@ impl<S> Node<S> {
     }
 
     #[must_use]
-    pub fn role(&self) -> Role {
-        self.casting.role()
-    }
-
-    #[must_use]
     pub fn casting(&self) -> Casting {
         self.casting
     }

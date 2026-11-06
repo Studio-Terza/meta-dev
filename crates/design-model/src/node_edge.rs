@@ -22,18 +22,13 @@ impl NodeEdge {
     }
 
     #[must_use]
-    pub fn source(self) -> NodeId {
-        self.source
+    pub fn ends(self) -> [NodeId; ENDS] {
+        [self.source, self.target]
     }
 
     #[must_use]
     pub fn relation(self) -> NodeRelation {
         self.relation
-    }
-
-    #[must_use]
-    pub fn target(self) -> NodeId {
-        self.target
     }
 
     pub fn upheld(self, source: Role, target: Role) -> Result<NodeEdge, Inversion> {

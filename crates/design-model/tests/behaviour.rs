@@ -285,7 +285,7 @@ laws::law!(
         prop_assert_eq!(walked.identity(), fresh.identity());
         prop_assert_eq!(walked.entry(), fresh.entry());
         prop_assert_eq!(walked.title(), fresh.title());
-        prop_assert_eq!(walked.role(), Role::Core);
+        prop_assert_eq!(walked.casting().role(), Role::Core);
     }
 );
 
