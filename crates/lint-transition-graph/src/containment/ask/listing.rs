@@ -1,7 +1,6 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
-use lint_layout::Name;
 use newtype::{Arbitrary, Newtype};
 
 use super::super::Containment;
@@ -40,12 +39,6 @@ enum Line<'view, 'found, 'file> {
     Outside(Outsider<'found, 'file>),
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Spelling<'found> {
-    Path(Member<'found>),
-    Name(&'found Name),
-}
-
 #[derive(Debug)]
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
@@ -80,15 +73,6 @@ impl<'found> FromIterator<Member<'found>> for Names<'found> {
     }
 }
 
-impl Spelled {
-    fn spelling(self, member: Member<'_>) -> Spelling<'_> {
-        match self {
-            Spelled::Path => Spelling::Path(member),
-            Spelled::Name => Spelling::Name(member.name()),
-        }
-    }
-}
-
 impl Listed {
     pub(super) fn more<Item>(self, items: &[Item]) -> Option<NonZeroUsize> {
         NonZeroUsize::new(items.len().saturating_sub(self.into_inner()))
@@ -108,18 +92,12 @@ impl fmt::Display for Line<'_, '_, '_> {
     }
 }
 
-impl fmt::Display for Spelling<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Spelling::Path(member) => write!(formatter, "{member}"),
-            Spelling::Name(name) => write!(formatter, "{name}"),
-        }
-    }
-}
-
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}", self.spelled.spelling(self.member))?;
+        match self.spelled {
+            Spelled::Path => write!(formatter, "{}", self.member),
+            Spelled::Name => write!(formatter, "{}", self.member.name()),
+        }?;
         self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
     }
 }
