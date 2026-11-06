@@ -1,3 +1,4 @@
+mod boundary;
 mod caller;
 mod delegation;
 mod filler;
@@ -38,6 +39,12 @@ pub struct Declared {
     methods: Vec<Method>,
 }
 
+impl AsRef<[Method]> for Declared {
+    fn as_ref(&self) -> &[Method] {
+        &self.methods
+    }
+}
+
 impl Declared {
     const REFUSED: &'static str = "a #[port] trait has no generics, no supertraits and is neither unsafe nor auto";
 
@@ -73,10 +80,6 @@ impl Declared {
 
     pub fn ops_name(&self) -> &OpsName {
         &self.ops
-    }
-
-    pub fn methods(&self) -> &[Method] {
-        &self.methods
     }
 
     fn parsed(item: ItemTrait) -> syn::Result<Declared> {

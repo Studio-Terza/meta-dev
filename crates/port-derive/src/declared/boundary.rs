@@ -1,4 +1,3 @@
-use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{Ident, LitStr};
 
@@ -6,21 +5,6 @@ use syn::{Ident, LitStr};
 pub enum Derivation {
     Filler,
     OpsModule,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Naming {
-    Type,
-    Release,
-}
-
-impl Naming {
-    fn suffix(self) -> &'static str {
-        match self {
-            Naming::Type => "",
-            Naming::Release => "::release",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -82,9 +66,5 @@ impl Spelling {
 
     pub fn method_path(caller: &impl ToTokens, method: &Ident) -> LitStr {
         LitStr::new(&format!("::{}::{method}", caller.to_token_stream()), method.span())
-    }
-
-    pub fn type_path(ident: &Ident, naming: Naming) -> LitStr {
-        LitStr::new(&format!("::{ident}{}", naming.suffix()), Span::call_site())
     }
 }

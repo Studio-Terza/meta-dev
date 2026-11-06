@@ -9,49 +9,20 @@ use super::calls::Calls;
 use super::op::OpName;
 use super::snapshot::Snapshot;
 
-#[derive(Debug)]
-pub struct ReleaseFailure {
-    resource: OpName,
-    failure: Box<dyn Error + Send + Sync>,
-}
-
-impl ReleaseFailure {
-    pub(crate) fn new(resource: OpName, failure: Box<dyn Error + Send + Sync>) -> Self {
-        ReleaseFailure { resource, failure }
-    }
-
-    #[must_use]
-    pub fn resource(&self) -> OpName {
-        self.resource
-    }
-
-    #[must_use]
-    pub fn failure(&self) -> &(dyn Error + Send + Sync + 'static) {
-        &*self.failure
-    }
-}
-
 #[derive(Debug, Default)]
 struct Ledger {
     calls: Mutex<BTreeMap<OpName, Calls>>,
-    failures: Mutex<Vec<ReleaseFailure>>,
 }
 
 #[derive(Debug)]
 pub struct Measured {
     snapshot: Snapshot,
-    failures: Vec<ReleaseFailure>,
 }
 
 impl Measured {
     #[must_use]
     pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    #[must_use]
-    pub fn failures(&self) -> &[ReleaseFailure] {
-        &self.failures
     }
 }
 
@@ -130,18 +101,13 @@ impl Run {
 
     pub fn finish(self) -> Measured {
         let calls = std::mem::take(&mut *self.ledger.calls.lock().unwrap_or_else(PoisonError::into_inner));
-        let failures = std::mem::take(&mut *self.ledger.failures.lock().unwrap_or_else(PoisonError::into_inner));
-        Measured { snapshot: Snapshot::counted(calls), failures }
+        Measured { snapshot: Snapshot::counted(calls) }
     }
 
     pub(crate) fn count(&self, name: OpName) {
         let mut calls = self.ledger.calls.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = calls.entry(name).or_default();
         *entry = entry.incremented();
-    }
-
-    pub(crate) fn fail(&self, failure: ReleaseFailure) {
-        self.ledger.failures.lock().unwrap_or_else(PoisonError::into_inner).push(failure);
     }
 }
 

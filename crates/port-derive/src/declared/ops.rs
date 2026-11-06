@@ -2,10 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
+use super::boundary::Spelling;
 use super::method::Method;
 use super::names::CallerName;
 use super::{Declared, Rendered};
-use crate::boundary::Spelling;
 
 pub struct Ops;
 
@@ -15,10 +15,10 @@ impl Rendered for Ops {
         let module = declared.ops_name();
         let caller = declared.caller_name();
         let declarations = declared
-            .methods()
+            .as_ref()
             .iter()
             .filter(|method| method.provided().is_none())
-            .filter_map(|method| method.op_struct().map(|op| Self::op_declaration(&op, caller, method)));
+            .map(|method| Self::op_declaration(&method.op_struct(), caller, method));
         quote! {
             #visibility mod #module {
                 #(#declarations)*

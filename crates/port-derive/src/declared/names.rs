@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Ident;
 
-use crate::boundary::{Derivation, Spelling};
+use super::boundary::{Derivation, Spelling};
 
 pub trait Role {
     fn spelled(caller: &Ident) -> Ident;

@@ -13,7 +13,7 @@ impl Rendered for Filler {
         let filler = declared.filler_name();
         let ops = declared.ops_name();
         let items = declared
-            .methods()
+            .as_ref()
             .iter()
             .filter(|method| method.provided().is_none())
             .map(|method| Self::required_item(method, ops));
@@ -33,7 +33,7 @@ impl Filler {
         let where_clause = &signature.generics.where_clause;
         let pass = method.pass(ops);
         let parameters = method.parameters();
-        let output = method.returned().filler_output();
+        let output = &signature.output;
         quote! { fn #name #generics (&self, pass: #pass #(, #parameters)*) #output #where_clause; }
     }
 }

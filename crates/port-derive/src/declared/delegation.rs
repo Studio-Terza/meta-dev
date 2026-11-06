@@ -10,7 +10,7 @@ impl Rendered for Delegation {
     fn rendered(declared: &Declared) -> TokenStream {
         let name = declared.caller_name();
         let filler = declared.filler_name();
-        let items = declared.methods().iter().filter(|method| method.provided().is_none()).map(Self::delegated_item);
+        let items = declared.as_ref().iter().filter(|method| method.provided().is_none()).map(Self::delegated_item);
         quote! {
             impl<'run, F: #filler> #name for ::port_core::Port<'run, F> {
                 #(#items)*
@@ -22,12 +22,11 @@ impl Rendered for Delegation {
 impl Delegation {
     fn delegated_item(method: &Method) -> TokenStream {
         let signature = method.signature();
-        let counting = method.counting();
         let method_name = &signature.ident;
         let arguments = method.parameters().iter().map(Parameter::name);
         quote! {
             #signature {
-                self.#counting(|filler: &F, pass| filler.#method_name(pass #(, #arguments)*))
+                self.counted_call(|filler: &F, pass| filler.#method_name(pass #(, #arguments)*))
             }
         }
     }

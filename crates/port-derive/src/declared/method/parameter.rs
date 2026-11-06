@@ -2,8 +2,6 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Error, FnArg, Ident, Pat, PatIdent, PatType, Type};
 
-use super::returned::Returned;
-
 pub struct Parameter {
     name: Ident,
     tree: Type,
@@ -27,7 +25,6 @@ impl Parameter {
     pub fn parsed(argument: &FnArg) -> syn::Result<Parameter> {
         let typed = Self::typed(argument)?;
         let name = Self::identifier(&typed.pat)?;
-        Returned::refuse_held_parameter(&typed.ty)?;
         Ok(Parameter { name, tree: (*typed.ty).clone() })
     }
 

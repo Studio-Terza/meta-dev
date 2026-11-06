@@ -11,7 +11,7 @@ impl Rendered for Caller {
         let attributes = declared.attributes();
         let visibility = declared.visibility();
         let name = declared.caller_name();
-        let items = declared.methods().iter().map(Self::method_item);
+        let items = declared.as_ref().iter().map(Self::method_item);
         quote! {
             #(#attributes)*
             #visibility trait #name: ::port_core::Metered {
