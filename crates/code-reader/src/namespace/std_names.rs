@@ -1,7 +1,11 @@
+use syn::Macro;
+
 use code_model::ItemPath;
 use lint_layout::{Name, Whole, Word, words};
 
-use super::binding::{Binding, Globbed};
+use super::binding::Binding;
+use super::tables::{Key, Keyed};
+use super::view::View;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Canonical {
@@ -30,12 +34,31 @@ impl StdGlob {
         [StdNames::STD, self.module].map(Name::from).into_iter().collect()
     }
 
-    fn exported(&self, module: &ItemPath, name: &Name) -> Globbed {
-        match name.matches::<Whole>(self.names) {
-            Some(_) => Globbed::Present(Binding::Std(module.joined(name))),
-            None => Globbed::Absent,
-        }
+    fn listed(&self, module: &ItemPath) -> Vec<Listed> {
+        self.names
+            .iter()
+            .map(|word| Name::from(*word))
+            .map(|name| Listed { binding: Binding::Std(module.joined(&name)), name })
+            .collect()
     }
+}
+
+#[derive(Debug)]
+pub(super) struct Listed {
+    name: Name,
+    binding: Binding,
+}
+
+impl Listed {
+    pub(super) fn views(&self) -> impl Iterator<Item = Keyed<'_, View<'_>>> {
+        Key::every(&self.name).map(|key| Keyed::new(key, View::from(&self.binding)))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Expansion {
+    Statement,
+    Items,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -109,6 +132,28 @@ impl StdNames {
         Canonical::new(Word::new("cmp"), Word::new("PartialEq")),
         Canonical::new(Word::new("cmp"), Word::new("PartialOrd")),
     ];
+    const STATEMENT_MACROS: [Word<'static>; 20] = words![
+        "assert",
+        "assert_eq",
+        "assert_ne",
+        "debug_assert",
+        "debug_assert_eq",
+        "debug_assert_ne",
+        "println",
+        "print",
+        "eprintln",
+        "eprint",
+        "format",
+        "write",
+        "writeln",
+        "panic",
+        "todo",
+        "unimplemented",
+        "unreachable",
+        "vec",
+        "matches",
+        "dbg",
+    ];
     const STD_GLOBS: [StdGlob; 4] = [
         StdGlob {
             module: Word::new("fmt"),
@@ -169,10 +214,14 @@ impl StdNames {
         table.names().iter().find(|canonical| only.matches::<Whole>(&[canonical.name]).is_some())
     }
 
-    pub(super) fn globbed(module: &ItemPath, name: &Name) -> Globbed {
-        match Self::STD_GLOBS.iter().find(|glob| glob.path() == *module) {
-            Some(glob) => glob.exported(module, name),
-            None => Globbed::Opaque,
+    pub(super) fn listed(module: &ItemPath) -> Option<Vec<Listed>> {
+        Self::STD_GLOBS.iter().find(|glob| glob.path() == *module).map(|glob| glob.listed(module))
+    }
+
+    pub(super) fn expansion(invoked: &Macro) -> Expansion {
+        match invoked.path.get_ident().map(Name::from).and_then(|name| name.matches::<Whole>(&Self::STATEMENT_MACROS)) {
+            Some(_) => Expansion::Statement,
+            None => Expansion::Items,
         }
     }
 }

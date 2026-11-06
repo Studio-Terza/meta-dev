@@ -1,12 +1,16 @@
 use code_model::{ItemPath, Resolved};
 use lint_layout::Name;
 
-use super::Namespace;
 use super::boundary::ScopeId;
-use super::entries::{Admission, ItemId};
-use super::resolver::{Domain, Walk};
-use super::std_names::{Canonical, StdNames};
-use super::use_path::UsePath;
+use super::entries::{ItemId, Sight};
+use super::resolver::Resolution;
+use super::settling::Target;
+
+pub(super) trait Locating {
+    fn located(&self, scope: ScopeId) -> Option<ItemPath>;
+
+    fn declared_path(&self, scope: ScopeId, item: ItemId) -> Option<ItemPath>;
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Binding {
@@ -18,50 +22,37 @@ pub(crate) enum Binding {
 }
 
 impl Binding {
-    pub(super) fn stepped(self, segment: &Name, walk: &Walk<'_>) -> Binding {
+    pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
         match self {
-            Binding::Module(module) => walk.entered(module, segment),
-            Binding::Std(path) => Binding::Std(path.joined(segment)),
-            Binding::External(path) => Binding::External(path.joined(segment)),
-            Binding::Item(..) | Binding::Unknown => Binding::Unknown,
+            Binding::Module(module) => entered(module),
+            Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
+            Binding::External(path) => Resolution::Bound(Binding::External(path.joined(segment))),
+            Binding::Item(..) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
         }
     }
 
-    pub(super) fn globbed(self, name: &Name, walk: &Walk<'_>, domain: Domain) -> Globbed {
+    pub(super) fn target(self, sight_of: impl FnOnce(ScopeId) -> Sight) -> Target {
         match self {
-            Binding::Module(module) => walk.globbed_member(module, name, domain),
-            Binding::Std(path) => StdNames::globbed(&path, name),
-            Binding::Item(..) | Binding::External(_) | Binding::Unknown => Globbed::Opaque,
+            Binding::Module(module) => Target::Module(module, sight_of(module)),
+            Binding::Std(path) => Target::listed(&path),
+            Binding::Item(..) | Binding::External(_) | Binding::Unknown => Target::Opaque,
         }
     }
 
-    pub(super) fn resolved(self, space: &Namespace, written: &UsePath) -> Resolved {
+    pub(super) fn resolved(self, places: &impl Locating, written: ItemPath) -> Resolved {
         match self {
-            Binding::Module(module) => Binding::crate_or_unknown(space.located(module), written),
-            Binding::Item(scope, item) => Binding::crate_or_unknown(space.declared_path(scope, item), written),
+            Binding::Module(module) => Binding::crate_or_unknown(places.located(module), written),
+            Binding::Item(scope, item) => Binding::crate_or_unknown(places.declared_path(scope, item), written),
             Binding::Std(path) => Resolved::Std(path),
             Binding::External(path) => Resolved::External(path),
-            Binding::Unknown => Resolved::Unknown(written.written()),
+            Binding::Unknown => Resolved::Unknown(written),
         }
     }
 
-    fn crate_or_unknown(found: Option<ItemPath>, written: &UsePath) -> Resolved {
+    fn crate_or_unknown(found: Option<ItemPath>, written: ItemPath) -> Resolved {
         match found {
             Some(path) => Resolved::Crate(path),
-            None => Resolved::Unknown(written.written()),
-        }
-    }
-
-    fn agreed(self, other: &Binding) -> Binding {
-        [self].into_iter().find(|binding| binding == other).unwrap_or(Binding::Unknown)
-    }
-}
-
-impl From<Option<&Canonical>> for Binding {
-    fn from(canonical: Option<&Canonical>) -> Binding {
-        match canonical {
-            Some(found) => Binding::Std(found.path()),
-            None => Binding::Unknown,
+            None => Resolved::Unknown(written),
         }
     }
 }
@@ -71,61 +62,6 @@ impl From<Option<ScopeId>> for Binding {
         match module {
             Some(module) => Binding::Module(module),
             None => Binding::Unknown,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Globbed {
-    Absent,
-    Present(Binding),
-    Opaque,
-}
-
-impl Globbed {
-    pub(super) fn joined(self, other: Globbed) -> Globbed {
-        match self {
-            Globbed::Absent => other,
-            Globbed::Present(left) => other.met(left),
-            Globbed::Opaque => Globbed::Opaque,
-        }
-    }
-
-    pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> Globbed) -> Globbed {
-        match admission {
-            Admission::Hidden => Globbed::Absent,
-            Admission::Shown => shown(),
-            Admission::Obscured => Globbed::Opaque,
-        }
-    }
-
-    pub(super) fn typed(domain: Domain, found: impl FnOnce() -> Globbed) -> Globbed {
-        match domain {
-            Domain::Types => found(),
-            Domain::Macros => Globbed::Absent,
-        }
-    }
-
-    pub(super) fn or_else(self, next: impl FnOnce() -> Globbed) -> Globbed {
-        match self {
-            Globbed::Absent => next(),
-            found @ (Globbed::Present(_) | Globbed::Opaque) => found,
-        }
-    }
-
-    pub(super) fn settled(self, absent: Binding) -> Binding {
-        match self {
-            Globbed::Absent => absent,
-            Globbed::Present(binding) => binding,
-            Globbed::Opaque => Binding::Unknown,
-        }
-    }
-
-    fn met(self, left: Binding) -> Globbed {
-        match self {
-            Globbed::Absent => Globbed::Present(left),
-            Globbed::Present(right) => Globbed::Present(left.agreed(&right)),
-            Globbed::Opaque => Globbed::Opaque,
         }
     }
 }

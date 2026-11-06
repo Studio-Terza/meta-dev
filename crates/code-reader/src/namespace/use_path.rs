@@ -6,9 +6,11 @@ use lint_layout::{Name, Whole, Word, words};
 use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
+use super::boundary::ScopeId;
 use super::entries::Imported;
-use super::resolver::{Domain, Walk};
+use super::resolver::{Outer, Resolution, Resolver};
 use super::std_names::{Canonical, StdNames, Table};
+use super::tables::Domain;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Leading {
@@ -50,13 +52,12 @@ impl From<&[Name]> for Shape {
 }
 
 impl Shape {
-    pub(super) fn fallback(self, first: &Name, space: &Namespace) -> Binding {
-        space
-            .workspace(first)
-            .map(Binding::Module)
+    pub(super) fn fallback(self, first: &Name, prelude: Option<Binding>, space: &Namespace) -> Outer {
+        let known = prelude
+            .or_else(|| space.workspace(first).map(Binding::Module))
             .or_else(|| StdNames::root(first))
-            .or_else(|| self.prelude(first).map(Binding::Std))
-            .unwrap_or_else(|| self.unbound(first))
+            .or_else(|| self.prelude(first).map(Binding::Std));
+        Outer::known_or(known, || self.unbound(first))
     }
 
     fn prelude(self, first: &Name) -> Option<ItemPath> {
@@ -66,10 +67,10 @@ impl Shape {
         }
     }
 
-    fn derived(self, first: &Name, walk: &Walk<'_>, path: &UsePath) -> Binding {
+    fn derived(self, first: &Name, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
         match self {
-            Shape::Single => walk.macro_named(first),
-            Shape::Multiple => walk.path(path),
+            Shape::Single => resolver.macro_named(first, viewer),
+            Shape::Multiple => resolver.path(path, viewer),
         }
     }
 
@@ -90,19 +91,19 @@ pub(super) enum Head<'path> {
 }
 
 impl Head<'_> {
-    pub(super) fn derived(self, walk: &Walk<'_>, path: &UsePath) -> Binding {
+    pub(super) fn derived(self, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
         match self {
-            Head::Named(first, shape) => shape.derived(first, walk, path),
-            Head::Empty | Head::Global(_) | Head::Anchored(_) => walk.path(path),
+            Head::Named(first, shape) => shape.derived(first, resolver, path, viewer),
+            Head::Empty | Head::Global(_) | Head::Anchored(_) => resolver.path(path, viewer),
         }
     }
 
-    pub(super) fn started(self, walk: &Walk<'_>) -> Binding {
+    pub(super) fn started(self, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
         match self {
-            Head::Empty => Binding::Unknown,
-            Head::Global(first) => walk.space().global(first),
-            Head::Anchored(anchor) => Binding::from(anchor.anchored(walk.space().anchors(walk.scope()))),
-            Head::Named(first, shape) => walk.named(first, shape),
+            Head::Empty => Resolution::Bound(Binding::Unknown),
+            Head::Global(first) => resolver.global(first),
+            Head::Anchored(anchor) => resolver.anchored(anchor, viewer),
+            Head::Named(first, shape) => resolver.named(first, shape, viewer),
         }
     }
 
@@ -180,10 +181,10 @@ impl UsePath {
         self.segments.get(1..).unwrap_or_default()
     }
 
-    pub(super) fn bound(&self, domain: Domain, walk: &Walk<'_>) -> Binding {
+    pub(super) fn bound(&self, domain: Domain, resolver: &Resolver<'_, '_>, viewer: ScopeId) -> Resolution {
         match domain {
-            Domain::Types => walk.path(self),
-            Domain::Macros => self.head().derived(walk, self),
+            Domain::Types => resolver.path(self, viewer),
+            Domain::Macros => self.head().derived(resolver, self, viewer),
         }
     }
 

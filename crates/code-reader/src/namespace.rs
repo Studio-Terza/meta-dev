@@ -1,36 +1,41 @@
 mod anchor;
 mod binding;
 mod boundary;
+mod converging;
 mod entries;
 mod resolver;
 mod scope;
+mod settling;
 mod std_names;
+mod tables;
 mod use_path;
+mod view;
 
 use std::collections::BTreeMap;
 
 use code_model::ItemPath;
 use lint_layout::Name;
 
-use anchor::Anchors;
-use binding::{Binding, Globbed};
+use anchor::{Anchor, Anchors};
+use binding::{Binding, Locating};
 pub(crate) use boundary::ScopeId;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, ItemId, Visibility};
-pub(crate) use resolver::{Domain, Resolver};
-use resolver::{Search, Walk};
+pub(crate) use resolver::Resolver;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
+pub(crate) use settling::{Seeds, Settled};
 use std_names::StdNames;
+pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
 
 #[derive(Debug, Default)]
-pub(crate) struct Namespace {
+pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
-    crates: BTreeMap<Name, ScopeId>,
+    crates: BTreeMap<&'read Name, ScopeId>,
 }
 
-impl Namespace {
-    pub(crate) fn planted(&mut self, form: CrateForm, name: Option<Name>, entries: Entries) -> ScopeId {
+impl<'read> Namespace<'read> {
+    pub(crate) fn planted(&mut self, form: CrateForm, name: Option<&'read Name>, entries: Entries) -> ScopeId {
         let root = ScopeId::after(&self.scopes);
         self.scopes.push(ScopeRow::root(root, form, entries));
         self.crates.extend(name.map(|name| (name, root)));
@@ -46,7 +51,8 @@ impl Namespace {
 
     pub(crate) fn declare(&mut self, scope: ScopeId, declared: Declared) {
         scope
-            .entries_mut(&mut self.scopes)
+            .row_mut(&mut self.scopes)
+            .map(ScopeRow::entries_mut)
             .zip(Some(declared))
             .into_iter()
             .for_each(|(entries, declared)| entries.declare(declared));
@@ -60,31 +66,18 @@ impl Namespace {
         scope.row(&self.scopes).map(ScopeRow::chain).unwrap_or_default()
     }
 
-    pub(super) fn located(&self, scope: ScopeId) -> Option<ItemPath> {
-        scope.row(&self.scopes).map(ScopeRow::place).and_then(|place| place.located(self, scope))
-    }
-
     pub(super) fn within(&self, above: ScopeId, scope: ScopeId) -> Option<ItemPath> {
         above.row(&self.scopes).and_then(|row| row.entries().within(scope, self.located(above)))
     }
 
-    pub(super) fn declared_path(&self, scope: ScopeId, item: ItemId) -> Option<ItemPath> {
-        scope.row(&self.scopes).and_then(|row| row.entries().path_of(item, self.located(scope)))
-    }
-
-    pub(super) fn prelude(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Option<Binding> {
-        level.row(&self.scopes).and_then(|row| row.entries().prelude(name, walk))
+    pub(super) fn prelude(&self, name: &Name, viewer: ScopeId) -> Option<Binding> {
+        Anchor::Crate
+            .anchored(self.anchors(viewer))
+            .and_then(|root| root.row(&self.scopes).and_then(|row| row.entries().prelude(name, self, root)))
     }
 
     pub(super) fn within_reach(&self, level: ScopeId, from: ScopeId) -> Option<ScopeId> {
         from.row(&self.scopes).and_then(|row| row.ancestor(level))
-    }
-
-    pub(super) fn level(&self, level: ScopeId, name: &Name, search: &Search<'_>) -> Globbed {
-        match level.row(&self.scopes) {
-            Some(row) => row.entries().found(level, name, search),
-            None => Globbed::Opaque,
-        }
     }
 
     pub(super) fn workspace(&self, name: &Name) -> Option<ScopeId> {
@@ -95,5 +88,15 @@ impl Namespace {
         StdNames::root(first)
             .or_else(|| self.workspace(first).map(Binding::Module))
             .unwrap_or_else(|| Binding::External(ItemPath::default().joined(first)))
+    }
+}
+
+impl Locating for Namespace<'_> {
+    fn located(&self, scope: ScopeId) -> Option<ItemPath> {
+        scope.row(&self.scopes).map(ScopeRow::place).and_then(|place| place.located(self, scope))
+    }
+
+    fn declared_path(&self, scope: ScopeId, item: ItemId) -> Option<ItemPath> {
+        scope.row(&self.scopes).and_then(|row| row.entries().path_of(item, self.located(scope)))
     }
 }

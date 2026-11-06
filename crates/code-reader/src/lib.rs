@@ -25,7 +25,7 @@ impl Reader {
             .flat_map(|file| std::iter::once(file).chain(file.test_modules()))
             .map(|source| ReadFile::new(source, building.file(source.path().to_path_buf())))
             .collect();
-        let lowered: Lowered = Planting::new(&read).lowered();
+        let lowered: Lowered<'_> = Planting::new(&read).lowered();
         lowered.built(building)
     }
 }
