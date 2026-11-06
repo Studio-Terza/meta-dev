@@ -1,0 +1,8 @@
+[package]
+name = "store"
+
+[package.metadata.port]
+owns = ["logos"]
+
+[dependencies]
+logos = "1"
