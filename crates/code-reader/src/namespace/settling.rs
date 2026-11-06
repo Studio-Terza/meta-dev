@@ -2,7 +2,7 @@ use code_model::ItemPath;
 
 use super::Namespace;
 use super::binding::Binding;
-use super::boundary::{GlobId, Rounds, ScopeId};
+use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::resolver::{Resolution, Resolver};
 use super::std_names::{Listed, StdNames};
@@ -41,7 +41,7 @@ impl<'space> From<&'space Namespace<'space>> for Seeds<'space> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Target {
     Waiting,
     Module(ScopeId, Sight),
@@ -77,6 +77,15 @@ impl Target {
         }
     }
 
+    fn kept(self, held: &Target) -> Target {
+        match self {
+            Target::Waiting => held.clone(),
+            Target::Module(..) | Target::Listed(_) | Target::Opaque => {
+                [self].into_iter().find(|found| found == held).unwrap_or(Target::Opaque)
+            }
+        }
+    }
+
     fn forced(self) -> Target {
         match self {
             Target::Waiting | Target::Opaque => Target::Opaque,
@@ -103,17 +112,27 @@ impl ScopeSettling {
             targets: self.targets.into_iter().map(Target::forced).collect(),
         }
     }
+}
 
-    fn steps(&self) -> impl Iterator<Item = ()> {
-        self.imports.iter().map(|_| ()).chain(self.targets.iter().map(|_| ()))
+impl Lattice for Target {
+    fn joined(&self, computed: Target) -> Target {
+        match self {
+            Target::Waiting => computed,
+            Target::Module(..) | Target::Listed(_) | Target::Opaque => computed.kept(self),
+        }
+    }
+}
+
+impl Lattice for ScopeSettling {
+    fn joined(&self, computed: ScopeSettling) -> ScopeSettling {
+        ScopeSettling { imports: self.imports.joined(computed.imports), targets: self.targets.joined(computed.targets) }
     }
 }
 
 impl Seeds<'_> {
     pub(crate) fn settled(&self) -> Vec<ScopeSettling> {
         let unsettled: Vec<ScopeSettling> = self.space.scopes.iter().map(|row| row.entries().unsettled()).collect();
-        let rounds = Rounds::bounding(unsettled.iter().flat_map(ScopeSettling::steps));
-        rounds.settled(unsettled, |settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
+        unsettled.settled(|settling| self.advanced(settling)).into_iter().map(ScopeSettling::forced).collect()
     }
 
     pub(crate) fn tables<'rows>(&'rows self, settling: &'rows [ScopeSettling]) -> Tables<'rows> {
@@ -125,8 +144,7 @@ impl Seeds<'_> {
             .map(|((row, seeds), settled)| row.entries().explicit(seeds, &settled.imports));
         let fixed = scopes.iter().zip(settling).map(|(row, settled)| row.entries().fixed(&settled.targets));
         let modules = scopes.iter().zip(settling).map(|(row, settled)| row.entries().modules(&settled.targets));
-        let rounds = Rounds::bounding(settling.iter().flat_map(ScopeSettling::steps));
-        Tables::new(explicit.collect(), fixed.collect(), modules.collect(), rounds)
+        Tables::new(explicit.collect(), fixed.collect(), modules.collect())
     }
 
     fn advanced(&self, settling: &[ScopeSettling]) -> Vec<ScopeSettling> {

@@ -39,6 +39,13 @@ impl Binding {
         }
     }
 
+    pub(super) fn agreed(&self, found: Binding) -> Binding {
+        match [found].into_iter().find(|found| found == self) {
+            Some(agreed) => agreed,
+            None => Binding::Unknown,
+        }
+    }
+
     pub(super) fn resolved(self, places: &impl Locating, written: ItemPath) -> Resolved {
         match self {
             Binding::Module(module) => Binding::crate_or_unknown(places.located(module), written),

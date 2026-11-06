@@ -31,31 +31,32 @@ impl GlobId {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct Rounds(usize);
+pub(super) trait Lattice: PartialEq + Sized {
+    fn joined(&self, computed: Self) -> Self;
 
-impl Rounds {
-    pub(super) fn bounding(steps: impl Iterator<Item = ()>) -> Rounds {
-        Rounds(iter::once(()).chain(steps).count())
-    }
-
-    pub(super) fn settled<State: PartialEq>(self, start: State, advanced: impl Fn(&State) -> State) -> State {
-        Rounds::reached(iter::repeat_n((), self.0).try_fold(start, |state, ()| {
-            let next = advanced(&state);
-            Rounds::stepped(state, next)
+    fn settled(self, advanced: impl Fn(&Self) -> Self) -> Self {
+        Self::reached(iter::repeat(()).try_fold(self, |state, ()| {
+            let next = state.joined(advanced(&state));
+            state.stepped(next)
         }))
     }
 
-    fn stepped<State: PartialEq>(state: State, next: State) -> ControlFlow<State, State> {
-        match [state].into_iter().find(|state| *state == next) {
+    fn stepped(self, next: Self) -> ControlFlow<Self, Self> {
+        match [self].into_iter().find(|state| *state == next) {
             Some(_) => ControlFlow::Break(next),
             None => ControlFlow::Continue(next),
         }
     }
 
-    fn reached<State>(settling: ControlFlow<State, State>) -> State {
+    fn reached(settling: ControlFlow<Self, Self>) -> Self {
         match settling {
             ControlFlow::Break(state) | ControlFlow::Continue(state) => state,
         }
+    }
+}
+
+impl<Entry: Lattice> Lattice for Vec<Entry> {
+    fn joined(&self, computed: Vec<Entry>) -> Vec<Entry> {
+        self.iter().zip(computed).map(|(held, found)| held.joined(found)).collect()
     }
 }

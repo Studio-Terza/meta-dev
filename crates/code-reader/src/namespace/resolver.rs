@@ -6,7 +6,7 @@ use lint_layout::Name;
 use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
-use super::boundary::{GlobId, ScopeId};
+use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::Sight;
 use super::settling::Target;
 use super::std_names::{Canonical, StdNames, Table};
@@ -65,10 +65,26 @@ impl Resolution {
         }
     }
 
+    fn kept(self, held: &Binding) -> Resolution {
+        match self {
+            Resolution::Waiting => Resolution::Bound(held.clone()),
+            Resolution::Bound(found) => Resolution::Bound(held.agreed(found)),
+        }
+    }
+
     fn target(self, sight_of: impl FnOnce(ScopeId) -> Sight) -> Target {
         match self {
             Resolution::Waiting => Target::Waiting,
             Resolution::Bound(binding) => binding.target(sight_of),
+        }
+    }
+}
+
+impl Lattice for Resolution {
+    fn joined(&self, computed: Resolution) -> Resolution {
+        match self {
+            Resolution::Waiting => computed,
+            Resolution::Bound(held) => computed.kept(held),
         }
     }
 }

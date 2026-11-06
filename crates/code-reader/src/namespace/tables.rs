@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lint_layout::Name;
 
-use super::boundary::{GlobId, Rounds, ScopeId};
+use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::view::View;
 
@@ -133,6 +133,15 @@ impl<'rows> From<View<'rows>> for Exposed<'rows> {
 }
 
 impl<'rows> Exposed<'rows> {
+    fn joined(&self, computed: &Exposed<'rows>) -> Exposed<'rows> {
+        let keys: BTreeSet<Key<'rows>> = self.names.keys().chain(computed.names.keys()).copied().collect();
+        let names = keys
+            .into_iter()
+            .map(|key| (key, self.found(Sought::Named(key)).union(computed.found(Sought::Named(key)))))
+            .collect();
+        Exposed { default: self.default.union(computed.default), names }
+    }
+
     fn found(&self, sought: Sought<'_>) -> View<'rows> {
         match sought {
             Sought::Named(key) => self.names.get(&key).copied().unwrap_or(self.default),
@@ -176,6 +185,20 @@ impl<'rows> ModuleGlob<'rows> {
                 id: self.glob.id,
                 visibility: self.glob.visibility,
                 exposed: names.exposure(self.module, self.sight),
+            },
+            module: self.module,
+            sight: self.sight,
+        }
+    }
+}
+
+impl<'rows> Lattice for ModuleGlob<'rows> {
+    fn joined(&self, computed: ModuleGlob<'rows>) -> ModuleGlob<'rows> {
+        ModuleGlob {
+            glob: GlobView {
+                id: self.glob.id,
+                visibility: self.glob.visibility,
+                exposed: self.glob.exposed.joined(&computed.glob.exposed),
             },
             module: self.module,
             sight: self.sight,
@@ -256,10 +279,8 @@ impl<'rows> Tables<'rows> {
         explicit: Vec<Explicit<'rows>>,
         fixed: Vec<Vec<GlobView<'rows>>>,
         modules: Vec<Vec<ModuleGlob<'rows>>>,
-        rounds: Rounds,
     ) -> Tables<'rows> {
-        let modules =
-            rounds.settled(modules, |modules| Names { explicit: &explicit, fixed: &fixed, modules }.exposed());
+        let modules = modules.settled(|modules| Names { explicit: &explicit, fixed: &fixed, modules }.exposed());
         Tables { explicit, fixed, modules }
     }
 

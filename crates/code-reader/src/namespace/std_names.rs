@@ -43,7 +43,7 @@ impl StdGlob {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Listed {
     name: Name,
     binding: Binding,
