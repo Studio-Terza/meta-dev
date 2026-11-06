@@ -127,3 +127,23 @@ fn ops_with_one_name_count_separately() {
     assert_eq!(snapshot.calls::<ListSessions>(), Calls::new(2));
     assert_eq!(snapshot.iter().count(), 2);
 }
+
+#[derive(Debug)]
+struct Alpha;
+
+impl Op for Alpha {
+    type Port = Lines;
+    const NAME: OpName = OpName::new("alpha");
+}
+
+#[test]
+fn the_snapshot_lists_ops_by_name_then_type_name_whatever_the_call_order() {
+    let run = Run::default();
+    let port = run.meter(Lines(1));
+    port.call(Sessions::write_session);
+    port.call(|_, _entry: Entry<ListSessions>| ());
+    port.call(Sessions::read_session);
+    port.call(|_, _entry: Entry<Alpha>| ());
+    let names: Vec<OpName> = run.snapshot().iter().map(|counted| counted.name()).collect();
+    assert_eq!(names, vec![Alpha::NAME, ReadSession::NAME, ReadSession::NAME, WriteSession::NAME]);
+}
