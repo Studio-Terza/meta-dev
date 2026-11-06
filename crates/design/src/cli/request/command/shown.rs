@@ -1,6 +1,5 @@
 use std::fmt;
 
-use port_core::Metered;
 use stream::{MechanicalLink, Message, Shape, Stream};
 use transcript_ports::{Transcripts, Uuid};
 
@@ -13,7 +12,7 @@ pub struct Shown {
 }
 
 impl Shown {
-    pub fn find(port: &(impl Transcripts + Metered), uuid: &Uuid) -> Result<Shown, Failure> {
+    pub fn find(port: &impl Transcripts, uuid: &Uuid) -> Result<Shown, Failure> {
         let sessions = port.sessions()?;
         port.read_all(&sessions)?
             .into_iter()

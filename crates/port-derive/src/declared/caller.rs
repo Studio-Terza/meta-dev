@@ -7,7 +7,7 @@ pub struct Caller;
 
 impl Rendered for Caller {
     fn rendered(declared: &Declared) -> TokenStream {
-        let item = declared.declared_trait();
+        let item = declared.sealed_trait();
         quote!(#item)
     }
 }

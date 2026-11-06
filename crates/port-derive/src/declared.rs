@@ -9,7 +9,7 @@ mod ops;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::Nothing;
-use syn::{ItemTrait, TraitItem, TraitItemFn, Visibility};
+use syn::{ItemTrait, Token, TraitItem, TraitItemFn, TypeParamBound, Visibility, parse_quote};
 
 use caller::Caller;
 use delegation::Delegation;
@@ -59,7 +59,7 @@ impl Declared {
         Delegation::rendered_after(self, &ops)
     }
 
-    pub fn declared_trait(&self) -> &ItemTrait {
+    pub fn sealed_trait(&self) -> &ItemTrait {
         &self.item
     }
 
@@ -80,6 +80,7 @@ impl Declared {
     }
 
     fn parsed(item: ItemTrait) -> Declared {
+        let item = Self::sealed(item);
         let methods =
             item.items.iter().filter_map(Self::required).map(|function| Method::declared(&function.sig)).collect();
         Declared {
@@ -89,6 +90,13 @@ impl Declared {
             methods,
             item,
         }
+    }
+
+    fn sealed(mut item: ItemTrait) -> ItemTrait {
+        let seal: TypeParamBound = parse_quote!(::port_core::Metered);
+        item.colon_token.get_or_insert_with(<Token![:]>::default);
+        item.supertraits.push(seal);
+        item
     }
 
     fn required(item: &TraitItem) -> Option<&TraitItemFn> {
