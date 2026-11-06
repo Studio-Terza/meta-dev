@@ -15,7 +15,7 @@ pub use query::Query;
 pub use schema::Schema;
 pub use sqlite::Sqlite;
 pub use statements::Statements;
-pub use store::{Store, StoreFiller};
+pub use store::Store;
 pub use store_failure::StoreFailure;
 pub use store_lock::Unlock;
 pub use written::Written;

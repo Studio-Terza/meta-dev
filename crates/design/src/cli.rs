@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use console_ports::Environment;
 use file_ports::Files;
 use port_core::Run;
-use store_ports::StoreFiller;
+use store_ports::Sqlite;
 
 use crate::Outcome;
 
@@ -27,32 +27,28 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
         Cli { environment, files, opened }
     }
 
-    pub fn rooted<S: StoreFiller>(
-        self,
-        arguments: impl Iterator<Item = OsString>,
-        out: &mut impl Write,
-    ) -> Result<Outcome, Failure>
+    pub fn rooted(self, arguments: impl Iterator<Item = OsString>, out: &mut impl Write) -> Result<Outcome, Failure>
     where
-        O: FnOnce(PathBuf) -> S,
+        O: FnOnce(PathBuf) -> Sqlite,
     {
         let run = Run::root();
         let outcome = self.report(&run, arguments, out);
         Failure::settled(outcome, run.finish().settled())
     }
 
-    pub fn report<S: StoreFiller>(
+    pub fn report(
         self,
         run: &Run,
         arguments: impl Iterator<Item = OsString>,
         out: &mut impl Write,
     ) -> Result<Outcome, Failure>
     where
-        O: FnOnce(PathBuf) -> S,
+        O: FnOnce(PathBuf) -> Sqlite,
     {
         let request = Request::parsed(arguments)?;
         let located = request.located(self.environment)?;
         let transcripts = run.port(located.transcripts(self.files));
-        let store = run.port(located.store(self.opened));
+        let store = run.port(request.persistence().store(located, self.opened));
         request.command().written(&transcripts, &store, out)
     }
 }

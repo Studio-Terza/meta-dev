@@ -322,16 +322,36 @@ fn show_reads_the_store_not_the_live_transcript() {
     assert!(matches!(before, Err(Failure::Missing(_))));
 }
 
+struct Opened {
+    paths: Vec<PathBuf>,
+    out: String,
+}
+
+impl Opened {
+    fn by(arguments: &[&str]) -> Result<Opened, Failure> {
+        let opened = Mutex::new(Vec::new());
+        let run = Run::root();
+        let mut out = Vec::new();
+        Cli::new(&Invocation::environment(), Session::typical().files(), |path: PathBuf| {
+            opened.lock().map(|mut paths| paths.push(path)).ok();
+            Sqlite::in_memory::<StreamSchema>()
+        })
+        .report(&run, arguments.iter().map(OsString::from), &mut out)?;
+        Ok(Opened { paths: opened.into_inner().unwrap_or_default(), out: String::from_utf8(out).unwrap_or_default() })
+    }
+}
+
 #[test]
 fn the_store_lives_in_the_workspace_meta_directory() -> Result<(), Failure> {
-    let opened = Mutex::new(Vec::new());
-    let run = Run::root();
-    Cli::new(&Invocation::environment(), Session::typical().files(), |path: PathBuf| {
-        opened.lock().map(|mut paths| paths.push(path)).ok();
-        Sqlite::in_memory::<StreamSchema>()
-    })
-    .report(&run, ["ingest"].iter().map(OsString::from), &mut Vec::new())?;
-    assert_eq!(opened.into_inner().unwrap_or_default(), [PathBuf::from("/work/.meta/design.sqlite")]);
+    assert_eq!(Opened::by(&["ingest"])?.paths, [PathBuf::from("/work/.meta/design.sqlite")]);
+    Ok(())
+}
+
+#[test]
+fn a_dry_run_ingest_prints_the_counts_and_leaves_the_workspace_store_absent() -> Result<(), Failure> {
+    let dry = Opened::by(&["ingest", "--dry-run"])?;
+    assert!(dry.out.contains("authorship owner 2\n"));
+    assert_eq!(dry.paths, Vec::<PathBuf>::new());
     Ok(())
 }
 

@@ -9,10 +9,10 @@ use std::sync::{Arc, Mutex, PoisonError};
 use port_core::Pass;
 use sqlx::migrate::Migrator;
 
-use crate::store::store_ops;
+use crate::store::{StoreFiller, store_ops};
 use crate::store_lock::Claim;
 use crate::store_lock::StoreLock;
-use crate::{Batch, Busy, Query, Schema, StoreFailure, StoreFiller, Written};
+use crate::{Batch, Busy, Query, Schema, StoreFailure, Written};
 use opened::Opened;
 use place::Place;
 
