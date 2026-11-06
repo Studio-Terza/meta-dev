@@ -1,5 +1,6 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
+    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Reach, Region, Resolved, Sited,
+    TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -277,10 +278,6 @@ impl Expect {
 
     fn projected(subject: TypeRef<Seen>, item: &str, line: usize) -> TypeRef<Seen> {
         TypeRef::Projected(Box::new(Projection::new(subject, None, Name::from(item), LineNumber::from(line))))
-    }
-
-    fn returning(primitive: Primitive) -> Option<TypeRef<Seen>> {
-        Some(Expect::primitive(primitive))
     }
 }
 
@@ -608,11 +605,11 @@ fn every_function_is_read_with_its_owner_entry_and_output() {
         Read::functions(FORMS),
         [
             Expect::function("free", Owner::Free, Entry::Called, None),
-            Expect::function("inherent", Owner::Inherent, Entry::Called, Expect::returning(Primitive::Bool)),
-            Expect::function("declared", Owner::TraitDecl, Entry::Called, Expect::returning(Primitive::Integer)),
-            Expect::function("declared", Owner::TraitImpl, Entry::Called, Expect::returning(Primitive::Integer)),
+            Expect::function("inherent", Owner::Inherent, Entry::Called, Some(Expect::primitive(Primitive::Bool))),
+            Expect::function("declared", Owner::TraitDecl, Entry::Called, Some(Expect::primitive(Primitive::Integer))),
+            Expect::function("declared", Owner::TraitImpl, Entry::Called, Some(Expect::primitive(Primitive::Integer))),
             Expect::function("outer", Owner::Free, Entry::Called, None),
-            Expect::function("nested", Owner::Nested, Entry::Called, Expect::returning(Primitive::Char)),
+            Expect::function("nested", Owner::Nested, Entry::Called, Some(Expect::primitive(Primitive::Char))),
             Expect::function("inner", Owner::Inherent, Entry::Called, None),
             Expect::function("checked", Owner::Free, Entry::Test, None),
             Expect::function("awaited", Owner::Free, Entry::Test, None),
@@ -720,6 +717,30 @@ fn an_implementation_reads_the_type_it_implements_for() {
         [
             Expect::named(Expect::item("A", ItemKind::Struct), Vec::new()),
             Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")]),
+        ]
+    );
+}
+
+const REACHED: &str = "fn shipped() {}\n#[cfg(test)]\nmod tests {\n    fn tested() {}\n}\nm! {\n    fn expanded() {}\n}\nfn outer() {\n    n! {\n        fn inner() {}\n    }\n}\n";
+
+#[test]
+fn every_function_carries_the_reach_of_where_it_is_written() {
+    let model = Reader::read_files(&[Read::file("a.rs", REACHED)]);
+    let reached: Vec<(String, Reach)> = model
+        .functions()
+        .everywhere()
+        .map(|found| {
+            (AsRef::<Name>::as_ref(found.entity()).to_string(), AsRef::<Region>::as_ref(found.entity()).reach())
+        })
+        .collect();
+    assert_eq!(
+        reached,
+        [
+            ("shipped".to_owned(), Reach::Shipped),
+            ("tested".to_owned(), Reach::Test),
+            ("expanded".to_owned(), Reach::MacroBody),
+            ("outer".to_owned(), Reach::Shipped),
+            ("inner".to_owned(), Reach::MacroBody),
         ]
     );
 }

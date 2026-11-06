@@ -1,6 +1,6 @@
 use lint_primitive_boundary::{PrimitiveBoundary, WidenedPrimitiveBoundary};
 
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 
 const BARE: &str = "fn f(x: u32) -> f64 {\n    g(x)\n}\n";
 const SUPPORT_MODULE: &str = "#[cfg(test)]\nmod fixtures;\n";
@@ -59,8 +59,14 @@ const SHIPPED_CONSTRUCTOR: &str =
     "pub struct Id {\n    v: V,\n}\nimpl Id {\n    pub fn new(v: u64) -> Id {\n        g(v)\n    }\n}\n";
 const CHOSEN: &str = "pub struct A;\nimpl core::str::FromStr for A {\n    type Err = String;\n    fn from_str(t: &str) -> Result<A, String> {\n        g(t)\n    }\n}\n";
 const ASSOCIATED: &str = "trait T {\n    type X: AsRef<str>;\n    const N: usize;\n}\n";
+const TEST_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\n#[cfg(test)]\nmod tests {\n    impl fmt::Display for super::A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const MACRO_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.trim();\n    }\n}\nm! {\n    impl fmt::Display for A {\n        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n            g(f)\n        }\n    }\n}\n";
+const SHARED_TEXT: &str = "use std::borrow::Cow;\nuse std::sync::Arc;\nstruct Boxed(Box<str>);\nstruct Shared(Arc<str>);\nstruct Borrowed<'a>(Cow<'a, str>);\n";
+const MACRO_TEXT: &str =
+    "fn f(x: Name) {\n    assert!(x.trim().is_empty());\n    println!(\"{}\", x.to_string());\n}\n";
+const BESIDE_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\nfn g(y: u8) {}\n";
 
-const CASES: [Case; 48] = [
+const CASES: [Case; 53] = [
     Case::new(
         Title::new("a shipped constructor beside a same-named newtype in a test file"),
         &[
@@ -296,9 +302,34 @@ const CASES: [Case; 48] = [
         &[Source::new(Located::new("crates/x/src/ports.rs"), Text::new(FLAG))],
         Flagged::new(&["crates/x/src/ports.rs:1"]),
     ),
+    Case::new(
+        Title::new("a door impl in a cfg(test) module opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEST_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a door impl in a macro body opens no door for shipped text"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_DOOR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("text in std macro arguments is not blocked yet"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("one-field structs of owned or shared str are newtypes"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHARED_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a primitive beside an item macro"),
+        &[Source::new(Located::new("a.rs"), Text::new(BESIDE_MACRO))],
+        Flagged::new(&["a.rs:4"]),
+    ),
 ];
 
-const WIDENED: [Case; 19] = [
+const WIDENED: [Case; 22] = [
     Case::new(
         Title::new("an associated type chosen in a trait impl"),
         &[Source::new(Located::new("a.rs"), Text::new(CHOSEN))],
@@ -378,9 +409,9 @@ const WIDENED: [Case; 19] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("a newtype and its edges in a test file"),
+        Title::new("a newtype's hand-written new, try_new and into_inner in a test file"),
         &[Source::new(Located::new("x/tests/a.rs"), Text::new(NEWTYPE_EDGES))],
-        Flagged::new(&[]),
+        Flagged::new(&["x/tests/a.rs:3", "x/tests/a.rs:6", "x/tests/a.rs:9"]),
     ),
     Case::new(
         Title::new("a boundary module file"),
@@ -397,14 +428,29 @@ const WIDENED: [Case; 19] = [
         &[Source::new(Located::new("a.rs"), Text::new(ALIASED_QUALIFIED))],
         Flagged::new(&[]),
     ),
+    Case::new(
+        Title::new("a newtype's hand-written new, try_new and into_inner are judged like any method"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPE_EDGES))],
+        Flagged::new(&["a.rs:3", "a.rs:6", "a.rs:9"]),
+    ),
+    Case::new(
+        Title::new("one-field structs of owned or shared str are newtypes, not collections"),
+        &[Source::new(Located::new("a.rs"), Text::new(SHARED_TEXT))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("text in std macro arguments"),
+        &[Source::new(Located::new("a.rs"), Text::new(MACRO_TEXT))],
+        Flagged::new(&["a.rs:2", "a.rs:3"]),
+    ),
 ];
 
 #[test]
 fn primitives_outside_a_boundary_are_flagged() {
-    assert_eq!(Sources::mismatches::<PrimitiveBoundary>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<PrimitiveBoundary>>(&CASES), Lines::default());
 }
 
 #[test]
 fn primitives_the_gate_does_not_yet_block_are_listed() {
-    assert_eq!(Sources::mismatches::<WidenedPrimitiveBoundary>(&WIDENED), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<WidenedPrimitiveBoundary>>(&WIDENED), Lines::default());
 }

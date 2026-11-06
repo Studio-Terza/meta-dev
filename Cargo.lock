@@ -753,9 +753,9 @@ dependencies = [
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "lint-core",
  "lint-layout",
- "syn 2.0.119",
 ]
 
 [[package]]

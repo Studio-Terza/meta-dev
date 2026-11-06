@@ -431,9 +431,7 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_mod(&mut self, item: &'ast ItemMod) {
         match self.mode {
             Mode::Source => self.module_entered(item),
-            Mode::Expansion => {
-                self.contextual(self.context.within_module(item), |lowering| visit::visit_item_mod(lowering, item))
-            }
+            Mode::Expansion => self.module_expanded(self.context.within_module(item), item),
         }
     }
 
@@ -501,18 +499,20 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
         self.derived(&item.attrs, &item.ident);
-        let scope = self.generics.extended(&item.generics);
-        self.parameters(Holder::named(&item.ident, Held::StructParameter), &item.generics, &scope);
-        self.struct_held(item, &scope, Link::from(self.mode.declared(&item.ident)));
+        let link = Link::from(self.mode.declared(&item.ident));
+        self.parameters(&Holder::named(&item.ident, Held::StructParameter), &item.generics, &link);
+        self.struct_held(item, &self.generics.extended(&item.generics), link);
         visit::visit_item_struct(self, item);
     }
 
     fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
         self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
-        self.parameters(Holder::named(&item.ident, Held::EnumParameter), &item.generics, &scope);
-        item.variants.iter().for_each(|variant| {
-            self.fields_held(&Holder::named(&variant.ident, Held::EnumField), variant.fields.iter(), &scope);
+        let link = Link::from(self.mode.declared(&item.ident));
+        self.parameters(&Holder::named(&item.ident, Held::EnumParameter), &item.generics, &link);
+        item.variants.iter().fold(&mut *self, |lowering, variant| {
+            lowering.fields_held(&Holder::named(&variant.ident, Held::EnumField), variant.fields.iter(), &scope);
+            lowering
         });
         visit::visit_item_enum(self, item);
     }
@@ -520,7 +520,8 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
     fn visit_item_union(&mut self, item: &'ast ItemUnion) {
         self.derived(&item.attrs, &item.ident);
         let scope = self.generics.extended(&item.generics);
-        self.parameters(Holder::named(&item.ident, Held::UnionParameter), &item.generics, &scope);
+        let link = Link::from(self.mode.declared(&item.ident));
+        self.parameters(&Holder::named(&item.ident, Held::UnionParameter), &item.generics, &link);
         self.fields_held(&Holder::named(&item.ident, Held::UnionField), item.fields.named.iter(), &scope);
         visit::visit_item_union(self, item);
     }

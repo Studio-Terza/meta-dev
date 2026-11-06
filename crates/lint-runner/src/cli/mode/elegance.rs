@@ -36,7 +36,7 @@ impl Elegance {
             FlowShapes::report(files),
             NormalisedShapes::report(files),
             <NarrowedReturns as ModelLint>::report(model),
-            WidenedPrimitiveBoundary::report(files),
+            <WidenedPrimitiveBoundary as ModelLint>::report(model),
         ]
     }
 }

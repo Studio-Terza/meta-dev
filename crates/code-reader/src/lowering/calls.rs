@@ -50,6 +50,28 @@ impl Built for CallRow {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct CallPath<'path> {
+    path: &'path ExprPath,
+}
+
+impl CallPath<'_> {
+    fn line(self) -> LineNumber {
+        match self.path.path.segments.last() {
+            Some(last) => LineNumber::from(last.ident.span()),
+            None => LineNumber::from(self.path.span()),
+        }
+    }
+
+    fn prefix(self) -> syn::Path {
+        let segments = &self.path.path.segments;
+        syn::Path {
+            leading_colon: self.path.path.leading_colon,
+            segments: segments.iter().take(segments.len().saturating_sub(1)).cloned().collect(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Invocation<'invoked> {
     invoked: &'invoked Macro,
 }
@@ -70,10 +92,10 @@ impl Lowering<'_, '_> {
     }
 
     pub(super) fn path_called(&mut self, call: &ExprCall) {
-        match Syntax::expr_path(&call.func) {
-            Some(path) => self.path_call_lowered(path),
-            None => (),
-        }
+        Syntax::expr_path(&call.func).into_iter().fold(self, |lowering, path| {
+            lowering.path_call_lowered(path);
+            lowering
+        });
     }
 
     pub(super) fn macro_called(&mut self, invoked: &Macro, position: Position) {
@@ -84,30 +106,29 @@ impl Lowering<'_, '_> {
 
     pub(super) fn expanded(&mut self, invoked: &Macro) {
         match StdNames::expansion(invoked) {
-            Expansion::Statement => self.expressions_visited(Invocation { invoked }.arguments()),
-            Expansion::Items => self.items_visited(Invocation { invoked }.items()),
+            Expansion::Statement => self.expressions_visited(&Invocation { invoked }.arguments()),
+            Expansion::Items => self.items_visited(&Invocation { invoked }.items()),
         }
     }
 
-    pub(super) fn expressions_visited(&mut self, arguments: Vec<Expr>) {
-        arguments.iter().for_each(|argument| self.expansion_visited(|lowering| lowering.visit_expr(argument)));
+    pub(super) fn expressions_visited(&mut self, arguments: &[Expr]) {
+        arguments.iter().fold(self, |lowering, argument| {
+            lowering.expansion_visited(|expanding| expanding.visit_expr(argument));
+            lowering
+        });
     }
 
-    pub(super) fn items_visited(&mut self, items: Vec<Item>) {
-        items.iter().for_each(|item| self.expansion_visited(|lowering| lowering.visit_item(item)));
+    pub(super) fn items_visited(&mut self, items: &[Item]) {
+        items.iter().fold(self, |lowering, item| {
+            lowering.expansion_visited(|expanding| expanding.visit_item(item));
+            lowering
+        });
     }
 
     pub(super) fn path_call_lowered(&mut self, path: &ExprPath) {
-        let segments = &path.path.segments;
-        let line = segments
-            .last()
-            .map(|last| LineNumber::from(last.ident.span()))
-            .unwrap_or_else(|| LineNumber::from(path.span()));
-        let prefix = syn::Path {
-            leading_colon: path.path.leading_colon,
-            segments: segments.iter().take(segments.len().saturating_sub(1)).cloned().collect(),
-        };
-        let owner = self.owner_lowered(&prefix, line);
+        let called = CallPath { path };
+        let line = called.line();
+        let owner = self.owner_lowered(&called.prefix(), line);
         self.called(line, CalleeRow::Path(UsePath::from(&path.path).written(), owner));
     }
 

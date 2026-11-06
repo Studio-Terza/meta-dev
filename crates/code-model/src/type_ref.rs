@@ -35,7 +35,7 @@ pub enum TypeRef<Bound = Sited> {
     Reference(Referenced<Bound>),
     Pointer(Referenced<Bound>),
     Slice(Box<TypeRef<Bound>>),
-    Array(Box<TypeRef<Bound>>),
+    Array(Arrayed<Bound>),
     Bounded(Bounds<Bound>),
     Projected(Box<Projection<Bound>>),
     Function(Callable<Bound>),
@@ -53,6 +53,12 @@ pub struct Named<Bound> {
 pub struct Referenced<Bound> {
     access: Access,
     pointee: Box<TypeRef<Bound>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Arrayed<Bound> {
+    element: Box<TypeRef<Bound>>,
+    measured: Vec<TypeRef<Bound>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,6 +180,43 @@ impl Referenced<Sited> {
     }
 }
 
+impl<Bound> Arrayed<Bound> {
+    #[must_use]
+    pub fn new(element: TypeRef<Bound>, measured: Vec<TypeRef<Bound>>) -> Arrayed<Bound> {
+        Arrayed { element: Box::new(element), measured }
+    }
+
+    fn mapped<Into>(self, resolve: &mut impl FnMut(Bound) -> Into) -> Arrayed<Into> {
+        Arrayed {
+            element: Box::new(self.element.mapped(resolve)),
+            measured: TypeRef::each_mapped(self.measured, resolve),
+        }
+    }
+}
+
+impl Arrayed<Sited> {
+    fn each_use(&self, uses: &mut impl TypeUses) {
+        [&*self.element].into_iter().chain(&self.measured).fold(uses, |uses, ty| {
+            ty.each_use(uses);
+            uses
+        });
+    }
+
+    fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> Arrayed<Sited> {
+        Arrayed {
+            element: Box::new(self.element.substituted(parameters, arguments)),
+            measured: TypeRef::each_substituted(&self.measured, parameters, arguments),
+        }
+    }
+
+    fn expanded(&self, aliases: &Aliases, steps: Steps) -> Option<Arrayed<Sited>> {
+        Some(Arrayed {
+            element: Box::new(self.element.expanded(aliases, steps)?),
+            measured: TypeRef::each_expanded(&self.measured, aliases, steps)?,
+        })
+    }
+}
+
 impl<Bound> From<Vec<Named<Bound>>> for Bounds<Bound> {
     fn from(traits: Vec<Named<Bound>>) -> Bounds<Bound> {
         Bounds { traits }
@@ -188,7 +231,10 @@ impl<Bound> Bounds<Bound> {
 
 impl Bounds<Sited> {
     fn each_use(&self, uses: &mut impl TypeUses) {
-        self.traits.iter().for_each(|bound| uses.named(bound));
+        self.traits.iter().fold(uses, |uses, bound| {
+            uses.named(bound);
+            uses
+        });
     }
 
     fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> Bounds<Sited> {
@@ -248,7 +294,10 @@ impl<Bound> AsRef<LineNumber> for Projection<Bound> {
 impl Projection<Sited> {
     pub fn each_inner_use(&self, uses: &mut impl TypeUses) {
         self.subject.each_use(uses);
-        self.interface.iter().for_each(|interface| uses.named(interface));
+        self.interface.iter().fold(uses, |uses, interface| {
+            uses.named(interface);
+            uses
+        });
     }
 
     fn substituted(&self, parameters: &[AliasParameter], arguments: &[TypeRef]) -> Projection<Sited> {
@@ -316,7 +365,7 @@ impl<Bound> TypeRef<Bound> {
             TypeRef::Reference(referenced) => TypeRef::Reference(referenced.mapped(resolve)),
             TypeRef::Pointer(referenced) => TypeRef::Pointer(referenced.mapped(resolve)),
             TypeRef::Slice(element) => TypeRef::Slice(Box::new(element.mapped(resolve))),
-            TypeRef::Array(element) => TypeRef::Array(Box::new(element.mapped(resolve))),
+            TypeRef::Array(arrayed) => TypeRef::Array(arrayed.mapped(resolve)),
             TypeRef::Bounded(bounds) => TypeRef::Bounded(bounds.mapped(resolve)),
             TypeRef::Projected(projection) => TypeRef::Projected(Box::new(projection.mapped(resolve))),
             TypeRef::Function(callable) => TypeRef::Function(callable.mapped(resolve)),
@@ -374,12 +423,21 @@ impl<Bound> TypeRef<Bound> {
 }
 
 impl TypeRef {
+    #[must_use]
+    pub fn dereferenced(&self) -> &TypeRef {
+        match self {
+            TypeRef::Reference(referenced) => referenced.pointee.dereferenced(),
+            other => other,
+        }
+    }
+
     pub fn each_use(&self, uses: &mut impl TypeUses) {
         match self {
             TypeRef::Named(named) => uses.named(named),
             TypeRef::Tuple(elements) => TypeRef::each_used(elements, uses),
             TypeRef::Reference(referenced) | TypeRef::Pointer(referenced) => referenced.pointee.each_use(uses),
-            TypeRef::Slice(element) | TypeRef::Array(element) => element.each_use(uses),
+            TypeRef::Slice(element) => element.each_use(uses),
+            TypeRef::Array(arrayed) => arrayed.each_use(uses),
             TypeRef::Bounded(bounds) => bounds.each_use(uses),
             TypeRef::Projected(projection) => uses.projected(projection),
             TypeRef::Function(callable) => callable.each_use(uses),
@@ -395,7 +453,7 @@ impl TypeRef {
             TypeRef::Reference(referenced) => TypeRef::Reference(referenced.substituted(parameters, arguments)),
             TypeRef::Pointer(referenced) => TypeRef::Pointer(referenced.substituted(parameters, arguments)),
             TypeRef::Slice(element) => TypeRef::Slice(Box::new(element.substituted(parameters, arguments))),
-            TypeRef::Array(element) => TypeRef::Array(Box::new(element.substituted(parameters, arguments))),
+            TypeRef::Array(arrayed) => TypeRef::Array(arrayed.substituted(parameters, arguments)),
             TypeRef::Bounded(bounds) => TypeRef::Bounded(bounds.substituted(parameters, arguments)),
             TypeRef::Projected(projection) => {
                 TypeRef::Projected(Box::new(projection.substituted(parameters, arguments)))
@@ -412,7 +470,7 @@ impl TypeRef {
             TypeRef::Reference(referenced) => referenced.expanded(aliases, steps).map(TypeRef::Reference),
             TypeRef::Pointer(referenced) => referenced.expanded(aliases, steps).map(TypeRef::Pointer),
             TypeRef::Slice(element) => element.expanded(aliases, steps).map(Box::new).map(TypeRef::Slice),
-            TypeRef::Array(element) => element.expanded(aliases, steps).map(Box::new).map(TypeRef::Array),
+            TypeRef::Array(arrayed) => arrayed.expanded(aliases, steps).map(TypeRef::Array),
             TypeRef::Bounded(bounds) => bounds.expanded(aliases, steps).map(TypeRef::Bounded),
             TypeRef::Projected(projection) => projection.expanded(aliases, steps).map(Box::new).map(TypeRef::Projected),
             TypeRef::Function(callable) => callable.expanded(aliases, steps).map(TypeRef::Function),
@@ -421,7 +479,10 @@ impl TypeRef {
     }
 
     fn each_used(types: &[TypeRef], uses: &mut impl TypeUses) {
-        types.iter().for_each(|ty| ty.each_use(uses));
+        types.iter().fold(uses, |uses, ty| {
+            ty.each_use(uses);
+            uses
+        });
     }
 
     fn each_substituted(types: &[TypeRef], parameters: &[AliasParameter], arguments: &[TypeRef]) -> Vec<TypeRef> {

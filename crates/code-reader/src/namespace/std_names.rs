@@ -319,8 +319,8 @@ impl StdNames {
         Self::PRIMITIVES.iter().find(|row| only.matches::<Whole>(&[row.word]).is_some()).map(|row| row.primitive)
     }
 
-    pub(super) fn stepped(module: ItemPath, segment: &Name) -> Binding {
-        match Self::primitive_within(&module, segment) {
+    pub(super) fn stepped(module: &ItemPath, segment: &Name) -> Binding {
+        match Self::primitive_within(module, segment) {
             Some(primitive) => Binding::Primitive(primitive),
             None => Binding::Std(module.joined(segment)),
         }

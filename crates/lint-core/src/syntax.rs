@@ -2,9 +2,9 @@ use proc_macro2::{Group, Literal, Punct, TokenTree};
 use syn::punctuated::Punctuated;
 use syn::{
     AngleBracketedGenericArguments, Expr, ExprLit, ExprPath, Field, Fields, FnArg, GenericArgument, GenericParam,
-    Ident, ImplItem, ImplItemFn, ImplItemType, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent,
-    PatType, PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam,
-    TypeParamBound, TypePath,
+    Ident, ImplItem, ImplItemFn, Item, ItemImpl, ItemMod, ItemUse, Lit, LitStr, Member, Pat, PatIdent, PatType,
+    PathArguments, ReturnType, Stmt, Token, TraitBound, TraitItem, TraitItemFn, Type, TypeParam, TypeParamBound,
+    TypePath,
 };
 
 #[derive(Debug)]
@@ -15,14 +15,6 @@ impl Syntax {
     pub fn impl_fn(member: &ImplItem) -> Option<&ImplItemFn> {
         match member {
             ImplItem::Fn(function) => Some(function),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn impl_type(member: &ImplItem) -> Option<&ImplItemType> {
-        match member {
-            ImplItem::Type(associated) => Some(associated),
             _ => None,
         }
     }

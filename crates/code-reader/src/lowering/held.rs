@@ -25,12 +25,18 @@ impl Holder {
     }
 
     fn field(&self, field: &Field) -> Holder {
-        let name = field.ident.as_ref().map(Name::from).unwrap_or_else(|| self.name.clone());
-        Holder { line: LineNumber::from(field.span()), name, held: self.held }
+        Holder { line: LineNumber::from(field.span()), name: self.field_name(field), held: self.held }
+    }
+
+    fn field_name(&self, field: &Field) -> Name {
+        match &field.ident {
+            Some(ident) => Name::from(ident),
+            None => self.name.clone(),
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct SlotRow {
     subject: TypeRef<Written>,
     interface: Option<Written>,
@@ -47,7 +53,7 @@ impl SlotRow {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) enum Link {
     Free,
     Declares(UsePath),
@@ -119,8 +125,12 @@ impl Lowering<'_, '_> {
         self.lowered.rows.extend(rows);
     }
 
-    pub(super) fn parameters(&mut self, holder: Holder, generics: &Generics, scope: &InScope) {
-        scope.constraints(generics).into_iter().for_each(|ty| self.hold(holder.clone(), Link::Free, ty));
+    pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {
+        let scope = self.generics.extended(generics);
+        scope.constraints(generics).into_iter().fold(self, |lowering, ty| {
+            lowering.hold(holder.clone(), link.clone(), ty);
+            lowering
+        });
     }
 
     pub(super) fn struct_held(&mut self, item: &ItemStruct, scope: &InScope, link: Link) {
@@ -136,6 +146,9 @@ impl Lowering<'_, '_> {
         fields: impl Iterator<Item = &'field Field>,
         scope: &InScope,
     ) {
-        fields.for_each(|field| self.hold(holder.field(field), Link::Free, scope.lowered(&field.ty)));
+        fields.fold(self, |lowering, field| {
+            lowering.hold(holder.field(field), Link::Free, scope.lowered(&field.ty));
+            lowering
+        });
     }
 }
