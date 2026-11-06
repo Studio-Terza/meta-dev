@@ -1,0 +1,19 @@
+[package]
+name = "port-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+newtype = { path = "../newtype" }
+port-derive = { path = "../port-derive" }
+
+[dev-dependencies]
+laws = { path = "../laws" }
+
+[lints]
+workspace = true

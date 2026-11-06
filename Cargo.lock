@@ -1130,6 +1130,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "port-core"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "newtype",
+ "port-derive",
+]
+
+[[package]]
+name = "port-derive"
+version = "0.1.0"
+dependencies = [
+ "laws",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
