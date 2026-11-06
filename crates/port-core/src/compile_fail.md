@@ -6,16 +6,19 @@ A port method receives its entry from the meter:
 ```
 use port_core::{Entry, Metered, Op, OpName};
 
+struct Disk;
+
 struct Read;
 
 impl Op for Read {
+    type Port = Disk;
     const NAME: OpName = OpName::new("read");
 }
 
 fn read(_entry: Entry<Read>) {}
 
 fn main() {
-    Metered::new(()).call(|_, entry| read(entry));
+    Metered::new(Disk).call(|_, entry| read(entry));
 }
 ```
 
@@ -24,9 +27,12 @@ An entry cannot be built by calling its constructor:
 ```compile_fail,E0423
 use port_core::{Entry, Op, OpName};
 
+struct Disk;
+
 struct Read;
 
 impl Op for Read {
+    type Port = Disk;
     const NAME: OpName = OpName::new("read");
 }
 
@@ -42,9 +48,12 @@ An entry cannot be built from a struct literal:
 ```compile_fail
 use port_core::{Entry, Op, OpName};
 
+struct Disk;
+
 struct Read;
 
 impl Op for Read {
+    type Port = Disk;
     const NAME: OpName = OpName::new("read");
 }
 
@@ -60,9 +69,12 @@ An entry cannot be admitted from outside the crate:
 ```compile_fail,E0624
 use port_core::{Entry, Op, OpName};
 
+struct Disk;
+
 struct Read;
 
 impl Op for Read {
+    type Port = Disk;
     const NAME: OpName = OpName::new("read");
 }
 
@@ -70,5 +82,26 @@ fn read(_entry: Entry<Read>) {}
 
 fn main() {
     read(Entry::admitted());
+}
+```
+
+An entry for one port's op cannot be minted by the meter of another port:
+
+```compile_fail,E0271
+use port_core::{Entry, Metered, Op, OpName};
+
+struct Disk;
+
+struct Read;
+
+impl Op for Read {
+    type Port = Disk;
+    const NAME: OpName = OpName::new("read");
+}
+
+fn read(_entry: Entry<Read>) {}
+
+fn main() {
+    Metered::new(()).call(|_, entry| read(entry));
 }
 ```

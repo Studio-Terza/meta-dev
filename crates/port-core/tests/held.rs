@@ -6,7 +6,11 @@ use port_core::{Entry, Held, Metered, Op, OpName, ReleaseLog, Resource};
 #[derive(Debug)]
 struct Lock;
 
+#[derive(Debug)]
+struct Vault;
+
 impl Op for Lock {
+    type Port = Vault;
     const NAME: OpName = OpName::new("lock");
 }
 
@@ -40,7 +44,7 @@ impl Fixture {
         let releases = Rc::new(Cell::new(0));
         let log = Rc::new(ReleaseLog::default());
         let slot = Slot { releases: Rc::clone(&releases), outcome };
-        let held = Metered::new(()).call(|(), entry: Entry<Lock>| Held::new(entry, slot, &log));
+        let held = Metered::new(Vault).call(|_, entry: Entry<Lock>| Held::new(entry, slot, &log));
         Fixture { held, releases, log }
     }
 }

@@ -4,5 +4,6 @@ use newtype::Newtype;
 pub struct OpName(&'static str);
 
 pub trait Op {
+    type Port;
     const NAME: OpName;
 }

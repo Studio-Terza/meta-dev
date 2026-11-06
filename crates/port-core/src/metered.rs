@@ -11,7 +11,7 @@ impl<P> Metered<P> {
         Metered { port, tally: Tally::default() }
     }
 
-    pub fn call<O: Op, R>(&self, body: impl FnOnce(&P, Entry<O>) -> R) -> R {
+    pub fn call<O: Op<Port = P>, R>(&self, body: impl FnOnce(&P, Entry<O>) -> R) -> R {
         self.tally.record(O::NAME);
         body(&self.port, Entry::admitted())
     }

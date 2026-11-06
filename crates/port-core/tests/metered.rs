@@ -5,6 +5,7 @@ use port_core::{Calls, Entry, Metered, Op, OpName};
 struct ReadSession;
 
 impl Op for ReadSession {
+    type Port = Lines;
     const NAME: OpName = OpName::new("read_session");
 }
 
@@ -12,6 +13,7 @@ impl Op for ReadSession {
 struct WriteSession;
 
 impl Op for WriteSession {
+    type Port = Lines;
     const NAME: OpName = OpName::new("write_session");
 }
 
