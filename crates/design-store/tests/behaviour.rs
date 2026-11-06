@@ -4,13 +4,13 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use design_model::{
-    AnyNode, Casting, Entered, Entry, Facet, Kin, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project,
-    Provenance, Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    AnyNode, Casting, Entered, Entry, Facet, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix,
+    Project, Provenance, Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
     AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
-    Refusal, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage, ShownNode,
-    StreamSchema, Unseen,
+    Refusal, Resolved, Resolving, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords, ShownMessage,
+    ShownNode, StreamSchema, Unseen,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
@@ -242,7 +242,25 @@ impl Dag {
     }
 
     fn planting(store: &Port<'_, Sqlite>, entry: Entry) -> Result<Planting, Box<dyn Error>> {
-        Ok(Planting::new(Some(Node::new(store.read(NextNode)?, entry)), None))
+        Ok(Planting::sown(Node::new(store.read(NextNode)?, entry)))
+    }
+
+    fn resolved(store: &Port<'_, Sqlite>, id: NodeId) -> Result<Resolved, Box<dyn Error>> {
+        Ok(store.read(Resolving::from(id))?.ok_or("the node is not stored")?)
+    }
+
+    fn linked(
+        store: &Port<'_, Sqlite>,
+        [source, target]: [NodeId; 2],
+        relation: NodeRelation,
+    ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+        let (source, target) = (Dag::resolved(store, source)?, Dag::resolved(store, target)?);
+        Ok(store.write(Linked::new(source, relation, target, Entered::Init.into())))
+    }
+
+    fn cast(store: &Port<'_, Sqlite>, node: NodeId, role: Role) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
+        let node = Dag::resolved(store, node)?;
+        Ok(store.write(Cast::new(node, Casting::new(role, Entered::Role.into()))))
     }
 
     fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
@@ -254,14 +272,7 @@ impl Dag {
         let links = self
             .edges
             .iter()
-            .map(|edge| {
-                Ok(store.write(Linked::new(
-                    Dag::id(edge.child),
-                    NodeRelation::Refines,
-                    Dag::id(edge.parent),
-                    Entered::Init.into(),
-                ))?)
-            })
+            .map(|edge| Ok(Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines)??))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         Ok(Written::total(nodes.into_iter().chain(links)))
     }
@@ -331,7 +342,7 @@ impl Projects {
     fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, Box<dyn Error>> {
         let project: Project = name.parse()?;
         store.write(Dag::planting(store, Entry::new(project.clone(), Facet::Project, Entered::Init.into()))?)?;
-        Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?)
+        Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?.identity())
     }
 }
 
@@ -353,8 +364,8 @@ impl Projects {
         store.write(Dag::node(&store, facet)?)?;
         store.write(Dag::planting(&store, Entry::new("p".parse()?, Facet::Project, Entered::Init.into()))?)?;
         Ok([
-            store.read(ProjectRoot::from("p".parse::<Project>()?))?,
-            store.read(ProjectRoot::from("r".parse::<Project>()?))?,
+            store.read(ProjectRoot::from("p".parse::<Project>()?))?.map(Resolved::identity),
+            store.read(ProjectRoot::from("r".parse::<Project>()?))?.map(Resolved::identity),
         ])
     }
 }
@@ -365,7 +376,7 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eater = Projects::rooted(&store, "p")?;
     let consumed = Projects::rooted(&store, "q")?;
-    store.write(Linked::new(eater, NodeRelation::Consumes, consumed, Entered::Init.into()))?;
+    Dag::linked(&store, [eater, consumed], NodeRelation::Consumes)??;
     let shown = store.read(ShownNode::from(eater))?.ok_or("no consumer shown")?;
     let links: Vec<NodeEdge> = shown.links().iter().map(|link| link.edge()).collect();
     assert_eq!(links, [NodeEdge::new(eater, NodeRelation::Consumes, consumed)]);
@@ -381,8 +392,8 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let parent = Projects::rooted(&store, "p")?;
     store.write(Dag::node(&store, Facet::Project)?)?;
     let child = NodeId::new(parent.into_inner().saturating_add(1));
-    let first = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
-    let second = store.write(Linked::new(child, NodeRelation::Refines, parent, Entered::Init.into()))?;
+    let first = Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
+    let second = Dag::linked(&store, [child, parent], NodeRelation::Refines)??;
     assert!(first > Written::zero());
     assert_eq!(second, Written::zero());
     Ok(())
@@ -611,12 +622,15 @@ impl Closed {
 }
 
 impl Ends {
-    fn linked(self, store: &Port<'_, Sqlite>, edge: Edge, file: Unseen) -> Result<Written, Refusal> {
+    fn linked(
+        self,
+        store: &Port<'_, Sqlite>,
+        edge: Edge,
+        file: Unseen,
+    ) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
         match self {
-            Ends::Nodes(relation) => {
-                store.write(Linked::new(Dag::id(edge.child), relation, Dag::id(edge.parent), Entered::Init.into()))
-            }
-            Ends::Segments(relation) => store.write(Directions::new(
+            Ends::Nodes(relation) => Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], relation),
+            Ends::Segments(relation) => Ok(store.write(Directions::new(
                 Provenance::from(Entered::Apply),
                 file,
                 vec![Directed::Related {
@@ -624,7 +638,7 @@ impl Ends {
                     target: Proposals::segment("o1", edge.parent),
                     relation,
                 }],
-            )),
+            ))),
         }
     }
 
@@ -675,9 +689,9 @@ impl Probe {
         self.edges
             .iter()
             .zip(files)
-            .map(|(edge, file)| ends.linked(&store, *edge, file))
-            .collect::<Result<Vec<Written>, Refusal>>()?;
-        Probe::cyclic(ends.linked(&store, self.tried, tried))
+            .map(|(edge, file)| Ok(ends.linked(&store, *edge, file)??))
+            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        Probe::cyclic(ends.linked(&store, self.tried, tried)?)
     }
 
     fn cyclic(written: Result<Written, Refusal>) -> Result<Option<Cycle>, Box<dyn Error>> {
@@ -759,8 +773,8 @@ impl Mixed {
         self.edges
             .iter()
             .zip(files)
-            .map(|(edge, file)| ends.linked(&store, *edge, file))
-            .collect::<Result<Vec<Written>, Refusal>>()?;
+            .map(|(edge, file)| Ok(ends.linked(&store, *edge, file)??))
+            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         (0..self.dag.facets.len())
             .map(|node| {
                 let placed = store.read(ShownNode::from(Dag::id(node)))?.ok_or("a planted node is not shown")?;
@@ -789,8 +803,8 @@ impl Mixed {
 
 #[derive(Debug, PartialEq, Eq)]
 struct Mismatch {
-    moved: AnyNode,
-    stored: AnyNode,
+    wanted: (Option<Misstaged>, AnyNode),
+    stored: (Option<Misstaged>, AnyNode),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -825,25 +839,30 @@ impl Staging {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         let root = Projects::rooted(&store, "p")?;
+        let resolved = Dag::resolved(&store, root)?;
         let moved = steps
             .iter()
             .map(|step| {
                 let before = Staging::stored(&store, root)?;
-                let moved = Staging::transition(*step)?.applied(before).ok();
-                moved
-                    .map(|moved| {
-                        store.write(Restaged::from(moved.clone()))?;
-                        Ok(Mismatch { moved, stored: Staging::stored(&store, root)? })
-                    })
-                    .transpose()
+                let transition = Staging::transition(*step)?;
+                let wanted = transition.clone().applied(before.clone()).map_or_else(|misstaged| (Some(misstaged), before), |moved| (None, moved));
+                let refused = store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
+                Ok(Mismatch { wanted, stored: (refused, Staging::stored(&store, root)?) })
             })
-            .collect::<Result<Vec<Option<Mismatch>>, Box<dyn Error>>>()?;
-        Ok(moved.into_iter().flatten().filter(|mismatch| mismatch.moved != mismatch.stored).collect())
+            .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
+        Ok(moved.into_iter().filter(|mismatch| mismatch.wanted != mismatch.stored).collect())
+    }
+
+    fn misstaged(refusal: Refusal) -> Result<Misstaged, Box<dyn Error>> {
+        match refusal {
+            Refusal::Misstaged(misstaged) => Ok(misstaged),
+            other @ (Refusal::Cyclic(_) | Refusal::Inverted(_) | Refusal::Store(_)) => Err(other.into()),
+        }
     }
 }
 
 laws::law!(
-    a_restaged_node_reads_back_with_its_stage_artifact_condition_and_reason,
+    a_restaged_node_reads_back_as_its_transition_applies_or_is_refused_unchanged_as_misstaged,
     vec(select(Staging::STEPS.to_vec()), 0..8),
     steps,
     {
@@ -858,8 +877,7 @@ fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), Box<dyn Error>> {
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let root = Projects::rooted(&store, "p")?;
     Proposals::written(&store, vec![Proposals::child(root, 2)?])?;
-    let dropped = Staging::transition(Step::Drop)?.applied(Staging::stored(&store, NodeId::new(2))?)?;
-    store.write(Restaged::from(dropped))?;
+    store.write(Restaged::new(Dag::resolved(&store, NodeId::new(2))?, Staging::transition(Step::Drop)?))?;
     assert_eq!(Staging::stored(&store, NodeId::new(2))?.stage().stage(), Stage::Dropped);
     assert_eq!(Ids::kin(&store.read(ShownNode::from(root))?.ok_or("no root")?, Kin::Child), [NodeId::new(2)]);
     Ok(())
@@ -903,7 +921,7 @@ impl Changes {
         let refused = self
             .0
             .iter()
-            .map(|change| Changes::inverted(change.written(&store)))
+            .map(|change| change.written(&store).and_then(Changes::inverted))
             .collect::<Result<Vec<Option<NodeEdge>>, Box<dyn Error>>>()?;
         let roles = (0..ENDS)
             .map(|node| Ok(Staging::stored(&store, Dag::id(node))?.casting().role()))
@@ -927,15 +945,10 @@ impl Changes {
 }
 
 impl Change {
-    fn written(self, store: &Port<'_, Sqlite>) -> Result<Written, Refusal> {
+    fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
         match self {
-            Change::Cast(node, role) => store.write(Cast::new(Dag::id(node), Casting::new(role, Entered::Role.into()))),
-            Change::Refined(edge) => store.write(Linked::new(
-                Dag::id(edge.child),
-                NodeRelation::Refines,
-                Dag::id(edge.parent),
-                Entered::Init.into(),
-            )),
+            Change::Cast(node, role) => Dag::cast(store, Dag::id(node), role),
+            Change::Refined(edge) => Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines),
         }
     }
 
@@ -1002,14 +1015,13 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eating = Projects::rooted(&store, "p")?;
     let consumed = Projects::rooted(&store, "q")?;
-    store.write(Cast::new(consumed, Casting::new(Role::Secondary, Entered::Role.into())))?;
-    let refused =
-        Changes::inverted(store.write(Linked::new(eating, NodeRelation::Consumes, consumed, Entered::Init.into())))?;
+    Dag::cast(&store, consumed, Role::Secondary)??;
+    let refused = Changes::inverted(Dag::linked(&store, [eating, consumed], NodeRelation::Consumes)?)?;
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     assert_eq!(store.read(ShownNode::from(eating))?.ok_or("no eating")?.links().len(), 0);
-    store.write(Cast::new(eating, Casting::new(Role::Secondary, Entered::Role.into())))?;
-    store.write(Linked::new(eating, NodeRelation::Consumes, consumed, Entered::Init.into()))?;
-    let refused = Changes::inverted(store.write(Cast::new(eating, Casting::new(Role::Core, Entered::Role.into()))))?;
+    Dag::cast(&store, eating, Role::Secondary)??;
+    Dag::linked(&store, [eating, consumed], NodeRelation::Consumes)??;
+    let refused = Changes::inverted(Dag::cast(&store, eating, Role::Core)?)?;
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }

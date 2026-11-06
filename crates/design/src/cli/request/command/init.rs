@@ -1,7 +1,7 @@
 use std::fmt;
 
-use design_model::{Entered, Entry, Facet, Node, NodeId, NodeRelation, Project, Provenance, Vague};
-use design_store::{Linked, NextNode, Planting, ProjectRoot, ShownNode};
+use design_model::{Entered, Entry, Facet, Node, NodeId, Project, Provenance, Vague};
+use design_store::{NextNode, Planting, ProjectRoot, Resolved};
 use file_ports::Files;
 use store_ports::Store;
 
@@ -29,7 +29,7 @@ struct Rooted {
 
 #[derive(Debug)]
 enum Root {
-    Found(Rooted),
+    Found(Project, Resolved),
     Sown(Node<Vague>),
 }
 
@@ -71,17 +71,17 @@ impl Init {
 
     fn plan(self, store: &impl Store) -> Result<Plan, Failure> {
         let consumed = self.consumes.map(|project| Rooted::found(store, project)).transpose()?;
-        let sown = Root::resolved(store, self.project)?;
-        let root = sown.rooted();
-        let linked = consumed.iter().map(|consumed| root.consuming(consumed)).next();
-        Ok(Plan { planting: Planting::new(sown.sown(), linked), initialised: Initialised { root, consumed } })
+        let root = Root::resolved(store, self.project)?;
+        let rooted = root.rooted();
+        let planting = consumed.iter().fold(root.planting(), |planting, (_, resolved)| planting.consuming(*resolved));
+        Ok(Plan { planting, initialised: Initialised { root: rooted, consumed: consumed.map(|(rooted, _)| rooted) } })
     }
 }
 
 impl Root {
     fn resolved(store: &impl Store, project: Project) -> Result<Root, Failure> {
         match store.read(ProjectRoot::from(project.clone()))? {
-            Some(root) => Rooted::placed(store, project, root).map(Root::Found),
+            Some(root) => Ok(Root::Found(project, root)),
             None => Ok(Root::Sown(Node::new(
                 store.read(NextNode)?,
                 Entry::new(project, Facet::Project, Provenance::from(Entered::Init)),
@@ -91,32 +91,23 @@ impl Root {
 
     fn rooted(&self) -> Rooted {
         match self {
-            Root::Found(rooted) => rooted.clone(),
+            Root::Found(project, root) => Rooted { project: project.clone(), root: root.identity() },
             Root::Sown(node) => Rooted { project: node.entry().project().clone(), root: node.identity() },
         }
     }
 
-    fn sown(self) -> Option<Node<Vague>> {
+    fn planting(self) -> Planting {
         match self {
-            Root::Found(_) => None,
-            Root::Sown(node) => Some(node),
+            Root::Found(_, root) => Planting::found(root),
+            Root::Sown(node) => Planting::sown(node),
         }
     }
 }
 
 impl Rooted {
-    fn found(store: &impl Store, project: Project) -> Result<Rooted, Failure> {
-        let root = store.read(ProjectRoot::from(project.clone()))?;
-        root.ok_or_else(|| Failure::Unrooted(project.clone())).and_then(|root| Rooted::placed(store, project, root))
-    }
-
-    fn placed(store: &impl Store, project: Project, root: NodeId) -> Result<Rooted, Failure> {
-        store.read(ShownNode::from(root))?.ok_or(Failure::Unplaced(root))?;
-        Ok(Rooted { project, root })
-    }
-
-    fn consuming(&self, consumed: &Rooted) -> Linked {
-        Linked::new(self.root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init))
+    fn found(store: &impl Store, project: Project) -> Result<(Rooted, Resolved), Failure> {
+        let root = store.read(ProjectRoot::from(project.clone()))?.ok_or_else(|| Failure::Unrooted(project.clone()))?;
+        Ok((Rooted { project, root: root.identity() }, root))
     }
 }
 

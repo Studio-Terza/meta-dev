@@ -77,6 +77,7 @@ impl From<Refusal> for Failure {
         match refusal {
             Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
             Refusal::Inverted(inversion) => Failure::Inverted { edge: inversion.edge() },
+            Refusal::Misstaged(misstaged) => Failure::from(misstaged),
             Refusal::Store(failure) => Failure::Store(failure),
         }
     }
