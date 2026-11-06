@@ -29,6 +29,11 @@ const GLOB_ENUM: &str = "enum E {\n    A,\n}\nuse E::*;\nimpl Clone for R {}\n";
 const GLOB_ITSELF: &str =
     "mod m {\n    pub use std::clone::Clone as Dup;\n}\nuse m::*;\nuse self::m::*;\nimpl Dup for R {}\n";
 
+const GLOB_OPAQUE_FIRST: &str = "use other::*;\nuse std::hash::*;\nimpl Clone for R {}\n";
+const GLOB_OPAQUE_LAST: &str = "use std::fmt::*;\nuse other::*;\nimpl Debug for R {}\n";
+const GLOB_CONFLICT: &str = "use std::fmt::*;\nuse std::io::*;\nimpl Result for R {}\n";
+const DECLARED_KINDS: &str = "struct Clone;\nenum Eq {}\nunion Copy {\n    a: u8,\n}\ntype Default = u8;\ntrait Hash = Sized;\nimpl Clone for R {}\nimpl Eq for R {}\nimpl Copy for R {}\nimpl Default for R {}\nimpl Hash for R {}\n";
+
 const MACRO_CALL: &str = "make!();\nimpl Clone for R {}\n";
 const MACRO_STATEMENT: &str = "fn f() {\n    make!();\n    impl Clone for R {}\n}\n";
 const MACRO_DEFINED: &str = "macro_rules! make {\n    () => {};\n}\nimpl Clone for R {}\n";
@@ -191,6 +196,18 @@ fn each_implementation_is_placed_in_its_own_file() {
 }
 
 #[test]
+fn implementations_keep_the_order_of_the_files_read() {
+    assert_eq!(
+        Read::sites(&[
+            Read::file("src/lib.rs", "mod b;\nmod a;\n"),
+            Read::file("src/a.rs", "impl Clone for A {}\n"),
+            Read::file("src/b.rs", "impl Clone for B {}\n"),
+        ]),
+        ["src/a.rs:1", "src/b.rs:1"]
+    );
+}
+
+#[test]
 fn a_renamed_trait_is_read_as_its_original() {
     assert_eq!(
         Read::implementations(&[Read::file("a.rs", RENAMED)]),
@@ -239,6 +256,13 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
     BLOCK_CHAIN => [Expect::std(&["std", "fmt", "Debug"]), Expect::unknown(&["Show"])],
     BLOCK_SUPER => [Expect::std(&["std", "clone", "Clone"])],
     CFG_ALTERNATIVES => [Expect::unknown(&["Clone"])],
+    DECLARED_KINDS => [
+        Expect::krate(&["crate", "Clone"]),
+        Expect::krate(&["crate", "Eq"]),
+        Expect::krate(&["crate", "Copy"]),
+        Expect::krate(&["crate", "Default"]),
+        Expect::krate(&["crate", "Hash"]),
+    ],
     ALTERNATIVE_IMPORTS => [Expect::unknown(&["Dup"])],
     DISCARDED => [Expect::unknown(&["Debug"]), Expect::std(&["std", "fmt", "Debug"])],
     ITEM_PATH => [Expect::unknown(&["S", "T"]), Expect::external(&["Option", "T"]), Expect::external(&["a", "T"])],
@@ -258,6 +282,9 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_SHADOWING => [Expect::std(&["std", "fmt", "Result"])],
     GLOB_ENUM => [Expect::unknown(&["Clone"])],
     GLOB_ITSELF => [Expect::std(&["std", "clone", "Clone"])],
+    GLOB_OPAQUE_FIRST => [Expect::unknown(&["Clone"])],
+    GLOB_OPAQUE_LAST => [Expect::unknown(&["Debug"])],
+    GLOB_CONFLICT => [Expect::unknown(&["Result"])],
 ]);
 
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [
