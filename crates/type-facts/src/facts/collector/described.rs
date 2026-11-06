@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use syn::{ReturnType, Type};
+use syn::Type;
 
 use lint_layout::Name;
 
@@ -20,16 +20,9 @@ impl Described<'_> {
         }
     }
 
-    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> Name {
+    fn listed<Item: fmt::Display>(separator: Separator, items: impl Iterator<Item = Item>) -> String {
         let texts: Vec<String> = items.map(|item| item.to_string()).collect();
-        Name::from(texts.join(&separator.to_string()).as_str())
-    }
-
-    fn returned(output: &ReturnType) -> Name {
-        match Spelled::returned_by(output) {
-            Some(returned) => Name::from(format!(" -> {}", Described(returned)).as_str()),
-            None => Name::from(""),
-        }
+        texts.join(&separator.to_string())
     }
 }
 
@@ -63,12 +56,13 @@ impl fmt::Display for Described<'_> {
                     Self::listed(Separator::Plus, object.bounds.iter().filter_map(Spelled::bound_of))
                 )
             }
-            Type::BareFn(function) => write!(
-                formatter,
-                "fn({}){}",
-                Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
-                Self::returned(&function.output)
-            ),
+            Type::BareFn(function) => {
+                let inputs = Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty)));
+                match Spelled::returned_by(&function.output) {
+                    Some(returned) => write!(formatter, "fn({inputs}) -> {}", Described(returned)),
+                    None => write!(formatter, "fn({inputs})"),
+                }
+            }
             Type::Ptr(pointer) => {
                 write!(formatter, "*{} {}", pointer.mutability.map_or("const", |_| "mut"), Described(&pointer.elem))
             }

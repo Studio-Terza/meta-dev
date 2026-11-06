@@ -73,15 +73,6 @@ impl<'found> FromIterator<Member<'found>> for Names<'found> {
     }
 }
 
-impl Spelled {
-    fn spelling<'found>(self, member: Member<'found>) -> Box<dyn fmt::Display + 'found> {
-        match self {
-            Spelled::Path => Box::new(member),
-            Spelled::Name => Box::new(member.name()),
-        }
-    }
-}
-
 impl Listed {
     pub(super) fn more<Item>(self, items: &[Item]) -> Option<NonZeroUsize> {
         NonZeroUsize::new(items.len().saturating_sub(self.into_inner()))
@@ -103,7 +94,10 @@ impl fmt::Display for Line<'_, '_, '_> {
 
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}", self.spelled.spelling(self.member))?;
+        match self.spelled {
+            Spelled::Path => write!(formatter, "{}", self.member),
+            Spelled::Name => write!(formatter, "{}", self.member.name()),
+        }?;
         self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
     }
 }
