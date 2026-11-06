@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT node_edges.source, node_edges.relation, node_edges.target, sources.role AS source_role, targets.role AS target_role FROM node_edges JOIN nodes AS sources ON sources.id = node_edges.source JOIN nodes AS targets ON targets.id = node_edges.target WHERE node_edges.source = ?1 OR node_edges.target = ?1 ORDER BY node_edges.source, node_edges.relation, node_edges.target",
+  "query": "SELECT source, relation, target, provenance FROM node_edges WHERE source = ?1 OR target = ?1 ORDER BY source, relation, target",
   "describe": {
     "columns": [
       {
@@ -37,24 +37,13 @@
         }
       },
       {
-        "name": "source_role",
+        "name": "provenance",
         "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "nodes",
-            "name": "role"
-          }
-        }
-      },
-      {
-        "name": "target_role",
-        "ordinal": 4,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "nodes",
-            "name": "role"
+            "table": "node_edges",
+            "name": "provenance"
           }
         }
       }
@@ -66,9 +55,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "827370ff65e941c6c7001b9b93cc53a2f7809f4f2957dce0e06c07a67183e7fa"
+  "hash": "fe06cbc0f74702bb63e5162ba2c1192317d6462a9db93f1e0295912756684ec5"
 }

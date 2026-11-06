@@ -84,11 +84,16 @@ struct StageColumns {
 
 #[derive(Debug)]
 struct LeaningRow {
+    source_role: String,
+    target_role: String,
+}
+
+#[derive(Debug)]
+struct EdgeRow {
     source: i64,
     relation: String,
     target: i64,
-    source_role: String,
-    target_role: String,
+    provenance: String,
 }
 
 #[derive(Debug)]
@@ -125,27 +130,35 @@ impl Linked {
     }
 }
 
-impl From<Linked> for EdgeColumns {
-    fn from(linked: Linked) -> EdgeColumns {
-        EdgeColumns {
-            source: linked.source.into_inner(),
-            relation: linked.relation.name(),
-            target: linked.target.into_inner(),
-            provenance: Entered::from(linked.provenance).name(),
-        }
-    }
-}
-
 impl EdgeColumns {
-    fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
-        let written = statements.written(sqlx::query!(
+    fn inserted(linked: Linked, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
+        let source = linked.source.into_inner();
+        let target = linked.target.into_inner();
+        let leanings = statements.rows(sqlx::query_as!(
+            LeaningRow,
+            "SELECT sources.role AS source_role, targets.role AS target_role FROM nodes AS sources JOIN nodes AS targets ON targets.id = ?2 WHERE sources.id = ?1",
+            source,
+            target
+        ))?;
+        let upheld = leanings
+            .into_iter()
+            .map(|leaning| leaning.upheld(linked))
+            .collect::<Result<Vec<EdgeColumns>, Refusal>>()?;
+        let written = upheld
+            .into_iter()
+            .map(|columns| columns.written(statements))
+            .collect::<Result<Vec<Written>, StoreFailure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+
+    fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+        statements.written(sqlx::query!(
             "INSERT OR IGNORE INTO node_edges (source, relation, target, provenance) VALUES (?1, ?2, ?3, ?4)",
             self.source,
             self.relation,
             self.target,
             self.provenance
-        ))?;
-        LeaningRow::upheld(NodeId::new(self.source), statements).map(|_upheld| written)
+        ))
     }
 }
 
@@ -173,10 +186,10 @@ impl Batch for Linked {
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
         match self.relation {
             NodeRelation::Refines => Closing::<Refines>::new(self.source, self.target)
-                .written(statements, |edged| EdgeColumns::from(self).written(edged)),
+                .written(statements, |edged| EdgeColumns::inserted(self, edged)),
             NodeRelation::Supersedes => Closing::<Supersedes>::new(self.source, self.target)
-                .written(statements, |edged| EdgeColumns::from(self).written(edged)),
-            NodeRelation::Consumes => EdgeColumns::from(self).written(statements),
+                .written(statements, |edged| EdgeColumns::inserted(self, edged)),
+            NodeRelation::Consumes => EdgeColumns::inserted(self, statements),
         }
     }
 }
@@ -211,7 +224,16 @@ impl Batch for Cast {
             role,
             provenance
         ))?;
-        LeaningRow::upheld(self.node, statements).map(|_upheld| written)
+        let touching = statements.rows(sqlx::query_as!(
+            EdgeRow,
+            "SELECT source, relation, target, provenance FROM node_edges WHERE source = ?1 OR target = ?1 ORDER BY source, relation, target",
+            id
+        ))?;
+        let relinked = touching
+            .into_iter()
+            .map(|row| Linked::try_from(row).map_err(StoreFailure::from)?.written(statements))
+            .collect::<Result<Vec<Written>, Refusal>>()?;
+        Ok(Written::total([written].into_iter().chain(relinked)))
     }
 }
 
@@ -307,6 +329,15 @@ impl TryFrom<RelativeRow> for Relative {
             reason: row.reason,
         };
         Ok(Relative::new(NodeRow::decoded(&row.kin)?, AnyNode::try_from(node)?))
+    }
+}
+
+impl TryFrom<EdgeRow> for Linked {
+    type Error = sqlx::Error;
+
+    fn try_from(row: EdgeRow) -> Result<Linked, sqlx::Error> {
+        let provenance = Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?);
+        Ok(Linked::new(NodeId::new(row.source), NodeRow::decoded(&row.relation)?, NodeId::new(row.target), provenance))
     }
 }
 
@@ -411,20 +442,15 @@ impl OutgoingRow {
 }
 
 impl LeaningRow {
-    fn upheld(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<NodeEdge>, Refusal> {
-        let id = node.into_inner();
-        let rows = statements.rows(sqlx::query_as!(
-            LeaningRow,
-            "SELECT node_edges.source, node_edges.relation, node_edges.target, sources.role AS source_role, targets.role AS target_role FROM node_edges JOIN nodes AS sources ON sources.id = node_edges.source JOIN nodes AS targets ON targets.id = node_edges.target WHERE node_edges.source = ?1 OR node_edges.target = ?1 ORDER BY node_edges.source, node_edges.relation, node_edges.target",
-            id
-        ))?;
-        rows.into_iter().map(LeaningRow::edge).collect()
-    }
-
-    fn edge(self) -> Result<NodeEdge, Refusal> {
-        let relation = NodeRow::decoded(&self.relation).map_err(StoreFailure::from)?;
+    fn upheld(self, linked: Linked) -> Result<EdgeColumns, Refusal> {
         let source = NodeRow::decoded(&self.source_role).map_err(StoreFailure::from)?;
         let target = NodeRow::decoded(&self.target_role).map_err(StoreFailure::from)?;
-        Ok(NodeEdge::new(NodeId::new(self.source), relation, NodeId::new(self.target)).upheld(source, target)?)
+        let edge = NodeEdge::new(linked.source, linked.relation, linked.target).upheld(source, target)?;
+        Ok(EdgeColumns {
+            source: edge.source().into_inner(),
+            relation: edge.relation().name(),
+            target: edge.target().into_inner(),
+            provenance: Entered::from(linked.provenance).name(),
+        })
     }
 }

@@ -1,7 +1,7 @@
 use std::fmt;
 
-use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance, Role, Vague};
-use design_store::{Linked, NextNode, Planting, ProjectRoot, Refusal, ShownNode};
+use design_model::{Entered, Entry, Facet, Node, NodeId, NodeRelation, Project, Provenance, Vague};
+use design_store::{Linked, NextNode, Planting, ProjectRoot, ShownNode};
 use file_ports::Files;
 use store_ports::Store;
 
@@ -25,7 +25,6 @@ pub struct Initialised {
 struct Rooted {
     project: Project,
     root: NodeId,
-    role: Role,
 }
 
 #[derive(Debug)]
@@ -74,7 +73,7 @@ impl Init {
         let consumed = self.consumes.map(|project| Rooted::found(store, project)).transpose()?;
         let sown = Root::resolved(store, self.project)?;
         let root = sown.rooted();
-        let linked = consumed.iter().map(|consumed| root.consuming(consumed)).next().transpose()?;
+        let linked = consumed.iter().map(|consumed| root.consuming(consumed)).next();
         Ok(Plan { planting: Planting::new(sown.sown(), linked), initialised: Initialised { root, consumed } })
     }
 }
@@ -93,9 +92,7 @@ impl Root {
     fn rooted(&self) -> Rooted {
         match self {
             Root::Found(rooted) => rooted.clone(),
-            Root::Sown(node) => {
-                Rooted { project: node.entry().project().clone(), root: node.identity(), role: node.role() }
-            }
+            Root::Sown(node) => Rooted { project: node.entry().project().clone(), root: node.identity() },
         }
     }
 
@@ -114,14 +111,12 @@ impl Rooted {
     }
 
     fn placed(store: &impl Store, project: Project, root: NodeId) -> Result<Rooted, Failure> {
-        let placed = store.read(ShownNode::from(root))?.ok_or(Failure::Unplaced(root))?;
-        Ok(Rooted { project, root, role: placed.node().role() })
+        store.read(ShownNode::from(root))?.ok_or(Failure::Unplaced(root))?;
+        Ok(Rooted { project, root })
     }
 
-    fn consuming(&self, consumed: &Rooted) -> Result<Linked, Failure> {
-        let edge = NodeEdge::new(self.root, NodeRelation::Consumes, consumed.root);
-        edge.upheld(self.role, consumed.role).map_err(Refusal::from)?;
-        Ok(Linked::new(self.root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init)))
+    fn consuming(&self, consumed: &Rooted) -> Linked {
+        Linked::new(self.root, NodeRelation::Consumes, consumed.root, Provenance::from(Entered::Init))
     }
 }
 
