@@ -309,6 +309,11 @@ impl Read {
         model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type().clone())).collect()
     }
 
+    fn entries(fixtures: &[Fixture]) -> Vec<Function> {
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        Reader::read_files(&files).functions().map(|found| found.entity().clone()).collect()
+    }
+
     fn functions(text: &str) -> Vec<Function> {
         Reader::read_files(&[Read::file("a.rs", text)]).functions().map(|found| found.entity().clone()).collect()
     }
@@ -544,6 +549,12 @@ const FORMS: &str = "fn free() {}\nimpl S {\n    fn inherent(&self) -> bool { tr
 const OWN_TYPE: &str = "struct Failure;\nfn f() -> Failure { Failure }\n";
 const GENERIC_SHADOWS: &str = "struct T;\nfn f<T>() -> T { todo!() }\nfn g() -> T { T }\n";
 const SELF_TYPE: &str = "struct S;\nimpl S {\n    fn new() -> Self { S }\n}\n";
+const SELF_GENERIC: &str = "struct S<T>(T);\nimpl<T> S<T> {\n    fn get() -> Self { todo!() }\n}\n";
+const SELF_TRAIT_IMPL: &str = "struct S;\nimpl Default for S {\n    fn default() -> Self { S }\n}\n";
+const SELF_TRAIT_DECL: &str = "trait T {\n    fn f() -> Self;\n}\n";
+const SELF_TRAIT_IN_IMPL: &str =
+    "struct S;\nimpl S {\n    fn f() {\n        trait T {\n            fn g() -> Self;\n        }\n    }\n}\n";
+const SELF_PROJECTED: &str = "struct S;\nimpl S {\n    fn f() -> Self::Out { todo!() }\n}\n";
 const IMPL_GENERIC: &str = "struct S<T>(T);\nimpl<T> S<T> {\n    fn get(&self) -> Option<T> { None }\n}\n";
 const PROJECTED: &str = "trait T {\n    type Out;\n    fn f(&self) -> Self::Out;\n}\n";
 
@@ -551,6 +562,11 @@ const CRATE_ALIAS: &str = "type Checked<T> = Result<T, std::fmt::Error>;\nfn f()
 const STD_FMT_ALIAS: &str = "fn f() -> std::fmt::Result { Ok(()) }\n";
 const STD_IO_ALIAS: &str = "use std::io;\nfn f() -> io::Result<()> { Ok(()) }\n";
 const RECURSIVE_ALIAS: &str = "type A = B;\ntype B = A;\nfn f() -> A { todo!() }\n";
+const DEFAULTED_ALIAS: &str =
+    "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn f() -> Res<u8> { todo!() }\n";
+const GIVEN_ALIAS: &str =
+    "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn f() -> Res<u8, bool> { todo!() }\n";
+const UNDEFAULTED_ALIAS: &str = "type Res<T, E> = Result<T, E>;\nfn f() -> Res<u8, bool> { todo!() }\n";
 const CHAINED_ALIAS: &str = "struct Failure;\ntype Outcome = Checked<()>;\ntype Checked<T> = Result<T, Failure>;\nfn f() -> Outcome { Ok(()) }\n";
 
 const SUBJECTS: &str = "#[derive(Debug)]\nstruct A;\nimpl<T> Clone for Wrap<T> {}\n";
@@ -569,7 +585,7 @@ fn every_function_is_read_with_its_owner_entry_and_output() {
             Expect::function("inner", Owner::Inherent, Entry::Called, Output::Implicit),
             Expect::function("checked", Owner::Free, Entry::Test, Output::Implicit),
             Expect::function("awaited", Owner::Free, Entry::Test, Output::Implicit),
-            Expect::function("main", Owner::Free, Entry::Main, Output::Implicit),
+            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
             Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
         ]
     );
@@ -578,7 +594,12 @@ fn every_function_is_read_with_its_owner_entry_and_output() {
 laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&str| Read::outputs(text), [
     OWN_TYPE => [Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new())],
     GENERIC_SHADOWS => [Expect::param("T"), Expect::named(Expect::item("T", ItemKind::Struct), Vec::new())],
-    SELF_TYPE => [Expect::param("Self")],
+    SELF_TYPE => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
+    SELF_GENERIC => [Expect::named(Expect::item("S", ItemKind::Struct), vec![Expect::param("T")])],
+    SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
+    SELF_TRAIT_DECL => [Expect::param("Self")],
+    SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
+    SELF_PROJECTED => [TypeRef::Opaque],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
     PROJECTED => [TypeRef::Opaque],
 ]);
@@ -617,6 +638,33 @@ laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Re
         Expect::std(&["std", "result", "Result"]),
         vec![TypeRef::Tuple(Vec::new()), Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new())],
     )],
+    DEFAULTED_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![Expect::primitive(Primitive::Integer), Expect::named(Expect::item("Rejected", ItemKind::Struct), Vec::new())],
+    )],
+    GIVEN_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![Expect::primitive(Primitive::Integer), Expect::primitive(Primitive::Bool)],
+    )],
+    UNDEFAULTED_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![Expect::primitive(Primitive::Integer), Expect::primitive(Primitive::Bool)],
+    )],
+]);
+
+const BINARY_MAIN: [Fixture; 1] = [Fixture::new("src/main.rs", "fn main() {}\n")];
+const BINARY_LISTED_MAIN: [Fixture; 1] = [Fixture::new("src/bin/tool.rs", "fn main() {}\n")];
+const LIBRARY_MAIN: [Fixture; 1] = [Fixture::new("src/lib.rs", "pub fn main() {}\n")];
+const ISLAND_MAIN: [Fixture; 2] = [Fixture::new("src/lib.rs", "\n"), Fixture::new("src/loose.rs", "fn main() {}\n")];
+const BINARY_CHILD_MAIN: [Fixture; 2] =
+    [Fixture::new("src/main.rs", "mod m;\n"), Fixture::new("src/m.rs", "fn main() {}\n")];
+
+laws::table!(only_the_main_of_a_binary_crate_root_is_the_entry, Read::entries, [
+    BINARY_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
+    BINARY_LISTED_MAIN => [Expect::function("main", Owner::Free, Entry::Main, Output::Implicit)],
+    LIBRARY_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
+    ISLAND_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
+    BINARY_CHILD_MAIN => [Expect::function("main", Owner::Free, Entry::Called, Output::Implicit)],
 ]);
 
 #[test]

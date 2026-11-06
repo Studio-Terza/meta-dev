@@ -1,6 +1,6 @@
 use syn::Macro;
 
-use code_model::{Alias, Building, ItemPath, Named, Primitive, Resolved, TypeRef};
+use code_model::{Alias, AliasParameter, Building, ItemPath, Named, Primitive, Resolved, TypeRef};
 use lint_layout::{Name, Whole, Word, words};
 
 use super::binding::Binding;
@@ -42,10 +42,10 @@ enum OkSide {
 }
 
 impl OkSide {
-    fn parameters(self) -> Vec<Name> {
+    fn parameters(self) -> Vec<AliasParameter> {
         match self {
             OkSide::Unit => Vec::new(),
-            OkSide::Parameter => vec![Name::from(StdAlias::PARAMETER)],
+            OkSide::Parameter => vec![AliasParameter::new(Name::from(StdAlias::PARAMETER), None)],
         }
     }
 

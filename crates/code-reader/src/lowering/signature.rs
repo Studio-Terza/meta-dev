@@ -1,7 +1,7 @@
 use syn::{GenericArgument, GenericParam, Generics, PathArguments, ReturnType, Type, TypePath};
 
-use code_model::{Named, Resolved, TypeRef};
-use lint_layout::{Name, Whole, Word, words};
+use code_model::{AliasParameter, Named, Resolved, TypeRef};
+use lint_layout::{Name, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
@@ -23,11 +23,37 @@ impl Written {
         }
     }
 
-    fn parameter(parameter: Name, path: &syn::Path) -> TypeRef<Written> {
+    fn bound(held: TypeRef<Written>, path: &syn::Path) -> TypeRef<Written> {
         match path.segments.get(1) {
             Some(_) => TypeRef::Opaque,
-            None => TypeRef::Named(Named::new(Written::Param(parameter), Vec::new())),
+            None => held,
         }
+    }
+
+    fn parameter(name: Name) -> TypeRef<Written> {
+        TypeRef::Named(Named::new(Written::Param(name), Vec::new()))
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct DeclaredParameter {
+    name: Name,
+    default: Option<TypeRef<Written>>,
+}
+
+impl DeclaredParameter {
+    fn written(scope: &InScope, parameter: &GenericParam) -> Option<DeclaredParameter> {
+        match parameter {
+            GenericParam::Type(declared) => Some(DeclaredParameter {
+                name: Name::from(&declared.ident),
+                default: declared.default.as_ref().map(|ty| scope.lowered(ty)),
+            }),
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        }
+    }
+
+    pub(super) fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> AliasParameter {
+        AliasParameter::new(self.name, self.default.map(|ty| Written::typed(ty, resolving, scope)))
     }
 }
 
@@ -43,21 +69,34 @@ impl TypeParameter {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(super) struct InScope {
     parameters: Vec<Name>,
+    subject: TypeRef<Written>,
 }
 
 impl InScope {
-    const SELF: [Word<'static>; 1] = words!["Self"];
+    const SELF: Word<'static> = Word::new("Self");
+
+    pub(super) fn outside() -> InScope {
+        InScope { parameters: Vec::new(), subject: Written::parameter(Name::from(InScope::SELF)) }
+    }
 
     pub(super) fn extended(&self, generics: &Generics) -> InScope {
         let declared = generics.params.iter().filter_map(TypeParameter::named);
-        InScope { parameters: self.parameters.iter().cloned().chain(declared).collect() }
+        InScope { parameters: self.parameters.iter().cloned().chain(declared).collect(), subject: self.subject.clone() }
     }
 
-    pub(super) fn parameters(&self) -> Vec<Name> {
-        self.parameters.clone()
+    pub(super) fn subject(&self, subject: TypeRef<Written>) -> InScope {
+        InScope { parameters: self.parameters.clone(), subject }
+    }
+
+    pub(super) fn subjectless(&self) -> InScope {
+        InScope { parameters: self.parameters.clone(), subject: Written::parameter(Name::from(InScope::SELF)) }
+    }
+
+    pub(super) fn declarations(&self, generics: &Generics) -> Vec<DeclaredParameter> {
+        generics.params.iter().filter_map(|parameter| DeclaredParameter::written(self, parameter)).collect()
     }
 
     pub(super) fn output(&self, output: &ReturnType) -> Option<TypeRef<Written>> {
@@ -84,15 +123,15 @@ impl InScope {
     }
 
     fn path_lowered(&self, path: &syn::Path) -> TypeRef<Written> {
-        match path.segments.first().map(|first| Name::from(&first.ident)).and_then(|first| self.held(first)) {
-            Some(parameter) => Written::parameter(parameter, path),
+        match path.segments.first().map(|first| Name::from(&first.ident)).and_then(|first| self.held(&first)) {
+            Some(held) => Written::bound(held, path),
             None => TypeRef::Named(Named::new(Written::Path(UsePath::from(path)), self.arguments(path))),
         }
     }
 
-    fn held(&self, first: Name) -> Option<Name> {
-        let declared = self.parameters.iter().find(|parameter| **parameter == first).cloned();
-        declared.or_else(|| first.matches::<Whole>(&Self::SELF).map(|_| first))
+    fn held(&self, first: &Name) -> Option<TypeRef<Written>> {
+        let declared = self.parameters.iter().find(|parameter| **parameter == *first).cloned().map(Written::parameter);
+        declared.or_else(|| first.matches::<Whole>(&[Self::SELF]).map(|_| self.subject.clone()))
     }
 
     fn arguments(&self, path: &syn::Path) -> Vec<TypeRef<Written>> {

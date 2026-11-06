@@ -25,18 +25,41 @@ impl Item {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AliasParameter {
+    name: Name,
+    default: Option<TypeRef>,
+}
+
+impl AliasParameter {
+    #[must_use]
+    pub fn new(name: Name, default: Option<TypeRef>) -> AliasParameter {
+        AliasParameter { name, default }
+    }
+
+    pub(crate) fn default(&self) -> Option<&TypeRef> {
+        self.default.as_ref()
+    }
+}
+
+impl AsRef<Name> for AliasParameter {
+    fn as_ref(&self) -> &Name {
+        &self.name
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Alias {
-    parameters: Vec<Name>,
+    parameters: Vec<AliasParameter>,
     target: TypeRef,
 }
 
 impl Alias {
     #[must_use]
-    pub fn new(parameters: Vec<Name>, target: TypeRef) -> Alias {
+    pub fn new(parameters: Vec<AliasParameter>, target: TypeRef) -> Alias {
         Alias { parameters, target }
     }
 
-    pub(crate) fn parameters(&self) -> &[Name] {
+    pub(crate) fn parameters(&self) -> &[AliasParameter] {
         &self.parameters
     }
 

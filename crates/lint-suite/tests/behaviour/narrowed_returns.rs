@@ -20,7 +20,14 @@ const REJECTED_INPUT: &str = "struct Text;\nstruct X;\nimpl TryFrom<Text> for X 
 const GENERIC_NAMED_LIKE_AN_ERROR: &str =
     "struct Failure;\nfn parse() -> Result<u8, Failure> { Ok(0) }\nfn f<Failure>() -> Option<Failure> { None }\n";
 
-const CASES: [Case; 14] = [
+const LIBRARY_MAIN: &str = "pub fn main() -> Result<(), u8> { Ok(()) }\n";
+const SELF_OF_AN_ERROR: &str = "struct Failure;\nimpl std::error::Error for Failure {}\nimpl Failure {\n    fn again() -> Option<Self> { None }\n}\n";
+const SELF_OF_A_PLAIN_TYPE: &str = "struct Plain;\nimpl Plain {\n    fn again() -> Option<Self> { None }\n}\n";
+const DEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn p() -> Res<u8> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
+const GIVEN_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
+const UNDEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
+
+const CASES: [Case; 22] = [
     Case::new(
         Title::new("free, nested, inherent and trait declaration functions"),
         &[Source::new(Located::new("a.rs"), Text::new(FORMS))],
@@ -88,6 +95,49 @@ const CASES: [Case; 14] = [
     Case::new(
         Title::new("a generic named like an error type"),
         &[Source::new(Located::new("a.rs"), Text::new(GENERIC_NAMED_LIKE_AN_ERROR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a library root's main"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(LIBRARY_MAIN))],
+        Flagged::new(&["src/lib.rs:1"]),
+    ),
+    Case::new(
+        Title::new("a binary file listed under bin"),
+        &[Source::new(Located::new("src/bin/tool.rs"), Text::new(ROOT_MAIN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a file no crate root reaches"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new("")),
+            Source::new(Located::new("src/loose.rs"), Text::new(ROOT_MAIN)),
+        ],
+        Flagged::new(&["src/loose.rs:1"]),
+    ),
+    Case::new(
+        Title::new("an option of Self in an error type's impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_OF_AN_ERROR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("an option of Self in a plain type's impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(SELF_OF_A_PLAIN_TYPE))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an alias default error type"),
+        &[Source::new(Located::new("a.rs"), Text::new(DEFAULTED_ERROR))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("an alias default overridden at the use"),
+        &[Source::new(Located::new("a.rs"), Text::new(GIVEN_ERROR))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an alias without a default"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNDEFAULTED_ERROR))],
         Flagged::new(&[]),
     ),
 ];
