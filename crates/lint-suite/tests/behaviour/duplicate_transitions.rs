@@ -2,7 +2,7 @@ use lint_core::{Lint, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
-use crate::shown::{OnGraph, Presence, Shown};
+use crate::shown::{OnGraph, Shown};
 
 struct Duplicates;
 
@@ -19,8 +19,8 @@ impl Duplicates {
         Source::new(Located::new(path), Text::new(Box::leak(text.to_owned().into_boxed_str())))
     }
 
-    fn shows(pair: &[&str]) -> bool {
-        Shown::by(pair, Self::reported) == Presence::Present
+    fn shows(pair: &[&str]) -> Vec<String> {
+        Shown::by(pair, Self::reported)
     }
 }
 
@@ -43,23 +43,23 @@ laws::table!(
     input_types_joined_to_one_output_more_than_once_are_listed,
     Duplicates::shows,
     [
-        [TWO_PARSERS, "crates/x/src/lib.rs:4: x::Raw -> x::Policy has 2 transitions: x::Policy::from at crates/x/src/lib.rs:4, x::Raw::policy at crates/x/src/lib.rs:7; x::Policy::from is the standard conversion; keep the standard conversion and route the other transitions through it"] => true,
-        [NO_CONVERSION, "x::Raw -> x::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:4, x::Raw::parsed at crates/x/src/lib.rs:5; keep one transition, as From, TryFrom or FromStr where it fits"] => true,
-        [DIFFERENT_INPUTS, "x::A, x::B -> x::C has 2 transitions: x::A::c_with at crates/x/src/lib.rs:6, x::A::b_and_a at crates/x/src/lib.rs:7"] => true,
-        [DIFFERENT_INPUTS, "workspace: 3 written edges between domain types compared, 1 input-output pairs joined more than once by 2 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 0 derived lifts and store operations"] => true,
-        [PRIMITIVE_PAIRS, "has 2 transitions"] => false,
-        [PRIMITIVE_PAIRS, "workspace: 0 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 2 touching a bare primitive, 1 touching an interface node or black box, 0 derived lifts and store operations"] => true,
-        [LIFTED, "has 2 transitions"] => false,
-        [LIFTED, "workspace: 1 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 2 derived lifts and store operations"] => true,
-        ["struct A;\n", "workspace:"] => false,
-        [ALGEBRA, "has 2 transitions"] => false,
-        [SELF_LOOP, "x::A, x::B -> x::A has 2 transitions"] => true,
-        [ACTED_PAIR, "x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5"] => true,
-        [PURE_PAIR, "has 2 transitions"] => false,
-        [PURE_PAIR, "has 3 transitions"] => false,
-        [CHILDREN, "x::A -> x::A has 2 transitions"] => true,
-        [FROM_PARTS, "x::A -> x::A has 2 transitions"] => true,
-        [FOREIGN_ORD, "has 2 transitions"] => false,
+        [TWO_PARSERS, "crates/x/src/lib.rs:4: x::Raw -> x::Policy has 2 transitions: x::Policy::from at crates/x/src/lib.rs:4, x::Raw::policy at crates/x/src/lib.rs:7; x::Policy::from is the standard conversion; keep the standard conversion and route the other transitions through it"] => vec!["crates/x/src/lib.rs:4: x::Raw -> x::Policy has 2 transitions: x::Policy::from at crates/x/src/lib.rs:4, x::Raw::policy at crates/x/src/lib.rs:7; x::Policy::from is the standard conversion; keep the standard conversion and route the other transitions through it"],
+        [NO_CONVERSION, "x::Raw -> x::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:4, x::Raw::parsed at crates/x/src/lib.rs:5; keep one transition, as From, TryFrom or FromStr where it fits"] => vec!["x::Raw -> x::Policy has 2 transitions: x::Raw::policy at crates/x/src/lib.rs:4, x::Raw::parsed at crates/x/src/lib.rs:5; keep one transition, as From, TryFrom or FromStr where it fits"],
+        [DIFFERENT_INPUTS, "x::A, x::B -> x::C has 2 transitions: x::A::c_with at crates/x/src/lib.rs:6, x::A::b_and_a at crates/x/src/lib.rs:7"] => vec!["x::A, x::B -> x::C has 2 transitions: x::A::c_with at crates/x/src/lib.rs:6, x::A::b_and_a at crates/x/src/lib.rs:7"],
+        [DIFFERENT_INPUTS, "workspace: 3 written edges between domain types compared, 1 input-output pairs joined more than once by 2 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 0 derived lifts and store operations"] => vec!["workspace: 3 written edges between domain types compared, 1 input-output pairs joined more than once by 2 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 0 derived lifts and store operations"],
+        [PRIMITIVE_PAIRS, "has 2 transitions"] => Vec::<String>::new(),
+        [PRIMITIVE_PAIRS, "workspace: 0 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 2 touching a bare primitive, 1 touching an interface node or black box, 0 derived lifts and store operations"] => vec!["workspace: 0 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 2 touching a bare primitive, 1 touching an interface node or black box, 0 derived lifts and store operations"],
+        [LIFTED, "has 2 transitions"] => Vec::<String>::new(),
+        [LIFTED, "workspace: 1 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 2 derived lifts and store operations"] => vec!["workspace: 1 written edges between domain types compared, 0 input-output pairs joined more than once by 0 edges; not compared: 0 touching a bare primitive, 0 touching an interface node or black box, 2 derived lifts and store operations"],
+        ["struct A;\n", "workspace:"] => Vec::<String>::new(),
+        [ALGEBRA, "has 2 transitions"] => Vec::<String>::new(),
+        [SELF_LOOP, "x::A, x::B -> x::A has 2 transitions"] => vec!["x::A, x::B -> x::A has 2 transitions"],
+        [ACTED_PAIR, "x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5"] => vec!["x::A, x::Factor -> x::A has 2 transitions: x::A::scale at crates/x/src/lib.rs:4, x::A::scaled at crates/x/src/lib.rs:5"],
+        [PURE_PAIR, "has 2 transitions"] => Vec::<String>::new(),
+        [PURE_PAIR, "has 3 transitions"] => Vec::<String>::new(),
+        [CHILDREN, "x::A -> x::A has 2 transitions"] => vec!["x::A -> x::A has 2 transitions"],
+        [FROM_PARTS, "x::A -> x::A has 2 transitions"] => vec!["x::A -> x::A has 2 transitions"],
+        [FOREIGN_ORD, "has 2 transitions"] => Vec::<String>::new(),
     ]
 );
 

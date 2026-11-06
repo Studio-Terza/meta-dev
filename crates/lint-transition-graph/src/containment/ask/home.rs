@@ -33,14 +33,28 @@ impl<'found> Home<'_, 'found, '_> {
 
 impl fmt::Display for Home<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.named.each(formatter, |formatter, member| {
-            write!(formatter, "    in {}", member.cluster())?;
-            self.named
-                .view()
-                .users_within(member)
-                .map_or(Ok(()), |users| write!(formatter, "; its users lie within {users}"))?;
-            writeln!(formatter, "; beside {}", self.beside(member))
-        })?;
-        Ok(())
+        match self.named.found() {
+            Err(missing) => write!(formatter, "{missing}"),
+            Ok(found) => found.iter().try_for_each(|member| {
+                write!(formatter, "  {}\n{}", self.named.placed(*member), Located { home: self, member: *member })
+            }),
+        }
+    }
+}
+
+struct Located<'home, 'view, 'found, 'file> {
+    home: &'home Home<'view, 'found, 'file>,
+    member: Member<'found>,
+}
+
+impl fmt::Display for Located<'_, '_, '_, '_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "    in {}", self.member.cluster())?;
+        self.home
+            .named
+            .view()
+            .users_within(self.member)
+            .map_or(Ok(()), |users| write!(formatter, "; its users lie within {users}"))?;
+        writeln!(formatter, "; beside {}", self.home.beside(self.member))
     }
 }

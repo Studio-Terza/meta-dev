@@ -3,8 +3,9 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 use lint_runner::Cli;
+use text_lines::Lines;
 
 use crate::fakes::FakeLinked;
 
@@ -12,8 +13,8 @@ const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const CLEAN: &str = "struct A;\n";
 const HEADLINE: &str = "logic is Rust; web assets live under a directory named assets:\n";
 const FINDING: &str = " source outside assets; ";
-const REWRITE: &str = "rewrite it in Rust\n";
-const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust\n";
+const REWRITE: &str = "rewrite it in Rust";
+const MOVE: &str = "if it is a web asset, move it under a directory named assets; otherwise rewrite it in Rust";
 
 #[derive(Debug, PartialEq)]
 struct Run {
@@ -22,9 +23,13 @@ struct Run {
 }
 
 impl Run {
-    fn finding(&self, path: &str, language: &str, fix: &str) -> Option<&str> {
-        let expected = format!("{path}:1: {language}{FINDING}{fix}");
-        self.err.matches(&expected).next()
+    fn finding(path: &str, language: &str, fix: &str) -> String {
+        format!("{path}:1: {language}{FINDING}{fix}")
+    }
+
+    fn lines_at(&self, path: &str) -> Vec<String> {
+        let site = format!("{path}:1: ");
+        Lines::from(self.err.as_str()).filter(|line| line.contains(&site)).map(str::to_owned).collect()
     }
 
     fn findings(&self) -> usize {
@@ -84,7 +89,10 @@ fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), Box<dyn Error>
     let run = checkout.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains(HEADLINE));
-    assert_ne!(run.finding(&checkout.shown("run.sh"), "shell", REWRITE), None);
+    assert_eq!(
+        run.lines_at(&checkout.shown("run.sh")),
+        vec![Run::finding(&checkout.shown("run.sh"), "shell", REWRITE)]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -119,7 +127,10 @@ fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write(".github/scripts/matrix.py", "print(1)\n")?;
     let run = checkout.checked();
-    assert_ne!(run.finding(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE), None);
+    assert_eq!(
+        run.lines_at(&checkout.shown(".github/scripts/matrix.py")),
+        vec![Run::finding(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE)]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -137,19 +148,27 @@ fn version_control_and_build_output_are_not_read() -> Result<(), Box<dyn Error>>
 fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("docs/target/run.sh", "x\n")?;
-    assert_ne!(checkout.checked().finding(&checkout.shown("docs/target/run.sh"), "shell", REWRITE), None);
+    assert_eq!(
+        checkout.checked().lines_at(&checkout.shown("docs/target/run.sh")),
+        vec![Run::finding(&checkout.shown("docs/target/run.sh"), "shell", REWRITE)]
+    );
     Ok(())
 }
 
 #[test]
 fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
-    ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
+    let written: Vec<PathBuf> = ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
         .iter()
         .map(|path| checkout.write(path, "x\n"))
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
+    let kinds: Vec<Kind> = written.iter().map(|file| checkout.files.kind(file)).collect();
+    assert_eq!(kinds, vec![Kind::File; 3]);
     let run = checkout.checked();
-    assert_ne!(run.finding(&checkout.shown("site/app.js"), "JavaScript", MOVE), None);
+    assert_eq!(
+        run.lines_at(&checkout.shown("site/app.js")),
+        vec![Run::finding(&checkout.shown("site/app.js"), "JavaScript", MOVE)]
+    );
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -162,7 +181,7 @@ fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Res
     nested.write("run.sh", "x\n")?;
     let run = nested.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
-    assert_ne!(run.finding(&nested.shown("run.sh"), "shell", REWRITE), None);
+    assert_eq!(run.lines_at(&nested.shown("run.sh")), vec![Run::finding(&nested.shown("run.sh"), "shell", REWRITE)]);
     Ok(())
 }
 

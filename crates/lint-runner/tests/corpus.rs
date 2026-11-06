@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::ffi::OsStr;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -46,35 +47,45 @@ impl Corpus {
         Some(name).filter(|name| *name == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
-    fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
+    fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<Vec<PathBuf>, FileFailure> {
         match corpus.kind(found) {
             Kind::Directory => Self::copied_directory(corpus, found, target, into),
             Kind::File | Kind::Link | Kind::Missing => Self::copied_file(corpus, found, target, into),
         }
     }
 
-    fn copied_file(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
+    fn copied_file(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<Vec<PathBuf>, FileFailure> {
         into.write(target, corpus.read(found)?)?;
-        Ok(target.to_path_buf())
+        Ok(vec![target.to_path_buf()])
     }
 
-    fn copied_directory(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
+    fn copied_directory(
+        corpus: &Memory,
+        found: &Path,
+        target: &Path,
+        into: &Memory,
+    ) -> Result<Vec<PathBuf>, FileFailure> {
         into.create_directories(target)?;
-        corpus
+        let inside = corpus
             .entries(found)?
             .iter()
             .map(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
-            .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
-        Ok(target.to_path_buf())
+            .collect::<Result<Vec<Vec<PathBuf>>, FileFailure>>()?;
+        Ok(iter::once(target.to_path_buf()).chain(inside.into_iter().flatten()).collect())
     }
 
     fn output(corpus: &Memory, fixture: &Path) -> Result<String, Box<dyn Error>> {
         let root = Memory::default();
-        corpus
+        let written: Vec<PathBuf> = corpus
             .entries(fixture)?
             .iter()
             .map(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))
-            .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
+            .collect::<Result<Vec<Vec<PathBuf>>, FileFailure>>()?
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_ne!(written, Vec::<PathBuf>::new());
+        assert!(written.iter().all(|path| root.kind(path) != Kind::Missing));
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
         let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");

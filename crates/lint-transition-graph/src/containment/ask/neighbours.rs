@@ -1,6 +1,7 @@
 use std::fmt;
 
 use super::super::Toward;
+use super::super::member::Member;
 use super::listing::{Listed, Listing};
 use super::named::Named;
 
@@ -19,18 +20,20 @@ impl<'view, 'found, 'file> Neighbours<'view, 'found, 'file> {
     ) -> Neighbours<'view, 'found, 'file> {
         Neighbours { named, toward, listed }
     }
+
+    fn listing(&self, member: Member<'found>) -> Listing<'view, 'found, 'file> {
+        let view = self.named.view();
+        Listing::new(view, view.adjacent(member, self.toward), view.outside(member, self.toward), self.listed)
+    }
 }
 
 impl fmt::Display for Neighbours<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let view = self.named.view();
-        self.named.each(formatter, |formatter, member| {
-            write!(
-                formatter,
-                "{}",
-                Listing::new(view, view.adjacent(member, self.toward), view.outside(member, self.toward), self.listed)
-            )
-        })?;
-        Ok(())
+        match self.named.found() {
+            Err(missing) => write!(formatter, "{missing}"),
+            Ok(found) => found.iter().try_for_each(|member| {
+                write!(formatter, "  {}\n{}", self.named.placed(*member), self.listing(*member))
+            }),
+        }
     }
 }

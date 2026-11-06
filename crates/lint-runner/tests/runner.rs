@@ -411,14 +411,14 @@ fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
 #[test]
 fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::temporary()?;
-    [("clean", CLEAN), ("dirty", DIRTY)]
+    let roots: Vec<PathBuf> = [("clean", CLEAN), ("dirty", DIRTY)]
         .iter()
         .map(|(package, library)| {
-            scratch.write_below(package, "Cargo.toml", MANIFEST)?;
-            scratch.write_below(package, "src/lib.rs", library)
+            let manifest = scratch.write_below(package, "Cargo.toml", MANIFEST)?;
+            scratch.write_below(package, "src/lib.rs", library)?;
+            Ok(manifest.parent().map(Path::to_path_buf).unwrap_or_default())
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
-    let roots = [scratch.at("clean"), scratch.at("dirty")];
     assert_eq!(Trees::reported_through(&scratch.files, &roots).exit, ExitCode::FAILURE);
     Ok(())
 }
@@ -512,18 +512,22 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
     let build = "fn main() { println!(\"{}\", 2 + 3); }\n";
     let nested = "pub mod a;\npub mod b;\n";
     let layouts = ["plain/proj", "src/proj", "tests/proj"];
-    layouts
+    let projects: Vec<PathBuf> = layouts
         .iter()
         .map(|layout| {
-            root.write_below(layout, "Cargo.toml", MANIFEST)?;
+            let manifest = root.write_below(layout, "Cargo.toml", MANIFEST)?;
             root.write_below(layout, "src/lib.rs", nested)?;
             root.write_below(layout, "src/a.rs", "pub struct Tool;\n")?;
             root.write_below(layout, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
             root.write_below(layout, "tests/flow.rs", flow)?;
-            root.write_below(layout, "build.rs", build)
+            root.write_below(layout, "build.rs", build)?;
+            Ok(manifest.parent().map(Path::to_path_buf).unwrap_or_default())
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
-    let counts: Vec<usize> = layouts.iter().map(|layout| root.reported_at(layout).violations()).collect();
+    let counts: Vec<usize> = projects
+        .iter()
+        .map(|project| Trees::reported_through(&root.files, std::slice::from_ref(project)).violations())
+        .collect();
     let first = counts.first().copied().unwrap_or_default();
     assert!(first > 0);
     assert!(counts.iter().all(|count| *count == first));
@@ -617,15 +621,16 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Box<dyn Error>> {
-    let declared = [("example", "examples/e.rs", ExitCode::SUCCESS), ("test", "tests/e.rs", ExitCode::FAILURE)];
-    declared.iter().try_for_each(|(kind, file, exit)| {
+    let declared = |kind: &str, file: &str| -> Result<Reported, FileFailure> {
         let root = Scratch::temporary()?;
         let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
         root.write("Cargo.toml", &table)?;
         root.write(file, CLEAN)?;
-        assert_eq!(root.reported().exit, *exit, "{kind}");
-        Ok(())
-    })
+        Ok(root.reported())
+    };
+    assert_eq!(declared("example", "examples/e.rs")?, Reported::clean());
+    assert_eq!(declared("test", "tests/e.rs")?.exit, ExitCode::FAILURE);
+    Ok(())
 }
 
 #[test]
@@ -657,13 +662,15 @@ fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result
 fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
-    ["target/package/copy", ".cache/copy"]
+    let copies: Vec<PathBuf> = ["target/package/copy", ".cache/copy"]
         .iter()
         .map(|copy| {
             root.write(&format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
             root.write(&format!("{copy}/src/lib.rs"), DIRTY)
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
+    let kinds: Vec<Kind> = copies.iter().map(|copy| root.files.kind(copy)).collect();
+    assert_eq!(kinds, vec![Kind::File; 2]);
     assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }

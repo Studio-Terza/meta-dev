@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::iter;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Kind};
@@ -19,6 +20,17 @@ pub struct Survey {
     canonical: BTreeMap<PathBuf, PathBuf>,
     listed: BTreeMap<PathBuf, Vec<PathBuf>>,
     failed: Vec<Failure>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Settled<'survey>(&'survey Survey);
+
+impl Deref for Settled<'_> {
+    type Target = Survey;
+
+    fn deref(&self) -> &Survey {
+        self.0
+    }
 }
 
 impl Survey {
@@ -66,12 +78,12 @@ impl Survey {
         self.listed.get(directory).map_or(&[], Vec::as_slice)
     }
 
-    pub fn settled(&mut self, order: &[impl AsRef<Path>]) -> Result<&Survey, Failure> {
+    pub fn settled(&mut self, order: &[impl AsRef<Path>]) -> Result<Settled<'_>, Failure> {
         let latest = order.iter().map(AsRef::as_ref).find_map(|directory| {
             self.failed.iter().rposition(|failure| matches!(failure, Failure::Io { path, .. } if path == directory))
         });
         let removed = latest.map(|index| self.failed.remove(index));
-        removed.map(Err).unwrap_or(Ok(&*self))
+        removed.map(Err).unwrap_or(Ok(Settled(&*self)))
     }
 
     fn extended<Value>(

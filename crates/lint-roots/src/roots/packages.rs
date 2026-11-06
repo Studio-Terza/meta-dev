@@ -3,7 +3,7 @@ mod package;
 use std::path::{Path, PathBuf};
 
 use super::target::Target;
-use crate::survey::{Fact, Survey};
+use crate::survey::{Fact, Settled, Survey};
 use crate::tree::Tree;
 use file_ports::{Files, Kind};
 use lint_layout::Failure;
@@ -65,7 +65,7 @@ impl Packages {
         survey.learn(files, Fact::Followed, &mains)
     }
 
-    fn checked<'survey>(survey: &'survey mut Survey, packages: &[Package]) -> Result<&'survey Survey, Failure> {
+    fn checked<'survey>(survey: &'survey mut Survey, packages: &[Package]) -> Result<Settled<'survey>, Failure> {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)

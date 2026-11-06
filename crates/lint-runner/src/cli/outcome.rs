@@ -32,10 +32,23 @@ impl fmt::Display for Outcome<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Outcome::Clean => formatter.write_str("all lints pass"),
-            Outcome::Violations { reports, failures } => reports
-                .iter()
-                .try_for_each(|report| write!(formatter, "{report}"))
-                .and(failures.iter().try_for_each(|failure| writeln!(formatter, "{failure}"))),
+            Outcome::Violations { reports, failures } => write!(formatter, "{}{}", Listed(reports), Failed(failures)),
         }
+    }
+}
+
+struct Listed<'reports>(&'reports [Rendered]);
+
+impl fmt::Display for Listed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|report| write!(formatter, "{report}"))
+    }
+}
+
+struct Failed<'failures>(&'failures [Failure]);
+
+impl fmt::Display for Failed<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|failure| writeln!(formatter, "{failure}"))
     }
 }
