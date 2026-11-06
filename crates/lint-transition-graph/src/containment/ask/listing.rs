@@ -74,10 +74,10 @@ impl<'found> FromIterator<Member<'found>> for Names<'found> {
 }
 
 impl Spelled {
-    fn written(self, member: Member<'_>, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn spelling<'found>(self, member: Member<'found>) -> Box<dyn fmt::Display + 'found> {
         match self {
-            Spelled::Path => write!(formatter, "{member}"),
-            Spelled::Name => write!(formatter, "{}", member.name()),
+            Spelled::Path => Box::new(member),
+            Spelled::Name => Box::new(member.name()),
         }
     }
 }
@@ -103,7 +103,7 @@ impl fmt::Display for Line<'_, '_, '_> {
 
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.spelled.written(self.member, formatter)?;
+        write!(formatter, "{}", self.spelled.spelling(self.member))?;
         self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
     }
 }

@@ -94,7 +94,7 @@ fn a_clean_tree_is_clean_and_build_directories_are_not_read() -> Result<(), Box<
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     root.write("target/out.rs", DIRTY)?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }
 
@@ -103,7 +103,7 @@ fn a_report_only_finding_blocks_nothing() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "pub struct A;\n")?;
     root.write("src/paired.rs", PAIRED)?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     assert_eq!(root.reported().exit, ExitCode::SUCCESS);
     Ok(())
 }
@@ -271,18 +271,21 @@ impl Scratch {
         self.root.join(path)
     }
 
-    fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
+    fn write(&self, path: &str, text: &str) -> Result<PathBuf, FileFailure> {
         let file = self.at(path);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, Bytes::from(text))
+        self.files.write(&file, Bytes::from(text))?;
+        Ok(file)
     }
 
-    fn write_below(&self, directory: &str, path: &str, text: &str) -> Result<(), FileFailure> {
+    fn write_below(&self, directory: &str, path: &str, text: &str) -> Result<PathBuf, FileFailure> {
         self.write(&format!("{directory}/{path}"), text)
     }
 
-    fn directory(&self, path: &str) -> Result<(), FileFailure> {
-        self.files.create_directories(&self.at(path))
+    fn directory(&self, path: &str) -> Result<PathBuf, FileFailure> {
+        let directory = self.at(path);
+        self.files.create_directories(&directory)?;
+        Ok(directory)
     }
 
     fn reported(&self) -> Reported {
@@ -309,6 +312,7 @@ struct Printed {
     err: String,
 }
 
+#[derive(Debug, PartialEq)]
 struct Reported {
     exit: ExitCode,
     err: String,
@@ -319,8 +323,8 @@ impl Reported {
     const HEADLINE_END: &'static str = ":\n";
     const SITE: &'static str = ".rs:";
 
-    fn is_clean(&self) -> bool {
-        (self.exit, self.err.as_str()) == (ExitCode::SUCCESS, "\n")
+    fn clean() -> Reported {
+        Reported { exit: ExitCode::SUCCESS, err: String::from("\n") }
     }
 
     fn headlines(&self) -> usize {
@@ -363,12 +367,12 @@ fn files_outside_crate_targets_and_fixture_trees_are_not_read() -> Result<(), Bo
     root.write("src/lib.rs", CLEAN)?;
     root.write("tests/ui/bad.rs", "fn (")?;
     root.write("tooling/corpus/dirty.rs", DIRTY)?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     root.write("tooling/corpus/case/src/lib.rs", DIRTY)?;
     root.write("tests/fixtures/bad/src/lib.rs", "fn (")?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }
 
@@ -407,10 +411,13 @@ fn a_tree_with_no_rust_sources_fails_closed() -> Result<(), Box<dyn Error>> {
 #[test]
 fn every_path_given_is_checked() -> Result<(), Box<dyn Error>> {
     let scratch = Scratch::temporary()?;
-    [("clean", CLEAN), ("dirty", DIRTY)].iter().try_for_each(|(package, library)| {
-        scratch.write_below(package, "Cargo.toml", MANIFEST)?;
-        scratch.write_below(package, "src/lib.rs", library)
-    })?;
+    [("clean", CLEAN), ("dirty", DIRTY)]
+        .iter()
+        .map(|(package, library)| {
+            scratch.write_below(package, "Cargo.toml", MANIFEST)?;
+            scratch.write_below(package, "src/lib.rs", library)
+        })
+        .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     let roots = [scratch.at("clean"), scratch.at("dirty")];
     assert_eq!(Trees::reported_through(&scratch.files, &roots).exit, ExitCode::FAILURE);
     Ok(())
@@ -451,7 +458,7 @@ fn symlink_loops_do_not_repeat_findings() -> Result<(), Box<dyn Error>> {
 fn a_shebang_is_not_a_comment() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", "#!//usr/bin/env foo\nstruct A;\n")?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }
 
@@ -479,7 +486,7 @@ fn hidden_directories_and_unlisted_crates_are_not_read() -> Result<(), Box<dyn E
     root.write("vendor/dep/src/lib.rs", DIRTY)?;
     root.write(".claude/worktrees/t1/Cargo.toml", MANIFEST)?;
     root.write(".claude/worktrees/t1/src/lib.rs", DIRTY)?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     root.write("crates/two/Cargo.toml", MANIFEST)?;
     root.write("crates/two/src/lib.rs", DIRTY)?;
     assert_eq!(root.reported().violations(), 2);
@@ -505,14 +512,17 @@ fn the_verdict_does_not_depend_on_where_the_checkout_lives() -> Result<(), Box<d
     let build = "fn main() { println!(\"{}\", 2 + 3); }\n";
     let nested = "pub mod a;\npub mod b;\n";
     let layouts = ["plain/proj", "src/proj", "tests/proj"];
-    layouts.iter().try_for_each(|layout| {
-        root.write_below(layout, "Cargo.toml", MANIFEST)?;
-        root.write_below(layout, "src/lib.rs", nested)?;
-        root.write_below(layout, "src/a.rs", "pub struct Tool;\n")?;
-        root.write_below(layout, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
-        root.write_below(layout, "tests/flow.rs", flow)?;
-        root.write_below(layout, "build.rs", build)
-    })?;
+    layouts
+        .iter()
+        .map(|layout| {
+            root.write_below(layout, "Cargo.toml", MANIFEST)?;
+            root.write_below(layout, "src/lib.rs", nested)?;
+            root.write_below(layout, "src/a.rs", "pub struct Tool;\n")?;
+            root.write_below(layout, "src/b.rs", "use crate::a::Tool;\npub struct User(Tool);\n")?;
+            root.write_below(layout, "tests/flow.rs", flow)?;
+            root.write_below(layout, "build.rs", build)
+        })
+        .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     let counts: Vec<usize> = layouts.iter().map(|layout| root.reported_at(layout).violations()).collect();
     let first = counts.first().copied().unwrap_or_default();
     assert!(first > 0);
@@ -607,13 +617,13 @@ fn targets_declared_with_a_path_are_read() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn an_example_that_is_not_run_as_a_test_is_not_a_skipped_test() -> Result<(), Box<dyn Error>> {
-    let declared = [("example", "examples/e.rs", true), ("test", "tests/e.rs", false)];
-    declared.iter().try_for_each(|(kind, file, clean)| {
+    let declared = [("example", "examples/e.rs", ExitCode::SUCCESS), ("test", "tests/e.rs", ExitCode::FAILURE)];
+    declared.iter().try_for_each(|(kind, file, exit)| {
         let root = Scratch::temporary()?;
         let table = format!("{MANIFEST}[[{kind}]]\nname = \"e\"\ntest = false\n");
         root.write("Cargo.toml", &table)?;
         root.write(file, CLEAN)?;
-        assert_eq!(root.reported().is_clean(), *clean, "{kind}");
+        assert_eq!(root.reported().exit, *exit, "{kind}");
         Ok(())
     })
 }
@@ -647,11 +657,14 @@ fn a_package_with_its_own_workspace_inside_another_workspace_is_read() -> Result
 fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
-    ["target/package/copy", ".cache/copy"].iter().try_for_each(|copy| {
-        root.write(&format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
-        root.write(&format!("{copy}/src/lib.rs"), DIRTY)
-    })?;
-    assert!(root.reported().is_clean());
+    ["target/package/copy", ".cache/copy"]
+        .iter()
+        .map(|copy| {
+            root.write(&format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
+            root.write(&format!("{copy}/src/lib.rs"), DIRTY)
+        })
+        .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
+    assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }
 
@@ -662,7 +675,7 @@ fn a_workspace_manifest_is_not_a_package() -> Result<(), Box<dyn Error>> {
     root.write("src/lib.rs", DIRTY)?;
     root.write("one/Cargo.toml", MANIFEST)?;
     root.write("one/src/lib.rs", CLEAN)?;
-    assert!(root.reported().is_clean());
+    assert_eq!(root.reported(), Reported::clean());
     Ok(())
 }
 
@@ -681,7 +694,7 @@ fn a_manifest_beside_the_linted_member_that_cannot_be_read_fails_closed() -> Res
     root.write("one/Cargo.toml", MANIFEST)?;
     root.write("one/src/lib.rs", CLEAN)?;
     root.write("two/src/lib.rs", CLEAN)?;
-    assert!(root.reported_at("one").is_clean());
+    assert_eq!(root.reported_at("one"), Reported::clean());
     root.directory("two/Cargo.toml")?;
     assert!(root.reported_at("one").err.contains("two/Cargo.toml"));
     Ok(())
@@ -704,7 +717,7 @@ fn a_directory_that_cannot_be_listed_fails_closed_wherever_it_is_reached() -> Re
     cases.iter().try_for_each(|(root, directory, given)| {
         scratch.write(&format!("{root}/{directory}/kept.txt"), "x")?;
         let unlistable = scratch.files.canonical(&scratch.at(&format!("{root}/{directory}")))?;
-        assert!(scratch.reported_at(&format!("{root}/{given}")).is_clean(), "{directory}");
+        assert_eq!(scratch.reported_at(&format!("{root}/{given}")), Reported::clean(), "{directory}");
         let given = [scratch.at(&format!("{root}/{given}"))];
         let run = Trees::reported_through(&FakeUnlistable::new(&scratch.files, unlistable.clone()), &given);
         assert_eq!(run.exit, ExitCode::FAILURE, "{directory}");

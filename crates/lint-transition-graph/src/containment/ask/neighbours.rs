@@ -30,6 +30,7 @@ impl fmt::Display for Neighbours<'_, '_, '_> {
                 "{}",
                 Listing::new(view, view.adjacent(member, self.toward), view.outside(member, self.toward), self.listed)
             )
-        })
+        })?;
+        Ok(())
     }
 }

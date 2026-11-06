@@ -2,7 +2,7 @@ use lint_core::{Lint, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
-use crate::shown::{OnGraph, Shown};
+use crate::shown::{OnGraph, Presence, Shown};
 
 struct Duplicates;
 
@@ -20,7 +20,7 @@ impl Duplicates {
     }
 
     fn shows(pair: &[&str]) -> bool {
-        Shown::by(pair, Self::reported)
+        Shown::by(pair, Self::reported) == Presence::Present
     }
 }
 

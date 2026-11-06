@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use file_ports::{FileFailure, Files, Kind, Memory};
@@ -27,7 +27,10 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
     let printed: Vec<&str> = outputs
         .iter()
         .flat_map(|(_, output)| Lines::from(output.as_str()))
-        .filter(|line| Corpus::is_violation(line))
+        .filter(|line| {
+            let site = line.match_indices(SITE_END).next().and_then(|(at, _)| line.get(..at));
+            matches!(site.and_then(|site| site.chars().last()), Some(last) if last.is_ascii_digit())
+        })
         .collect();
     let unfixed: Vec<&str> = printed.iter().copied().filter(|line| Corpus::fix_named(line).is_none()).collect();
     assert_ne!(printed, Vec::<&str>::new());
@@ -43,19 +46,26 @@ impl Corpus {
         Some(name).filter(|name| *name == STORED_MANIFEST).map_or(name, |_| MANIFEST.as_ref())
     }
 
-    fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<(), FileFailure> {
+    fn copied(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
         match corpus.kind(found) {
             Kind::Directory => Self::copied_directory(corpus, found, target, into),
-            _ => into.write(target, corpus.read(found)?),
+            Kind::File | Kind::Link | Kind::Missing => Self::copied_file(corpus, found, target, into),
         }
     }
 
-    fn copied_directory(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<(), FileFailure> {
+    fn copied_file(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
+        into.write(target, corpus.read(found)?)?;
+        Ok(target.to_path_buf())
+    }
+
+    fn copied_directory(corpus: &Memory, found: &Path, target: &Path, into: &Memory) -> Result<PathBuf, FileFailure> {
         into.create_directories(target)?;
         corpus
             .entries(found)?
             .iter()
-            .try_for_each(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
+            .map(|inner| Self::copied(corpus, inner, &target.join(Self::renamed(inner)), into))
+            .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
+        Ok(target.to_path_buf())
     }
 
     fn output(corpus: &Memory, fixture: &Path) -> Result<String, Box<dyn Error>> {
@@ -63,7 +73,8 @@ impl Corpus {
         corpus
             .entries(fixture)?
             .iter()
-            .try_for_each(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))?;
+            .map(|found| Self::copied(corpus, found, Path::new(Self::renamed(found)), &root))
+            .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
         let exit = Cli::from_args(std::iter::empty()).report_to(&root, &mut printed, &mut failed);
         let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
@@ -77,14 +88,6 @@ impl Corpus {
             .map(|call| runner.matches(call).count())
             .sum::<usize>()
             + include_str!("../src/cli/mode.rs").matches("::report(files)").count()
-    }
-
-    fn is_violation(line: &str) -> bool {
-        line.match_indices(SITE_END)
-            .next()
-            .and_then(|(at, _)| line.get(..at))
-            .and_then(|site| site.chars().last())
-            .is_some_and(|last| last.is_ascii_digit())
     }
 
     fn fix_named(line: &str) -> Option<&str> {

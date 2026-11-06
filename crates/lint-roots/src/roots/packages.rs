@@ -31,8 +31,8 @@ impl Packages {
             .zip(groups)
             .map(|(tree, group)| {
                 let packages = group?;
-                Self::checked(&mut survey, &packages)?;
-                Ok(packages.into_iter().filter_map(|package| package.into_target(&survey, tree)).collect())
+                let settled = Self::checked(&mut survey, &packages)?;
+                Ok(packages.into_iter().filter_map(|package| package.into_target(settled, tree)).collect())
             })
             .collect()
     }
@@ -65,13 +65,13 @@ impl Packages {
         survey.learn(files, Fact::Followed, &mains)
     }
 
-    fn checked(survey: &mut Survey, packages: &[Package]) -> Result<(), Failure> {
+    fn checked<'survey>(survey: &'survey mut Survey, packages: &[Package]) -> Result<&'survey Survey, Failure> {
         let real: Vec<PathBuf> = packages
             .iter()
             .flat_map(Package::target_directories)
             .map(Newtype::into_inner)
             .filter(|directory| survey.kind(directory) == Kind::Directory)
             .collect();
-        survey.failure(&real).map_or(Ok(()), Err)
+        survey.settled(&real)
     }
 }

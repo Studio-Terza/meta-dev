@@ -25,18 +25,20 @@ impl<'view, 'found, 'file> Named<'view, 'found, 'file> {
         &self,
         formatter: &mut fmt::Formatter<'_>,
         mut each: impl FnMut(&mut fmt::Formatter<'_>, Member<'found>) -> fmt::Result,
-    ) -> fmt::Result {
+    ) -> Result<Vec<Member<'found>>, fmt::Error> {
         let named: Vec<Member<'found>> = self.view.named(self.name).collect();
         named.first().map_or_else(|| writeln!(formatter, "  no type or trait named {}", self.name), |_| Ok(()))?;
-        named.into_iter().try_for_each(|member| {
-            writeln!(formatter, "  {}", Placed::new(self.view, member, Spelled::Path))?;
-            each(formatter, member)
-        })
+        named.iter().try_for_each(|member| {
+            writeln!(formatter, "  {}", Placed::new(self.view, *member, Spelled::Path))?;
+            each(formatter, *member)
+        })?;
+        Ok(named)
     }
 }
 
 impl fmt::Display for Named<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.each(formatter, |_, _| Ok(()))
+        self.each(formatter, |_, _| Ok(()))?;
+        Ok(())
     }
 }

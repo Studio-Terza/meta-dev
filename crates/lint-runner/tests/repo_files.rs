@@ -22,8 +22,9 @@ struct Run {
 }
 
 impl Run {
-    fn names(&self, path: &str, language: &str, fix: &str) -> bool {
-        self.err.contains(&format!("{path}:1: {language}{FINDING}{fix}"))
+    fn finding(&self, path: &str, language: &str, fix: &str) -> Option<&str> {
+        let expected = format!("{path}:1: {language}{FINDING}{fix}");
+        self.err.matches(&expected).next()
     }
 
     fn findings(&self) -> usize {
@@ -50,10 +51,11 @@ impl Checkout {
         Checkout { root: self.root.join(directory), files: self.files }
     }
 
-    fn write(&self, path: &str, text: &str) -> Result<(), FileFailure> {
+    fn write(&self, path: &str, text: &str) -> Result<PathBuf, FileFailure> {
         let file = self.root.join(path);
         file.parent().map_or(Ok(()), |parent| self.files.create_directories(parent))?;
-        self.files.write(&file, Bytes::from(text))
+        self.files.write(&file, Bytes::from(text))?;
+        Ok(file)
     }
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
@@ -82,7 +84,7 @@ fn a_shell_script_fails_the_run_and_names_the_fix() -> Result<(), Box<dyn Error>
     let run = checkout.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
     assert!(run.err.contains(HEADLINE));
-    assert!(run.names(&checkout.shown("run.sh"), "shell", REWRITE));
+    assert_ne!(run.finding(&checkout.shown("run.sh"), "shell", REWRITE), None);
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -117,7 +119,7 @@ fn hidden_directories_are_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write(".github/scripts/matrix.py", "print(1)\n")?;
     let run = checkout.checked();
-    assert!(run.names(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE));
+    assert_ne!(run.finding(&checkout.shown(".github/scripts/matrix.py"), "Python", REWRITE), None);
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -135,7 +137,7 @@ fn version_control_and_build_output_are_not_read() -> Result<(), Box<dyn Error>>
 fn a_directory_named_target_without_a_manifest_beside_it_is_read() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     checkout.write("docs/target/run.sh", "x\n")?;
-    assert!(checkout.checked().names(&checkout.shown("docs/target/run.sh"), "shell", REWRITE));
+    assert_ne!(checkout.checked().finding(&checkout.shown("docs/target/run.sh"), "shell", REWRITE), None);
     Ok(())
 }
 
@@ -144,9 +146,10 @@ fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
     let checkout = Checkout::new()?;
     ["site/assets/app.js", "assets/css/site.css", "site/app.js"]
         .iter()
-        .try_for_each(|path| checkout.write(path, "x\n"))?;
+        .map(|path| checkout.write(path, "x\n"))
+        .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
     let run = checkout.checked();
-    assert!(run.names(&checkout.shown("site/app.js"), "JavaScript", MOVE));
+    assert_ne!(run.finding(&checkout.shown("site/app.js"), "JavaScript", MOVE), None);
     assert_eq!(run.findings(), 1);
     Ok(())
 }
@@ -159,7 +162,7 @@ fn a_checkout_below_a_directory_named_assets_is_judged_by_its_own_paths() -> Res
     nested.write("run.sh", "x\n")?;
     let run = nested.checked();
     assert_eq!(run.exit, ExitCode::FAILURE);
-    assert!(run.names(&nested.shown("run.sh"), "shell", REWRITE));
+    assert_ne!(run.finding(&nested.shown("run.sh"), "shell", REWRITE), None);
     Ok(())
 }
 

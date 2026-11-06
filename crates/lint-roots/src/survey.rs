@@ -66,11 +66,12 @@ impl Survey {
         self.listed.get(directory).map_or(&[], Vec::as_slice)
     }
 
-    pub fn failure(&mut self, order: &[impl AsRef<Path>]) -> Option<Failure> {
+    pub fn settled(&mut self, order: &[impl AsRef<Path>]) -> Result<&Survey, Failure> {
         let latest = order.iter().map(AsRef::as_ref).find_map(|directory| {
             self.failed.iter().rposition(|failure| matches!(failure, Failure::Io { path, .. } if path == directory))
-        })?;
-        Some(self.failed.remove(latest))
+        });
+        let removed = latest.map(|index| self.failed.remove(index));
+        removed.map(Err).unwrap_or(Ok(&*self))
     }
 
     fn extended<Value>(

@@ -37,7 +37,7 @@ impl Directory {
                 let kept = Kept::new(&survey, ignored);
                 let below = kept.preorder(kept.below(root));
                 let order: Vec<&Path> = iter::once(root.as_path()).chain(below.iter().map(AsRef::as_ref)).collect();
-                survey.failure(&order).map_or_else(|| Ok(found(&Kept::new(&survey, ignored), root, below)), Err)
+                survey.settled(&order).map(|settled| found(&Kept::new(settled, ignored), root, below))
             })
             .collect()
     }

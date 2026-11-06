@@ -2,7 +2,7 @@ use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::ParallelStructures;
 
-use crate::shown::{OnGraph, Shown};
+use crate::shown::{OnGraph, Presence, Shown};
 
 struct Parallel;
 
@@ -12,7 +12,7 @@ impl Parallel {
     }
 
     fn shown(pair: &[&str]) -> bool {
-        Shown::by(pair, |files| OnGraph::<ParallelStructures>::report(files).to_string())
+        Shown::by(pair, |files| OnGraph::<ParallelStructures>::report(files).to_string()) == Presence::Present
     }
 
     fn structures(text: &&str) -> usize {

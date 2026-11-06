@@ -2,7 +2,7 @@ use lint_core::Lint;
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::TransitionGraph;
 
-use crate::shown::{OnGraph, Shown};
+use crate::shown::{OnGraph, Presence, Shown};
 
 struct Graphed;
 
@@ -46,31 +46,31 @@ laws::table!(
     the_transition_graph_of_a_crate_is_measured_with_its_coverage,
     Shown::of::<OnGraph<TransitionGraph>>,
     [
-        [CONVERSIONS, "crates/x/src/lib.rs:4: crate x: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"] => true,
-        [PRIMITIVES, "crate x: 1 domain types, 0 interface nodes, 1 black boxes, 0 domain pairs, 4 written edges, coverage 1 of 4, share 0.250, 3 touch a bare primitive; of which 1 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations"] => true,
-        [TRAIT_FIXED, "crate x: 1 domain types, 1 interface nodes, 2 black boxes, 0 domain pairs, 3 written edges, coverage 2 of 3, share 0.667, 1 touch a bare primitive"] => true,
-        [GENERIC, "crate x: 2 domain types, 3 interface nodes, 1 black boxes, 2 domain pairs, 5 written edges, coverage 4 of 5, share 0.800, 1 touch a bare primitive"] => true,
-        [LIFTS, "crate x: 2 domain types, 0 interface nodes, 2 black boxes, 2 domain pairs, 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 2 derived lifts, 1 store operations"] => true,
-        [LIFTS, "crates/x/src/lib.rs:4: workspace: 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 2 derived lifts, 1 store operations; give each bare primitive a newtype, an enum or a standard trait, so every written edge joins nodes the graph can see"] => true,
-        [ALGEBRA, "6 written edges, coverage 6 of 6, share 1.000, 0 touch a bare primitive; of which 5 algebra operations, 1 partial; not written: 0 derived lifts, 0 store operations"] => true,
-        [PORTED, "2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial"] => true,
-        [LIFTED_ALGEBRA, "1 written edges, coverage 1 of 1, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial; not written: 1 derived lifts, 0 store operations"] => true,
-        [OUTPUT, "1 written edges, coverage 1 of 1, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial"] => true,
-        [FOREIGN, "2 written edges"] => true,
-        [FOREIGN, "of which 0 algebra operations, 0 partial"] => true,
-        [LOCAL_TRAIT, "of which 1 algebra operations, 0 partial"] => true,
-        [COLLECTED, "2 written edges"] => true,
-        [COLLECTED, "of which 0 algebra operations, 0 partial"] => true,
-        [OUTPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
-        [OUTPUT_OPTIONAL, "of which 1 algebra operations, 1 partial"] => true,
-        [INPUT_MANY, "of which 0 algebra operations, 0 partial"] => true,
-        [ARRAYED, "of which 0 algebra operations, 0 partial"] => true,
-        [ACTED_WRAPPED, "of which 1 algebra operations, 0 partial"] => true,
-        [PARENTHESISED, "of which 1 algebra operations, 1 partial"] => true,
-        [TRIED, "of which 0 algebra operations, 0 partial"] => true,
-        [TESTED, "crate x"] => false,
-        [TESTED, "workspace:"] => false,
-        ["struct A;\n", "crate x"] => false,
+        [CONVERSIONS, "crates/x/src/lib.rs:4: crate x: 2 domain types, 0 interface nodes, 0 black boxes, 1 domain pairs, 2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations; give each bare primitive a newtype, an enum or a standard trait, and keep one transition per input-output pair"] => Presence::Present,
+        [PRIMITIVES, "crate x: 1 domain types, 0 interface nodes, 1 black boxes, 0 domain pairs, 4 written edges, coverage 1 of 4, share 0.250, 3 touch a bare primitive; of which 1 algebra operations, 0 partial; not written: 0 derived lifts, 0 store operations"] => Presence::Present,
+        [TRAIT_FIXED, "crate x: 1 domain types, 1 interface nodes, 2 black boxes, 0 domain pairs, 3 written edges, coverage 2 of 3, share 0.667, 1 touch a bare primitive"] => Presence::Present,
+        [GENERIC, "crate x: 2 domain types, 3 interface nodes, 1 black boxes, 2 domain pairs, 5 written edges, coverage 4 of 5, share 0.800, 1 touch a bare primitive"] => Presence::Present,
+        [LIFTS, "crate x: 2 domain types, 0 interface nodes, 2 black boxes, 2 domain pairs, 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 2 derived lifts, 1 store operations"] => Presence::Present,
+        [LIFTS, "crates/x/src/lib.rs:4: workspace: 2 written edges, coverage 1 of 2, share 0.500, 1 touch a bare primitive; of which 0 algebra operations, 0 partial; not written: 2 derived lifts, 1 store operations; give each bare primitive a newtype, an enum or a standard trait, so every written edge joins nodes the graph can see"] => Presence::Present,
+        [ALGEBRA, "6 written edges, coverage 6 of 6, share 1.000, 0 touch a bare primitive; of which 5 algebra operations, 1 partial; not written: 0 derived lifts, 0 store operations"] => Presence::Present,
+        [PORTED, "2 written edges, coverage 2 of 2, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial"] => Presence::Present,
+        [LIFTED_ALGEBRA, "1 written edges, coverage 1 of 1, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial; not written: 1 derived lifts, 0 store operations"] => Presence::Present,
+        [OUTPUT, "1 written edges, coverage 1 of 1, share 1.000, 0 touch a bare primitive; of which 1 algebra operations, 0 partial"] => Presence::Present,
+        [FOREIGN, "2 written edges"] => Presence::Present,
+        [FOREIGN, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [LOCAL_TRAIT, "of which 1 algebra operations, 0 partial"] => Presence::Present,
+        [COLLECTED, "2 written edges"] => Presence::Present,
+        [COLLECTED, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [OUTPUT_MANY, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [OUTPUT_OPTIONAL, "of which 1 algebra operations, 1 partial"] => Presence::Present,
+        [INPUT_MANY, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [ARRAYED, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [ACTED_WRAPPED, "of which 1 algebra operations, 0 partial"] => Presence::Present,
+        [PARENTHESISED, "of which 1 algebra operations, 1 partial"] => Presence::Present,
+        [TRIED, "of which 0 algebra operations, 0 partial"] => Presence::Present,
+        [TESTED, "crate x"] => Presence::Absent,
+        [TESTED, "workspace:"] => Presence::Absent,
+        ["struct A;\n", "crate x"] => Presence::Absent,
     ]
 );
 
