@@ -37,7 +37,8 @@ impl Spelling {
     ];
     const OWNED: [&'static [Word<'static>]; 2] =
         [&words!["std", "string", "String"], &words!["alloc", "string", "String"]];
-    const PRIMITIVE_MODULES: [&'static [Word<'static>]; 2] = [&words!["core", "primitive"], &words!["std", "primitive"]];
+    const PRIMITIVE_MODULES: [&'static [Word<'static>]; 2] =
+        [&words!["core", "primitive"], &words!["std", "primitive"]];
     const WIRE_TYPES: [&'static [Word<'static>]; 9] = [
         &words!["serde_json", "Value"],
         &words!["toml", "Value"],
@@ -69,13 +70,13 @@ impl Spelling {
     }
 
     fn in_primitive_module(spelled: &UsePath) -> Option<Name> {
-        spelled
-            .segments()
-            .split_last()
-            .and_then(|(last, module)| {
-                let module: UsePath = module.iter().cloned().collect();
-                Self::PRIMITIVE_MODULES.iter().find_map(|primitive| module.spells(primitive)).and_then(|_| Self::primitive(last))
-            })
+        spelled.segments().split_last().and_then(|(last, module)| {
+            let module: UsePath = module.iter().cloned().collect();
+            Self::PRIMITIVE_MODULES
+                .iter()
+                .find_map(|primitive| module.spells(primitive))
+                .and_then(|_| Self::primitive(last))
+        })
     }
 
     fn primitive(name: &Name) -> Option<Name> {

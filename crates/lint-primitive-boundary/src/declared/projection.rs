@@ -53,10 +53,14 @@ impl Projection {
     }
 
     fn of_type(owner: &Owner, interface: Option<&PathSegment>, associated: &ImplItemType) -> Option<Projection> {
-        let spelled = Syntax::type_path(&associated.ty)
-            .and_then(|target| UseAliases::default().spelled(target, Reach::Widened));
+        let spelled =
+            Syntax::type_path(&associated.ty).and_then(|target| UseAliases::default().spelled(target, Reach::Widened));
         owner.name().zip(interface).zip(spelled).map(|((owner, interface), spelled)| Projection {
-            slot: Slot { owner: owner.clone(), interface: Name::from(&interface.ident), item: Name::from(&associated.ident) },
+            slot: Slot {
+                owner: owner.clone(),
+                interface: Name::from(&interface.ident),
+                item: Name::from(&associated.ident),
+            },
             spelled,
         })
     }

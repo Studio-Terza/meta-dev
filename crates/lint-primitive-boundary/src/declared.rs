@@ -49,19 +49,24 @@ impl Declared {
     }
 
     fn wrapped(&self, owner: &Owner) -> Option<Wrapped> {
-        owner.name().and_then(|name| self.newtypes.iter().find(|newtype| newtype.name == *name)).map(|newtype| newtype.wrapped)
+        owner
+            .name()
+            .and_then(|name| self.newtypes.iter().find(|newtype| newtype.name == *name))
+            .map(|newtype| newtype.wrapped)
     }
 }
 
 impl<'ast> Visit<'ast> for Declared {
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-        self.newtypes.extend(Wrapped::of_fields(&item.fields).map(|wrapped| Newtype { name: Name::from(&item.ident), wrapped }));
+        self.newtypes
+            .extend(Wrapped::of_fields(&item.fields).map(|wrapped| Newtype { name: Name::from(&item.ident), wrapped }));
     }
 
     fn visit_item_impl(&mut self, item: &'ast ItemImpl) {
         let owner = Owner::of_impl(item);
         let interface = item.trait_.as_ref().and_then(|(_, path, _)| path.segments.last());
-        self.projections.extend(item.items.iter().filter_map(|member| Projection::of_member(&owner, interface, member)));
+        self.projections
+            .extend(item.items.iter().filter_map(|member| Projection::of_member(&owner, interface, member)));
         syn::visit::visit_item_impl(self, item);
     }
 }
