@@ -131,9 +131,7 @@ laws::table!(
     the_parameters_count_every_place_where_any_member_differs_other_inputs_included,
     Parallel::shown,
     [
-        [THREE_WAYS, "3 types answer 2 moves alike under one renaming"] => vec!["3 types answer 2 moves alike under one renaming"],
-        [THREE_WAYS, "one generic over 3 type parameters"] => vec!["one generic over 3 type parameters"],
-        [RENAMED_INPUTS, "2 types answer 2 moves alike under one renaming"] => vec!["2 types answer 2 moves alike under one renaming"],
-        [RENAMED_INPUTS, "one generic over 2 type parameters"] => vec!["one generic over 2 type parameters"],
+        [THREE_WAYS, "alike under one renaming"] => vec!["crates/x/src/lib.rs:1: 3 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:1, x::B at crates/x/src/lib.rs:2, x::C at crates/x/src/lib.rs:3; one generic over 3 type parameters covers them; write the shared structure once, as one generic type or trait over the types the renaming swaps, and make each member an instance of it; where they mean different things, give them moves of their own"],
+        [RENAMED_INPUTS, "alike under one renaming"] => vec!["crates/x/src/lib.rs:1: 2 types answer 2 moves alike under one renaming: x::A at crates/x/src/lib.rs:1, x::B at crates/x/src/lib.rs:2; one generic over 2 type parameters covers them; write the shared structure once, as one generic type or trait over the types the renaming swaps, and make each member an instance of it; where they mean different things, give them moves of their own"],
     ]
 );

@@ -10,10 +10,10 @@ impl Shown {
     pub(crate) fn by(pair: &[&str], reported: impl Fn(&[SourceFile]) -> String) -> Vec<String> {
         <&[&str; 2]>::try_from(pair)
             .into_iter()
-            .flat_map(|[text, expected]| {
+            .flat_map(|[text, subject]| {
                 reported(&[Sources::file("crates/x/src/lib.rs", Text::new(text))])
-                    .matches(expected)
-                    .take(1)
+                    .lines()
+                    .filter(|line| line.contains(subject))
                     .map(str::to_owned)
                     .collect::<Vec<String>>()
             })
