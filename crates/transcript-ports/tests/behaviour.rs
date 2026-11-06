@@ -35,6 +35,12 @@ impl Lines {
         )
     }
 
+    fn fragment(content: &str) -> String {
+        format!(
+            "{{\"type\":\"assistant\",\"uuid\":\"7\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:07Z\",\"origin\":null,\"message\":{{\"content\":{content}}}}}\n"
+        )
+    }
+
     fn tool_result(uuid: &str) -> String {
         Self::entry("user", uuid, "null", "[{\"type\":\"tool_result\",\"content\":\"output\"}]")
     }
@@ -121,6 +127,17 @@ impl Gather for Gathered {
 impl From<Read> for Gathered {
     fn from(read: Read) -> Gathered {
         read.into_iter().fold(Gathered::default(), |gathered, line| line.gathered(gathered))
+    }
+}
+
+struct Cases;
+
+impl Cases {
+    fn classified(content: &&str) -> Vec<String> {
+        let transcript = Transcript::holding(&Lines::fragment(content));
+        let said = transcript.read(Cursor::default()).map(|read| Views::uuids(&Views::records(read)));
+        let edges = transcript.read(Cursor::default()).map(Views::edges);
+        said.into_iter().chain(edges).flatten().collect()
     }
 }
 
@@ -230,3 +247,13 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
     let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
     prop_assert_eq!(Views::uuids(&together), ["1", "2", "3", "4"]);
 });
+
+laws::table!(
+    a_lead_record_without_a_text_block_is_only_a_parent_edge,
+    Cases::classified,
+    [
+        "[{\"type\":\"thinking\",\"thinking\":\"hmm\"}]" => ["7 after 1"],
+        "[{\"type\":\"tool_use\",\"name\":\"Bash\"}]" => ["7 after 1"],
+        "[{\"type\":\"text\",\"text\":\"said\"}]" => ["7"],
+    ]
+);

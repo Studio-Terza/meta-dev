@@ -72,6 +72,11 @@ pub struct Entry {
     origin: Option<Origin>,
 }
 
+struct Spoken {
+    author: Authorship,
+    text: Body,
+}
+
 impl OriginKind {
     fn authorship(self) -> Authorship {
         match self {
@@ -82,10 +87,13 @@ impl OriginKind {
 }
 
 impl Kind {
-    fn authorship(self, origin: Option<&Origin>) -> Option<Authorship> {
+    fn spoken(self, origin: Option<&Origin>, text: Option<Body>) -> Option<Spoken> {
         match self {
-            Kind::Assistant => Some(Authorship::Lead),
-            Kind::User => Some(origin.map_or(Authorship::Bystander, |found| found.kind.authorship())),
+            Kind::Assistant => text.map(|text| Spoken { author: Authorship::Lead, text }),
+            Kind::User => Some(Spoken {
+                author: origin.map_or(Authorship::Bystander, |found| found.kind.authorship()),
+                text: text.unwrap_or_default(),
+            }),
             Kind::Other => None,
         }
     }
@@ -101,48 +109,49 @@ impl Block {
 }
 
 impl Wording {
-    fn body(self) -> Body {
+    fn body(self) -> Option<Body> {
         match self {
-            Wording::Text(text) => text,
-            Wording::Blocks(blocks) => Body::new(
-                blocks
-                    .into_iter()
-                    .filter_map(Block::written)
-                    .map(|text| text.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            ),
-            Wording::Other(_) => Body::default(),
+            Wording::Text(text) => Some(text),
+            Wording::Blocks(blocks) => blocks
+                .into_iter()
+                .filter_map(Block::written)
+                .reduce(|joined, text| Body::new(format!("{joined} {text}"))),
+            Wording::Other(_) => None,
         }
     }
 }
 
 impl Message {
-    fn body(self) -> Body {
+    fn body(self) -> Option<Body> {
         match self {
             Message::Said { content } => content.body(),
-            Message::Other(_) => Body::default(),
+            Message::Other(_) => None,
         }
     }
 }
 
 impl Entry {
-    pub fn line(self) -> Option<Line> {
-        match self.kind.authorship(self.origin.as_ref()) {
-            Some(author) => self.said(author).map(Line::Said),
+    pub fn line(mut self) -> Option<Line> {
+        let text = self.message.take().and_then(Message::body);
+        let spoken = self.kind.spoken(self.origin.as_ref(), text);
+        self.heard(spoken)
+    }
+
+    fn heard(self, spoken: Option<Spoken>) -> Option<Line> {
+        match spoken {
+            Some(spoken) => self.said(spoken).map(Line::Said),
             None => self.skipped().map(Line::Skipped),
         }
     }
 
-    fn said(self, author: Authorship) -> Option<Record> {
-        let text = self.message.map_or_else(Body::default, Message::body);
+    fn said(self, spoken: Spoken) -> Option<Record> {
         Some(Record {
             uuid: self.uuid?,
             parent: self.parent,
             session: self.session?,
             at: self.timestamp?,
-            author,
-            text,
+            author: spoken.author,
+            text: spoken.text,
         })
     }
 

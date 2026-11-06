@@ -36,6 +36,7 @@ struct Exchange<'said> {
 #[derive(Clone, Copy)]
 enum Turn {
     Said(Authorship, &'static str),
+    Acts,
     System,
 }
 
@@ -49,18 +50,24 @@ struct Say<'said> {
     uuid: &'said str,
     parent: Option<&'said str>,
     wire: Wire,
-    text: &'said str,
+    content: String,
 }
 
 impl<'said> Say<'said> {
     fn new(uuid: &'said str, parent: Option<&'said str>, author: Authorship, text: &'said str) -> Say<'said> {
-        Say { uuid, parent, wire: Wire::of(author), text }
+        Say { uuid, parent, wire: Wire::of(author), content: format!("{text:?}") }
     }
 
     fn turn(uuid: &'said str, parent: Option<&'said str>, turn: Turn) -> Say<'said> {
         match turn {
             Turn::Said(author, text) => Say::new(uuid, parent, author, text),
-            Turn::System => Say { uuid, parent, wire: Wire::SYSTEM, text: "" },
+            Turn::Acts => Say {
+                uuid,
+                parent,
+                wire: Wire::of(Authorship::Lead),
+                content: "[{\"type\":\"tool_use\",\"name\":\"Bash\"}]".to_owned(),
+            },
+            Turn::System => Say { uuid, parent, wire: Wire::SYSTEM, content: "\"\"".to_owned() },
         }
     }
 
@@ -68,8 +75,8 @@ impl<'said> Say<'said> {
         let Wire { kind, origin } = self.wire;
         let parent = self.parent.map_or_else(|| "null".to_owned(), |parent| format!("{parent:?}"));
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":{:?},\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":{:?}}}}}\n",
-            self.uuid, self.text
+            "{{\"type\":\"{kind}\",\"uuid\":{:?},\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":{}}}}}\n",
+            self.uuid, self.content
         )
     }
 }
@@ -252,6 +259,7 @@ laws::table!(
             => ["m1 replies-to m0", "m3 replies-to m1", "m4 replies-to m3"],
         [ASKS, Turn::System, ANSWERS][..]
             => ["m2 replies-to m0", "m2#0 answers m0#0", "m2#1 answers m0#1"],
+        [OWNER, Turn::Acts, LEAD][..] => ["m2 replies-to m0"],
         [LEAD][..] => Vec::<String>::new(),
     ]
 );
