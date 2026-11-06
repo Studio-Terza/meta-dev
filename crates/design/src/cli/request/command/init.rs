@@ -28,8 +28,9 @@ struct Rooted {
 }
 
 impl Init {
-    pub fn new(project: Project, consumes: Option<Project>) -> Init {
-        Init { project, consumes }
+    pub fn new(project: Project, consumes: Option<Project>) -> Result<Init, Failure> {
+        let itself = consumes.iter().find(|consumed| **consumed == project).cloned();
+        itself.map(Failure::SelfConsuming).map_or(Ok(Init { project, consumes }), Err)
     }
 
     pub fn planted<F: Files, S: Store>(self, ground: &Ground<'_, F, S>) -> Result<Initialised, Failure> {

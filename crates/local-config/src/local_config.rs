@@ -5,7 +5,7 @@ use design_model::Project;
 use file_ports::{Bytes, Files, Kind};
 use serde::{Deserialize, Serialize};
 
-use crate::{ConfigFailure, Keeping, Kept};
+use crate::{ConfigFailure, Kept};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -33,13 +33,25 @@ impl LocalConfig {
         LocalConfig { project, workspace }
     }
 
-    pub fn kept(&self, files: &impl Files, repo: &Path, keeping: Keeping) -> Result<Kept, ConfigFailure> {
-        Self::found(files, &repo.join(Self::META).join(Self::FILE))?
-            .map_or_else(|| keeping.settled(self, files, &repo.join(Self::META)), |found| self.compared(found))
+    #[must_use]
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
     }
 
-    fn found(files: &impl Files, path: &Path) -> Result<Option<LocalConfig>, ConfigFailure> {
-        match files.kind(path) {
+    pub fn kept(&self, files: &impl Files, repo: &Path) -> Result<Kept, ConfigFailure> {
+        Self::found(files, repo)?.map_or_else(
+            || self.written(files, &repo.join(Self::META)).map(|_written| Kept::Written),
+            |found| self.compared(found),
+        )
+    }
+
+    pub fn found(files: &impl Files, repo: &Path) -> Result<Option<LocalConfig>, ConfigFailure> {
+        let path = repo.join(Self::META).join(Self::FILE);
+        Self::read(files, &path, files.kind(&path))
+    }
+
+    fn read(files: &impl Files, path: &Path, kind: Kind) -> Result<Option<LocalConfig>, ConfigFailure> {
+        match kind {
             Kind::Missing => Ok(None),
             Kind::File | Kind::Directory | Kind::Link => Ok(Some(files.read_text(path)?.as_ref().parse()?)),
         }
@@ -51,7 +63,7 @@ impl LocalConfig {
             .ok_or(ConfigFailure::Elsewhere { project: found.project, workspace: found.workspace })
     }
 
-    pub(crate) fn written(&self, files: &impl Files, meta: &Path) -> Result<PathBuf, ConfigFailure> {
+    fn written(&self, files: &impl Files, meta: &Path) -> Result<PathBuf, ConfigFailure> {
         let path = meta.join(Self::FILE);
         files.create_directories(meta)?;
         files.write(&meta.join(Self::IGNORE), Bytes::new(Self::IGNORED.to_vec()))?;

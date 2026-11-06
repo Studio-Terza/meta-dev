@@ -5,8 +5,4 @@ use strum::VariantArray;
 pub enum Facet {
     #[name("project")]
     Project,
-    #[name("domain")]
-    Domain,
-    #[name("element")]
-    Element,
 }

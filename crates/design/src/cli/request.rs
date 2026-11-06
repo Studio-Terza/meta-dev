@@ -2,6 +2,7 @@ mod command;
 mod ground;
 mod persistence;
 mod projects;
+mod token;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,8 @@ use std::str::FromStr;
 use console_ports::Environment;
 use design_model::Project;
 use design_store::Scope;
+use file_ports::Files;
+use store_ports::Sqlite;
 
 use super::failure::Failure;
 use command::Command;
@@ -17,20 +20,19 @@ pub use ground::Ground;
 use persistence::Persistence;
 use projects::Located;
 use projects::Projects;
+pub use token::Token;
 
 #[derive(Debug)]
 pub struct Request {
     command: Command,
     workspace: Option<PathBuf>,
-    persistence: Persistence,
 }
 
 #[derive(Debug, Default)]
 struct Words {
-    plain: Vec<OsString>,
+    spoken: Vec<Token>,
     workspace: Option<PathBuf>,
     consumes: Option<OsString>,
-    persistence: Persistence,
     scope: Scope,
     expecting: Expecting,
 }
@@ -98,13 +100,6 @@ impl Argument {
         }
     }
 
-    fn persistence(&self, current: Persistence) -> Persistence {
-        match self {
-            Argument::DryRun => Persistence::DryRun,
-            Argument::Workspace | Argument::All | Argument::Consumes | Argument::Plain(_) => current,
-        }
-    }
-
     fn scope(&self, current: Scope) -> Scope {
         match self {
             Argument::All => Scope::Everyone,
@@ -112,10 +107,11 @@ impl Argument {
         }
     }
 
-    fn plain(self) -> Option<OsString> {
+    fn token(self) -> Option<Token> {
         match self {
-            Argument::Workspace | Argument::DryRun | Argument::All | Argument::Consumes => None,
-            Argument::Plain(word) => Some(word),
+            Argument::Workspace | Argument::All | Argument::Consumes => None,
+            Argument::DryRun => Some(Token::Persisted(Persistence::DryRun)),
+            Argument::Plain(word) => Some(Token::Word(word)),
         }
     }
 }
@@ -136,9 +132,8 @@ impl Words {
     fn worded(self, argument: Argument) -> Words {
         Words {
             expecting: argument.expectation(),
-            persistence: argument.persistence(self.persistence),
             scope: argument.scope(self.scope),
-            plain: self.plain.into_iter().chain(argument.plain()).collect(),
+            spoken: self.spoken.into_iter().chain(argument.token()).collect(),
             ..self
         }
     }
@@ -156,8 +151,8 @@ impl TryFrom<Words> for Request {
     fn try_from(words: Words) -> Result<Request, Failure> {
         match words.expecting {
             Expecting::Path | Expecting::Project => Err(Failure::Usage),
-            Expecting::Word => Command::spoken(&words.plain, words.scope, Words::consumed(words.consumes)?)
-                .map(|command| Request { command, workspace: words.workspace, persistence: words.persistence }),
+            Expecting::Word => Command::spoken(&words.spoken, words.scope, Words::consumed(words.consumes)?)
+                .map(|command| Request { command, workspace: words.workspace }),
         }
     }
 }
@@ -167,8 +162,12 @@ impl Request {
         Request::try_from(arguments.fold(Words::default(), Words::taking))
     }
 
-    pub fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
-        Projects::located(environment, self.workspace.as_deref().map(Path::new), self.persistence)
+    pub fn located(&self, environment: &impl Environment, files: &impl Files) -> Result<Located, Failure> {
+        Projects::located(environment, files, self.workspace.as_deref().map(Path::new))
+    }
+
+    pub fn opened(&self, located: &Located, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+        self.command.opened(located.store(), opened)
     }
 
     pub fn command(self) -> Command {

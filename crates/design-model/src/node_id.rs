@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::NodeId;
+pub use boundary::{NodeId, Unnumbered};

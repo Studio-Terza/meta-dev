@@ -257,7 +257,6 @@ dependencies = [
  "port-core",
  "store-ports",
  "stream",
- "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -283,13 +282,11 @@ dependencies = [
  "design-model",
  "file-ports",
  "grammar",
- "laws",
  "newtype",
  "port-core",
  "sqlx",
  "store-ports",
  "stream",
- "strum",
  "transcript-ports",
 ]
 

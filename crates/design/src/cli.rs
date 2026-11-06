@@ -47,8 +47,8 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
         O: FnOnce(PathBuf) -> Sqlite,
     {
         let request = Request::parsed(arguments)?;
-        let located = request.located(self.environment)?;
-        let store = run.port(located.store(self.opened));
+        let located = request.located(self.environment, &self.files)?;
+        let store = run.port(request.opened(&located, self.opened));
         request.command().written(Ground::new(run, self.files, located, &store), out)
     }
 }

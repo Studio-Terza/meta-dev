@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use design_model::{NodeId, Project, Unnamed};
+use design_model::{NodeId, Project, Unnamed, Unnumbered};
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use port_core::{ReleaseFailures, Snapshot};
@@ -15,9 +15,11 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] [--dry-run] (ingest | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>])"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>])"
     )]
     Usage,
+    #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
+    SelfConsuming(Project),
     #[error("the environment does not name {0:?}")]
     Unset(OsString),
     #[error("the workspace path {0:?} is not text")]
@@ -32,6 +34,8 @@ pub enum Failure {
     Missing(Uuid),
     #[error("{0}")]
     Project(#[from] Unnamed),
+    #[error("{0}")]
+    Unnumbered(#[from] Unnumbered),
     #[error("no node {} in the design store", Id::from(*.0))]
     Unplaced(NodeId),
     #[error("no project {0} in the design store; run design init {0} in its repository first")]

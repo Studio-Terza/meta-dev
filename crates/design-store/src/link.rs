@@ -12,12 +12,12 @@ impl Link {
     }
 
     #[must_use]
-    pub fn relation(&self) -> NodeRelation {
+    pub fn relation(self) -> NodeRelation {
         self.relation
     }
 
     #[must_use]
-    pub fn target(&self) -> NodeId {
+    pub fn target(self) -> NodeId {
         self.target
     }
 }

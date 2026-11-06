@@ -1,6 +1,6 @@
 use design_model::Project;
 use file_ports::Files;
-use local_config::{Kept, LocalConfig};
+use local_config::Kept;
 use port_core::{Port, Run};
 use store_ports::Store;
 use transcript_ports::ClaudeCodeDir;
@@ -30,10 +30,6 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
     }
 
     pub fn configured(&self, project: Project) -> Result<Kept, Failure> {
-        Ok(LocalConfig::new(project, self.located.workspace()).kept(
-            &self.files,
-            self.located.repo(),
-            self.located.keeping(),
-        )?)
+        Ok(self.located.configured(project).kept(&self.files, self.located.repo())?)
     }
 }

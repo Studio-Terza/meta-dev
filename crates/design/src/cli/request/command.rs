@@ -4,17 +4,18 @@ mod printed;
 mod search;
 mod subject;
 
-use std::ffi::OsString;
 use std::io::Write;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use design_model::Project;
 use design_store::Scope;
 use file_ports::Files;
 use grammar::search::Terms;
-use store_ports::Store;
+use store_ports::{Sqlite, Store};
 
-use super::Ground;
+use super::persistence::Persistence;
+use super::{Ground, Token};
 use crate::Outcome;
 use crate::cli::failure::Failure;
 use ingest::Ingest;
@@ -25,7 +26,7 @@ use subject::Subject;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
-    Ingest,
+    Ingest(Persistence),
     Show(Subject),
     Search(Terms, Scope),
     Init(Init),
@@ -51,39 +52,40 @@ impl Verb {
     const NAMED: [(&'static str, Verb); 4] =
         [("ingest", Verb::Ingest), ("show", Verb::Show), ("search", Verb::Search), ("init", Verb::Init)];
 
-    fn command(self, rest: &[OsString], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
+    fn command(self, rest: &[Token], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
         match self {
-            Verb::Ingest => Ok(Command::Ingest),
-            Verb::Show => rest
-                .first()
-                .and_then(|word| word.to_str())
-                .ok_or(Failure::Usage)
-                .map(|word| Command::Show(Subject::from(word))),
+            Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
+            Verb::Show => Token::only(rest).and_then(Subject::try_from).map(Command::Show),
             Verb::Search => rest
                 .iter()
-                .map(|word| word.to_str())
+                .map(Token::text)
                 .collect::<Option<Vec<&str>>>()
                 .and_then(Terms::lexed)
                 .ok_or(Failure::Usage)
                 .map(|terms| Command::Search(terms, scope)),
-            Verb::Init => rest
-                .first()
-                .and_then(|word| word.to_str())
-                .ok_or(Failure::Usage)
+            Verb::Init => Token::only(rest)
                 .and_then(|word| Ok(word.parse::<Project>()?))
-                .map(|project| Command::Init(Init::new(project, consumes))),
+                .and_then(|project| Init::new(project, consumes))
+                .map(Command::Init),
         }
     }
 }
 
 impl Command {
-    pub fn spoken(words: &[OsString], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
+    pub fn spoken(words: &[Token], scope: Scope, consumes: Option<Project>) -> Result<Command, Failure> {
         words
             .first()
-            .and_then(|word| word.to_str())
+            .and_then(Token::text)
             .ok_or(Failure::Usage)
             .and_then(str::parse::<Verb>)
             .and_then(|verb| verb.command(words.get(1..).unwrap_or_default(), scope, consumes))
+    }
+
+    pub fn opened(&self, path: PathBuf, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+        match self {
+            Command::Ingest(persistence) => persistence.opened(path, opened),
+            Command::Show(_) | Command::Search(..) | Command::Init(_) => opened(path),
+        }
     }
 
     pub fn written<F: Files, S: Store>(
@@ -92,7 +94,7 @@ impl Command {
         out: &mut impl Write,
     ) -> Result<Outcome, Failure> {
         match self {
-            Command::Ingest => Ingest::read(ground.store(), &ground.transcripts())
+            Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
                 .and_then(|tally| Printed::shown(out, &tally))
                 .map(|_printed| Outcome::Ingested),
             Command::Show(subject) => subject.shown(ground.store(), out).map(|_printed| Outcome::Shown),

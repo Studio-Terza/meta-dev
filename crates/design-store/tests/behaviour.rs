@@ -1,25 +1,17 @@
-use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use design_model::{Entered, Entry, Facet, Kin, NodeId, NodeRelation, Project, Provenance, Stage};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Project, Stage};
 use design_store::{
-    Linked, NewNode, Placed, ProjectRoot, Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage,
-    ShownNode, StreamSchema,
+    Linked, NewNode, ProjectRoot, Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage, ShownNode,
+    StreamSchema,
 };
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
-use laws::proptest::collection::vec;
-use laws::proptest::prelude::{Just, any, prop_assert_eq};
-use laws::proptest::sample::{Index, select};
-use laws::proptest::strategy::Strategy;
-use laws::proptest::test_runner::TestCaseError;
-use newtype::{Counter, Newtype};
+use newtype::Counter;
 use port_core::{Port, Run};
 use store_ports::{Sqlite, Store, Written};
 use stream::Stream;
-use strum::VariantArray;
 use transcript_ports::{Body, ClaudeCodeDir, Cursor, SessionId, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
@@ -199,123 +191,6 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-#[derive(Clone, Debug)]
-struct Dag {
-    facets: Vec<Facet>,
-    edges: Vec<Edge>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Edge {
-    child: usize,
-    parent: usize,
-}
-
-impl Dag {
-    fn any() -> impl Strategy<Value = Dag> {
-        vec((vec(any::<Index>(), 0..4), select(Facet::VARIANTS)), 1..16).prop_flat_map(|choices| {
-            let facets: Vec<Facet> = choices.iter().map(|(_parents, facet)| *facet).collect();
-            let edges: BTreeSet<Edge> = choices
-                .iter()
-                .enumerate()
-                .skip(1)
-                .flat_map(|(child, (parents, _facet))| {
-                    parents.iter().map(move |index| Edge { child, parent: index.index(child) })
-                })
-                .collect();
-            Just(edges.into_iter().collect::<Vec<Edge>>())
-                .prop_shuffle()
-                .prop_map(move |edges| Dag { facets: facets.clone(), edges })
-        })
-    }
-
-    fn id(node: usize) -> NodeId {
-        NodeId::new(i64::try_from(node).unwrap_or(i64::MAX).saturating_add(1))
-    }
-
-    fn node(facet: Facet) -> Result<NewNode, Box<dyn Error>> {
-        Ok(NewNode::from(Entry::new("p".parse()?, facet, Stage::Vague, Provenance::from(Entered::Init))))
-    }
-
-    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
-        let nodes = self
-            .facets
-            .iter()
-            .map(|facet| Ok(store.write(Dag::node(*facet)?)?))
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
-        let links = self
-            .edges
-            .iter()
-            .map(|edge| {
-                Ok(store.write(Linked::new(Dag::id(edge.child), NodeRelation::Refines, Dag::id(edge.parent)))?)
-            })
-            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
-        Ok(Written::total(nodes.into_iter().chain(links)))
-    }
-
-    fn parents(&self, node: usize) -> impl Iterator<Item = usize> + '_ {
-        self.edges.iter().filter(move |edge| edge.child == node).map(|edge| edge.parent)
-    }
-
-    fn ancestors(&self, node: usize) -> Vec<NodeId> {
-        let levels = std::iter::successors(Some(BTreeSet::from([node])), |frontier| {
-            Some(frontier.iter().flat_map(|below| self.parents(*below)).collect::<BTreeSet<usize>>())
-        })
-        .take(self.facets.len());
-        let depths = levels
-            .enumerate()
-            .skip(1)
-            .flat_map(|(depth, level)| level.into_iter().map(move |above| (above, depth)))
-            .fold(BTreeMap::new(), |mut depths, (above, depth)| {
-                depths.entry(above).or_insert(depth);
-                depths
-            });
-        let ordered: BTreeSet<(Reverse<usize>, usize)> =
-            depths.into_iter().map(|(above, depth)| (Reverse(depth), above)).collect();
-        ordered.into_iter().map(|(_depth, above)| Dag::id(above)).collect()
-    }
-
-    fn children(&self, node: usize) -> Vec<NodeId> {
-        self.edges
-            .iter()
-            .filter(|edge| edge.parent == node)
-            .map(|edge| edge.child)
-            .collect::<BTreeSet<usize>>()
-            .into_iter()
-            .map(Dag::id)
-            .collect()
-    }
-}
-
-struct Ids;
-
-impl Ids {
-    fn kin(placed: &Placed, kin: Kin) -> Vec<NodeId> {
-        placed
-            .relatives()
-            .iter()
-            .filter(|relative| relative.kin() == kin)
-            .map(|relative| relative.node().identity())
-            .collect()
-    }
-}
-
-laws::law!(the_closure_holds_exactly_the_transitive_refinements, Dag::any(), dag, {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    dag.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    (0..dag.facets.len()).try_for_each(|node| {
-        let placed = store
-            .read(ShownNode::from(Dag::id(node)))
-            .map_err(|failure| TestCaseError::fail(failure.to_string()))?
-            .ok_or_else(|| TestCaseError::fail("a planted node is not shown"))?;
-        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), dag.ancestors(node));
-        prop_assert_eq!(Ids::kin(&placed, Kin::Child), dag.children(node));
-        prop_assert_eq!(placed.node().entry().facet(), dag.facets.get(node).copied().unwrap_or(Facet::Project));
-        Ok(())
-    })?;
-});
-
 struct Projects;
 
 impl Projects {
@@ -326,32 +201,19 @@ impl Projects {
     }
 }
 
-laws::law!(
-    a_project_root_is_found_by_its_project_alone,
-    select(Facet::VARIANTS).prop_filter("a facet other than a project root", |facet| *facet != Facet::Project),
-    facet,
-    {
-        let found = Projects::alone(facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-        prop_assert_eq!(found, [Some(NodeId::new(3)), None]);
-    }
-);
-
-impl Projects {
-    fn alone(facet: Facet) -> Result<[Option<NodeId>; 2], Box<dyn Error>> {
-        let run = Run::root();
-        let store = run.port(Sqlite::in_memory::<StreamSchema>());
-        Projects::rooted(&store, "q")?;
-        store.write(Dag::node(facet)?)?;
-        store.write(NewNode::from(Entry::new("p".parse()?, Facet::Project, Stage::Vague, Entered::Init.into())))?;
-        Ok([
-            store.read(ProjectRoot::from("p".parse::<Project>()?))?,
-            store.read(ProjectRoot::from("r".parse::<Project>()?))?,
-        ])
-    }
+#[test]
+fn a_project_root_is_found_by_its_project_alone() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    Projects::rooted(&store, "q")?;
+    let rooted = Projects::rooted(&store, "p")?;
+    assert_eq!(rooted, NodeId::new(2));
+    assert_eq!(store.read(ProjectRoot::from("r".parse::<Project>()?))?, None);
+    Ok(())
 }
 
 #[test]
-fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<(), Box<dyn Error>> {
+fn a_consumes_link_is_listed_from_its_source_only() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let eater = Projects::rooted(&store, "p")?;
@@ -361,8 +223,8 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
     let links: Vec<(NodeRelation, NodeId)> =
         shown.links().iter().map(|link| (link.relation(), link.target())).collect();
     assert_eq!(links, [(NodeRelation::Consumes, consumed)]);
-    assert_eq!(Ids::kin(&shown, Kin::Ancestor), []);
-    assert_eq!(Ids::kin(&store.read(ShownNode::from(consumed))?.ok_or("no consumed shown")?, Kin::Child), []);
+    assert_eq!(shown.node().identity(), eater);
+    assert_eq!(store.read(ShownNode::from(consumed))?.ok_or("no consumed shown")?.links(), []);
     Ok(())
 }
 
@@ -370,24 +232,12 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
 fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let parent = Projects::rooted(&store, "p")?;
-    store.write(Dag::node(Facet::Project)?)?;
-    let child = NodeId::new(parent.into_inner().saturating_add(1));
-    let first = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
-    let second = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
+    let eater = Projects::rooted(&store, "p")?;
+    let consumed = Projects::rooted(&store, "q")?;
+    let first = store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    let second = store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
     assert!(first > Written::zero());
     assert_eq!(second, Written::zero());
-    Ok(())
-}
-
-#[test]
-fn a_shortcut_refinement_is_listed_as_a_child() -> Result<(), Box<dyn Error>> {
-    let run = Run::root();
-    let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    let edges = [(1, 0), (2, 1), (2, 0)].map(|(child, parent)| Edge { child, parent });
-    Dag { facets: vec![Facet::Project; 3], edges: edges.to_vec() }.planted(&store)?;
-    let shown = store.read(ShownNode::from(Dag::id(0)))?.ok_or("no root shown")?;
-    assert_eq!(Ids::kin(&shown, Kin::Child), [Dag::id(1), Dag::id(2)]);
     Ok(())
 }
 

@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::Ids;
+pub use boundary::{Ids, Spelled};

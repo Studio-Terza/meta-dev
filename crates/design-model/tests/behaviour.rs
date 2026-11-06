@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use design_model::{Entered, Facet, Kin, NodeId, NodeRelation, Project, Provenance, Stage};
+use design_model::{Entered, Facet, NodeId, NodeRelation, Project, Provenance, Stage};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::strategy::Strategy;
 use strum::VariantArray;
@@ -52,12 +52,6 @@ fn every_stage_is_displayed_as_its_name_and_parsed_back_from_it() {
 fn every_node_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
     assert_eq!(Names::unparsed(NodeRelation::name), []);
     assert_eq!(Names::undisplayed(NodeRelation::name), []);
-}
-
-#[test]
-fn every_kin_is_displayed_as_its_name_and_parsed_back_from_it() {
-    assert_eq!(Names::unparsed(Kin::name), []);
-    assert_eq!(Names::undisplayed(Kin::name), []);
 }
 
 #[test]

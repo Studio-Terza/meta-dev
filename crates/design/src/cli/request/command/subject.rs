@@ -18,9 +18,13 @@ pub enum Subject {
     Message(Uuid),
 }
 
-impl From<&str> for Subject {
-    fn from(word: &str) -> Subject {
-        word.parse::<NodeId>().map_or_else(|_unnumbered| Subject::Message(Uuid::new(word.to_owned())), Subject::Node)
+impl TryFrom<&str> for Subject {
+    type Error = Failure;
+
+    fn try_from(word: &str) -> Result<Subject, Failure> {
+        word.parse::<NodeId>()
+            .map(Subject::Node)
+            .or_else(|unnumbered| Ok(Subject::Message(Uuid::new(unnumbered.unspelled()?))))
     }
 }
 

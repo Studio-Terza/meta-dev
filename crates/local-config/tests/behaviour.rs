@@ -6,7 +6,7 @@ use file_ports::{Files, Memory};
 use laws::proptest::prelude::{any, prop_assert, prop_assert_eq};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
-use local_config::{ConfigFailure, Keeping, Kept, LocalConfig};
+use local_config::{ConfigFailure, Kept, LocalConfig};
 
 const REPO: &str = "/repo";
 
@@ -30,7 +30,7 @@ impl Configs {
     }
 
     fn kept(config: &LocalConfig, memory: &Memory) -> Result<Kept, TestCaseError> {
-        config.kept(memory, Path::new(REPO), Keeping::Write).map_err(|failure| TestCaseError::fail(failure.to_string()))
+        config.kept(memory, Path::new(REPO)).map_err(|failure| TestCaseError::fail(failure.to_string()))
     }
 }
 
@@ -38,6 +38,20 @@ laws::law!(a_kept_config_reads_back_as_itself, Configs::any(), config, {
     let memory = Memory::default();
     prop_assert_eq!(Configs::kept(&config, &memory)?, Kept::Written);
     prop_assert_eq!(Configs::stored(&memory)?, config);
+});
+
+laws::law!(a_kept_config_is_found_at_its_repository_and_nowhere_else, Configs::any(), config, {
+    let memory = Memory::default();
+    let before =
+        LocalConfig::found(&memory, Path::new(REPO)).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(before, None);
+    Configs::kept(&config, &memory)?;
+    let found =
+        LocalConfig::found(&memory, Path::new(REPO)).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(found, Some(config));
+    let elsewhere = LocalConfig::found(&memory, &Path::new(REPO).join("sub"))
+        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    prop_assert_eq!(elsewhere, None);
 });
 
 laws::law!(keeping_the_same_config_twice_changes_nothing, Configs::any(), config, {
@@ -53,7 +67,7 @@ laws::law!(a_repository_kept_for_one_project_refuses_another, (Configs::any(), C
     let memory = Memory::default();
     Configs::kept(&config, &memory)?;
     let moved = LocalConfig::new(other, PathBuf::from("/elsewhere"));
-    let refused = moved.kept(&memory, Path::new(REPO), Keeping::Write);
+    let refused = moved.kept(&memory, Path::new(REPO));
     let elsewhere = matches!(refused, Err(ConfigFailure::Elsewhere { .. }));
     prop_assert!(elsewhere);
     prop_assert_eq!(Configs::stored(&memory)?, config);
@@ -62,7 +76,7 @@ laws::law!(a_repository_kept_for_one_project_refuses_another, (Configs::any(), C
 #[test]
 fn a_kept_config_leaves_the_meta_directory_ignored_by_git() -> Result<(), Box<dyn Error>> {
     let memory = Memory::default();
-    LocalConfig::new("demo".parse()?, PathBuf::from("/ws")).kept(&memory, Path::new(REPO), Keeping::Write)?;
+    LocalConfig::new("demo".parse()?, PathBuf::from("/ws")).kept(&memory, Path::new(REPO))?;
     assert!(memory.read(&Path::new(REPO).join(".meta/.gitignore")).is_ok());
     Ok(())
 }

@@ -20,10 +20,6 @@ impl fmt::Display for Neighbourhood {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(formatter, "{}", Line::from(self.0.node()))?;
         self.0
-            .relatives()
-            .iter()
-            .try_for_each(|relative| writeln!(formatter, "  {} {}", relative.kin(), Line::from(relative.node())))?;
-        self.0
             .links()
             .iter()
             .try_for_each(|link| writeln!(formatter, "  {} {}", link.relation(), Id::from(link.target())))

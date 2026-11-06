@@ -14,12 +14,3 @@ CREATE TABLE node_edges (
     target INTEGER NOT NULL REFERENCES nodes (id),
     PRIMARY KEY (source, relation, target)
 ) STRICT;
-
-CREATE TABLE closure (
-    ancestor INTEGER NOT NULL REFERENCES nodes (id),
-    descendant INTEGER NOT NULL REFERENCES nodes (id),
-    depth INTEGER NOT NULL,
-    PRIMARY KEY (ancestor, descendant)
-) STRICT;
-
-CREATE INDEX closure_by_descendant ON closure (descendant, depth);

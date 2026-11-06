@@ -23,9 +23,5 @@ store-ports = { path = "../store-ports" }
 stream = { path = "../stream" }
 transcript-ports = { path = "../transcript-ports" }
 
-[dev-dependencies]
-laws = { path = "../laws" }
-strum.workspace = true
-
 [lints]
 workspace = true

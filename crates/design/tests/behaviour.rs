@@ -6,17 +6,12 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
-use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Stage};
-use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
+use design_store::{ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
-use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
-use local_config::{ConfigFailure, Keeping, LocalConfig};
-use newtype::Counter;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Busy, Sqlite, Store, Written};
-use strum::VariantArray;
+use store_ports::{Busy, Sqlite, Store};
 use transcript_ports::Uuid;
 
 const HOME: &str = "/home/tester";
@@ -198,7 +193,11 @@ struct Invocation;
 
 impl Invocation {
     fn environment() -> Variables {
-        [("HOME", HOME), ("PWD", "/work")]
+        Invocation::at("/work")
+    }
+
+    fn at(directory: &str) -> Variables {
+        [("HOME", HOME), ("PWD", directory)]
             .map(|(name, value)| (OsString::from(name), OsString::from(value)))
             .into_iter()
             .collect()
@@ -390,10 +389,14 @@ struct Opened {
 
 impl Opened {
     fn by(arguments: &[&str]) -> Result<Opened, Failure> {
+        Opened::from("/work", Session::typical().files(), arguments)
+    }
+
+    fn from(directory: &str, files: impl Files, arguments: &[&str]) -> Result<Opened, Failure> {
         let opened = Mutex::new(Vec::new());
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Invocation::environment(), Session::typical().files(), |path: PathBuf| {
+        Cli::new(&Invocation::at(directory), files, |path: PathBuf| {
             opened.lock().map(|mut paths| paths.push(path)).ok();
             Sqlite::in_memory::<StreamSchema>()
         })
@@ -605,22 +608,6 @@ impl Graph {
     fn shown(store: &Sqlite, node: &str) -> Result<String, Failure> {
         Invocation::against(store, &Session::typical(), &["show", node])
     }
-
-    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<Written, Failure> {
-        let run = Run::root();
-        let port = run.port(store.clone());
-        let written = (2_i64..)
-            .zip(parents)
-            .map(|(child, parent)| {
-                let entry = Entry::new("demo".parse()?, facet, Stage::Vague, Entered::Init.into());
-                let planted = port.write(NewNode::from(entry))?;
-                let linked =
-                    port.write(Linked::new(NodeId::new(child), NodeRelation::Refines, NodeId::new(*parent)))?;
-                Ok(planted.plus(linked))
-            })
-            .collect::<Result<Vec<Written>, Failure>>()?;
-        Ok(Written::total(written.into_iter()))
-    }
 }
 
 #[test]
@@ -658,7 +645,7 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
     let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
     assert!(consuming.contains("consumes n1 project meta-dev"));
-    assert!(Graph::shown(&store, "n2")?.contains("  consumes n1"));
+    assert!(Graph::shown(&store, "n2")?.contains("n2 demo project vague entered init\n  consumes n1\n"));
     assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
     Ok(())
 }
@@ -671,60 +658,91 @@ fn init_consuming_a_project_without_a_root_fails_and_plants_nothing() {
 }
 
 #[test]
+fn init_refuses_a_project_consuming_itself_and_plants_nothing() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Graph::init(&store, &["demo"])?;
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes", "demo"]), Err(Failure::SelfConsuming(_))));
+    assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_misnumbered_node_id_is_refused_as_a_node_id_not_looked_up_as_a_message() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::shown(&store, "n001"), Err(Failure::Unnumbered(_))));
+    assert!(matches!(Graph::shown(&store, "n99999999999999999999"), Err(Failure::Unnumbered(_))));
+}
+
+#[test]
+fn only_ingest_has_a_dry_run() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let refused = [
+        Graph::init(&store, &["demo", "--dry-run"]),
+        Graph::shown(&store, "--dry-run"),
+        Invocation::against(&store, &Session::typical(), &["show", "o1", "--dry-run"]),
+        Invocation::against(&store, &Session::typical(), &["search", "thanks", "--dry-run"]),
+        Invocation::against(&store, &Session::typical(), &["--dry-run", "ingest"]),
+        Invocation::against(&store, &Session::typical(), &["ingest", "--dry-run", "--dry-run"]),
+    ];
+    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+}
+
+#[test]
 fn init_without_a_project_or_a_consumed_name_is_a_usage_failure() {
     let store = Sqlite::in_memory::<StreamSchema>();
     assert!(matches!(Graph::init(&store, &[]), Err(Failure::Usage)));
     assert!(matches!(Graph::init(&store, &["demo", "--consumes"]), Err(Failure::Usage)));
 }
 
-laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
-    let store = Sqlite::in_memory::<StreamSchema>();
-    let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let wanted = [
-        format!("n3 demo {facet} vague entered init"),
-        "  ancestor n1 demo project vague entered init".to_owned(),
-        format!("  ancestor n2 demo {facet} vague entered init"),
-        format!("  child n5 demo {facet} vague entered init"),
-        "  refines n2".to_owned(),
-    ];
-    let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
-    prop_assert_eq!(missing, Vec::<&String>::new());
-    prop_assert_eq!(shown.matches("  child ").count(), 1);
-    prop_assert_eq!(shown.matches("  ancestor ").count(), 2);
-});
-
-impl Graph {
-    fn planted(store: &Sqlite, facet: Facet) -> Result<String, Failure> {
-        Graph::init(store, &["demo"])?;
-        Graph::refined(store, facet, &[1, 2, 2, 3])?;
-        Graph::shown(store, "n3")
-    }
-}
-
-#[test]
-fn init_keeps_a_repository_configured_for_the_same_workspace_and_refuses_another() -> Result<(), Failure> {
-    let configured = || -> Result<Memory, Failure> {
-        let files = Session::typical().files();
-        LocalConfig::new("demo".parse()?, PathBuf::from("/work")).kept(&files, Path::new("/work"), Keeping::Write)?;
-        Ok(files)
-    };
-    let store = Sqlite::in_memory::<StreamSchema>();
-    Invocation::within(&store, configured()?, &["init", "demo"])?;
-    let moved = Invocation::within(&store, configured()?, &["init", "demo", "--workspace", "/elsewhere"]);
-    assert!(matches!(moved, Err(Failure::Config(ConfigFailure::Elsewhere { .. }))));
-    Ok(())
-}
-
-#[test]
-fn a_dry_run_init_leaves_the_repository_without_a_meta_directory() -> Result<(), Failure> {
-    let files = Session::typical().files();
-    Invocation::within(&Sqlite::in_memory::<StreamSchema>(), FakeLent::new(&files), &["--dry-run", "init", "demo"])?;
-    assert_eq!(files.kind(Path::new("/work/.meta")), Kind::Missing);
-    Ok(())
-}
-
 #[test]
 fn show_of_an_unknown_node_fails_naming_it() {
     let store = Sqlite::in_memory::<StreamSchema>();
     assert!(matches!(Graph::shown(&store, "n7"), Err(Failure::Unplaced(_))));
+}
+
+struct Repository {
+    files: Memory,
+}
+
+impl Repository {
+    fn at(root: &str) -> Repository {
+        let files = Session::typical().files();
+        files.create_directories(&Path::new(root).join(".git")).ok();
+        Repository { files }
+    }
+
+    fn opened(&self, directory: &str, arguments: &[&str]) -> Result<Vec<PathBuf>, TestCaseError> {
+        Opened::from(directory, FakeLent::new(&self.files), arguments)
+            .map(|opened| opened.paths)
+            .map_err(|failure| TestCaseError::fail(failure.to_string()))
+    }
+}
+
+laws::law!(
+    init_from_a_subdirectory_records_the_workspace_at_the_repository_root,
+    "[a-z]{1,6}(/[a-z]{1,6}){0,2}",
+    below,
+    {
+        let repository = Repository::at("/work");
+        let inside = format!("/work/{below}");
+        repository.opened(&inside, &["init", "demo", "--workspace", "/ws"])?;
+        prop_assert_eq!(repository.files.kind(Path::new("/work/.meta/local.toml")), Kind::File);
+        prop_assert_eq!(repository.files.kind(&Path::new(&inside).join(".meta")), Kind::Missing);
+        prop_assert_eq!(repository.opened(&inside, &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+        prop_assert_eq!(repository.opened("/work", &["search", "thanks"])?, [PathBuf::from("/ws/.meta/design.sqlite")]);
+    }
+);
+
+laws::law!(the_workspace_flag_overrides_the_recorded_workspace, "/[a-z]{1,6}", flagged, {
+    let repository = Repository::at("/work");
+    repository.opened("/work", &["init", "demo", "--workspace", "/ws"])?;
+    let opened = repository.opened("/work", &["search", "thanks", "--workspace", &flagged])?;
+    prop_assert_eq!(opened, [Path::new(&flagged).join(".meta/design.sqlite")]);
+});
+
+#[test]
+fn without_a_repository_or_a_recorded_workspace_the_working_directory_is_the_workspace() -> Result<(), Failure> {
+    let opened = Opened::from("/work/sub", Session::typical().files(), &["search", "thanks"])?;
+    assert_eq!(opened.paths, [PathBuf::from("/work/sub/.meta/design.sqlite")]);
+    Ok(())
 }
