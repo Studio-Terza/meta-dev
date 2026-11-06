@@ -4,7 +4,7 @@ use crate::boundary::ItemId;
 use crate::item_path::ItemPath;
 use crate::primitive::Primitive;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Resolved {
     Std(ItemPath),
     Crate(ItemId),

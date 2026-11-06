@@ -72,7 +72,6 @@ impl InScope {
             Type::Path(path) => self.type_path_lowered(path),
             Type::Tuple(tuple) => TypeRef::Tuple(tuple.elems.iter().map(|element| self.lowered(element)).collect()),
             Type::Paren(inner) => self.lowered(&inner.elem),
-            Type::Group(inner) => self.lowered(&inner.elem),
             _ => TypeRef::Opaque,
         }
     }

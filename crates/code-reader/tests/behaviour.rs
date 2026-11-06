@@ -583,6 +583,22 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     PROJECTED => [TypeRef::Opaque],
 ]);
 
+const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";
+const PLAIN_PRIMITIVE: &str = "fn f() -> bool { true }\n";
+const PAREN_PATH: &str = "struct S;\nfn f() -> (S) { S }\n";
+const PLAIN_PATH: &str = "struct S;\nfn f() -> S { S }\n";
+const PAREN_GENERIC: &str = "fn f<T>() -> (Option<T>) { None }\n";
+const PLAIN_GENERIC: &str = "fn f<T>() -> Option<T> { None }\n";
+const PAREN_REFERENCE: &str = "fn f() -> (&'static str) { \"a\" }\n";
+const PLAIN_REFERENCE: &str = "fn f() -> &'static str { \"a\" }\n";
+
+laws::table!(a_parenthesised_output_reads_as_the_type_inside, |text: &&str| Read::outputs(text), [
+    PAREN_PRIMITIVE => Read::outputs(PLAIN_PRIMITIVE),
+    PAREN_PATH => Read::outputs(PLAIN_PATH),
+    PAREN_GENERIC => Read::outputs(PLAIN_GENERIC),
+    PAREN_REFERENCE => Read::outputs(PLAIN_REFERENCE),
+]);
+
 laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Read::expanded(text), [
     CRATE_ALIAS => [Expect::named(
         Expect::std(&["std", "result", "Result"]),

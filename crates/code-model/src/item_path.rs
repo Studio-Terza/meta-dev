@@ -1,6 +1,6 @@
 use lint_layout::{Name, Word};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ItemPath {
     segments: Vec<Name>,
 }
