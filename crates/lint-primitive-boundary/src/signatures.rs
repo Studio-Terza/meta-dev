@@ -14,9 +14,9 @@ struct Candidate {
 }
 
 #[derive(Debug)]
-struct Signed<'model> {
-    site: Site<'model>,
-    found: Vec<Violation<'model>>,
+struct Ranked<'model> {
+    row: Site<'model>,
+    violation: Violation<'model>,
 }
 
 #[derive(Debug)]
@@ -71,31 +71,31 @@ impl<'read, 'model> Signatures<'read, 'model> {
     pub fn found(&self, model: &'model Model) -> Vec<Violation<'model>> {
         let functions = model.functions().filter_map(|placed| {
             let function = self.scope.function(placed.entity());
-            function.map(|function| self.signed(placed.site(), function.as_ref(), function.signature().written()))
+            function.map(|function| self.ranked(placed.site(), function.as_ref(), function.signature().written()))
         });
         let holdings = model.holdings().filter_map(|placed| {
             let holding = self.scope.holding(placed.entity());
-            holding.map(|holding| self.signed(placed.site(), holding.as_ref(), [holding.as_ref()].into_iter()))
+            holding.map(|holding| self.ranked(placed.site(), holding.as_ref(), [holding.as_ref()].into_iter()))
         });
-        let mut signed: Vec<Signed<'model>> =
-            functions.chain(holdings).filter(|signed| signed.found.first().is_some()).collect();
-        signed.sort_by(|left, right| left.site.cmp(&right.site));
-        signed.into_iter().flat_map(|signed| signed.found).collect()
+        let mut ranked: Vec<Ranked<'model>> = functions.chain(holdings).flatten().collect();
+        ranked.sort_by(|left, right| left.row.cmp(&right.row));
+        ranked.into_iter().map(|ranked| ranked.violation).collect()
     }
 
-    fn signed<'ty>(
+    fn ranked<'ty>(
         &self,
         site: Site<'model>,
         context: &Name,
         types: impl Iterator<Item = &'ty TypeRef>,
-    ) -> Signed<'model> {
+    ) -> Vec<Ranked<'model>> {
         let mut walk = TypeWalk { lexicon: self.lexicon, scope: self.scope, file: site.path(), found: Vec::new() };
         types.for_each(|ty| ty.each_use(&mut walk));
-        let found = walk
-            .found
+        walk.found
             .into_iter()
-            .map(|found| Violation::new(Site::new(site.path(), found.line), found.identity.finding(context.clone())))
-            .collect();
-        Signed { site, found }
+            .map(|found| Ranked {
+                row: site,
+                violation: Violation::new(Site::new(site.path(), found.line), found.identity.finding(context.clone())),
+            })
+            .collect()
     }
 }
