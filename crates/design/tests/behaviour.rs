@@ -185,3 +185,8 @@ fn the_workspace_flag_picks_the_projects_directory() -> Result<(), Failure> {
 fn an_unknown_command_is_a_usage_failure() {
     assert!(matches!(Invocation::output(&Session::typical(), &["frobnicate"]), Err(Failure::Usage)));
 }
+
+#[test]
+fn a_workspace_flag_without_a_path_is_a_usage_failure() {
+    assert!(matches!(Invocation::output(&Session::typical(), &["ingest", "--workspace"]), Err(Failure::Usage)));
+}

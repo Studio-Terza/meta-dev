@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{Authorship, Body, Instant, Record, SessionId, Uuid};
+use crate::{Authorship, Body, Instant, Line, Record, SessionId, Skipped, Uuid};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -82,7 +82,7 @@ impl OriginKind {
 }
 
 impl Kind {
-    fn authorship(self, origin: Option<Origin>) -> Option<Authorship> {
+    fn authorship(self, origin: Option<&Origin>) -> Option<Authorship> {
         match self {
             Kind::Assistant => Some(Authorship::Lead),
             Kind::User => Some(origin.map_or(Authorship::Bystander, |found| found.kind.authorship())),
@@ -124,8 +124,14 @@ impl Message {
 }
 
 impl Entry {
-    pub fn record(self) -> Option<Record> {
-        let author = self.kind.authorship(self.origin)?;
+    pub fn line(self) -> Option<Line> {
+        match self.kind.authorship(self.origin.as_ref()) {
+            Some(author) => self.said(author).map(Line::Said),
+            None => self.skipped().map(Line::Skipped),
+        }
+    }
+
+    fn said(self, author: Authorship) -> Option<Record> {
         let text = self.message.map_or_else(Body::default, Message::body);
         Some(Record {
             uuid: self.uuid?,
@@ -135,5 +141,9 @@ impl Entry {
             author,
             text,
         })
+    }
+
+    fn skipped(self) -> Option<Skipped> {
+        self.uuid.map(|uuid| Skipped::new(uuid, self.parent))
     }
 }

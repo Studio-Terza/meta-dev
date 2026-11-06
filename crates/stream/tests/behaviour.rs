@@ -17,6 +17,8 @@ struct Wire {
 }
 
 impl Wire {
+    const SYSTEM: Wire = Wire { kind: "system", origin: "null" };
+
     fn of(author: Authorship) -> Wire {
         match author {
             Authorship::Owner => Wire { kind: "user", origin: "{\"kind\":\"human\"}" },
@@ -31,20 +33,39 @@ struct Exchange<'said> {
     replied: &'said str,
 }
 
+#[derive(Clone, Copy)]
+enum Turn {
+    Said(Authorship, &'static str),
+    System,
+}
+
+const OWNER: Turn = Turn::Said(Authorship::Owner, "words");
+const LEAD: Turn = Turn::Said(Authorship::Lead, "words");
+const BYSTANDER: Turn = Turn::Said(Authorship::Bystander, "words");
+const ASKS: Turn = Turn::Said(Authorship::Lead, "1. a\n2. b");
+const ANSWERS: Turn = Turn::Said(Authorship::Owner, "1. yes\n2. no");
+
 struct Say<'said> {
     uuid: &'said str,
     parent: Option<&'said str>,
-    author: Authorship,
+    wire: Wire,
     text: &'said str,
 }
 
 impl<'said> Say<'said> {
     fn new(uuid: &'said str, parent: Option<&'said str>, author: Authorship, text: &'said str) -> Say<'said> {
-        Say { uuid, parent, author, text }
+        Say { uuid, parent, wire: Wire::of(author), text }
+    }
+
+    fn turn(uuid: &'said str, parent: Option<&'said str>, turn: Turn) -> Say<'said> {
+        match turn {
+            Turn::Said(author, text) => Say::new(uuid, parent, author, text),
+            Turn::System => Say { uuid, parent, wire: Wire::SYSTEM, text: "" },
+        }
     }
 
     fn line(&self) -> String {
-        let Wire { kind, origin } = Wire::of(self.author);
+        let Wire { kind, origin } = self.wire;
         let parent = self.parent.map_or_else(|| "null".to_owned(), |parent| format!("{parent:?}"));
         format!(
             "{{\"type\":\"{kind}\",\"uuid\":{:?},\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":{:?}}}}}\n",
@@ -125,22 +146,20 @@ impl Cases {
         Fixture::related(Relation::Resends, &said)
     }
 
-    fn replies(chain: &[Authorship]) -> Vec<String> {
+    fn replies(chain: &[Turn]) -> Vec<String> {
         let ids: Vec<String> = (0..chain.len()).map(|position| format!("m{position}")).collect();
         let said: Vec<Say<'_>> = ids
             .iter()
             .zip(chain)
             .enumerate()
-            .map(|(position, (id, author))| {
-                Say::new(
-                    id,
-                    position.checked_sub(1).and_then(|before| ids.get(before)).map(String::as_str),
-                    *author,
-                    "words",
-                )
+            .map(|(position, (id, turn))| {
+                Say::turn(id, position.checked_sub(1).and_then(|before| ids.get(before)).map(String::as_str), *turn)
             })
             .collect();
-        Fixture::related(Relation::RepliesTo, &said)
+        [Relation::RepliesTo, Relation::Answers]
+            .into_iter()
+            .flat_map(|relation| Fixture::related(relation, &said))
+            .collect()
     }
 }
 
@@ -223,12 +242,14 @@ laws::table!(
 );
 
 laws::table!(
-    a_reply_skips_the_bystander_records_between,
+    a_reply_skips_the_bystander_and_system_records_between,
     Cases::replies,
     [
-        [Authorship::Owner, Authorship::Lead, Authorship::Bystander, Authorship::Lead, Authorship::Owner][..]
+        [OWNER, LEAD, BYSTANDER, LEAD, OWNER][..]
             => ["m1 replies-to m0", "m3 replies-to m1", "m4 replies-to m3"],
-        [Authorship::Lead][..] => Vec::<String>::new(),
+        [ASKS, Turn::System, ANSWERS][..]
+            => ["m2 replies-to m0", "m2#0 answers m0#0", "m2#1 answers m0#1"],
+        [LEAD][..] => Vec::<String>::new(),
     ]
 );
 

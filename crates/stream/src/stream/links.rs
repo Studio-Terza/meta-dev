@@ -4,7 +4,7 @@ mod resends;
 use std::collections::{BTreeMap, BTreeSet};
 
 use grammar::message::{Lexemes, Mark};
-use transcript_ports::{Authorship, Uuid};
+use transcript_ports::{Authorship, Skipped, Uuid};
 
 use crate::anchor::Anchor;
 use crate::segment::Segment;
@@ -15,11 +15,16 @@ use resends::Resends;
 pub struct Links<'stream> {
     messages: &'stream [Message],
     known: BTreeMap<&'stream Uuid, &'stream Message>,
+    skipped: BTreeMap<&'stream Uuid, &'stream Uuid>,
 }
 
 impl<'stream> Links<'stream> {
-    pub fn over(messages: &'stream [Message]) -> Links<'stream> {
-        Links { messages, known: messages.iter().map(|message| (message.record().uuid(), message)).collect() }
+    pub fn over(messages: &'stream [Message], skipped: &'stream [Skipped]) -> Links<'stream> {
+        Links {
+            messages,
+            known: messages.iter().map(|message| (message.record().uuid(), message)).collect(),
+            skipped: skipped.iter().filter_map(|line| line.parent().map(|parent| (line.uuid(), parent))).collect(),
+        }
     }
 
     pub fn all(&self) -> Vec<MechanicalLink> {
@@ -35,7 +40,9 @@ impl<'stream> Links<'stream> {
     }
 
     fn parent(&self, message: &Message) -> Option<&'stream Message> {
-        message.record().parent().and_then(|parent| self.known.get(parent).copied())
+        std::iter::successors(message.record().parent(), |uuid| self.skipped.get(*uuid).copied())
+            .take(self.skipped.len().saturating_add(1))
+            .find_map(|uuid| self.known.get(uuid).copied())
     }
 
     fn replies(&self) -> Vec<Reply<'stream>> {

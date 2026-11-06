@@ -1,10 +1,10 @@
 mod boundary;
 
-use crate::{Cursor, Record};
+use crate::{Cursor, Line};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Read {
-    records: Vec<Record>,
+    lines: Vec<Line>,
     cursor: Cursor,
 }
 
@@ -16,10 +16,10 @@ impl Read {
 }
 
 impl IntoIterator for Read {
-    type Item = Record;
-    type IntoIter = std::vec::IntoIter<Record>;
+    type Item = Line;
+    type IntoIter = std::vec::IntoIter<Line>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.records.into_iter()
+        self.lines.into_iter()
     }
 }

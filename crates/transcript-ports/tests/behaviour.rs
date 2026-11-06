@@ -6,7 +6,7 @@ use laws::proptest::prelude::prop_assert_eq;
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Rooting, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
-use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Instant, Read, Record, Session, Transcripts};
+use transcript_ports::{Authorship, ClaudeCodeDir, Cursor, Instant, Line, Read, Record, Session, Transcripts};
 
 const DIRECTORY: &str = "/projects/work";
 const SESSION: &str = "/projects/work/s1.jsonl";
@@ -39,6 +39,12 @@ impl Lines {
 
     fn notice(uuid: &str) -> String {
         Self::entry("user", uuid, "{\"kind\":\"task-notification\"}", "\"finished\"")
+    }
+
+    fn system(uuid: &str, parent: &str) -> String {
+        format!(
+            "{{\"type\":\"system\",\"subtype\":\"turn_duration\",\"uuid\":\"{uuid}\",\"parentUuid\":\"{parent}\",\"sessionId\":\"s1\"}}\n"
+        )
     }
 
     fn skipped() -> String {
@@ -98,8 +104,19 @@ impl Transcript {
 struct Views;
 
 impl Views {
+    fn records(read: Read) -> Vec<Record> {
+        read.into_iter().filter_map(Line::said).collect()
+    }
+
+    fn edges(read: Read) -> Vec<String> {
+        read.into_iter()
+            .filter_map(Line::skipped)
+            .filter_map(|skipped| skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid())))
+            .collect()
+    }
+
     fn authors(read: Read) -> Vec<Authorship> {
-        read.into_iter().map(|record| record.author()).collect()
+        Self::records(read).into_iter().map(|record| record.author()).collect()
     }
 
     fn uuids(records: &[Record]) -> Vec<String> {
@@ -107,7 +124,7 @@ impl Views {
     }
 
     fn texts(read: Read) -> Vec<String> {
-        read.into_iter().map(|record| record.text().to_string()).collect()
+        Self::records(read).into_iter().map(|record| record.text().to_string()).collect()
     }
 }
 
@@ -124,6 +141,14 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn a_line_that_is_not_a_message_yields_its_parent_edge() -> Result<(), Box<dyn Error>> {
+    let text = [Lines::answer("2"), Lines::system("5", "2"), Lines::skipped()].concat();
+    let read = Transcript::holding(&text).read(Cursor::default())?;
+    assert_eq!(Views::edges(read), ["5 after 2"]);
+    Ok(())
+}
+
+#[test]
 fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::answer("2")).read(Cursor::default())?;
     assert_eq!(Views::texts(read), ["first second"]);
@@ -133,7 +158,7 @@ fn a_lead_record_keeps_only_its_text_blocks() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
-    let stamps: Vec<Instant> = read.into_iter().map(|record| record.stamp().clone()).collect();
+    let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
     assert_eq!(stamps, [Instant::new("2026-01-01T00:00:01Z".to_owned())]);
     Ok(())
 }
@@ -144,7 +169,7 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
     let partial = Lines::answer("2");
     let cut = partial.chars().take(partial.len() / 2).collect::<String>();
     let read = Transcript::holding(&format!("{whole}{cut}")).read(Cursor::default())?;
-    let records: Vec<Record> = read.into_iter().collect();
+    let records = Views::records(read);
     assert_eq!(Views::uuids(&records), ["1"]);
     Ok(())
 }
@@ -152,7 +177,7 @@ fn a_partial_last_line_is_not_yielded() -> Result<(), Box<dyn Error>> {
 #[test]
 fn a_record_uuid_reads_as_its_text() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("abc")).read(Cursor::default())?;
-    let texts: Vec<String> = read.into_iter().map(|record| record.uuid().as_ref().to_owned()).collect();
+    let texts: Vec<String> = Views::records(read).into_iter().map(|record| record.uuid().as_ref().to_owned()).collect();
     assert_eq!(texts, ["abc"]);
     Ok(())
 }
@@ -178,6 +203,6 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
         .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let second =
         Transcript::holding(&text).read(first.cursor()).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let together: Vec<Record> = first.into_iter().chain(second).collect();
+    let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
     prop_assert_eq!(Views::uuids(&together), ["1", "2", "3", "4"]);
 });

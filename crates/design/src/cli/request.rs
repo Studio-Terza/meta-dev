@@ -79,10 +79,22 @@ impl Words {
     }
 }
 
+impl TryFrom<Words> for Request {
+    type Error = Failure;
+
+    fn try_from(words: Words) -> Result<Request, Failure> {
+        match words.expecting {
+            Expecting::Path => Err(Failure::Usage),
+            Expecting::Word => {
+                Command::try_from(words.plain.as_slice()).map(|command| Request { command, workspace: words.workspace })
+            }
+        }
+    }
+}
+
 impl Request {
     pub fn parsed(arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
-        let words = arguments.fold(Words::default(), Words::taking);
-        Command::try_from(words.plain.as_slice()).map(|command| Request { command, workspace: words.workspace })
+        Request::try_from(arguments.fold(Words::default(), Words::taking))
     }
 
     pub fn directory(&self, environment: &impl Environment) -> Result<PathBuf, Failure> {
