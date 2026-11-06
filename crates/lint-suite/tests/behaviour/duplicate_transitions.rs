@@ -1,4 +1,4 @@
-use lint_core::{Lint, SourceFile};
+use lint_core::{Lint, Report, SourceFile};
 use lint_fixtures::{Located, Source, Sources, Text};
 use lint_transition_graph::{DuplicateTransitions, OneEdge};
 
@@ -8,11 +8,11 @@ struct Duplicates;
 
 impl Duplicates {
     fn of(sources: &[Source]) -> String {
-        Self::reported(&Sources::parsed(sources))
+        Self::reported(&Sources::parsed(sources)).iter().map(ToString::to_string).collect()
     }
 
-    fn reported(files: &[SourceFile]) -> String {
-        format!("{}{}", OnGraph::<OneEdge>::report(files), OnGraph::<DuplicateTransitions>::report(files))
+    fn reported(files: &[SourceFile]) -> [Report<'_>; 2] {
+        [OnGraph::<OneEdge>::report(files), OnGraph::<DuplicateTransitions>::report(files)]
     }
 
     fn at(path: &'static str, text: &str) -> Source {
@@ -20,12 +20,7 @@ impl Duplicates {
     }
 
     fn shows(pair: &[&str]) -> Vec<String> {
-        Shown::by(pair, |files| {
-            [OnGraph::<OneEdge>::report(files), OnGraph::<DuplicateTransitions>::report(files)]
-                .iter()
-                .flat_map(Shown::lines)
-                .collect()
-        })
+        Shown::by(pair, |files| Self::reported(files).iter().flat_map(Shown::lines).collect())
     }
 }
 
