@@ -1,6 +1,7 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
+use lint_layout::Name;
 use newtype::{Arbitrary, Newtype};
 
 use super::super::Containment;
@@ -39,6 +40,12 @@ enum Line<'view, 'found, 'file> {
     Outside(Outsider<'found, 'file>),
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Spelling<'found> {
+    Path(Member<'found>),
+    Name(&'found Name),
+}
+
 #[derive(Debug)]
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
@@ -74,10 +81,10 @@ impl<'found> FromIterator<Member<'found>> for Names<'found> {
 }
 
 impl Spelled {
-    fn spelling<'found>(self, member: Member<'found>) -> Box<dyn fmt::Display + 'found> {
+    fn spelling(self, member: Member<'_>) -> Spelling<'_> {
         match self {
-            Spelled::Path => Box::new(member),
-            Spelled::Name => Box::new(member.name()),
+            Spelled::Path => Spelling::Path(member),
+            Spelled::Name => Spelling::Name(member.name()),
         }
     }
 }
@@ -97,6 +104,15 @@ impl fmt::Display for Line<'_, '_, '_> {
         match self {
             Line::Member(placed) => write!(formatter, "{placed}"),
             Line::Outside(outsider) => write!(formatter, "{outsider}"),
+        }
+    }
+}
+
+impl fmt::Display for Spelling<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Spelling::Path(member) => write!(formatter, "{member}"),
+            Spelling::Name(name) => write!(formatter, "{name}"),
         }
     }
 }

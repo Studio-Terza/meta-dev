@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
+use file_ports::{Bytes, FileFailure, Files, Memory};
 use lint_runner::Cli;
 use text_lines::Lines;
 
@@ -162,12 +162,11 @@ fn files_below_assets_are_web_assets_and_pass() -> Result<(), Box<dyn Error>> {
         .iter()
         .map(|path| checkout.write(path, "x\n"))
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
-    let kinds: Vec<Kind> = written.iter().map(|file| checkout.files.kind(file)).collect();
-    assert_eq!(kinds, vec![Kind::File; 3]);
     let run = checkout.checked();
+    let found: Vec<Vec<String>> = written.iter().map(|file| run.lines_at(&file.display().to_string())).collect();
     assert_eq!(
-        run.lines_at(&checkout.shown("site/app.js")),
-        vec![Run::finding(&checkout.shown("site/app.js"), "JavaScript", MOVE)]
+        found,
+        vec![Vec::new(), Vec::new(), vec![Run::finding(&checkout.shown("site/app.js"), "JavaScript", MOVE)]]
     );
     assert_eq!(run.findings(), 1);
     Ok(())

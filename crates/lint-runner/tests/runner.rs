@@ -666,12 +666,16 @@ fn hidden_and_build_directories_hide_their_packages() -> Result<(), Box<dyn Erro
         .iter()
         .map(|copy| {
             root.write(&format!("{copy}/Cargo.toml"), "[package]\nname = \"copy\"\n[workspace]\n")?;
-            root.write(&format!("{copy}/src/lib.rs"), DIRTY)
+            root.write(&format!("{copy}/src/lib.rs"), DIRTY)?;
+            Ok(root.at(copy))
         })
         .collect::<Result<Vec<PathBuf>, FileFailure>>()?;
-    let kinds: Vec<Kind> = copies.iter().map(|copy| root.files.kind(copy)).collect();
-    assert_eq!(kinds, vec![Kind::File; 2]);
     assert_eq!(root.reported(), Reported::clean());
+    let direct: Vec<usize> = copies
+        .iter()
+        .map(|copy| Trees::reported_through(&root.files, std::slice::from_ref(copy)).violations())
+        .collect();
+    assert_eq!(direct, vec![2, 2]);
     Ok(())
 }
 

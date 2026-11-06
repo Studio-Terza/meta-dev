@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use syn::{ReturnType, Type};
+use syn::Type;
 
 use lint_layout::Name;
 
@@ -24,14 +24,10 @@ impl Described<'_> {
         let texts: Vec<String> = items.map(|item| item.to_string()).collect();
         Name::from(texts.join(&separator.to_string()).as_str())
     }
-
-    fn returned(output: &ReturnType) -> Name {
-        match Spelled::returned_by(output) {
-            Some(returned) => Name::from(format!(" -> {}", Described(returned)).as_str()),
-            None => Name::from(""),
-        }
-    }
 }
+
+#[derive(Clone, Copy)]
+struct Returned<'ast>(Option<&'ast Type>);
 
 #[derive(Clone, Copy)]
 enum Separator {
@@ -44,6 +40,15 @@ impl fmt::Display for Separator {
         match self {
             Separator::Comma => formatter.write_str(", "),
             Separator::Plus => formatter.write_str(" + "),
+        }
+    }
+}
+
+impl fmt::Display for Returned<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Some(returned) => write!(formatter, " -> {}", Described(returned)),
+            None => Ok(()),
         }
     }
 }
@@ -67,7 +72,7 @@ impl fmt::Display for Described<'_> {
                 formatter,
                 "fn({}){}",
                 Self::listed(Separator::Comma, function.inputs.iter().map(|input| Described(&input.ty))),
-                Self::returned(&function.output)
+                Returned(Spelled::returned_by(&function.output))
             ),
             Type::Ptr(pointer) => {
                 write!(formatter, "*{} {}", pointer.mutability.map_or("const", |_| "mut"), Described(&pointer.elem))

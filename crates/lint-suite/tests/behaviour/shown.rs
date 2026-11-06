@@ -7,21 +7,24 @@ use lint_transition_graph::{Extraction, GraphLint, TypeSystem};
 pub(crate) struct Shown;
 
 impl Shown {
-    pub(crate) fn by(pair: &[&str], reported: impl Fn(&[SourceFile]) -> String) -> Vec<String> {
+    pub(crate) fn by(pair: &[&str], reported: impl Fn(&[SourceFile]) -> Vec<String>) -> Vec<String> {
         <&[&str; 2]>::try_from(pair)
             .into_iter()
-            .flat_map(|[text, expected]| {
+            .flat_map(|[text, subject]| {
                 reported(&[Sources::file("crates/x/src/lib.rs", Text::new(text))])
-                    .matches(expected)
-                    .take(1)
-                    .map(str::to_owned)
+                    .into_iter()
+                    .filter(|line| line.contains(subject))
                     .collect::<Vec<String>>()
             })
             .collect()
     }
 
     pub(crate) fn of<Checked: Lint>(pair: &[&str]) -> Vec<String> {
-        Self::by(pair, |files| Checked::report(files).to_string())
+        Self::by(pair, |files| Self::lines(&Checked::report(files)))
+    }
+
+    pub(crate) fn lines(report: &Report<'_>) -> Vec<String> {
+        report.violations().iter().map(ToString::to_string).collect()
     }
 }
 
