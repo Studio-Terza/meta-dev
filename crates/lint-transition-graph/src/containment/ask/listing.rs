@@ -1,6 +1,7 @@
 use std::fmt;
 use std::num::NonZeroUsize;
 
+use lint_core::Site;
 use newtype::{Arbitrary, Newtype};
 
 use super::super::Containment;
@@ -39,6 +40,9 @@ enum Line<'view, 'found, 'file> {
     Outside(Outsider<'found, 'file>),
 }
 
+#[derive(Clone, Copy, Debug)]
+struct At<'file>(Option<Site<'file>>);
+
 #[derive(Debug)]
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
@@ -49,6 +53,10 @@ impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
         spelled: Spelled,
     ) -> Placed<'view, 'found, 'file> {
         Placed { view, member, spelled }
+    }
+
+    fn found_at(&self) -> At<'file> {
+        At(self.view.site(self.member))
     }
 }
 
@@ -95,10 +103,15 @@ impl fmt::Display for Line<'_, '_, '_> {
 impl fmt::Display for Placed<'_, '_, '_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.spelled {
-            Spelled::Path => write!(formatter, "{}", self.member),
-            Spelled::Name => write!(formatter, "{}", self.member.name()),
-        }?;
-        self.view.site(self.member).map_or(Ok(()), |site| write!(formatter, " at {site}"))
+            Spelled::Path => write!(formatter, "{}{}", self.member, self.found_at()),
+            Spelled::Name => write!(formatter, "{}{}", self.member.name(), self.found_at()),
+        }
+    }
+}
+
+impl fmt::Display for At<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.iter().try_for_each(|site| write!(formatter, " at {site}"))
     }
 }
 
