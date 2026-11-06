@@ -21,9 +21,12 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
 file-ports = { path = "../file-ports" }
+grammar = { path = "../grammar" }
 laws = { path = "../laws" }
+strum.workspace = true
 tempfile.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 

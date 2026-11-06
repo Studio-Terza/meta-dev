@@ -883,6 +883,44 @@ fn a_dropped_node_stays_shown_under_its_parent() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn a_vague_node_is_refused_a_specification_and_keeps_its_stage() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    let specified = store.write(Restaged::new(Dag::resolved(&store, root)?, Staging::transition(Step::Specify)?));
+    let refused = specified.err().map(Staging::misstaged).transpose()?;
+    assert_eq!(refused.map(Misstaged::stage), Some(Stage::Vague));
+    assert_eq!(Staging::stored(&store, root)?.stage().stage(), Stage::Vague);
+    Ok(())
+}
+
+#[test]
+fn a_missing_node_resolves_to_nothing_and_once_planted_refines_without_a_cycle() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    let missing = NodeId::new(root.into_inner().saturating_add(1));
+    assert_eq!(store.read(Resolving::from(missing))?, None);
+    store.write(Dag::node(&store, Facet::Feature)?)?;
+    assert!(Dag::linked(&store, [missing, root], NodeRelation::Refines)?? > Written::zero());
+    Ok(())
+}
+
+#[test]
+fn a_proposal_under_a_missing_parent_is_refused_and_closes_nothing() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let root = Projects::rooted(&store, "p")?;
+    let missing = NodeId::new(9);
+    assert!(Proposals::written(&store, vec![Proposals::child(missing, 2)?]).is_err());
+    assert_eq!(store.read(Resolving::from(NodeId::new(2)))?, None);
+    Proposals::written(&store, vec![Proposals::child(root, 2)?])?;
+    store.write(Planting::sown(Proposals::node(9)?))?;
+    assert!(Dag::linked(&store, [missing, NodeId::new(2)], NodeRelation::Refines)?? > Written::zero());
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Change {
     Cast(usize, Role),

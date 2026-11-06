@@ -2360,13 +2360,16 @@ dependencies = [
 name = "store-ports"
 version = "0.1.0"
 dependencies = [
+ "design-model",
  "design-store",
  "file-ports",
+ "grammar",
  "laws",
  "newtype",
  "port-core",
  "sqlx",
  "store-ports-macros",
+ "strum",
  "tempfile",
  "thiserror",
  "tokio",
