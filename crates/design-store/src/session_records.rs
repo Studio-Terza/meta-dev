@@ -39,6 +39,8 @@ impl SessionRecords {
 }
 
 impl Batch for SessionRecords {
+    type Failure = StoreFailure;
+
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         let written = [
             Self::all(&self.messages, statements)?,

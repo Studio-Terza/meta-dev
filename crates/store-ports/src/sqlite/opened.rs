@@ -23,20 +23,26 @@ impl Opened {
         query.rows(&mut Statements::over(&mut self.connection, &self.runtime))
     }
 
-    pub(super) fn transacted(&mut self, batch: impl Batch) -> Result<Written, StoreFailure> {
-        let mut transaction = self.runtime.block_on(self.connection.begin())?;
+    pub(super) fn transacted<B: Batch>(&mut self, batch: B) -> Result<Written, B::Failure> {
+        let mut transaction = self.runtime.block_on(self.connection.begin()).map_err(StoreFailure::from)?;
         let written = batch.written(&mut Statements::over(&mut transaction, &self.runtime));
         Self::settled(&self.runtime, transaction, written)
     }
 
-    fn settled(
+    fn settled<Failure: From<StoreFailure>>(
         runtime: &Runtime,
         transaction: Transaction<'_, Sqlite>,
-        written: Result<Written, StoreFailure>,
-    ) -> Result<Written, StoreFailure> {
+        written: Result<Written, Failure>,
+    ) -> Result<Written, Failure> {
         match written {
-            Ok(written) => runtime.block_on(transaction.commit()).map(|()| written).map_err(StoreFailure::from),
-            Err(failure) => runtime.block_on(transaction.rollback()).map_err(StoreFailure::from).and(Err(failure)),
+            Ok(written) => runtime
+                .block_on(transaction.commit())
+                .map(|()| written)
+                .map_err(|failed| Failure::from(StoreFailure::from(failed))),
+            Err(failure) => runtime
+                .block_on(transaction.rollback())
+                .map_err(|failed| Failure::from(StoreFailure::from(failed)))
+                .and(Err(failure)),
         }
     }
 }

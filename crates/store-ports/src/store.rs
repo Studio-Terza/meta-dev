@@ -9,7 +9,7 @@ pub trait Store {
     fn read<Q: Query>(&self, query: Q) -> Result<Q::Rows, StoreFailure>;
 
     #[op(Q)]
-    fn write<Q: Batch>(&self, batch: Q) -> Result<Written, StoreFailure>;
+    fn write<Q: Batch>(&self, batch: Q) -> Result<Written, Q::Failure>;
 
     fn lock(&self) -> Result<Held<'_, StoreLock>, Busy>;
 }

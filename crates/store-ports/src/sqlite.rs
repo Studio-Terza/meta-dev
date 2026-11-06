@@ -47,11 +47,11 @@ impl Sqlite {
 }
 
 impl Shared {
-    fn opened<T>(
+    fn opened<T, Failure: From<StoreFailure>>(
         &self,
         prepare: impl FnOnce(&Path) -> io::Result<()>,
-        body: impl FnOnce(&mut Opened) -> Result<T, StoreFailure>,
-    ) -> Result<T, StoreFailure> {
+        body: impl FnOnce(&mut Opened) -> Result<T, Failure>,
+    ) -> Result<T, Failure> {
         let mut slot = self.opened.lock().unwrap_or_else(PoisonError::into_inner);
         let opened = slot.take().map_or_else(
             || self.place.connecting(prepare).and_then(|options| Opened::connected(&options, self.migrator)),
@@ -66,7 +66,7 @@ impl StoreFiller for Sqlite {
         self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.read(query))
     }
 
-    fn write<Q: Batch>(&self, _pass: Pass<'_, Q>, batch: Q) -> Result<Written, StoreFailure> {
+    fn write<Q: Batch>(&self, _pass: Pass<'_, Q>, batch: Q) -> Result<Written, Q::Failure> {
         self.shared.opened(|path: &Path| fs::create_dir_all(path), |opened| opened.transacted(batch))
     }
 

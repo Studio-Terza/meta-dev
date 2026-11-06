@@ -807,7 +807,7 @@ fn apply_places_proposes_and_reports_the_owner_segments_it_leaves_uncovered() ->
         format!("applied sense({answer}, decision, specific, firm, explicit)"),
         format!("applied link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
         format!("uncovered {}", Applying::answer(1)),
-        "written 7".to_owned(),
+        "written 6".to_owned(),
     ];
     assert_eq!(Lines::missing(&out, &wanted), Vec::<&String>::new());
     assert_eq!(out.matches('\n').count(), wanted.len());

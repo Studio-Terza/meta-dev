@@ -18,12 +18,16 @@ struct HalfWritten;
 struct Applied;
 
 impl Batch for Resumed {
+    type Failure = StoreFailure;
+
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         statements.written(sqlx::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 7)"))
     }
 }
 
 impl Batch for HalfWritten {
+    type Failure = StoreFailure;
+
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         statements.written(sqlx::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 1)"))?;
         statements.written(sqlx::query!("INSERT INTO cursors (session, read_to) VALUES ('s', 2)"))

@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use design_model::{
-    Entered, Entry, Facet, Node, NodeId, Ordinal, Prefix, Provenance, Segment, SegmentRelation, Sense, SpanRelation,
-    Stage, Straddling, Supersession, Title,
+    Entered, Entry, Facet, Node, NodeId, NodeRelation, Ordinal, Prefix, Provenance, Segment, SegmentRelation, Sense,
+    SpanRelation, Stage, Straddling, Supersession, Title,
 };
-use design_store::{Covered, Directed, Directions, NextNode, Ordered, Prefixed, ShownNode, Spoken, SupersededBy};
+use design_store::{Closes, Covered, Cycle, Directed, Directions, NextNode, Prefixed, ShownNode, Spoken};
 use file_ports::Files;
 use newtype::Newtype;
 use store_ports::{Store, Written};
@@ -33,18 +33,19 @@ pub enum Unresolved {
     #[error("{0}")]
     Straddling(#[from] Straddling),
     #[error(
-        "{} cannot be superseded by {}, which {} already supersedes, directly or through a chain",
-        Id::from(*old),
-        Id::from(*by),
-        Id::from(*old)
+        "{} cannot be linked as {relation} {}, which already {relation} it, directly or through a chain",
+        Id::from(*from),
+        Id::from(*to)
     )]
-    Cyclic { old: NodeId, by: NodeId },
+    Cyclic { from: NodeId, relation: NodeRelation, to: NodeId },
     #[error("segment {0} cannot be linked to itself")]
     Looped(SegmentRef),
     #[error(
-        "{later} cannot be linked as {relation} {earlier}, which already {relation} it, directly or through a chain"
+        "{} cannot be linked as {relation} {}, which already {relation} it, directly or through a chain",
+        SegmentRef::from(from),
+        SegmentRef::from(to)
     )]
-    Circular { later: SegmentRef, relation: SegmentRelation, earlier: SegmentRef },
+    Circular { from: Segment, relation: SegmentRelation, to: Segment },
 }
 
 #[derive(Debug)]
@@ -71,38 +72,10 @@ struct Batch {
     next: NodeId,
     labels: BTreeMap<Label, NodeId>,
     proposed: BTreeMap<NodeId, Node>,
-    superseding: Vec<Edge<NodeId>>,
-    links: Vec<Linking>,
-}
-
-#[derive(Clone, Debug)]
-struct Linking {
-    relation: SegmentRelation,
-    edge: Edge<Segment>,
-}
-
-#[derive(Debug)]
-struct Chain<'store, S: Store, O: Ordering<S>> {
-    store: &'store S,
-    order: O,
-    pending: Vec<Edge<O::End>>,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Superseding;
-
-#[derive(Clone, Copy, Debug)]
-struct Sequence(SegmentRelation);
-
-trait Ordering<S: Store> {
-    type End: Ord + Clone;
-
-    fn reached(&self, store: &S, from: Self::End) -> Result<BTreeSet<Self::End>, Failure>;
-
-    fn pending(&self, batch: &Batch) -> Vec<Edge<Self::End>>;
-
-    fn cyclic(&self, source: Self::End, target: Self::End) -> Unresolved;
-}
+struct Cycled;
 
 #[derive(Debug)]
 struct Labels<'batch>(&'batch BTreeMap<Label, NodeId>);
@@ -111,8 +84,6 @@ struct Labels<'batch>(&'batch BTreeMap<Label, NodeId>);
 enum Effect {
     Unchanged,
     Proposed { node: Node, fresh: Option<Label> },
-    Superseded(Edge<NodeId>),
-    Linked(Linking),
 }
 
 #[derive(Debug)]
@@ -209,7 +180,7 @@ impl Folded {
 
 impl Batch {
     fn starting(next: NodeId) -> Batch {
-        Batch { next, labels: BTreeMap::new(), proposed: BTreeMap::new(), superseding: Vec::new(), links: Vec::new() }
+        Batch { next, labels: BTreeMap::new(), proposed: BTreeMap::new() }
     }
 
     fn after(self, effect: &Effect) -> Batch {
@@ -218,14 +189,7 @@ impl Batch {
                 next: NodeId::new(node.identity().into_inner().saturating_add(1)),
                 labels: self.labels.into_iter().chain(fresh.clone().map(|label| (label, node.identity()))).collect(),
                 proposed: self.proposed.into_iter().chain([(node.identity(), node.clone())]).collect(),
-                ..self
             },
-            Effect::Superseded(edge) => {
-                Batch { superseding: self.superseding.into_iter().chain([edge.clone()]).collect(), ..self }
-            }
-            Effect::Linked(linking) => {
-                Batch { links: self.links.into_iter().chain([linking.clone()]).collect(), ..self }
-            }
             Effect::Unchanged => self,
         }
     }
@@ -272,76 +236,23 @@ impl<S: Store> Resolution<'_, S> {
         let placed = self.store.read(ShownNode::from(id))?;
         Ok(placed.map(|placed| placed.node().clone()).ok_or(Unresolved::Unplaced(id))?)
     }
+}
 
-    fn acyclic<O: Ordering<S>>(&self, order: O, edge: Edge<O::End>) -> Result<Edge<O::End>, Failure> {
-        let pending = order.pending(self.batch);
-        Chain { store: self.store, order, pending }.acyclic(edge)
+impl From<Cycle> for Unresolved {
+    fn from(cycle: Cycle) -> Unresolved {
+        cycle.closed(Cycled)
     }
 }
 
-impl<S: Store, O: Ordering<S>> Chain<'_, S, O> {
-    fn acyclic(&self, edge: Edge<O::End>) -> Result<Edge<O::End>, Failure> {
-        let reached = edge.ends(|_source, target| self.reached(target.clone()))?;
-        let cycle = edge.ends(|source, target| {
-            reached.get(source).map(|_closed| self.order.cyclic(source.clone(), target.clone()))
-        });
-        Ok(cycle.map_or(Ok(edge), Err)?)
+impl Closes for Cycled {
+    type Output = Unresolved;
+
+    fn nodes(self, from: NodeId, relation: NodeRelation, to: NodeId) -> Unresolved {
+        Unresolved::Cyclic { from, relation, to }
     }
 
-    fn reached(&self, from: O::End) -> Result<BTreeSet<O::End>, Failure> {
-        let stored = self.order.reached(self.store, from)?;
-        let onward = self
-            .pending
-            .iter()
-            .filter(|pending| pending.ends(|source, _target| stored.contains(source)))
-            .map(|pending| pending.ends(|_source, target| self.reached(target.clone())))
-            .collect::<Result<Vec<BTreeSet<O::End>>, Failure>>()?;
-        Ok(stored.into_iter().chain(onward.into_iter().flatten()).collect())
-    }
-}
-
-impl<S: Store> Ordering<S> for Superseding {
-    type End = NodeId;
-
-    fn reached(&self, store: &S, from: NodeId) -> Result<BTreeSet<NodeId>, Failure> {
-        Ok(store.read(SupersededBy::from(from))?)
-    }
-
-    fn pending(&self, batch: &Batch) -> Vec<Edge<NodeId>> {
-        batch.superseding.clone()
-    }
-
-    fn cyclic(&self, by: NodeId, old: NodeId) -> Unresolved {
-        Unresolved::Cyclic { old, by }
-    }
-}
-
-impl Sequence {
-    fn sequenced<S: Store>(
-        resolution: &Resolution<'_, S>,
-        relation: SegmentRelation,
-        joined: Edge<Segment>,
-    ) -> Result<Edge<Segment>, Failure> {
-        match relation {
-            SegmentRelation::Supersedes | SegmentRelation::Corrects => resolution.acyclic(Sequence(relation), joined),
-            SegmentRelation::Answers | SegmentRelation::RefersTo => Ok(joined),
-        }
-    }
-}
-
-impl<S: Store> Ordering<S> for Sequence {
-    type End = Segment;
-
-    fn reached(&self, store: &S, from: Segment) -> Result<BTreeSet<Segment>, Failure> {
-        Ok(store.read(Ordered::along(self.0, from))?)
-    }
-
-    fn pending(&self, batch: &Batch) -> Vec<Edge<Segment>> {
-        batch.links.iter().filter(|linking| linking.relation == self.0).map(|linking| linking.edge.clone()).collect()
-    }
-
-    fn cyclic(&self, source: Segment, target: Segment) -> Unresolved {
-        Unresolved::Circular { later: SegmentRef::from(&source), relation: self.0, earlier: SegmentRef::from(&target) }
+    fn segments(self, from: Segment, relation: SegmentRelation, to: Segment) -> Unresolved {
+        Unresolved::Circular { from, relation, to }
     }
 }
 
@@ -380,11 +291,10 @@ impl<S: Store> Visit for &Resolution<'_, S> {
         let source = self.heard(source)?;
         let target = self.heard(target)?;
         let heard = source.message.into_iter().chain(target.message).collect();
-        let joined = Edge::new(source.segment, target.segment).map_err(|_looped| looped)?;
-        let edge = Sequence::sequenced(self, relation, joined)?;
+        let edge = Edge::new(source.segment, target.segment).map_err(|_looped| looped)?;
         let directed =
             edge.ends(|source, target| Directed::Related { source: source.clone(), target: target.clone(), relation });
-        Ok(Grounded { directed, heard, effect: Effect::Linked(Linking { relation, edge }) })
+        Ok(Grounded { directed, heard, effect: Effect::Unchanged })
     }
 
     fn propose(
@@ -405,11 +315,8 @@ impl<S: Store> Visit for &Resolution<'_, S> {
     fn supersede(self, old: &NodeRef, by: &NodeRef) -> Result<Grounded, Failure> {
         let old = self.node(old)?;
         let by = self.node(by)?;
-        let cycle = Unresolved::Cyclic { old: old.identity(), by: by.identity() };
-        let joined = Edge::new(by.identity(), old.identity()).map_err(|_looped| cycle)?;
         let supersession = Supersession::within(&old, &by).map_err(Unresolved::from)?;
-        let effect = Effect::Superseded(self.acyclic(Superseding, joined)?);
-        Ok(Grounded { directed: Directed::Superseded(supersession), heard: Vec::new(), effect })
+        Ok(Grounded { directed: Directed::Superseded(supersession), heard: Vec::new(), effect: Effect::Unchanged })
     }
 
     fn converse(self, segment: &SegmentRef) -> Result<Grounded, Failure> {

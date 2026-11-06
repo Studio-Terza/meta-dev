@@ -2,7 +2,9 @@ mod boundary;
 
 use design_model::{Node, NodeId, Provenance, Segment, SegmentRelation, Sense, SpanRelation, Supersession};
 use port_core::Op;
-use store_ports::{StoreFailure, Written};
+use store_ports::Written;
+
+use crate::Refusal;
 
 use boundary::Annotating;
 pub(crate) use boundary::Columns;
@@ -43,7 +45,7 @@ impl Directed {
         }
     }
 
-    fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, StoreFailure> {
+    fn written(&self, annotating: &mut Annotating<'_, '_>) -> Result<Written, Refusal> {
         match self {
             Directed::Placed { segment, node, relation } => annotating.placed(segment, *node, *relation),
             Directed::Sensed { segment, sense } => annotating.sensed(segment, *sense),

@@ -3,6 +3,7 @@ use std::io;
 use std::path::PathBuf;
 
 use design_model::{NodeId, Project, Unnamed, Unnumbered};
+use design_store::Refusal;
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use port_core::{ReleaseFailures, Snapshot};
@@ -61,6 +62,15 @@ pub enum Failure {
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
+}
+
+impl From<Refusal> for Failure {
+    fn from(refusal: Refusal) -> Failure {
+        match refusal {
+            Refusal::Cyclic(cycle) => Failure::Unresolved(Unresolved::from(cycle)),
+            Refusal::Store(failure) => Failure::Store(failure),
+        }
+    }
 }
 
 impl Failure {
