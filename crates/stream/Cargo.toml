@@ -1,0 +1,23 @@
+[package]
+name = "stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+grammar = { path = "../grammar" }
+newtype = { path = "../newtype" }
+transcript-ports = { path = "../transcript-ports" }
+
+[dev-dependencies]
+file-ports = { path = "../file-ports" }
+laws = { path = "../laws" }
+port-core = { path = "../port-core" }
+
+[lints]
+workspace = true

@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Size, Text};
+use file_ports::{Absent, Bytes, Disk, FileFailure, Files, Kind, Memory, Offset, Size, Text};
 
 struct Contract<'files, Port: Files> {
     files: &'files Port,
@@ -228,4 +228,33 @@ fn disk_and_the_fake_answer_batches_path_by_path() -> Result<(), FileFailure> {
     let fake = Memory::default();
     fake.create_directories(Path::new("/batch"))?;
     Batches::on(&fake, Path::new("/batch"))
+}
+
+struct Tails;
+
+impl Tails {
+    fn of(files: &impl Files, root: &Path, offset: Offset) -> Result<Bytes, FileFailure> {
+        let path = root.join("tail.txt");
+        files.write(&path, Bytes::from("0123456789"))?;
+        files.read_from(&path, offset)
+    }
+}
+
+laws::law!(read_from_agrees_between_disk_and_memory, 0u64..16, at, {
+    let scratch = tempfile::tempdir().map_err(|_| laws::proptest::test_runner::TestCaseError::fail("no scratch"))?;
+    let memory = Memory::default();
+    memory
+        .create_directories(Path::new("/scratch"))
+        .map_err(|_| laws::proptest::test_runner::TestCaseError::fail("no memory"))?;
+    let on_disk = Tails::of(&Disk, scratch.path(), Offset::new(at));
+    let in_memory = Tails::of(&memory, Path::new("/scratch"), Offset::new(at));
+    laws::proptest::prop_assert_eq!(on_disk.ok(), in_memory.ok());
+});
+
+#[test]
+fn read_from_returns_the_bytes_after_the_offset() -> Result<(), FileFailure> {
+    let memory = Memory::default();
+    memory.create_directories(Path::new("/scratch"))?;
+    assert_eq!(Tails::of(&memory, Path::new("/scratch"), Offset::new(7))?, Bytes::from("789"));
+    Ok(())
 }
