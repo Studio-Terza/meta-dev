@@ -1288,6 +1288,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-effect-sites",
+ "lint-file",
  "lint-layout",
  "lint-placement",
  "proc-macro2",

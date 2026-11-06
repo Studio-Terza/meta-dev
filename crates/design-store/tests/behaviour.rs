@@ -802,9 +802,15 @@ impl Mixed {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+struct Restaging {
+    refused: Option<Misstaged>,
+    node: AnyNode,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct Mismatch {
-    wanted: (Option<Misstaged>, AnyNode),
-    stored: (Option<Misstaged>, AnyNode),
+    wanted: Restaging,
+    stored: Restaging,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -845,13 +851,13 @@ impl Staging {
             .map(|step| {
                 let before = Staging::stored(&store, root)?;
                 let transition = Staging::transition(*step)?;
-                let wanted = transition
-                    .clone()
-                    .applied(before.clone())
-                    .map_or_else(|misstaged| (Some(misstaged), before), |moved| (None, moved));
+                let wanted = transition.clone().applied(before.clone()).map_or_else(
+                    |misstaged| Restaging { refused: Some(misstaged), node: before },
+                    |moved| Restaging { refused: None, node: moved },
+                );
                 let refused =
                     store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
-                Ok(Mismatch { wanted, stored: (refused, Staging::stored(&store, root)?) })
+                Ok(Mismatch { wanted, stored: Restaging { refused, node: Staging::stored(&store, root)? } })
             })
             .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
         Ok(moved.into_iter().filter(|mismatch| mismatch.wanted != mismatch.stored).collect())

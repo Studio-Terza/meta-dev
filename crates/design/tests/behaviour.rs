@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome, Unresolved};
 use design_model::{Entered, Entry, Facet, Node, NodeEdge, NodeId, NodeRelation, Role, SegmentRelation, Stage};
-use design_store::{AppliedId, Linked, Planting, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
+use design_store::{AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShownMessage, ShownNode, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
@@ -283,7 +283,8 @@ impl Links {
             .flat_map(Stored::links)
             .map(|link| {
                 let [source, target] = link.anchors();
-                Link { source: source.to_string(), relation: link.relation().to_string(), target: target.to_string() }
+                let relation: &RelationName = link.as_ref();
+                Link { source: source.to_string(), relation: relation.to_string(), target: target.to_string() }
             })
             .collect())
     }
