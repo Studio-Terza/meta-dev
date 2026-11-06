@@ -64,6 +64,10 @@ const DISCARDED: &str =
     "use std::fmt::Debug as _;\nuse std::fmt::{self as shown};\nimpl Debug for R {}\nimpl shown::Debug for R {}\n";
 const ITEM_PATH: &str = "struct S;\nimpl S::T for R {}\nimpl Option::T for R {}\nimpl ::a::T for R {}\n";
 
+const BLOCK_GLOB_FALLS_THROUGH: &str =
+    "trait Clone {}\nmod a {}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
+const BLOCK_GLOB_SUPPLIES: &str = "trait Clone {}\nmod a {\n    pub trait Clone {}\n}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
+
 const GLOB_PRIVATE_SELF: &str = "trait Clone {}\nmod a {\n    pub(self) use std::clone::Clone;\n}\nfn f() {\n    use crate::a::*;\n    impl Clone for R {}\n}\n";
 const GLOB_VISIBLE_CRATE: &str = "mod a {\n    pub(crate) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
 const GLOB_RESTRICTED: &str = "mod a {\n    pub(super) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
@@ -361,6 +365,11 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
     PATH_RESTRICTED => [Expect::krate(&["crate", "a", "T"])],
+]);
+
+laws::table!(a_block_looks_past_its_glob_to_the_enclosing_module, |text: &&str| Read::resolved(text), [
+    BLOCK_GLOB_FALLS_THROUGH => [Expect::krate(&["crate", "Clone"])],
+    BLOCK_GLOB_SUPPLIES => [Expect::krate(&["crate", "a", "Clone"])],
 ]);
 
 laws::table!(a_glob_carries_the_hidden_names_of_its_module, |text: &&str| Read::resolved(text), [
