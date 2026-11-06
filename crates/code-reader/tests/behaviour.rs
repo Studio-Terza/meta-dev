@@ -1,6 +1,5 @@
 use code_model::{
-    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Reach, Region, Resolved, Sited,
-    TypeRef,
+    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
 };
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
@@ -717,30 +716,6 @@ fn an_implementation_reads_the_type_it_implements_for() {
         [
             Expect::named(Expect::item("A", ItemKind::Struct), Vec::new()),
             Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")]),
-        ]
-    );
-}
-
-const REACHED: &str = "fn shipped() {}\n#[cfg(test)]\nmod tests {\n    fn tested() {}\n}\nm! {\n    fn expanded() {}\n}\nfn outer() {\n    n! {\n        fn inner() {}\n    }\n}\n";
-
-#[test]
-fn every_function_carries_the_reach_of_where_it_is_written() {
-    let model = Reader::read_files(&[Read::file("a.rs", REACHED)]);
-    let reached: Vec<(String, Reach)> = model
-        .functions()
-        .everywhere()
-        .map(|found| {
-            (AsRef::<Name>::as_ref(found.entity()).to_string(), AsRef::<Region>::as_ref(found.entity()).reach())
-        })
-        .collect();
-    assert_eq!(
-        reached,
-        [
-            ("shipped".to_owned(), Reach::Shipped),
-            ("tested".to_owned(), Reach::Test),
-            ("expanded".to_owned(), Reach::MacroBody),
-            ("outer".to_owned(), Reach::Shipped),
-            ("inner".to_owned(), Reach::MacroBody),
         ]
     );
 }

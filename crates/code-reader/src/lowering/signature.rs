@@ -269,8 +269,9 @@ impl Constraints<'_> {
     }
 
     fn of_type_parameter(self, declared: &TypeParam) -> Vec<TypeRef<Written>> {
+        let bounded = declared.bounds.first().map(|_| self.scope.bounded(declared.bounds.iter()));
         let defaults = declared.default.iter().map(|ty| self.scope.lowered(ty));
-        [self.scope.bounded(declared.bounds.iter())].into_iter().chain(defaults).collect()
+        bounded.into_iter().chain(defaults).collect()
     }
 
     fn of_predicate(self, predicate: &WherePredicate) -> Vec<TypeRef<Written>> {

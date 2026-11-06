@@ -543,8 +543,9 @@ impl<'ast> Visit<'ast> for Lowering<'_, '_> {
 
     fn visit_trait_item_type(&mut self, item: &'ast TraitItemType) {
         let scope = self.generics.extended(&item.generics);
+        let bounded = item.bounds.first().map(|_| scope.bounded(item.bounds.iter()));
         let defaults = item.default.iter().map(|(_, ty)| scope.lowered(ty));
-        [scope.bounded(item.bounds.iter())].into_iter().chain(defaults).for_each(|ty| {
+        bounded.into_iter().chain(defaults).for_each(|ty| {
             self.hold(Holder::named(&item.ident, Held::AssociatedType), self.context.slot(), ty);
         });
         visit::visit_trait_item_type(self, item);
