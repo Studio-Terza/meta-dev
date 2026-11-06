@@ -13,7 +13,7 @@ const DIRECTORY: &str = "/projects/work";
 
 const SESSION: &str = concat!(
     "{\"type\":\"user\",\"uuid\":\"o1\",\"parentUuid\":null,\"sessionId\":\"s\",",
-    "\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{\"kind\":\"human\"},\"message\":{\"content\":\"1. go. now\"}}\n",
+    "\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{\"kind\":\"human\"},\"message\":{\"content\":\"1. go\\n2. now\"}}\n",
     "{\"type\":\"assistant\",\"uuid\":\"l1\",\"parentUuid\":\"o1\",\"sessionId\":\"s\",",
     "\"timestamp\":\"2026-01-01T00:00:01Z\",\"origin\":null,\"message\":{\"model\":\"claude\",\"content\":[{\"type\":\"text\",\"text\":\"done\"}]}}\n"
 );
@@ -56,12 +56,11 @@ fn a_written_session_reads_back_with_its_segments_links_and_cursor() -> Result<(
         ],
         ["o1", "owner", "s", "2026-01-01T00:00:00Z"]
     );
-    let segments: Vec<String> = shown
-        .segments()
-        .iter()
-        .map(|segment| format!("{} {} {}", segment.ordinal(), segment.shape(), Body::from(segment)))
-        .collect();
-    assert_eq!(segments, ["0 item 1. go. now"]);
+    let segments: Vec<String> =
+        shown.segments().iter().map(|segment| format!("{} {}", segment.ordinal(), segment.shape())).collect();
+    assert_eq!(segments, ["0 item", "1 item"]);
+    let first = shown.segments().first().map(Body::from).ok_or("no segment")?;
+    assert_eq!(first.to_string(), "1. go");
     let links: Vec<String> = shown
         .links()
         .iter()
