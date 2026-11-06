@@ -5,13 +5,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use console_ports::Variables;
-use design::{Cli, Failure, Outcome};
-use design_store::{ShownMessage, Stored, StreamSchema};
+use design::{Cli, Failure, Outcome, Unresolved};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Stage};
+use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
+use newtype::Counter;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Busy, Sqlite, Store};
+use store_ports::{Busy, Sqlite, Store, Written};
+use strum::VariantArray;
 use transcript_ports::Uuid;
 
 const HOME: &str = "/home/tester";
@@ -745,4 +749,198 @@ fn without_a_repository_or_a_recorded_workspace_the_working_directory_is_the_wor
     let opened = Opened::from("/work/sub", Session::typical().files(), &["search", "thanks"])?;
     assert_eq!(opened.paths, [PathBuf::from("/work/sub/.meta/design.sqlite")]);
     Ok(())
+}
+
+struct Lines;
+
+impl Lines {
+    fn missing<'wanted, Line: AsRef<str>>(out: &str, wanted: &'wanted [Line]) -> Vec<&'wanted Line> {
+        wanted.iter().filter(|line| out.matches(&format!("{}\n", line.as_ref())).count() == 0).collect()
+    }
+}
+
+struct Applying {
+    store: Sqlite,
+    files: Memory,
+}
+
+impl Applying {
+    const ANSWER: &str = "aaaaaaaa-0000-4000-8000-000000000003";
+
+    fn ready() -> Result<Applying, Failure> {
+        let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Session::linked().files() };
+        applying.run(&["ingest"])?;
+        applying.run(&["init", "demo"])?;
+        Ok(applying)
+    }
+
+    fn run(&self, arguments: &[&str]) -> Result<String, Failure> {
+        Invocation::within(&self.store, FakeLent::new(&self.files), arguments)
+    }
+
+    fn applied(&self, directives: &str) -> Result<String, Failure> {
+        self.files.create_directories(Path::new("/work/notes")).ok();
+        self.files.write(Path::new("/work/notes/directives"), Bytes::from(directives)).ok();
+        self.run(&["apply", "notes/directives"])
+    }
+
+    fn answer(ordinal: usize) -> String {
+        format!("{}.{ordinal}", Self::ANSWER)
+    }
+}
+
+#[test]
+fn apply_places_proposes_and_reports_the_owner_segments_it_leaves_uncovered() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let answer = Applying::answer(0);
+    let directives = [
+        format!("place({answer}, n1, decides)"),
+        "propose(new, refines(n1), feature, \"Apply \\\"directives\\\"\")".to_owned(),
+        format!("sense({answer}, decision, specific, firm, explicit)"),
+        format!("link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
+    ]
+    .join("\n");
+    let out = applying.applied(&directives)?;
+    let wanted = [
+        format!("applied place({answer}, n1, decides)"),
+        "proposed n2 by propose(new, refines(n1), feature, \"Apply \\\"directives\\\"\")".to_owned(),
+        format!("applied sense({answer}, decision, specific, firm, explicit)"),
+        format!("applied link({answer}, aaaaaaaa-0000-4000-8000-000000000002.0, answers)"),
+        format!("uncovered {}", Applying::answer(1)),
+        "written 7".to_owned(),
+    ];
+    assert_eq!(Lines::missing(&out, &wanted), Vec::<&String>::new());
+    assert_eq!(out.matches('\n').count(), wanted.len());
+    Ok(())
+}
+
+#[test]
+fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    applying.applied("propose(new, refines(n1), feature, \"apply\")\npropose(new, refines(n1), smell, \"drift\")")?;
+    applying.applied("propose(new, refines(n2), feature, \"echo\")")?;
+    let child = applying.run(&["show", "n4"])?;
+    let wanted = [
+        "n4 demo feature vague entered apply \"echo\"",
+        "  ancestor n1 demo project vague entered init",
+        "  ancestor n2 demo feature vague entered apply \"apply\"",
+        "  refines n2",
+    ];
+    assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
+    assert_eq!(child.matches('\n').count(), wanted.len());
+    let root = applying.run(&["show", "n1"])?;
+    assert_eq!(root.matches("  child ").count(), 2);
+    assert!(root.contains("  child n3 demo smell vague entered apply \"drift\"\n"));
+    Ok(())
+}
+
+#[test]
+fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
+    applying.applied("supersede(n2, by(n3))")?;
+    assert!(applying.run(&["show", "n3"])?.contains("  supersedes n2\n"));
+    assert!(applying.run(&["show", "n2"])?.contains("n2 demo feature vague entered apply \"old\"\n"));
+    let placed = applying.applied(&format!("place({}, n2, mentions)", Applying::answer(1)))?;
+    assert!(placed.contains("written 1\n"));
+    Ok(())
+}
+
+impl Applying {
+    fn refused(&self, directives: &str) -> Option<Failure> {
+        self.applied(&format!("propose(new, refines(n1), feature, \"first\")\n{directives}")).err()
+    }
+}
+
+#[test]
+fn an_unknown_reference_is_refused_and_nothing_is_written() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    let refusals = [
+        "conversational(ffffffff.0)".to_owned(),
+        "conversational(aaaaaaaa.0)".to_owned(),
+        format!("conversational({})", Applying::answer(7)),
+        format!("place({}, n9, defines)", Applying::answer(0)),
+        "supersede(n1, by(n9))".to_owned(),
+        "place(n1, n1, defines)".to_owned(),
+    ]
+    .map(|directives| applying.refused(&directives));
+    assert!(matches!(
+        refusals,
+        [
+            Some(Failure::Unresolved(Unresolved::Unheard(_))),
+            Some(Failure::Unresolved(Unresolved::Ambiguous(_))),
+            Some(Failure::Unresolved(Unresolved::Unsegmented(_))),
+            Some(Failure::Unresolved(Unresolved::Unplaced(_))),
+            Some(Failure::Unresolved(Unresolved::Unplaced(_))),
+            Some(Failure::Misread(_)),
+        ]
+    ));
+    assert!(matches!(applying.run(&["show", "n2"]), Err(Failure::Unplaced(_))));
+    Ok(())
+}
+
+#[test]
+fn apply_reads_its_file_from_the_working_directory_and_names_its_outcome() -> Result<(), Failure> {
+    let applying = Applying::ready()?;
+    applying.applied("")?;
+    assert!(matches!(applying.run(&["apply", "directives"]), Err(Failure::Directives(_))));
+    let lent = Cli::new(&Invocation::environment(), FakeLent::new(&applying.files), |_path| applying.store.clone())
+        .rooted(["apply", "notes/../notes/directives"].iter().map(OsString::from), &mut Vec::new())?;
+    assert_eq!(lent, Outcome::Applied);
+    Ok(())
+}
+
+#[test]
+fn only_init_consumes_a_project() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let session = Session::typical();
+    let refused = [
+        Invocation::against(&store, &session, &["show", "n1", "--consumes", "demo"]),
+        Invocation::against(&store, &session, &["search", "thanks", "--consumes", "demo"]),
+        Invocation::against(&store, &session, &["ingest", "--consumes", "demo"]),
+        Invocation::against(&store, &session, &["apply", "directives", "--consumes", "demo"]),
+        Invocation::against(&store, &session, &["--consumes", "demo", "init", "other"]),
+        Invocation::against(&store, &session, &["init", "other", "--consumes", "demo", "--consumes", "demo"]),
+    ];
+    assert!(refused.iter().all(|refused| matches!(refused, Err(Failure::Usage))));
+}
+
+laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let wanted = [
+        format!("n3 demo {facet} vague entered init"),
+        "  ancestor n1 demo project vague entered init".to_owned(),
+        format!("  ancestor n2 demo {facet} vague entered init"),
+        format!("  child n5 demo {facet} vague entered init"),
+        "  refines n2".to_owned(),
+    ];
+    let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
+    prop_assert_eq!(missing, Vec::<&String>::new());
+    prop_assert_eq!(shown.matches("  child ").count(), 1);
+    prop_assert_eq!(shown.matches("  ancestor ").count(), 2);
+});
+
+impl Graph {
+    fn planted(store: &Sqlite, facet: Facet) -> Result<String, Failure> {
+        Graph::init(store, &["demo"])?;
+        Graph::refined(store, facet, &[1, 2, 2, 3])?;
+        Graph::shown(store, "n3")
+    }
+
+    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<Written, Failure> {
+        let run = Run::root();
+        let port = run.port(store.clone());
+        let written = (2_i64..)
+            .zip(parents)
+            .map(|(child, parent)| {
+                let entry = Entry::new("demo".parse()?, facet, Stage::Vague, Entered::Init.into());
+                let planted = port.write(NewNode::from(entry))?;
+                let linked =
+                    port.write(Linked::new(NodeId::new(child), NodeRelation::Refines, NodeId::new(*parent)))?;
+                Ok(planted.plus(linked))
+            })
+            .collect::<Result<Vec<Written>, Failure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
 }

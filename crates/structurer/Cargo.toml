@@ -1,0 +1,24 @@
+[package]
+name = "structurer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+design-model = { path = "../design-model" }
+grammar = { path = "../grammar" }
+named-derive = { path = "../named-derive" }
+newtype = { path = "../newtype" }
+thiserror.workspace = true
+
+[dev-dependencies]
+laws = { path = "../laws" }
+strum.workspace = true
+
+[lints]
+workspace = true

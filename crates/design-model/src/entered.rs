@@ -5,4 +5,6 @@ use strum::VariantArray;
 pub enum Entered {
     #[name("init")]
     Init,
+    #[name("apply")]
+    Apply,
 }

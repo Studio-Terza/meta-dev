@@ -7,7 +7,7 @@ use store_ports::{Store, Written};
 
 use crate::cli::failure::Failure;
 use crate::cli::rendering::Id;
-use crate::cli::request::Ground;
+use crate::cli::request::{Ground, Token};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Init {
@@ -27,8 +27,21 @@ struct Rooted {
     root: NodeId,
 }
 
+impl TryFrom<&[Token]> for Init {
+    type Error = Failure;
+
+    fn try_from(rest: &[Token]) -> Result<Init, Failure> {
+        let (consuming, naming): (Vec<&Token>, Vec<&Token>) = rest.iter().partition(|token| token.consumed().is_some());
+        let [project] = <[&Token; 1]>::try_from(naming).map_err(|_named| Failure::Usage)?;
+        let consumed = <[&Token; 1]>::try_from(consuming)
+            .map(|[consumed]| Some(consumed))
+            .or_else(|consuming| consuming.first().map_or(Ok(None), |_several| Err(Failure::Usage)))?;
+        Init::new(project.project()?, consumed.map(Token::project).transpose()?)
+    }
+}
+
 impl Init {
-    pub fn new(project: Project, consumes: Option<Project>) -> Result<Init, Failure> {
+    fn new(project: Project, consumes: Option<Project>) -> Result<Init, Failure> {
         let itself = consumes.iter().find(|consumed| **consumed == project).cloned();
         itself.map(Failure::SelfConsuming).map_or(Ok(Init { project, consumes }), Err)
     }

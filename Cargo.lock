@@ -257,6 +257,8 @@ dependencies = [
  "port-core",
  "store-ports",
  "stream",
+ "structurer",
+ "strum",
  "thiserror",
  "transcript-ports",
 ]
@@ -273,6 +275,7 @@ dependencies = [
  "serde_json",
  "strum",
  "thiserror",
+ "transcript-ports",
 ]
 
 [[package]]
@@ -282,11 +285,13 @@ dependencies = [
  "design-model",
  "file-ports",
  "grammar",
+ "laws",
  "newtype",
  "port-core",
  "sqlx",
  "store-ports",
  "stream",
+ "strum",
  "transcript-ports",
 ]
 
@@ -2386,6 +2391,19 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
  "unicode-properties",
+]
+
+[[package]]
+name = "structurer"
+version = "0.1.0"
+dependencies = [
+ "design-model",
+ "grammar",
+ "laws",
+ "named-derive",
+ "newtype",
+ "strum",
+ "thiserror",
 ]
 
 [[package]]

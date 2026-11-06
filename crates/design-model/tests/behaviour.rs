@@ -1,7 +1,10 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use design_model::{Entered, Facet, NodeId, NodeRelation, Project, Provenance, Stage};
+use design_model::{
+    Confidence, Entered, Explicitness, Facet, Kin, NodeId, NodeRelation, Project, Provenance, SegmentRelation,
+    SenseKind, SpanRelation, Specificity, Stage,
+};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::strategy::Strategy;
 use strum::VariantArray;
@@ -52,6 +55,48 @@ fn every_stage_is_displayed_as_its_name_and_parsed_back_from_it() {
 fn every_node_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
     assert_eq!(Names::unparsed(NodeRelation::name), []);
     assert_eq!(Names::undisplayed(NodeRelation::name), []);
+}
+
+#[test]
+fn every_kin_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(Kin::name), []);
+    assert_eq!(Names::undisplayed(Kin::name), []);
+}
+
+#[test]
+fn every_span_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(SpanRelation::name), []);
+    assert_eq!(Names::undisplayed(SpanRelation::name), []);
+}
+
+#[test]
+fn every_segment_relation_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(SegmentRelation::name), []);
+    assert_eq!(Names::undisplayed(SegmentRelation::name), []);
+}
+
+#[test]
+fn every_sense_kind_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(SenseKind::name), []);
+    assert_eq!(Names::undisplayed(SenseKind::name), []);
+}
+
+#[test]
+fn every_specificity_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(Specificity::name), []);
+    assert_eq!(Names::undisplayed(Specificity::name), []);
+}
+
+#[test]
+fn every_confidence_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(Confidence::name), []);
+    assert_eq!(Names::undisplayed(Confidence::name), []);
+}
+
+#[test]
+fn every_explicitness_is_displayed_as_its_name_and_parsed_back_from_it() {
+    assert_eq!(Names::unparsed(Explicitness::name), []);
+    assert_eq!(Names::undisplayed(Explicitness::name), []);
 }
 
 #[test]

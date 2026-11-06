@@ -9,13 +9,16 @@ use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::{ReadFailure, Uuid};
 
+use structurer::Misread;
+
 use super::rendering::Id;
+use super::request::Unresolved;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>])"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -42,6 +45,12 @@ pub enum Failure {
     Unrooted(Project),
     #[error("cannot keep the local config: {0}")]
     Config(#[from] ConfigFailure),
+    #[error("cannot read the directives file: {0}")]
+    Directives(#[source] FileFailure),
+    #[error("cannot read the directives: {0}")]
+    Misread(#[from] Misread),
+    #[error("{0}; nothing was written")]
+    Unresolved(#[from] Unresolved),
     #[error("the design store lock was refused: {0}")]
     Busy(#[from] Busy),
     #[error("the design store failed: {0}")]

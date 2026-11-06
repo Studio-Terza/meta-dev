@@ -1,10 +1,13 @@
 mod boundary;
 mod cursors;
+mod directions;
 mod earlier_lines;
 mod graph;
 mod link;
 mod placed;
+mod prefixed;
 mod project_root;
+mod relative;
 mod scope;
 mod search_segments;
 mod session_cursors;
@@ -16,11 +19,14 @@ mod stream_schema;
 
 pub use boundary::Hit;
 pub use cursors::Cursors;
+pub use directions::{Directed, Directions};
 pub use earlier_lines::EarlierLines;
 pub use graph::{Linked, NewNode};
 use link::Link;
 pub use placed::Placed;
+pub use prefixed::{NextNode, Prefixed, Spoken};
 pub use project_root::ProjectRoot;
+use relative::Relative;
 pub use scope::Scope;
 pub use search_segments::SearchSegments;
 pub use session_cursors::SessionCursors;

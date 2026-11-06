@@ -9,7 +9,8 @@ use transcript_ports::Uuid;
 
 use super::printed::Printed;
 use crate::cli::failure::Failure;
-use placed::Neighbourhood;
+use crate::cli::rendering::Neighbourhood;
+use placed::Found;
 use shown::Shown;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,7 +32,9 @@ impl TryFrom<&str> for Subject {
 impl Subject {
     pub fn shown(self, store: &impl Store, out: &mut impl Write) -> Result<Printed, Failure> {
         match self {
-            Subject::Node(id) => Neighbourhood::find(store, id).and_then(|shown| Printed::shown(out, &shown)),
+            Subject::Node(id) => {
+                Found::find(store, id).and_then(|found| Printed::shown(out, &Neighbourhood::from(found.placed())))
+            }
             Subject::Message(uuid) => Shown::find(store, &uuid).and_then(|shown| Printed::shown(out, &shown)),
         }
     }

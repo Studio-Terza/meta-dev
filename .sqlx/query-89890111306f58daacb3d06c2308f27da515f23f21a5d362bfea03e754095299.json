@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO closure (ancestor, descendant, depth) VALUES (?1, ?1, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "89890111306f58daacb3d06c2308f27da515f23f21a5d362bfea03e754095299"
+}
