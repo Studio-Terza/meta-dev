@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT INTO\n  applied_files (content, provenance)\nVALUES\n  (?1, ?2)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a35dee14c50a55486c37816a67819a342a554093f680a32a88516af2d140195a"
+}

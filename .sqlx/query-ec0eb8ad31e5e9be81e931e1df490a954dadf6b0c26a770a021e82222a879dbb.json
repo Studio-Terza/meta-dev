@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nINSERT\n  OR IGNORE INTO segment_links (\n    source_message,\n    source_ordinal,\n    relation,\n    target_message,\n    target_ordinal,\n    provenance\n  )\nVALUES\n  (?1, ?2, ?3, ?4, ?5, ?6)\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "ec0eb8ad31e5e9be81e931e1df490a954dadf6b0c26a770a021e82222a879dbb"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\nUPDATE\n  nodes\nSET\n  stage = ?2,\n  artifact = ?3,\n  condition = ?4,\n  reason = ?5\nWHERE\n  id = ?1\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "5027b32caf57ec39183986f5d4874388b5e6fd933dd5e6764cc5eb29d133990d"
+}
