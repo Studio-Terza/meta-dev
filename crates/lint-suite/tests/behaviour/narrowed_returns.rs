@@ -27,7 +27,7 @@ const DEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Res
 const GIVEN_ERROR: &str = "struct Rejected;\ntype Res<T, E = Rejected> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
 const UNDEFAULTED_ERROR: &str = "struct Rejected;\ntype Res<T, E> = Result<T, E>;\nfn p() -> Res<u8, bool> { Ok(0) }\nfn q() -> Option<Rejected> { None }\n";
 
-const CASES: [Case; 22] = [
+const CASES: [Case; 25] = [
     Case::new(
         Title::new("free, nested, inherent and trait declaration functions"),
         &[Source::new(Located::new("a.rs"), Text::new(FORMS))],
@@ -105,6 +105,21 @@ const CASES: [Case; 22] = [
     Case::new(
         Title::new("a binary file listed under bin"),
         &[Source::new(Located::new("src/bin/tool.rs"), Text::new(ROOT_MAIN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a build script's main"),
+        &[Source::new(Located::new("build.rs"), Text::new(ROOT_MAIN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an example's main"),
+        &[Source::new(Located::new("examples/x.rs"), Text::new(ROOT_MAIN))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("a bench's main"),
+        &[Source::new(Located::new("benches/y.rs"), Text::new(ROOT_MAIN))],
         Flagged::new(&[]),
     ),
     Case::new(

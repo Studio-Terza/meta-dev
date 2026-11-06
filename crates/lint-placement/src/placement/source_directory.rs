@@ -24,7 +24,7 @@ impl SourceDirectory {
             Role::BinaryRoot => Some(inside)
                 .filter(|inside| *inside == Path::new(Self::MAIN_FILE))
                 .map_or_else(|| ModulePath::of_file(inside), |_| ModulePath::default()),
-            Role::Other | Role::Target => ModulePath::of_file(inside),
+            Role::Other | Role::Target | Role::BuildScript => ModulePath::of_file(inside),
         }
     }
 }

@@ -86,6 +86,11 @@ impl SourceFile {
     }
 
     #[must_use]
+    pub fn located(&self) -> &Located {
+        &self.located
+    }
+
+    #[must_use]
     pub fn switched_off(&self) -> Option<&Path> {
         self.placement.package().untested().holds(self.located.within(&self.path)).map(|_| self.path.as_path())
     }

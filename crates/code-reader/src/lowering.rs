@@ -17,7 +17,6 @@ use code_model::{
     Subject, TypeRef,
 };
 use lint_layout::{LineNumber, Name, TestMarks, Whole, Word, words};
-use lint_placement::Role;
 
 use crate::namespace::{
     CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, Resolving, ScopeId, ScopeKind, Seeds,
@@ -27,9 +26,10 @@ use crate::planting::{Files, ReadFile};
 use boundary::SelfType;
 use signature::{DeclaredParameter, InScope, Written};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 enum Enclosure {
     BinaryRoot,
+    #[default]
     Module,
     Body,
     Impl(Owner),
@@ -63,15 +63,6 @@ impl Enclosure {
         match self {
             Enclosure::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
             Enclosure::Module | Enclosure::Body | Enclosure::Impl(_) | Enclosure::Trait => None,
-        }
-    }
-}
-
-impl From<Role> for Enclosure {
-    fn from(role: Role) -> Enclosure {
-        match role {
-            Role::BinaryRoot => Enclosure::BinaryRoot,
-            Role::LibraryRoot | Role::Target | Role::Other => Enclosure::Module,
         }
     }
 }
@@ -259,7 +250,12 @@ pub(crate) struct Lowered<'read> {
 
 impl<'read> Lowered<'read> {
     pub(crate) fn rooted(&mut self, read: ReadFile<'_>, name: Option<&'read Name>, form: CrateForm) -> Vec<Slot> {
-        let enclosure = Enclosure::from(read.source().placement().role());
+        let enclosure = read
+            .source()
+            .placement()
+            .executable_root(read.source().located().within(read.source().path()))
+            .map(|_| Enclosure::BinaryRoot)
+            .unwrap_or_default();
         self.root_lowered(read, name, form, enclosure)
     }
 

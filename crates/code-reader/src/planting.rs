@@ -32,7 +32,7 @@ impl<'read> ReadFile<'read> {
     fn named(self) -> Option<&'read Name> {
         match self.source.placement().role() {
             Role::LibraryRoot => Some(Borrow::<Name>::borrow(self.source.placement().package().crate_name())),
-            Role::BinaryRoot | Role::Target | Role::Other => None,
+            Role::BinaryRoot | Role::Target | Role::BuildScript | Role::Other => None,
         }
     }
 }
