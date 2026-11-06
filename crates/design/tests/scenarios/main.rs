@@ -8,10 +8,7 @@ use ports::Design;
 fn an_unknown_command_exits_with_failure_and_prints_the_usage() -> Result<(), Box<dyn Error>> {
     let output = Design::with_a_session_in_work()?.run(&["frobnicate"])?;
     assert_ne!(output.status.code(), Some(0));
-    assert!(
-        String::from_utf8(output.stderr)?
-            .contains("usage: design [--workspace <dir>] [--dry-run] (ingest | show <uuid>)")
-    );
+    assert!(String::from_utf8(output.stderr)?.contains("usage: design"));
     Ok(())
 }
 

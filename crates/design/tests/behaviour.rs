@@ -9,7 +9,7 @@ use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
 use design_store::{ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, Files, Memory};
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::test_runner::TestCaseError;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store};
@@ -414,6 +414,89 @@ laws::law!(ingesting_a_transcript_in_two_parts_stores_the_links_of_ingesting_it_
     prop_assert_eq!(relations, BTreeSet::from(["answers", "cites", "replies-to", "resends"]));
     prop_assert_eq!(split, whole);
 });
+
+struct Found;
+
+impl Found {
+    fn by(session: &Session, arguments: &[&str]) -> Result<String, TestCaseError> {
+        let store = Sqlite::in_memory::<StreamSchema>();
+        Invocation::against(&store, session, &["ingest"])
+            .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        Invocation::against(&store, session, arguments).map_err(|failure| TestCaseError::fail(failure.to_string()))
+    }
+
+    fn said(lines: &[Said]) -> Session {
+        Session::working(lines.iter().map(|said| Session::line(said.speaker, said.uuid, "null", &said.text)).collect())
+    }
+}
+
+struct Said {
+    speaker: Speaker,
+    uuid: &'static str,
+    text: String,
+}
+
+impl Said {
+    fn by(speaker: Speaker, uuid: &'static str, text: String) -> Said {
+        Said { speaker, uuid, text }
+    }
+}
+
+laws::law!(an_owner_segment_is_found_by_a_word_it_contains_and_no_other_is, "[a-z]{4,10}", word, {
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "o1", format!("alpha {word}")),
+        Said::by(Speaker::Owner, "o2", "1234 5678".to_owned()),
+    ]);
+    let out = Found::by(&session, &["search", &word])?;
+    prop_assert!(out.contains("o1 owner"));
+    prop_assert!(!out.contains("o2 owner"));
+});
+
+laws::law!(several_words_find_only_the_segments_holding_every_one, ("a[a-z]{3,8}", "b[a-z]{3,8}"), words, {
+    let (first, second) = words;
+    let session = Found::said(&[
+        Said::by(Speaker::Owner, "o1", format!("{second} and {first}")),
+        Said::by(Speaker::Owner, "o2", format!("{first} 1234")),
+        Said::by(Speaker::Owner, "o3", format!("5678 {second}")),
+    ]);
+    let out = Found::by(&session, &["search", &first, &second])?;
+    prop_assert_eq!(out.matches(" owner ").count(), 1);
+    prop_assert!(out.contains("o1 owner"));
+});
+
+laws::law!(the_lead_is_searched_only_when_everyone_is_asked_for, "[a-z]{4,10}", word, {
+    let session =
+        Found::said(&[Said::by(Speaker::Owner, "o1", word.clone()), Said::by(Speaker::Lead, "l1", word.clone())]);
+    let owner = Found::by(&session, &["search", &word])?;
+    let everyone = Found::by(&session, &["search", "--all", &word])?;
+    prop_assert!(owner.contains("o1 owner"));
+    prop_assert!(!owner.contains("l1 lead"));
+    prop_assert!(everyone.contains("o1 owner"));
+    prop_assert!(everyone.contains("l1 lead"));
+});
+
+laws::law!(a_word_is_found_whatever_its_case, "[a-z]{4,10}", word, {
+    let raised: String = word.chars().map(|letter| letter.to_ascii_uppercase()).collect();
+    let session =
+        Found::said(&[Said::by(Speaker::Owner, "o1", raised.clone()), Said::by(Speaker::Owner, "o2", word.clone())]);
+    let lower = Found::by(&session, &["search", &word])?;
+    let upper = Found::by(&session, &["search", &raised])?;
+    prop_assert!(lower.contains("o1 owner") && lower.contains("o2 owner"));
+    prop_assert!(upper.contains("o1 owner") && upper.contains("o2 owner"));
+});
+
+#[test]
+fn a_search_without_words_is_a_usage_failure() {
+    assert!(matches!(Invocation::output(&Session::typical(), &["search", "--all"]), Err(Failure::Usage)));
+    assert!(matches!(Invocation::output(&Session::typical(), &["search", "..."]), Err(Failure::Usage)));
+}
+
+#[test]
+fn a_rooted_search_names_its_outcome() -> Result<(), Failure> {
+    let searched = Rooted::outcome(&Sqlite::in_memory::<StreamSchema>(), &Session::typical(), &["search", "thanks"])?;
+    assert_eq!(searched.outcome, Outcome::Searched);
+    Ok(())
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("the lock was already gone")]

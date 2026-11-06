@@ -1,5 +1,6 @@
 use grammar::ident::Words;
 use grammar::message::{Depth, Lexemes, Mark, Number};
+use grammar::search::Terms;
 use grammar::slug::Letters;
 use laws::proptest::prelude::prop_assert_eq;
 
@@ -61,5 +62,26 @@ laws::table!(
         "sessions" => "Sessions",
         "a__b_" => "AB",
         "" => "",
+    ]
+);
+
+struct Lexed;
+
+impl Lexed {
+    fn terms(words: &[&str]) -> Vec<String> {
+        Terms::lexed(words.iter().copied())
+            .map(|terms| [terms.first()].into_iter().chain(terms.rest()).map(ToString::to_string).collect())
+            .unwrap_or_default()
+    }
+}
+
+laws::table!(
+    search_words_lex_into_lowered_terms_split_at_every_other_character,
+    Lexed::terms,
+    [
+        ["Pinning-tests", "NOW"] => vec!["pinning", "tests", "now"],
+        ["\"a OR b*\"", "c:d"] => vec!["a", "or", "b", "c", "d"],
+        ["Écoute", "v0.2"] => vec!["écoute", "v0", "2"],
+        ["--", "..."] => Vec::<String>::new(),
     ]
 );

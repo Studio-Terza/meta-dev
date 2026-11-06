@@ -1,8 +1,9 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use design_store::{SessionCursors, SessionRecords, ShownMessage, StreamSchema};
+use design_store::{Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage, StreamSchema};
 use file_ports::{Bytes, Files, Memory};
+use grammar::search::Terms;
 use newtype::Counter;
 use port_core::Run;
 use store_ports::{Sqlite, Store, Written};
@@ -25,9 +26,13 @@ struct Recorded {
 
 impl Recorded {
     fn session() -> Result<Recorded, Box<dyn Error>> {
+        Recorded::of(SESSION)
+    }
+
+    fn of(lines: &str) -> Result<Recorded, Box<dyn Error>> {
         let memory = Memory::default();
         memory.create_directories(Path::new(DIRECTORY))?;
-        memory.write(&Path::new(DIRECTORY).join("s.jsonl"), Bytes::from(SESSION))?;
+        memory.write(&Path::new(DIRECTORY).join("s.jsonl"), Bytes::from(lines))?;
         let run = Run::root();
         let port = run.port(ClaudeCodeDir::new(memory, PathBuf::from(DIRECTORY)));
         let sessions = port.sessions()?;
@@ -92,5 +97,92 @@ fn an_unknown_message_is_not_shown() -> Result<(), Box<dyn Error>> {
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     store.write(Recorded::session()?.records)?;
     assert!(store.read(ShownMessage::named(Uuid::new("nobody".to_owned())))?.is_none());
+    Ok(())
+}
+
+struct Said;
+
+impl Said {
+    fn owner(uuid: &str, second: usize, text: &str) -> String {
+        format!(
+            "{{\"type\":\"user\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:0{second}Z\",\"origin\":{{\"kind\":\"human\"}},\"message\":{{\"content\":\"{text}\"}}}}\n"
+        )
+    }
+
+    fn lead(uuid: &str, text: &str) -> String {
+        format!(
+            "{{\"type\":\"assistant\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:09Z\",\"origin\":null,\"message\":{{\"model\":\"claude\",\"content\":[{{\"type\":\"text\",\"text\":\"{text}\"}}]}}}}\n"
+        )
+    }
+
+    fn found(lines: &[String], words: &[&str]) -> Result<Vec<String>, Box<dyn Error>> {
+        Said::scoped(lines, words, Scope::Owner)
+    }
+
+    fn scoped(lines: &[String], words: &[&str], scope: Scope) -> Result<Vec<String>, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(Recorded::of(&lines.concat())?.records)?;
+        let terms = Terms::lexed(words.iter().copied()).ok_or("no terms")?;
+        let hits = store.read(SearchSegments::matching(terms, scope))?;
+        Ok(hits
+            .iter()
+            .map(|hit| format!("{} {} {} {}", hit.uuid(), hit.author(), hit.stamp(), Body::from(hit)))
+            .collect())
+    }
+}
+
+#[test]
+fn a_search_returns_each_segment_holding_the_word_with_its_message() -> Result<(), Box<dyn Error>> {
+    let lines = [Said::owner("o1", 1, "alpha here"), Said::owner("o2", 2, "beta there")];
+    assert_eq!(Said::found(&lines, &["beta"])?, ["o2 owner 2026-01-01T00:00:02Z beta there"]);
+    Ok(())
+}
+
+#[test]
+fn several_terms_rank_a_segment_dense_in_the_rarer_term_first() -> Result<(), Box<dyn Error>> {
+    let lines = [
+        Said::owner("o1", 1, "alpha alpha alpha alpha beta"),
+        Said::owner("o2", 2, "alpha beta beta beta beta"),
+        Said::owner("o3", 3, "alpha"),
+        Said::owner("o4", 4, "gamma"),
+        Said::owner("o5", 5, "gamma"),
+        Said::owner("o6", 6, "gamma"),
+        Said::owner("o7", 7, "gamma"),
+        Said::owner("o8", 8, "gamma"),
+    ];
+    let found = Said::found(&lines, &["alpha", "beta"])?;
+    assert_eq!(
+        found,
+        [
+            "o2 owner 2026-01-01T00:00:02Z alpha beta beta beta beta",
+            "o1 owner 2026-01-01T00:00:01Z alpha alpha alpha alpha beta"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn several_terms_rank_a_segment_dense_in_both_before_one_diluted() -> Result<(), Box<dyn Error>> {
+    let lines = [
+        Said::owner("o1", 1, "delta epsilon zeta zeta zeta zeta zeta zeta zeta zeta"),
+        Said::owner("o2", 2, "delta epsilon"),
+        Said::owner("o3", 3, "gamma"),
+        Said::owner("o4", 4, "gamma"),
+        Said::owner("o5", 5, "gamma"),
+        Said::owner("o6", 6, "gamma"),
+        Said::owner("o7", 7, "gamma"),
+        Said::owner("o8", 8, "gamma"),
+    ];
+    let found = Said::found(&lines, &["delta", "epsilon"])?;
+    assert_eq!(found.first().map(String::as_str), Some("o2 owner 2026-01-01T00:00:02Z delta epsilon"));
+    Ok(())
+}
+
+#[test]
+fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> {
+    let lines = [Said::owner("o1", 1, "omega"), Said::lead("l1", "omega")];
+    assert_eq!(Said::scoped(&lines, &["omega"], Scope::Owner)?, ["o1 owner 2026-01-01T00:00:01Z omega"]);
+    assert_eq!(Said::scoped(&lines, &["omega"], Scope::Everyone)?.len(), 2);
     Ok(())
 }

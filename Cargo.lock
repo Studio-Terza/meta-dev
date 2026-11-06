@@ -264,6 +264,7 @@ name = "design-store"
 version = "0.1.0"
 dependencies = [
  "file-ports",
+ "grammar",
  "laws",
  "newtype",
  "port-core",
