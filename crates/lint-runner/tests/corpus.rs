@@ -22,9 +22,7 @@ fn every_lint_prints_its_golden_over_its_fixture_and_every_violation_names_its_f
         .iter()
         .map(|fixture| Ok((fixture.as_path(), Corpus::output(&corpus, fixture)?)))
         .collect::<Result<Vec<(&Path, String)>, Box<dyn Error>>>()?;
-    let differences: Vec<String> =
-        outputs.iter().filter_map(|(fixture, output)| Corpus::difference(fixture, output)).collect();
-    assert_eq!(differences, Vec::<String>::new());
+    assert_eq!(outputs.iter().map(|(fixture, output)| Corpus::verify(fixture, output)).count(), fixtures.len());
     let printed: Vec<&str> = outputs
         .iter()
         .flat_map(|(_, output)| Lines::from(output.as_str()))
@@ -95,8 +93,8 @@ impl Corpus {
             .filter(|fix| fix.chars().filter(|letter| letter.is_whitespace()).count() < fix.chars().count())
     }
 
-    fn difference(fixture: &Path, output: &str) -> Option<String> {
+    fn verify(fixture: &Path, output: &str) {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        golden::golden!(format!("lints/{name}.txt"), output).err().map(|failure| failure.to_string())
+        golden::golden!(format!("lints/{name}.txt"), output);
     }
 }

@@ -90,6 +90,7 @@ dependencies = [
  "laws",
  "lint-core",
  "lint-layout",
+ "proc-macro2",
  "syn 2.0.119",
 ]
 

@@ -118,8 +118,8 @@ fn equal_texts_have_no_difference() {
 }
 
 #[test]
-fn the_golden_macro_finds_a_golden_in_the_calling_package() -> Result<(), Failure> {
-    golden!("macro.txt", "found through the macro\n")
+fn the_golden_macro_finds_a_golden_in_the_calling_package() {
+    golden!("macro.txt", "found through the macro\n");
 }
 
 #[test]
