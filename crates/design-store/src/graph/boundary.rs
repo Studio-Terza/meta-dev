@@ -89,15 +89,8 @@ struct LeaningRow {
 }
 
 #[derive(Debug)]
-struct EdgeRow {
+pub(crate) struct EdgeRow {
     source: i64,
-    relation: String,
-    target: i64,
-    provenance: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct OutgoingRow {
     relation: String,
     target: i64,
     provenance: String,
@@ -215,12 +208,7 @@ impl Batch for Cast {
             role,
             provenance
         ))?;
-        let touching = statements.rows(sqlx::query_as!(
-            EdgeRow,
-            "SELECT source, relation, target, provenance FROM node_edges WHERE source = ?1 OR target = ?1 ORDER BY source, relation, target",
-            id
-        ))?;
-        let relinked = touching
+        let relinked = EdgeRow::touching(self.node, statements)?
             .into_iter()
             .map(|row| Linked::try_from(row).map_err(StoreFailure::from)?.written(statements))
             .collect::<Result<Vec<Written>, Refusal>>()?;
@@ -325,12 +313,12 @@ impl TryFrom<EdgeRow> for Linked {
     }
 }
 
-impl TryFrom<OutgoingRow> for Link {
+impl TryFrom<EdgeRow> for Link {
     type Error = sqlx::Error;
 
-    fn try_from(row: OutgoingRow) -> Result<Link, sqlx::Error> {
-        let provenance = Provenance::from(NodeRow::decoded::<Entered>(&row.provenance)?);
-        Ok(Link::new(NodeRow::decoded(&row.relation)?, NodeId::new(row.target), provenance))
+    fn try_from(row: EdgeRow) -> Result<Link, sqlx::Error> {
+        let linked = Linked::try_from(row)?;
+        Ok(Link::new(NodeEdge::new(linked.source, linked.relation, linked.target), linked.provenance))
     }
 }
 
@@ -413,14 +401,18 @@ impl RelativeRow {
     }
 }
 
-impl OutgoingRow {
-    pub(crate) fn from_node(id: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
-        let id = id.into_inner();
-        let rows = statements.rows(sqlx::query_as!(
-            OutgoingRow,
-            "SELECT relation, target, provenance FROM node_edges WHERE source = ?1 ORDER BY relation, target",
+impl EdgeRow {
+    fn touching(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<EdgeRow>, StoreFailure> {
+        let id = node.into_inner();
+        statements.rows(sqlx::query_as!(
+            EdgeRow,
+            "SELECT source, relation, target, provenance FROM node_edges WHERE source = ?1 OR target = ?1 ORDER BY source, relation, target",
             id
-        ))?;
+        ))
+    }
+
+    pub(crate) fn links(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Link>, StoreFailure> {
+        let rows = EdgeRow::touching(node, statements)?;
         Ok(rows.into_iter().map(Link::try_from).collect::<Result<Vec<Link>, sqlx::Error>>()?)
     }
 }

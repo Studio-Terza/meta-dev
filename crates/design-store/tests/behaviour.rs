@@ -367,9 +367,8 @@ fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<()
     let consumed = Projects::rooted(&store, "q")?;
     store.write(Linked::new(eater, NodeRelation::Consumes, consumed, Entered::Init.into()))?;
     let shown = store.read(ShownNode::from(eater))?.ok_or("no consumer shown")?;
-    let links: Vec<(NodeRelation, NodeId)> =
-        shown.links().iter().map(|link| (link.relation(), link.target())).collect();
-    assert_eq!(links, [(NodeRelation::Consumes, consumed)]);
+    let links: Vec<NodeEdge> = shown.links().iter().map(|link| link.edge()).collect();
+    assert_eq!(links, [NodeEdge::new(eater, NodeRelation::Consumes, consumed)]);
     assert_eq!(Ids::kin(&shown, Kin::Ancestor), []);
     assert_eq!(Ids::kin(&store.read(ShownNode::from(consumed))?.ok_or("no consumed shown")?, Kin::Child), []);
     Ok(())
@@ -514,10 +513,17 @@ fn a_superseded_node_stays_shown_and_its_successor_links_to_it() -> Result<(), B
     Proposals::written(&store, vec![Proposals::child(root, 2)?, Proposals::child(root, 3)?])?;
     Proposals::written(&store, vec![Proposals::superseded(2, 3)?])?;
     let successor = store.read(ShownNode::from(NodeId::new(3)))?.ok_or("no successor")?;
-    let links: Vec<(NodeRelation, NodeId, Provenance)> =
-        successor.links().iter().map(|link| (link.relation(), link.target(), link.provenance())).collect();
+    let links: Vec<(NodeEdge, Provenance)> =
+        successor.links().iter().map(|link| (link.edge(), link.provenance())).collect();
     let applied = Provenance::from(Entered::Apply);
-    assert_eq!(links, [(NodeRelation::Refines, root, applied), (NodeRelation::Supersedes, NodeId::new(2), applied)]);
+    let successor = NodeId::new(3);
+    assert_eq!(
+        links,
+        [
+            (NodeEdge::new(successor, NodeRelation::Refines, root), applied),
+            (NodeEdge::new(successor, NodeRelation::Supersedes, NodeId::new(2)), applied)
+        ]
+    );
     assert!(store.read(ShownNode::from(NodeId::new(2)))?.is_some());
     Ok(())
 }

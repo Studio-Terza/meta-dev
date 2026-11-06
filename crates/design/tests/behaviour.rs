@@ -650,9 +650,13 @@ fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
     let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
     assert!(consuming.contains("consumes n1 project meta-dev"));
     assert!(
-        Graph::shown(&store, "n2")?.contains("n2 demo project vague core entered init\n  consumes n1 entered init\n")
+        Graph::shown(&store, "n2")?
+            .contains("n2 demo project vague core entered init\n  n2 consumes n1 entered init\n")
     );
-    assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
+    assert!(
+        Graph::shown(&store, "n1")?
+            .contains("n1 meta-dev project vague core entered init\n  n2 consumes n1 entered init\n")
+    );
     Ok(())
 }
 
@@ -826,7 +830,7 @@ fn a_proposal_is_a_vague_child_shown_with_its_ancestors_and_children() -> Result
         "n4 demo feature vague core entered apply \"echo\"",
         "  ancestor n1 demo project vague core entered init",
         "  ancestor n2 demo feature vague core entered apply \"apply\"",
-        "  refines n2 entered apply",
+        "  n4 refines n2 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&child, &wanted), Vec::<&&str>::new());
@@ -843,17 +847,26 @@ fn a_superseded_node_stays_resolvable() -> Result<(), Failure> {
     applying.applied("propose(new, refines(n1), feature, \"old\")\npropose(new, refines(n1), feature, \"new\")")?;
     applying.applied("supersede(n2, by(n3))")?;
     let root = "  ancestor n1 demo project vague core entered init";
-    let refines = "  refines n1 entered apply";
+    let supersedes = "  n3 supersedes n2 entered apply";
     let cast = "  role core entered apply";
     let wanted = [
-        ("n2", vec!["n2 demo feature vague core entered apply \"old\"", root, refines, cast]),
+        (
+            "n2",
+            vec![
+                "n2 demo feature vague core entered apply \"old\"",
+                root,
+                "  n2 refines n1 entered apply",
+                supersedes,
+                cast,
+            ],
+        ),
         (
             "n3",
             vec![
                 "n3 demo feature vague core entered apply \"new\"",
                 root,
-                refines,
-                "  supersedes n2 entered apply",
+                "  n3 refines n1 entered apply",
+                supersedes,
                 cast,
             ],
         ),
@@ -1033,8 +1046,8 @@ fn applied_annotations_show_their_provenance() -> Result<(), Failure> {
     let node = applying.run(&["show", "n3"])?;
     let wanted = [
         "n3 demo feature vague core entered apply \"b\"",
-        "  refines n2 entered apply",
-        "  supersedes n2 entered apply",
+        "  n3 refines n2 entered apply",
+        "  n3 supersedes n2 entered apply",
     ];
     assert_eq!(Lines::missing(&node, &wanted), Vec::<&&str>::new());
     Ok(())
@@ -1191,7 +1204,7 @@ laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VA
         "  ancestor n1 demo project vague core entered init".to_owned(),
         format!("  ancestor n2 demo {facet} vague core entered init"),
         format!("  child n5 demo {facet} vague core entered init"),
-        "  refines n2 entered init".to_owned(),
+        "  n3 refines n2 entered init".to_owned(),
     ];
     let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
     prop_assert_eq!(missing, Vec::<&String>::new());
@@ -1382,7 +1395,7 @@ fn show_renders_a_terminal_node_with_its_artifact_and_condition() -> Result<(), 
         "  artifact lint:no-comments",
         "  condition \"every comment is refused\"",
         "  ancestor n1 demo project vague core entered init",
-        "  refines n1 entered apply",
+        "  n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
@@ -1400,7 +1413,7 @@ fn a_dropped_node_stays_resolvable_with_its_reason() -> Result<(), Failure> {
         "n2 demo feature dropped core entered apply \"child\"",
         "  reason \"folded into n1\"",
         "  ancestor n1 demo project vague core entered init",
-        "  refines n1 entered apply",
+        "  n2 refines n1 entered apply",
         "  role core entered apply",
     ];
     assert_eq!(Lines::missing(&shown, &wanted), Vec::<&&str>::new());
@@ -1754,12 +1767,10 @@ impl Rendered {
         workspace.run("/q", &["role", "n5", "secondary"])?;
         Rendered::applied(&workspace, "propose(new, refines(n5), smell, \"inherited\")")?;
         workspace.run("/q", &["drop", "n5", "--reason", "folded into n4"])?;
-        let refused = workspace.run("/q", &["role", "n2", "secondary"]).err().map(|failure| format!("{failure}\n"));
-        let shown = ["n1", "n2", "n3", "n4", "n5", "n6"]
+        Ok(["n1", "n2", "n3", "n4", "n5", "n6"]
             .iter()
             .map(|node| workspace.run("/q", &["show", node]).map(|out| format!("design show {node}\n{out}")))
-            .collect::<Result<String, Failure>>()?;
-        Ok(format!("{shown}design role n2 secondary\n{}", refused.unwrap_or_default()))
+            .collect::<Result<String, Failure>>()?)
     }
 }
 

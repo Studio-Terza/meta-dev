@@ -1,25 +1,19 @@
-use design_model::{NodeId, NodeRelation, Provenance};
+use design_model::{NodeEdge, Provenance};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Link {
-    relation: NodeRelation,
-    target: NodeId,
+    edge: NodeEdge,
     provenance: Provenance,
 }
 
 impl Link {
-    pub(crate) fn new(relation: NodeRelation, target: NodeId, provenance: Provenance) -> Link {
-        Link { relation, target, provenance }
+    pub(crate) fn new(edge: NodeEdge, provenance: Provenance) -> Link {
+        Link { edge, provenance }
     }
 
     #[must_use]
-    pub fn relation(self) -> NodeRelation {
-        self.relation
-    }
-
-    #[must_use]
-    pub fn target(self) -> NodeId {
-        self.target
+    pub fn edge(self) -> NodeEdge {
+        self.edge
     }
 
     #[must_use]

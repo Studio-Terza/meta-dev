@@ -1,38 +1,42 @@
 design show n1
 n1 upstream project vague core entered init
+  n2 consumes n1 entered init
   role core entered init
 design show n2
 n2 demo project vague core entered init
   child n3 demo feature refining core entered apply "old"
   child n4 demo feature terminal core entered apply "new"
   child n5 demo feature dropped secondary entered apply "spare"
-  consumes n1 entered init
+  n2 consumes n1 entered init
+  n3 refines n2 entered apply
+  n4 refines n2 entered apply
+  n5 refines n2 entered apply
   role core entered init
 design show n3
 n3 demo feature refining core entered apply "old"
   ancestor n2 demo project vague core entered init
-  refines n2 entered apply
+  n3 refines n2 entered apply
+  n4 supersedes n3 entered apply
   role core entered apply
 design show n4
 n4 demo feature terminal core entered apply "new"
   artifact lint:no-comments
   condition "every comment is refused"
   ancestor n2 demo project vague core entered init
-  refines n2 entered apply
-  supersedes n3 entered apply
+  n4 refines n2 entered apply
+  n4 supersedes n3 entered apply
   role core entered apply
 design show n5
 n5 demo feature dropped secondary entered apply "spare"
   reason "folded into n4"
   ancestor n2 demo project vague core entered init
   child n6 demo smell vague secondary entered apply "inherited"
-  refines n2 entered apply
+  n5 refines n2 entered apply
+  n6 refines n5 entered apply
   role secondary entered role
 design show n6
 n6 demo smell vague secondary entered apply "inherited"
   ancestor n2 demo project vague core entered init
   ancestor n5 demo feature dropped secondary entered apply "spare"
-  refines n5 entered apply
+  n6 refines n5 entered apply
   role secondary entered inheritance
-design role n2 secondary
-n3 refines n2 would have a core node depend on a secondary one; nothing was written

@@ -108,13 +108,7 @@ impl fmt::Display for Neighbourhood<'_> {
             .iter()
             .try_for_each(|relative| writeln!(formatter, "  {} {}", relative.kin(), Line(relative.node())))?;
         self.0.links().iter().try_for_each(|link| {
-            writeln!(
-                formatter,
-                "  {} {} entered {}",
-                link.relation(),
-                Id(link.target()),
-                Entered::from(link.provenance())
-            )
+            writeln!(formatter, "  {} entered {}", Edge(link.edge()), Entered::from(link.provenance()))
         })?;
         let casting = self.0.node().casting();
         writeln!(formatter, "  role {} entered {}", casting.role(), Entered::from(casting.provenance()))
