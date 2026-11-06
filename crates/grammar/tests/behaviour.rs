@@ -1,4 +1,6 @@
+use grammar::ident::Words;
 use grammar::message::{Depth, Lexemes, Mark, Number};
+use grammar::slug::Letters;
 use laws::proptest::prelude::prop_assert_eq;
 
 struct Marks;
@@ -28,3 +30,36 @@ laws::law!(lexemes_tile_the_text_without_gaps, "[ -~\n\t•é]{0,60}", text, {
     let rebuilt: String = Lexemes::scanned(&text).iter().map(|lexeme| lexeme.span().slice(&text)).collect();
     prop_assert_eq!(rebuilt, text);
 });
+
+laws::table!(
+    slugs_keep_letters_and_digits_and_replace_every_other_character,
+    Letters::slugged,
+    [
+        "/Users/me/my_repo" => "-Users-me-my-repo",
+        "abc123" => "abc123",
+        "a.b é" => "a-b--",
+        "" => "",
+    ]
+);
+
+laws::table!(
+    camel_names_split_into_lowered_humps,
+    Words::lowered_humps,
+    [
+        "Transcripts" => vec!["transcripts"],
+        "ReadFrom" => vec!["read", "from"],
+        "lowerThenUpper" => vec!["lower", "then", "upper"],
+        "" => Vec::<String>::new(),
+    ]
+);
+
+laws::table!(
+    snake_names_raise_into_camel_case,
+    Words::camel,
+    [
+        "read_from" => "ReadFrom",
+        "sessions" => "Sessions",
+        "a__b_" => "AB",
+        "" => "",
+    ]
+);

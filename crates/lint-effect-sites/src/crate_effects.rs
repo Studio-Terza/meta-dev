@@ -8,19 +8,21 @@ mod vocabulary;
 use std::collections::BTreeSet;
 
 use lint_core::{Site, SourceFile, Violation};
-use lint_paths::Paths;
+use lint_paths::{Ground, Paths};
 use lint_placement::CrateName;
 
-use effect_site::EffectSite;
 use file_scan::FileScan;
 use summary::Summary;
 use vocabulary::Vocabulary;
 
+use effect_site::{Confinement, EffectSite};
+
 #[derive(Debug)]
-pub(crate) struct CrateEffects<'file>(Vec<EffectSite<'file>>);
+pub struct CrateEffects<'file>(Vec<EffectSite<'file>>);
 
 impl<'file> CrateEffects<'file> {
-    pub(crate) fn found(files: &[&'file SourceFile]) -> CrateEffects<'file> {
+    #[must_use]
+    pub fn found(files: &[&'file SourceFile]) -> CrateEffects<'file> {
         let called = Paths::read(files.iter().copied(), &Vocabulary::FINALS);
         let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
         let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();
@@ -36,12 +38,25 @@ impl<'file> CrateEffects<'file> {
         CrateEffects(sites)
     }
 
+    #[must_use]
+    pub fn outside_fillers(&self, fillers: &BTreeSet<Site<'file>>) -> Vec<Violation<'file>> {
+        self.0
+            .iter()
+            .filter(|site| fillers.get(&site.place()).is_none())
+            .map(|site| site.violation(Confinement::Fillers))
+            .collect()
+    }
+
     pub(crate) fn violations(&self, name: &CrateName) -> Vec<Violation<'file>> {
         let summary = self.0.first().map(|first| Violation::new(first.place(), Summary::counted(name, &self.0)));
         summary.into_iter().chain(self.outside_ports()).collect()
     }
 
     pub(crate) fn outside_ports(&self) -> Vec<Violation<'file>> {
-        self.0.iter().filter_map(EffectSite::outside_ports).collect()
+        self.0
+            .iter()
+            .filter(|site| site.ground() == Ground::Open)
+            .map(|site| site.violation(Confinement::Ports))
+            .collect()
     }
 }

@@ -6,13 +6,14 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
 use newtype::Newtype;
-use toml::Spanned;
 use toml::de::DeTable;
 use toml::{Table, Value};
 
+use crate::dependencies::Dependencies;
 use crate::failure::Failure;
 use crate::line_number::LineNumber;
 use crate::name::Name;
+use crate::owned::Owned;
 use crate::path_dependencies::PathDependencies;
 use crate::source_text::SourceText;
 use crate::untested::Untested;
@@ -88,14 +89,10 @@ impl Manifest {
                     .filter(|(key, _)| key.get_ref() == Self::FEATURES)
                     .filter_map(|(_, value)| value.get_ref().as_table())
                     .flat_map(|features| features.keys())
-                    .map(|key| (Name::from(key.get_ref().as_ref()), self.line_of(key)))
+                    .map(|key| (Name::from(key.get_ref().as_ref()), self.text.line_of(key)))
                     .collect()
             })
             .unwrap_or_default()
-    }
-
-    fn line_of<Key>(&self, key: &Spanned<Key>) -> LineNumber {
-        LineNumber::from(self.text.as_ref().get(..key.span().start).unwrap_or_default().matches('\n').count() + 1)
     }
 
     #[must_use]
@@ -183,5 +180,19 @@ impl Manifest {
             .filter_map(Value::as_str)
             .map(Name::from)
             .collect()
+    }
+}
+
+impl From<&Manifest> for Owned {
+    fn from(manifest: &Manifest) -> Owned {
+        Owned::from(&manifest.table)
+    }
+}
+
+impl From<&Manifest> for Dependencies {
+    fn from(manifest: &Manifest) -> Dependencies {
+        DeTable::parse(manifest.text.as_ref())
+            .map(|document| Dependencies::listed(&manifest.text, document.get_ref()))
+            .unwrap_or_default()
     }
 }

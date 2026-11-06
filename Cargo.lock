@@ -111,7 +111,7 @@ dependencies = [
  "e2e",
  "exit",
  "file-ports",
- "logos",
+ "grammar",
  "newtype",
  "port-core",
  "stream",
@@ -476,8 +476,10 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "file-ports",
  "laws",
  "lint-core",
+ "lint-placement",
  "newtype",
 ]
 
@@ -755,6 +757,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lint-port-dependencies"
+version = "0.1.0"
+dependencies = [
+ "lint-core",
+ "lint-effect-sites",
+ "lint-layout",
+ "lint-placement",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "lint-primitive-boundary"
 version = "0.1.0"
 dependencies = [
@@ -901,6 +916,7 @@ dependencies = [
  "lint-no-test-only-api",
  "lint-paired-apis",
  "lint-port-batching",
+ "lint-port-dependencies",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
@@ -986,6 +1002,7 @@ dependencies = [
  "lint-paths",
  "lint-placement",
  "lint-port-batching",
+ "lint-port-dependencies",
  "lint-primitive-boundary",
  "lint-private-fns",
  "lint-process-starters",
@@ -1220,7 +1237,7 @@ dependencies = [
 name = "port-derive"
 version = "0.1.0"
 dependencies = [
- "logos",
+ "grammar",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

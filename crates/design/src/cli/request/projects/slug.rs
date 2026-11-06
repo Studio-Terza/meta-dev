@@ -1,11 +1,9 @@
-mod boundary;
-
 use std::path::{Path, PathBuf};
 
+use grammar::slug::Letters;
 use newtype::{Arbitrary, Newtype};
 
 use crate::cli::failure::Failure;
-use boundary::Letters;
 
 #[derive(Newtype, Arbitrary, Clone, Debug, PartialEq, Eq)]
 pub struct Slug(String);

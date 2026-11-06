@@ -4,9 +4,11 @@ use std::path::{Path, PathBuf};
 use crate::crate_name::CrateName;
 use crate::crate_root::CrateRoot;
 use file_ports::Files;
+use lint_layout::Dependencies;
 use lint_layout::LineNumber;
 use lint_layout::Manifest;
 use lint_layout::Name;
+use lint_layout::Owned;
 use lint_layout::Untested;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -15,6 +17,8 @@ pub struct PackageRoot {
     name: CrateName,
     features: BTreeMap<Name, LineNumber>,
     untested: Untested,
+    owned: Owned,
+    dependencies: Dependencies,
 }
 
 impl PackageRoot {
@@ -43,6 +47,8 @@ impl PackageRoot {
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
+                    owned: manifest.as_ref().map(Owned::from).unwrap_or_default(),
+                    dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
                 }
             })
             .collect()
@@ -50,7 +56,14 @@ impl PackageRoot {
 
     #[must_use]
     pub fn unplaced(root: CrateRoot) -> PackageRoot {
-        PackageRoot { name: CrateName::from(&root), root, features: BTreeMap::new(), untested: Untested::default() }
+        PackageRoot {
+            name: CrateName::from(&root),
+            root,
+            features: BTreeMap::new(),
+            untested: Untested::default(),
+            owned: Owned::default(),
+            dependencies: Dependencies::default(),
+        }
     }
 
     #[must_use]
@@ -71,5 +84,15 @@ impl PackageRoot {
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
+    }
+
+    #[must_use]
+    pub fn owned(&self) -> &Owned {
+        &self.owned
+    }
+
+    #[must_use]
+    pub fn dependencies(&self) -> &Dependencies {
+        &self.dependencies
     }
 }
