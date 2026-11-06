@@ -1,0 +1,74 @@
+Compile checks for `Entry`. The first block compiles; each later block differs from it by one defect
+and must not compile. Stable rustdoc does not check the error codes, so they are recorded for readers.
+
+A port method receives its entry from the meter:
+
+```
+use port_core::{Entry, Metered, Op, OpName};
+
+struct Read;
+
+impl Op for Read {
+    const NAME: OpName = OpName::new("read");
+}
+
+fn read(_entry: Entry<Read>) {}
+
+fn main() {
+    Metered::new(()).call(|_, entry| read(entry));
+}
+```
+
+An entry cannot be built by calling its constructor:
+
+```compile_fail,E0423
+use port_core::{Entry, Op, OpName};
+
+struct Read;
+
+impl Op for Read {
+    const NAME: OpName = OpName::new("read");
+}
+
+fn read(_entry: Entry<Read>) {}
+
+fn main() {
+    read(Entry(std::marker::PhantomData));
+}
+```
+
+An entry cannot be built from a struct literal:
+
+```compile_fail
+use port_core::{Entry, Op, OpName};
+
+struct Read;
+
+impl Op for Read {
+    const NAME: OpName = OpName::new("read");
+}
+
+fn read(_entry: Entry<Read>) {}
+
+fn main() {
+    read(Entry { 0: std::marker::PhantomData });
+}
+```
+
+An entry cannot be admitted from outside the crate:
+
+```compile_fail,E0624
+use port_core::{Entry, Op, OpName};
+
+struct Read;
+
+impl Op for Read {
+    const NAME: OpName = OpName::new("read");
+}
+
+fn read(_entry: Entry<Read>) {}
+
+fn main() {
+    read(Entry::admitted());
+}
+```
