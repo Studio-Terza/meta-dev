@@ -18,6 +18,7 @@ use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
+const NARROWED: &str = "pub fn f() -> Result<(), u8> { Ok(()) }\n";
 const PAIRED: &str = "pub struct A;\nimpl A {\n    pub fn open(&self) {}\n    pub fn close(&self) {}\n}\n";
 const REPEATED: &str = "pub struct A;\nimpl A {\n    pub fn a(items: &[u32]) -> u32 {\n    let mut total = 0;\n    for item in items {\n        if *item > 3 {\n            total += item * 2;\n        } else {\n            total += 1;\n        }\n    }\n    if total > 100 {\n        return 100;\n    }\n    total\n}\n}\n";
 const REPEATED_AGAIN: &str = "pub struct B;\nimpl B {\n    pub fn b(rows: &[u32]) -> u32 {\n    let mut sum = 0;\n    for row in rows {\n        if *row > 3 {\n            sum += row * 2;\n        } else {\n            sum += 1;\n        }\n    }\n    if sum > 100 {\n        return 100;\n    }\n    sum\n}\n}\n";
@@ -68,10 +69,11 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
             .sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
-    let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&system)"]
-        .iter()
-        .map(|call| elegance.matches(call).count())
-        .sum::<usize>();
+    let listed_by_elegance =
+        ["::report(files)", "::report_facts(&facts)", "::report_graph(&system)", "ModelLint>::report"]
+            .iter()
+            .map(|call| elegance.matches(call).count())
+            .sum::<usize>();
     assert_eq!(listed_by_the_runner, implemented - listed_by_the_mode - listed_by_elegance);
     Ok(())
 }
@@ -114,6 +116,24 @@ fn the_report_flag_prints_elegance_reports_and_blocks_nothing() -> Result<(), Bo
     assert_eq!(run.exit, ExitCode::SUCCESS);
     assert!(run.out.contains("/src/lib.rs:2: crate r: 1 functions by complexity"), "{}", run.out);
     assert_eq!(run.err, "");
+    Ok(())
+}
+
+#[test]
+fn the_report_flag_lists_narrowed_returns_and_blocks_nothing() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", NARROWED)?;
+    let reported = root.flagged(&["--report"]);
+    assert_eq!(reported.exit, ExitCode::SUCCESS);
+    assert!(reported.out.contains("src/lib.rs:1: fn f -> Result<(), E>"), "{}", reported.out);
+    let gated = root.flagged(&[]);
+    assert_eq!(
+        gated.out.matches("fn f ->").count() + gated.err.matches("fn f ->").count(),
+        0,
+        "{}{}",
+        gated.out,
+        gated.err
+    );
     Ok(())
 }
 

@@ -101,6 +101,14 @@ ports and outside.
 declarations and functions inside bodies. Only a trait impl may, since the trait fixes its signature (`PartialEq::eq` and the
 like). Return an enum to match on, an `Option` or `Result` carrying the value, or a proof type such as `NonEmpty`.
 
+`narrowed_returns` lists, in the `--report` run only, every function returning `bool`, `Result<(), E>` or `Option<E>`
+where `E` is an error type, read through the code model: return types resolve through imports, globs and aliases (crate
+aliases and `fmt::Result`, `io::Result`, `thread::Result`), so a crate type named `Result` or a generic named like an
+error is not flagged. An error type is a crate type with an `Error` impl or a `thiserror` derive, a crate type returned as
+the `Err` of a `Result` outside trait impls, or `io::Error` and `fmt::Error`. Trait impls, `#[test]` functions and the
+crate's root `main` are exempt; test-scope helpers and inherent `fmt::Result` helpers are flagged. It stays report-only,
+beside the blocking `bool_methods`, until the backlog is fixed; then it joins the gate and replaces `bool_methods`.
+
 `no_early_exits` blocks the `return`, `break` and `continue` keywords in shipped and test code alike: function bodies,
 const fns, trait impls, closures, labeled blocks, `#[cfg(test)]` modules, files under `tests` and macro bodies. A body
 leaves through its tail value or through `?`, which stays allowed. The message names the fix: yield the value from an

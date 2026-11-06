@@ -19,6 +19,7 @@ code-model = { path = "../code-model" }
 code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 lint-hand-impls = { path = "../lint-hand-impls" }
+lint-narrowed-returns = { path = "../lint-narrowed-returns" }
 lint-reader = { path = "../lint-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-bool-methods = { path = "../lint-bool-methods" }
