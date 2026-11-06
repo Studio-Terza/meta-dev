@@ -1,7 +1,8 @@
-use design_model::{NodeId, Project};
+use design_model::Project;
 use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 
+use crate::Resolved;
 use crate::graph::NodeRow;
 
 #[derive(Clone, Debug, Op)]
@@ -14,9 +15,9 @@ impl From<Project> for ProjectRoot {
 }
 
 impl Query for ProjectRoot {
-    type Rows = Option<NodeId>;
+    type Rows = Option<Resolved>;
 
-    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<NodeId>, StoreFailure> {
-        Ok(NodeRow::root(&self.0, statements)?.into_iter().next())
+    fn rows(self, statements: &mut Statements<'_>) -> Result<Option<Resolved>, StoreFailure> {
+        NodeRow::root(&self.0, statements)
     }
 }

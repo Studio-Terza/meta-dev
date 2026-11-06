@@ -13,12 +13,14 @@ pub enum ColumnFailure {
     Unfit(#[from] TryFromIntError),
     #[error("a stored spelling names nothing of its column's type: {0}")]
     Misspelled(#[source] Box<dyn Error + Send + Sync>),
+    #[error("a stored column its row needs is null")]
+    Absent,
 }
 
 pub trait Encoding<Value> {
     type Raw;
 
-    fn into_raw(value: Value) -> Self::Raw;
+    fn raw(value: &Value) -> Self::Raw;
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure>;
 }
@@ -31,11 +33,11 @@ pub trait Primitive: Sized {
     fn from_raw(raw: Self::Raw) -> Result<Self, ColumnFailure>;
 }
 
-impl<Value: Newtype<Inner: Primitive>> Encoding<Value> for Inner {
+impl<Value: Newtype<Inner: Primitive> + Clone> Encoding<Value> for Inner {
     type Raw = <Value::Inner as Primitive>::Raw;
 
-    fn into_raw(value: Value) -> Self::Raw {
-        value.into_inner().into_raw()
+    fn raw(value: &Value) -> Self::Raw {
+        value.clone().into_inner().into_raw()
     }
 
     fn from_raw(raw: Self::Raw) -> Result<Value, ColumnFailure> {
@@ -46,7 +48,7 @@ impl<Value: Newtype<Inner: Primitive>> Encoding<Value> for Inner {
 impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Value> for Spelled {
     type Raw = String;
 
-    fn into_raw(value: Value) -> String {
+    fn raw(value: &Value) -> String {
         value.to_string()
     }
 
@@ -58,8 +60,8 @@ impl<Value: Display + FromStr<Err: Error + Send + Sync + 'static>> Encoding<Valu
 impl<Value: Column> Encoding<Option<Value>> for Optional {
     type Raw = Option<Value::Raw>;
 
-    fn into_raw(value: Option<Value>) -> Option<Value::Raw> {
-        value.map(Value::into_raw)
+    fn raw(value: &Option<Value>) -> Option<Value::Raw> {
+        value.as_ref().map(Value::raw)
     }
 
     fn from_raw(raw: Option<Value::Raw>) -> Result<Option<Value>, ColumnFailure> {

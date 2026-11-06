@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
 use grammar::project::Names;
-use newtype::Display;
+use newtype::{Display, Spelled};
 use serde::{Deserialize, Serialize};
 
-#[derive(Display, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Display, Spelled, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub struct Project(String);
 

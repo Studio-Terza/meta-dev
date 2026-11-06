@@ -2,14 +2,14 @@ use std::fmt;
 use std::str::FromStr;
 
 use grammar::artifact::Artifacts;
-use newtype::Display;
+use newtype::{Display, Spelled};
 
 use crate::ArtifactKind;
 
 #[derive(Display, Clone, Debug, PartialEq, Eq)]
 pub struct ArtifactName(String);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Spelled, Clone, Debug, PartialEq, Eq)]
 pub struct Artifact {
     kind: ArtifactKind,
     name: ArtifactName,

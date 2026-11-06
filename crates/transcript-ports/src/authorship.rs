@@ -1,7 +1,9 @@
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+use newtype::Spelled;
+
+#[derive(Spelled, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Authorship {
     Owner,
     Lead,

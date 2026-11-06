@@ -290,7 +290,6 @@ dependencies = [
  "named-derive",
  "newtype",
  "port-core",
- "sqlx",
  "store-ports",
  "stream",
  "strum",

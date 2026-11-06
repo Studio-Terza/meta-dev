@@ -12,7 +12,7 @@ pub struct Bound {
 impl Bound {
     pub fn raw(&self) -> TokenStream {
         let Bound { name, column } = self;
-        quote!(<#column as ::store_ports::Column>::into_raw(#name))
+        quote!(<#column as ::store_ports::Column>::raw(&#name))
     }
 }
 

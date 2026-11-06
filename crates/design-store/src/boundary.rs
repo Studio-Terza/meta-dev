@@ -1,17 +1,15 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
+use design_model::Ordinal;
 use file_ports::Offset;
 use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype};
-use store_ports::{Statements, StoreFailure, Written};
+use store_ports::{Columns, Statements, StoreFailure, Written};
 use stream::{MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
-
-#[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
-pub struct Author(String);
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct ShapeName(String);
@@ -22,109 +20,107 @@ pub struct RelationName(String);
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct AnchorName(String);
 
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct SegmentKey(i64);
+
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Rank(f64);
+
 pub(crate) trait Row {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub struct MessageRow {
-    uuid: String,
-    session: String,
-    parent: Option<String>,
-    at: String,
-    author: String,
-    body: String,
+    uuid: Uuid,
+    session: SessionId,
+    parent: Option<Uuid>,
+    at: Instant,
+    author: Authorship,
+    body: Body,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub struct SegmentRow {
-    message: String,
-    ordinal: i64,
-    shape: String,
-    body: String,
+    message: Uuid,
+    ordinal: Ordinal,
+    shape: ShapeName,
+    body: Body,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub struct LinkRow {
-    source: String,
-    relation: String,
-    target: String,
-    source_message: String,
-    target_message: String,
+    source: AnchorName,
+    relation: RelationName,
+    target: AnchorName,
+    source_message: Uuid,
+    target_message: Uuid,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub struct Hit {
-    id: i64,
-    uuid: String,
-    author: String,
-    at: String,
-    body: String,
-    rank: f64,
+    id: SegmentKey,
+    uuid: Uuid,
+    author: Authorship,
+    at: Instant,
+    body: Body,
+    rank: Rank,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub(crate) struct RankRow {
-    id: i64,
-    rank: f64,
+    id: SegmentKey,
+    rank: Rank,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub(crate) struct EdgeRow {
-    session: String,
-    uuid: String,
-    parent: Option<String>,
+    session: SessionId,
+    uuid: Uuid,
+    parent: Option<Uuid>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Columns)]
 pub(crate) struct CursorRow {
-    session: String,
-    read_to: i64,
+    session: SessionId,
+    read_to: Offset,
 }
 
 impl From<&Message> for MessageRow {
     fn from(message: &Message) -> MessageRow {
         let record = message.record();
         MessageRow {
-            uuid: record.uuid().to_string(),
-            session: record.session().to_string(),
-            parent: record.parent().map(ToString::to_string),
-            at: record.stamp().to_string(),
-            author: record.author().to_string(),
-            body: record.text().to_string(),
+            uuid: record.uuid().clone(),
+            session: record.session().clone(),
+            parent: record.parent().cloned(),
+            at: record.stamp().clone(),
+            author: record.author(),
+            body: record.text().clone(),
         }
     }
 }
 
-impl TryFrom<MessageRow> for Record {
-    type Error = sqlx::Error;
-
-    fn try_from(row: MessageRow) -> Result<Record, sqlx::Error> {
-        let author: Authorship = row.author.parse().map_err(|unvoiced| sqlx::Error::Decode(Box::new(unvoiced)))?;
-        Ok(Skipped::new(Uuid::new(row.uuid), row.parent.map(Uuid::new)).said(
-            SessionId::new(row.session),
-            Instant::new(row.at),
-            author,
-            Body::new(row.body),
-        ))
+impl From<MessageRow> for Record {
+    fn from(row: MessageRow) -> Record {
+        Skipped::new(row.uuid, row.parent).said(row.session, row.at, row.author, row.body)
     }
 }
 
 impl From<EdgeRow> for Skipped {
     fn from(row: EdgeRow) -> Skipped {
-        Skipped::new(Uuid::new(row.uuid), row.parent.map(Uuid::new))
+        Skipped::new(row.uuid, row.parent)
     }
 }
 
 impl From<&SegmentRow> for Body {
     fn from(segment: &SegmentRow) -> Body {
-        Body::new(segment.body.clone())
+        segment.body.clone()
     }
 }
 
 impl From<&Hit> for Body {
     fn from(hit: &Hit) -> Body {
-        Body::new(hit.body.clone())
+        hit.body.clone()
     }
 }
 
@@ -132,109 +128,105 @@ impl From<&MechanicalLink> for LinkRow {
     fn from(link: &MechanicalLink) -> LinkRow {
         let [source, target] = link.anchors();
         LinkRow {
-            source: source.to_string(),
-            relation: link.relation().to_string(),
-            target: target.to_string(),
-            source_message: source.message().to_string(),
-            target_message: target.message().to_string(),
+            source: AnchorName::new(source.to_string()),
+            relation: RelationName::new(link.relation().to_string()),
+            target: AnchorName::new(target.to_string()),
+            source_message: source.message().clone(),
+            target_message: target.message().clone(),
         }
     }
 }
 
 impl MessageRow {
     pub(crate) fn named(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<MessageRow>, StoreFailure> {
-        let uuid = uuid.to_string();
-        statements.rows(sqlx::query_as!(
+        statements.rows(store_ports::query!(
             MessageRow,
             "SELECT uuid, session, parent, at, author, body FROM messages WHERE uuid = ?1",
-            uuid
+            uuid: Uuid
         ))
     }
 
     pub(crate) fn earlier(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Record>, StoreFailure> {
-        let session = session.to_string();
-        let rows = statements.rows(sqlx::query_as!(
+        let rows = statements.rows(store_ports::query!(
             MessageRow,
             "SELECT messages.uuid, messages.session, messages.parent, messages.at, messages.author, messages.body FROM edges JOIN messages ON messages.uuid = edges.uuid WHERE edges.session = ?1 ORDER BY edges.rowid",
-            session
+            session: SessionId
         ))?;
-        Ok(rows.into_iter().map(Record::try_from).collect::<Result<Vec<Record>, sqlx::Error>>()?)
+        Ok(rows.into_iter().map(Record::from).collect())
     }
 
     #[must_use]
     pub fn uuid(&self) -> Uuid {
-        Uuid::new(self.uuid.clone())
+        self.uuid.clone()
     }
 
     #[must_use]
     pub fn session(&self) -> SessionId {
-        SessionId::new(self.session.clone())
+        self.session.clone()
     }
 
     #[must_use]
     pub fn stamp(&self) -> Instant {
-        Instant::new(self.at.clone())
+        self.at.clone()
     }
 
     #[must_use]
-    pub fn author(&self) -> Author {
-        Author::new(self.author.clone())
+    pub fn author(&self) -> Authorship {
+        self.author
     }
 }
 
 impl SegmentRow {
     pub(crate) fn within(message: &Message) -> Vec<SegmentRow> {
-        let uuid = message.record().uuid().to_string();
+        let uuid = message.record().uuid();
         message
             .segments()
             .iter()
             .map(|segment| SegmentRow {
                 message: uuid.clone(),
-                ordinal: i64::try_from(segment.identity().ordinal().into_inner()).unwrap_or(i64::MAX),
-                shape: Shape::from(segment.form()).to_string(),
-                body: segment.text(message).to_string(),
+                ordinal: Ordinal::new(segment.identity().ordinal().into_inner()),
+                shape: ShapeName::new(Shape::from(segment.form()).to_string()),
+                body: segment.text(message),
             })
             .collect()
     }
 
     pub(crate) fn stored_for(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<SegmentRow>, StoreFailure> {
-        let uuid = uuid.to_string();
-        statements.rows(sqlx::query_as!(
+        statements.rows(store_ports::query!(
             SegmentRow,
             "SELECT message, ordinal, shape, body FROM segments WHERE message = ?1 ORDER BY ordinal",
-            uuid
+            uuid: Uuid
         ))
     }
 
     #[must_use]
-    pub fn ordinal(&self) -> i64 {
+    pub fn ordinal(&self) -> Ordinal {
         self.ordinal
     }
 
     #[must_use]
     pub fn shape(&self) -> ShapeName {
-        ShapeName::new(self.shape.clone())
+        self.shape.clone()
     }
 }
 
 impl LinkRow {
     pub(crate) fn touching(uuid: &Uuid, statements: &mut Statements<'_>) -> Result<Vec<LinkRow>, StoreFailure> {
-        let uuid = uuid.to_string();
-        statements.rows(sqlx::query_as!(
+        statements.rows(store_ports::query!(
             LinkRow,
             "SELECT source, relation, target, source_message, target_message FROM mechanical_links WHERE ?1 IN (source_message, target_message) ORDER BY rowid",
-            uuid
+            uuid: Uuid
         ))
     }
 
     #[must_use]
     pub fn anchors(&self) -> [AnchorName; 2] {
-        [AnchorName::new(self.source.clone()), AnchorName::new(self.target.clone())]
+        [self.source.clone(), self.target.clone()]
     }
 
     #[must_use]
     pub fn relation(&self) -> RelationName {
-        RelationName::new(self.relation.clone())
+        self.relation.clone()
     }
 }
 
@@ -244,54 +236,52 @@ impl Hit {
         scope: Scope,
         statements: &mut Statements<'_>,
     ) -> Result<Vec<Hit>, StoreFailure> {
-        let term = term.to_string();
-        let only = scope.only().map(|author| author.to_string());
-        statements.rows(sqlx::query_as!(
+        let only = scope.only();
+        statements.rows(store_ports::query!(
             Hit,
             r#"SELECT segments.rowid AS "id!: i64", messages.uuid, messages.author, messages.at, segments.body, segments_fts.rank AS "rank!: f64" FROM segments_fts JOIN segments ON segments.rowid = segments_fts.rowid JOIN messages ON messages.uuid = segments.message WHERE segments_fts MATCH ?1 AND (?2 IS NULL OR messages.author = ?2)"#,
-            term,
-            only
+            term: Term,
+            only: Option<Authorship>
         ))
     }
 
-    pub(crate) fn within(self, rest: &[BTreeMap<i64, f64>]) -> Option<Hit> {
+    pub(crate) fn within(self, rest: &[BTreeMap<SegmentKey, Rank>]) -> Option<Hit> {
         rest.iter()
-            .map(|ranks| ranks.get(&self.id).copied())
+            .map(|ranks| ranks.get(&self.id).map(|rank| rank.into_inner()))
             .sum::<Option<f64>>()
-            .map(|more| Hit { rank: self.rank + more, ..self })
+            .map(|more| Hit { rank: Rank::new(self.rank.into_inner() + more), ..self })
     }
 
     pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
-        self.rank.total_cmp(&other.rank).then(self.id.cmp(&other.id))
+        self.rank.into_inner().total_cmp(&other.rank.into_inner()).then(self.id.cmp(&other.id))
     }
 
     #[must_use]
     pub fn uuid(&self) -> Uuid {
-        Uuid::new(self.uuid.clone())
+        self.uuid.clone()
     }
 
     #[must_use]
-    pub fn author(&self) -> Author {
-        Author::new(self.author.clone())
+    pub fn author(&self) -> Authorship {
+        self.author
     }
 
     #[must_use]
     pub fn stamp(&self) -> Instant {
-        Instant::new(self.at.clone())
+        self.at.clone()
     }
 }
 
 impl RankRow {
     pub(crate) fn matching(term: &Term, statements: &mut Statements<'_>) -> Result<Vec<RankRow>, StoreFailure> {
-        let term = term.to_string();
-        statements.rows(sqlx::query_as!(
+        statements.rows(store_ports::query!(
             RankRow,
             r#"SELECT rowid AS "id!: i64", rank AS "rank!: f64" FROM segments_fts WHERE segments_fts MATCH ?1"#,
-            term
+            term: Term
         ))
     }
 
-    pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<i64, f64> {
+    pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<SegmentKey, Rank> {
         rows.into_iter().map(|row| (row.id, row.rank)).collect()
     }
 }
@@ -299,27 +289,18 @@ impl RankRow {
 impl EdgeRow {
     pub(crate) fn said(session: &SessionId, message: &Message) -> EdgeRow {
         let record = message.record();
-        EdgeRow {
-            session: session.to_string(),
-            uuid: record.uuid().to_string(),
-            parent: record.parent().map(ToString::to_string),
-        }
+        EdgeRow { session: session.clone(), uuid: record.uuid().clone(), parent: record.parent().cloned() }
     }
 
     pub(crate) fn skipped(session: &SessionId, skipped: &Skipped) -> EdgeRow {
-        EdgeRow {
-            session: session.to_string(),
-            uuid: skipped.uuid().to_string(),
-            parent: skipped.parent().map(ToString::to_string),
-        }
+        EdgeRow { session: session.clone(), uuid: skipped.uuid().clone(), parent: skipped.parent().cloned() }
     }
 
     pub(crate) fn passing(session: &SessionId, statements: &mut Statements<'_>) -> Result<Vec<Skipped>, StoreFailure> {
-        let session = session.to_string();
-        let rows = statements.rows(sqlx::query_as!(
+        let rows = statements.rows(store_ports::query!(
             EdgeRow,
             "SELECT session, uuid, parent FROM edges WHERE session = ?1 AND uuid NOT IN (SELECT uuid FROM messages) ORDER BY rowid",
-            session
+            session: SessionId
         ))?;
         Ok(rows.into_iter().map(Skipped::from).collect())
     }
@@ -327,81 +308,83 @@ impl EdgeRow {
 
 impl CursorRow {
     pub(crate) fn reached(session: &SessionId, cursor: Cursor) -> CursorRow {
-        CursorRow {
-            session: session.to_string(),
-            read_to: i64::try_from(cursor.into_inner().into_inner()).unwrap_or(i64::MAX),
-        }
+        CursorRow { session: session.clone(), read_to: cursor.into_inner() }
     }
 
     pub(crate) fn all(statements: &mut Statements<'_>) -> Result<Vec<CursorRow>, StoreFailure> {
-        statements.rows(sqlx::query_as!(CursorRow, "SELECT session, read_to FROM cursors"))
+        statements.rows(store_ports::query!(CursorRow, "SELECT session, read_to FROM cursors"))
     }
 
     pub(crate) fn session(&self) -> SessionId {
-        SessionId::new(self.session.clone())
+        self.session.clone()
     }
 
     pub(crate) fn cursor(&self) -> Cursor {
-        Cursor::new(Offset::new(u64::try_from(self.read_to).unwrap_or_default()))
+        Cursor::new(self.read_to)
     }
 }
 
 impl Row for MessageRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+        let MessageRow { uuid, session, parent, at, author, body } = self;
+        statements.written(store_ports::query!(
             "INSERT OR IGNORE INTO messages (uuid, session, parent, at, author, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            self.uuid,
-            self.session,
-            self.parent,
-            self.at,
-            self.author,
-            self.body
+            uuid: Uuid,
+            session: SessionId,
+            parent: Option<Uuid>,
+            at: Instant,
+            author: Authorship,
+            body: Body
         ))
     }
 }
 
 impl Row for SegmentRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+        let SegmentRow { message, ordinal, shape, body } = self;
+        statements.written(store_ports::query!(
             "INSERT OR IGNORE INTO segments (message, ordinal, shape, body) VALUES (?1, ?2, ?3, ?4)",
-            self.message,
-            self.ordinal,
-            self.shape,
-            self.body
+            message: Uuid,
+            ordinal: Ordinal,
+            shape: ShapeName,
+            body: Body
         ))
     }
 }
 
 impl Row for LinkRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+        let LinkRow { source, relation, target, source_message, target_message } = self;
+        statements.written(store_ports::query!(
             "INSERT OR IGNORE INTO mechanical_links (source, relation, target, source_message, target_message) VALUES (?1, ?2, ?3, ?4, ?5)",
-            self.source,
-            self.relation,
-            self.target,
-            self.source_message,
-            self.target_message
+            source: AnchorName,
+            relation: RelationName,
+            target: AnchorName,
+            source_message: Uuid,
+            target_message: Uuid
         ))
     }
 }
 
 impl Row for EdgeRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+        let EdgeRow { session, uuid, parent } = self;
+        statements.written(store_ports::query!(
             "INSERT OR IGNORE INTO edges (session, uuid, parent) VALUES (?1, ?2, ?3)",
-            self.session,
-            self.uuid,
-            self.parent
+            session: SessionId,
+            uuid: Uuid,
+            parent: Option<Uuid>
         ))
     }
 }
 
 impl Row for CursorRow {
     fn written(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
-        statements.written(sqlx::query!(
+        let CursorRow { session, read_to } = self;
+        statements.written(store_ports::query!(
             "INSERT INTO cursors (session, read_to) VALUES (?1, ?2) ON CONFLICT (session) DO UPDATE SET read_to = excluded.read_to WHERE read_to <> excluded.read_to",
-            self.session,
-            self.read_to
+            session: SessionId,
+            read_to: Offset
         ))
     }
 }

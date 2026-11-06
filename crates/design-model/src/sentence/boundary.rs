@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use grammar::line::Unbroken;
-use newtype::Display;
+use newtype::{Display, Spelled};
 
-#[derive(Display, Clone, Debug, PartialEq, Eq)]
+#[derive(Display, Spelled, Clone, Debug, PartialEq, Eq)]
 pub struct Condition(String);
 
-#[derive(Display, Clone, Debug, PartialEq, Eq)]
+#[derive(Display, Spelled, Clone, Debug, PartialEq, Eq)]
 pub struct Reason(String);
 
 #[derive(Debug, thiserror::Error)]

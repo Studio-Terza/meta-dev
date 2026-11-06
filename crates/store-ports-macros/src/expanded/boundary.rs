@@ -22,8 +22,8 @@ impl Rewritten {
 
     fn rewritten(tokens: TokenStream) -> TokenStream {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
-        let colons: Vec<Option<&Punct>> = [None, None].into_iter().chain(trees.iter().map(Self::colon)).collect();
-        trees.iter().zip(colons.windows(2)).map(|(tree, before)| Self::replaced(tree, before)).collect()
+        let colons = trees.iter().skip(1).map(Self::colon).chain([None]);
+        trees.iter().zip(colons).map(|(tree, after)| Self::replaced(tree, after)).collect()
     }
 
     fn colon(tree: &TokenTree) -> Option<&Punct> {
@@ -40,12 +40,9 @@ impl Rewritten {
         }
     }
 
-    fn replaced(tree: &TokenTree, before: &[Option<&Punct>]) -> TokenStream {
-        before
-            .iter()
-            .all(Option::is_some)
-            .then_some(tree)
-            .and_then(Self::sqlx)
+    fn replaced(tree: &TokenTree, after: Option<&Punct>) -> TokenStream {
+        after
+            .and(Self::sqlx(tree))
             .map_or_else(|| Self::kept(tree), |_| quote!(store_ports::__sqlx))
     }
 
