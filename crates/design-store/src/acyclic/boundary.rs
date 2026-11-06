@@ -85,7 +85,11 @@ WHERE
             descendant: Keyed,
             ancestor: Keyed
         ))?;
-        reverse.into_iter().map(|reached| reached.depth).next().map_or(Ok(open), |_depth| Err(Refusal::Cyclic(R::cycle(self.source, self.target))))
+        reverse
+            .into_iter()
+            .map(|reached| reached.depth)
+            .next()
+            .map_or(Ok(open), |_depth| Err(Refusal::Cyclic(R::cycle(self.source, self.target))))
     }
 }
 

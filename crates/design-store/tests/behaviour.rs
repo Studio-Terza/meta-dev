@@ -845,8 +845,12 @@ impl Staging {
             .map(|step| {
                 let before = Staging::stored(&store, root)?;
                 let transition = Staging::transition(*step)?;
-                let wanted = transition.clone().applied(before.clone()).map_or_else(|misstaged| (Some(misstaged), before), |moved| (None, moved));
-                let refused = store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
+                let wanted = transition
+                    .clone()
+                    .applied(before.clone())
+                    .map_or_else(|misstaged| (Some(misstaged), before), |moved| (None, moved));
+                let refused =
+                    store.write(Restaged::new(resolved, transition)).err().map(Staging::misstaged).transpose()?;
                 Ok(Mismatch { wanted, stored: (refused, Staging::stored(&store, root)?) })
             })
             .collect::<Result<Vec<Mismatch>, Box<dyn Error>>>()?;
@@ -986,7 +990,9 @@ impl Change {
     fn written(self, store: &Port<'_, Sqlite>) -> Result<Result<Written, Refusal>, Box<dyn Error>> {
         match self {
             Change::Cast(node, role) => Dag::cast(store, Dag::id(node), role),
-            Change::Refined(edge) => Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines),
+            Change::Refined(edge) => {
+                Dag::linked(store, [Dag::id(edge.child), Dag::id(edge.parent)], NodeRelation::Refines)
+            }
         }
     }
 

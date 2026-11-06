@@ -40,7 +40,9 @@ impl<'file> Visit<'file> for Queries<'file> {
 impl Queries<'_> {
     fn met(&mut self, invocation: &Macro) {
         match Sql::queried(invocation) {
-            Some(sql) => self.found.extend(sql.unformatted().map(|line| Violation::new(Site::new(self.path, line), Unformatted))),
+            Some(sql) => {
+                self.found.extend(sql.unformatted().map(|line| Violation::new(Site::new(self.path, line), Unformatted)))
+            }
             None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
         }
     }

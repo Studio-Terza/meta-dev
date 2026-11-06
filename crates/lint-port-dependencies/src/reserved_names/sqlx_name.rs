@@ -23,6 +23,8 @@ impl fmt::Display for SqlxName {
 
 impl Finding for SqlxName {
     fn fix(&self) -> Fix {
-        Fix::new("reach the store through store_ports::query!, store_ports::migrate! and the Store port, never through sqlx")
+        Fix::new(
+            "reach the store through store_ports::query!, store_ports::migrate! and the Store port, never through sqlx",
+        )
     }
 }

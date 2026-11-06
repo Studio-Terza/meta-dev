@@ -40,7 +40,11 @@ WHERE
 }
 
 impl Unseen {
-    pub(crate) fn written(&self, provenance: Entered, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
+    pub(crate) fn written(
+        &self,
+        provenance: Entered,
+        statements: &mut Statements<'_>,
+    ) -> Result<Written, StoreFailure> {
         let content = &self.0;
         statements.written(store_ports::query!(
             r#"

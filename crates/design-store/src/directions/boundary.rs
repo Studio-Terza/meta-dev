@@ -1,6 +1,6 @@
 use design_model::{
-    Confidence, Entered, Explicitness, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation, Sense,
-    SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
+    Confidence, Entered, Explicitness, Node, NodeId, NodeRelation, Ordinal, Provenance, Segment, SegmentRelation,
+    Sense, SenseKind, SpanRelation, Specificity, Standing, Supersession, Vague,
 };
 use newtype::Counter;
 use store_ports::{Batch, Columns as Row, Statements, StoreFailure, Written};

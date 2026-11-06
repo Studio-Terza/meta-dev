@@ -41,9 +41,7 @@ impl Rewritten {
     }
 
     fn replaced(tree: &TokenTree, after: Option<&Punct>) -> TokenStream {
-        after
-            .and(Self::sqlx(tree))
-            .map_or_else(|| Self::kept(tree), |_| quote!(store_ports::__sqlx))
+        after.and(Self::sqlx(tree)).map_or_else(|| Self::kept(tree), |_| quote!(store_ports::__sqlx))
     }
 
     fn kept(tree: &TokenTree) -> TokenStream {
