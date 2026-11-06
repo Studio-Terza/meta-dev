@@ -12,16 +12,16 @@ impl Sql {
 
     pub(super) fn queried(invocation: &Macro) -> Option<Sql> {
         let path: Vec<String> = invocation.path.segments.iter().map(|segment| segment.ident.to_string()).collect();
-        Some(invocation)
-            .filter(|_| path == Self::PATH)
+        (path == Self::PATH)
+            .then_some(invocation)
             .and_then(|query| query.tokens.clone().into_iter().find_map(Self::literal))
             .map(Sql)
     }
 
     pub(super) fn unformatted(&self) -> Option<LineNumber> {
         let written = self.0.token().to_string();
-        let formatted = sqlformat::format(self.0.value().trim(), &QueryParams::None, &FormatOptions::default());
-        Some(LineNumber::from(self.0.span())).filter(|_| written != format!("r#\"\n{formatted}\n\"#"))
+        let formatted = sqlformat::format(&self.0.value(), &QueryParams::None, &FormatOptions::default());
+        (written != format!("r#\"\n{formatted}\n\"#")).then_some(LineNumber::from(self.0.span()))
     }
 
     fn literal(tree: TokenTree) -> Option<LitStr> {
