@@ -1,9 +1,6 @@
 use std::fmt;
 
-use design_model::{
-    AnyNode, AnyStage, Dropped, Entered, NodeId, Refining, Segment, SegmentRelation, Sense, SpanRelation, Staging,
-    Terminal, Vague,
-};
+use design_model::{AnyNode, AnyStage, Entered, NodeId, Segment, SegmentRelation, Sense, SpanRelation};
 use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
@@ -105,28 +102,14 @@ impl fmt::Display for Neighbourhood<'_> {
 
 impl fmt::Display for Details<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.staged(Writing(formatter))
-    }
-}
-
-impl Staging for Writing<'_, '_> {
-    type Output = fmt::Result;
-
-    fn vague(self, _vague: &Vague) -> fmt::Result {
-        Ok(())
-    }
-
-    fn refining(self, _refining: &Refining) -> fmt::Result {
-        Ok(())
-    }
-
-    fn terminal(self, terminal: &Terminal) -> fmt::Result {
-        writeln!(self.0, "  artifact {}", terminal.artifact())?;
-        writeln!(self.0, "  condition {:?}", terminal.condition().to_string())
-    }
-
-    fn dropped(self, dropped: &Dropped) -> fmt::Result {
-        writeln!(self.0, "  reason {:?}", dropped.reason().to_string())
+        match self.0 {
+            AnyStage::Terminal(terminal) => {
+                writeln!(formatter, "  artifact {}", terminal.artifact())?;
+                writeln!(formatter, "  condition {:?}", terminal.condition().to_string())
+            }
+            AnyStage::Dropped(dropped) => writeln!(formatter, "  reason {:?}", dropped.reason().to_string()),
+            AnyStage::Vague(_) | AnyStage::Refining(_) => Ok(()),
+        }
     }
 }
 
