@@ -55,8 +55,27 @@ const MACRO_DOOR: &str = "struct A;\nimpl A {\n    fn g(x: Name) {\n        x.tr
 const MACRO_TEXT: &str =
     "fn f(x: Name) {\n    assert!(x.trim().is_empty());\n    println!(\"{}\", x.to_string());\n}\n";
 const BESIDE_MACRO: &str = "m! {\n    fn f(x: &str) {}\n}\nfn g(y: u8) {}\n";
+const SAME_NAME_DOOR: &str = "mod m {\n    pub struct A;\n    impl std::fmt::Display for A {\n        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {\n            g(f)\n        }\n    }\n}\nmod n {\n    pub struct A;\n    impl A {\n        fn f(x: Name) {\n            x.trim();\n        }\n    }\n}\n";
+const SAME_NAME_NEWTYPE: &str = "pub struct Id(u64);\nmod other {\n    pub struct Id {\n        v: V,\n    }\n    impl Id {\n        pub fn new(v: u64) -> Id {\n            g(v)\n        }\n    }\n}\n";
+const MODULE_ALIAS: &str =
+    "pub type Count = usize;\nmod inner {\n    use super::Count;\n    fn c(x: Count) {}\n}\nfn d(x: Count) {}\n";
 
-const CASES: [Case; 52] = [
+const CASES: [Case; 55] = [
+    Case::new(
+        Title::new("a door on another same-named type exempts nothing"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_DOOR))],
+        Flagged::new(&["crates/x/src/lib.rs:13"]),
+    ),
+    Case::new(
+        Title::new("a constructor on a same-named type elsewhere than the newtype"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(SAME_NAME_NEWTYPE))],
+        Flagged::new(&["crates/x/src/lib.rs:7"]),
+    ),
+    Case::new(
+        Title::new("an alias resolves through module scope"),
+        &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(MODULE_ALIAS))],
+        Flagged::new(&["crates/x/src/lib.rs:4", "crates/x/src/lib.rs:6"]),
+    ),
     Case::new(
         Title::new("a shipped constructor beside a same-named newtype in a test file"),
         &[
