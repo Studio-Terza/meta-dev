@@ -38,6 +38,7 @@ impl Sessions for Lines {
 law!(every_call_is_counted_once_for_its_own_op, (0usize..16, 0usize..16), counts, {
     let (reads, writes) = counts;
     let port = Metered::new(Lines(1));
+    port.tally().reset();
     (0..reads).for_each(|_| {
         port.call(Sessions::read_session);
     });
@@ -63,4 +64,23 @@ fn the_snapshot_lists_only_the_ops_that_were_called() {
     port.call(Sessions::write_session);
     let names: Vec<OpName> = port.tally().snapshot().keys().copied().collect();
     assert_eq!(names, vec![WriteSession::NAME]);
+}
+
+#[test]
+fn two_meters_of_one_port_count_into_one_tally() {
+    let first = Metered::new(Lines(1));
+    let second = Metered::new(Lines(2));
+    first.tally().reset();
+    first.call(Sessions::read_session);
+    second.call(Sessions::read_session);
+    assert_eq!(first.tally().calls(ReadSession::NAME), Calls::new(2));
+    assert_eq!(second.tally().calls(ReadSession::NAME), Calls::new(2));
+}
+
+#[test]
+fn a_reset_clears_the_tally() {
+    let port = Metered::new(Lines(1));
+    port.call(Sessions::read_session);
+    port.tally().reset();
+    assert_eq!(port.tally().snapshot(), std::collections::BTreeMap::new());
 }

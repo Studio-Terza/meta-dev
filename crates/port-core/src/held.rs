@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::{Entry, Op};
 
 pub trait Resource {
+    type Port;
     type Failure;
 
     fn release(&mut self) -> Result<(), Self::Failure>;
@@ -37,7 +38,7 @@ pub struct Held<R: Resource> {
 }
 
 impl<R: Resource> Held<R> {
-    pub fn new<O: Op>(_entry: Entry<O>, resource: R, log: &Rc<ReleaseLog<R::Failure>>) -> Held<R> {
+    pub fn new<O: Op<Port = R::Port>>(_entry: Entry<O>, resource: R, log: &Rc<ReleaseLog<R::Failure>>) -> Held<R> {
         Held { resource: Some(resource), log: Rc::clone(log) }
     }
 

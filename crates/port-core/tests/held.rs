@@ -24,6 +24,7 @@ struct Slot {
 }
 
 impl Resource for Slot {
+    type Port = Vault;
     type Failure = Stuck;
 
     fn release(&mut self) -> Result<(), Stuck> {

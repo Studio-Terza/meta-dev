@@ -105,3 +105,38 @@ fn main() {
     Metered::new(()).call(|_, entry| read(entry));
 }
 ```
+
+A held resource cannot be built from an entry of another port's op:
+
+```compile_fail,E0271
+use std::rc::Rc;
+
+use port_core::{Entry, Held, Metered, Op, OpName, ReleaseLog, Resource};
+
+struct Disk;
+
+struct Vault;
+
+struct Read;
+
+impl Op for Read {
+    type Port = Disk;
+    const NAME: OpName = OpName::new("read");
+}
+
+struct Key;
+
+impl Resource for Key {
+    type Port = Vault;
+    type Failure = ();
+
+    fn release(&mut self) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
+fn main() {
+    let log = Rc::new(ReleaseLog::default());
+    let _held: Held<Key> = Metered::new(Disk).call(|_, entry: Entry<Read>| Held::new(entry, Key, &log));
+}
+```
