@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, Ident, TokenStream};
 use syn::Macro;
 use syn::parse::ParseStream;
 
-use code_model::{Found, Implementation, Origin, Subject, TraitPath};
+use code_model::{Found, Implementation, Origin, TraitPath};
 use lint_layout::{LineNumber, Name};
 
 use lexeme::{Lexeme, Mark};
@@ -45,15 +45,13 @@ impl MacroImpls {
         Some(Found::new(LineNumber::from(keyword.span()), implementation))
     }
 
-    fn subject(after: &[Lexeme]) -> Subject {
+    fn subject(after: &[Lexeme]) -> Name {
         after
-            .first()
-            .filter(|lexeme| lexeme.mark() == Mark::Metavariable)
-            .and_then(|_| after.get(1))
+            .iter()
+            .find(|lexeme| lexeme.mark() != Mark::Metavariable)
             .and_then(Lexeme::word)
-            .map(|ident| Subject::Metavariable(Name::from(ident)))
-            .or_else(|| after.first().and_then(Lexeme::word).map(|ident| Subject::Named(Name::from(ident))))
-            .unwrap_or_else(|| Subject::Named(Name::default()))
+            .map(Name::from)
+            .unwrap_or_default()
     }
 
     fn path(lexemes: &[Lexeme]) -> TraitPath {

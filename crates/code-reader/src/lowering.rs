@@ -2,7 +2,7 @@ use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{Attribute, File, ItemEnum, ItemImpl, ItemMacro, ItemStruct, ItemUnion, Path, Token};
 
-use code_model::{Found, Implementation, Origin, Subject, TraitPath};
+use code_model::{Found, Implementation, Origin, TraitPath};
 use lint_core::SourceFile;
 use lint_layout::{LineNumber, Name};
 
@@ -44,11 +44,7 @@ impl<'ast> Lowering<'ast> {
             .map(|path| {
                 Found::new(
                     LineNumber::from(path.segments.first().map_or(subject.span(), |first| first.ident.span())),
-                    Implementation::new(
-                        Subject::Named(Name::from(subject)),
-                        Some(self.trait_path(&path)),
-                        Origin::Derived,
-                    ),
+                    Implementation::new(Name::from(subject), Some(self.trait_path(&path)), Origin::Derived),
                 )
             })
             .collect();
@@ -58,7 +54,7 @@ impl<'ast> Lowering<'ast> {
 
 impl<'ast> Visit<'ast> for Lowering<'ast> {
     fn visit_item_impl(&mut self, block: &'ast ItemImpl) {
-        let subject = Subject::Named(Name::of_type(&block.self_ty).unwrap_or_default());
+        let subject = Name::of_type(&block.self_ty).unwrap_or_default();
         let implemented = block.trait_.as_ref().map(|(_, path, _)| self.trait_path(path));
         let line = LineNumber::from(block.impl_token.span);
         self.found.push(Found::new(line, Implementation::new(subject, implemented, Origin::Written)));
