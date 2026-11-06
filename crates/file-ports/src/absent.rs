@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Files, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Files, Kind, Offset, Size, Text};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Absent;
@@ -18,6 +18,10 @@ impl Files for Absent {
     }
 
     fn read_text(&self, _path: &Path) -> Result<Text, FileFailure> {
+        Err(Self::missing())
+    }
+
+    fn read_from(&self, _path: &Path, _offset: Offset) -> Result<Bytes, FileFailure> {
         Err(Self::missing())
     }
 

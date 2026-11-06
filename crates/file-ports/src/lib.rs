@@ -5,6 +5,7 @@ mod file_failure;
 mod files;
 mod kind;
 mod memory;
+mod offset;
 mod size;
 mod text;
 
@@ -15,5 +16,6 @@ pub use file_failure::FileFailure;
 pub use files::Files;
 pub use kind::Kind;
 pub use memory::Memory;
+pub use offset::Offset;
 pub use size::Size;
 pub use text::Text;

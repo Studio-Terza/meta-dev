@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use crate::{Bytes, FileFailure, Kind, Size, Text};
+use crate::{Bytes, FileFailure, Kind, Offset, Size, Text};
 
 pub trait Files {
     fn read(&self, path: &Path) -> Result<Bytes, FileFailure>;
 
     fn read_text(&self, path: &Path) -> Result<Text, FileFailure>;
+
+    fn read_from(&self, path: &Path, offset: Offset) -> Result<Bytes, FileFailure>;
 
     fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure>;
 
