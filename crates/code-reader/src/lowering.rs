@@ -12,8 +12,8 @@ use code_model::{Building, FileId, Found, Implementation, Model, Origin};
 use lint_layout::{LineNumber, Name};
 
 use crate::namespace::{
-    CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, ScopeId, ScopeKind, Seeds, Settled,
-    UsePath, Visibility,
+    CrateForm, Declared, DeclaredKind, Domain, Entries, Namespace, Resolver, ScopeId, ScopeKind, Seeds, UsePath,
+    Visibility,
 };
 use crate::planting::{Files, ReadFile};
 use boundary::SelfType;
@@ -165,8 +165,8 @@ impl<'read> Lowered<'read> {
 
     pub(crate) fn built(self, building: Building) -> Model {
         let seeds = Seeds::from(&self.space);
-        let settled = Settled::from(&seeds);
-        let tables = settled.tables();
+        let settled = seeds.settled();
+        let tables = seeds.tables(&settled);
         let resolver = Resolver::new(&self.space, &tables);
         self.rows.into_iter().fold(building, |building, row| row.built(&resolver, building)).built()
     }

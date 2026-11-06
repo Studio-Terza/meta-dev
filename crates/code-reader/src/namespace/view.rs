@@ -1,5 +1,4 @@
 use super::binding::Binding;
-use super::boundary::Measure;
 use super::entries::Admission;
 use super::resolver::{Outer, Resolution};
 
@@ -34,14 +33,6 @@ impl<'rows> Found<'rows> {
             None => Found::Conflict,
         }
     }
-
-    fn height(self) -> Measure {
-        match self {
-            Found::Nothing => Measure::ZERO,
-            Found::One(_) => Measure::ONE,
-            Found::Conflict => Measure::TWO,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -56,7 +47,7 @@ impl Determinacy {
     fn or_else<'rows>(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
         match self {
             Determinacy::Determined => next(),
-            Determinacy::Weak => next().beneath(Determinacy::Weak),
+            Determinacy::Weak => View::UNEXPANDED,
             Determinacy::Strong => View::WAITING,
         }
     }
@@ -73,14 +64,6 @@ impl Determinacy {
             Determinacy::Determined => Resolution::Bound(absent().binding()),
             Determinacy::Weak => absent().known(),
             Determinacy::Strong => Resolution::Waiting,
-        }
-    }
-
-    fn height(self) -> Measure {
-        match self {
-            Determinacy::Determined => Measure::ZERO,
-            Determinacy::Weak => Measure::ONE,
-            Determinacy::Strong => Measure::TWO,
         }
     }
 }
@@ -121,17 +104,6 @@ impl<'rows> View<'rows> {
             Found::Nothing => self.pending.absent(absent),
             Found::One(binding) => self.pending.bound(binding),
             Found::Conflict => Resolution::Bound(Binding::Unknown),
-        }
-    }
-
-    pub(super) fn height(self) -> Measure {
-        [self.found.height(), self.pending.height()].into_iter().sum()
-    }
-
-    fn beneath(self, outer: Determinacy) -> View<'rows> {
-        match self.found {
-            Found::Nothing => View { found: Found::Nothing, pending: self.pending.max(outer) },
-            Found::One(_) | Found::Conflict => self,
         }
     }
 }

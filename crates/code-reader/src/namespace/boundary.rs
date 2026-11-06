@@ -1,4 +1,5 @@
-use std::iter::Sum;
+use std::iter;
+use std::ops::ControlFlow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ScopeId(usize);
@@ -30,23 +31,31 @@ impl GlobId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct Measure(usize);
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Rounds(usize);
 
-impl Measure {
-    pub(super) const ZERO: Measure = Measure(0);
-    pub(super) const ONE: Measure = Measure(1);
-    pub(super) const TWO: Measure = Measure(2);
-}
-
-impl From<usize> for Measure {
-    fn from(count: usize) -> Measure {
-        Measure(count)
+impl Rounds {
+    pub(super) fn bounding(steps: impl Iterator<Item = ()>) -> Rounds {
+        Rounds(iter::once(()).chain(steps).count())
     }
-}
 
-impl Sum for Measure {
-    fn sum<Measures: Iterator<Item = Measure>>(measures: Measures) -> Measure {
-        Measure(measures.map(|measure| measure.0).sum())
+    pub(super) fn settled<State: PartialEq>(self, start: State, advanced: impl Fn(&State) -> State) -> State {
+        Rounds::reached(iter::repeat_n((), self.0).try_fold(start, |state, ()| {
+            let next = advanced(&state);
+            Rounds::stepped(state, next)
+        }))
+    }
+
+    fn stepped<State: PartialEq>(state: State, next: State) -> ControlFlow<State, State> {
+        match [state].into_iter().find(|state| *state == next) {
+            Some(_) => ControlFlow::Break(next),
+            None => ControlFlow::Continue(next),
+        }
+    }
+
+    fn reached<State>(settling: ControlFlow<State, State>) -> State {
+        match settling {
+            ControlFlow::Break(state) | ControlFlow::Continue(state) => state,
+        }
     }
 }

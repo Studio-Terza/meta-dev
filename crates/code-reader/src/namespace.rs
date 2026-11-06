@@ -1,7 +1,6 @@
 mod anchor;
 mod binding;
 mod boundary;
-mod converging;
 mod entries;
 mod resolver;
 mod scope;
@@ -23,7 +22,7 @@ pub(crate) use entries::{Declared, DeclaredKind, Entries, ItemId, Visibility};
 pub(crate) use resolver::Resolver;
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
-pub(crate) use settling::{Seeds, Settled};
+pub(crate) use settling::Seeds;
 use std_names::StdNames;
 pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
