@@ -7,6 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Generics, Ident};
 
+use crate::marked::Marked;
 use check::Check;
 pub use expansion::{Constructors, Expansion, Formatting, Strategy};
 use only_field::OnlyField;
@@ -28,7 +29,10 @@ impl Wrapped {
         let (implemented, arguments, bounds) = generics.split_for_impl();
         let member = field.member();
         let inner = field.inner();
+        let stored = Marked::new(name, generics).stored(&quote!(::newtype::Inner));
         quote! {
+                    #stored
+
                     impl #implemented #name #arguments #bounds {
                         #[must_use]
                         pub const fn new(inner: #inner) -> Self {

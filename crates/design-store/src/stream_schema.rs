@@ -1,7 +1,6 @@
-use sqlx::migrate::Migrator;
-use store_ports::Schema;
+use store_ports::{Migrator, Schema};
 
-static MIGRATOR: Migrator = sqlx::migrate!();
+static MIGRATOR: Migrator = store_ports::migrate!();
 
 #[derive(Clone, Copy, Debug)]
 pub struct StreamSchema;

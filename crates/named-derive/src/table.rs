@@ -48,6 +48,10 @@ impl Table {
                 }
             }
 
+            impl ::newtype::Stored for #ident {
+                type Kind = ::newtype::Spelled;
+            }
+
             #[derive(Debug, ::thiserror::Error)]
             #[error("{0:?} names no {kind}", kind = ::core::stringify!(#ident))]
             #visibility struct #unknown(::std::string::String);

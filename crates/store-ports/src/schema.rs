@@ -1,4 +1,4 @@
-use sqlx::migrate::Migrator;
+use crate::Migrator;
 
 pub trait Schema {
     fn migrator() -> &'static Migrator;

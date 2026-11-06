@@ -2367,10 +2367,21 @@ dependencies = [
  "newtype",
  "port-core",
  "sqlx",
+ "store-ports-macros",
  "tempfile",
  "thiserror",
  "tokio",
  "transcript-ports",
+]
+
+[[package]]
+name = "store-ports-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "sqlx-macros-core",
+ "syn 2.0.119",
 ]
 
 [[package]]

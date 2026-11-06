@@ -16,6 +16,7 @@ doctest = false
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 sqlx.workspace = true
+store-ports-macros = { path = "../store-ports-macros" }
 thiserror.workspace = true
 tokio.workspace = true
 
