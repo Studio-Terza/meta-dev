@@ -32,7 +32,7 @@ no_parameter_bags, no_plaintext, primitive_boundary, private_fns, process_starte
 repeated_methods, state_graph, guard_must_use, crate_graph, public_api_tests, no_test_only_api, no_ignored_tests,
 no_test_io, fakes_at_ports, long_exact_strings, repeated_shapes, mandatory_laws, arbitrary_newtypes, bool_methods,
 effects_in_ports, no_early_exits, one_edge, unconsumed_traits, rust_only, workflow_run, owned_dependencies,
-effects_in_fillers, counted_calls.
+effects_in_fillers, counted_calls, hidden_sqlx, store_queries.
 
 `repeated_shapes` keeps each shape written once. A function or method body, closure, block or match expression of 40
 tokens or more may not repeat anywhere in the workspace, shipped code, tests and examples alike, once its local names
@@ -170,10 +170,11 @@ Everywhere else a test goes through the port's in-memory fake or a library API s
 and the message names that fix. A method call on a value, such as `path.exists()`, is not resolved and is not read. Starting
 a process in test code still also needs what `process_starters` asks for.
 
-`owned_dependencies`, `effects_in_fillers` and `counted_calls` (crate `lint-port-dependencies`) keep the port framework
-the only way to an effect. A crate owns a dependency by naming it in `[package.metadata.port] owns = ["logos"]` in its
-`Cargo.toml` (`grammar` owns `logos`; `store-ports` owns `sqlx` and `tokio`, and `design-store` owns `sqlx` too, since
-`query!` and `migrate!` expand where they are called). A dependency may have several owners. `owned_dependencies` then fails every other crate whose manifest depends on it, in
+`owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` (crate `lint-port-dependencies`) keep the
+port framework the only way to an effect. A crate owns a dependency by naming it in `[package.metadata.port] owns =
+["logos"]` in its `Cargo.toml` (`grammar` owns `logos`; `store-ports` owns `sqlx` and `tokio`; `store-ports-macros` owns
+`sqlx-macros-core`). A dependency has one owner: `owned_dependencies` fails each crate that owns a dependency another crate
+owns too, at its manifest line for that dependency, naming the other owner. It then fails every other crate whose manifest depends on it, in
 `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or their `[target.*]` forms, also when renamed with
 `package =`; it points at the manifest line and names the owner. There is no allow-list: a crate that needs the dependency
 calls an owner's API. `effects_in_fillers` judges a crate that declares a `#[port]` (or `#[port_core::port]`) trait: every
@@ -182,7 +183,18 @@ that crate declares or an `impl Release for ..` block (a held resource's release
 function or another trait impl. Test code is skipped as
 `effects_in_ports` skips it, and a crate with no `#[port]` trait is not judged. `counted_calls` fails the identifiers
 `counted_call` and `counted_acquire` anywhere in source, macro bodies included, outside `port-core` and `port-derive`; the
-code `#[port]` expands to is not source, so only the generated fillers count calls and acquisitions.
+code `#[port]` expands to is not source, so only the generated fillers count calls and acquisitions. `hidden_sqlx` fails
+the identifier `__sqlx` anywhere in source outside `store-ports` and `store-ports-macros`: `store_ports` re-exports sqlx as
+`__sqlx` only so that the code `store_ports::query!` and `store_ports::migrate!` expand to can name it.
+
+The store is reached through `store_ports::query!`, never through sqlx. `store_ports::query!(Row, r#"…"#, id: NodeId)` reads
+rows of a `#[derive(Columns)]` struct for `Statements::rows` or `Statements::one`, and `store_ports::query!(r#"…"#, id: NodeId)`
+writes for `Statements::written`; sqlx checks the SQL against the schema as its own `query!` does. Every bound argument and
+every field of a row is a `store_ports::Column`: a newtype over an integer, float, text or bytes, an enum with
+`#[derive(Named)]`, a type with `#[derive(newtype::Spelled)]` that is stored as its `Display` and read back through
+`FromStr`, or an `Option` of one. A bare `i64`, `&str` or `String` is not a column and does not compile.
+`store_queries` (crate `lint-store-queries`) fails a `store_ports::query!` whose SQL is not written exactly as `sqlformat`
+formats it with its default options, starting at column 0 on the line after `r#"` and ending with a line break before `"#`.
 
 `fakes_at_ports` keeps test doubles at ports. In a file under a package's `tests` directory, a struct, enum or union
 whose name has the word `Fake`, `Stub`, `Mock`, `Spy` or `Dummy` among its camel-case words (`FakeClock`, `HTTPStub`, not
@@ -213,7 +225,7 @@ uses elsewhere passes.
 
 Crates: `lint-core` (the `Lint` trait, reports, sites, violations, source files), `lint-layout` (names, matching, manifests, failures, findings and their fixes), `lint-placement` (where a file sits: package, crate root, module path), `lint-roots` (package and workspace discovery), `lint-reader` (reads a tree into source files), one `lint-<name>` crate
 per lint (`lint-crate-graph` among them), `lint-item-graph` (the item graph `crate_graph` reads), `lint-paths` (the paths a crate uses, resolved through its imports, shared by `process_starters`, `raw_resources` and `no_test_io`, whose imports `fakes_at_ports` reads too), `lint-fixtures` (shared test sources), `lint-rust-only` (the `rust_only` lint over every file of the tree), `lint-workflow-run` (the `workflow_run` lint over the workflows), `graph-query` (the `lint query` command), `lint-runner` (the runner
-library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers` and `counted_calls` lints), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, and `StoreLock`, the first held resource), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
+library), `lint` (the binary), `lint-arbitrary-newtypes` (the `arbitrary_newtypes` lint), `lint-port-dependencies` (the `owned_dependencies`, `effects_in_fillers`, `counted_calls` and `hidden_sqlx` lints), `lint-store-queries` (the `store_queries` lint), `lint-bool-methods` (the bool lint), `lint-linear-flow` (the linear flow lints), `lint-paired-apis` (the report-only list), `states` (the `states!` macro), `golden` (golden files for tests), `fuzz` (the fuzz targets, outside the default members), `laws` (law macros for tests), `newtype` (the newtype traits), `newtype-derive` (their derives), `gate-limits` (the CI wall-time gate), `reach` (what a change can affect), `workspace-metadata` (the crates and dependencies of `cargo metadata`), `ci` (the CI helper), `mutation-shard` and `mutation-report` (the mutation matrix), `test-log` (reads libtest output), `text-lines` (lines of a text), `store-ports` (the store port: the `Store` trait with per-type `read` and `write` ops and `lock`, its `Sqlite` filler over sqlx, `StoreLock`, the first held resource, and the `Column` and `Columns` traits), `store-ports-macros` (`store_ports::query!`, `store_ports::migrate!` and `#[derive(Columns)]`, over `sqlx-macros-core`, whose version moves in lockstep with sqlx as `[package.metadata.lockstep]` records), `design-store` (the design store's schema, queries and batches), `file-ports` (the file system port: the `Files` trait, `Disk` and the in-memory `Memory`) and `console-ports` (the process's arguments, standard streams and environment: `Process`, and the in-memory `Variables`). Crates
 stay split by lint because `crate_graph` flags a crate whose cycle spans more than 40 items.
 
 ## Query
