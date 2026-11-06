@@ -18,12 +18,20 @@ struct Wire {
 
 impl Wire {
     const SYSTEM: Wire = Wire { kind: "system", origin: "null" };
+    const NOTICE: Wire = Wire { kind: "user", origin: "{\"kind\":\"task-notification\"}" };
+    const UNHEARD: Wire = Wire { kind: "brand-new-kind", origin: "null" };
 
     fn of(author: Authorship) -> Wire {
         match author {
             Authorship::Owner => Wire { kind: "user", origin: "{\"kind\":\"human\"}" },
             Authorship::Lead => Wire { kind: "assistant", origin: "null" },
-            Authorship::Bystander => Wire { kind: "user", origin: "null" },
+        }
+    }
+
+    fn content(author: Authorship, text: &str) -> String {
+        match author {
+            Authorship::Owner => format!("{text:?}"),
+            Authorship::Lead => format!("[{{\"type\":\"text\",\"text\":{text:?}}}]"),
         }
     }
 }
@@ -38,11 +46,12 @@ enum Turn {
     Said(Authorship, &'static str),
     Acts,
     System,
+    Notice,
+    Unheard,
 }
 
 const OWNER: Turn = Turn::Said(Authorship::Owner, "words");
 const LEAD: Turn = Turn::Said(Authorship::Lead, "words");
-const BYSTANDER: Turn = Turn::Said(Authorship::Bystander, "words");
 const ASKS: Turn = Turn::Said(Authorship::Lead, "1. a\n2. b");
 const ANSWERS: Turn = Turn::Said(Authorship::Owner, "1. yes\n2. no");
 
@@ -55,7 +64,7 @@ struct Say<'said> {
 
 impl<'said> Say<'said> {
     fn new(uuid: &'said str, parent: Option<&'said str>, author: Authorship, text: &'said str) -> Say<'said> {
-        Say { uuid, parent, wire: Wire::of(author), content: format!("{text:?}") }
+        Say { uuid, parent, wire: Wire::of(author), content: Wire::content(author, text) }
     }
 
     fn turn(uuid: &'said str, parent: Option<&'said str>, turn: Turn) -> Say<'said> {
@@ -68,6 +77,8 @@ impl<'said> Say<'said> {
                 content: "[{\"type\":\"tool_use\",\"name\":\"Bash\"}]".to_owned(),
             },
             Turn::System => Say { uuid, parent, wire: Wire::SYSTEM, content: "\"\"".to_owned() },
+            Turn::Notice => Say { uuid, parent, wire: Wire::NOTICE, content: "\"finished\"".to_owned() },
+            Turn::Unheard => Say { uuid, parent, wire: Wire::UNHEARD, content: "\"\"".to_owned() },
         }
     }
 
@@ -75,7 +86,7 @@ impl<'said> Say<'said> {
         let Wire { kind, origin } = self.wire;
         let parent = self.parent.map_or_else(|| "null".to_owned(), |parent| format!("{parent:?}"));
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":{:?},\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":{}}}}}\n",
+            "{{\"type\":\"{kind}\",\"uuid\":{:?},\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{}}}}}\n",
             self.uuid, self.content
         )
     }
@@ -151,6 +162,16 @@ impl Cases {
         let said: Vec<Say<'_>> =
             ids.iter().zip(authors).map(|(id, author)| Say::new(id, None, *author, "same")).collect();
         Fixture::related(Relation::Resends, &said)
+    }
+
+    fn said(chain: &[Turn]) -> Vec<Say<'static>> {
+        chain.iter().map(|turn| Say::turn("m", None, *turn)).collect()
+    }
+
+    fn unrecognised(chain: &[Turn]) -> Vec<String> {
+        Fixture::stream(&Self::said(chain))
+            .map(|stream| stream.unrecognised().iter().map(|unrecognised| unrecognised.kind().to_string()).collect())
+            .unwrap_or_default()
     }
 
     fn replies(chain: &[Turn]) -> Vec<String> {
@@ -252,10 +273,10 @@ laws::table!(
 );
 
 laws::table!(
-    a_reply_skips_the_bystander_and_system_records_between,
+    a_reply_skips_the_records_between,
     Cases::replies,
     [
-        [OWNER, LEAD, BYSTANDER, LEAD, OWNER][..]
+        [OWNER, LEAD, Turn::Notice, LEAD, OWNER][..]
             => ["m1 replies-to m0", "m3 replies-to m1", "m4 replies-to m3"],
         [ASKS, Turn::System, ANSWERS][..]
             => ["m2 replies-to m0", "m2#0 answers m0#0", "m2#1 answers m0#1"],
@@ -273,5 +294,14 @@ laws::table!(
         "plain words" => ["sentence"],
         "\n\ntrailing\n\n" => ["sentence"],
         "" => Vec::<String>::new(),
+    ]
+);
+
+laws::table!(
+    a_stream_counts_each_unrecognised_record,
+    Cases::unrecognised,
+    [
+        [OWNER, Turn::Unheard, Turn::Unheard][..] => ["brand-new-kind", "brand-new-kind"],
+        [OWNER, LEAD][..] => Vec::<String>::new(),
     ]
 );

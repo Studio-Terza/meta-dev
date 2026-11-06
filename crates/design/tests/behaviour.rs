@@ -12,7 +12,7 @@ const HOME: &str = "/home/tester";
 enum Speaker {
     Owner,
     Lead,
-    Bystander,
+    Unheard,
 }
 
 struct Wire {
@@ -25,7 +25,14 @@ impl Speaker {
         match self {
             Speaker::Owner => Wire { kind: "user", origin: "{\"kind\":\"human\"}" },
             Speaker::Lead => Wire { kind: "assistant", origin: "null" },
-            Speaker::Bystander => Wire { kind: "user", origin: "null" },
+            Speaker::Unheard => Wire { kind: "brand-new-kind", origin: "null" },
+        }
+    }
+
+    fn content(self, text: &str) -> String {
+        match self {
+            Speaker::Lead => format!("[{{\"type\":\"text\",\"text\":\"{text}\"}}]"),
+            Speaker::Owner | Speaker::Unheard => format!("\"{text}\""),
         }
     }
 }
@@ -40,10 +47,11 @@ impl Session {
         Session { directory: "/home/tester/.claude/projects/-work", lines }
     }
 
-    fn line(speaker: Speaker, uuid: &str, parent: &str, content: &str) -> String {
+    fn line(speaker: Speaker, uuid: &str, parent: &str, text: &str) -> String {
         let Wire { kind, origin } = speaker.wire();
+        let content = speaker.content(text);
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"content\":\"{content}\"}}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":{parent},\"sessionId\":\"s\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
         )
     }
 
@@ -63,7 +71,7 @@ impl Session {
                 Self::line(Speaker::Owner, "o1", "null", "1. go. now"),
                 Self::line(Speaker::Lead, "l1", "null", "done"),
                 Self::line(Speaker::Owner, "o2", "null", "thanks"),
-                Self::line(Speaker::Bystander, "b1", "null", "result"),
+                Self::line(Speaker::Unheard, "b1", "null", "result"),
             ]
             .concat(),
         )
@@ -93,13 +101,20 @@ impl Invocation {
 }
 
 #[test]
-fn ingest_counts_each_authorship_form_and_relation() -> Result<(), Failure> {
+fn ingest_prints_no_unrecognised_line_when_every_record_is_recognised() -> Result<(), Failure> {
+    let out = Invocation::output(&Session::answered(), &["ingest"])?;
+    assert_eq!(out.matches("unrecognised").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn ingest_counts_each_authorship_unrecognised_kind_form_and_relation() -> Result<(), Failure> {
     let out = Invocation::output(&Session::typical(), &["ingest"])?;
     assert!(out.contains("authorship owner 2\n"));
     assert!(out.contains("authorship lead 1\n"));
-    assert!(out.contains("authorship bystander 1\n"));
+    assert!(out.contains("unrecognised brand-new-kind 1\n"));
     assert!(out.contains("form item 1\n"));
-    assert!(out.contains("form sentence 3\n"));
+    assert!(out.contains("form sentence 2\n"));
     Ok(())
 }
 

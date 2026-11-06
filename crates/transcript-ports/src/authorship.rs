@@ -4,7 +4,6 @@ use std::fmt;
 pub enum Authorship {
     Owner,
     Lead,
-    Bystander,
 }
 
 impl fmt::Display for Authorship {
@@ -12,7 +11,6 @@ impl fmt::Display for Authorship {
         match self {
             Authorship::Owner => formatter.write_str("owner"),
             Authorship::Lead => formatter.write_str("lead"),
-            Authorship::Bystander => formatter.write_str("bystander"),
         }
     }
 }

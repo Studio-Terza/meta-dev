@@ -4,7 +4,7 @@ mod resends;
 use std::collections::{BTreeMap, BTreeSet};
 
 use grammar::message::{Lexemes, Mark};
-use transcript_ports::{Authorship, Skipped, Uuid};
+use transcript_ports::{Skipped, Uuid};
 
 use crate::anchor::Anchor;
 use crate::segment::Segment;
@@ -48,13 +48,7 @@ impl<'stream> Links<'stream> {
     fn replies(&self) -> Vec<Reply<'stream>> {
         self.messages
             .iter()
-            .filter(|message| message.record().author() != Authorship::Bystander)
-            .filter_map(|message| {
-                std::iter::successors(self.parent(message), |ancestor| self.parent(ancestor))
-                    .take(self.messages.len())
-                    .find(|ancestor| ancestor.record().author() != Authorship::Bystander)
-                    .map(|replied| Reply::new(message, replied))
-            })
+            .filter_map(|message| self.parent(message).map(|replied| Reply::new(message, replied)))
             .collect()
     }
 

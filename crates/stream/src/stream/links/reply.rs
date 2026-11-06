@@ -32,7 +32,7 @@ impl<'stream> Reply<'stream> {
     pub fn answers(&self) -> Answers {
         match self.replying.record().author() {
             Authorship::Owner => OwnerReply { replying: self.replying, replied: self.replied }.answers(),
-            Authorship::Lead | Authorship::Bystander => Answers::default(),
+            Authorship::Lead => Answers::default(),
         }
     }
 }
@@ -41,7 +41,7 @@ impl OwnerReply<'_> {
     fn answers(&self) -> Answers {
         match self.replied.record().author() {
             Authorship::Lead => Answers::between(self.replying, self.replied),
-            Authorship::Owner | Authorship::Bystander => Answers::default(),
+            Authorship::Owner => Answers::default(),
         }
     }
 }

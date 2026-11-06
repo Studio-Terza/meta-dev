@@ -11,6 +11,7 @@ pub struct Label(&'static str);
 
 impl Label {
     pub const AUTHORSHIP: Label = Label("authorship");
+    pub const UNRECOGNISED: Label = Label("unrecognised");
     pub const FORM: Label = Label("form");
     pub const RELATION: Label = Label("relation");
 }

@@ -7,7 +7,7 @@ use laws::proptest::test_runner::TestCaseError;
 use port_core::{Calls, Run};
 use transcript_ports::transcripts_ops::{ReadFrom, Sessions};
 use transcript_ports::{
-    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Read, Record, Session, Skipped, Transcripts,
+    Authorship, ClaudeCodeDir, Cursor, Gather, Instant, Read, Record, Session, Skipped, Transcripts, Unrecognised,
 };
 
 const DIRECTORY: &str = "/projects/work";
@@ -18,7 +18,7 @@ struct Lines;
 impl Lines {
     fn entry(kind: &str, uuid: &str, origin: &str, content: &str) -> String {
         format!(
-            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:0{uuid}Z\",\"origin\":{origin},\"message\":{{\"content\":{content}}}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"{uuid}\",\"parentUuid\":null,\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:0{uuid}Z\",\"origin\":{origin},\"message\":{{\"model\":\"claude\",\"content\":{content}}}}}\n"
         )
     }
 
@@ -35,12 +35,6 @@ impl Lines {
         )
     }
 
-    fn fragment(content: &str) -> String {
-        format!(
-            "{{\"type\":\"assistant\",\"uuid\":\"7\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:07Z\",\"origin\":null,\"message\":{{\"content\":{content}}}}}\n"
-        )
-    }
-
     fn tool_result(uuid: &str) -> String {
         Self::entry("user", uuid, "null", "[{\"type\":\"tool_result\",\"content\":\"output\"}]")
     }
@@ -49,9 +43,9 @@ impl Lines {
         Self::entry("user", uuid, "{\"kind\":\"task-notification\"}", "\"finished\"")
     }
 
-    fn attached(attachment: &str) -> String {
+    fn shaped(kind: &str, fields: &str) -> String {
         format!(
-            "{{\"type\":\"attachment\",\"uuid\":\"8\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:08Z\",\"attachment\":{attachment}}}\n"
+            "{{\"type\":\"{kind}\",\"uuid\":\"8\",\"parentUuid\":\"1\",\"sessionId\":\"s1\",\"timestamp\":\"2026-01-01T00:00:08Z\",{fields}}}\n"
         )
     }
 
@@ -116,16 +110,24 @@ impl Transcript {
 struct Gathered {
     records: Vec<Record>,
     skipped: Vec<Skipped>,
+    classes: Vec<String>,
 }
 
 impl Gather for Gathered {
     fn said(mut self, record: Record) -> Gathered {
+        self.classes.push(format!("{:?} {}", record.author(), record.text()));
         self.records.push(record);
         self
     }
 
     fn skipped(mut self, skipped: Skipped) -> Gathered {
+        self.classes.extend(skipped.parent().map(|parent| format!("{} after {parent}", skipped.uuid())));
         self.skipped.push(skipped);
+        self
+    }
+
+    fn unrecognised(mut self, unrecognised: Unrecognised) -> Gathered {
+        self.classes.push(format!("unrecognised {}", unrecognised.kind()));
         self
     }
 }
@@ -139,18 +141,28 @@ impl From<Read> for Gathered {
 struct Cases;
 
 impl Cases {
-    fn classified(content: &&str) -> Vec<String> {
-        let transcript = Transcript::holding(&Lines::fragment(content));
-        let said = transcript.read(Cursor::default()).map(|read| Views::uuids(&Views::records(read)));
-        let edges = transcript.read(Cursor::default()).map(Views::edges);
-        said.into_iter().chain(edges).flatten().collect()
+    fn classified(line: &str) -> Vec<String> {
+        Transcript::holding(line).read(Cursor::default()).map(|read| Gathered::from(read).classes).unwrap_or_default()
+    }
+
+    fn kind(kind: &&str) -> Vec<String> {
+        Self::classified(&Lines::shaped(kind, "\"slug\":\"quiet\""))
+    }
+
+    fn user(fields: &&str) -> Vec<String> {
+        Self::classified(&Lines::shaped("user", fields))
+    }
+
+    fn assistant(fields: &&str) -> Vec<String> {
+        Self::classified(&Lines::shaped("assistant", fields))
     }
 
     fn attached(attachment: &&str) -> Vec<String> {
-        let transcript = Transcript::holding(&Lines::attached(attachment));
-        let said = transcript.read(Cursor::default()).map(Views::spoken);
-        let edges = transcript.read(Cursor::default()).map(Views::edges);
-        said.into_iter().chain(edges).flatten().collect()
+        Self::classified(&Lines::shaped("attachment", &format!("\"attachment\":{attachment}")))
+    }
+
+    fn carried(kind: &&str) -> Vec<String> {
+        Self::attached(&format!("{{\"type\":\"{kind}\",\"content\":\"ok\"}}").as_str())
     }
 }
 
@@ -173,10 +185,6 @@ impl Views {
         Self::records(read).into_iter().map(|record| record.author()).collect()
     }
 
-    fn spoken(read: Read) -> Vec<String> {
-        Self::records(read).into_iter().map(|record| format!("{:?} {}", record.author(), record.text())).collect()
-    }
-
     fn uuids(records: &[Record]) -> Vec<String> {
         records.iter().map(|record| record.uuid().to_string()).collect()
     }
@@ -191,7 +199,7 @@ fn each_line_is_classified_by_who_wrote_it() -> Result<(), Box<dyn Error>> {
     let text =
         [Lines::typed("1"), Lines::answer("2"), Lines::tool_result("3"), Lines::notice("4"), Lines::skipped()].concat();
     let read = Transcript::holding(&text).read(Cursor::default())?;
-    assert_eq!(Views::authors(read), [Authorship::Owner, Authorship::Lead, Authorship::Bystander]);
+    assert_eq!(Views::authors(read), [Authorship::Owner, Authorship::Lead]);
     Ok(())
 }
 
@@ -215,6 +223,21 @@ fn a_record_carries_the_timestamp_of_its_line() -> Result<(), Box<dyn Error>> {
     let read = Transcript::holding(&Lines::typed("1")).read(Cursor::default())?;
     let stamps: Vec<Instant> = Views::records(read).into_iter().map(|record| record.stamp().clone()).collect();
     assert_eq!(stamps, [Instant::new("2026-01-01T00:00:01Z".to_owned())]);
+    Ok(())
+}
+
+#[test]
+fn a_record_carries_its_session_and_parent() -> Result<(), Box<dyn Error>> {
+    let read = Transcript::holding(&Lines::shaped(
+        "assistant",
+        r#""message":{"model":"claude","content":[{"type":"text","text":"a"}]}"#,
+    ))
+    .read(Cursor::default())?;
+    let found: Vec<String> = Views::records(read)
+        .into_iter()
+        .map(|record| format!("{} {:?}", record.session(), record.parent().map(ToString::to_string)))
+        .collect();
+    assert_eq!(found, ["s1 Some(\"1\")"]);
     Ok(())
 }
 
@@ -259,25 +282,153 @@ laws::law!(resuming_from_the_cursor_yields_every_record_exactly_once, 0usize..40
     let second =
         Transcript::holding(&text).read(first.cursor()).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let together: Vec<Record> = Views::records(first).into_iter().chain(Views::records(second)).collect();
-    prop_assert_eq!(Views::uuids(&together), ["1", "2", "4"]);
+    prop_assert_eq!(Views::uuids(&together), ["1", "2"]);
+});
+
+laws::law!(an_unknown_record_kind_is_unrecognised_and_never_a_message, "[a-z]{1,8}-unheard", kind, {
+    let line = Lines::shaped(&kind, r#""origin":{"kind":"human"},"message":{"model":"claude","content":"hi"}"#);
+    prop_assert_eq!(Cases::classified(&line), [format!("unrecognised {kind}")]);
+});
+
+laws::law!(an_unknown_block_in_a_lead_record_is_unrecognised, "[a-z]{1,8}_unheard", block, {
+    let fields =
+        format!(r#""message":{{"model":"claude","content":[{{"type":"text","text":"said"}},{{"type":"{block}"}}]}}"#);
+    prop_assert_eq!(Cases::assistant(&fields.as_str()), [format!("unrecognised {block}")]);
 });
 
 laws::table!(
-    a_lead_record_without_a_text_block_is_only_a_parent_edge,
-    Cases::classified,
+    every_surveyed_record_kind_without_a_voice_is_only_a_parent_edge,
+    Cases::kind,
     [
-        "[{\"type\":\"thinking\",\"thinking\":\"hmm\"}]" => ["7 after 1"],
-        "[{\"type\":\"tool_use\",\"name\":\"Bash\"}]" => ["7 after 1"],
-        "[{\"type\":\"text\",\"text\":\"said\"}]" => ["7"],
+        "ai-title" => ["8 after 1"],
+        "api-request" => ["8 after 1"],
+        "api-request-blob" => ["8 after 1"],
+        "api-request-shape" => ["8 after 1"],
+        "artifact-autoreact-ledger" => ["8 after 1"],
+        "artifact-comment-monitor" => ["8 after 1"],
+        "atis-latch" => ["8 after 1"],
+        "cost-state" => ["8 after 1"],
+        "file-history-delta" => ["8 after 1"],
+        "file-history-snapshot" => ["8 after 1"],
+        "frame-link" => ["8 after 1"],
+        "last-prompt" => ["8 after 1"],
+        "launched" => ["8 after 1"],
+        "mode" => ["8 after 1"],
+        "permission-mode" => ["8 after 1"],
+        "pr-link" => ["8 after 1"],
+        "queue-operation" => ["8 after 1"],
+        "result" => ["8 after 1"],
+        "started" => ["8 after 1"],
+        "summary" => ["8 after 1"],
+        "system" => ["8 after 1"],
+        "tools-used" => ["8 after 1"],
+        "brand-new-kind" => ["unrecognised brand-new-kind"],
     ]
 );
 
 laws::table!(
-    a_queued_command_is_heard_as_its_prompt_and_any_other_attachment_is_only_a_parent_edge,
+    a_user_record_is_the_owner_only_when_a_human_typed_text_in_the_main_chain,
+    Cases::user,
+    [
+        r#""origin":{"kind":"human"},"message":{"content":"typed"}"# => ["Owner typed"],
+        r#""origin":{"kind":"human"},"message":{"content":[{"type":"image","source":{}},{"type":"text","text":"look"}]}"# => ["Owner look"],
+        r#""origin":{"kind":"human"},"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
+        r#""origin":{"kind":"human"},"isSidechain":true,"isMeta":true,"message":{"content":"relayed"}"# => ["8 after 1"],
+        r#""origin":{"kind":"task-notification"},"message":{"content":"finished"}"# => ["8 after 1"],
+        r#""origin":{"kind":"task-notification"},"isSidechain":true,"isMeta":true,"message":{"content":"finished"}"# => ["8 after 1"],
+        r#""origin":{"kind":"coordinator"},"isSidechain":true,"isMeta":true,"message":{"content":"go"}"# => ["8 after 1"],
+        r#""origin":{"kind":"peer"},"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
+        r#""origin":{"kind":"peer"},"isSidechain":true,"isMeta":true,"message":{"content":"hello"}"# => ["8 after 1"],
+        r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
+        r#""origin":{"kind":"unclassified"},"isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
+        r#""origin":{"kind":"auto-continuation"},"isMeta":true,"message":{"content":"continue"}"# => ["8 after 1"],
+        r#""origin":null,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"content":[{"type":"tool_result","content":"out"}]}"# => ["8 after 1"],
+        r#""message":{"content":"<command-name>/compact</command-name>"}"# => ["8 after 1"],
+        r#""isMeta":true,"message":{"content":"caveat"}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"content":"brief"}"# => ["8 after 1"],
+        r#""isSidechain":true,"isMeta":true,"message":{"content":"brief"}"# => ["8 after 1"],
+        r#""message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}"# => ["8 after 1"],
+        r#""isMeta":true,"message":{"content":[{"type":"text","text":"skill"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"content":[{"type":"text","text":"a"},{"type":"tool_result","content":"b"}]}"# => ["8 after 1"],
+        r#""isCompactSummary":true,"isVisibleInTranscriptOnly":true,"message":{"content":"summary"}"# => ["8 after 1"],
+        r#""origin":{"kind":"brand-new-kind"},"message":{"content":"hello"}"# => ["unrecognised brand-new-kind"],
+        r#""origin":{"kind":"human"},"message":{"content":[{"type":"document"},{"type":"text","text":"a"}]}"# => ["unrecognised document"],
+    ]
+);
+
+laws::table!(
+    an_assistant_record_is_the_lead_only_when_it_answered_with_text_in_the_main_chain,
+    Cases::assistant,
+    [
+        r#""message":{"model":"claude","content":[{"type":"text","text":"said"}]}"# => ["Lead said"],
+        r#""message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"text","text":"subagent words"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"thinking","thinking":"hmm"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"message":{"model":"claude","content":[{"type":"tool_use","name":"Bash"}]}"# => ["8 after 1"],
+        r#""isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
+        r#""isApiErrorMessage":true,"message":{"model":"claude","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
+        r#""isSidechain":true,"isApiErrorMessage":true,"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error"}]}"# => ["8 after 1"],
+        r#""message":{"model":"<synthetic>","content":[{"type":"text","text":"No response requested."}]}"# => ["8 after 1"],
+        r#""message":{"model":"claude","content":[{"type":"server_tool_use"}]}"# => ["unrecognised server_tool_use"],
+    ]
+);
+
+laws::table!(
+    a_queued_command_is_the_owner_only_when_a_human_queued_it,
     Cases::attached,
     [
-        "{\"type\":\"queued_command\",\"prompt\":\"typed while busy\",\"origin\":{\"kind\":\"human\"}}" => ["Owner typed while busy"],
-        "{\"type\":\"queued_command\",\"prompt\":\"finished\"}" => ["Bystander finished"],
-        "{\"type\":\"hook_success\",\"content\":\"ok\"}" => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"typed while busy","origin":{"kind":"human"}}"# => ["Owner typed while busy"],
+        r#"{"type":"queued_command","prompt":[{"type":"text","text":"see"},{"type":"image"}],"origin":{"kind":"human"}}"# => ["Owner see"],
+        r#"{"type":"queued_command","prompt":"finished","origin":{"kind":"task-notification"}}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"go","origin":{"kind":"coordinator"}}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"peer"}}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"finished"}"# => ["8 after 1"],
+        r#"{"type":"queued_command","prompt":"hello","origin":{"kind":"brand-new-kind"}}"# => ["unrecognised brand-new-kind"],
+        r#"{"type":"brand_new_attachment"}"# => ["unrecognised brand_new_attachment"],
+    ]
+);
+
+laws::table!(
+    every_surveyed_attachment_other_than_a_queued_command_is_only_a_parent_edge,
+    Cases::carried,
+    [
+        "agent_listing_delta" => ["8 after 1"],
+        "auto_mode" => ["8 after 1"],
+        "bash_output_audience_note" => ["8 after 1"],
+        "batching_reminder_sent" => ["8 after 1"],
+        "command_permissions" => ["8 after 1"],
+        "compact_file_reference" => ["8 after 1"],
+        "credential_org" => ["8 after 1"],
+        "date" => ["8 after 1"],
+        "deferred_tools_delta" => ["8 after 1"],
+        "deferred_tools_record" => ["8 after 1"],
+        "edited_text_file" => ["8 after 1"],
+        "environment" => ["8 after 1"],
+        "file" => ["8 after 1"],
+        "hook_additional_context" => ["8 after 1"],
+        "hook_blocking_error" => ["8 after 1"],
+        "hook_non_blocking_error" => ["8 after 1"],
+        "hook_permission_decision" => ["8 after 1"],
+        "hook_success" => ["8 after 1"],
+        "hook_system_message" => ["8 after 1"],
+        "instructions" => ["8 after 1"],
+        "invoked_skills" => ["8 after 1"],
+        "mcp_instructions_delta" => ["8 after 1"],
+        "model" => ["8 after 1"],
+        "nested_memory" => ["8 after 1"],
+        "prompt_snapshot" => ["8 after 1"],
+        "read_truncation_notice" => ["8 after 1"],
+        "remote_session_change" => ["8 after 1"],
+        "session_context" => ["8 after 1"],
+        "session_cron_carry" => ["8 after 1"],
+        "silent_turn_reminder" => ["8 after 1"],
+        "skill_listing" => ["8 after 1"],
+        "task_reminder" => ["8 after 1"],
+        "task_status" => ["8 after 1"],
+        "thinking_drop" => ["8 after 1"],
+        "total_tokens_reminder" => ["8 after 1"],
+        "ultrathink_effort" => ["8 after 1"],
     ]
 );

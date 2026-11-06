@@ -1,6 +1,6 @@
 mod links;
 
-use transcript_ports::{Gather, Line, Record, Skipped};
+use transcript_ports::{Gather, Line, Record, Skipped, Unrecognised};
 
 use crate::{MechanicalLink, Message};
 use links::Links;
@@ -9,6 +9,7 @@ use links::Links;
 pub struct Stream {
     messages: Vec<Message>,
     skipped: Vec<Skipped>,
+    unrecognised: Vec<Unrecognised>,
 }
 
 impl FromIterator<Line> for Stream {
@@ -27,6 +28,11 @@ impl Gather for Stream {
         self.skipped.push(skipped);
         self
     }
+
+    fn unrecognised(mut self, unrecognised: Unrecognised) -> Stream {
+        self.unrecognised.push(unrecognised);
+        self
+    }
 }
 
 impl AsRef<[Message]> for Stream {
@@ -39,5 +45,10 @@ impl Stream {
     #[must_use]
     pub fn links(&self) -> Vec<MechanicalLink> {
         Links::over(&self.messages, &self.skipped).all()
+    }
+
+    #[must_use]
+    pub fn unrecognised(&self) -> &[Unrecognised] {
+        &self.unrecognised
     }
 }
