@@ -7,7 +7,7 @@ use store_ports::{Columns, Statements, StoreFailure, Written};
 use super::{Acyclic, Closed, Refusal};
 use crate::directions::Columns as SegmentColumns;
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Keyed(i64);
 
 #[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,7 +63,8 @@ impl<R: Acyclic> Closing<R> {
     fn opened(self, statements: &mut Statements<'_>) -> Result<Open, Refusal> {
         let open =
             Open { ancestor: R::keyed(&self.target, statements)?, descendant: R::keyed(&self.source, statements)? };
-        let (relation, descendant, ancestor) = (R::CLOSED, open.descendant, open.ancestor);
+        let relation = R::CLOSED;
+        let Open { ancestor, descendant } = &open;
         let reverse = statements.rows(store_ports::query!(
             Reached,
             r#"

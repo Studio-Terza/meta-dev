@@ -4,6 +4,7 @@ mod reserved_names;
 
 use lint_core::{Headline, Lint, Report, SourceFile};
 use lint_effect_sites::EffectSites;
+use lint_file::FileLint;
 
 use owners::Owners;
 use port_crate::PortCrate;
@@ -53,11 +54,7 @@ impl Lint for CountedCalls {
             Headline::new(
                 "counted_call and counted_acquire are named only in port-core and port-derive, so every op is counted through a generated filler",
             ),
-            files
-                .iter()
-                .filter_map(ReservedNames::<CountedName>::outside_owners)
-                .flat_map(ReservedNames::<CountedName>::named)
-                .collect(),
+            files.iter().flat_map(ReservedNames::<CountedName>::violations).collect(),
         )
     }
 }
@@ -68,11 +65,7 @@ impl Lint for HiddenSqlx {
             Headline::new(
                 "__sqlx is named only in store-ports and store-ports-macros, so every query goes through store_ports::query! and no crate reaches sqlx through the re-export",
             ),
-            files
-                .iter()
-                .filter_map(ReservedNames::<SqlxName>::outside_owners)
-                .flat_map(ReservedNames::<SqlxName>::named)
-                .collect(),
+            files.iter().flat_map(ReservedNames::<SqlxName>::violations).collect(),
         )
     }
 }

@@ -185,16 +185,18 @@ impl Planting {
 }
 
 impl Root {
-    fn planted(self, statements: &mut Statements<'_>) -> Result<(Written, Resolved), StoreFailure> {
+    fn sown(&self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         match self {
-            Root::Sown(node) => Root::sown(&node, statements),
-            Root::Found(root) => Ok((Written::zero(), root)),
+            Root::Sown(node) => NodeRow::proposed(node, statements),
+            Root::Found(_) => Ok(Written::zero()),
         }
     }
 
-    fn sown(node: &Node<Vague>, statements: &mut Statements<'_>) -> Result<(Written, Resolved), StoreFailure> {
-        let written = NodeRow::proposed(node, statements)?;
-        Ok((written, Resolved::read(node.identity(), statements)?))
+    fn resolved(&self, statements: &mut Statements<'_>) -> Result<Resolved, StoreFailure> {
+        match self {
+            Root::Sown(node) => Resolved::read(node.identity(), statements),
+            Root::Found(root) => Ok(*root),
+        }
     }
 }
 
@@ -278,7 +280,8 @@ impl Batch for Planting {
     type Failure = Refusal;
 
     fn written(self, statements: &mut Statements<'_>) -> Result<Written, Refusal> {
-        let (sown, root) = self.root.planted(statements)?;
+        let sown = self.root.sown(statements)?;
+        let root = self.root.resolved(statements)?;
         let linked = self
             .consumed
             .map(|consumed| {
@@ -579,7 +582,9 @@ impl RelativeRow {
         id: NodeId,
         statements: &mut Statements<'_>,
     ) -> Result<Vec<Relative>, StoreFailure> {
-        let (ancestor, child, relation) = (Kin::Ancestor, Kin::Child, R::CLOSED);
+        let ancestor = Kin::Ancestor;
+        let child = Kin::Child;
+        let relation = R::CLOSED;
         let rows = statements.rows(store_ports::query!(
             RelativeRow,
             r#"

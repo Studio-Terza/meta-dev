@@ -3,7 +3,7 @@ use std::fmt;
 use design_store::{Hit, Scope, SearchSegments};
 use grammar::search::Terms;
 use store_ports::Store;
-use transcript_ports::Body;
+use transcript_ports::{Authorship, Body, Instant, Uuid};
 
 use crate::cli::failure::Failure;
 
@@ -19,7 +19,10 @@ impl Search {
 impl fmt::Display for Search {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|hit| {
-            writeln!(formatter, "{} {} {} {:?}", hit.uuid(), hit.author(), hit.stamp(), Body::from(hit).to_string())
+            let uuid: &Uuid = hit.as_ref();
+            let author: &Authorship = hit.as_ref();
+            let stamp: &Instant = hit.as_ref();
+            writeln!(formatter, "{uuid} {author} {stamp} {:?}", Body::from(hit).to_string())
         })
     }
 }

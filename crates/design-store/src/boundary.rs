@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::iter::Sum;
+use std::ops::Add;
 
 use design_model::Ordinal;
 use file_ports::Offset;
@@ -10,6 +12,7 @@ use stream::{MechanicalLink, Message, Shape};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Record, SessionId, Skipped, Uuid};
 
 use crate::Scope;
+use crate::acyclic::Keyed;
 
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct ShapeName(String);
@@ -20,10 +23,7 @@ pub struct RelationName(String);
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct AnchorName(String);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct SegmentKey(i64);
-
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Rank(f64);
 
 pub(crate) trait Row {
@@ -59,7 +59,7 @@ pub struct LinkRow {
 
 #[derive(Debug, Columns)]
 pub struct Hit {
-    id: SegmentKey,
+    id: Keyed,
     uuid: Uuid,
     author: Authorship,
     at: Instant,
@@ -69,7 +69,7 @@ pub struct Hit {
 
 #[derive(Debug, Columns)]
 pub(crate) struct RankRow {
-    id: SegmentKey,
+    id: Keyed,
     rank: Rank,
 }
 
@@ -182,25 +182,6 @@ ORDER BY
         Ok(rows.into_iter().map(Record::from).collect())
     }
 
-    #[must_use]
-    pub fn uuid(&self) -> Uuid {
-        self.uuid.clone()
-    }
-
-    #[must_use]
-    pub fn session(&self) -> SessionId {
-        self.session.clone()
-    }
-
-    #[must_use]
-    pub fn stamp(&self) -> Instant {
-        self.at.clone()
-    }
-
-    #[must_use]
-    pub fn author(&self) -> Authorship {
-        self.author
-    }
 }
 
 impl SegmentRow {
@@ -243,10 +224,6 @@ ORDER BY
         self.ordinal
     }
 
-    #[must_use]
-    pub fn shape(&self) -> ShapeName {
-        self.shape.clone()
-    }
 }
 
 impl LinkRow {
@@ -276,10 +253,6 @@ ORDER BY
         [self.source.clone(), self.target.clone()]
     }
 
-    #[must_use]
-    pub fn relation(&self) -> RelationName {
-        self.relation.clone()
-    }
 }
 
 impl Hit {
@@ -315,30 +288,35 @@ WHERE
         ))
     }
 
-    pub(crate) fn within(self, rest: &[BTreeMap<SegmentKey, Rank>]) -> Option<Hit> {
+    pub(crate) fn within(self, rest: &[BTreeMap<Keyed, Rank>]) -> Option<Hit> {
         rest.iter()
-            .map(|ranks| ranks.get(&self.id).map(|rank| rank.into_inner()))
-            .sum::<Option<f64>>()
-            .map(|more| Hit { rank: Rank::new(self.rank.into_inner() + more), ..self })
+            .map(|ranks| ranks.get(&self.id).copied())
+            .sum::<Option<Rank>>()
+            .map(|more| Hit { rank: self.rank + more, ..self })
     }
 
     pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
-        self.rank.into_inner().total_cmp(&other.rank.into_inner()).then(self.id.cmp(&other.id))
+        self.rank.ordered(other.rank).then(self.id.cmp(&other.id))
     }
+}
 
-    #[must_use]
-    pub fn uuid(&self) -> Uuid {
-        self.uuid.clone()
+impl Rank {
+    fn ordered(self, other: Rank) -> Ordering {
+        self.0.total_cmp(&other.0)
     }
+}
 
-    #[must_use]
-    pub fn author(&self) -> Authorship {
-        self.author
+impl Add for Rank {
+    type Output = Rank;
+
+    fn add(self, more: Rank) -> Rank {
+        Rank(self.0 + more.0)
     }
+}
 
-    #[must_use]
-    pub fn stamp(&self) -> Instant {
-        self.at.clone()
+impl Sum for Rank {
+    fn sum<Ranks: Iterator<Item = Rank>>(ranks: Ranks) -> Rank {
+        ranks.fold(Rank::default(), Add::add)
     }
 }
 
@@ -359,7 +337,7 @@ WHERE
         ))
     }
 
-    pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<SegmentKey, Rank> {
+    pub(crate) fn ranked(rows: Vec<RankRow>) -> BTreeMap<Keyed, Rank> {
         rows.into_iter().map(|row| (row.id, row.rank)).collect()
     }
 }
@@ -419,12 +397,8 @@ FROM
         ))
     }
 
-    pub(crate) fn session(&self) -> SessionId {
-        self.session.clone()
-    }
-
-    pub(crate) fn cursor(&self) -> Cursor {
-        Cursor::new(self.read_to)
+    pub(crate) fn session(&self) -> &SessionId {
+        &self.session
     }
 }
 
@@ -527,5 +501,65 @@ WHERE
             session: SessionId,
             read_to: Offset
         ))
+    }
+}
+
+impl From<&CursorRow> for Cursor {
+    fn from(row: &CursorRow) -> Cursor {
+        Cursor::new(row.read_to)
+    }
+}
+
+impl AsRef<Uuid> for MessageRow {
+    fn as_ref(&self) -> &Uuid {
+        &self.uuid
+    }
+}
+
+impl AsRef<SessionId> for MessageRow {
+    fn as_ref(&self) -> &SessionId {
+        &self.session
+    }
+}
+
+impl AsRef<Instant> for MessageRow {
+    fn as_ref(&self) -> &Instant {
+        &self.at
+    }
+}
+
+impl AsRef<Authorship> for MessageRow {
+    fn as_ref(&self) -> &Authorship {
+        &self.author
+    }
+}
+
+impl AsRef<ShapeName> for SegmentRow {
+    fn as_ref(&self) -> &ShapeName {
+        &self.shape
+    }
+}
+
+impl AsRef<RelationName> for LinkRow {
+    fn as_ref(&self) -> &RelationName {
+        &self.relation
+    }
+}
+
+impl AsRef<Uuid> for Hit {
+    fn as_ref(&self) -> &Uuid {
+        &self.uuid
+    }
+}
+
+impl AsRef<Authorship> for Hit {
+    fn as_ref(&self) -> &Authorship {
+        &self.author
+    }
+}
+
+impl AsRef<Instant> for Hit {
+    fn as_ref(&self) -> &Instant {
+        &self.at
     }
 }
