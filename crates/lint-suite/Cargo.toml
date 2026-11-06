@@ -10,6 +10,7 @@ file-ports = { path = "../file-ports" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-bool-methods = { path = "../lint-bool-methods" }
 lint-hand-impls = { path = "../lint-hand-impls" }
+lint-narrowed-returns = { path = "../lint-narrowed-returns" }
 lint-complexity = { path = "../lint-complexity" }
 lint-const-shape = { path = "../lint-const-shape" }
 lint-core = { path = "../lint-core" }

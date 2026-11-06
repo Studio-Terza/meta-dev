@@ -1,4 +1,6 @@
-use code_model::{Implementation, Origin, Resolved};
+use code_model::{
+    Entry, Function, Item, ItemKind, Model, Named, Output, Owner, Primitive, Resolved, Signature, TypeRef,
+};
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
 use lint_layout::Name;
@@ -66,7 +68,7 @@ const ITEM_PATH: &str = "struct S;\nimpl S::T for R {}\nimpl Option::T for R {}\
 
 const BLOCK_GLOB_FALLS_THROUGH: &str =
     "trait Clone {}\nmod a {}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
-const BLOCK_GLOB_SUPPLIES: &str = "trait Clone {}\nmod a {\n    pub trait Clone {}\n}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
+const BLOCK_GLOB_SUPPLIES: &str = "struct Clone;\nmod a {\n    pub trait Clone {}\n}\nfn f() {\n    use crate::a::*;\n    use Clone as Dup;\n    impl Dup for R {}\n}\n";
 
 const OWN_ITEM_HIDES_GLOB: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    trait Clone {}\n}\nuse m::*;\nimpl Clone for R {}\nimpl m::Clone for R {}\n";
 const OWN_IMPORT_HIDES_GLOB: &str = "mod inner {\n    pub trait Clone {}\n}\nmod m {\n    pub use crate::inner::*;\n    use std::fmt::Debug as Clone;\n}\nuse m::*;\nimpl Clone for R {}\n";
@@ -186,27 +188,76 @@ impl Fixture {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum Seen {
+    Resolved(Resolved),
+    Item(Item),
+}
+
+impl Seen {
+    fn of(model: &Model, resolved: Resolved) -> Seen {
+        match resolved.crate_item().and_then(|id| model.declared(id)) {
+            Some(item) => Seen::Item(item.clone()),
+            None => Seen::Resolved(resolved),
+        }
+    }
+
+    fn typed(model: &Model, ty: TypeRef) -> TypeRef<Seen> {
+        ty.mapped(&mut |resolved| Seen::of(model, resolved))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Sighted {
+    subject: Name,
+    implemented: Option<Seen>,
+}
+
 struct Expect;
 
 impl Expect {
-    fn written(subject: &str, resolved: Resolved) -> Implementation {
-        Implementation::new(Name::from(subject), Some(resolved), Origin::Written)
+    fn written(subject: &str, implemented: Seen) -> Sighted {
+        Sighted { subject: Name::from(subject), implemented: Some(implemented) }
     }
 
-    fn std(path: &[&str]) -> Resolved {
-        Resolved::Std(path.iter().map(|segment| Name::from(*segment)).collect())
+    fn std(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::Std(path.iter().map(|segment| Name::from(*segment)).collect()))
     }
 
-    fn krate(path: &[&str]) -> Resolved {
-        Resolved::Crate(path.iter().map(|segment| Name::from(*segment)).collect())
+    fn krate(path: &[&str]) -> Seen {
+        Expect::item(path.last().copied().unwrap_or_default(), ItemKind::Trait)
     }
 
-    fn external(path: &[&str]) -> Resolved {
-        Resolved::External(path.iter().map(|segment| Name::from(*segment)).collect())
+    fn item(name: &str, kind: ItemKind) -> Seen {
+        Seen::Item(Item::new(Name::from(name), kind))
     }
 
-    fn unknown(path: &[&str]) -> Resolved {
-        Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect())
+    fn external(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::External(path.iter().map(|segment| Name::from(*segment)).collect()))
+    }
+
+    fn unknown(path: &[&str]) -> Seen {
+        Seen::Resolved(Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect()))
+    }
+
+    fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
+        TypeRef::Named(Named::new(path, arguments))
+    }
+
+    fn primitive(primitive: Primitive) -> TypeRef<Seen> {
+        Expect::named(Seen::Resolved(Resolved::Primitive(primitive)), Vec::new())
+    }
+
+    fn param(name: &str) -> TypeRef<Seen> {
+        Expect::named(Seen::Resolved(Resolved::Param(Name::from(name))), Vec::new())
+    }
+
+    fn function(name: &str, owner: Owner, entry: Entry, output: Output) -> Function {
+        Function::new(Name::from(name), owner, entry, Signature::from(output))
+    }
+
+    fn returning(primitive: Primitive) -> Output {
+        Output::Written(TypeRef::Named(Named::new(Resolved::Primitive(primitive), Vec::new())))
     }
 }
 
@@ -224,23 +275,63 @@ impl Read {
         Reader::read_files(files).implementations().map(|found| found.site().to_string()).collect()
     }
 
-    fn implementations(files: &[SourceFile]) -> Vec<Implementation> {
-        Reader::read_files(files).implementations().map(|found| found.entity().clone()).collect()
-    }
-
-    fn resolved(text: &str) -> Vec<Resolved> {
-        Reader::read_files(&[Read::file("a.rs", text)])
+    fn implementations(files: &[SourceFile]) -> Vec<Sighted> {
+        let model = Reader::read_files(files);
+        model
             .implementations()
-            .filter_map(|found| found.entity().implemented().cloned())
+            .map(|found| Sighted {
+                subject: found.entity().subject().clone(),
+                implemented: found.entity().implemented().cloned().map(|resolved| Seen::of(&model, resolved)),
+            })
             .collect()
     }
 
-    fn across(fixtures: &[Fixture]) -> Vec<Resolved> {
-        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
-        Reader::read_files(&files).implementations().filter_map(|found| found.entity().implemented().cloned()).collect()
+    fn resolved(text: &str) -> Vec<Seen> {
+        Read::implemented(&[Read::file("a.rs", text)])
     }
 
-    fn written(files: &[SourceFile]) -> Vec<String> {
+    fn across(fixtures: &[Fixture]) -> Vec<Seen> {
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        Read::implemented(&files)
+    }
+
+    fn implemented(files: &[SourceFile]) -> Vec<Seen> {
+        let model = Reader::read_files(files);
+        model
+            .implementations()
+            .filter_map(|found| found.entity().implemented().cloned())
+            .map(|resolved| Seen::of(&model, resolved))
+            .collect()
+    }
+
+    fn subjects(text: &str) -> Vec<TypeRef<Seen>> {
+        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type().clone())).collect()
+    }
+
+    fn functions(text: &str) -> Vec<Function> {
+        Reader::read_files(&[Read::file("a.rs", text)]).functions().map(|found| found.entity().clone()).collect()
+    }
+
+    fn outputs(text: &str) -> Vec<TypeRef<Seen>> {
+        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        model.functions().filter_map(|found| Read::written(found.entity())).map(|ty| Seen::typed(&model, ty)).collect()
+    }
+
+    fn expanded(text: &str) -> Vec<TypeRef<Seen>> {
+        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        model
+            .functions()
+            .filter_map(|found| Read::written(found.entity()))
+            .map(|ty| Seen::typed(&model, model.expanded(&ty)))
+            .collect()
+    }
+
+    fn written(function: &Function) -> Option<TypeRef> {
+        function.signature().output().written().cloned()
+    }
+
+    fn written_sites(files: &[SourceFile]) -> Vec<String> {
         Reader::read_files(files)
             .implementations()
             .filter_map(|found| found.entity().written().map(|_| found.site().to_string()))
@@ -254,7 +345,7 @@ laws::table!(every_implementation_is_read_at_its_impl_or_derive_path, |text: &&s
     MIXED => ["a.rs:1", "a.rs:3"],
 ]);
 
-laws::table!(only_impl_blocks_are_written, |text: &&str| Read::written(&[Read::file("a.rs", text)]), [
+laws::table!(only_impl_blocks_are_written, |text: &&str| Read::written_sites(&[Read::file("a.rs", text)]), [
     DERIVED => Vec::<&str>::new(),
     WRITTEN => ["a.rs:2", "a.rs:5"],
     MIXED => ["a.rs:3"],
@@ -330,11 +421,11 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
     BLOCK_SUPER => [Expect::std(&["std", "clone", "Clone"])],
     CFG_ALTERNATIVES => [Expect::unknown(&["Clone"])],
     DECLARED_KINDS => [
-        Expect::krate(&["crate", "Clone"]),
-        Expect::krate(&["crate", "Eq"]),
-        Expect::krate(&["crate", "Copy"]),
-        Expect::krate(&["crate", "Default"]),
-        Expect::krate(&["crate", "Hash"]),
+        Expect::item("Clone", ItemKind::Struct),
+        Expect::item("Eq", ItemKind::Enum),
+        Expect::item("Copy", ItemKind::Union),
+        Expect::item("Default", ItemKind::Alias),
+        Expect::item("Hash", ItemKind::Trait),
     ],
     ALTERNATIVE_IMPORTS => [Expect::unknown(&["Dup"])],
     DISCARDED => [Expect::unknown(&["Debug"]), Expect::std(&["std", "fmt", "Debug"])],
@@ -368,7 +459,7 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
     GLOB_VISIBLE_CRATE => [Expect::std(&["std", "fmt", "Debug"])],
     GLOB_RESTRICTED => [Expect::unknown(&["Debug"])],
     GLOB_RESTRICTED_IN => [Expect::unknown(&["Debug"])],
-    PATH_RESTRICTED => [Expect::krate(&["crate", "a", "T"])],
+    PATH_RESTRICTED => [Expect::item("T", ItemKind::Struct)],
 ]);
 
 laws::table!(a_block_looks_past_its_glob_to_the_enclosing_module, |text: &&str| Read::resolved(text), [
@@ -446,4 +537,79 @@ fn a_test_module_file_is_planted_under_its_parent() {
     let tests = Read::file("src/tests.rs", "use super::*;\nimpl Default for R {}\n");
     let root = Read::file("src/lib.rs", "struct R;\n#[cfg(test)]\nmod tests;\n").with_test_modules(vec![tests]);
     assert_eq!(Read::implementations(&[root]), [Expect::written("R", Expect::std(&["std", "default", "Default"]))]);
+}
+
+const FORMS: &str = "fn free() {}\nimpl S {\n    fn inherent(&self) -> bool { true }\n}\ntrait T {\n    fn declared(&self) -> u8;\n}\nimpl T for S {\n    fn declared(&self) -> u8 { 0 }\n}\nfn outer() {\n    fn nested() -> char { 'a' }\n    impl S {\n        fn inner(&self) {}\n    }\n}\n#[test]\nfn checked() {}\n#[tokio::test]\nasync fn awaited() {}\nfn main() {}\nmod m {\n    fn main() {}\n}\n";
+
+const OWN_TYPE: &str = "struct Failure;\nfn f() -> Failure { Failure }\n";
+const GENERIC_SHADOWS: &str = "struct T;\nfn f<T>() -> T { todo!() }\nfn g() -> T { T }\n";
+const SELF_TYPE: &str = "struct S;\nimpl S {\n    fn new() -> Self { S }\n}\n";
+const IMPL_GENERIC: &str = "struct S<T>(T);\nimpl<T> S<T> {\n    fn get(&self) -> Option<T> { None }\n}\n";
+const PROJECTED: &str = "trait T {\n    type Out;\n    fn f(&self) -> Self::Out;\n}\n";
+
+const CRATE_ALIAS: &str = "type Checked<T> = Result<T, std::fmt::Error>;\nfn f() -> Checked<u8> { todo!() }\n";
+const STD_FMT_ALIAS: &str = "fn f() -> std::fmt::Result { Ok(()) }\n";
+const STD_IO_ALIAS: &str = "use std::io;\nfn f() -> io::Result<()> { Ok(()) }\n";
+const RECURSIVE_ALIAS: &str = "type A = B;\ntype B = A;\nfn f() -> A { todo!() }\n";
+const CHAINED_ALIAS: &str = "struct Failure;\ntype Outcome = Checked<()>;\ntype Checked<T> = Result<T, Failure>;\nfn f() -> Outcome { Ok(()) }\n";
+
+const SUBJECTS: &str = "#[derive(Debug)]\nstruct A;\nimpl<T> Clone for Wrap<T> {}\n";
+
+#[test]
+fn every_function_is_read_with_its_owner_entry_and_output() {
+    assert_eq!(
+        Read::functions(FORMS),
+        [
+            Expect::function("free", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("inherent", Owner::Inherent, Entry::Called, Expect::returning(Primitive::Bool)),
+            Expect::function("declared", Owner::TraitDecl, Entry::Called, Expect::returning(Primitive::Integer)),
+            Expect::function("declared", Owner::TraitImpl, Entry::Called, Expect::returning(Primitive::Integer)),
+            Expect::function("outer", Owner::Free, Entry::Called, Output::Implicit),
+            Expect::function("nested", Owner::Nested, Entry::Called, Expect::returning(Primitive::Char)),
+            Expect::function("inner", Owner::Inherent, Entry::Called, Output::Implicit),
+            Expect::function("checked", Owner::Free, Entry::Test, Output::Implicit),
+            Expect::function("awaited", Owner::Free, Entry::Test, Output::Implicit),
+            Expect::function("main", Owner::Free, Entry::Main, Output::Implicit),
+            Expect::function("main", Owner::Free, Entry::Called, Output::Implicit),
+        ]
+    );
+}
+
+laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&str| Read::outputs(text), [
+    OWN_TYPE => [Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new())],
+    GENERIC_SHADOWS => [Expect::param("T"), Expect::named(Expect::item("T", ItemKind::Struct), Vec::new())],
+    SELF_TYPE => [Expect::param("Self")],
+    IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
+    PROJECTED => [TypeRef::Opaque],
+]);
+
+laws::table!(an_alias_expands_to_its_target_with_its_arguments, |text: &&str| Read::expanded(text), [
+    CRATE_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![Expect::primitive(Primitive::Integer), Expect::named(Expect::std(&["std", "fmt", "Error"]), Vec::new())],
+    )],
+    STD_FMT_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![TypeRef::Tuple(Vec::new()), Expect::named(Expect::std(&["std", "fmt", "Error"]), Vec::new())],
+    )],
+    STD_IO_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![TypeRef::Tuple(Vec::new()), Expect::named(Expect::std(&["std", "io", "Error"]), Vec::new())],
+    )],
+    RECURSIVE_ALIAS => [Expect::named(Expect::item("A", ItemKind::Alias), Vec::new())],
+    CHAINED_ALIAS => [Expect::named(
+        Expect::std(&["std", "result", "Result"]),
+        vec![TypeRef::Tuple(Vec::new()), Expect::named(Expect::item("Failure", ItemKind::Struct), Vec::new())],
+    )],
+]);
+
+#[test]
+fn an_implementation_reads_the_type_it_implements_for() {
+    assert_eq!(
+        Read::subjects(SUBJECTS),
+        [
+            Expect::named(Expect::item("A", ItemKind::Struct), Vec::new()),
+            Expect::named(Expect::unknown(&["Wrap"]), vec![Expect::param("T")]),
+        ]
+    );
 }

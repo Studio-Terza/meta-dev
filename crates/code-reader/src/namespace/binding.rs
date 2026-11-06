@@ -1,23 +1,19 @@
-use code_model::{ItemPath, Resolved};
+use code_model::{ItemId, ItemPath, Primitive, Resolved};
 use lint_layout::Name;
 
 use super::boundary::ScopeId;
-use super::entries::{ItemId, Sight};
+use super::entries::{DeclaredId, Sight};
+use super::items::ItemIds;
 use super::resolver::Resolution;
 use super::settling::Target;
-
-pub(super) trait Locating {
-    fn located(&self, scope: ScopeId) -> Option<ItemPath>;
-
-    fn declared_path(&self, scope: ScopeId, item: ItemId) -> Option<ItemPath>;
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Binding {
     Module(ScopeId),
-    Item(ScopeId, ItemId),
+    Item(ScopeId, DeclaredId),
     Std(ItemPath),
     External(ItemPath),
+    Primitive(Primitive),
     Unknown,
 }
 
@@ -27,7 +23,7 @@ impl Binding {
             Binding::Module(module) => entered(module),
             Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
             Binding::External(path) => Resolution::Bound(Binding::External(path.joined(segment))),
-            Binding::Item(..) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
+            Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown => Resolution::Bound(Binding::Unknown),
         }
     }
 
@@ -35,7 +31,7 @@ impl Binding {
         match self {
             Binding::Module(module) => Target::Module(module, sight_of(module)),
             Binding::Std(path) => Target::listed(&path),
-            Binding::Item(..) | Binding::External(_) | Binding::Unknown => Target::Opaque,
+            Binding::Item(..) | Binding::External(_) | Binding::Primitive(_) | Binding::Unknown => Target::Opaque,
         }
     }
 
@@ -46,19 +42,21 @@ impl Binding {
         }
     }
 
-    pub(super) fn resolved(self, places: &impl Locating, written: ItemPath) -> Resolved {
+    pub(super) fn resolved(self, ids: &ItemIds, written: ItemPath) -> Resolved {
         match self {
-            Binding::Module(module) => Binding::crate_or_unknown(places.located(module), written),
-            Binding::Item(scope, item) => Binding::crate_or_unknown(places.declared_path(scope, item), written),
+            Binding::Item(scope, item) => Binding::issued(ids.issued(scope, item), written),
             Binding::Std(path) => Resolved::Std(path),
             Binding::External(path) => Resolved::External(path),
-            Binding::Unknown => Resolved::Unknown(written),
+            Binding::Primitive(primitive) => Resolved::Primitive(primitive),
+            Binding::Module(_) | Binding::Unknown => Resolved::Unknown(written),
         }
     }
+}
 
-    fn crate_or_unknown(found: Option<ItemPath>, written: ItemPath) -> Resolved {
-        match found {
-            Some(path) => Resolved::Crate(path),
+impl Binding {
+    fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {
+        match item {
+            Some(item) => Resolved::Crate(item),
             None => Resolved::Unknown(written),
         }
     }

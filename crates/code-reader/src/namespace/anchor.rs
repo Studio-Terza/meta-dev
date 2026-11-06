@@ -11,8 +11,7 @@ pub(super) enum Anchor {
 }
 
 impl Anchor {
-    pub(super) const CRATE: Word<'static> = Word::new("crate");
-    const WORDS: [Word<'static>; 3] = [Self::CRATE, Word::new("self"), Word::new("super")];
+    const WORDS: [Word<'static>; 3] = [Word::new("crate"), Word::new("self"), Word::new("super")];
     const ANCHORS: [Anchor; 3] = [Anchor::Crate, Anchor::Module, Anchor::Super];
 
     pub(super) fn spelled(first: &Name) -> Option<Anchor> {

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Macro, Stmt, StmtMacro, VisRestricted};
 
-use code_model::ItemPath;
+use code_model::{Building, Item as ModelItem, ItemId, ItemKind};
 use lint_layout::Name;
 
 use super::Namespace;
@@ -87,21 +87,34 @@ pub(super) enum Admission {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ItemId(usize);
+pub(crate) struct DeclaredId(usize);
+
+impl DeclaredId {
+    pub(super) fn row<Row>(self, rows: &[Row]) -> Option<&Row> {
+        rows.get(self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DeclaredKind {
     Module(ScopeId),
     OpaqueModule,
-    Item,
+    Item(ItemKind),
 }
 
 impl DeclaredKind {
-    fn bound(self, level: ScopeId, item: ItemId) -> Binding {
+    fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
             DeclaredKind::Module(module) => Binding::Module(module),
             DeclaredKind::OpaqueModule => Binding::Unknown,
-            DeclaredKind::Item => Binding::Item(level, item),
+            DeclaredKind::Item(_) => Binding::Item(level, item),
+        }
+    }
+
+    fn item_kind(self) -> Option<ItemKind> {
+        match self {
+            DeclaredKind::Item(kind) => Some(kind),
+            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule => None,
         }
     }
 }
@@ -118,8 +131,13 @@ impl Declared {
         Declared { name, visibility, kind }
     }
 
-    fn named_item(ident: &Ident, visibility: &syn::Visibility) -> Declared {
-        Declared { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item }
+    fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
+        Declared { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item(kind) }
+    }
+
+    fn issued(&self, building: &mut Building) -> Option<ItemId> {
+        let kind = self.kind.item_kind()?;
+        Some(building.declared(ModelItem::new(self.name.clone(), kind)))
     }
 }
 
@@ -272,12 +290,22 @@ impl From<&Item> for Entries {
             Item::Use(used) => Entries::from(used),
             Item::ExternCrate(declared) => Entries::from(declared),
             Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
-            Item::Struct(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Union(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Type(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::Trait(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
-            Item::TraitAlias(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
+            Item::Struct(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
+            }
+            Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Enum)),
+            Item::Union(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Union))
+            }
+            Item::Type(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias))
+            }
+            Item::Trait(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
+            }
+            Item::TraitAlias(declared) => {
+                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
+            }
             _ => Entries::default(),
         }
     }
@@ -306,18 +334,8 @@ impl Entries {
         self.declared.push(declared);
     }
 
-    pub(super) fn path_of(&self, item: ItemId, located: Option<ItemPath>) -> Option<ItemPath> {
-        let name = self.declared.get(item.0).map(|declared| &declared.name);
-        located.zip(name).map(|(path, name)| path.joined(name))
-    }
-
-    pub(super) fn within(&self, module: ScopeId, located: Option<ItemPath>) -> Option<ItemPath> {
-        let name = self
-            .declared
-            .iter()
-            .find(|declared| declared.kind == DeclaredKind::Module(module))
-            .map(|declared| &declared.name);
-        located.zip(name).map(|(path, name)| path.joined(name))
+    pub(super) fn issued(&self, building: &mut Building) -> Vec<Option<ItemId>> {
+        self.declared.iter().map(|declared| declared.issued(building)).collect()
     }
 
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {
@@ -330,7 +348,7 @@ impl Entries {
                 Key::new(Domain::Types, &declared.name),
                 Layer::Declared,
                 declared.visibility,
-                declared.kind.bound(scope, ItemId(index)),
+                declared.kind.bound(scope, DeclaredId(index)),
             )
         });
         let externs = self.externs.iter().flat_map(|(name, externs)| {

@@ -1,6 +1,7 @@
 use lint_layout::Name;
 
 use crate::resolved::Resolved;
+use crate::type_ref::TypeRef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
@@ -9,15 +10,28 @@ pub enum Origin {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Subject {
+    written: Name,
+    ty: TypeRef,
+}
+
+impl Subject {
+    #[must_use]
+    pub fn new(written: Name, ty: TypeRef) -> Subject {
+        Subject { written, ty }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Implementation {
-    subject: Name,
+    subject: Subject,
     implemented: Option<Resolved>,
     origin: Origin,
 }
 
 impl Implementation {
     #[must_use]
-    pub fn new(subject: Name, implemented: Option<Resolved>, origin: Origin) -> Implementation {
+    pub fn new(subject: Subject, implemented: Option<Resolved>, origin: Origin) -> Implementation {
         Implementation { subject, implemented, origin }
     }
 
@@ -36,6 +50,11 @@ impl Implementation {
 
     #[must_use]
     pub fn subject(&self) -> &Name {
-        &self.subject
+        &self.subject.written
+    }
+
+    #[must_use]
+    pub fn subject_type(&self) -> &TypeRef {
+        &self.subject.ty
     }
 }

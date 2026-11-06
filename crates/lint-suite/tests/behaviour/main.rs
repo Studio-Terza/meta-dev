@@ -25,6 +25,7 @@ mod manual_iteration;
 mod module_nesting;
 mod named_lifetimes;
 mod named_numbers;
+mod narrowed_returns;
 mod no_early_exits;
 mod no_forwarders;
 mod no_free_fns;
