@@ -51,6 +51,8 @@ const GLOB_VISIBLE_CRATE: &str = "mod a {\n    pub(crate) use std::fmt::Debug;\n
 const GLOB_RESTRICTED: &str = "mod a {\n    pub(super) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
 const GLOB_RESTRICTED_IN: &str = "mod a {\n    pub(in crate) use std::fmt::Debug;\n}\nuse a::*;\nimpl Debug for R {}\n";
 const PATH_RESTRICTED: &str = "mod a {\n    pub(super) struct T;\n}\nimpl a::T for R {}\n";
+const IMPORT_SEES_ITS_MODULE: &str =
+    "mod m {\n    mod hidden {\n        pub trait T {}\n    }\n    pub use hidden::T as X;\n}\nimpl m::X for R {}\n";
 
 const EXTERN_SELF: &str =
     "extern crate self as core;\nmod clone {\n    pub trait Clone {}\n}\nimpl core::clone::Clone for R {}\n";
@@ -295,6 +297,7 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
     ALTERNATIVE_IMPORTS => [Expect::unknown(&["Dup"])],
     DISCARDED => [Expect::unknown(&["Debug"]), Expect::std(&["std", "fmt", "Debug"])],
     ITEM_PATH => [Expect::unknown(&["S", "T"]), Expect::external(&["Option", "T"]), Expect::external(&["a", "T"])],
+    IMPORT_SEES_ITS_MODULE => [Expect::krate(&["crate", "m", "hidden", "T"])],
 ]);
 
 laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| Read::resolved(text), [

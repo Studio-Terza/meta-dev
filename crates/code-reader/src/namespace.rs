@@ -16,8 +16,8 @@ use anchor::Anchors;
 use binding::{Binding, Globbed};
 pub(crate) use boundary::ScopeId;
 pub(crate) use entries::{Declared, DeclaredKind, Entries, ItemId, Visibility};
-use resolver::Walk;
 pub(crate) use resolver::{Domain, Resolver};
+use resolver::{Search, Walk};
 use scope::ScopeRow;
 pub(crate) use scope::{CrateForm, ScopeKind};
 use std_names::StdNames;
@@ -80,9 +80,9 @@ impl Namespace {
         from.row(&self.scopes).and_then(|row| row.ancestor(level))
     }
 
-    pub(super) fn level(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Globbed {
+    pub(super) fn level(&self, level: ScopeId, name: &Name, search: &Search<'_>) -> Globbed {
         match level.row(&self.scopes) {
-            Some(row) => row.entries().found(level, name, walk),
+            Some(row) => row.entries().found(level, name, search),
             None => Globbed::Opaque,
         }
     }

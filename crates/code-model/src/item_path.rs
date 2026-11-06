@@ -11,12 +11,6 @@ impl FromIterator<Name> for ItemPath {
     }
 }
 
-impl AsRef<[Name]> for ItemPath {
-    fn as_ref(&self) -> &[Name] {
-        &self.segments
-    }
-}
-
 impl ItemPath {
     #[must_use]
     pub fn joined(&self, segment: &Name) -> ItemPath {

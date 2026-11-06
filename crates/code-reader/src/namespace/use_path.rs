@@ -7,7 +7,7 @@ use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::Binding;
 use super::entries::Imported;
-use super::resolver::Walk;
+use super::resolver::{Domain, Walk};
 use super::std_names::{Canonical, StdNames, Table};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,6 +178,13 @@ impl UsePath {
 
     pub(super) fn tail(&self) -> &[Name] {
         self.segments.get(1..).unwrap_or_default()
+    }
+
+    pub(super) fn bound(&self, domain: Domain, walk: &Walk<'_>) -> Binding {
+        match domain {
+            Domain::Types => walk.path(self),
+            Domain::Macros => self.head().derived(walk, self),
+        }
     }
 
     pub(super) fn written(&self) -> ItemPath {

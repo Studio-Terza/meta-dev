@@ -3,8 +3,8 @@ use lint_layout::Name;
 
 use super::Namespace;
 use super::boundary::ScopeId;
-use super::entries::{Admission, ItemId, Via};
-use super::resolver::Walk;
+use super::entries::{Admission, ItemId};
+use super::resolver::{Domain, Walk};
 use super::std_names::{Canonical, StdNames};
 use super::use_path::UsePath;
 
@@ -27,9 +27,9 @@ impl Binding {
         }
     }
 
-    pub(super) fn globbed(self, name: &Name, walk: &Walk<'_>) -> Globbed {
+    pub(super) fn globbed(self, name: &Name, walk: &Walk<'_>, domain: Domain) -> Globbed {
         match self {
-            Binding::Module(module) => walk.member(module, name, Via::Glob),
+            Binding::Module(module) => walk.globbed_member(module, name, domain),
             Binding::Std(path) => StdNames::globbed(&path, name),
             Binding::Item(..) | Binding::External(_) | Binding::Unknown => Globbed::Opaque,
         }
@@ -96,6 +96,13 @@ impl Globbed {
             Admission::Hidden => Globbed::Absent,
             Admission::Shown => shown(),
             Admission::Obscured => Globbed::Opaque,
+        }
+    }
+
+    pub(super) fn typed(domain: Domain, found: impl FnOnce() -> Globbed) -> Globbed {
+        match domain {
+            Domain::Types => found(),
+            Domain::Macros => Globbed::Absent,
         }
     }
 

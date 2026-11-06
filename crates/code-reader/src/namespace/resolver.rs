@@ -5,7 +5,7 @@ use super::Namespace;
 use super::anchor::Anchor;
 use super::binding::{Binding, Globbed};
 use super::boundary::ScopeId;
-use super::entries::{Sight, Via};
+use super::entries::Sight;
 use super::std_names::{StdNames, Table};
 use super::use_path::{Shape, UsePath};
 
@@ -13,31 +13,6 @@ use super::use_path::{Shape, UsePath};
 pub(crate) enum Domain {
     Types,
     Macros,
-}
-
-impl Domain {
-    pub(super) fn typed(self, found: impl FnOnce() -> Globbed) -> Globbed {
-        match self {
-            Domain::Types => found(),
-            Domain::Macros => Globbed::Absent,
-        }
-    }
-
-    fn bound(self, walk: &Walk<'_>, path: &UsePath) -> Binding {
-        match self {
-            Domain::Types => walk.path(path),
-            Domain::Macros => path.head().derived(walk, path),
-        }
-    }
-}
-
-impl Via {
-    fn domain(self, current: Domain) -> Domain {
-        match self {
-            Via::Path => Domain::Types,
-            Via::Glob => current,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -113,17 +88,33 @@ pub(super) enum Tracing<'trail> {
 }
 
 impl Tracing<'_> {
-    pub(super) fn globbed(self, walk: &Walk<'_>, path: &UsePath, name: &Name) -> Globbed {
+    pub(super) fn globbed(self, walk: &Walk<'_>, path: &UsePath, name: &Name, domain: Domain) -> Globbed {
         match self {
-            Tracing::Fresh(trail) => walk.traced(&trail).expanded(path, name),
+            Tracing::Fresh(trail) => walk.traced(&trail).expanded(path, name, domain),
             Tracing::Repeated => Globbed::Absent,
         }
     }
 
-    fn found(self, walk: &Walk<'_>, name: &Name) -> Globbed {
+    fn found(self, space: &Namespace, site: Site, domain: Domain, name: &Name) -> Globbed {
         match self {
-            Tracing::Fresh(trail) => walk.traced(&trail).levels(name),
+            Tracing::Fresh(trail) => Search { space, site, domain, trail: &trail }.levels(name),
             Tracing::Repeated => Globbed::Present(Binding::Unknown),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Site {
+    At(ScopeId),
+    Path { module: ScopeId, viewer: ScopeId },
+    Glob { module: ScopeId, viewer: ScopeId },
+}
+
+impl Site {
+    fn scope(self) -> ScopeId {
+        match self {
+            Site::At(scope) => scope,
+            Site::Path { module, .. } | Site::Glob { module, .. } => module,
         }
     }
 }
@@ -132,9 +123,6 @@ impl Tracing<'_> {
 pub(crate) struct Walk<'walk> {
     space: &'walk Namespace,
     scope: ScopeId,
-    from: ScopeId,
-    via: Via,
-    domain: Domain,
     trail: &'walk Trail<'walk>,
 }
 
@@ -147,52 +135,38 @@ impl<'walk> Walk<'walk> {
         self.scope
     }
 
-    pub(super) fn domain(&self) -> Domain {
-        self.domain
-    }
-
     pub(super) fn path(&self, path: &UsePath) -> Binding {
-        let walk = Walk { domain: Domain::Types, ..*self };
-        path.tail().iter().fold(path.head().started(&walk), |binding, segment| binding.stepped(segment, &walk))
+        path.tail().iter().fold(path.head().started(self), |binding, segment| binding.stepped(segment, self))
     }
 
     pub(super) fn macro_named(&self, first: &Name) -> Binding {
-        let walk = Walk { domain: Domain::Macros, ..*self };
-        walk.visiting(first).found(&walk, first).settled(Binding::from(StdNames::canonical(Table::Derives, first)))
+        self.looked_up(Site::At(self.scope), Domain::Macros, first)
+            .settled(Binding::from(StdNames::canonical(Table::Derives, first)))
     }
 
     pub(super) fn named(&self, first: &Name, shape: Shape) -> Binding {
-        let prelude = Anchor::Crate
-            .anchored(self.space.anchors(self.scope))
-            .and_then(|root| self.space.prelude(root, first, &self.at_level(root)));
-        self.visiting(first).found(self, first).settled(prelude.unwrap_or_else(|| shape.fallback(first, self.space)))
+        let prelude = Anchor::Crate.anchored(self.space.anchors(self.scope)).and_then(|root| {
+            self.space.prelude(root, first, &Walk { space: self.space, scope: root, trail: self.trail })
+        });
+        self.looked_up(Site::At(self.scope), Domain::Types, first)
+            .settled(prelude.unwrap_or_else(|| shape.fallback(first, self.space)))
     }
 
-    pub(super) fn member(&self, module: ScopeId, name: &Name, via: Via) -> Globbed {
-        let walk = Walk { scope: module, from: self.scope, via, domain: via.domain(self.domain), ..*self };
-        walk.visiting(name).found(&walk, name)
+    pub(super) fn globbed_member(&self, module: ScopeId, name: &Name, domain: Domain) -> Globbed {
+        self.looked_up(Site::Glob { module, viewer: self.scope }, domain, name)
     }
 
     pub(super) fn entered(&self, module: ScopeId, segment: &Name) -> Binding {
         match Anchor::spelled(segment) {
             Some(anchor) => Binding::from(anchor.anchored(self.space.anchors(module))),
-            None => self.member(module, segment, Via::Path).settled(Binding::Unknown),
+            None => self
+                .looked_up(Site::Path { module, viewer: self.scope }, Domain::Types, segment)
+                .settled(Binding::Unknown),
         }
     }
 
-    pub(super) fn expanded(&self, path: &UsePath, name: &Name) -> Globbed {
-        self.path(path).globbed(name, self)
-    }
-
-    pub(super) fn view(&self, level: ScopeId) -> Sight {
-        match self.space.within_reach(level, self.from) {
-            Some(_) => Sight::Inside,
-            None => self.via.outside(),
-        }
-    }
-
-    pub(super) fn at_level(&self, scope: ScopeId) -> Walk<'walk> {
-        Walk { scope, from: scope, ..*self }
+    pub(super) fn expanded(&self, path: &UsePath, name: &Name, domain: Domain) -> Globbed {
+        self.path(path).globbed(name, self, domain)
     }
 
     pub(super) fn expanding<'path>(&self, path: &'path UsePath) -> Tracing<'path>
@@ -202,23 +176,46 @@ impl<'walk> Walk<'walk> {
         Expansion { scope: self.scope, path }.traced(self.trail)
     }
 
-    fn visiting<'name>(&self, name: &'name Name) -> Tracing<'name>
-    where
-        'walk: 'name,
-    {
-        Step { scope: self.scope, name, domain: self.domain }.traced(self.trail)
+    fn looked_up(&self, site: Site, domain: Domain, name: &Name) -> Globbed {
+        Step { scope: site.scope(), name, domain }.traced(self.trail).found(self.space, site, domain, name)
     }
 
     fn traced<'trail>(&self, trail: &'trail Trail<'trail>) -> Walk<'trail>
     where
         'walk: 'trail,
     {
-        Walk { trail, ..*self }
+        Walk { space: self.space, scope: self.scope, trail }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Search<'search> {
+    space: &'search Namespace,
+    site: Site,
+    domain: Domain,
+    trail: &'search Trail<'search>,
+}
+
+impl<'search> Search<'search> {
+    pub(super) fn domain(&self) -> Domain {
+        self.domain
+    }
+
+    pub(super) fn sight(&self, level: ScopeId) -> Sight {
+        match self.site {
+            Site::At(_) => Sight::Inside,
+            Site::Path { viewer, .. } => Sight::ByPath.beyond(self.space.within_reach(level, viewer)),
+            Site::Glob { viewer, .. } => Sight::ByGlob.beyond(self.space.within_reach(level, viewer)),
+        }
+    }
+
+    pub(super) fn importer(&self, level: ScopeId) -> Walk<'search> {
+        Walk { space: self.space, scope: level, trail: self.trail }
     }
 
     fn levels(&self, name: &Name) -> Globbed {
         self.space
-            .chain(self.scope)
+            .chain(self.site.scope())
             .iter()
             .fold(Globbed::Absent, |found, level| found.or_else(|| self.space.level(*level, name, self)))
     }
@@ -236,7 +233,6 @@ impl<'space> Resolver<'space> {
 
     pub(crate) fn path_resolved(&self, scope: ScopeId, path: &UsePath, domain: Domain) -> Resolved {
         let trail = Trail::EMPTY;
-        let walk = Walk { space: self.space, scope, from: scope, via: Via::Path, domain: Domain::Types, trail: &trail };
-        domain.bound(&walk, path).resolved(self.space, path)
+        path.bound(domain, &Walk { space: self.space, scope, trail: &trail }).resolved(self.space, path)
     }
 }

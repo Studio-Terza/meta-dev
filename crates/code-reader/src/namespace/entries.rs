@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use syn::{Ident, Item, ItemExternCrate, ItemMacro, ItemUse, Stmt, VisRestricted};
 
 use code_model::ItemPath;
@@ -6,7 +8,7 @@ use lint_layout::Name;
 use super::anchor::Anchor;
 use super::binding::{Binding, Globbed};
 use super::boundary::ScopeId;
-use super::resolver::Walk;
+use super::resolver::{Domain, Search, Walk};
 use super::use_path::{Leaf, UsePath};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,33 +41,11 @@ impl From<&VisRestricted> for Visibility {
 }
 
 impl Visibility {
-    fn seen(self, via: Via) -> Admission {
+    fn seen(self, restricted: Admission) -> Admission {
         match self {
             Visibility::Private => Admission::Hidden,
             Visibility::Visible => Admission::Shown,
-            Visibility::Restricted => via.restricted(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Via {
-    Path,
-    Glob,
-}
-
-impl Via {
-    fn restricted(self) -> Admission {
-        match self {
-            Via::Path => Admission::Shown,
-            Via::Glob => Admission::Obscured,
-        }
-    }
-
-    pub(super) fn outside(self) -> Sight {
-        match self {
-            Via::Path => Sight::ByPath,
-            Via::Glob => Sight::ByGlob,
+            Visibility::Restricted => restricted,
         }
     }
 }
@@ -81,8 +61,15 @@ impl Sight {
     fn admits(self, visibility: Visibility) -> Admission {
         match self {
             Sight::Inside => Admission::Shown,
-            Sight::ByPath => visibility.seen(Via::Path),
-            Sight::ByGlob => visibility.seen(Via::Glob),
+            Sight::ByPath => visibility.seen(Admission::Shown),
+            Sight::ByGlob => visibility.seen(Admission::Obscured),
+        }
+    }
+
+    pub(super) fn beyond(self, reach: Option<ScopeId>) -> Sight {
+        match reach {
+            Some(_) => Sight::Inside,
+            None => self,
         }
     }
 }
@@ -190,13 +177,12 @@ struct Import {
 
 #[derive(Debug)]
 struct Extern {
-    name: Name,
     visibility: Visibility,
     krate: Name,
 }
 
 impl Extern {
-    fn binding(declared: &ItemExternCrate) -> Option<Extern> {
+    fn keyed(declared: &ItemExternCrate) -> BTreeMap<Name, Vec<Extern>> {
         declared
             .rename
             .iter()
@@ -205,17 +191,18 @@ impl Extern {
             .next()
             .map(Name::from)
             .and_then(|name| Leaf::from(name).standalone())
-            .map(|name| Extern {
-                name,
-                visibility: Visibility::from(&declared.vis),
-                krate: Name::from(&declared.ident),
+            .map(|name| {
+                (name, vec![Extern { visibility: Visibility::from(&declared.vis), krate: Name::from(&declared.ident) }])
             })
+            .into_iter()
+            .collect()
     }
 
-    fn found(externs: &[Extern], name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
+    fn found(externs: &BTreeMap<Name, Vec<Extern>>, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
         externs
-            .iter()
-            .filter(|external| external.name == *name)
+            .get(name)
+            .into_iter()
+            .flatten()
             .map(|external| {
                 Globbed::admitted(sight.admits(external.visibility), || Globbed::Present(external.bound(walk)))
             })
@@ -237,9 +224,9 @@ enum GlobSource {
 }
 
 impl GlobSource {
-    fn globbed(&self, name: &Name, walk: &Walk<'_>) -> Globbed {
+    fn globbed(&self, name: &Name, walk: &Walk<'_>, domain: Domain) -> Globbed {
         match self {
-            GlobSource::Path(path) => walk.expanding(path).globbed(walk, path, name),
+            GlobSource::Path(path) => walk.expanding(path).globbed(walk, path, name, domain),
             GlobSource::Expansion => Globbed::Opaque,
         }
     }
@@ -290,10 +277,10 @@ impl Imports {
 struct Globs(Vec<Glob>);
 
 impl Globs {
-    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>) -> Globbed {
+    fn found(&self, name: &Name, sight: Sight, walk: &Walk<'_>, domain: Domain) -> Globbed {
         self.0
             .iter()
-            .map(|glob| Globbed::admitted(sight.admits(glob.visibility), || glob.source.globbed(name, walk)))
+            .map(|glob| Globbed::admitted(sight.admits(glob.visibility), || glob.source.globbed(name, walk, domain)))
             .fold(Globbed::Absent, Globbed::joined)
     }
 }
@@ -302,7 +289,7 @@ impl Globs {
 pub(crate) struct Entries {
     declared: Declarations,
     imports: Imports,
-    externs: Vec<Extern>,
+    externs: BTreeMap<Name, Vec<Extern>>,
     globs: Globs,
 }
 
@@ -324,12 +311,6 @@ impl From<Glob> for Entries {
     }
 }
 
-impl From<Option<Extern>> for Entries {
-    fn from(external: Option<Extern>) -> Entries {
-        Entries { externs: external.into_iter().collect(), ..Entries::default() }
-    }
-}
-
 impl From<&ItemUse> for Entries {
     fn from(used: &ItemUse) -> Entries {
         let visibility = Visibility::from(&used.vis);
@@ -344,7 +325,7 @@ impl From<&Item> for Entries {
     fn from(item: &Item) -> Entries {
         match item {
             Item::Use(used) => Entries::from(used),
-            Item::ExternCrate(declared) => Entries::from(Extern::binding(declared)),
+            Item::ExternCrate(declared) => Entries { externs: Extern::keyed(declared), ..Entries::default() },
             Item::Macro(ItemMacro { ident: None, .. }) => Entries::from(Glob::EXPANSION),
             Item::Struct(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
             Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis)),
@@ -370,15 +351,14 @@ impl Entries {
         self.declared.0.push(declared);
     }
 
-    pub(super) fn found(&self, level: ScopeId, name: &Name, walk: &Walk<'_>) -> Globbed {
-        let sight = walk.view(level);
-        let at = walk.at_level(level);
-        let domain = walk.domain();
-        domain
-            .typed(|| self.declared.found(level, name, sight))
-            .or_else(|| self.imports.found(name, sight, &at))
-            .or_else(|| domain.typed(|| Extern::found(&self.externs, name, sight, &at)))
-            .or_else(|| self.globs.found(name, sight, &at))
+    pub(super) fn found(&self, level: ScopeId, name: &Name, search: &Search<'_>) -> Globbed {
+        let sight = search.sight(level);
+        let importer = search.importer(level);
+        let domain = search.domain();
+        Globbed::typed(domain, || self.declared.found(level, name, sight))
+            .or_else(|| self.imports.found(name, sight, &importer))
+            .or_else(|| Globbed::typed(domain, || Extern::found(&self.externs, name, sight, &importer)))
+            .or_else(|| self.globs.found(name, sight, &importer, domain))
     }
 
     pub(super) fn path_of(&self, item: ItemId, located: Option<ItemPath>) -> Option<ItemPath> {
@@ -397,7 +377,7 @@ impl Entries {
     }
 
     pub(super) fn prelude(&self, name: &Name, walk: &Walk<'_>) -> Option<Binding> {
-        self.externs.iter().find(|external| external.name == *name).map(|external| external.bound(walk))
+        self.externs.get(name).and_then(|externs| externs.first()).map(|external| external.bound(walk))
     }
 
     fn of_statement(statement: &Stmt) -> Entries {
@@ -411,7 +391,7 @@ impl Entries {
     fn merged(mut self, other: Entries) -> Entries {
         self.declared.0.extend(other.declared.0);
         self.imports.0.extend(other.imports.0);
-        self.externs.extend(other.externs);
+        other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));
         self.globs.0.extend(other.globs.0);
         self
     }
