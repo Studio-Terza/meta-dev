@@ -1,13 +1,24 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use design_store::{Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage, StreamSchema};
+use design_model::{Entered, Entry, Facet, Kin, NodeId, NodeRelation, Project, Provenance, Stage};
+use design_store::{
+    Linked, NewNode, Placed, ProjectRoot, Scope, SearchSegments, SessionCursors, SessionRecords, ShownMessage,
+    ShownNode, StreamSchema,
+};
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
-use newtype::Counter;
-use port_core::Run;
+use laws::proptest::collection::vec;
+use laws::proptest::option;
+use laws::proptest::prelude::{Just, any, prop_assert_eq};
+use laws::proptest::sample::{Index, select};
+use laws::proptest::strategy::Strategy;
+use laws::proptest::test_runner::TestCaseError;
+use newtype::{Counter, Newtype};
+use port_core::{Port, Run};
 use store_ports::{Sqlite, Store, Written};
 use stream::Stream;
+use strum::VariantArray;
 use transcript_ports::{Body, ClaudeCodeDir, Cursor, SessionId, Transcripts, Uuid};
 
 const DIRECTORY: &str = "/projects/work";
@@ -184,5 +195,179 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
     let lines = [Said::owner("o1", 1, "omega"), Said::lead("l1", "omega")];
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Owner)?, ["o1 owner 2026-01-01T00:00:01Z omega"]);
     assert_eq!(Said::scoped(&lines, &["omega"], Scope::Everyone)?.len(), 2);
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct Forest {
+    parents: Vec<Option<usize>>,
+    facets: Vec<Facet>,
+    order: Vec<usize>,
+}
+
+impl Forest {
+    fn any() -> impl Strategy<Value = Forest> {
+        vec((option::of(any::<Index>()), select(Facet::VARIANTS)), 1..16).prop_flat_map(|choices| {
+            let parents: Vec<Option<usize>> = choices
+                .iter()
+                .enumerate()
+                .map(|(node, (choice, _facet))| choice.filter(|_| node > 0).map(|index| index.index(node)))
+                .collect();
+            let facets: Vec<Facet> = choices.iter().map(|(_choice, facet)| *facet).collect();
+            let refining: Vec<usize> =
+                (0..parents.len()).filter(|node| Forest::parent(&parents, *node).is_some()).collect();
+            Just(refining).prop_shuffle().prop_map(move |order| Forest {
+                parents: parents.clone(),
+                facets: facets.clone(),
+                order,
+            })
+        })
+    }
+
+    fn parent(parents: &[Option<usize>], node: usize) -> Option<usize> {
+        parents.get(node).copied().flatten()
+    }
+
+    fn id(node: usize) -> NodeId {
+        NodeId::new(i64::try_from(node).unwrap_or(i64::MAX).saturating_add(1))
+    }
+
+    fn node(facet: Facet) -> Result<NewNode, Box<dyn Error>> {
+        Ok(NewNode::from(Entry::new("p".parse()?, facet, Stage::Vague, Provenance::from(Entered::Init))))
+    }
+
+    fn planted(&self, store: &Port<'_, Sqlite>) -> Result<Written, Box<dyn Error>> {
+        let nodes = self
+            .facets
+            .iter()
+            .map(|facet| Ok(store.write(Forest::node(*facet)?)?))
+            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        let links = self
+            .order
+            .iter()
+            .map(|node| {
+                let parent = Forest::parent(&self.parents, *node).ok_or("a refining node has a parent")?;
+                Ok(store.write(Linked::new(Forest::id(*node), NodeRelation::Refines, Forest::id(parent)))?)
+            })
+            .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
+        Ok(Written::total(nodes.into_iter().chain(links)))
+    }
+
+    fn ancestors(&self, node: usize) -> Vec<NodeId> {
+        let mut above: Vec<NodeId> =
+            std::iter::successors(Forest::parent(&self.parents, node), |up| Forest::parent(&self.parents, *up))
+                .map(Forest::id)
+                .collect();
+        above.reverse();
+        above
+    }
+
+    fn children(&self, node: usize) -> Vec<NodeId> {
+        (0..self.parents.len())
+            .filter(|child| Forest::parent(&self.parents, *child) == Some(node))
+            .map(Forest::id)
+            .collect()
+    }
+}
+
+struct Ids;
+
+impl Ids {
+    fn kin(placed: &Placed, kin: Kin) -> Vec<NodeId> {
+        placed
+            .relatives()
+            .iter()
+            .filter(|relative| relative.kin() == kin)
+            .map(|relative| relative.node().identity())
+            .collect()
+    }
+}
+
+laws::law!(the_closure_holds_exactly_the_transitive_refinements, Forest::any(), forest, {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    forest.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    (0..forest.parents.len()).try_for_each(|node| {
+        let placed = store
+            .read(ShownNode::from(Forest::id(node)))
+            .map_err(|failure| TestCaseError::fail(failure.to_string()))?
+            .ok_or_else(|| TestCaseError::fail("a planted node is not shown"))?;
+        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), forest.ancestors(node));
+        prop_assert_eq!(Ids::kin(&placed, Kin::Child), forest.children(node));
+        prop_assert_eq!(placed.node().entry().facet(), forest.facets.get(node).copied().unwrap_or(Facet::Project));
+        Ok(())
+    })?;
+});
+
+struct Projects;
+
+impl Projects {
+    fn rooted(store: &Port<'_, Sqlite>, name: &str) -> Result<NodeId, Box<dyn Error>> {
+        let project: Project = name.parse()?;
+        store.write(NewNode::from(Entry::new(project.clone(), Facet::Project, Stage::Vague, Entered::Init.into())))?;
+        Ok(store.read(ProjectRoot::from(project))?.ok_or("no root")?)
+    }
+}
+
+laws::law!(
+    a_project_root_is_found_by_its_project_alone,
+    select(Facet::VARIANTS).prop_filter("a facet other than a project root", |facet| *facet != Facet::Project),
+    facet,
+    {
+        let found = Projects::alone(facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+        prop_assert_eq!(found, [Some(NodeId::new(3)), None]);
+    }
+);
+
+impl Projects {
+    fn alone(facet: Facet) -> Result<[Option<NodeId>; 2], Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        Projects::rooted(&store, "q")?;
+        store.write(Forest::node(facet)?)?;
+        store.write(NewNode::from(Entry::new("p".parse()?, Facet::Project, Stage::Vague, Entered::Init.into())))?;
+        Ok([
+            store.read(ProjectRoot::from("p".parse::<Project>()?))?,
+            store.read(ProjectRoot::from("r".parse::<Project>()?))?,
+        ])
+    }
+}
+
+#[test]
+fn a_consumes_link_is_listed_from_its_source_and_adds_no_ancestor() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let eater = Projects::rooted(&store, "p")?;
+    let consumed = Projects::rooted(&store, "q")?;
+    store.write(Linked::new(eater, NodeRelation::Consumes, consumed))?;
+    let shown = store.read(ShownNode::from(eater))?.ok_or("no consumer shown")?;
+    let links: Vec<(NodeRelation, NodeId)> =
+        shown.links().iter().map(|link| (link.relation(), link.target())).collect();
+    assert_eq!(links, [(NodeRelation::Consumes, consumed)]);
+    assert_eq!(Ids::kin(&shown, Kin::Ancestor), []);
+    assert_eq!(Ids::kin(&store.read(ShownNode::from(consumed))?.ok_or("no consumed shown")?, Kin::Child), []);
+    Ok(())
+}
+
+#[test]
+fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let parent = Projects::rooted(&store, "p")?;
+    store.write(Forest::node(Facet::Project)?)?;
+    let child = NodeId::new(parent.into_inner().saturating_add(1));
+    let first = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
+    let second = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
+    assert!(first > Written::zero());
+    assert_eq!(second, Written::zero());
+    Ok(())
+}
+
+#[test]
+fn an_unknown_node_is_not_shown() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    Projects::rooted(&store, "p")?;
+    assert!(store.read(ShownNode::from(NodeId::new(99)))?.is_none());
     Ok(())
 }

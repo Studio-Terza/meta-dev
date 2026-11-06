@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "9bae1ef3e87ce7e6230f2e8413b80bdbf2e216606feb5f0d4c9170a7050806be"
+}

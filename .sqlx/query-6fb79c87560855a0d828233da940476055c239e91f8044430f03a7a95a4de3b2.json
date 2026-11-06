@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT relation, target FROM node_edges WHERE source = ?1 ORDER BY relation, target",
+  "describe": {
+    "columns": [
+      {
+        "name": "relation",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "relation"
+          }
+        }
+      },
+      {
+        "name": "target",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "node_edges",
+            "name": "target"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6fb79c87560855a0d828233da940476055c239e91f8044430f03a7a95a4de3b2"
+}

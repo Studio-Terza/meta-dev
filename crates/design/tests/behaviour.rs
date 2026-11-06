@@ -7,12 +7,17 @@ use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
-use design_store::{ShownMessage, Stored, StreamSchema};
+use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Stage};
+use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
 use file_ports::{Bytes, Files, Memory};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
+use local_config::{ConfigFailure, LocalConfig};
+use newtype::Counter;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
-use store_ports::{Busy, Sqlite, Store};
+use store_ports::{Busy, Sqlite, Store, Written};
+use strum::VariantArray;
 use transcript_ports::Uuid;
 
 const HOME: &str = "/home/tester";
@@ -152,9 +157,13 @@ impl Invocation {
     }
 
     fn against(store: &Sqlite, session: &Session, arguments: &[&str]) -> Result<String, Failure> {
+        Self::within(store, session.files(), arguments)
+    }
+
+    fn within(store: &Sqlite, files: Memory, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
-        Cli::new(&Self::environment(), session.files(), |_path| store.clone()).report(
+        Cli::new(&Self::environment(), files, |_path| store.clone()).report(
             &run,
             arguments.iter().map(OsString::from),
             &mut out,
@@ -532,4 +541,130 @@ fn a_failed_command_keeps_the_release_failures_of_its_run() {
     drop(run.port(Locker).lock());
     let settled = Failure::settled(Err(Failure::Usage), run.finish().settled());
     assert!(matches!(settled, Err(Failure::Unreleased { command, .. }) if matches!(*command, Failure::Usage)));
+}
+
+struct Graph;
+
+impl Graph {
+    fn init(store: &Sqlite, arguments: &[&str]) -> Result<String, Failure> {
+        Invocation::against(store, &Session::typical(), &[&["init"], arguments].concat())
+    }
+
+    fn shown(store: &Sqlite, node: &str) -> Result<String, Failure> {
+        Invocation::against(store, &Session::typical(), &["show", node])
+    }
+
+    fn refined(store: &Sqlite, facet: Facet, parents: &[i64]) -> Result<Written, Failure> {
+        let run = Run::root();
+        let port = run.port(store.clone());
+        let written = (2_i64..)
+            .zip(parents)
+            .map(|(child, parent)| {
+                let entry = Entry::new("demo".parse()?, facet, Stage::Vague, Entered::Init.into());
+                let planted = port.write(NewNode::from(entry))?;
+                let linked =
+                    port.write(Linked::new(NodeId::new(child), NodeRelation::Refines, NodeId::new(*parent)))?;
+                Ok(planted.plus(linked))
+            })
+            .collect::<Result<Vec<Written>, Failure>>()?;
+        Ok(Written::total(written.into_iter()))
+    }
+}
+
+#[test]
+fn init_plants_the_project_root_in_the_workspace_store() -> Result<(), Failure> {
+    let opened = Opened::by(&["init", "demo"])?;
+    assert_eq!(opened.paths, [PathBuf::from("/work/.meta/design.sqlite")]);
+    assert!(opened.out.contains("root n1 project demo"));
+    Ok(())
+}
+
+#[test]
+fn a_rooted_init_names_its_outcome() -> Result<(), Failure> {
+    let initialised = Rooted::outcome(&Sqlite::in_memory::<StreamSchema>(), &Session::typical(), &["init", "demo"])?;
+    assert_eq!(initialised.outcome, Outcome::Initialised);
+    Ok(())
+}
+
+#[test]
+fn a_second_init_changes_nothing() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let first = Graph::init(&store, &["demo"])?;
+    let before = Graph::shown(&store, "n1")?;
+    let second = Graph::init(&store, &["demo"])?;
+    assert_eq!(second, first);
+    assert_eq!(Graph::shown(&store, "n1")?, before);
+    assert!(matches!(Graph::shown(&store, "n2"), Err(Failure::Unplaced(_))));
+    Ok(())
+}
+
+#[test]
+fn init_links_a_consumed_project_only_when_asked() -> Result<(), Failure> {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Graph::init(&store, &["meta-dev"])?;
+    Graph::init(&store, &["demo"])?;
+    assert_eq!(Graph::shown(&store, "n2")?.matches("consumes").count(), 0);
+    let consuming = Graph::init(&store, &["demo", "--consumes", "meta-dev"])?;
+    assert!(consuming.contains("consumes n1 project meta-dev"));
+    assert!(Graph::shown(&store, "n2")?.contains("  consumes n1"));
+    assert_eq!(Graph::shown(&store, "n1")?.matches("consumes").count(), 0);
+    Ok(())
+}
+
+#[test]
+fn init_consuming_a_project_without_a_root_fails_and_plants_nothing() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes", "nowhere"]), Err(Failure::Unrooted(_))));
+    assert!(matches!(Graph::shown(&store, "n1"), Err(Failure::Unplaced(_))));
+}
+
+#[test]
+fn init_without_a_project_or_a_consumed_name_is_a_usage_failure() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::init(&store, &[]), Err(Failure::Usage)));
+    assert!(matches!(Graph::init(&store, &["demo", "--consumes"]), Err(Failure::Usage)));
+}
+
+laws::law!(show_of_a_node_lists_its_ancestors_and_its_children, select(Facet::VARIANTS), facet, {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    let shown = Graph::planted(&store, facet).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let wanted = [
+        format!("n3 demo {facet} vague entered init"),
+        "  ancestor n1 demo project vague entered init".to_owned(),
+        format!("  ancestor n2 demo {facet} vague entered init"),
+        format!("  child n5 demo {facet} vague entered init"),
+        "  refines n2".to_owned(),
+    ];
+    let missing: Vec<&String> = wanted.iter().filter(|line| shown.matches(line.as_str()).count() == 0).collect();
+    prop_assert_eq!(missing, Vec::<&String>::new());
+    prop_assert_eq!(shown.matches("  child ").count(), 1);
+    prop_assert_eq!(shown.matches("  ancestor ").count(), 2);
+});
+
+impl Graph {
+    fn planted(store: &Sqlite, facet: Facet) -> Result<String, Failure> {
+        Graph::init(store, &["demo"])?;
+        Graph::refined(store, facet, &[1, 2, 2, 3])?;
+        Graph::shown(store, "n3")
+    }
+}
+
+#[test]
+fn init_keeps_a_repository_configured_for_the_same_workspace_and_refuses_another() -> Result<(), Failure> {
+    let configured = || -> Result<Memory, Failure> {
+        let files = Session::typical().files();
+        LocalConfig::new("demo".parse()?, PathBuf::from("/work")).kept(&files, Path::new("/work"))?;
+        Ok(files)
+    };
+    let store = Sqlite::in_memory::<StreamSchema>();
+    Invocation::within(&store, configured()?, &["init", "demo"])?;
+    let moved = Invocation::within(&store, configured()?, &["init", "demo", "--workspace", "/elsewhere"]);
+    assert!(matches!(moved, Err(Failure::Config(ConfigFailure::Elsewhere { .. }))));
+    Ok(())
+}
+
+#[test]
+fn show_of_an_unknown_node_fails_naming_it() {
+    let store = Sqlite::in_memory::<StreamSchema>();
+    assert!(matches!(Graph::shown(&store, "n7"), Err(Failure::Unplaced(_))));
 }

@@ -13,6 +13,7 @@ test = false
 doctest = false
 
 [dependencies]
+design-model = { path = "../design-model" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 newtype = { path = "../newtype" }
@@ -24,6 +25,7 @@ transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]
 laws = { path = "../laws" }
+strum.workspace = true
 
 [lints]
 workspace = true

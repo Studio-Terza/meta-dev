@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO nodes (project, facet, stage, provenance) VALUES (?1, ?2, ?3, ?4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "3e3c4f87a316bbf96b51904dc02295b12d68f0e1085feb0f697cc7ed323b8c4e"
+}

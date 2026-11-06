@@ -16,16 +16,28 @@ pub struct Projects;
 #[derive(Debug)]
 pub struct Located {
     transcripts: PathBuf,
-    store: PathBuf,
+    workspace: PathBuf,
+    repo: PathBuf,
 }
 
 impl Located {
+    const META: &'static str = ".meta";
+    const STORE: &'static str = "design.sqlite";
+
     pub fn transcripts<F: Files>(&self, files: F) -> ClaudeCodeDir<F> {
         ClaudeCodeDir::new(files, self.transcripts.clone())
     }
 
-    pub fn store<S>(self, opened: impl FnOnce(PathBuf) -> S) -> S {
-        opened(self.store)
+    pub fn store<S>(&self, opened: impl FnOnce(PathBuf) -> S) -> S {
+        opened(self.workspace.join(Self::META).join(Self::STORE))
+    }
+
+    pub fn workspace(&self) -> PathBuf {
+        self.workspace.clone()
+    }
+
+    pub fn repo(&self) -> &Path {
+        &self.repo
     }
 }
 
@@ -33,12 +45,14 @@ impl Projects {
     pub fn located(environment: &impl Environment, workspace: Option<&Path>) -> Result<Located, Failure> {
         let home = environment.variable(OsStr::new("HOME")).ok_or(Failure::Unset(OsString::from("HOME")))?;
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
+        let repo = Self::resolved(&current.clone().unwrap_or_default());
         let chosen = Self::chosen(current, workspace).ok_or(Failure::Unset(OsString::from("PWD")))?;
         let root = Self::resolved(&chosen);
         let slug = Slug::try_from(root.as_path())?;
         Ok(Located {
             transcripts: PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)),
-            store: root.join(".meta").join("design.sqlite"),
+            workspace: root,
+            repo,
         })
     }
 

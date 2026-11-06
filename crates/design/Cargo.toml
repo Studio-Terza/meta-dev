@@ -11,10 +11,12 @@ doctest = false
 
 [dependencies]
 console-ports = { path = "../console-ports" }
+design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
+local-config = { path = "../local-config" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }
@@ -25,6 +27,7 @@ transcript-ports = { path = "../transcript-ports" }
 [dev-dependencies]
 e2e = { path = "../../e2e" }
 laws = { path = "../laws" }
+strum.workspace = true
 
 [lints]
 workspace = true
