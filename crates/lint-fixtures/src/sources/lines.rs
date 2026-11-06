@@ -7,15 +7,15 @@ use super::Flagged;
 #[derive(Newtype, Arbitrary, Debug, Default, PartialEq, Eq)]
 pub struct Lines(Vec<String>);
 
-impl PartialEq<Flagged> for Lines {
-    fn eq(&self, flagged: &Flagged) -> bool {
-        self.0.iter().map(String::as_str).eq(flagged.into_inner().iter().copied())
+impl From<Flagged> for Lines {
+    fn from(flagged: Flagged) -> Lines {
+        Lines(flagged.into_inner().iter().map(ToString::to_string).collect())
     }
 }
 
-impl<const WANTED: usize> PartialEq<[&str; WANTED]> for Lines {
-    fn eq(&self, wanted: &[&str; WANTED]) -> bool {
-        self.0 == *wanted
+impl<const WANTED: usize> From<[&str; WANTED]> for Lines {
+    fn from(wanted: [&str; WANTED]) -> Lines {
+        Lines(wanted.iter().map(ToString::to_string).collect())
     }
 }
 

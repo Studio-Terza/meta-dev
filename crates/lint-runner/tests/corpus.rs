@@ -72,14 +72,12 @@ impl Corpus {
     }
 
     fn lints() -> usize {
-        [
-            include_str!("../src/cli/mode/lints.rs").matches("::report(readout.files())").count(),
-            include_str!("../src/cli/mode/lints.rs").matches("flows.report::<").count(),
-            include_str!("../src/cli/mode/lints.rs").matches("::dirty(&system)").count(),
-            include_str!("../src/cli/mode.rs").matches("::report(files)").count(),
-        ]
-        .iter()
-        .sum()
+        let runner = include_str!("../src/cli/mode/lints.rs");
+        ["::report(readout.files())", "flows.report::<", "::dirty(&system)", "ModelLint>::report"]
+            .iter()
+            .map(|call| runner.matches(call).count())
+            .sum::<usize>()
+            + include_str!("../src/cli/mode.rs").matches("::report(files)").count()
     }
 
     fn is_violation(line: &str) -> bool {
@@ -99,6 +97,6 @@ impl Corpus {
 
     fn difference(fixture: &Path, output: &str) -> Option<String> {
         let name = fixture.file_name().unwrap_or_default().to_string_lossy();
-        golden::golden!(format!("lints/{name}.txt"), output).err().map(|failure| format!("{failure:?}"))
+        golden::golden!(format!("lints/{name}.txt"), output).err().map(|failure| failure.to_string())
     }
 }

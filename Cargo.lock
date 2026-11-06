@@ -76,6 +76,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-model"
+version = "0.1.0"
+dependencies = [
+ "lint-layout",
+]
+
+[[package]]
+name = "code-reader"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "laws",
+ "lint-core",
+ "lint-layout",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "console-ports"
 version = "0.1.0"
 
@@ -345,6 +363,7 @@ dependencies = [
 name = "lint-core"
 version = "0.1.0"
 dependencies = [
+ "code-model",
  "file-ports",
  "lint-layout",
  "lint-placement",
@@ -430,6 +449,7 @@ dependencies = [
 name = "lint-fixtures"
 version = "0.1.0"
 dependencies = [
+ "code-reader",
  "laws",
  "lint-core",
  "newtype",
@@ -456,6 +476,15 @@ dependencies = [
  "lint-paths",
  "lint-placement",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "lint-hand-impls"
+version = "0.1.0"
+dependencies = [
+ "code-model",
+ "lint-core",
+ "lint-layout",
 ]
 
 [[package]]
@@ -816,6 +845,8 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "code-model",
+ "code-reader",
  "file-ports",
  "golden",
  "graph-query",
@@ -834,6 +865,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",
@@ -918,6 +950,7 @@ dependencies = [
  "lint-fixtures",
  "lint-fn-shape",
  "lint-guard-must-use",
+ "lint-hand-impls",
  "lint-layout",
  "lint-linear-flow",
  "lint-literal-names",

@@ -16,7 +16,7 @@ impl<'file> Shape<'file> {
     }
 
     pub fn answers_to(&self, name: &Name) -> Option<&Shape<'file>> {
-        (*name == *self.name).then_some(self)
+        (*name == Name::from(self.name)).then_some(self)
     }
 
     pub fn holds_text(&self, settled: &Wrappers) -> Option<&'file Ident> {

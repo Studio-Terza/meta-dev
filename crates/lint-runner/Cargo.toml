@@ -15,7 +15,10 @@ file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
 lint-complexity = { path = "../lint-complexity" }
+code-model = { path = "../code-model" }
+code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
+lint-hand-impls = { path = "../lint-hand-impls" }
 lint-reader = { path = "../lint-reader" }
 lint-layout = { path = "../lint-layout" }
 lint-bool-methods = { path = "../lint-bool-methods" }

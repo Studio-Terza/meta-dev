@@ -7,8 +7,10 @@ mod text;
 use std::fmt;
 use std::path::PathBuf;
 
-use lint_core::{Lint, Report, SourceFile, SourceText};
+use lint_core::{Report, SourceFile, SourceText};
 use newtype::Newtype;
+
+use crate::checks::Checks;
 
 pub use case::{Case, Title};
 pub use flagged::Flagged;
@@ -39,19 +41,20 @@ impl Sources {
     }
 
     #[must_use]
-    pub fn flagged<Checked: Lint>(sources: &[Source]) -> Lines {
-        Self::lines(&Checked::report(&Self::parsed(sources)))
+    pub fn flagged<Checked: Checks>(sources: &[Source]) -> Lines {
+        Checked::flagged(&Self::parsed(sources))
     }
 
     #[must_use]
-    pub fn mismatches<Checked: Lint>(cases: &[Case]) -> Lines {
+    pub fn mismatches<Checked: Checks>(cases: &[Case]) -> Lines {
         Lines::new(
             cases
                 .iter()
                 .filter_map(|case| {
                     let sources = Sources(case.sources());
                     let found = Self::flagged::<Checked>(sources.0);
-                    (found != case.flagged()).then(|| format!("{} ({sources}) flagged {found}", case.name()))
+                    (found != Lines::from(case.flagged()))
+                        .then(|| format!("{} ({sources}) flagged {found}", case.name()))
                 })
                 .collect(),
         )

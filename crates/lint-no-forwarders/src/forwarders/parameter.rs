@@ -26,7 +26,7 @@ impl Parameter {
 
     pub fn named_by<'params>(params: &'params [Parameter], path: &Path) -> Option<&'params Parameter> {
         let ident = path.get_ident()?;
-        params.iter().find(|parameter| parameter.name == *ident)
+        params.iter().find(|parameter| parameter.name == Name::from(ident))
     }
 
     pub fn forwarded<'expr>(expr: &'expr Expr, params: &[Parameter]) -> Option<&'expr Expr> {

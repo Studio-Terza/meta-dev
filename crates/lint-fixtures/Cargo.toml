@@ -10,6 +10,7 @@ test = false
 doctest = false
 
 [dependencies]
+code-reader = { path = "../code-reader" }
 lint-core = { path = "../lint-core" }
 newtype = { path = "../newtype" }
 

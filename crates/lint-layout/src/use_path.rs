@@ -39,16 +39,16 @@ impl UsePath {
     #[must_use]
     pub fn ends_with(&self, tail: PathTail<'_>) -> Option<&UsePath> {
         let words = tail.into_inner();
-        (self.0.len() >= words.len())
-            .then_some(self)
-            .filter(|path| path.0.iter().rev().zip(words.iter().rev()).all(|(segment, spelled)| segment == spelled))
+        (self.0.len() >= words.len()).then_some(self).filter(|path| {
+            path.0.iter().rev().zip(words.iter().rev()).all(|(segment, spelled)| *segment == Name::from(*spelled))
+        })
     }
 
     #[must_use]
     pub fn spells(&self, segments: &[Word<'_>]) -> Option<&UsePath> {
         (self.0.len() == segments.len())
             .then_some(self)
-            .filter(|path| path.0.iter().zip(segments).all(|(segment, spelled)| segment == spelled))
+            .filter(|path| path.0.iter().zip(segments).all(|(segment, spelled)| *segment == Name::from(*spelled)))
     }
 
     #[must_use]

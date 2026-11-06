@@ -16,7 +16,7 @@ impl Start {
     const NAMED: [(&'static str, Start); 2] = [("crate", Start::Crate), ("super", Start::Super)];
 
     fn spelled(name: &Name) -> Start {
-        Self::NAMED.iter().find(|(word, _)| *name == *word).map_or(Start::Relative, |(_, start)| *start)
+        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map_or(Start::Relative, |(_, start)| *start)
     }
 
     fn advance<'path>(self, mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {

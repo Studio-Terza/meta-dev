@@ -99,7 +99,7 @@ impl<'file> Facets<'file> {
             .iter()
             .filter_map(|fact| {
                 let words = fact.words();
-                words.first().filter(|first| **first == lead)?;
+                words.first().filter(|first| **first == Name::from(lead))?;
                 Some((words.into_iter().skip(1).collect(), fact))
             })
             .collect()

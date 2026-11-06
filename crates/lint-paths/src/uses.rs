@@ -1,7 +1,7 @@
 use crate::cover::Cover;
 use crate::ground::Ground;
 use lint_core::Site;
-use lint_layout::{PathTail, UsePath, Word};
+use lint_layout::{Name, PathTail, UsePath, Word};
 
 #[derive(Clone, Debug)]
 pub struct Use<'file> {
@@ -28,10 +28,9 @@ impl<'file> Use<'file> {
 
     #[must_use]
     pub fn under(&self, root: &[Word<'_>]) -> Option<&UsePath> {
-        self.candidates
-            .iter()
-            .filter(|candidate| candidate.segments().len() > root.len())
-            .find(|candidate| candidate.segments().iter().zip(root).all(|(segment, spelled)| segment == spelled))
+        self.candidates.iter().filter(|candidate| candidate.segments().len() > root.len()).find(|candidate| {
+            candidate.segments().iter().zip(root).all(|(segment, spelled)| *segment == Name::from(*spelled))
+        })
     }
 
     #[must_use]
