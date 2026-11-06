@@ -74,7 +74,7 @@ impl Linked {
 impl Refinement {
     fn closed(self, statements: &mut Statements<'_>) -> Result<Written, StoreFailure> {
         statements.written(sqlx::query!(
-            "INSERT OR IGNORE INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2",
+            "INSERT INTO closure (ancestor, descendant, depth) SELECT above.ancestor, below.descendant, above.depth + below.depth + 1 FROM closure AS above, closure AS below WHERE above.descendant = ?1 AND below.ancestor = ?2 ON CONFLICT (ancestor, descendant) DO UPDATE SET depth = excluded.depth WHERE excluded.depth < closure.depth",
             self.parent,
             self.child
         ))
@@ -192,7 +192,7 @@ impl RelativeRow {
         let child = Kin::Child.name();
         let rows = statements.rows(sqlx::query_as!(
             RelativeRow,
-            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END"#,
+            r#"SELECT CASE WHEN closure.descendant = ?1 THEN ?2 ELSE ?3 END AS "kin!: String", nodes.id, nodes.project, nodes.facet, nodes.stage, nodes.provenance FROM closure JOIN nodes ON nodes.id = CASE WHEN closure.descendant = ?1 THEN closure.ancestor ELSE closure.descendant END WHERE (closure.descendant = ?1 AND closure.depth > 0) OR (closure.ancestor = ?1 AND closure.depth = 1) ORDER BY CASE WHEN closure.descendant = ?1 THEN -closure.depth ELSE nodes.id END, nodes.id"#,
             id,
             ancestor,
             child

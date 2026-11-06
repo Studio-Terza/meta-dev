@@ -168,11 +168,7 @@ impl Request {
     }
 
     pub fn located(&self, environment: &impl Environment) -> Result<Located, Failure> {
-        Projects::located(environment, self.workspace.as_deref().map(Path::new))
-    }
-
-    pub fn persistence(&self) -> Persistence {
-        self.persistence
+        Projects::located(environment, self.workspace.as_deref().map(Path::new), self.persistence)
     }
 
     pub fn command(self) -> Command {

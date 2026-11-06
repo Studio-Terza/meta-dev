@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -9,7 +11,6 @@ use design_store::{
 use file_ports::{Bytes, Files, Memory};
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
-use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert_eq};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
@@ -199,33 +200,33 @@ fn the_lead_is_found_only_in_the_everyone_scope() -> Result<(), Box<dyn Error>> 
 }
 
 #[derive(Clone, Debug)]
-struct Forest {
-    parents: Vec<Option<usize>>,
+struct Dag {
     facets: Vec<Facet>,
-    order: Vec<usize>,
+    edges: Vec<Edge>,
 }
 
-impl Forest {
-    fn any() -> impl Strategy<Value = Forest> {
-        vec((option::of(any::<Index>()), select(Facet::VARIANTS)), 1..16).prop_flat_map(|choices| {
-            let parents: Vec<Option<usize>> = choices
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Edge {
+    child: usize,
+    parent: usize,
+}
+
+impl Dag {
+    fn any() -> impl Strategy<Value = Dag> {
+        vec((vec(any::<Index>(), 0..4), select(Facet::VARIANTS)), 1..16).prop_flat_map(|choices| {
+            let facets: Vec<Facet> = choices.iter().map(|(_parents, facet)| *facet).collect();
+            let edges: BTreeSet<Edge> = choices
                 .iter()
                 .enumerate()
-                .map(|(node, (choice, _facet))| choice.filter(|_| node > 0).map(|index| index.index(node)))
+                .skip(1)
+                .flat_map(|(child, (parents, _facet))| {
+                    parents.iter().map(move |index| Edge { child, parent: index.index(child) })
+                })
                 .collect();
-            let facets: Vec<Facet> = choices.iter().map(|(_choice, facet)| *facet).collect();
-            let refining: Vec<usize> =
-                (0..parents.len()).filter(|node| Forest::parent(&parents, *node).is_some()).collect();
-            Just(refining).prop_shuffle().prop_map(move |order| Forest {
-                parents: parents.clone(),
-                facets: facets.clone(),
-                order,
-            })
+            Just(edges.into_iter().collect::<Vec<Edge>>())
+                .prop_shuffle()
+                .prop_map(move |edges| Dag { facets: facets.clone(), edges })
         })
-    }
-
-    fn parent(parents: &[Option<usize>], node: usize) -> Option<usize> {
-        parents.get(node).copied().flatten()
     }
 
     fn id(node: usize) -> NodeId {
@@ -240,32 +241,48 @@ impl Forest {
         let nodes = self
             .facets
             .iter()
-            .map(|facet| Ok(store.write(Forest::node(*facet)?)?))
+            .map(|facet| Ok(store.write(Dag::node(*facet)?)?))
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         let links = self
-            .order
+            .edges
             .iter()
-            .map(|node| {
-                let parent = Forest::parent(&self.parents, *node).ok_or("a refining node has a parent")?;
-                Ok(store.write(Linked::new(Forest::id(*node), NodeRelation::Refines, Forest::id(parent)))?)
+            .map(|edge| {
+                Ok(store.write(Linked::new(Dag::id(edge.child), NodeRelation::Refines, Dag::id(edge.parent)))?)
             })
             .collect::<Result<Vec<Written>, Box<dyn Error>>>()?;
         Ok(Written::total(nodes.into_iter().chain(links)))
     }
 
+    fn parents(&self, node: usize) -> impl Iterator<Item = usize> + '_ {
+        self.edges.iter().filter(move |edge| edge.child == node).map(|edge| edge.parent)
+    }
+
     fn ancestors(&self, node: usize) -> Vec<NodeId> {
-        let mut above: Vec<NodeId> =
-            std::iter::successors(Forest::parent(&self.parents, node), |up| Forest::parent(&self.parents, *up))
-                .map(Forest::id)
-                .collect();
-        above.reverse();
-        above
+        let levels = std::iter::successors(Some(BTreeSet::from([node])), |frontier| {
+            Some(frontier.iter().flat_map(|below| self.parents(*below)).collect::<BTreeSet<usize>>())
+        })
+        .take(self.facets.len());
+        let depths = levels
+            .enumerate()
+            .skip(1)
+            .flat_map(|(depth, level)| level.into_iter().map(move |above| (above, depth)))
+            .fold(BTreeMap::new(), |mut depths, (above, depth)| {
+                depths.entry(above).or_insert(depth);
+                depths
+            });
+        let ordered: BTreeSet<(Reverse<usize>, usize)> =
+            depths.into_iter().map(|(above, depth)| (Reverse(depth), above)).collect();
+        ordered.into_iter().map(|(_depth, above)| Dag::id(above)).collect()
     }
 
     fn children(&self, node: usize) -> Vec<NodeId> {
-        (0..self.parents.len())
-            .filter(|child| Forest::parent(&self.parents, *child) == Some(node))
-            .map(Forest::id)
+        self.edges
+            .iter()
+            .filter(|edge| edge.parent == node)
+            .map(|edge| edge.child)
+            .collect::<BTreeSet<usize>>()
+            .into_iter()
+            .map(Dag::id)
             .collect()
     }
 }
@@ -283,18 +300,18 @@ impl Ids {
     }
 }
 
-laws::law!(the_closure_holds_exactly_the_transitive_refinements, Forest::any(), forest, {
+laws::law!(the_closure_holds_exactly_the_transitive_refinements, Dag::any(), dag, {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
-    forest.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    (0..forest.parents.len()).try_for_each(|node| {
+    dag.planted(&store).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    (0..dag.facets.len()).try_for_each(|node| {
         let placed = store
-            .read(ShownNode::from(Forest::id(node)))
+            .read(ShownNode::from(Dag::id(node)))
             .map_err(|failure| TestCaseError::fail(failure.to_string()))?
             .ok_or_else(|| TestCaseError::fail("a planted node is not shown"))?;
-        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), forest.ancestors(node));
-        prop_assert_eq!(Ids::kin(&placed, Kin::Child), forest.children(node));
-        prop_assert_eq!(placed.node().entry().facet(), forest.facets.get(node).copied().unwrap_or(Facet::Project));
+        prop_assert_eq!(Ids::kin(&placed, Kin::Ancestor), dag.ancestors(node));
+        prop_assert_eq!(Ids::kin(&placed, Kin::Child), dag.children(node));
+        prop_assert_eq!(placed.node().entry().facet(), dag.facets.get(node).copied().unwrap_or(Facet::Project));
         Ok(())
     })?;
 });
@@ -324,7 +341,7 @@ impl Projects {
         let run = Run::root();
         let store = run.port(Sqlite::in_memory::<StreamSchema>());
         Projects::rooted(&store, "q")?;
-        store.write(Forest::node(facet)?)?;
+        store.write(Dag::node(facet)?)?;
         store.write(NewNode::from(Entry::new("p".parse()?, Facet::Project, Stage::Vague, Entered::Init.into())))?;
         Ok([
             store.read(ProjectRoot::from("p".parse::<Project>()?))?,
@@ -354,12 +371,23 @@ fn linking_the_same_nodes_again_writes_no_row() -> Result<(), Box<dyn Error>> {
     let run = Run::root();
     let store = run.port(Sqlite::in_memory::<StreamSchema>());
     let parent = Projects::rooted(&store, "p")?;
-    store.write(Forest::node(Facet::Project)?)?;
+    store.write(Dag::node(Facet::Project)?)?;
     let child = NodeId::new(parent.into_inner().saturating_add(1));
     let first = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
     let second = store.write(Linked::new(child, NodeRelation::Refines, parent))?;
     assert!(first > Written::zero());
     assert_eq!(second, Written::zero());
+    Ok(())
+}
+
+#[test]
+fn a_shortcut_refinement_is_listed_as_a_child() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    let edges = [(1, 0), (2, 1), (2, 0)].map(|(child, parent)| Edge { child, parent });
+    Dag { facets: vec![Facet::Project; 3], edges: edges.to_vec() }.planted(&store)?;
+    let shown = store.read(ShownNode::from(Dag::id(0)))?.ok_or("no root shown")?;
+    assert_eq!(Ids::kin(&shown, Kin::Child), [Dag::id(1), Dag::id(2)]);
     Ok(())
 }
 

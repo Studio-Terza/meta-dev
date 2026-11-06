@@ -48,7 +48,7 @@ impl<'environment, E: Environment, F: Files, O> Cli<'environment, E, F, O> {
     {
         let request = Request::parsed(arguments)?;
         let located = request.located(self.environment)?;
-        let store = run.port(request.persistence().store(&located, self.opened));
+        let store = run.port(located.store(self.opened));
         request.command().written(Ground::new(run, self.files, located, &store), out)
     }
 }

@@ -5,7 +5,7 @@ use design_model::Project;
 use file_ports::{Bytes, Files, Kind};
 use serde::{Deserialize, Serialize};
 
-use crate::{ConfigFailure, Kept};
+use crate::{ConfigFailure, Keeping, Kept};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -33,10 +33,9 @@ impl LocalConfig {
         LocalConfig { project, workspace }
     }
 
-    pub fn kept(&self, files: &impl Files, repo: &Path) -> Result<Kept, ConfigFailure> {
-        let meta = repo.join(Self::META);
-        Self::found(files, &meta.join(Self::FILE))?
-            .map_or_else(|| self.written(files, &meta).map(|_written| Kept::Written), |found| self.compared(found))
+    pub fn kept(&self, files: &impl Files, repo: &Path, keeping: Keeping) -> Result<Kept, ConfigFailure> {
+        Self::found(files, &repo.join(Self::META).join(Self::FILE))?
+            .map_or_else(|| keeping.settled(self, files, &repo.join(Self::META)), |found| self.compared(found))
     }
 
     fn found(files: &impl Files, path: &Path) -> Result<Option<LocalConfig>, ConfigFailure> {
@@ -52,7 +51,7 @@ impl LocalConfig {
             .ok_or(ConfigFailure::Elsewhere { project: found.project, workspace: found.workspace })
     }
 
-    fn written(&self, files: &impl Files, meta: &Path) -> Result<PathBuf, ConfigFailure> {
+    pub(crate) fn written(&self, files: &impl Files, meta: &Path) -> Result<PathBuf, ConfigFailure> {
         let path = meta.join(Self::FILE);
         files.create_directories(meta)?;
         files.write(&meta.join(Self::IGNORE), Bytes::new(Self::IGNORED.to_vec()))?;

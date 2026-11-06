@@ -1,19 +1,18 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use console_ports::Variables;
 use design::{Cli, Failure, Outcome};
 use design_model::{Entered, Entry, Facet, NodeId, NodeRelation, Stage};
 use design_store::{Linked, NewNode, ShownMessage, Stored, StreamSchema};
-use file_ports::{Bytes, Files, Memory};
+use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
 use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::sample::select;
 use laws::proptest::test_runner::TestCaseError;
-use local_config::{ConfigFailure, LocalConfig};
+use local_config::{ConfigFailure, Keeping, LocalConfig};
 use newtype::Counter;
 use port_core::{Held, Pass, Release, ReleaseReceipt, Released, Resource, Run, port};
 use store_ports::{Busy, Sqlite, Store, Written};
@@ -142,6 +141,59 @@ impl Session {
     }
 }
 
+#[derive(Debug)]
+struct FakeLent<'memory> {
+    memory: &'memory Memory,
+}
+
+impl FakeLent<'_> {
+    fn new(memory: &Memory) -> FakeLent<'_> {
+        FakeLent { memory }
+    }
+}
+
+impl Files for FakeLent<'_> {
+    fn read(&self, path: &Path) -> Result<Bytes, FileFailure> {
+        self.memory.read(path)
+    }
+
+    fn read_text(&self, path: &Path) -> Result<Text, FileFailure> {
+        self.memory.read_text(path)
+    }
+
+    fn write(&self, path: &Path, bytes: Bytes) -> Result<(), FileFailure> {
+        self.memory.write(path, bytes)
+    }
+
+    fn append(&self, path: &Path, bytes: &Bytes) -> Result<(), FileFailure> {
+        self.memory.append(path, bytes)
+    }
+
+    fn create_directories(&self, path: &Path) -> Result<(), FileFailure> {
+        self.memory.create_directories(path)
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> Result<(), FileFailure> {
+        self.memory.copy(from, to)
+    }
+
+    fn entries(&self, directory: &Path) -> Result<Vec<PathBuf>, FileFailure> {
+        self.memory.entries(directory)
+    }
+
+    fn canonical(&self, path: &Path) -> Result<PathBuf, FileFailure> {
+        self.memory.canonical(path)
+    }
+
+    fn kind(&self, path: &Path) -> Kind {
+        self.memory.kind(path)
+    }
+
+    fn size(&self, path: &Path) -> Result<Size, FileFailure> {
+        self.memory.size(path)
+    }
+}
+
 struct Invocation;
 
 impl Invocation {
@@ -160,7 +212,7 @@ impl Invocation {
         Self::within(store, session.files(), arguments)
     }
 
-    fn within(store: &Sqlite, files: Memory, arguments: &[&str]) -> Result<String, Failure> {
+    fn within(store: &Sqlite, files: impl Files, arguments: &[&str]) -> Result<String, Failure> {
         let run = Run::root();
         let mut out = Vec::new();
         Cli::new(&Self::environment(), files, |_path| store.clone()).report(
@@ -653,13 +705,21 @@ impl Graph {
 fn init_keeps_a_repository_configured_for_the_same_workspace_and_refuses_another() -> Result<(), Failure> {
     let configured = || -> Result<Memory, Failure> {
         let files = Session::typical().files();
-        LocalConfig::new("demo".parse()?, PathBuf::from("/work")).kept(&files, Path::new("/work"))?;
+        LocalConfig::new("demo".parse()?, PathBuf::from("/work")).kept(&files, Path::new("/work"), Keeping::Write)?;
         Ok(files)
     };
     let store = Sqlite::in_memory::<StreamSchema>();
     Invocation::within(&store, configured()?, &["init", "demo"])?;
     let moved = Invocation::within(&store, configured()?, &["init", "demo", "--workspace", "/elsewhere"]);
     assert!(matches!(moved, Err(Failure::Config(ConfigFailure::Elsewhere { .. }))));
+    Ok(())
+}
+
+#[test]
+fn a_dry_run_init_leaves_the_repository_without_a_meta_directory() -> Result<(), Failure> {
+    let files = Session::typical().files();
+    Invocation::within(&Sqlite::in_memory::<StreamSchema>(), FakeLent::new(&files), &["--dry-run", "init", "demo"])?;
+    assert_eq!(files.kind(Path::new("/work/.meta")), Kind::Missing);
     Ok(())
 }
 

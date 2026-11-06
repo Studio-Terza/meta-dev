@@ -4,9 +4,13 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Component, Path, PathBuf};
 
 use console_ports::Environment;
+use design_store::StreamSchema;
 use file_ports::Files;
+use local_config::Keeping;
+use store_ports::Sqlite;
 use transcript_ports::ClaudeCodeDir;
 
+use super::persistence::Persistence;
 use crate::cli::failure::Failure;
 use slug::Slug;
 
@@ -18,6 +22,7 @@ pub struct Located {
     transcripts: PathBuf,
     workspace: PathBuf,
     repo: PathBuf,
+    persistence: Persistence,
 }
 
 impl Located {
@@ -28,8 +33,18 @@ impl Located {
         ClaudeCodeDir::new(files, self.transcripts.clone())
     }
 
-    pub fn store<S>(&self, opened: impl FnOnce(PathBuf) -> S) -> S {
-        opened(self.workspace.join(Self::META).join(Self::STORE))
+    pub fn store(&self, opened: impl FnOnce(PathBuf) -> Sqlite) -> Sqlite {
+        match self.persistence {
+            Persistence::File => opened(self.workspace.join(Self::META).join(Self::STORE)),
+            Persistence::DryRun => Sqlite::in_memory::<StreamSchema>(),
+        }
+    }
+
+    pub fn keeping(&self) -> Keeping {
+        match self.persistence {
+            Persistence::File => Keeping::Write,
+            Persistence::DryRun => Keeping::Plan,
+        }
     }
 
     pub fn workspace(&self) -> PathBuf {
@@ -42,7 +57,11 @@ impl Located {
 }
 
 impl Projects {
-    pub fn located(environment: &impl Environment, workspace: Option<&Path>) -> Result<Located, Failure> {
+    pub fn located(
+        environment: &impl Environment,
+        workspace: Option<&Path>,
+        persistence: Persistence,
+    ) -> Result<Located, Failure> {
         let home = environment.variable(OsStr::new("HOME")).ok_or(Failure::Unset(OsString::from("HOME")))?;
         let current = environment.variable(OsStr::new("PWD")).map(PathBuf::from);
         let repo = Self::resolved(&current.clone().unwrap_or_default());
@@ -53,6 +72,7 @@ impl Projects {
             transcripts: PathBuf::from(home).join(".claude").join("projects").join(PathBuf::from(slug)),
             workspace: root,
             repo,
+            persistence,
         })
     }
 

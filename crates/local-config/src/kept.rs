@@ -2,4 +2,5 @@
 pub enum Kept {
     Written,
     Unchanged,
+    Planned,
 }

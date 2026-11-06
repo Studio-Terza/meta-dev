@@ -30,6 +30,10 @@ impl<'run, F: Files, S: Store> Ground<'run, F, S> {
     }
 
     pub fn configured(&self, project: Project) -> Result<Kept, Failure> {
-        Ok(LocalConfig::new(project, self.located.workspace()).kept(&self.files, self.located.repo())?)
+        Ok(LocalConfig::new(project, self.located.workspace()).kept(
+            &self.files,
+            self.located.repo(),
+            self.located.keeping(),
+        )?)
     }
 }

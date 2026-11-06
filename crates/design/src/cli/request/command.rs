@@ -2,7 +2,7 @@ mod ingest;
 mod init;
 mod printed;
 mod search;
-mod target;
+mod subject;
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -21,12 +21,12 @@ use ingest::Ingest;
 use init::Init;
 use printed::Printed;
 use search::Search;
-use target::Target;
+use subject::Subject;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
     Ingest,
-    Show(Target),
+    Show(Subject),
     Search(Terms, Scope),
     Init(Init),
 }
@@ -58,7 +58,7 @@ impl Verb {
                 .first()
                 .and_then(|word| word.to_str())
                 .ok_or(Failure::Usage)
-                .map(|word| Command::Show(Target::from(word))),
+                .map(|word| Command::Show(Subject::from(word))),
             Verb::Search => rest
                 .iter()
                 .map(|word| word.to_str())
@@ -95,7 +95,7 @@ impl Command {
             Command::Ingest => Ingest::read(ground.store(), &ground.transcripts())
                 .and_then(|tally| Printed::shown(out, &tally))
                 .map(|_printed| Outcome::Ingested),
-            Command::Show(target) => target.shown(ground.store(), out).map(|_printed| Outcome::Shown),
+            Command::Show(subject) => subject.shown(ground.store(), out).map(|_printed| Outcome::Shown),
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
                 .and_then(|search| Printed::shown(out, &search))
                 .map(|_printed| Outcome::Searched),
