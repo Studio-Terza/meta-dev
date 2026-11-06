@@ -102,7 +102,7 @@ impl Op for Read {
 fn read(_entry: Entry<Read>) {}
 
 fn main() {
-    Metered::new(()).call(|_, entry| read(entry));
+    Run::default().meter(()).call(|_, entry| read(entry));
 }
 ```
 
@@ -143,12 +143,12 @@ fn main() {
 
 A meter cannot be made outside a run:
 
-```compile_fail
+```compile_fail,E0624
 use port_core::Metered;
 
 struct Disk;
 
 fn main() {
-    let _meter = Metered::new(Disk);
+    let _meter = Metered::sharing(Disk, Default::default());
 }
 ```
