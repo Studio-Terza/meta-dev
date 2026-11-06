@@ -1,19 +1,15 @@
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
-use syn::{
-    Attribute, Block, File, Item, ItemEnum, ItemImpl, ItemMacro, ItemMod, ItemStruct, ItemUnion, Path, Stmt, Token,
-};
+use syn::{Attribute, Block, File, Item, ItemEnum, ItemImpl, ItemMod, ItemStruct, ItemUnion, Path, Stmt, Token};
 
 use code_model::{Found, Implementation, Origin};
 use lint_core::SourceFile;
 use lint_layout::{LineNumber, Name};
 
 mod boundary;
-mod macro_impls;
 mod scopes;
 
 use boundary::SelfType;
-use macro_impls::MacroImpls;
 use scopes::{Reach, Scopes};
 
 #[derive(Debug)]
@@ -75,11 +71,6 @@ impl<'ast> Visit<'ast> for Lowering {
         let line = LineNumber::from(block.impl_token.span);
         self.found.push(Found::new(line, Implementation::new(subject, implemented, Origin::Written)));
         visit::visit_item_impl(self, block);
-    }
-
-    fn visit_item_macro(&mut self, item: &'ast ItemMacro) {
-        self.found.extend(MacroImpls::in_macro(&item.mac, &self.scopes));
-        visit::visit_item_macro(self, item);
     }
 
     fn visit_item_struct(&mut self, item: &'ast ItemStruct) {

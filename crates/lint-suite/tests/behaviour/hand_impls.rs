@@ -12,9 +12,6 @@ const ALIASED: &str = "use std::clone::Clone as Dup;\nstruct R;\nimpl Dup for R 
 const GROUPED: &str = "use std::{fmt::Debug as Show};\nstruct R;\nimpl Show for R {\n    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) }\n}\n";
 const ALIASED_OUTSIDE: &str = "use std::fmt::Display as Shown;\nstruct R;\nimpl Shown for R {\n    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) }\n}\n";
 const MACRO_BANNED: &str = "macro_rules! make {\n    ($t:ty) => {\n        impl Clone for $t {\n            fn clone(&self) -> $t { *self }\n        }\n    };\n}\n";
-const MACRO_OUTSIDE: &str = "macro_rules! make {\n    ($t:ty) => {\n        impl Display for $t {\n            fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n        }\n    };\n}\n";
-const MACRO_MATCHER: &str =
-    "macro_rules! make {\n    (impl Clone for $t:ty) => {\n        impl Shown for $t {}\n    };\n}\n";
 
 const QUALIFIED: &str =
     "use std::clone::Clone as Dup;\nmod a {\n    pub trait Dup {}\n}\nstruct R;\nimpl a::Dup for R {}\n";
@@ -35,7 +32,7 @@ const UNIMPORTED: &str =
     "struct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
 const GLOB_STD: &str = "use std::fmt::*;\nstruct R;\nimpl Debug for R {\n    fn fmt(&self, f: &mut Formatter<'_>) -> Result { Ok(()) }\n}\n";
 
-const CASES: [Case; 23] = [
+const CASES: [Case; 21] = [
     Case::new(
         Title::new("written std impls"),
         &[Source::new(Located::new("a.rs"), Text::new(WRITTEN))],
@@ -73,18 +70,8 @@ const CASES: [Case; 23] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("an impl in a macro_rules body"),
+        Title::new("a banned impl in a macro_rules transcriber is not flagged"),
         &[Source::new(Located::new("a.rs"), Text::new(MACRO_BANNED))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("an impl outside the ban in a macro_rules body"),
-        &[Source::new(Located::new("a.rs"), Text::new(MACRO_OUTSIDE))],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("a banned impl written in a macro_rules matcher"),
-        &[Source::new(Located::new("a.rs"), Text::new(MACRO_MATCHER))],
         Flagged::new(&[]),
     ),
     Case::new(

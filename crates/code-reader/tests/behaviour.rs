@@ -16,17 +16,12 @@ const DECLARED: &str =
 const SCOPED: &str = "use std::clone::Clone as Dup;\nmod a {\n    impl Dup for R {}\n}\nfn f() {\n    use std::fmt::Debug as Show;\n    impl Dup for R {}\n    impl Show for R {}\n    mod b {\n        impl Show for R {}\n    }\n}\nimpl Show for R {}\n";
 const SHADOWED: &str = "use std::clone::Clone;\nfn f() {\n    trait Clone {}\n    impl Clone for R {}\n}\n";
 const DERIVES: &str = "#[derive(Clone, serde::Serialize)]\nstruct A;\n";
-const MACRO_SCOPE: &str = "mod m {\n    use std::fmt::Debug as Show;\n    macro_rules! make {\n        () => { impl Show for R {} };\n    }\n}\n";
-const MACROS: &str = "macro_rules! make {\n    ($t:ty, $u:ty) => {\n        impl<T> Clone for Wrapper<T> {}\n        impl PartialEq<$u> for $t {}\n        impl $t {\n            fn each() { for x in y {} }\n        }\n        mod inner {\n            impl Inner {}\n            impl Copy for Inner {}\n            impl $tr for Inner {}\n        }\n    };\n}\nfn f() {\n    other! {\n        impl Eq for Skipped {}\n    }\n}\n";
 
 const GLOB_DECLARED: &str = "trait Clone {}\nmod tests {\n    use super::*;\n    impl Clone for R {}\n}\n";
 const GLOB_CRATE: &str = "use crate::shapes::*;\nimpl Hash for R {}\n";
 const GLOB_STD: &str =
     "use std::fmt::*;\nuse core::hash::*;\nimpl Debug for R {}\nimpl Hash for R {}\nimpl Clone for R {}\n";
 const SELF_IMPORT: &str = "use std::fmt::{self, Write};\nimpl fmt::Debug for R {}\n";
-const ARROW: &str = "macro_rules! m {\n    () => { impl<F: Fn() -> u8> Clone for W<F> {} };\n}\n";
-const MATCHER: &str = "macro_rules! m {\n    (impl Clone for $t:ty) => { impl Shown for $t {} };\n}\n";
-const HIGHER_RANKED: &str = "macro_rules! m {\n    () => { impl<F: for<'a> Fn(&'a u8)> Clone for W<F> {} };\n}\n";
 
 struct Expect;
 
@@ -112,19 +107,6 @@ fn a_renamed_trait_is_read_as_its_original() {
     );
 }
 
-#[test]
-fn only_macro_rules_bodies_yield_trait_impls_in_macros() {
-    assert_eq!(
-        Read::implementations(&[Read::file("a.rs", MACROS)]),
-        [
-            Expect::written("Wrapper", Expect::std(&["std", "clone", "Clone"])),
-            Expect::written("t", Expect::std(&["std", "cmp", "PartialEq"])),
-            Expect::written("Inner", Expect::std(&["std", "marker", "Copy"])),
-            Expect::written("Inner", Expect::external(&[])),
-        ]
-    );
-}
-
 laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text: &&str| Read::resolved(text), [
     ROOTED => [
         Expect::std(&["std", "fmt", "Debug"]),
@@ -160,7 +142,6 @@ laws::table!(each_trait_path_resolves_through_the_scopes_it_is_written_in, |text
     ],
     SHADOWED => [Expect::krate(&["crate", "Clone"])],
     DERIVES => [Expect::std(&["std", "clone", "Clone"]), Expect::external(&["serde", "Serialize"])],
-    MACRO_SCOPE => [Expect::std(&["std", "fmt", "Debug"])],
 ]);
 
 laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| Read::resolved(text), [
@@ -172,7 +153,4 @@ laws::table!(a_glob_import_decides_what_a_bare_trait_name_means, |text: &&str| R
         Expect::std(&["std", "clone", "Clone"]),
     ],
     SELF_IMPORT => [Expect::std(&["std", "fmt", "Debug"])],
-    ARROW => [Expect::std(&["std", "clone", "Clone"])],
-    HIGHER_RANKED => [Expect::std(&["std", "clone", "Clone"])],
-    MATCHER => [Expect::external(&["Shown"])],
 ]);
