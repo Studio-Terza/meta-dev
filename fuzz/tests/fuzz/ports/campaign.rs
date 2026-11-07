@@ -8,7 +8,7 @@ use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::{Cli, Verdict};
 use proptest::prelude::{Strategy, prop_assert_eq};
-use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
+use proptest::test_runner::{Config, Reason, TestCaseError, TestError, TestRunner};
 
 use crate::crash::{Crash, Failing, Kept};
 use crate::input::Input;
@@ -57,12 +57,14 @@ impl Campaign {
 
     fn crashed(crashes: Crashes, target: &str, failure: TestError<Input>) -> Crash {
         match failure {
-            TestError::Fail(reason, input) => {
-                let kept = Kept::from(crashes.keep(&Self::case(target, &input)));
-                Self::replayed(crashes, target, Failing::new(input, reason.message().to_owned(), kept))
-            }
+            TestError::Fail(reason, input) => Self::failed(crashes, target, input, &reason),
             TestError::Abort(reason) => Crash::Aborted { reason: reason.message().to_owned() },
         }
+    }
+
+    fn failed(crashes: Crashes, target: &str, input: Input, reason: &Reason) -> Crash {
+        let kept = Kept::from(crashes.keep(&Self::case(target, &input)));
+        Self::replayed(crashes, target, Failing::new(input, reason.message().to_owned(), kept))
     }
 
     fn replayed(crashes: Crashes, target: &str, failing: Failing) -> Crash {
