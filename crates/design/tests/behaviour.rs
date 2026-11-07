@@ -1765,7 +1765,8 @@ impl Rendered {
                 format!("place({}, n4, questions)", Applying::answer(1)),
             ]
             .join("\n"),
-        )
+        )?;
+        Rendered::applied(workspace, &format!("sense({}, opinion, general, tentative, implicit)", Applying::answer(0)))
     }
 
     fn tree() -> Result<String, Box<dyn std::error::Error>> {

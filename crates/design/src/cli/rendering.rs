@@ -125,10 +125,9 @@ impl fmt::Display for Neighbourhood<'_> {
 
 impl fmt::Display for Placing<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let segment = SegmentRef::new(self.0.prefix().clone(), Ordinal::from(self.0));
         let author: &Authorship = self.0.as_ref();
         let provenance: &Provenance = self.0.as_ref();
-        write!(formatter, "{} {segment} {author}", self.0.relation())?;
+        write!(formatter, "{} {}.{} {author}", self.0.relation(), self.0.prefix(), Ordinal::from(self.0))?;
         self.0.sense().iter().try_for_each(|sense| write!(formatter, " {}", Words(*sense)))?;
         write!(formatter, " entered {} {:?}", Entered::from(*provenance), self.0.body().to_string())
     }
