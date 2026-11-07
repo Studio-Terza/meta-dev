@@ -156,9 +156,11 @@ impl Token {
     }
 
     pub(crate) fn spelled<L: for<'text> Logos<'text, Source = str, Extras = ()>>(self) -> Result<Token, Token> {
+        let kept = self.clone();
+        let length = self.text.len();
         let mut lexer = L::lexer(&self.text);
         let whole = lexer.next().and_then(Result::ok).map(|_spelling| lexer.span());
-        if whole == Some(0..self.text.len()) { Ok(self) } else { Err(self) }
+        whole.filter(|span| *span == (0..length)).map(|_whole| self).ok_or(kept)
     }
 
     pub(crate) fn parsed<T: FromStr>(self, kind: Kind) -> Result<T, Token> {

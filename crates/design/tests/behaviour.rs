@@ -34,7 +34,7 @@ use transcript_ports::{Authorship, Body, Cursor, Instant, SessionId, Uuid};
 
 const HOME: &str = "/home/tester";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Speaker {
     Owner,
     Lead,
@@ -2261,7 +2261,7 @@ const SAYINGS: [&str; 3] = ["", "word", "1. word\\n2. more word"];
 #[derive(Clone, Debug)]
 struct Uttered {
     stem: &'static str,
-    owner: bool,
+    speaker: Speaker,
     text: &'static str,
     back: Option<usize>,
 }
@@ -2271,8 +2271,13 @@ struct Echoes;
 impl Echoes {
     fn uttered() -> BoxedStrategy<Vec<Uttered>> {
         proptest::collection::vec(
-            (select(STEMS.to_vec()), any::<bool>(), select(SAYINGS.to_vec()), proptest::option::of(0usize..3))
-                .prop_map(|(stem, owner, text, back)| Uttered { stem, owner, text, back }),
+            (
+                select(STEMS.to_vec()),
+                select(vec![Speaker::Owner, Speaker::Lead]),
+                select(SAYINGS.to_vec()),
+                proptest::option::of(0usize..3),
+            )
+                .prop_map(|(stem, speaker, text, back)| Uttered { stem, speaker, text, back }),
             1..6,
         )
         .boxed()
@@ -2294,13 +2299,12 @@ impl Echoes {
                 .zip(&uuids)
                 .enumerate()
                 .map(|(index, (said, uuid))| {
-                    let speaker = if said.owner { Speaker::Owner } else { Speaker::Lead };
                     let parent = said
                         .back
                         .and_then(|back| index.checked_sub(back.saturating_add(1)))
                         .and_then(|earlier| uuids.get(earlier))
                         .map_or_else(|| "null".to_owned(), |earlier| format!("\"{earlier}\""));
-                    Session::line(speaker, uuid, &parent, said.text)
+                    Session::line(said.speaker, uuid, &parent, said.text)
                 })
                 .collect(),
         )
@@ -2314,21 +2318,17 @@ impl Echoes {
             _ => Vec::new(),
         }
     }
-
-    fn failed(failure: Failure) -> TestCaseError {
-        TestCaseError::fail(failure.to_string())
-    }
 }
 
 laws::law!(every_ref_that_show_or_search_prints_is_shown, Echoes::uttered(), uttered, {
     let applying = Applying { store: Sqlite::in_memory::<StreamSchema>(), files: Echoes::session(&uttered).files() };
-    applying.run(&["ingest"]).map_err(Echoes::failed)?;
+    applying.run(&["ingest"]).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let printed = Echoes::uuids(&uttered)
         .iter()
         .map(|uuid| applying.run(&["show", uuid]))
         .chain([applying.run(&["search", "--all", "word"])])
         .collect::<Result<String, Failure>>()
-        .map_err(Echoes::failed)?;
+        .map_err(|failure| TestCaseError::fail(failure.to_string()))?;
     let refs: Vec<String> = Spread::parsed(&printed).into_iter().flat_map(Echoes::refs).collect();
     prop_assert!(refs.len() >= uttered.len(), "{}", printed);
     let refused: Vec<&String> = refs.iter().filter(|reference| applying.run(&["show", reference]).is_err()).collect();
