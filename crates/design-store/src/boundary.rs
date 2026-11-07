@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::iter::Sum;
-use std::ops::Add;
 
 use design_model::Ordinal;
 use file_ports::Offset;
@@ -23,7 +22,7 @@ pub struct RelationName(String);
 #[derive(Newtype, Arbitrary, Display, Clone, Debug, PartialEq, Eq)]
 pub struct AnchorName(String);
 
-#[derive(Newtype, Arbitrary, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Newtype, Arbitrary, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Rank(f64);
 
 pub(crate) trait Row {
@@ -288,8 +287,9 @@ WHERE
     pub(crate) fn within(self, rest: &[BTreeMap<Keyed, Rank>]) -> Option<Hit> {
         rest.iter()
             .map(|ranks| ranks.get(&self.id).copied())
+            .chain([Some(self.rank)])
             .sum::<Option<Rank>>()
-            .map(|more| Hit { rank: self.rank + more, ..self })
+            .map(|rank| Hit { rank, ..self })
     }
 
     pub(crate) fn ranking(&self, other: &Hit) -> Ordering {
@@ -303,17 +303,9 @@ impl Rank {
     }
 }
 
-impl Add for Rank {
-    type Output = Rank;
-
-    fn add(self, more: Rank) -> Rank {
-        Rank(self.0 + more.0)
-    }
-}
-
 impl Sum for Rank {
     fn sum<Ranks: Iterator<Item = Rank>>(ranks: Ranks) -> Rank {
-        ranks.fold(Rank::default(), Add::add)
+        Rank(ranks.map(|Rank(rank)| rank).sum())
     }
 }
 
