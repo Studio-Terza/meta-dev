@@ -1,8 +1,10 @@
 use std::ffi::OsString;
+use std::io;
 use std::iter;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use console_ports::Cargo;
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::Cli;
@@ -16,6 +18,18 @@ const ROOT: &str = "/fuzzed";
 const BATCH: u32 = 64;
 
 pub struct Campaign;
+
+struct Workspace;
+
+impl Workspace {
+    const METADATA: &'static str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
+}
+
+impl Cargo for Workspace {
+    fn metadata(&self, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
+        roots.iter().map(|_| Ok(Text::new(Self::METADATA.to_owned()))).collect()
+    }
+}
 
 impl Campaign {
     fn case(target: &str, input: &Input) -> Case {
@@ -32,7 +46,7 @@ impl Campaign {
         .into_iter()
         .collect();
         let arguments = [OsString::from(root)];
-        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, &mut Vec::new(), &mut Vec::new());
+        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, &Workspace, &mut Vec::new(), &mut Vec::new());
         Ok(())
     }
 

@@ -546,6 +546,7 @@ dependencies = [
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "console-ports",
  "file-ports",
  "lint-runner",
  "proptest",
