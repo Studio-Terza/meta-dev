@@ -1493,6 +1493,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-layout",
+ "lint-paths",
  "proc-macro2",
  "sqlformat",
  "syn 2.0.119",
