@@ -6,17 +6,20 @@ use std::sync::LazyLock;
 
 use design_model::{
     AnyNode, Casting, Entered, Entry, Facet, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Ordinal, Prefix,
-    Project, Provenance, Role, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
+    Project, Provenance, Role, RunId, Segment, SegmentRelation, Stage, Supersession, Title, Transition, Vague,
 };
 use design_store::{
-    AppliedFile, Cast, Covered, Cycle, Directed, Directions, Linked, NextNode, Placed, Planting, Prefixed, ProjectRoot,
-    Refusal, RelationName, Resolved, Resolving, Restaged, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
-    ShapeName, ShownMessage, ShownNode, StreamSchema, Unseen,
+    AppliedFile, Cast, Covered, Cycle, Directed, Directions, JobClosed, JobOpened, JobState, Linked, LiveRuns, NextJob,
+    NextNode, NextRun, Placed, Planting, Prefixed, ProjectRoot, Ran, Refusal, RelationName, Resolved, Resolving,
+    Restaged, RunEnded, RunSpawned, RunState, RunsOf, Scope, SearchSegments, Seen, SessionCursors, SessionRecords,
+    ShapeName, ShownMessage, ShownNode, Spawned, StoredRun, StreamSchema, Unseen, Unstructured,
 };
+use dispatch_ports::{Deadline, Pid, Started, Tokens, Usage, Wall};
 use file_ports::{Bytes, Files, Memory};
 use grammar::message::Lexemes;
 use grammar::search::Terms;
 use laws::proptest::collection::vec;
+use laws::proptest::option;
 use laws::proptest::prelude::{Just, any, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
@@ -1233,3 +1236,92 @@ fn a_core_project_cannot_consume_a_secondary_one() -> Result<(), Box<dyn Error>>
     assert_eq!(refused, Some(NodeEdge::new(eating, NodeRelation::Consumes, consumed)));
     Ok(())
 }
+
+struct Unstructuring;
+
+impl Unstructuring {
+    fn listed(store: &Port<'_, Sqlite>) -> Result<Vec<Segment>, Box<dyn Error>> {
+        Ok(store.read(Unstructured)?.iter().map(|unplaced| AsRef::<Segment>::as_ref(unplaced).clone()).collect())
+    }
+}
+
+#[test]
+fn the_unstructured_owner_segments_shrink_as_directives_cover_them() -> Result<(), Box<dyn Error>> {
+    let run = Run::root();
+    let store = run.port(Sqlite::in_memory::<StreamSchema>());
+    store.write(Recorded::session()?.records)?;
+    let before = Unstructuring::listed(&store)?;
+    Proposals::written(&store, vec![Directed::Conversational { segment: Proposals::segment("o1", 0) }])?;
+    let after = Unstructuring::listed(&store)?;
+    assert_eq!(
+        (before, after),
+        (vec![Proposals::segment("o1", 0), Proposals::segment("o1", 1)], vec![Proposals::segment("o1", 1)])
+    );
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct Spawning {
+    pid: Pid,
+    started: Option<Started>,
+    deadline: Wall,
+    state: RunState,
+    usage: Option<Usage>,
+}
+
+impl Spawning {
+    fn any() -> impl Strategy<Value = Spawning> {
+        (
+            any::<Pid>(),
+            option::of(
+                Just("Sat Nov  7 10:00:00 2026").prop_filter_map("a start time", |text| text.parse::<Started>().ok()),
+            ),
+            any::<Wall>(),
+            select(RunState::VARIANTS),
+            option::of((any::<Tokens>(), any::<Tokens>(), any::<Tokens>(), any::<Tokens>())),
+        )
+            .prop_map(|(pid, started, deadline, state, usage)| Spawning {
+                pid,
+                started,
+                deadline,
+                state,
+                usage: usage.map(|(input, output, written, read)| Usage::new(input, output, written, read)),
+            })
+    }
+
+    fn stored(&self) -> Result<Lived, Box<dyn Error>> {
+        let run = Run::root();
+        let store = run.port(Sqlite::in_memory::<StreamSchema>());
+        store.write(Recorded::session()?.records)?;
+        let job = store.read(NextJob)?;
+        store.write(JobOpened::new(job, vec![Proposals::segment("o1", 0)]))?;
+        let id = store.read(NextRun)?;
+        let spawned = Spawned::new(self.pid, self.started.clone(), Deadline::new(self.deadline));
+        store.write(RunSpawned::new(id, job, spawned))?;
+        let live = store.read(LiveRuns)?;
+        store.write(RunEnded::new(id, self.state, self.usage))?;
+        store.write(JobClosed::new(job, JobState::Applied))?;
+        Ok(Lived { live, ran: store.read(RunsOf::from(job))?, after: store.read(LiveRuns)? })
+    }
+}
+
+#[derive(Debug)]
+struct Lived {
+    live: Vec<StoredRun>,
+    ran: Vec<Ran>,
+    after: Vec<StoredRun>,
+}
+
+laws::law!(a_spawned_run_is_live_until_it_ends_with_its_state_and_usage, Spawning::any(), spawning, {
+    let lived = spawning.stored().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
+    let spawned: Vec<Spawned> = lived.live.iter().map(|stored| stored.spawned().clone()).collect();
+    let wanted = Spawned::new(spawning.pid, spawning.started.clone(), Deadline::new(spawning.deadline));
+    prop_assert_eq!(spawned, vec![wanted]);
+    let ran: Vec<Ran> = lived.ran;
+    prop_assert_eq!(ran.iter().map(|ran| [ran.identity()]).collect::<Vec<[RunId; 1]>>(), vec![[RunId::new(1)]]);
+    prop_assert_eq!(ran.iter().map(Ran::state).collect::<Vec<RunState>>(), vec![spawning.state]);
+    prop_assert_eq!(ran.iter().map(Ran::usage).collect::<Vec<Option<Usage>>>(), vec![spawning.usage]);
+    let still: Vec<RunId> = lived.after.iter().map(StoredRun::identity).collect();
+    let running = [spawning.state].into_iter().filter(|state| *state == RunState::Running).map(|_| RunId::new(1));
+    prop_assert_eq!(still, running.collect::<Vec<RunId>>());
+});

@@ -43,10 +43,11 @@ impl AgentRun {
     pub fn pid(&self) -> Pid {
         self.pid
     }
+}
 
-    #[must_use]
-    pub fn deadline(&self) -> Deadline {
-        self.deadline
+impl AsRef<Deadline> for AgentRun {
+    fn as_ref(&self) -> &Deadline {
+        &self.deadline
     }
 }
 

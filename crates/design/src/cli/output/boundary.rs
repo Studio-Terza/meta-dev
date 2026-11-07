@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, Artifact, Condition, Entered, Facet, Kin, NodeEdge, NodeId, Prefix, Project, Reason, Role,
+    AnyNode, Artifact, Condition, Facet, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason, Role,
     SegmentRelation, Sense, SpanRelation, Stage, Standing, Title,
 };
 use design_store::{AppliedId, RelationName, ShapeName};
@@ -26,7 +26,7 @@ pub struct Summary {
     facet: Facet,
     stage: Stage,
     role: Role,
-    entered: Entered,
+    entered: Provenance,
     title: Option<Title>,
 }
 
@@ -91,18 +91,18 @@ pub enum Line {
     },
     Edge {
         edge: NodeEdge,
-        entered: Entered,
+        entered: Provenance,
     },
     Role {
         role: Role,
-        entered: Entered,
+        entered: Provenance,
     },
     Placed {
         relation: SpanRelation,
         segment: SegmentRef,
         author: Authorship,
         sense: Option<Sense>,
-        entered: Entered,
+        entered: Provenance,
         body: Body,
     },
     Message {
@@ -124,7 +124,7 @@ pub enum Line {
     Annotated {
         remark: Remark,
         standing: Standing,
-        entered: Entered,
+        entered: Provenance,
     },
     Applied(Directive),
     Proposed {
@@ -229,7 +229,7 @@ impl From<&AnyNode> for Summary {
             facet: entry.facet(),
             stage: node.stage().stage(),
             role: node.casting().role(),
-            entered: Entered::from(entry.provenance()),
+            entered: entry.provenance(),
             title: node.title().cloned(),
         }
     }

@@ -4,11 +4,11 @@ use std::str::FromStr;
 
 use design_model::{
     AnyNode, AnyStage, Artifact, ArtifactKind, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet,
-    Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance, Reason, Role,
+    Inversion, Kin, Misstaged, Node, NodeEdge, NodeId, NodeRelation, Project, Provenance, Reason, Role, RunId,
     SegmentRelation, SenseKind, SpanRelation, Specificity, Stage, Terminal, Title, Transition,
 };
 use laws::proptest::collection::vec;
-use laws::proptest::prelude::{prop_assert, prop_assert_eq};
+use laws::proptest::prelude::{any, prop_assert, prop_assert_eq, prop_oneof};
 use laws::proptest::sample::select;
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
@@ -122,12 +122,41 @@ fn every_way_of_entering_is_displayed_as_its_name_and_parsed_back_from_it() {
     assert_eq!(Names::undisplayed(Entered::name), []);
 }
 
-#[test]
-fn every_way_of_entering_survives_becoming_a_provenance() {
-    let recovered: Vec<Entered> =
-        Entered::VARIANTS.iter().map(|entered| Entered::from(Provenance::from(*entered))).collect();
-    assert_eq!(recovered, Entered::VARIANTS);
+struct Provenances;
+
+impl Provenances {
+    fn any() -> impl Strategy<Value = Provenance> {
+        prop_oneof![
+            select(Entered::VARIANTS).prop_map(Provenance::from),
+            any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+        ]
+    }
 }
+
+laws::roundtrip!(
+    a_provenance_is_displayed_and_parsed_back,
+    Provenances::any(),
+    |provenance: &Provenance| provenance.to_string(),
+    |text: &String| text.parse::<Provenance>().ok(),
+    Some
+);
+
+laws::table!(
+    a_provenance_is_a_way_of_entering_or_an_agent_run,
+    |text: &&'static str| text.parse::<Provenance>().ok(),
+    [
+        "apply" => Some(Provenance::from(Entered::Apply)),
+        "agent-7" => Some(Provenance::Agent(RunId::new(7))),
+        "agent-0" => Some(Provenance::Agent(RunId::new(0))),
+        "agent--3" => Some(Provenance::Agent(RunId::new(-3))),
+        "agent" => None,
+        "agent-" => None,
+        "agent-07" => None,
+        "agent-7 " => None,
+        "agent 7" => None,
+        "agent-99999999999999999999" => None,
+    ]
+);
 
 #[test]
 fn a_word_naming_no_variant_is_refused() {

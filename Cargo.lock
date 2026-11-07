@@ -294,6 +294,7 @@ version = "0.1.0"
 dependencies = [
  "console-ports",
  "design-model",
+ "dispatch-ports",
  "exit",
  "file-ports",
  "grammar",
@@ -2424,6 +2425,7 @@ version = "0.1.0"
 dependencies = [
  "design-model",
  "design-store",
+ "dispatch-ports",
  "file-ports",
  "grammar",
  "laws",

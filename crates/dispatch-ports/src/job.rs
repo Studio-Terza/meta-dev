@@ -10,9 +10,10 @@ impl Job {
     pub fn due_by(deadline: Deadline) -> Job {
         Job { deadline }
     }
+}
 
-    #[must_use]
-    pub fn deadline(&self) -> Deadline {
-        self.deadline
+impl AsRef<Deadline> for Job {
+    fn as_ref(&self) -> &Deadline {
+        &self.deadline
     }
 }

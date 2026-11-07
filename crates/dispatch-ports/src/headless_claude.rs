@@ -46,7 +46,7 @@ impl DispatchFiller for HeadlessClaude {
             .stderr(Stdio::null())
             .spawn()
             .map_err(DispatchFailure::Spawn)?;
-        let run = AgentRun::new(Pid::new(u64::from(child.id())), job.deadline());
+        let run = AgentRun::new(Pid::new(child.id()), *job.as_ref());
         let streams = child.stdin.take().zip(child.stdout.take());
         let (mut stdin, mut stdout) = streams.ok_or(DispatchFailure::Unpiped)?;
         let reading = thread::spawn(move || {

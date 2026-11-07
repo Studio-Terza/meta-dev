@@ -7,7 +7,7 @@ pub use boundary::{Uninked, Unreadable};
 
 #[derive(Newtype, Arbitrary, Display, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
-pub struct Tokens(u64);
+pub struct Tokens(u32);
 
 #[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Usage {

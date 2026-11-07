@@ -11,8 +11,8 @@ use console_ports::Variables;
 use design::{Anchored, Cli, Count, Failure, Line, Outcome, Remark, Summary, Unmatched, Unresolved};
 use design_model::{
     AnyStage, Artifact, Casting, Condition, Confidence, Dropped, Entered, Entry, Explicitness, Facet, Kin, Node,
-    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, SegmentRelation,
-    Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
+    NodeEdge, NodeId, NodeRelation, Ordinal, Prefix, Project, Provenance, Reason, Refining, Role, RunId,
+    SegmentRelation, Sense, SenseKind, SpanRelation, Specificity, Stage, Standing, Terminal, Title, Vague,
 };
 use design_store::{
     AppliedId, Linked, Planting, RelationName, Resolved, Resolving, ShapeName, ShownMessage, ShownNode, Stored,
@@ -1883,8 +1883,12 @@ impl Generated {
         select(vec![Authorship::Owner, Authorship::Lead]).boxed()
     }
 
-    fn entered() -> BoxedStrategy<Entered> {
-        select(Entered::VARIANTS).boxed()
+    fn entered() -> BoxedStrategy<Provenance> {
+        prop_oneof![
+            select(Entered::VARIANTS).prop_map(Provenance::from),
+            any::<i64>().prop_map(|run| Provenance::Agent(RunId::new(run))),
+        ]
+        .boxed()
     }
 
     fn segment() -> BoxedStrategy<SegmentRef> {
@@ -1952,8 +1956,8 @@ impl Generated {
             proptest::option::of(Generated::text()),
         )
             .prop_map(|((node, project, facet, entered), (role, cast, stage), title)| {
-                let entry = Entry::new(project, facet, Provenance::from(entered));
-                let loaded = Node::loaded(node, entry, Casting::new(role, Provenance::from(cast)), stage);
+                let entry = Entry::new(project, facet, entered);
+                let loaded = Node::loaded(node, entry, Casting::new(role, cast), stage);
                 Summary::from(&title.into_iter().fold(loaded, |node, title| node.titled(Title::new(title))))
             })
             .boxed()

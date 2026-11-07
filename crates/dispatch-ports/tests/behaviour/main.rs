@@ -17,7 +17,7 @@ use port_core::{Calls, Pass, Released, Run};
 #[derive(Debug, PartialEq, Eq)]
 struct Envelope {
     reply: String,
-    spent: [u64; 4],
+    spent: [u32; 4],
 }
 
 impl Envelope {
@@ -28,7 +28,7 @@ impl Envelope {
         })
     }
 
-    fn of(reply: &str, spent: [u64; 4]) -> Envelope {
+    fn of(reply: &str, spent: [u32; 4]) -> Envelope {
         Envelope { reply: reply.to_owned(), spent }
     }
 }
@@ -94,7 +94,7 @@ impl DispatchFiller for FakeDispatch {
         job: &Job,
         _prompt: &Prompt,
     ) -> Result<AgentRun, DispatchFailure> {
-        Ok(AgentRun::new(Pid::new(7), job.deadline()))
+        Ok(AgentRun::new(Pid::new(7), *job.as_ref()))
     }
 
     fn output(

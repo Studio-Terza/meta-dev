@@ -24,6 +24,7 @@ tokio.workspace = true
 [dev-dependencies]
 design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
+dispatch-ports = { path = "../dispatch-ports" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 laws = { path = "../laws" }

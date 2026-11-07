@@ -140,3 +140,15 @@ impl Primitive for u64 {
         u64::try_from(raw).map_err(ColumnFailure::Unfit)
     }
 }
+
+impl Primitive for u32 {
+    type Raw = i64;
+
+    fn into_raw(self) -> i64 {
+        i64::from(self)
+    }
+
+    fn from_raw(raw: i64) -> Result<u32, ColumnFailure> {
+        u32::try_from(raw).map_err(ColumnFailure::Unfit)
+    }
+}

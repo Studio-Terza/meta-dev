@@ -2,7 +2,7 @@ use std::iter;
 
 use port_core::Held;
 
-use crate::{AgentRun, Clock, Dispatch, DispatchFailure, Due, Finished, Pause};
+use crate::{AgentRun, Clock, Deadline, Dispatch, DispatchFailure, Due, Finished, Pause};
 
 #[derive(Debug)]
 pub struct Watch<'ports, D: Dispatch, C: Clock> {
@@ -31,7 +31,7 @@ impl<'ports, D: Dispatch, C: Clock> Watch<'ports, D, C> {
     }
 
     fn checked(&self, run: &mut AgentRun) -> Result<Option<Watched>, DispatchFailure> {
-        match run.deadline().due(self.clock.now()) {
+        match AsRef::<Deadline>::as_ref(run).due(self.clock.now()) {
             Due::Passed => Ok(Some(Watched::Overdue)),
             Due::Pending => Ok(self.dispatch.output(run)?.map(Watched::Finished).or_else(|| self.slept())),
         }
