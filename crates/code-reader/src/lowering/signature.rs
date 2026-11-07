@@ -2,11 +2,11 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
     AngleBracketedGenericArguments, Expr, FnArg, GenericArgument, GenericParam, Generics,
-    ParenthesizedGenericArguments, PathArguments, ReturnType, Signature, Type, TypeParam, TypeParamBound, TypePath,
-    WherePredicate,
+    ParenthesizedGenericArguments, PathArguments, QSelf, ReturnType, Signature, Type, TypeParam, TypeParamBound,
+    TypePath, WherePredicate,
 };
 
-use code_model::{AliasParameter, Arrayed, Input, Named, Resolved, Sited, Spelling, TypeRef};
+use code_model::{AliasParameter, Arrayed, Callable, Input, Named, Projection, Resolved, Sited, Spelling, TypeRef};
 use lint_layout::{LineNumber, Name, Whole, Word};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
@@ -44,13 +44,6 @@ impl Written {
 
     fn sited(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Sited {
         Sited::new(self.target.clone().resolved(resolving, scope), self.spelling.clone())
-    }
-
-    fn bound(held: TypeRef<Written>, path: &syn::Path) -> TypeRef<Written> {
-        match path.segments.get(1) {
-            Some(_) => TypeRef::Opaque,
-            None => held,
-        }
     }
 
     fn parameter(name: Name, spelling: Spelling) -> TypeRef<Written> {
@@ -179,13 +172,17 @@ impl InScope {
             }
             Type::ImplTrait(bounded) => Bounding { scope: self }.lowered(bounded.bounds.iter()),
             Type::TraitObject(bounded) => Bounding { scope: self }.lowered(bounded.bounds.iter()),
+            Type::BareFn(function) => TypeRef::Function(Callable::new(
+                function.inputs.iter().map(|input| self.lowered(&input.ty)).collect(),
+                self.output(&function.output).unwrap_or_else(|| TypeRef::Tuple(Vec::new())),
+            )),
             _ => TypeRef::Opaque,
         }
     }
 
     fn path_lowered(&self, path: &syn::Path, line: LineNumber) -> TypeRef<Written> {
         match self.held(path, line) {
-            Some(held) => Written::bound(held, path),
+            Some(held) => Projecting { scope: self }.held(held, path),
             None => Bracketed { scope: self }.named(path, line),
         }
     }
@@ -196,7 +193,7 @@ impl InScope {
 
     fn type_path_lowered(&self, path: &TypePath) -> TypeRef<Written> {
         match &path.qself {
-            Some(_) => TypeRef::Opaque,
+            Some(qself) => Projecting { scope: self }.qualified(qself, &path.path),
             None => self.path_lowered(&path.path, LineNumber::from(path.span())),
         }
     }
@@ -274,6 +271,12 @@ struct Arguments {
     bindings: Vec<TypeRef<Written>>,
 }
 
+impl Arguments {
+    fn types(self) -> impl Iterator<Item = TypeRef<Written>> {
+        self.arguments.into_iter().chain(self.bindings)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Bracketed<'scope> {
     scope: &'scope InScope,
@@ -295,6 +298,29 @@ impl Bracketed<'_> {
             PathArguments::Parenthesized(sugared) => Angled { scope: self.scope }.sugared(sugared),
             PathArguments::None => Arguments::default(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Projecting<'scope> {
+    scope: &'scope InScope,
+}
+
+impl Projecting<'_> {
+    fn held(self, held: TypeRef<Written>, path: &syn::Path) -> TypeRef<Written> {
+        match path.segments.get(1) {
+            Some(_) => TypeRef::Projected(Projection::new(held, self.carried(path))),
+            None => held,
+        }
+    }
+
+    fn qualified(self, qself: &QSelf, path: &syn::Path) -> TypeRef<Written> {
+        TypeRef::Projected(Projection::new(self.scope.lowered(&qself.ty), self.carried(path)))
+    }
+
+    fn carried(self, path: &syn::Path) -> Vec<TypeRef<Written>> {
+        let bracketed = Bracketed { scope: self.scope };
+        path.segments.iter().flat_map(|segment| bracketed.listed(&segment.arguments).types()).collect()
     }
 }
 
@@ -330,7 +356,7 @@ impl Angled<'_> {
             bindings: bracketed
                 .args
                 .iter()
-                .filter_map(|argument| Associated { scope: self.scope }.bound(argument))
+                .flat_map(|argument| Associated { scope: self.scope }.bound(argument))
                 .collect(),
         }
     }
@@ -356,10 +382,14 @@ struct Associated<'scope> {
 }
 
 impl Associated<'_> {
-    fn bound(self, argument: &GenericArgument) -> Option<TypeRef<Written>> {
+    fn bound(self, argument: &GenericArgument) -> Vec<TypeRef<Written>> {
         match argument {
-            GenericArgument::AssocType(bound) => Some(self.scope.lowered(&bound.ty)),
-            _ => None,
+            GenericArgument::AssocType(bound) => vec![self.scope.lowered(&bound.ty)],
+            GenericArgument::Constraint(constraint) => {
+                vec![Bounding { scope: self.scope }.lowered(constraint.bounds.iter())]
+            }
+            GenericArgument::Const(expression) => Measured::types(self.scope, expression),
+            _ => Vec::new(),
         }
     }
 }

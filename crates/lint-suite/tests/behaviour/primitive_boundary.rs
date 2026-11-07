@@ -60,8 +60,13 @@ const SAME_NAME_NEWTYPE: &str = "pub struct Id(u64);\nmod other {\n    pub struc
 const ANY_TRAIT: &str = "use std::any::Any;\npub fn f(a: &dyn Any, b: impl core::any::Any) {}\npub fn g<T: std::any::Any>(t: T, c: u32) {}\n";
 const MODULE_ALIAS: &str =
     "pub type Count = usize;\nmod inner {\n    use super::Count;\n    fn c(x: Count) {}\n}\nfn d(x: Count) {}\n";
+const BARE_FUNCTION_TYPES: &str = "pub fn f(x: fn(u8) -> String, y: Option<fn(&[usize]) -> bool>) {}\npub struct A {\n    pub b: fn(char),\n    pub c: Vec<fn() -> u32>,\n}\npub enum B {\n    C(fn(f32)),\n}\n";
+const PROJECTIONS: &str = "pub fn f<T: Tr>(x: <Vec<u32> as Tr>::X, y: <T as Tr>::X, z: <A as Tr<u8>>::X, w: <u16>::X) {}\npub fn g<T: Lending>(x: T::Item<i32>) {}\npub struct A {\n    pub b: <Vec<i64> as Tr>::X,\n}\ntrait L {\n    fn l(&self, x: Self::Item<char>);\n}\n";
+const CALLABLE_BOUNDS: &str = "pub fn f(x: impl Fn(u16) -> char, y: Box<dyn Fn(&str) -> i64>) {}\npub fn g<T: Into<f32>, U>(t: T, u: U)\nwhere\n    U: AsRef<[i16]>,\n{\n}\npub fn h(x: impl Iterator<Item: Into<String>>, y: impl Iterator<Item = f64>) {}\npub struct A<T: Into<u8>> {\n    pub b: T,\n}\n";
+const COMPOUNDS: &str = "pub fn f(x: [u64; 4], y: (A, i32), z: &&mut u128, w: *const isize) {}\npub struct A {\n    pub b: [u16; 2],\n    pub c: (B, i64),\n}\n";
+const CONST_ARGUMENT: &str = "pub fn f(x: A<{ size_of::<u64>() }>) {}\n";
 
-const CASES: [Case; 56] = [
+const CASES: [Case; 61] = [
     Case::new(
         Title::new("std's Any is a trait, so dyn, impl and bound uses of it are not primitives"),
         &[Source::new(Located::new("crates/x/src/lib.rs"), Text::new(ANY_TRAIT))],
@@ -336,6 +341,31 @@ const CASES: [Case; 56] = [
         Title::new("a primitive beside an item macro"),
         &[Source::new(Located::new("a.rs"), Text::new(BESIDE_MACRO))],
         Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bare fn types in signatures, fields and variants"),
+        &[Source::new(Located::new("a.rs"), Text::new(BARE_FUNCTION_TYPES))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside projections and qualified paths"),
+        &[Source::new(Located::new("a.rs"), Text::new(PROJECTIONS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7"]),
+    ),
+    Case::new(
+        Title::new("primitives inside bounds, Fn sugar and associated constraints"),
+        &[Source::new(Located::new("a.rs"), Text::new(CALLABLE_BOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:2", "a.rs:4", "a.rs:7", "a.rs:7", "a.rs:8"]),
+    ),
+    Case::new(
+        Title::new("primitives inside arrays, tuples, references and pointers"),
+        &[Source::new(Located::new("a.rs"), Text::new(COMPOUNDS))],
+        Flagged::new(&["a.rs:1", "a.rs:1", "a.rs:1", "a.rs:1", "a.rs:3", "a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("a primitive inside a const generic argument"),
+        &[Source::new(Located::new("a.rs"), Text::new(CONST_ARGUMENT))],
+        Flagged::new(&["a.rs:1"]),
     ),
 ];
 

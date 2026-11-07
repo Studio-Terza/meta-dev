@@ -25,6 +25,8 @@ pub enum TypeRef<Bound = Sited> {
     Slice(Box<TypeRef<Bound>>),
     Array(Arrayed<Bound>),
     Bounded(Vec<TypeRef<Bound>>),
+    Projected(Projection<Bound>),
+    Function(Callable<Bound>),
     Opaque,
 }
 
@@ -39,6 +41,18 @@ pub struct Named<Bound> {
 pub struct Arrayed<Bound> {
     element: Box<TypeRef<Bound>>,
     measured: Vec<TypeRef<Bound>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Projection<Bound> {
+    subject: Box<TypeRef<Bound>>,
+    arguments: Vec<TypeRef<Bound>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Callable<Bound> {
+    inputs: Vec<TypeRef<Bound>>,
+    output: Box<TypeRef<Bound>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -118,6 +132,39 @@ impl<Bound> Arrayed<Bound> {
     }
 }
 
+impl<Bound> Projection<Bound> {
+    #[must_use]
+    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>) -> Projection<Bound> {
+        Projection { subject: Box::new(subject), arguments }
+    }
+
+    fn parts(&self) -> Parts<'_, Bound> {
+        Parts { first: std::slice::from_ref(&*self.subject), rest: &self.arguments }
+    }
+
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Projection<Rule::Into>, Rule::Fail> {
+        Ok(Projection {
+            subject: Box::new(rule.child(&self.subject)?),
+            arguments: TypeRef::each_rebuilt(&self.arguments, rule)?,
+        })
+    }
+}
+
+impl<Bound> Callable<Bound> {
+    #[must_use]
+    pub fn new(inputs: Vec<TypeRef<Bound>>, output: TypeRef<Bound>) -> Callable<Bound> {
+        Callable { inputs, output: Box::new(output) }
+    }
+
+    fn parts(&self) -> Parts<'_, Bound> {
+        Parts { first: &self.inputs, rest: std::slice::from_ref(&*self.output) }
+    }
+
+    fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<Callable<Rule::Into>, Rule::Fail> {
+        Ok(Callable { inputs: TypeRef::each_rebuilt(&self.inputs, rule)?, output: Box::new(rule.child(&self.output)?) })
+    }
+}
+
 impl<Bound> TypeRef<Bound> {
     pub fn mapped<Into>(&self, resolve: &mut impl FnMut(&Bound) -> Into) -> TypeRef<Into> {
         let Ok(mapped) = Mapping { resolve }.child(self);
@@ -134,6 +181,8 @@ impl<Bound> TypeRef<Bound> {
             | TypeRef::Slice(_)
             | TypeRef::Array(_)
             | TypeRef::Bounded(_)
+            | TypeRef::Projected(_)
+            | TypeRef::Function(_)
             | TypeRef::Opaque => None,
         }
     }
@@ -148,6 +197,8 @@ impl<Bound> TypeRef<Bound> {
             | TypeRef::Slice(_)
             | TypeRef::Array(_)
             | TypeRef::Bounded(_)
+            | TypeRef::Projected(_)
+            | TypeRef::Function(_)
             | TypeRef::Opaque => None,
         }
     }
@@ -173,6 +224,8 @@ impl<Bound> TypeRef<Bound> {
             TypeRef::Slice(inner) => rule.child(inner).map(Box::new).map(TypeRef::Slice),
             TypeRef::Array(arrayed) => arrayed.rebuilt(rule).map(TypeRef::Array),
             TypeRef::Bounded(bounds) => TypeRef::each_rebuilt(bounds, rule).map(TypeRef::Bounded),
+            TypeRef::Projected(projection) => projection.rebuilt(rule).map(TypeRef::Projected),
+            TypeRef::Function(callable) => callable.rebuilt(rule).map(TypeRef::Function),
             TypeRef::Opaque => Ok(TypeRef::Opaque),
         }
     }
@@ -181,6 +234,8 @@ impl<Bound> TypeRef<Bound> {
         match self {
             TypeRef::Named(named) => named.parts(),
             TypeRef::Array(arrayed) => arrayed.parts(),
+            TypeRef::Projected(projection) => projection.parts(),
+            TypeRef::Function(callable) => callable.parts(),
             TypeRef::Tuple(elements) | TypeRef::Bounded(elements) => Parts { first: elements, rest: &[] },
             TypeRef::Reference(inner) | TypeRef::Pointer(inner) | TypeRef::Slice(inner) => {
                 Parts { first: std::slice::from_ref(&**inner), rest: &[] }

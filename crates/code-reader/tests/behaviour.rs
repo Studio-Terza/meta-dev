@@ -1,4 +1,6 @@
-use code_model::{Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Resolved, Sited, TypeRef};
+use code_model::{
+    Entry, Function, Item, ItemKind, Model, Named, Owner, Primitive, Projection, Resolved, Sited, TypeRef,
+};
 use code_reader::Reader;
 use lint_core::{SourceFile, SourceText};
 use lint_layout::Name;
@@ -643,9 +645,12 @@ laws::table!(a_written_output_resolves_in_the_scope_of_its_function, |text: &&st
     SELF_TRAIT_IMPL => [Expect::named(Expect::item("S", ItemKind::Struct), Vec::new())],
     SELF_TRAIT_DECL => [Expect::param("Self")],
     SELF_TRAIT_IN_IMPL => [Expect::param("Self")],
-    SELF_PROJECTED => [TypeRef::Opaque],
+    SELF_PROJECTED => [TypeRef::Projected(Projection::new(
+        Expect::named(Expect::item("S", ItemKind::Struct), Vec::new()),
+        Vec::new(),
+    ))],
     IMPL_GENERIC => [Expect::named(Expect::std(&["std", "option", "Option"]), vec![Expect::param("T")])],
-    PROJECTED => [TypeRef::Opaque],
+    PROJECTED => [TypeRef::Projected(Projection::new(Expect::param("Self"), Vec::new()))],
 ]);
 
 const PAREN_PRIMITIVE: &str = "fn f() -> (bool) { true }\n";
