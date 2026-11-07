@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 
 use file_ports::{FileFailure, Files, Text};
 use newtype::Newtype;
-use toml::de::DeTable;
+use serde_core::Deserialize;
+use toml::de::{DeTable, Deserializer};
 use toml::{Table, Value};
 
 use crate::dependencies::Dependencies;
@@ -23,8 +24,10 @@ use members::Members;
 #[derive(Debug)]
 pub struct Manifest {
     directory: PathBuf,
-    text: SourceText,
     table: Table,
+    features: BTreeMap<Name, LineNumber>,
+    owns: Option<LineNumber>,
+    dependencies: Dependencies,
 }
 
 impl Manifest {
@@ -56,14 +59,36 @@ impl Manifest {
 
     fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
         match read.map(Newtype::into_inner).map_err(io::Error::from) {
-            Ok(text) => text
-                .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
+            Ok(text) => Self::typed(directory, &SourceText::new(text))
+                .map(Some)
                 .map_err(|source| Failure::Manifest { path: directory.join(Self::FILE), source }),
             Err(source) => Some(source.kind())
                 .filter(|kind| *kind == io::ErrorKind::NotFound)
                 .map_or(Err(Failure::Io { path: directory.join(Self::FILE), source }), |_| Ok(None)),
         }
+    }
+
+    fn typed(directory: &Path, text: &SourceText) -> Result<Manifest, toml::de::Error> {
+        let document = DeTable::parse(text.as_ref())?;
+        let features = Self::features_in(text, document.get_ref());
+        let owns = Self::owns_in(text, document.get_ref());
+        let dependencies = Dependencies::listed(text, document.get_ref());
+        let table = Table::deserialize(Deserializer::from(document))?;
+        Ok(Manifest { directory: directory.to_path_buf(), table, features, owns, dependencies })
+    }
+
+    fn features_in(text: &SourceText, top: &DeTable<'_>) -> BTreeMap<Name, LineNumber> {
+        top.iter()
+            .filter(|(key, _)| key.get_ref() == Self::FEATURES)
+            .filter_map(|(_, value)| value.get_ref().as_table())
+            .flat_map(|features| features.keys())
+            .map(|key| (Name::from(key.get_ref().as_ref()), text.line_of(key)))
+            .collect()
+    }
+
+    fn owns_in(text: &SourceText, top: &DeTable<'_>) -> Option<LineNumber> {
+        let port = Self::PORT_TABLE.iter().try_fold(top, Self::table_in)?;
+        port.keys().find(|key| key.get_ref() == Self::OWNS).map(|key| text.line_of(key))
     }
 
     #[must_use]
@@ -82,27 +107,18 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn features(&self) -> BTreeMap<Name, LineNumber> {
-        DeTable::parse(self.text.as_ref())
-            .map(|document| {
-                document
-                    .get_ref()
-                    .iter()
-                    .filter(|(key, _)| key.get_ref() == Self::FEATURES)
-                    .filter_map(|(_, value)| value.get_ref().as_table())
-                    .flat_map(|features| features.keys())
-                    .map(|key| (Name::from(key.get_ref().as_ref()), self.text.line_of(key)))
-                    .collect()
-            })
-            .unwrap_or_default()
+    pub fn features(&self) -> &BTreeMap<Name, LineNumber> {
+        &self.features
     }
 
     #[must_use]
     pub fn owns(&self) -> Option<LineNumber> {
-        DeTable::parse(self.text.as_ref()).ok().and_then(|document| {
-            let port = Self::PORT_TABLE.iter().try_fold(document.get_ref(), Self::table_in)?;
-            port.keys().find(|key| key.get_ref() == Self::OWNS).map(|key| self.text.line_of(key))
-        })
+        self.owns
+    }
+
+    #[must_use]
+    pub fn dependencies(&self) -> &Dependencies {
+        &self.dependencies
     }
 
     #[must_use]
@@ -190,13 +206,5 @@ impl Manifest {
             .filter_map(Value::as_str)
             .map(Name::from)
             .collect()
-    }
-}
-
-impl From<&Manifest> for Dependencies {
-    fn from(manifest: &Manifest) -> Dependencies {
-        DeTable::parse(manifest.text.as_ref())
-            .map(|document| Dependencies::listed(&manifest.text, document.get_ref()))
-            .unwrap_or_default()
     }
 }

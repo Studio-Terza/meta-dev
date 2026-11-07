@@ -41,13 +41,13 @@ impl PackageRoot {
                 PackageRoot {
                     name: CrateName::from(&root),
                     root,
-                    features: manifest.as_ref().map(Manifest::features).unwrap_or_default(),
+                    features: manifest.as_ref().map(Manifest::features).cloned().unwrap_or_default(),
                     untested: manifest
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
                     owns: manifest.as_ref().and_then(Manifest::owns),
-                    dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
+                    dependencies: manifest.as_ref().map(Manifest::dependencies).cloned().unwrap_or_default(),
                 }
             })
             .collect()
