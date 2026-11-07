@@ -2,6 +2,7 @@ mod boundary;
 
 use std::error::Error;
 use std::fmt;
+use std::str::FromStr;
 
 use grammar::output::field::{Quoted, Word};
 use grammar::output::{Fields, Unread};
@@ -36,7 +37,8 @@ enum Lapsing {
     Refused,
 }
 
-pub(crate) struct Retried<'lapse>(&'lapse Lapse);
+#[derive(Clone, Copy, Debug)]
+pub struct Retried<'lapse>(&'lapse Lapse);
 
 impl Lapse {
     #[must_use]
@@ -77,5 +79,15 @@ impl fmt::Display for Retried<'_> {
 impl<'lapse> From<&'lapse Lapse> for Retried<'lapse> {
     fn from(lapse: &'lapse Lapse) -> Retried<'lapse> {
         Retried(lapse)
+    }
+}
+
+impl FromStr for Lapse {
+    type Err = Unread;
+
+    fn from_str(text: &str) -> Result<Lapse, Unread> {
+        let mut fields = Fields::lexed(text)?;
+        let lapse = Lapse::read(&mut fields)?;
+        fields.ended(lapse)
     }
 }

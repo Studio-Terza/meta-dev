@@ -35,6 +35,14 @@ impl Attempt {
 }
 
 impl Attempt {
+    #[must_use]
+    pub fn lapse(&self) -> Option<&Lapse> {
+        match self {
+            Attempt::First => None,
+            Attempt::Retry(lapse) => Some(lapse),
+        }
+    }
+
     pub(crate) fn briefed(&self, first: Briefing) -> Briefing {
         match self {
             Attempt::First => first,

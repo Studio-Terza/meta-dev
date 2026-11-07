@@ -4,7 +4,7 @@ use std::thread::JoinHandle;
 
 use port_core::{Pass, Release, ReleaseReceipt, Released, Resource};
 
-use crate::{Deadline, Pid};
+use crate::{Deadline, DispatchFailure, Pid};
 
 #[derive(Debug, Resource)]
 pub struct AgentRun {
@@ -20,10 +20,6 @@ pub(crate) struct Process {
 }
 
 pub(crate) type Reading = JoinHandle<io::Result<String>>;
-
-#[derive(Debug, thiserror::Error)]
-#[error("cannot kill the agent's process group: {0}")]
-pub struct Unkilled(#[from] io::Error);
 
 impl AgentRun {
     #[must_use]
@@ -52,9 +48,9 @@ impl AsRef<Deadline> for AgentRun {
 }
 
 impl Release for AgentRun {
-    type Failure = Unkilled;
+    type Failure = DispatchFailure;
 
-    fn release(&mut self, pass: Pass<'_, Released<AgentRun>>) -> Result<ReleaseReceipt, Unkilled> {
+    fn release(&mut self, pass: Pass<'_, Released<AgentRun>>) -> Result<ReleaseReceipt, DispatchFailure> {
         let group = self.pid.group();
         self.process
             .take()
@@ -68,6 +64,6 @@ impl Release for AgentRun {
             })
             .transpose()
             .map(|_reaped| pass.released())
-            .map_err(Unkilled::from)
+            .map_err(DispatchFailure::Kill)
     }
 }

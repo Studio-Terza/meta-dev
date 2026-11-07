@@ -13,6 +13,7 @@ doctest = false
 console-ports = { path = "../console-ports" }
 design-model = { path = "../design-model" }
 design-store = { path = "../design-store" }
+dispatch-ports = { path = "../dispatch-ports" }
 exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
@@ -31,6 +32,7 @@ e2e = { path = "../../e2e" }
 golden = { path = "../golden" }
 laws = { path = "../laws" }
 strum.workspace = true
+text-lines = { path = "../text-lines" }
 
 [lints]
 workspace = true

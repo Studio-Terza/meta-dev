@@ -255,6 +255,7 @@ dependencies = [
  "console-ports",
  "design-model",
  "design-store",
+ "dispatch-ports",
  "e2e",
  "exit",
  "file-ports",
@@ -269,6 +270,7 @@ dependencies = [
  "stream",
  "structurer",
  "strum",
+ "text-lines",
  "thiserror",
  "transcript-ports",
 ]

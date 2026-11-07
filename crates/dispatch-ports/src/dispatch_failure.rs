@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{Unkilled, Unreadable};
+use crate::finished::Unreadable;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DispatchFailure {
@@ -22,6 +22,4 @@ pub enum DispatchFailure {
     Lookup(#[source] io::Error),
     #[error("cannot kill a process group: {0}")]
     Kill(#[source] io::Error),
-    #[error("{0}")]
-    Unkilled(#[from] Unkilled),
 }

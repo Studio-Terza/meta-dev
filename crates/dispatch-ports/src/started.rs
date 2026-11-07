@@ -1,3 +1,3 @@
 mod boundary;
 
-pub use boundary::{Started, Unstarted};
+pub use boundary::Started;

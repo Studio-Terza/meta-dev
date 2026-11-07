@@ -2,10 +2,11 @@ use std::fmt;
 use std::str::FromStr;
 
 use design_model::{
-    AnyNode, Artifact, Condition, Facet, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason, Role,
-    SegmentRelation, Sense, SpanRelation, Stage, Standing, Title,
+    AnyNode, Artifact, Condition, Facet, JobId, Kin, NodeEdge, NodeId, Prefix, Project, Provenance, Reason, Role,
+    RunId, SegmentRelation, Sense, SenseKind, SpanRelation, Stage, Standing, Title,
 };
-use design_store::{AppliedId, RelationName, ShapeName};
+use design_store::{AppliedId, RelationName, RunState, ShapeName};
+use dispatch_ports::{Tokens, Usage};
 use file_ports::Offset;
 use grammar::cited::Cited;
 use grammar::output::field::{Bare, Id, Integer, Phrase, Quoted, Word};
@@ -13,7 +14,7 @@ use grammar::output::{Fields, Unread};
 use named_derive::Named;
 use newtype::{Arbitrary, Display, Newtype};
 use stream::{Relation, Shape};
-use structurer::{Directive, SegmentRef};
+use structurer::{Directive, Lapse, Retried, SegmentRef};
 use transcript_ports::{Authorship, Body, Cursor, Instant, Kind, SessionId, Uuid};
 
 #[derive(Newtype, Arbitrary, Display, Clone, Copy, Debug, PartialEq, Eq)]
@@ -136,6 +137,27 @@ pub enum Line {
         file: AppliedId,
         stamp: Instant,
     },
+    Reaped {
+        run: RunId,
+        state: RunState,
+    },
+    Ran(Attempted),
+    Retried(Lapsed),
+    Flailed(Lapsed),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Attempted {
+    run: RunId,
+    job: JobId,
+    state: RunState,
+    usage: Option<Usage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Lapsed {
+    job: JobId,
+    lapse: Lapse,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,6 +228,22 @@ enum Key {
     Already,
     #[name("file")]
     File,
+    #[name("reaped")]
+    Reaped,
+    #[name("run")]
+    Run,
+    #[name("retried")]
+    Retried,
+    #[name("flailed")]
+    Flailed,
+}
+
+#[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
+enum Spend {
+    #[name("job")]
+    Job,
+    #[name("tokens")]
+    Tokens,
 }
 
 #[derive(Named, Clone, Copy, Debug, PartialEq, Eq)]
@@ -328,6 +366,10 @@ impl fmt::Display for Line {
                 Key::At,
                 Line::quoted(stamp)
             ),
+            Line::Reaped { run, state } => write!(formatter, "{} {} {state}", Key::Reaped, run.into_inner()),
+            Line::Ran(attempted) => write!(formatter, "{} {attempted}", Key::Run),
+            Line::Retried(lapsed) => write!(formatter, "{} {lapsed}", Key::Retried),
+            Line::Flailed(lapsed) => write!(formatter, "{} {lapsed}", Key::Flailed),
         }
     }
 }
@@ -387,17 +429,7 @@ impl Line {
                 relation: fields.field::<Word<_>>()?,
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
                 author: fields.field::<Word<_>>()?,
-                sense: fields
-                    .optional::<Word<_>>()
-                    .map(|kind| {
-                        Ok::<Sense, Unread>(Sense::new(
-                            kind,
-                            fields.field::<Word<_>>()?,
-                            fields.field::<Word<_>>()?,
-                            fields.field::<Word<_>>()?,
-                        ))
-                    })
-                    .transpose()?,
+                sense: fields.optional::<Word<_>>().map(|kind| Remark::sensed(kind, fields)).transpose()?,
                 entered: fields.past(&[Key::Entered])?.field::<Word<_>>()?,
                 body: fields.field::<Quoted<_>>()?,
             }),
@@ -432,6 +464,12 @@ impl Line {
                 file: AppliedId::new(fields.past(&[Key::Applied, Key::File])?.field::<Integer<_>>()?),
                 stamp: fields.past(&[Key::At])?.field::<Quoted<_>>()?,
             }),
+            Key::Reaped => {
+                Ok(Line::Reaped { run: RunId::new(fields.field::<Integer<_>>()?), state: fields.field::<Word<_>>()? })
+            }
+            Key::Run => Attempted::read(fields).map(Line::Ran),
+            Key::Retried => Lapsed::read(fields).map(Line::Retried),
+            Key::Flailed => Lapsed::read(fields).map(Line::Flailed),
             Key::Read | Key::To | Key::Project | Key::Entered | Key::At | Key::By | Key::File => Err(Unread::Unkeyed),
         }
     }
@@ -493,6 +531,10 @@ impl Summary {
 }
 
 impl Remark {
+    fn sensed(kind: SenseKind, fields: &mut Fields) -> Result<Sense, Unread> {
+        Ok(Sense::new(kind, fields.field::<Word<_>>()?, fields.field::<Word<_>>()?, fields.field::<Word<_>>()?))
+    }
+
     fn read(fields: &mut Fields) -> Result<Remark, Unread> {
         match fields.field::<Word<Remarked>>()? {
             Remarked::Place => Ok(Remark::Place {
@@ -502,12 +544,7 @@ impl Remark {
             }),
             Remarked::Sense => Ok(Remark::Sense {
                 segment: SegmentRef::from(&fields.field::<Cited>()?),
-                sense: Sense::new(
-                    fields.field::<Word<_>>()?,
-                    fields.field::<Word<_>>()?,
-                    fields.field::<Word<_>>()?,
-                    fields.field::<Word<_>>()?,
-                ),
+                sense: Remark::sensed(fields.field::<Word<_>>()?, fields)?,
             }),
             Remarked::Link => Ok(Remark::Link {
                 source: SegmentRef::from(&fields.field::<Cited>()?),
@@ -529,5 +566,65 @@ impl Remark {
             Remark::Link { source, relation, target } => format!("{} {source} {relation} {target}", Remarked::Link),
             Remark::Conversational { segment } => format!("{} {segment}", Remarked::Conversational),
         }
+    }
+}
+
+impl Attempted {
+    #[must_use]
+    pub fn new(run: RunId, job: JobId, state: RunState, usage: Option<Usage>) -> Attempted {
+        Attempted { run, job, state, usage }
+    }
+
+    fn read(fields: &mut Fields) -> Result<Attempted, Unread> {
+        Ok(Attempted {
+            run: RunId::new(fields.field::<Integer<_>>()?),
+            job: JobId::new(fields.past(&[Spend::Job])?.field::<Integer<_>>()?),
+            state: fields.field::<Word<_>>()?,
+            usage: Attempted::usage(fields.optional::<Word<Spend>>(), fields)?,
+        })
+    }
+
+    fn usage(key: Option<Spend>, fields: &mut Fields) -> Result<Option<Usage>, Unread> {
+        match key {
+            None => Ok(None),
+            Some(Spend::Tokens) => Attempted::tokens(fields).map(Some),
+            Some(Spend::Job) => Err(Unread::Unkeyed),
+        }
+    }
+
+    fn tokens(fields: &mut Fields) -> Result<Usage, Unread> {
+        Ok(Usage::new(
+            Tokens::new(fields.field::<Integer<_>>()?),
+            Tokens::new(fields.field::<Integer<_>>()?),
+            Tokens::new(fields.field::<Integer<_>>()?),
+            Tokens::new(fields.field::<Integer<_>>()?),
+        ))
+    }
+}
+
+impl fmt::Display for Attempted {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {} {} {}", self.run.into_inner(), Spend::Job, self.job.into_inner(), self.state)?;
+        self.usage.iter().try_for_each(|usage| {
+            let [input, output, written, read] = usage.spent();
+            write!(formatter, " {} {input} {output} {written} {read}", Spend::Tokens)
+        })
+    }
+}
+
+impl Lapsed {
+    #[must_use]
+    pub fn new(job: JobId, lapse: Lapse) -> Lapsed {
+        Lapsed { job, lapse }
+    }
+
+    fn read(fields: &mut Fields) -> Result<Lapsed, Unread> {
+        Ok(Lapsed { job: JobId::new(fields.field::<Integer<_>>()?), lapse: fields.field::<Phrase<_>>()? })
+    }
+}
+
+impl fmt::Display for Lapsed {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} {}", self.job.into_inner(), Line::quoted(&Retried::from(&self.lapse)))
     }
 }

@@ -2,8 +2,11 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use design_model::{Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated};
+use design_model::{
+    JobId, Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated,
+};
 use design_store::Refusal;
+use dispatch_ports::DispatchFailure;
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
 use newtype::Newtype;
@@ -11,7 +14,7 @@ use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
 use transcript_ports::ReadFailure;
 
-use structurer::Misread;
+use structurer::{Lapse, Misread};
 
 use super::request::Unresolved;
 use crate::Outcome;
@@ -19,7 +22,7 @@ use crate::Outcome;
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | structure | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -71,6 +74,10 @@ pub enum Failure {
     Store(#[from] StoreFailure),
     #[error("cannot release the design store lock: {0}")]
     Unlock(#[from] Unlock),
+    #[error("the structuring agent could not be run: {0}")]
+    Dispatch(#[from] DispatchFailure),
+    #[error("FLAILED: job {job} failed twice, the second time because {lapse}; structure halted, triage it")]
+    Flailed { job: JobId, lapse: Lapse },
     #[error("a resource was not released cleanly: {0}")]
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
@@ -103,6 +110,13 @@ impl From<Misstaged> for Failure {
 }
 
 impl Failure {
+    pub(crate) fn refusal(self) -> Result<Lapse, Failure> {
+        match self {
+            Failure::Unresolved(unresolved) => Ok(Lapse::refused(&unresolved)),
+            other => Err(other),
+        }
+    }
+
     pub fn settled(
         outcome: Result<Outcome, Failure>,
         released: Result<Snapshot, ReleaseFailures>,
