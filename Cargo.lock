@@ -104,6 +104,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "cargo-ports"
+version = "0.1.0"
+dependencies = [
+ "file-ports",
+ "port-core",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -543,8 +551,10 @@ dependencies = [
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "lint-runner",
+ "port-core",
  "proptest",
 ]
 
@@ -857,6 +867,7 @@ dependencies = [
 name = "lint"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "console-ports",
  "file-ports",
  "lint-runner",
@@ -924,6 +935,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1007,6 +1019,7 @@ dependencies = [
  "lint-core",
  "lint-placement",
  "newtype",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1055,6 +1068,7 @@ dependencies = [
  "syn 2.0.119",
  "thiserror",
  "toml",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1294,6 +1308,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1404,6 +1419,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "file-ports",
  "golden",
  "graph-query",
@@ -1463,7 +1479,10 @@ dependencies = [
  "lint-unconsumed-traits",
  "lint-vec-out-params",
  "lint-workflow-run",
+ "port-core",
  "text-lines",
+ "thiserror",
+ "workspace-metadata",
 ]
 
 [[package]]
@@ -1493,6 +1512,7 @@ version = "0.1.0"
 dependencies = [
  "lint-core",
  "lint-layout",
+ "lint-paths",
  "proc-macro2",
  "sqlformat",
  "syn 2.0.119",
@@ -2834,6 +2854,7 @@ version = "0.1.0"
 dependencies = [
  "newtype",
  "serde",
+ "serde_json",
  "text-lines",
  "thiserror",
 ]

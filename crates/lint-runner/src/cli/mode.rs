@@ -6,6 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
 
+use cargo_ports::Cargo;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;
@@ -15,7 +16,7 @@ use lint_test_budget::TestBudget;
 use lint_transition_graph::{Extraction, TypeSystem};
 
 use super::boundary::Helpers;
-use super::{Outcome, Sources};
+use super::{Outcome, Refusal, Sources, Workspaces};
 use elegance::Elegance;
 use lints::Lints;
 
@@ -54,10 +55,11 @@ impl Mode {
         }
     }
 
-    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
+    pub(crate) fn workspaces(&self, cargo: &impl Cargo, roots: &[PathBuf]) -> Result<Workspaces, Refusal<'_>> {
         match self {
-            Mode::Query(Err(failure)) => Some(failure),
-            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) => None,
+            Mode::Gate => Workspaces::described(cargo, roots).map_err(Refusal::Workspace),
+            Mode::Report | Mode::Query(Ok(_)) => Ok(Workspaces::default()),
+            Mode::Query(Err(failure)) => Err(Refusal::Query(failure)),
         }
     }
 

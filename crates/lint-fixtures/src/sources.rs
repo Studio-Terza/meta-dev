@@ -6,11 +6,13 @@ mod text;
 
 use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use file_ports::{Bytes, Memory};
-use lint_core::{Lint, Report, SourceFile, SourceText};
+use lint_core::{Lint, Report, SourceFile, SourceText, WorkspaceLint};
 use lint_placement::Placement;
 use newtype::Newtype;
+use workspace_metadata::Metadata;
 
 pub use case::{Case, Title};
 pub use flagged::Flagged;
@@ -27,7 +29,7 @@ impl Sources {
         Self::kept(SourceFile::parse(path, SourceText::new(text.into_inner().to_string())))
     }
 
-    fn kept(parsed: Result<SourceFile, impl fmt::Display>) -> SourceFile {
+    fn kept<Parsed>(parsed: Result<Parsed, impl fmt::Display>) -> Parsed {
         match parsed {
             Ok(file) => file,
             Err(failure) => unreachable!("fixture source parses: {failure}"),
@@ -53,6 +55,12 @@ impl Sources {
     #[must_use]
     pub fn placed_flagged<Checked: Lint>(manifests: &[Source], sources: &[Source]) -> Lines {
         Self::lines(&Checked::report(&Self::placed(manifests, sources)))
+    }
+
+    #[must_use]
+    pub fn placed_in<Checked: WorkspaceLint>(manifests: &[Source], sources: &[Source], workspace: Text<'_>) -> Lines {
+        let workspaces = [Self::kept(Metadata::from_str(workspace.into_inner()))];
+        Self::lines(&Checked::report(&Self::placed(manifests, sources), &workspaces))
     }
 
     #[must_use]

@@ -37,7 +37,27 @@ const NESTED: &[Source] = &[Source::new(
 )];
 const OTHER: &[Source] = &[Source::new(
     Located::new("crates/store/src/lib.rs"),
-    Text::new("fn f() {\n    sqlx::query!(\"SELECT id FROM nodes\");\n    query!(\"SELECT id FROM nodes\");\n}\n"),
+    Text::new(
+        "use store_ports::query;\nfn f() {\n    sqlx::query!(\"SELECT id FROM nodes\");\n    query!(\"SELECT id FROM nodes\");\n}\n",
+    ),
+)];
+const RENAMED: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new("use store_ports::query as q;\nfn f() {\n    s.rows(q!(Row, \"select id from nodes\"));\n}\n"),
+)];
+const GLOBBED: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new("use store_ports::*;\nfn f() {\n    s.rows(query!(Row, \"select id from nodes\"));\n}\n"),
+)];
+const UNIMPORTED: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new("fn f() {\n    query!(\"SELECT id FROM nodes\");\n}\n"),
+)];
+const IMPORTED_IN_MODULE: &[Source] = &[Source::new(
+    Located::new("crates/store/src/lib.rs"),
+    Text::new(
+        "mod rows {\n    use store_ports::query;\n    fn f() {\n        query!(\"SELECT id FROM nodes\");\n    }\n}\nfn g() {\n    query!(\"SELECT id FROM nodes\");\n}\n",
+    ),
 )];
 
 laws::table!(
@@ -51,6 +71,10 @@ laws::table!(
         ESCAPED => ["crates/store/src/lib.rs:2"],
         INDENTED => ["crates/store/src/lib.rs:4"],
         NESTED => ["crates/store/src/lib.rs:2"],
-        OTHER => Lines::default(),
+        OTHER => ["crates/store/src/lib.rs:4"],
+        RENAMED => ["crates/store/src/lib.rs:3"],
+        GLOBBED => ["crates/store/src/lib.rs:3"],
+        UNIMPORTED => Lines::default(),
+        IMPORTED_IN_MODULE => ["crates/store/src/lib.rs:4"],
     ]
 );

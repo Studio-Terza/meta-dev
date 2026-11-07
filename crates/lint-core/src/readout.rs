@@ -1,12 +1,14 @@
 use crate::repo_file::RepoFile;
 use crate::source_file::SourceFile;
 use lint_layout::Failure;
+use workspace_metadata::Metadata;
 
 #[derive(Debug, Default)]
 pub struct Readout {
     files: Vec<SourceFile>,
     repo_files: Vec<RepoFile>,
     failures: Vec<Failure>,
+    workspaces: Vec<Metadata>,
 }
 
 impl Readout {
@@ -23,6 +25,18 @@ impl Readout {
     #[must_use]
     pub fn failures(&self) -> &[Failure] {
         &self.failures
+    }
+
+    #[must_use]
+    pub fn workspaces(&self) -> &[Metadata] {
+        &self.workspaces
+    }
+
+    #[must_use]
+    pub fn with_workspaces(self, found: Vec<Metadata>) -> Readout {
+        let mut workspaces = self.workspaces;
+        workspaces.extend(found);
+        Readout { workspaces, ..self }
     }
 
     #[must_use]

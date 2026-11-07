@@ -12,6 +12,7 @@ doctest = false
 [dependencies]
 newtype = { path = "../newtype" }
 file-ports = { path = "../file-ports" }
+workspace-metadata = { path = "../workspace-metadata" }
 proc-macro2.workspace = true
 syn.workspace = true
 thiserror.workspace = true

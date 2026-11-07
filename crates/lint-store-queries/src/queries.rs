@@ -1,50 +1,56 @@
 mod boundary;
 mod unformatted;
 
-use std::path::Path;
-
-use syn::Macro;
-use syn::visit::Visit;
+use syn::visit::{self, Visit};
+use syn::{ItemMod, Macro};
 
 use lint_core::{MacroCalls, Site, SourceFile, Violation};
+use lint_layout::{Name, UsePath};
+use lint_paths::{Imports, Module};
 
 use boundary::Sql;
 use unformatted::Unformatted;
 
-#[derive(Debug)]
-pub(crate) struct Queries<'file> {
-    path: &'file Path,
+pub(crate) struct Queries<'file, 'run> {
+    file: &'file SourceFile,
+    module: Module<'file>,
+    imports: &'run Imports<'run>,
     found: Vec<Violation<'file>>,
 }
 
-impl<'file> From<&'file SourceFile> for Queries<'file> {
-    fn from(file: &'file SourceFile) -> Queries<'file> {
-        let mut queries = Queries { path: file.path(), found: Vec::new() };
+impl<'file, 'run> Queries<'file, 'run> {
+    pub(crate) fn found(file: &'file SourceFile, imports: &'run Imports<'run>) -> Vec<Violation<'file>> {
+        let mut queries = Queries { file, module: Module::of_file(file), imports, found: Vec::new() };
         queries.visit_file(file.syntax());
-        queries
-    }
-}
-
-impl<'file> From<Queries<'file>> for Vec<Violation<'file>> {
-    fn from(queries: Queries<'file>) -> Vec<Violation<'file>> {
         queries.found
     }
-}
 
-impl<'file> Visit<'file> for Queries<'file> {
-    fn visit_macro(&mut self, invocation: &'file Macro) {
-        self.met(invocation);
+    fn met(&mut self, invocation: &Macro) {
+        let candidates = self.imports.candidates(&self.module, UsePath::from(&invocation.path));
+        self.judged(invocation, Sql::queried(invocation, &candidates));
+    }
+
+    fn judged(&mut self, invocation: &Macro, sql: Option<Sql>) {
+        match sql {
+            Some(sql) => self.checked(&sql),
+            None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
+        }
+    }
+
+    fn checked(&mut self, sql: &Sql) {
+        let path = self.file.path();
+        self.found.extend(sql.unformatted().map(|line| Violation::new(Site::new(path, line), Unformatted)));
     }
 }
 
-impl Queries<'_> {
-    fn met(&mut self, invocation: &Macro) {
-        match Sql::queried(invocation) {
-            Some(sql) => {
-                self.found
-                    .extend(sql.unformatted().map(|line| Violation::new(Site::new(self.path, line), Unformatted)));
-            }
-            None => MacroCalls::within(invocation).iter().for_each(|inner| self.met(inner)),
-        }
+impl<'file> Visit<'file> for Queries<'file, '_> {
+    fn visit_item_mod(&mut self, module: &'file ItemMod) {
+        self.module.enter(Name::from(&module.ident));
+        visit::visit_item_mod(self, module);
+        self.module.leave();
+    }
+
+    fn visit_macro(&mut self, invocation: &'file Macro) {
+        self.met(invocation);
     }
 }

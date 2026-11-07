@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [package.metadata.port]
-owns = ["sqlx", "tokio"]
+owns = ["sqlx", "sqlx-core", "sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "tokio", "tokio-stream"]
 
 [lib]
 test = false

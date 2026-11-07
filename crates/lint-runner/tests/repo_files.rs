@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use file_ports::{Bytes, FileFailure, Files, Memory};
 use lint_runner::Cli;
 
-use crate::fakes::FakeLinked;
+use crate::fakes::{FakeCargo, FakeLinked};
 
 const MANIFEST: &str = "[package]\nname = \"r\"\n";
 const CLEAN: &str = "struct A;\n";
@@ -58,7 +58,8 @@ impl Checkout {
 
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
+        let exit =
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 

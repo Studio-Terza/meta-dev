@@ -2,7 +2,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use cargo_ports::{CargoFiller, cargo_ops};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
+use port_core::Pass;
 
 pub struct FakeUnlistable<'memory> {
     memory: &'memory Memory,
@@ -176,5 +178,25 @@ impl Files for FakeCounted<'_> {
 
     fn size(&self, path: &Path) -> Result<Size, FileFailure> {
         self.memory.size(path)
+    }
+}
+
+pub struct FakeCargo(String);
+
+impl FakeCargo {
+    const EMPTY: &'static str = "{\"workspace_root\": \"/\", \"packages\": [], \"resolve\": null}";
+
+    pub fn new(metadata: String) -> FakeCargo {
+        FakeCargo(metadata)
+    }
+
+    pub fn empty() -> FakeCargo {
+        FakeCargo(Self::EMPTY.to_owned())
+    }
+}
+
+impl CargoFiller for FakeCargo {
+    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
+        roots.iter().map(|_| Ok(Text::new(self.0.clone()))).collect()
     }
 }

@@ -28,7 +28,7 @@ pub use declared_type::DeclaredType;
 pub use gate::Gate;
 pub use headline::Headline;
 pub use home::Home;
-pub use lint::Lint;
+pub use lint::{Lint, WorkspaceLint};
 pub use macro_aliases::MacroAliases;
 pub use macro_calls::MacroCalls;
 pub use macros::Macros;

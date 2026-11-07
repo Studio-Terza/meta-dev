@@ -14,7 +14,7 @@ use std::thread;
 
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory};
 
-use crate::fakes::{FakeCounted, FakeLinked, FakeUnlistable};
+use crate::fakes::{FakeCargo, FakeCounted, FakeLinked, FakeUnlistable};
 
 const DIRTY: &str = "// note\nfn render_page() {}\n";
 const CLEAN: &str = "struct A;\n";
@@ -54,16 +54,24 @@ fn the_runner_runs_every_lint_in_the_workspace() -> Result<(), Box<dyn Error>> {
         Ok::<usize, FileFailure>(
             found
                 + Trees::occurrences(&workspace, &source, "impl Lint for")?
+                + Trees::occurrences(&workspace, &source, "impl WorkspaceLint for")?
                 + Trees::occurrences(&workspace, &source, "impl GraphLint for")?
                 + Trees::occurrences(&workspace, &source, "impl ClusterLint for")?,
         )
     })?;
-    let listed_by_the_mode = include_str!("../src/cli/mode.rs").matches("::report(files)").count();
+    let mode = include_str!("../src/cli/mode.rs");
+    let listed_by_the_mode =
+        mode.matches("::report(files)").count() + mode.matches("::report(files, readout.workspaces())").count();
     let runner = include_str!("../src/cli/mode/lints.rs");
-    let listed_by_the_runner = ["::report(readout.files())", "flows.report::<", "::dirty(&system)"]
-        .iter()
-        .map(|call| runner.matches(call).count())
-        .sum::<usize>();
+    let listed_by_the_runner = [
+        "::report(readout.files())",
+        "::report(readout.files(), readout.workspaces())",
+        "flows.report::<",
+        "::dirty(&system)",
+    ]
+    .iter()
+    .map(|call| runner.matches(call).count())
+    .sum::<usize>();
     assert!(listed_by_the_mode < implemented);
     let elegance = include_str!("../src/cli/mode/elegance.rs");
     let listed_by_elegance = ["::report(files)", "::report_facts(&facts)", "::report_graph(&system)"]
@@ -170,6 +178,31 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", CLEAN)?;
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let gate = Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(
+        &root.files,
+        FakeCargo::new(String::from("not json")),
+        &mut out,
+        &mut err,
+    );
+    let (mut report_out, mut report_err) = (Vec::new(), Vec::new());
+    let report = Cli::from_args([OsString::from("--report"), OsString::from(&root.root)].into_iter()).report_to(
+        &root.files,
+        FakeCargo::new(String::from("not json")),
+        &mut report_out,
+        &mut report_err,
+    );
+    assert_eq!(gate, ExitCode::FAILURE);
+    assert_ne!(err, Vec::<u8>::new());
+    assert_eq!(out, Vec::<u8>::new());
+    assert_eq!(report, ExitCode::SUCCESS);
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
@@ -208,7 +241,7 @@ impl Trees {
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(files, &mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Printed {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -219,7 +252,8 @@ impl Trees {
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
         let mut out = Vec::new();
         let mut err = Vec::new();
-        let exit = Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &mut out, &mut err);
+        let exit =
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }
