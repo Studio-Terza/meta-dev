@@ -89,8 +89,7 @@ impl Expansion for Constructors {
         let guarded = quote! {
             impl #implemented #name #arguments #bounds {
                 pub fn try_new(inner: #inner) -> ::core::result::Result<Self, <Self as ::newtype::Checked>::Error> {
-                    <Self as ::newtype::Checked>::checked(&inner)?;
-                    ::core::result::Result::Ok(Self { #member: inner })
+                    <Self as ::newtype::Wrapping>::admitted(inner, |inner| Self { #member: inner })
                 }
 
                 #[must_use]
