@@ -16,7 +16,7 @@ impl PathTokens {
     const SEGMENT_LENGTH: usize = 3;
     const CALL: char = '!';
 
-    pub fn new(tokens: TokenStream) -> PathTokens {
+    pub fn new(tokens: TokenStream) -> Self {
         let tokens: Vec<TokenTree> = tokens.into_iter().collect();
         let calls: BTreeSet<usize> = tokens
             .iter()
@@ -34,7 +34,7 @@ impl PathTokens {
         let read = tokens.into_iter().enumerate().map(|(at, token)| {
             calls.get(&at).and(Syntax::group(&token)).map_or_else(|| token.clone(), Interpolated::of_macro)
         });
-        PathTokens(read.collect())
+        Self(read.collect())
     }
 
     pub fn roots(&self) -> Vec<Option<&TokenTree>> {

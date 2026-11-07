@@ -21,7 +21,7 @@ pub struct Arms<'file> {
 }
 
 impl<'file> Arms<'file> {
-    pub fn new(path: &'file Path) -> Arms<'file> {
+    pub const fn new(path: &'file Path) -> Self {
         Arms { path }
     }
 

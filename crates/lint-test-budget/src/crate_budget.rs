@@ -18,10 +18,10 @@ enum TestShare {
 }
 
 impl TestShare {
-    fn test_lines(self, inline: Count, whole: Count) -> Count {
+    const fn test_lines(self, inline: Count, whole: Count) -> Count {
         match self {
-            TestShare::InlineModules => inline,
-            TestShare::WholeFile => whole,
+            Self::InlineModules => inline,
+            Self::WholeFile => whole,
         }
     }
 }
@@ -38,10 +38,10 @@ pub struct CrateBudget {
 impl CrateBudget {
     const LINE_END: char = '\n';
 
-    fn measured(file: &SourceFile, share: TestShare) -> CrateBudget {
+    fn measured(file: &SourceFile, share: TestShare) -> Self {
         let lines = Count::new(file.text().as_ref().bytes().filter(|byte| char::from(*byte) == Self::LINE_END).count());
         let scan = TestScan::measured(file.syntax());
-        CrateBudget {
+        Self {
             files: Count::new(1),
             lines,
             starts: Count::new(CommandPaths::across(std::slice::from_ref(file), Scope::Everywhere).len()),
@@ -52,7 +52,7 @@ impl CrateBudget {
 }
 
 impl From<&SourceFile> for CrateBudget {
-    fn from(file: &SourceFile) -> CrateBudget {
+    fn from(file: &SourceFile) -> Self {
         let share = file.shipped().map_or(TestShare::WholeFile, |_| TestShare::InlineModules);
         file.test_modules()
             .iter()
@@ -62,10 +62,10 @@ impl From<&SourceFile> for CrateBudget {
 }
 
 impl Add for CrateBudget {
-    type Output = CrateBudget;
+    type Output = Self;
 
-    fn add(self, other: CrateBudget) -> CrateBudget {
-        CrateBudget {
+    fn add(self, other: Self) -> Self {
+        Self {
             tests: self.tests.plus(other.tests),
             files: self.files.plus(other.files),
             lines: self.lines.plus(other.lines),

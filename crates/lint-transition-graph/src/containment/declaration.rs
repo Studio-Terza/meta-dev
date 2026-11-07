@@ -14,12 +14,12 @@ pub(crate) struct Declaration<'found, 'file> {
 }
 
 impl<'found, 'file> Declaration<'found, 'file> {
-    pub(crate) fn all(facts: &'found Facts<'file>) -> Vec<Declaration<'found, 'file>> {
+    pub(crate) fn all(facts: &'found Facts<'file>) -> Vec<Self> {
         let types = facts.types().iter().map(|found| Declaration::of_type(facts, found));
         types.chain(facts.traits().iter().map(Declaration::of_trait)).collect()
     }
 
-    fn of_type(facts: &'found Facts<'file>, found: &'found TypeFact<'file>) -> Declaration<'found, 'file> {
+    fn of_type(facts: &'found Facts<'file>, found: &'found TypeFact<'file>) -> Self {
         Declaration {
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),
@@ -28,7 +28,7 @@ impl<'found, 'file> Declaration<'found, 'file> {
         }
     }
 
-    fn of_trait(found: &'found TraitFact<'file>) -> Declaration<'found, 'file> {
+    fn of_trait(found: &'found TraitFact<'file>) -> Self {
         Declaration {
             named: Member::declared(found.as_ref(), found.as_ref()),
             site: *AsRef::<Site<'file>>::as_ref(found),

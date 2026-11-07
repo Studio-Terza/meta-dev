@@ -19,8 +19,8 @@ pub struct Subject {
 
 impl Subject {
     #[must_use]
-    pub fn new(written: Name, ty: TypeRef) -> Subject {
-        Subject { written, ty }
+    pub const fn new(written: Name, ty: TypeRef) -> Self {
+        Self { written, ty }
     }
 }
 
@@ -34,12 +34,12 @@ pub struct Implementation {
 
 impl Implementation {
     #[must_use]
-    pub fn new(subject: Subject, implemented: Option<Sited>, origin: Origin, region: Region) -> Implementation {
-        Implementation { subject, implemented, origin, region }
+    pub const fn new(subject: Subject, implemented: Option<Sited>, origin: Origin, region: Region) -> Self {
+        Self { subject, implemented, origin, region }
     }
 
     #[must_use]
-    pub fn written(&self) -> Option<&Implementation> {
+    pub const fn written(&self) -> Option<&Self> {
         match self.origin {
             Origin::Written => Some(self),
             Origin::Derived => None,
@@ -52,17 +52,17 @@ impl Implementation {
     }
 
     #[must_use]
-    pub fn interface(&self) -> Option<&Sited> {
+    pub const fn interface(&self) -> Option<&Sited> {
         self.implemented.as_ref()
     }
 
     #[must_use]
-    pub fn subject(&self) -> &Name {
+    pub const fn subject(&self) -> &Name {
         &self.subject.written
     }
 
     #[must_use]
-    pub fn subject_type(&self) -> &TypeRef {
+    pub const fn subject_type(&self) -> &TypeRef {
         &self.subject.ty
     }
 }

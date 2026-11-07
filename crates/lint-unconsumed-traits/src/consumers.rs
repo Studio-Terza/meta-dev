@@ -13,8 +13,8 @@ pub(crate) struct Consumers {
 }
 
 impl Consumers {
-    pub(crate) fn of_files<'file>(files: impl Iterator<Item = &'file SourceFile>) -> Consumers {
-        files.fold(Consumers::default(), |mut scan, file| {
+    pub(crate) fn of_files<'file>(files: impl Iterator<Item = &'file SourceFile>) -> Self {
+        files.fold(Self::default(), |mut scan, file| {
             scan.visit_file(file.syntax());
             scan
         })

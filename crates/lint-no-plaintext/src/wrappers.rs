@@ -13,9 +13,9 @@ pub struct Wrappers {
 }
 
 impl Wrappers {
-    pub fn settled_in(files: &[&SourceFile]) -> Wrappers {
+    pub fn settled_in(files: &[&SourceFile]) -> Self {
         let definitions = Definitions::collected_from(files);
-        std::iter::successors(Some(Wrappers::default()), |settled| {
+        std::iter::successors(Some(Self::default()), |settled| {
             Some(settled.widened(&definitions)).filter(|wider| wider != settled)
         })
         .last()
@@ -26,7 +26,7 @@ impl Wrappers {
         self.plain.get(name)
     }
 
-    fn widened(&self, definitions: &Definitions<'_>) -> Wrappers {
-        Wrappers { plain: definitions.plain_among(self) }
+    fn widened(&self, definitions: &Definitions<'_>) -> Self {
+        Self { plain: definitions.plain_among(self) }
     }
 }

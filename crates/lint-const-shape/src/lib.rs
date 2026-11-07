@@ -55,8 +55,8 @@ impl FileLint for ConstShape {
 }
 
 impl Context {
-    fn of_fn(constness: Option<&syn::token::Const>) -> Context {
-        constness.map_or(Context::Surface, |_| Context::Const)
+    fn of_fn(constness: Option<&syn::token::Const>) -> Self {
+        constness.map_or(Self::Surface, |_| Self::Const)
     }
 }
 
@@ -67,10 +67,10 @@ enum Looping {
 }
 
 impl From<&Expr> for Looping {
-    fn from(condition: &Expr) -> Looping {
+    fn from(condition: &Expr) -> Self {
         match condition {
-            Expr::Let(_) => Looping::Walking,
-            _ => Looping::Counted,
+            Expr::Let(_) => Self::Walking,
+            _ => Self::Counted,
         }
     }
 }
@@ -82,12 +82,12 @@ enum Zone {
 }
 
 impl Zone {
-    fn of_file(file: &SourceFile) -> Zone {
-        Gate::BOUNDARY.admits(file).map_or(Zone::Elsewhere, |_| Zone::Boundary)
+    fn of_file(file: &SourceFile) -> Self {
+        Gate::BOUNDARY.admits(file).map_or(Self::Elsewhere, |_| Self::Boundary)
     }
 
-    fn entering(self, module: &ItemMod) -> Zone {
-        Gate::BOUNDARY.names(module).map_or(self, |_| Zone::Boundary)
+    fn entering(self, module: &ItemMod) -> Self {
+        Gate::BOUNDARY.names(module).map_or(self, |_| Self::Boundary)
     }
 }
 

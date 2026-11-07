@@ -14,17 +14,17 @@ impl Judged {
     const WORKFLOWS: &'static str = ".github/workflows";
     const EXTENSIONS: [&'static str; 2] = ["yml", "yaml"];
 
-    pub(crate) fn judging(file: &RepoFile) -> Option<Judged> {
+    pub(crate) fn judging(file: &RepoFile) -> Option<Self> {
         let workflow = file
             .below(Path::new(Self::WORKFLOWS))
             .and(file.shown().extension())
             .filter(|extension| Self::EXTENSIONS.iter().any(|known| *extension == *known))
-            .map(|_| Judged::Workflow);
+            .map(|_| Self::Workflow);
         let action = file
             .shown()
             .file_name()
             .filter(|name| Self::MANIFESTS.iter().any(|manifest| *name == OsStr::new(manifest)))
-            .map(|_| Judged::Action);
+            .map(|_| Self::Action);
         workflow.or(action)
     }
 }

@@ -17,7 +17,7 @@ pub(crate) enum RawToken {
 }
 
 impl RawToken {
-    pub(crate) fn flattened(tokens: TokenStream) -> Vec<RawToken> {
+    pub(crate) fn flattened(tokens: TokenStream) -> Vec<Self> {
         tokens.into_iter().flat_map(Self::of_tree).collect()
     }
 
@@ -28,30 +28,30 @@ impl RawToken {
         equivalence: Equivalence,
     ) -> Option<ShapeToken<'raw>> {
         match self {
-            RawToken::Literal(spelling) => Some(spelling.shaped(equivalence)),
-            RawToken::Mark(mark) => Self::marked(*mark, position, equivalence),
-            RawToken::Word(name) => Some(slots.classified(name, position, equivalence)),
+            Self::Literal(spelling) => Some(spelling.shaped(equivalence)),
+            Self::Mark(mark) => Self::marked(*mark, position, equivalence),
+            Self::Word(name) => Some(slots.classified(name, position, equivalence)),
         }
     }
 
     pub(crate) fn spelled(self, sign: Sign) -> Option<Spelled> {
         match self {
-            RawToken::Literal(spelling) => Some(Spelled::new(sign, Spoken::Literal(spelling))),
-            RawToken::Word(name) => Slots::literal(&name).is_some().then(|| Spelled::new(sign, Spoken::Word(name))),
-            RawToken::Mark(_) => None,
+            Self::Literal(spelling) => Some(Spelled::new(sign, Spoken::Literal(spelling))),
+            Self::Word(name) => Slots::literal(&name).is_some().then(|| Spelled::new(sign, Spoken::Word(name))),
+            Self::Mark(_) => None,
         }
     }
 
-    fn of_tree(tree: TokenTree) -> Vec<RawToken> {
+    fn of_tree(tree: TokenTree) -> Vec<Self> {
         match tree {
-            TokenTree::Literal(literal) => vec![RawToken::Literal(Spelling::new(literal.to_string()))],
-            TokenTree::Punct(punct) => vec![RawToken::Mark(Mark::new(punct.as_char()))],
-            TokenTree::Ident(ident) => vec![RawToken::Word(Name::from(&ident))],
+            TokenTree::Literal(literal) => vec![Self::Literal(Spelling::new(literal.to_string()))],
+            TokenTree::Punct(punct) => vec![Self::Mark(Mark::new(punct.as_char()))],
+            TokenTree::Ident(ident) => vec![Self::Word(Name::from(&ident))],
             TokenTree::Group(group) => Self::delimited(group.delimiter(), Self::flattened(group.stream())),
         }
     }
 
-    fn delimited(delimiter: Delimiter, inner: Vec<RawToken>) -> Vec<RawToken> {
+    fn delimited(delimiter: Delimiter, inner: Vec<Self>) -> Vec<Self> {
         match delimiter {
             Delimiter::Parenthesis => Self::between(Mark::OPEN_PAREN, inner, Mark::CLOSE_PAREN),
             Delimiter::Brace => Self::between(Mark::OPEN_BRACE, inner, Mark::CLOSE_BRACE),
@@ -68,7 +68,7 @@ impl RawToken {
             .map_or(Some(ShapeToken::Mark(mark)), |_| None)
     }
 
-    fn between(open: Mark, inner: Vec<RawToken>, close: Mark) -> Vec<RawToken> {
-        [RawToken::Mark(open)].into_iter().chain(inner).chain([RawToken::Mark(close)]).collect()
+    fn between(open: Mark, inner: Vec<Self>, close: Mark) -> Vec<Self> {
+        [Self::Mark(open)].into_iter().chain(inner).chain([Self::Mark(close)]).collect()
     }
 }

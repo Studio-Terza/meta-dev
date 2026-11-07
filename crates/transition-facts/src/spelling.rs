@@ -11,21 +11,21 @@ pub(crate) enum Spelling {
 }
 
 impl Spelling {
-    pub(crate) fn of_path(path: &Path) -> Option<Spelling> {
-        path.segments.first().map(|first| Spelling::of_head(Name::from(&first.ident), path.segments.iter().nth(1)))
+    pub(crate) fn of_path(path: &Path) -> Option<Self> {
+        path.segments.first().map(|first| Self::of_head(Name::from(&first.ident), path.segments.iter().nth(1)))
     }
 
-    fn of_head(head: Name, second: Option<&PathSegment>) -> Spelling {
+    const fn of_head(head: Name, second: Option<&PathSegment>) -> Self {
         match second {
-            Some(_) => Spelling::Pathed(head),
-            None => Spelling::Bare(head),
+            Some(_) => Self::Pathed(head),
+            None => Self::Bare(head),
         }
     }
 
     pub(crate) fn head<'spelled>(&'spelled self, imported: &'spelled BTreeMap<Name, Name>) -> Option<&'spelled Name> {
         match self {
-            Spelling::Bare(head) => imported.get(head),
-            Spelling::Pathed(head) => Some(head),
+            Self::Bare(head) => imported.get(head),
+            Self::Pathed(head) => Some(head),
         }
     }
 }

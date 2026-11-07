@@ -8,8 +8,8 @@ use lint_layout::Name;
 pub struct Finding(Name);
 
 impl From<&Ident> for Finding {
-    fn from(name: &Ident) -> Finding {
-        Finding(Name::from(name))
+    fn from(name: &Ident) -> Self {
+        Self(Name::from(name))
     }
 }
 

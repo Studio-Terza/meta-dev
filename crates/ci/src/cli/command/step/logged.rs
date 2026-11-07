@@ -14,12 +14,12 @@ pub struct Logged {
 }
 
 impl Step for Logged {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Logged, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let log = &arguments.taken()?;
         let program = &arguments.taken()?;
         let rest = arguments.rest();
-        Ok(Logged { log: PathBuf::from(log), invocation: Invocation::new(program, rest) })
+        Ok(Self { log: PathBuf::from(log), invocation: Invocation::new(program, rest) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

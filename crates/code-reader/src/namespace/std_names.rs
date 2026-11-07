@@ -14,10 +14,10 @@ enum Kind {
 }
 
 impl Kind {
-    fn resolved(found: Option<Kind>, path: ItemPath) -> Resolved {
+    const fn resolved(found: Option<Self>, path: ItemPath) -> Resolved {
         match found {
-            Some(Kind::Trait) => Resolved::StdTrait(path),
-            Some(Kind::Type) | None => Resolved::Std(path),
+            Some(Self::Trait) => Resolved::StdTrait(path),
+            Some(Self::Type) | None => Resolved::Std(path),
         }
     }
 }
@@ -29,8 +29,8 @@ struct Member {
 }
 
 impl Member {
-    const fn new(name: Word<'static>, kind: Kind) -> Member {
-        Member { name, kind }
+    const fn new(name: Word<'static>, kind: Kind) -> Self {
+        Self { name, kind }
     }
 
     fn kind(&self, name: &Name) -> Option<Kind> {
@@ -46,8 +46,8 @@ pub(super) struct Canonical {
 }
 
 impl Canonical {
-    const fn new(module: Word<'static>, name: Word<'static>, kind: Kind) -> Canonical {
-        Canonical { module, name, kind }
+    const fn new(module: Word<'static>, name: Word<'static>, kind: Kind) -> Self {
+        Self { module, name, kind }
     }
 
     fn kind(&self, module: &Name, name: &Name) -> Option<Kind> {
@@ -66,8 +66,8 @@ struct PrimitiveName {
 }
 
 impl PrimitiveName {
-    const fn new(word: Word<'static>, primitive: Primitive) -> PrimitiveName {
-        PrimitiveName { word, primitive }
+    const fn new(word: Word<'static>, primitive: Primitive) -> Self {
+        Self { word, primitive }
     }
 }
 
@@ -80,15 +80,15 @@ enum OkSide {
 impl OkSide {
     fn parameters(self) -> Vec<AliasParameter> {
         match self {
-            OkSide::Unit => Vec::new(),
-            OkSide::Parameter => vec![AliasParameter::new(Name::from(StdAlias::PARAMETER), None)],
+            Self::Unit => Vec::new(),
+            Self::Parameter => vec![AliasParameter::new(Name::from(StdAlias::PARAMETER), None)],
         }
     }
 
     fn side(self) -> TypeRef {
         match self {
-            OkSide::Unit => TypeRef::Tuple(Vec::new()),
-            OkSide::Parameter => {
+            Self::Unit => TypeRef::Tuple(Vec::new()),
+            Self::Parameter => {
                 TypeRef::Named(Named::new(Sited::implied(Resolved::Param(Name::from(StdAlias::PARAMETER))), Vec::new()))
             }
         }
@@ -104,10 +104,10 @@ enum ErrSide {
 impl ErrSide {
     fn side(self) -> TypeRef {
         match self {
-            ErrSide::Path(words) => {
+            Self::Path(words) => {
                 TypeRef::Named(Named::new(Sited::implied(Resolved::Std(words.iter().copied().collect())), Vec::new()))
             }
-            ErrSide::Opaque => TypeRef::Opaque,
+            Self::Opaque => TypeRef::Opaque,
         }
     }
 }
@@ -180,10 +180,10 @@ pub(super) enum Table {
 }
 
 impl Table {
-    fn names(self) -> &'static [Canonical] {
+    const fn names(self) -> &'static [Canonical] {
         match self {
-            Table::Prelude => &StdNames::PRELUDE,
-            Table::Derives => &StdNames::DERIVES,
+            Self::Prelude => &StdNames::PRELUDE,
+            Self::Derives => &StdNames::DERIVES,
         }
     }
 }

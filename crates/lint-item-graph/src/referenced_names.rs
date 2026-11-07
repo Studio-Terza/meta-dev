@@ -35,7 +35,7 @@ impl ReferencedNames {
     const UNNAMED: &str = "_";
 
     #[must_use]
-    pub fn of_file(file: &SourceFile) -> ReferencedNames {
+    pub fn of_file(file: &SourceFile) -> Self {
         Self::of_items(&file.syntax().items, &Scope::of_file(file.syntax()))
     }
 
@@ -44,15 +44,15 @@ impl ReferencedNames {
         self.across.iter().map(|(owner, uses)| (owner, uses.iter().collect())).collect()
     }
 
-    pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> ReferencedNames {
-        items.iter().fold(ReferencedNames::default(), |names, item| names.with_item(item, scope))
+    pub(crate) fn of_items(items: &[Item], scope: &Scope<'_>) -> Self {
+        items.iter().fold(Self::default(), |names, item| names.with_item(item, scope))
     }
 
     #[must_use]
-    pub fn merged(mut self, other: ReferencedNames) -> ReferencedNames {
+    pub fn merged(mut self, other: Self) -> Self {
         self.stand_ins.extend(other.stand_ins);
         self.types.extend(other.types);
-        ReferencedNames {
+        Self {
             declared: Self::united(self.declared, other.declared),
             implemented: Self::united(self.implemented, other.implemented),
             across: Self::united(self.across, other.across),
@@ -62,7 +62,7 @@ impl ReferencedNames {
 
     #[must_use]
     pub fn into_graph(self) -> ItemGraph {
-        let ReferencedNames { declared, implemented, stand_ins, types, .. } = self;
+        let Self { declared, implemented, stand_ins, types, .. } = self;
         let foreign = implemented.into_iter().filter(|(owner, _)| declared.contains_key(owner)).collect();
         let named =
             Self::united(declared, foreign).into_iter().map(|(owner, uses)| (owner, Self::naming(&uses, &types)));
@@ -82,13 +82,13 @@ impl ReferencedNames {
         })
     }
 
-    fn with_item(self, item: &Item, scope: &Scope<'_>) -> ReferencedNames {
+    fn with_item(self, item: &Item, scope: &Scope<'_>) -> Self {
         let own = Parts::of_item(item).entered().map(|parts| parts.referenced(scope));
         self.merged(own.unwrap_or_default())
     }
 
-    fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> ReferencedNames {
-        owner.filter(|owner| *owner != Name::from(Self::UNNAMED)).map_or_else(ReferencedNames::default, |owner| {
+    fn named(owner: Option<Name>, scope: &Scope<'_>, parameters: &Parameters, item: impl ToTokens) -> Self {
+        owner.filter(|owner| *owner != Name::from(Self::UNNAMED)).map_or_else(Self::default, |owner| {
             Referenced::of_tokens(scope, item.into_token_stream()).owned(owner, parameters)
         })
     }
@@ -103,7 +103,7 @@ struct Parts<'item> {
 }
 
 impl<'item> Parts<'item> {
-    pub fn of_item(item: &'item Item) -> Parts<'item> {
+    pub fn of_item(item: &'item Item) -> Self {
         match item {
             Item::Struct(found) => Parts::named(item, &found.attrs, &found.ident),
             Item::Enum(found) => Parts::named(item, &found.attrs, &found.ident),
@@ -132,7 +132,7 @@ impl<'item> Parts<'item> {
         }
     }
 
-    pub fn entered(self) -> Option<Parts<'item>> {
+    pub fn entered(self) -> Option<Self> {
         (Walk::outside_tests(self.attributes) == Walk::Entered).then_some(self)
     }
 
@@ -142,7 +142,7 @@ impl<'item> Parts<'item> {
         self.own(scope, &parameters).merged(nested)
     }
 
-    fn named(item: &'item Item, attributes: &'item [Attribute], ident: &Ident) -> Parts<'item> {
+    fn named(item: &'item Item, attributes: &'item [Attribute], ident: &Ident) -> Self {
         Parts { item, attributes, owner: Some(Name::from(ident)), nested: Cow::Borrowed(&[]) }
     }
 

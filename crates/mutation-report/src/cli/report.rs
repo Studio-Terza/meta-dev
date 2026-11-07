@@ -28,7 +28,7 @@ pub struct Report<'arguments> {
 impl<'arguments> Report<'arguments> {
     const ARGUMENTS: usize = 4;
 
-    pub fn from_arguments(arguments: &'arguments [impl AsRef<OsStr>]) -> Result<Report<'arguments>, Failure<'static>> {
+    pub fn from_arguments(arguments: &'arguments [impl AsRef<OsStr>]) -> Result<Self, Failure<'static>> {
         TryInto::<&[_; Report::<'static>::ARGUMENTS]>::try_into(arguments)
             .map(|[shards, sources, markdown, json]| Report {
                 shards: Path::new(shards),

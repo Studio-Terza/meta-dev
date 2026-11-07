@@ -32,7 +32,7 @@ impl<'text> Command<'text> {
     const SHELLS: [Word; 5] =
         [Word::new("bash"), Word::new("sh"), Word::new("pwsh"), Word::new("powershell"), Word::new("cmd")];
 
-    pub(crate) fn new(text: Text<'text>) -> Command<'text> {
+    pub(crate) fn new(text: Text<'text>) -> Self {
         Command(text.trimmed())
     }
 

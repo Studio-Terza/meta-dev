@@ -14,34 +14,35 @@ pub struct Method {
 }
 
 impl Method {
-    pub(crate) fn of_signature(signature: &Signature, selfish: Option<&Name>) -> Method {
+    pub(crate) fn of_signature(signature: &Signature, selfish: Option<&Name>) -> Self {
         let returns = Spelled::returned_by(&signature.output).and_then(Spelled::last_of);
         let shape = MethodShape::of_signature(signature, selfish);
-        Method { name: Name::from(&signature.ident), returns, shape }
+        Self { name: Name::from(&signature.ident), returns, shape }
     }
 
-    pub(crate) fn of_trait_item(item: &TraitItem) -> Option<Method> {
+    pub(crate) fn of_trait_item(item: &TraitItem) -> Option<Self> {
         match item {
-            TraitItem::Fn(function) => (Walk::outside_tests(&function.attrs) == Walk::Entered)
-                .then(|| Method::of_signature(&function.sig, None)),
+            TraitItem::Fn(function) => {
+                (Walk::outside_tests(&function.attrs) == Walk::Entered).then(|| Self::of_signature(&function.sig, None))
+            }
             _ => None,
         }
     }
 
-    pub(crate) fn of_impl_item(item: &ImplItem, selfish: Option<&Name>) -> Option<Method> {
+    pub(crate) fn of_impl_item(item: &ImplItem, selfish: Option<&Name>) -> Option<Self> {
         match item {
-            ImplItem::Fn(function) => Some(Method::of_signature(&function.sig, selfish)),
+            ImplItem::Fn(function) => Some(Self::of_signature(&function.sig, selfish)),
             _ => None,
         }
     }
 
     #[must_use]
-    pub fn returns(&self) -> Option<&Name> {
+    pub const fn returns(&self) -> Option<&Name> {
         self.returns.as_ref()
     }
 
     #[must_use]
-    pub fn shape(&self) -> &MethodShape {
+    pub const fn shape(&self) -> &MethodShape {
         &self.shape
     }
 }

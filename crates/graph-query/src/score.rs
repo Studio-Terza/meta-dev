@@ -6,9 +6,9 @@ use newtype::{Arbitrary, Display, Newtype};
 pub struct Score(usize);
 
 impl Add for Score {
-    type Output = Score;
+    type Output = Self;
 
-    fn add(self, other: Score) -> Score {
-        Score(self.0 + other.0)
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
     }
 }

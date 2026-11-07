@@ -25,7 +25,7 @@ pub struct ModuleTree<'file> {
 }
 
 impl<'file> From<&[&'file SourceFile]> for ModuleTree<'file> {
-    fn from(files: &[&'file SourceFile]) -> ModuleTree<'file> {
+    fn from(files: &[&'file SourceFile]) -> Self {
         let empty = ModuleTree {
             modules: ModuleIndex::from(files.iter().map(|file| ModulePath::of_file(file)).collect::<Vec<_>>()),
             users: Users::default(),
@@ -59,7 +59,7 @@ impl<'file> ModuleTree<'file> {
             .chain(crowded)
     }
 
-    fn absorbed(mut self, file: &'file SourceFile) -> ModuleTree<'file> {
+    fn absorbed(mut self, file: &'file SourceFile) -> Self {
         let module = ModulePath::of_file(file);
         self.reexports.insert(module, ReexportCount::of_file(file.syntax()));
         self.users.add_tests(&self.modules, file.test_modules());

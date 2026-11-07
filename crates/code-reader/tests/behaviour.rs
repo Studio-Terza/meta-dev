@@ -205,8 +205,8 @@ struct Fixture {
 }
 
 impl Fixture {
-    const fn new(path: &'static str, text: &'static str) -> Fixture {
-        Fixture { path, text }
+    const fn new(path: &'static str, text: &'static str) -> Self {
+        Self { path, text }
     }
 }
 
@@ -217,15 +217,15 @@ enum Seen {
 }
 
 impl Seen {
-    fn of(model: &Model, resolved: Resolved) -> Seen {
+    fn of(model: &Model, resolved: Resolved) -> Self {
         match resolved.crate_item().and_then(|id| model.declared(id)) {
-            Some(item) => Seen::Item(item.clone()),
-            None => Seen::Resolved(resolved),
+            Some(item) => Self::Item(item.clone()),
+            None => Self::Resolved(resolved),
         }
     }
 
-    fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Seen> {
-        ty.mapped(&mut |sited: &Sited| Seen::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
+    fn typed(model: &Model, ty: &TypeRef) -> TypeRef<Self> {
+        ty.mapped(&mut |sited: &Sited| Self::of(model, AsRef::<Resolved>::as_ref(sited).clone()))
     }
 }
 
@@ -238,8 +238,8 @@ struct Formed {
 }
 
 impl Formed {
-    fn of(model: &Model, function: &Function) -> Formed {
-        Formed {
+    fn of(model: &Model, function: &Function) -> Self {
+        Self {
             name: AsRef::<Name>::as_ref(function).clone(),
             owner: function.owner(),
             entry: function.entry(),
@@ -270,7 +270,7 @@ impl Expect {
     }
 
     fn krate(path: &[&str]) -> Seen {
-        Expect::item(path.last().copied().unwrap_or_default(), ItemKind::Trait)
+        Self::item(path.last().copied().unwrap_or_default(), ItemKind::Trait)
     }
 
     fn item(name: &str, kind: ItemKind) -> Seen {
@@ -285,16 +285,16 @@ impl Expect {
         Seen::Resolved(Resolved::Unknown(path.iter().map(|segment| Name::from(*segment)).collect()))
     }
 
-    fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
+    const fn named(path: Seen, arguments: Vec<TypeRef<Seen>>) -> TypeRef<Seen> {
         TypeRef::Named(Named::new(path, arguments))
     }
 
-    fn primitive(primitive: Primitive) -> TypeRef<Seen> {
-        Expect::named(Seen::Resolved(Resolved::Primitive(primitive)), Vec::new())
+    const fn primitive(primitive: Primitive) -> TypeRef<Seen> {
+        Self::named(Seen::Resolved(Resolved::Primitive(primitive)), Vec::new())
     }
 
     fn param(name: &str) -> TypeRef<Seen> {
-        Expect::named(Seen::Resolved(Resolved::Param(Name::from(name))), Vec::new())
+        Self::named(Seen::Resolved(Resolved::Param(Name::from(name))), Vec::new())
     }
 
     fn function(name: &str, owner: Owner, entry: Entry, output: Option<TypeRef<Seen>>) -> Formed {
@@ -328,12 +328,12 @@ impl Read {
     }
 
     fn resolved(text: &str) -> Vec<Seen> {
-        Read::implemented(&[Read::file("a.rs", text)])
+        Self::implemented(&[Self::file("a.rs", text)])
     }
 
     fn across(fixtures: &[Fixture]) -> Vec<Seen> {
-        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
-        Read::implemented(&files)
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Self::file(fixture.path, fixture.text)).collect();
+        Self::implemented(&files)
     }
 
     fn implemented(files: &[SourceFile]) -> Vec<Seen> {
@@ -346,36 +346,36 @@ impl Read {
     }
 
     fn subjects(text: &str) -> Vec<TypeRef<Seen>> {
-        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        let model = Reader::read_files(&[Self::file("a.rs", text)]);
         model.implementations().map(|found| Seen::typed(&model, found.entity().subject_type())).collect()
     }
 
     fn entries(fixtures: &[Fixture]) -> Vec<Formed> {
-        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Self::file(fixture.path, fixture.text)).collect();
         let model = Reader::read_files(&files);
         model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
     fn functions(text: &str) -> Vec<Formed> {
-        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        let model = Reader::read_files(&[Self::file("a.rs", text)]);
         model.functions().map(|found| Formed::of(&model, found.entity())).collect()
     }
 
     fn outputs(text: &str) -> Vec<TypeRef<Seen>> {
-        let model = Reader::read_files(&[Read::file("a.rs", text)]);
-        model.functions().filter_map(|found| Read::written(found.entity())).map(|ty| Seen::typed(&model, ty)).collect()
+        let model = Reader::read_files(&[Self::file("a.rs", text)]);
+        model.functions().filter_map(|found| Self::written(found.entity())).map(|ty| Seen::typed(&model, ty)).collect()
     }
 
     fn expanded(text: &str) -> Vec<TypeRef<Seen>> {
-        let model = Reader::read_files(&[Read::file("a.rs", text)]);
+        let model = Reader::read_files(&[Self::file("a.rs", text)]);
         model
             .functions()
-            .filter_map(|found| Read::written(found.entity()))
+            .filter_map(|found| Self::written(found.entity()))
             .map(|ty| Seen::typed(&model, &model.expanded(ty)))
             .collect()
     }
 
-    fn written(function: &Function) -> Option<&TypeRef> {
+    const fn written(function: &Function) -> Option<&TypeRef> {
         function.signature().output().written()
     }
 

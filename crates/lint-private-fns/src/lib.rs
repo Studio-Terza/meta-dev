@@ -65,7 +65,7 @@ impl PrivateFnCounter {
             .map(|function| Name::from(&function.sig.ident))
     }
 
-    fn function(member: &ImplItem) -> Option<&ImplItemFn> {
+    const fn function(member: &ImplItem) -> Option<&ImplItemFn> {
         match member {
             ImplItem::Fn(function) => Some(function),
             _ => None,

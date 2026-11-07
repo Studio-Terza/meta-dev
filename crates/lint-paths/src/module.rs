@@ -12,12 +12,12 @@ impl<'file> Module<'file> {
     pub const UNPLACED: Module<'static> = Module { crate_file: &CrateFile::UNPLACED, path: Vec::new() };
 
     #[must_use]
-    pub fn of_file(file: &'file SourceFile) -> Module<'file> {
+    pub fn of_file(file: &'file SourceFile) -> Self {
         Module { crate_file: file.crate_file(), path: file.placement().module().segments().to_vec() }
     }
 
     #[must_use]
-    pub fn within(&self, name: Name) -> Module<'file> {
+    pub fn within(&self, name: Name) -> Self {
         Module { crate_file: self.crate_file, path: self.path.iter().cloned().chain(Some(name)).collect() }
     }
 
@@ -29,7 +29,7 @@ impl<'file> Module<'file> {
         self.path.pop();
     }
 
-    pub(crate) fn parent(&self) -> Option<Module<'file>> {
+    pub(crate) fn parent(&self) -> Option<Self> {
         let outer = self.path.len().checked_sub(1)?;
         Some(Module { crate_file: self.crate_file, path: self.path.iter().take(outer).cloned().collect() })
     }
@@ -42,7 +42,7 @@ impl<'file> From<&Module<'file>> for &'file CrateFile {
 }
 
 impl<'file> From<&'file CrateFile> for Module<'file> {
-    fn from(crate_file: &'file CrateFile) -> Module<'file> {
+    fn from(crate_file: &'file CrateFile) -> Self {
         Module { crate_file, path: Vec::new() }
     }
 }

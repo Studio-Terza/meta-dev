@@ -17,13 +17,14 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn checked(self) -> Result<Metadata, Outside> {
-        let Metadata { workspace_root, packages } = self;
+    pub fn checked(self) -> Result<Self, Outside> {
+        let Self { workspace_root, packages } = self;
         let (inside, outside): (Vec<Package>, Vec<Package>) =
             packages.into_iter().partition(|package| package.directory_under(&workspace_root).is_some());
-        outside.into_iter().next().map_or(Ok(Metadata { workspace_root, packages: inside }), |package| {
-            Err(Outside::new(package.into_manifest()))
-        })
+        outside
+            .into_iter()
+            .next()
+            .map_or(Ok(Self { workspace_root, packages: inside }), |package| Err(Outside::new(package.into_manifest())))
     }
 
     #[must_use]

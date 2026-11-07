@@ -25,7 +25,7 @@ impl Binary {
             .and_then(|(at, mark)| line.get(at + mark.len()..))
     }
 
-    fn running(line: &str) -> Option<Binary> {
+    fn running(line: &str) -> Option<Self> {
         let rest = Self::after_indent(line, Self::RUNNING)?;
         let (at, mark) = rest.match_indices(Self::DEPS).last()?;
         let after = rest.get(at + mark.len()..)?;
@@ -36,7 +36,7 @@ impl Binary {
             .and(after.get(split + directory.len()..))?;
         let (close, _) = tail.match_indices(Self::CLOSE).next()?;
         let name = tail.get(..close).and_then(|name| Self::word(name, char::is_whitespace))?;
-        Some(Binary(name.to_owned()))
+        Some(Self(name.to_owned()))
     }
 
     fn word(text: &str, mut separator: impl FnMut(char) -> bool) -> Option<&str> {
@@ -56,7 +56,7 @@ impl Binary {
 impl FromStr for Binary {
     type Err = Unmatched;
 
-    fn from_str(line: &str) -> Result<Binary, Unmatched> {
+    fn from_str(line: &str) -> Result<Self, Unmatched> {
         Self::running(line).or_else(|| Self::doctests(line).map(Binary)).ok_or(Unmatched)
     }
 }

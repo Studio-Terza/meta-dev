@@ -10,8 +10,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(stage: Stage, seconds: Seconds) -> Entry {
-        Entry { stage, seconds }
+    pub const fn new(stage: Stage, seconds: Seconds) -> Self {
+        Self { stage, seconds }
     }
 }
 

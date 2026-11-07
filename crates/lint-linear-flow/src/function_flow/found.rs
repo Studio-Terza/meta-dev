@@ -9,7 +9,7 @@ pub struct Found<'file> {
 }
 
 impl<'file> Found<'file> {
-    pub fn new(site: Site<'file>, finding: Finding) -> Found<'file> {
+    pub const fn new(site: Site<'file>, finding: Finding) -> Self {
         Found { site, finding }
     }
 

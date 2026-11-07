@@ -4,8 +4,8 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 pub struct Locked<Held>(Mutex<Held>);
 
 impl<Held> Locked<Held> {
-    pub fn new(held: Held) -> Locked<Held> {
-        Locked(Mutex::new(held))
+    pub const fn new(held: Held) -> Self {
+        Self(Mutex::new(held))
     }
 
     pub fn held(&self) -> MutexGuard<'_, Held> {

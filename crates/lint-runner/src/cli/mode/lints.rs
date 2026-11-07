@@ -176,12 +176,12 @@ enum Job {
 impl Job {
     fn done(self, readout: &Readout, queue: &Queue) -> Vec<Rendered> {
         match self {
-            Job::Check { slot, check } => check(readout, queue)
+            Self::Check { slot, check } => check(readout, queue)
                 .into_iter()
                 .filter_map(Report::dirty)
                 .map(|report| Rendered::render(slot, &report))
                 .collect(),
-            Job::Query { slot, query } => {
+            Self::Query { slot, query } => {
                 query(queue.model(readout)).dirty().map(|report| Rendered::render(slot, &report)).into_iter().collect()
             }
         }

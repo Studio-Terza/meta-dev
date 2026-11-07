@@ -14,7 +14,7 @@ pub struct Flows<'file> {
 }
 
 impl<'file> From<&'file [SourceFile]> for Flows<'file> {
-    fn from(files: &'file [SourceFile]) -> Flows<'file> {
+    fn from(files: &'file [SourceFile]) -> Self {
         Flows { files: FileFlow::of_files(files) }
     }
 }

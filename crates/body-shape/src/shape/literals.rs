@@ -4,8 +4,8 @@ use super::spelling::Spelled;
 pub struct Literals(Vec<Spelled>);
 
 impl FromIterator<Spelled> for Literals {
-    fn from_iter<Found: IntoIterator<Item = Spelled>>(found: Found) -> Literals {
-        Literals(found.into_iter().collect())
+    fn from_iter<Found: IntoIterator<Item = Spelled>>(found: Found) -> Self {
+        Self(found.into_iter().collect())
     }
 }
 

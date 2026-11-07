@@ -12,7 +12,7 @@ pub(crate) struct Finding<'model> {
 }
 
 impl<'model> Finding<'model> {
-    pub(crate) fn new(name: &'model Name, narrowed: Narrowed) -> Finding<'model> {
+    pub(crate) const fn new(name: &'model Name, narrowed: Narrowed) -> Self {
         Finding { name, narrowed }
     }
 }

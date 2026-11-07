@@ -11,27 +11,27 @@ pub(super) enum Status {
 }
 
 impl From<char> for Status {
-    fn from(letter: char) -> Status {
-        Self::LETTERS.into_iter().find(|(known, _)| *known == letter).map_or(Status::Other, |(_, status)| status)
+    fn from(letter: char) -> Self {
+        Self::LETTERS.into_iter().find(|(known, _)| *known == letter).map_or(Self::Other, |(_, status)| status)
     }
 }
 
 impl Status {
-    const LETTERS: [(char, Status); 3] = [('A', Status::Added), ('C', Status::Copied), ('R', Status::Renamed)];
+    const LETTERS: [(char, Self); 3] = [('A', Self::Added), ('C', Self::Copied), ('R', Self::Renamed)];
     const PAIR: usize = 2;
 
     pub(super) fn change(self, paths: &[&str]) -> Option<Change> {
         match self {
-            Status::Added => Self::single(paths).map(Change::Added),
-            Status::Copied => <&[&str; Self::PAIR]>::try_from(paths)
+            Self::Added => Self::single(paths).map(Change::Added),
+            Self::Copied => <&[&str; Self::PAIR]>::try_from(paths)
                 .ok()
                 .map(|[_, path]| Change::Copied(PathBuf::from(path)))
                 .or_else(|| Self::single(paths).map(Change::Touched)),
-            Status::Renamed => <&[&str; Self::PAIR]>::try_from(paths)
+            Self::Renamed => <&[&str; Self::PAIR]>::try_from(paths)
                 .ok()
                 .map(|[from, to]| Change::Renamed { from: PathBuf::from(from), to: PathBuf::from(to) })
                 .or_else(|| Self::single(paths).map(Change::Touched)),
-            Status::Other => Self::single(paths).map(Change::Touched),
+            Self::Other => Self::single(paths).map(Change::Touched),
         }
     }
 

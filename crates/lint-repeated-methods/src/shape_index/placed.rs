@@ -11,7 +11,7 @@ pub struct Placed<'file> {
 }
 
 impl<'file> Placed<'file> {
-    pub fn new(owner: DeclaredType<'file>, shapes: BTreeMap<MethodShape, Site<'file>>) -> Placed<'file> {
+    pub const fn new(owner: DeclaredType<'file>, shapes: BTreeMap<MethodShape, Site<'file>>) -> Self {
         Placed { owner, shapes }
     }
 

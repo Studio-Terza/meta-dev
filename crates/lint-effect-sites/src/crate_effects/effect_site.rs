@@ -16,19 +16,19 @@ pub(super) struct EffectSite<'file> {
 }
 
 impl<'file> EffectSite<'file> {
-    pub(super) fn new(site: Site<'file>, effect: Effect, called: Called, ground: Ground) -> EffectSite<'file> {
+    pub(super) const fn new(site: Site<'file>, effect: Effect, called: Called, ground: Ground) -> Self {
         EffectSite { site, effect, called, ground }
     }
 
-    pub(super) fn place(&self) -> Site<'file> {
+    pub(super) const fn place(&self) -> Site<'file> {
         self.site
     }
 
-    pub(super) fn effect(&self) -> Effect {
+    pub(super) const fn effect(&self) -> Effect {
         self.effect
     }
 
-    pub(super) fn ground(&self) -> Ground {
+    pub(super) const fn ground(&self) -> Ground {
         self.ground
     }
 

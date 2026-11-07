@@ -47,12 +47,12 @@ impl CompileTimes {
 }
 
 impl Step for CompileTimes {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTimes, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let page = &arguments.taken()?;
         let report = &arguments.taken()?;
         arguments.ended()?;
-        Ok(CompileTimes { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
+        Ok(Self { page: Journal::file(Path::new(page)), report: Journal::file(Path::new(report)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

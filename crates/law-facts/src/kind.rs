@@ -16,18 +16,18 @@ pub enum Property {
 }
 
 impl Property {
-    const NAMED: [(&'static str, Property); 8] = [
-        ("associative", Property::Associative),
-        ("commutative", Property::Commutative),
-        ("identity", Property::Identity),
-        ("inverse", Property::Inverse),
-        ("idempotent", Property::Idempotent),
-        ("absorbing", Property::Absorbing),
-        ("distributive", Property::Distributive),
-        ("preserves", Property::Preserves),
+    const NAMED: [(&'static str, Self); 8] = [
+        ("associative", Self::Associative),
+        ("commutative", Self::Commutative),
+        ("identity", Self::Identity),
+        ("inverse", Self::Inverse),
+        ("idempotent", Self::Idempotent),
+        ("absorbing", Self::Absorbing),
+        ("distributive", Self::Distributive),
+        ("preserves", Self::Preserves),
     ];
 
-    fn declared_by(name: &Name) -> Option<Property> {
+    fn declared_by(name: &Name) -> Option<Self> {
         Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map(|(_, property)| *property)
     }
 }
@@ -46,28 +46,28 @@ impl Kind {
     const PROPTEST: &'static str = "proptest";
 
     #[must_use]
-    pub fn of_macro(invocation: &Macro) -> Kind {
+    pub fn of_macro(invocation: &Macro) -> Self {
         let last = invocation.path.segments.last().map(|segment| Name::from(&segment.ident));
         let law = TestMarks::law(invocation);
         let roundtrip =
-            last.as_ref().filter(|name| **name == Name::from(Self::ROUNDTRIP)).and(law).map(|_| Kind::Roundtrip);
-        let proptest = last.as_ref().filter(|name| **name == Name::from(Self::PROPTEST)).map(|_| Kind::Proptest);
+            last.as_ref().filter(|name| **name == Name::from(Self::ROUNDTRIP)).and(law).map(|_| Self::Roundtrip);
+        let proptest = last.as_ref().filter(|name| **name == Name::from(Self::PROPTEST)).map(|_| Self::Proptest);
         let property = law.and(last.as_ref()).and_then(Property::declared_by).map(Kind::Property);
-        roundtrip.or(proptest).or(property).or(law.map(|_| Kind::Law)).unwrap_or(Kind::Other)
+        roundtrip.or(proptest).or(property).or(law.map(|_| Self::Law)).unwrap_or(Self::Other)
     }
 
-    pub(crate) fn titled(self) -> Option<Kind> {
+    pub(crate) const fn titled(self) -> Option<Self> {
         match self {
-            Kind::Roundtrip | Kind::Law | Kind::Property(_) => Some(self),
-            Kind::Proptest | Kind::Other => None,
+            Self::Roundtrip | Self::Law | Self::Property(_) => Some(self),
+            Self::Proptest | Self::Other => None,
         }
     }
 
     #[must_use]
-    pub fn property(self) -> Option<Property> {
+    pub const fn property(self) -> Option<Property> {
         match self {
-            Kind::Property(property) => Some(property),
-            Kind::Roundtrip | Kind::Law | Kind::Proptest | Kind::Other => None,
+            Self::Property(property) => Some(property),
+            Self::Roundtrip | Self::Law | Self::Proptest | Self::Other => None,
         }
     }
 }

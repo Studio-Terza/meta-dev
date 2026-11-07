@@ -18,7 +18,7 @@ impl<'item> ItemHead<'item> {
     const DOCUMENTATION: &str = "doc";
     const HIDDEN: &str = "hidden";
 
-    pub(super) fn of_item(item: &'item Item) -> Option<ItemHead<'item>> {
+    pub(super) fn of_item(item: &'item Item) -> Option<Self> {
         match item {
             Item::Const(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
             Item::Enum(item) => Some(ItemHead { attributes: &item.attrs, visibility: &item.vis }),
@@ -34,7 +34,7 @@ impl<'item> ItemHead<'item> {
         }
     }
 
-    pub(super) fn of_member(member: &'item ImplItem) -> Option<ItemHead<'item>> {
+    pub(super) fn of_member(member: &'item ImplItem) -> Option<Self> {
         match member {
             ImplItem::Const(member) => Some(ItemHead { attributes: &member.attrs, visibility: &member.vis }),
             ImplItem::Fn(member) => Some(ItemHead { attributes: &member.attrs, visibility: &member.vis }),
@@ -43,7 +43,7 @@ impl<'item> ItemHead<'item> {
         }
     }
 
-    pub(super) fn of_field(field: &'item Field) -> ItemHead<'item> {
+    pub(super) fn of_field(field: &'item Field) -> Self {
         ItemHead { attributes: &field.attrs, visibility: &field.vis }
     }
 

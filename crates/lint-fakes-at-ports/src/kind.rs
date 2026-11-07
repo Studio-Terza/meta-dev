@@ -45,40 +45,40 @@ impl Kind {
     ];
 
     #[must_use]
-    pub fn written(written: &UsePath) -> Kind {
+    pub fn written(written: &UsePath) -> Self {
         written
             .segments()
             .split_first()
             .filter(|(_, rest)| rest.is_empty())
             .and_then(|(only, _)| only.matches::<Whole>(&Self::PRELUDE))
-            .map_or(Kind::Other, |_| Kind::Std)
+            .map_or(Self::Other, |_| Self::Std)
     }
 
     #[must_use]
-    pub fn judged(self, candidates: &[UsePath], ports: &PortTraits) -> Kind {
+    pub fn judged(self, candidates: &[UsePath], ports: &PortTraits) -> Self {
         candidates
             .iter()
             .map(|candidate| Self::resolved(candidate, ports))
             .chain(iter::once(self))
             .min()
-            .unwrap_or(Kind::Other)
+            .unwrap_or(Self::Other)
     }
 
-    fn resolved(candidate: &UsePath, ports: &PortTraits) -> Kind {
+    fn resolved(candidate: &UsePath, ports: &PortTraits) -> Self {
         match candidate.segments().split_last() {
             Some((last, modules)) => Self::within(last, modules, ports),
-            None => Kind::Other,
+            None => Self::Other,
         }
     }
 
-    fn within(last: &Name, modules: &[Name], ports: &PortTraits) -> Kind {
+    fn within(last: &Name, modules: &[Name], ports: &PortTraits) -> Self {
         let first = modules.first();
-        let named = modules.iter().find(|module| **module == Name::from(Self::PORTS)).map(|_| Kind::Port);
+        let named = modules.iter().find(|module| **module == Name::from(Self::PORTS)).map(|_| Self::Port);
         let suffixed = first
             .filter(|first| first.words().last().is_some_and(|word| *word == Name::from(Self::PORTS)))
-            .map(|_| Kind::Port);
-        let declared = first.filter(|first| ports.declares(first, last).is_some()).map(|_| Kind::Port);
-        let standard = first.filter(|first| first.matches::<Whole>(&Self::STD).is_some()).map(|_| Kind::Std);
-        named.or(suffixed).or(declared).or(standard).unwrap_or(Kind::Other)
+            .map(|_| Self::Port);
+        let declared = first.filter(|first| ports.declares(first, last).is_some()).map(|_| Self::Port);
+        let standard = first.filter(|first| first.matches::<Whole>(&Self::STD).is_some()).map(|_| Self::Std);
+        named.or(suffixed).or(declared).or(standard).unwrap_or(Self::Other)
     }
 }

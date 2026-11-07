@@ -12,7 +12,7 @@ pub struct UseEdges<Edge: FnMut(&UsePath)> {
 
 impl<Edge: FnMut(&UsePath)> UseEdges<Edge> {
     pub fn each(file: &syn::File, edge: Edge) {
-        let mut edges = UseEdges { prefix: UsePath::default(), edge };
+        let mut edges = Self { prefix: UsePath::default(), edge };
         edges.visit_file(file);
     }
 

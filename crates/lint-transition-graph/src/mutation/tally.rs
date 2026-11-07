@@ -29,28 +29,28 @@ impl Tally {
 
     pub(super) fn counted<'edge, 'found: 'edge, 'file: 'found>(
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
-    ) -> Tally {
-        edges.fold(Tally::default(), |tally, edge| {
+    ) -> Self {
+        edges.fold(Self::default(), |tally, edge| {
             tally.by_form(edge.form(), edge.transition().function().mutation()).fixed(edge.form(), edge.fixed_by())
         })
     }
 
-    fn by_form(self, form: &Form<'_>, mutation: Mutation) -> Tally {
+    fn by_form(self, form: &Form<'_>, mutation: Mutation) -> Self {
         let mutating = self.by_mutation(mutation);
-        form.sorted(mutating, mutating, Tally { operations: self.operations.incremented(), ..self })
+        form.sorted(mutating, mutating, Self { operations: self.operations.incremented(), ..self })
     }
 
-    fn by_mutation(self, mutation: Mutation) -> Tally {
+    fn by_mutation(self, mutation: Mutation) -> Self {
         match mutation {
-            Mutation::ThroughSelf => Tally { through_self: self.through_self.incremented(), ..self },
+            Mutation::ThroughSelf => Self { through_self: self.through_self.incremented(), ..self },
             Mutation::ThroughParameter | Mutation::Absent => {
-                Tally { through_parameter: self.through_parameter.incremented(), ..self }
+                Self { through_parameter: self.through_parameter.incremented(), ..self }
             }
         }
     }
 
-    fn fixed(self, form: &Form<'_>, fixed_by: Option<&Name>) -> Tally {
-        let fixing = fixed_by.map_or(self, |_| Tally { fixed: self.fixed.incremented(), ..self });
+    fn fixed(self, form: &Form<'_>, fixed_by: Option<&Name>) -> Self {
+        let fixing = fixed_by.map_or(self, |_| Self { fixed: self.fixed.incremented(), ..self });
         form.sorted(fixing, fixing, self)
     }
 

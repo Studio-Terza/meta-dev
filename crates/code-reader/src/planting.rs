@@ -17,13 +17,13 @@ pub(crate) struct Listed<'read> {
 }
 
 impl<'read> From<&'read SourceFile> for Listed<'read> {
-    fn from(source: &'read SourceFile) -> Listed<'read> {
+    fn from(source: &'read SourceFile) -> Self {
         Listed { source, reach: Listed::reach_of(source) }
     }
 }
 
 impl<'read> Listed<'read> {
-    pub(crate) fn tested(self) -> Listed<'read> {
+    pub(crate) const fn tested(self) -> Self {
         Listed { source: self.source, reach: Reach::Test }
     }
 
@@ -47,15 +47,15 @@ pub(crate) struct ReadFile<'read> {
 }
 
 impl<'read> ReadFile<'read> {
-    pub(crate) fn reach(self) -> Reach {
+    pub(crate) const fn reach(self) -> Reach {
         self.reach
     }
 
-    pub(crate) fn source(self) -> &'read SourceFile {
+    pub(crate) const fn source(self) -> &'read SourceFile {
         self.source
     }
 
-    pub(crate) fn file(self) -> FileId {
+    pub(crate) const fn file(self) -> FileId {
         self.file
     }
 
@@ -75,14 +75,14 @@ impl<'read> Files<'read> {
         self.0.get(path).copied()
     }
 
-    fn filled(self, lowered: &mut Lowered<'read>, slots: Vec<Slot>) -> Files<'read> {
+    fn filled(self, lowered: &mut Lowered<'read>, slots: Vec<Slot>) -> Self {
         slots.into_iter().fold(self, |mut files, slot| {
             files.slot_filled(lowered, slot);
             files
         })
     }
 
-    fn rooted(self, lowered: &mut Lowered<'read>, root: ReadFile<'read>, name: Option<&'read Name>) -> Files<'read> {
+    fn rooted(self, lowered: &mut Lowered<'read>, root: ReadFile<'read>, name: Option<&'read Name>) -> Self {
         let slots = lowered.rooted(root, name, CrateForm::Planted);
         self.filled(lowered, slots)
     }
@@ -109,7 +109,7 @@ struct CrateFiles<'read> {
 }
 
 impl<'read> CrateFiles<'read> {
-    fn new(crate_file: &Path, read: Vec<ReadFile<'read>>) -> CrateFiles<'read> {
+    fn new(crate_file: &Path, read: Vec<ReadFile<'read>>) -> Self {
         let mut files: BTreeMap<&'read Path, ReadFile<'read>> =
             read.into_iter().map(|file| (file.source.path(), file)).collect();
         let root = files.remove(crate_file);
@@ -134,7 +134,7 @@ pub(crate) struct Planting<'read> {
 }
 
 impl<'read> Planting<'read> {
-    pub(crate) fn new(read: &[ReadFile<'read>]) -> Planting<'read> {
+    pub(crate) fn new(read: &[ReadFile<'read>]) -> Self {
         let grouped =
             read.iter().fold(BTreeMap::new(), |mut grouped: BTreeMap<&'read Path, Vec<ReadFile<'read>>>, file| {
                 grouped.entry(file.source.crate_file().as_ref()).or_default().push(*file);

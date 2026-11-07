@@ -6,7 +6,7 @@ pub struct Borrows(usize);
 
 impl Borrows {
     pub fn owning(item: &ItemStruct) -> Option<&ItemStruct> {
-        let mut borrows = Borrows::default();
+        let mut borrows = Self::default();
         borrows.visit_generics(&item.generics);
         borrows.visit_fields(&item.fields);
         (borrows.0 == 0).then_some(item)

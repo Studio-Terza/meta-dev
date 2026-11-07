@@ -12,37 +12,35 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    pub fn describe(input: &FnArg) -> Option<Parameter> {
+    pub fn describe(input: &FnArg) -> Option<Self> {
         match input {
             FnArg::Receiver(receiver) => {
-                Some(Parameter { name: Name::from(&Ident::from(receiver.self_token)), type_name: None })
+                Some(Self { name: Name::from(&Ident::from(receiver.self_token)), type_name: None })
             }
-            FnArg::Typed(typed) => Syntax::pat_ident(&typed.pat).map(|ident| Parameter {
-                name: Name::from(&ident.ident),
-                type_name: StructFields::type_name(&typed.ty),
-            }),
+            FnArg::Typed(typed) => Syntax::pat_ident(&typed.pat)
+                .map(|ident| Self { name: Name::from(&ident.ident), type_name: StructFields::type_name(&typed.ty) }),
         }
     }
 
-    pub fn named_by<'params>(params: &'params [Parameter], path: &Path) -> Option<&'params Parameter> {
+    pub fn named_by<'params>(params: &'params [Self], path: &Path) -> Option<&'params Self> {
         let ident = path.get_ident()?;
         params.iter().find(|parameter| parameter.name == Name::from(ident))
     }
 
-    pub fn forwarded<'expr>(expr: &'expr Expr, params: &[Parameter]) -> Option<&'expr Expr> {
+    pub fn forwarded<'expr>(expr: &'expr Expr, params: &[Self]) -> Option<&'expr Expr> {
         match expr {
-            Expr::Path(path) => Parameter::named_by(params, &path.path).map(|_| expr),
+            Expr::Path(path) => Self::named_by(params, &path.path).map(|_| expr),
             Expr::Field(field) => Self::forwarded(&field.base, params),
             Expr::Reference(reference) => Self::forwarded(&reference.expr, params),
             _ => None,
         }
     }
 
-    pub fn forwarding(args: &Punctuated<Expr, Token![,]>, params: &[Parameter]) -> Option<()> {
+    pub fn forwarding(args: &Punctuated<Expr, Token![,]>, params: &[Self]) -> Option<()> {
         args.iter().all(|arg| Self::forwarded(arg, params).is_some()).then_some(())
     }
 
-    pub fn type_name(&self) -> Option<&Name> {
+    pub const fn type_name(&self) -> Option<&Name> {
         self.type_name.as_ref()
     }
 }

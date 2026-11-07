@@ -13,7 +13,7 @@ use lint_placement::CrateName;
 struct Hops(usize);
 
 impl Hops {
-    fn next(self) -> Option<Hops> {
+    fn next(self) -> Option<Self> {
         self.0.checked_sub(1).map(Hops)
     }
 }
@@ -52,7 +52,7 @@ pub(crate) struct Traits<'file> {
 impl<'file> Traits<'file> {
     const CONVERSIONS: [Word<'static>; 4] = words!["From", "Into", "TryFrom", "TryInto"];
 
-    pub(crate) fn declared(files: &'file [SourceFile]) -> Traits<'file> {
+    pub(crate) fn declared(files: &'file [SourceFile]) -> Self {
         files.iter().fold(Traits::default(), Traits::read)
     }
 
@@ -81,7 +81,7 @@ impl<'file> Traits<'file> {
             .or_else(|| self.exports.through(self.imports.get(home), home, name, hops))
     }
 
-    fn read(mut self, file: &'file SourceFile) -> Traits<'file> {
+    fn read(mut self, file: &'file SourceFile) -> Self {
         let home = file.placement().package().crate_name();
         let mut declared = Declared::default();
         declared.visit_file(file.syntax());
@@ -100,7 +100,7 @@ struct Declared {
 }
 
 impl Declared {
-    fn kept(&mut self, visibility: &Visibility) -> &mut Uses {
+    const fn kept(&mut self, visibility: &Visibility) -> &mut Uses {
         match visibility {
             Visibility::Public(_) => &mut self.exports,
             Visibility::Restricted(_) | Visibility::Inherited => &mut self.imports,

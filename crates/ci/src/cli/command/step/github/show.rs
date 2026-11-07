@@ -33,10 +33,10 @@ impl Show {
 }
 
 impl Step for Show {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Show, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let first = arguments.taken()?;
-        Ok(Show {
+        Ok(Self {
             journals: iter::once(first)
                 .chain(arguments.rest())
                 .map(|file| Journal::from(PathBuf::from(file)))

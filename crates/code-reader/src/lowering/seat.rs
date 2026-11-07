@@ -18,15 +18,15 @@ pub(super) struct Seat {
 }
 
 impl Seat {
-    pub(super) fn new(file: FileId, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file, scope, children }
+    pub(super) const fn new(file: FileId, scope: ScopeId, children: Rc<Path>) -> Self {
+        Self { file, scope, children }
     }
 
-    pub(super) fn inner(&self, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file: self.file, scope, children }
+    pub(super) const fn inner(&self, scope: ScopeId, children: Rc<Path>) -> Self {
+        Self { file: self.file, scope, children }
     }
 
-    pub(super) fn scope(&self) -> ScopeId {
+    pub(super) const fn scope(&self) -> ScopeId {
         self.scope
     }
 
@@ -34,7 +34,7 @@ impl Seat {
         Rc::clone(&self.children)
     }
 
-    pub(super) fn located(&self, position: Position) -> Located {
+    pub(super) const fn located(&self, position: Position) -> Located {
         Located { file: self.file, position, scope: self.scope }
     }
 }
@@ -47,11 +47,11 @@ pub(super) struct Located {
 }
 
 impl Located {
-    pub(super) fn scope(self) -> ScopeId {
+    pub(super) const fn scope(self) -> ScopeId {
         self.scope
     }
 
-    pub(super) fn position(self) -> Position {
+    pub(super) const fn position(self) -> Position {
         self.position
     }
 

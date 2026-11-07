@@ -19,7 +19,7 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn name(&self) -> &CrateName {
+    pub const fn name(&self) -> &CrateName {
         &self.name
     }
 

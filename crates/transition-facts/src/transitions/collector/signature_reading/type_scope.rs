@@ -19,7 +19,7 @@ use naming::Naming;
 #[derive(Debug)]
 pub(super) struct TypeScope<'outer> {
     selfish: Nature,
-    outer: Option<&'outer TypeScope<'outer>>,
+    outer: Option<&'outer Self>,
     generics: BTreeMap<Name, Resolved>,
     wrappings: BTreeMap<Name, Wrapping>,
 }
@@ -29,15 +29,11 @@ impl<'outer> TypeScope<'outer> {
     const FN: Word<'static> = Word::new("Fn");
     const ASSOCIATED: Word<'static> = Word::new("Self::Output");
 
-    pub(super) fn root(selfish: Nature) -> TypeScope<'outer> {
+    pub(super) const fn root(selfish: Nature) -> Self {
         TypeScope { selfish, outer: None, generics: BTreeMap::new(), wrappings: BTreeMap::new() }
     }
 
-    pub(super) fn declaring(
-        selfish: Nature,
-        outer: Option<&'outer TypeScope<'outer>>,
-        generics: &Generics,
-    ) -> TypeScope<'outer> {
+    pub(super) fn declaring(selfish: Nature, outer: Option<&'outer Self>, generics: &Generics) -> Self {
         let unbounded = generics
             .type_params()
             .map(|parameter| (Name::from(&parameter.ident), Resolved::interface(Self::SIZED)))
@@ -55,7 +51,7 @@ impl<'outer> TypeScope<'outer> {
         scope
     }
 
-    pub(super) fn associating(mut self, resolved: Resolved) -> TypeScope<'outer> {
+    pub(super) fn associating(mut self, resolved: Resolved) -> Self {
         self.generics.insert(Name::from(Self::ASSOCIATED), resolved);
         self
     }

@@ -22,7 +22,7 @@ pub struct Workspace<'meta> {
 }
 
 impl<'meta> From<&'meta Metadata> for Workspace<'meta> {
-    fn from(metadata: &'meta Metadata) -> Workspace<'meta> {
+    fn from(metadata: &'meta Metadata) -> Self {
         let directories = metadata.directories();
         let dependents = metadata.dependents(&directories);
         Workspace { directories, dependents, readers: metadata.readers() }

@@ -11,7 +11,7 @@ pub(crate) enum Globbing {
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Trail<'trail> {
     followed: Option<Followed<'trail>>,
-    earlier: Option<&'trail Trail<'trail>>,
+    earlier: Option<&'trail Self>,
     globbing: Globbing,
 }
 
@@ -30,15 +30,15 @@ impl<'trail> Trail<'trail> {
             .or_else(|| self.earlier?.followed(module, name))
     }
 
-    pub(crate) fn following(&'trail self, module: &'trail Module<'trail>, name: &'trail Name) -> Trail<'trail> {
+    pub(crate) const fn following(&'trail self, module: &'trail Module<'trail>, name: &'trail Name) -> Self {
         Trail { followed: Some(Followed { module, name }), earlier: Some(self), globbing: self.globbing }
     }
 
-    pub(crate) fn spent(&self) -> Trail<'trail> {
+    pub(crate) const fn spent(&self) -> Self {
         Trail { globbing: Globbing::Spent, ..*self }
     }
 
-    pub(crate) fn globbing(&self) -> Globbing {
+    pub(crate) const fn globbing(&self) -> Globbing {
         self.globbing
     }
 }

@@ -12,7 +12,7 @@ pub enum Outcome<'file> {
 
 impl<'file> Outcome<'file> {
     #[must_use]
-    pub fn from_rendered(reports: Vec<Rendered>, failures: &'file [Failure]) -> Outcome<'file> {
+    pub fn from_rendered(reports: Vec<Rendered>, failures: &'file [Failure]) -> Self {
         reports
             .is_empty()
             .then_some(failures)
@@ -20,7 +20,7 @@ impl<'file> Outcome<'file> {
             .map_or(Outcome::Violations { reports, failures }, |_| Outcome::Clean)
     }
 
-    pub(crate) fn violations(&self) -> Option<&Outcome<'file>> {
+    pub(crate) const fn violations(&self) -> Option<&Self> {
         match self {
             Outcome::Clean => None,
             Outcome::Violations { .. } => Some(self),

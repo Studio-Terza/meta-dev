@@ -19,10 +19,10 @@ pub(crate) struct Reach<'place, 'found> {
 impl<'place, 'found> Reach<'place, 'found> {
     const EXTERNAL: [Word<'static>; 3] = words!["std", "core", "alloc"];
 
-    pub(crate) fn new(
+    pub(crate) const fn new(
         place: &'place Place<'found>,
         modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    ) -> Reach<'place, 'found> {
+    ) -> Self {
         Reach { place, modules }
     }
 

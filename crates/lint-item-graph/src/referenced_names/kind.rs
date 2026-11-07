@@ -14,26 +14,26 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub fn of_item(item: &Item) -> Kind {
+    pub fn of_item(item: &Item) -> Self {
         match item {
-            Item::Struct(_) | Item::Enum(_) | Item::Trait(_) | Item::Union(_) => Kind::Type,
-            Item::Type(_) => Kind::Alias,
-            Item::Const(_) => Kind::StandIn,
-            Item::Macro(call) => MacroItems::defined_by(call).map_or(Kind::Plain, |_| Kind::StandIn),
-            _ => Kind::Plain,
+            Item::Struct(_) | Item::Enum(_) | Item::Trait(_) | Item::Union(_) => Self::Type,
+            Item::Type(_) => Self::Alias,
+            Item::Const(_) => Self::StandIn,
+            Item::Macro(call) => MacroItems::defined_by(call).map_or(Self::Plain, |_| Self::StandIn),
+            _ => Self::Plain,
         }
     }
 
     pub fn declaring(self, owner: Option<Name>) -> ReferencedNames {
         match self {
-            Kind::Type => ReferencedNames { types: owner.into_iter().collect(), ..ReferencedNames::default() },
-            Kind::StandIn => ReferencedNames { stand_ins: owner.into_iter().collect(), ..ReferencedNames::default() },
-            Kind::Alias => ReferencedNames {
+            Self::Type => ReferencedNames { types: owner.into_iter().collect(), ..ReferencedNames::default() },
+            Self::StandIn => ReferencedNames { stand_ins: owner.into_iter().collect(), ..ReferencedNames::default() },
+            Self::Alias => ReferencedNames {
                 stand_ins: owner.iter().cloned().collect(),
                 types: owner.into_iter().collect(),
                 ..ReferencedNames::default()
             },
-            Kind::Plain => ReferencedNames::default(),
+            Self::Plain => ReferencedNames::default(),
         }
     }
 }

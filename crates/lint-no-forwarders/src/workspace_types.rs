@@ -10,8 +10,8 @@ use lint_layout::Name;
 pub struct WorkspaceTypes(BTreeSet<Name>);
 
 impl From<&[&SourceFile]> for WorkspaceTypes {
-    fn from(files: &[&SourceFile]) -> WorkspaceTypes {
-        files.iter().fold(WorkspaceTypes::default(), |mut types, file| {
+    fn from(files: &[&SourceFile]) -> Self {
+        files.iter().fold(Self::default(), |mut types, file| {
             types.visit_file(file.syntax());
             types
         })

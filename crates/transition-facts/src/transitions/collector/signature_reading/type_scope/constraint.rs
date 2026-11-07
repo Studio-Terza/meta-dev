@@ -9,7 +9,7 @@ pub(super) struct Constraint<'generics> {
 }
 
 impl<'generics> Constraint<'generics> {
-    pub(super) fn declared(generics: &'generics Generics) -> Vec<Constraint<'generics>> {
+    pub(super) fn declared(generics: &'generics Generics) -> Vec<Self> {
         generics
             .type_params()
             .flat_map(|parameter| parameter.bounds.iter().map(|bound| Constraint { name: &parameter.ident, bound }))
@@ -18,7 +18,7 @@ impl<'generics> Constraint<'generics> {
     }
 
     pub(super) fn bounds<'all>(
-        constraints: &'all [Constraint<'generics>],
+        constraints: &'all [Self],
         name: &'all Name,
     ) -> impl Iterator<Item = &'generics TypeParamBound> + 'all {
         constraints
@@ -27,14 +27,14 @@ impl<'generics> Constraint<'generics> {
             .map(|constraint| constraint.bound)
     }
 
-    fn required(predicate: &'generics WherePredicate) -> Vec<Constraint<'generics>> {
+    fn required(predicate: &'generics WherePredicate) -> Vec<Self> {
         match predicate {
             WherePredicate::Type(typed) => Self::typed(typed),
             _ => Vec::new(),
         }
     }
 
-    fn typed(typed: &'generics PredicateType) -> Vec<Constraint<'generics>> {
+    fn typed(typed: &'generics PredicateType) -> Vec<Self> {
         Self::ident_of(&typed.bounded_ty)
             .map(|name| typed.bounds.iter().map(|bound| Constraint { name, bound }).collect())
             .unwrap_or_default()

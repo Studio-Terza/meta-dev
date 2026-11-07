@@ -4,5 +4,5 @@ use newtype::{Arbitrary, Display, Newtype};
 pub struct Lines(usize);
 
 impl Lines {
-    pub(crate) const ONE: Lines = Lines::new(1);
+    pub(crate) const ONE: Self = Self::new(1);
 }

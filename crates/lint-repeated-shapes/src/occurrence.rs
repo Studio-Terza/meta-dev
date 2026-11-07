@@ -15,15 +15,15 @@ pub(crate) struct Occurrence<'file> {
 }
 
 impl<'file> Occurrence<'file> {
-    pub(crate) fn new(reading: Reading, site: Site<'file>, extent: Extent, kind: Kind) -> Occurrence<'file> {
+    pub(crate) fn new(reading: Reading, site: Site<'file>, extent: Extent, kind: Kind) -> Self {
         Occurrence { shape: reading.shape(), literals: reading.into_literals(), site, extent, kind }
     }
 
-    pub(crate) fn literals(&self) -> &Literals {
+    pub(crate) const fn literals(&self) -> &Literals {
         &self.literals
     }
 
-    pub(crate) fn kind(&self) -> Kind {
+    pub(crate) const fn kind(&self) -> Kind {
         self.kind
     }
 }
@@ -36,8 +36,8 @@ impl Keyed for Occurrence<'_> {
     }
 }
 
-impl<'file> Nested for Occurrence<'file> {
-    fn lies_within<'outer>(&self, outer: &'outer Occurrence<'file>) -> Option<&'outer Occurrence<'file>> {
+impl Nested for Occurrence<'_> {
+    fn lies_within<'outer>(&self, outer: &'outer Self) -> Option<&'outer Self> {
         Some(outer)
             .filter(|outer| self.site.path() == outer.site.path())
             .and_then(|outer| outer.extent.holds(&self.extent).map(|_| outer))

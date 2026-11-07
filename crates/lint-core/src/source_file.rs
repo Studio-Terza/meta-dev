@@ -24,7 +24,7 @@ pub struct SourceFile {
     crate_file: CrateFile,
     text: SourceText,
     syntax: syn::File,
-    test_modules: Vec<SourceFile>,
+    test_modules: Vec<Self>,
     manifest: OnceLock<ManifestFile>,
 }
 
@@ -61,22 +61,22 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn with_test_modules(self, test_modules: Vec<SourceFile>) -> SourceFile {
-        SourceFile { test_modules, ..self }
+    pub fn with_test_modules(self, test_modules: Vec<Self>) -> Self {
+        Self { test_modules, ..self }
     }
 
     #[must_use]
-    pub fn in_crate_file(self, crate_file: CrateFile) -> SourceFile {
-        SourceFile { crate_file, ..self }
+    pub fn in_crate_file(self, crate_file: CrateFile) -> Self {
+        Self { crate_file, ..self }
     }
 
     #[must_use]
-    pub fn crate_file(&self) -> &CrateFile {
+    pub const fn crate_file(&self) -> &CrateFile {
         &self.crate_file
     }
 
     #[must_use]
-    pub fn test_modules(&self) -> &[SourceFile] {
+    pub fn test_modules(&self) -> &[Self] {
         &self.test_modules
     }
 
@@ -86,7 +86,7 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn located(&self) -> &Located {
+    pub const fn located(&self) -> &Located {
         &self.located
     }
 
@@ -105,22 +105,22 @@ impl SourceFile {
     }
 
     #[must_use]
-    pub fn placement(&self) -> &Placement {
+    pub const fn placement(&self) -> &Placement {
         &self.placement
     }
 
     #[must_use]
-    pub fn shipped(&self) -> Option<&SourceFile> {
+    pub fn shipped(&self) -> Option<&Self> {
         (self.placement.role() != Role::Target).then_some(self)
     }
 
     #[must_use]
-    pub fn text(&self) -> &SourceText {
+    pub const fn text(&self) -> &SourceText {
         &self.text
     }
 
     #[must_use]
-    pub fn syntax(&self) -> &syn::File {
+    pub const fn syntax(&self) -> &syn::File {
         &self.syntax
     }
 }

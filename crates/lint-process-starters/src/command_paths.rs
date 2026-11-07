@@ -12,8 +12,8 @@ pub enum Scope {
 impl Scope {
     fn admits(self, ground: Ground) -> Option<Ground> {
         match self {
-            Scope::Everywhere => Some(ground),
-            Scope::OutsidePorts => Some(ground).filter(|ground| *ground == Ground::Open),
+            Self::Everywhere => Some(ground),
+            Self::OutsidePorts => Some(ground).filter(|ground| *ground == Ground::Open),
         }
     }
 }

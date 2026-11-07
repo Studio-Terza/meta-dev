@@ -9,14 +9,14 @@ pub enum Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Finding::BoolPredicate { name } = self;
+        let Self::BoolPredicate { name } = self;
         write!(formatter, "fn {name} -> bool")
     }
 }
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        let Finding::BoolPredicate { .. } = self;
+        let Self::BoolPredicate { .. } = self;
         Fix::new("return an enum or match where the answer is used")
     }
 }

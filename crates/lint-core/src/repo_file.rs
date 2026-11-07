@@ -11,12 +11,12 @@ pub struct RepoFile {
 
 impl RepoFile {
     #[must_use]
-    pub fn new(shown: impl Into<PathBuf>, inside: impl Into<PathBuf>, contents: Contents) -> RepoFile {
-        RepoFile { shown: shown.into(), inside: inside.into(), contents }
+    pub fn new(shown: impl Into<PathBuf>, inside: impl Into<PathBuf>, contents: Contents) -> Self {
+        Self { shown: shown.into(), inside: inside.into(), contents }
     }
 
     #[must_use]
-    pub fn contents(&self) -> &Contents {
+    pub const fn contents(&self) -> &Contents {
         &self.contents
     }
 
@@ -26,7 +26,7 @@ impl RepoFile {
     }
 
     #[must_use]
-    pub fn lies_under(&self, directory: &Path) -> Option<&RepoFile> {
+    pub fn lies_under(&self, directory: &Path) -> Option<&Self> {
         self.inside
             .parent()
             .filter(|parents| parents.components().any(|part| part.as_os_str() == directory.as_os_str()))

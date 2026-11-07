@@ -7,8 +7,8 @@ use serde::Serialize;
 pub struct TestName(String);
 
 impl TestName {
-    pub(crate) fn new(text: String) -> TestName {
-        TestName(text)
+    pub(crate) const fn new(text: String) -> Self {
+        Self(text)
     }
 }
 

@@ -18,12 +18,12 @@ impl Skipped {
 impl TryFrom<&str> for Skipped {
     type Error = NotSkipped;
 
-    fn try_from(line: &str) -> Result<Skipped, NotSkipped> {
+    fn try_from(line: &str) -> Result<Self, NotSkipped> {
         line.char_indices()
             .last()
             .filter(|(_, last)| *last == Self::EMPTY)
             .and_then(|(at, _)| line.get(..at))
-            .map(|name| Skipped(name.to_owned()))
+            .map(|name| Self(name.to_owned()))
             .ok_or(NotSkipped)
     }
 }
@@ -35,8 +35,8 @@ impl fmt::Display for Skipped {
 }
 
 impl From<&str> for Skips {
-    fn from(report: &str) -> Skips {
-        Skips(Lines::from(report).filter_map(|line| Skipped::try_from(line).ok()).collect())
+    fn from(report: &str) -> Self {
+        Self(Lines::from(report).filter_map(|line| Skipped::try_from(line).ok()).collect())
     }
 }
 

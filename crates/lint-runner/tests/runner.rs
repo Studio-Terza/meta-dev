@@ -274,13 +274,13 @@ struct Scratch {
 impl Scratch {
     const ROOT: &'static str = "/scratch";
 
-    fn temporary() -> Result<Scratch, FileFailure> {
+    fn temporary() -> Result<Self, FileFailure> {
         let files = Memory::default();
         files.create_directories(Path::new(Self::ROOT))?;
-        Ok(Scratch { files, root: PathBuf::from(Self::ROOT) })
+        Ok(Self { files, root: PathBuf::from(Self::ROOT) })
     }
 
-    fn package() -> Result<Scratch, FileFailure> {
+    fn package() -> Result<Self, FileFailure> {
         let scratch = Self::temporary()?;
         scratch.write("Cargo.toml", MANIFEST)?;
         Ok(scratch)
@@ -346,8 +346,8 @@ impl Reported {
     const HEADLINE_END: &'static str = ":\n";
     const SITE: &'static str = ".rs:";
 
-    fn clean() -> Reported {
-        Reported { exit: ExitCode::SUCCESS, err: String::from("\n") }
+    fn clean() -> Self {
+        Self { exit: ExitCode::SUCCESS, err: String::from("\n") }
     }
 
     fn headlines(&self) -> usize {

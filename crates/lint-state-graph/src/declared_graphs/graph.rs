@@ -20,7 +20,7 @@ pub struct Graph(Vec<Block>);
 
 impl Graph {
     pub fn checked<'file>(invocation: &Macro, path: &'file Path) -> Vec<Violation<'file>> {
-        invocation.parse_body::<Graph>().map_or_else(
+        invocation.parse_body::<Self>().map_or_else(
             |_| {
                 let site = Site::new(path, LineNumber::from(invocation.bang_token.span));
                 vec![Violation::new(site, Finding::UnreadableGraph)]
@@ -53,7 +53,7 @@ impl Graph {
 }
 
 impl Parse for Graph {
-    fn parse(input: ParseStream) -> syn::Result<Graph> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         Attribute::parse_outer(input)?;
         input.parse::<Visibility>()?;
         input.parse::<Token![mod]>()?;

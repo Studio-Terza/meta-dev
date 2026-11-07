@@ -32,7 +32,7 @@ struct Divided<'view, 'found> {
 }
 
 impl<'view, 'found> Divided<'view, 'found> {
-    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Divided<'view, 'found>> {
+    fn found_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Self> {
         let slice = view.slice(cluster)?;
         let members = slice.members();
         let nested = members.iter().find_map(|member| Part::toward(cluster, member.cluster()).nested());

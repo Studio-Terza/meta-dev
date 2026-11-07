@@ -35,14 +35,14 @@ impl<'file> Collector<'file> {
         Site::new(file.path(), LineNumber::from(name.span()))
     }
 
-    fn trait_function(item: &TraitItem) -> Option<&TraitItemFn> {
+    const fn trait_function(item: &TraitItem) -> Option<&TraitItemFn> {
         match item {
             TraitItem::Fn(function) => Some(function),
             _ => None,
         }
     }
 
-    fn impl_function(item: &ImplItem) -> Option<&ImplItemFn> {
+    const fn impl_function(item: &ImplItem) -> Option<&ImplItemFn> {
         match item {
             ImplItem::Fn(function) => Some(function),
             _ => None,

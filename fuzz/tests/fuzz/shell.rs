@@ -5,8 +5,8 @@ pub struct Shell {
 }
 
 impl Shell {
-    pub const fn new(open: &'static str, close: &'static str) -> Shell {
-        Shell { open, close }
+    pub const fn new(open: &'static str, close: &'static str) -> Self {
+        Self { open, close }
     }
 
     pub fn around(self, core: &str, depth: usize) -> String {

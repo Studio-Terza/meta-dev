@@ -7,8 +7,8 @@ use crate::Environment;
 pub struct Variables(BTreeMap<OsString, OsString>);
 
 impl FromIterator<(OsString, OsString)> for Variables {
-    fn from_iter<Pairs: IntoIterator<Item = (OsString, OsString)>>(pairs: Pairs) -> Variables {
-        Variables(pairs.into_iter().collect())
+    fn from_iter<Pairs: IntoIterator<Item = (OsString, OsString)>>(pairs: Pairs) -> Self {
+        Self(pairs.into_iter().collect())
     }
 }
 

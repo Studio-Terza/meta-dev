@@ -18,7 +18,7 @@ pub(crate) struct WorkspaceTypes<'found> {
 }
 
 impl<'found> WorkspaceTypes<'found> {
-    pub(crate) fn declared(facts: &'found Facts<'_>, transitions: &'found Transitions<'_>) -> WorkspaceTypes<'found> {
+    pub(crate) fn declared(facts: &'found Facts<'_>, transitions: &'found Transitions<'_>) -> Self {
         WorkspaceTypes {
             crates: transitions
                 .all()

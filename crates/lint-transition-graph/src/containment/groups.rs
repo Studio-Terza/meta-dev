@@ -13,10 +13,7 @@ use super::member::Member;
 pub(crate) struct Groups<'found>(Vec<Vec<Member<'found>>>);
 
 impl<'found> Groups<'found> {
-    pub(crate) fn linked(
-        members: &BTreeSet<Member<'found>>,
-        links: impl Iterator<Item = Link<'found>>,
-    ) -> Groups<'found> {
+    pub(crate) fn linked(members: &BTreeSet<Member<'found>>, links: impl Iterator<Item = Link<'found>>) -> Self {
         let links = Containment::adjacency(links.flat_map(|link| [link, link.reversed()]));
         let mut groups: Vec<Vec<Member<'found>>> =
             Traversal::trees(members.iter().copied(), |member: Member<'found>| {
@@ -29,7 +26,7 @@ impl<'found> Groups<'found> {
         Groups(groups)
     }
 
-    pub(crate) fn split(self) -> Option<Groups<'found>> {
+    pub(crate) fn split(self) -> Option<Self> {
         Some(self).filter(|groups| groups.0.len() > 1)
     }
 }

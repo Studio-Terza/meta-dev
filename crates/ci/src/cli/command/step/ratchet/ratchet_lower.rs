@@ -12,12 +12,12 @@ pub struct RatchetLower {
 }
 
 impl Step for RatchetLower {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<RatchetLower, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let record = arguments.taken()?;
         let measured = arguments.taken()?;
         arguments.ended()?;
-        Ok(RatchetLower { record: gate_limits::Cli::from_args([record, measured].into_iter()) })
+        Ok(Self { record: gate_limits::Cli::from_args([record, measured].into_iter()) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

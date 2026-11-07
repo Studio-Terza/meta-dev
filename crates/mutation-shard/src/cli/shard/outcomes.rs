@@ -22,12 +22,12 @@ pub struct Outcomes {
 impl Outcomes {
     const FILE: &'static str = "outcomes.json";
 
-    pub fn read(files: &impl Files, directory: &Path) -> Result<Outcomes, Failure> {
+    pub fn read(files: &impl Files, directory: &Path) -> Result<Self, Failure> {
         let path = directory.join(Self::FILE);
         Self::parsed(files.read_text(&path), path)
     }
 
-    fn parsed(read: Result<Text, FileFailure>, path: PathBuf) -> Result<Outcomes, Failure> {
+    fn parsed(read: Result<Text, FileFailure>, path: PathBuf) -> Result<Self, Failure> {
         match read {
             Ok(text) => serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path, source }),
             Err(failure) => Err(Failure::Io { path, source: io::Error::from(failure) }),

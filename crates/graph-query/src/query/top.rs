@@ -8,13 +8,13 @@ use crate::boundary::QueryFailure;
 pub struct Top(usize);
 
 impl Top {
-    pub const DEFAULT: Top = Top(10);
+    pub const DEFAULT: Self = Self(10);
 }
 
 impl FromStr for Top {
     type Err = QueryFailure;
 
-    fn from_str(text: &str) -> Result<Top, QueryFailure> {
+    fn from_str(text: &str) -> Result<Self, QueryFailure> {
         text.parse().map(Top).map_err(|source| QueryFailure::Top { text: text.to_owned(), source })
     }
 }

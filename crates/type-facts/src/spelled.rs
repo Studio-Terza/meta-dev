@@ -49,7 +49,7 @@ impl Spelled {
         }
     }
 
-    pub(crate) fn typed(input: &FnArg) -> Option<&PatType> {
+    pub(crate) const fn typed(input: &FnArg) -> Option<&PatType> {
         match input {
             FnArg::Typed(typed) => Some(typed),
             FnArg::Receiver(_) => None,

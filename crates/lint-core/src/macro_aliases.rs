@@ -14,8 +14,8 @@ pub struct MacroAliases {
 
 impl MacroAliases {
     #[must_use]
-    pub fn in_file(file: &File, original: Word<'_>) -> MacroAliases {
-        let mut aliases = MacroAliases { names: BTreeSet::new(), original: Name::from(original) };
+    pub fn in_file(file: &File, original: Word<'_>) -> Self {
+        let mut aliases = Self { names: BTreeSet::new(), original: Name::from(original) };
         aliases.visit_file(file);
         aliases
     }

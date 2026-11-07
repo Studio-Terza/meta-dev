@@ -20,12 +20,12 @@ pub struct ColdSize {
 }
 
 impl Step for ColdSize {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ColdSize, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let directory = &arguments.taken()?;
         let out = &arguments.taken()?;
         arguments.ended()?;
-        Ok(ColdSize { directory: PathBuf::from(directory), out: Journal::from(PathBuf::from(out)) })
+        Ok(Self { directory: PathBuf::from(directory), out: Journal::from(PathBuf::from(out)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

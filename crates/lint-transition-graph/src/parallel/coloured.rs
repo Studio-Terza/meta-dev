@@ -12,11 +12,11 @@ pub(super) struct Coloured<'found> {
 }
 
 impl<'found> Coloured<'found> {
-    pub(super) fn refined<Label: Ord, Law: Ord>(refinement: &Refinement<Node<'found>, Label, Law>) -> Coloured<'found> {
+    pub(super) fn refined<Label: Ord, Law: Ord>(refinement: &Refinement<Node<'found>, Label, Law>) -> Self {
         Coloured { colours: refinement.coloured() }
     }
 
-    pub(super) fn colours(&self) -> &BTreeMap<Node<'found>, Colour> {
+    pub(super) const fn colours(&self) -> &BTreeMap<Node<'found>, Colour> {
         &self.colours
     }
 

@@ -14,8 +14,8 @@ impl Attributes {
     const DESERIALIZE: &'static str = "Deserialize";
     const VALIDATING: &'static str = "try_from";
 
-    pub fn flattened_from(attributes: &[Attribute]) -> Attributes {
-        Attributes { metas: attributes.iter().flat_map(|attribute| Self::flattened(&attribute.meta)).collect() }
+    pub fn flattened_from(attributes: &[Attribute]) -> Self {
+        Self { metas: attributes.iter().flat_map(|attribute| Self::flattened(&attribute.meta)).collect() }
     }
 
     pub fn deserialize_derive(&self) -> Option<Path> {

@@ -41,7 +41,7 @@ impl MethodShape {
     const SELF: [Word<'static>; 1] = words!["Self"];
 
     #[must_use]
-    pub fn of_signature(signature: &Signature, selfish: Option<&Name>) -> MethodShape {
+    pub fn of_signature(signature: &Signature, selfish: Option<&Name>) -> Self {
         let receiver = signature.receiver().map_or(Receiver::Absent, Receiver::from);
         let takes = signature
             .inputs
@@ -53,11 +53,11 @@ impl MethodShape {
             .collect();
         let returned = Spelled::returned_by(&signature.output)
             .map_or(Returned::Nothing, |found| Returned::of_type(found, selfish));
-        MethodShape { receiver, takes, returned }
+        Self { receiver, takes, returned }
     }
 
     #[must_use]
-    pub fn receiver(&self) -> Receiver {
+    pub const fn receiver(&self) -> Receiver {
         self.receiver
     }
 
@@ -67,7 +67,7 @@ impl MethodShape {
     }
 
     #[must_use]
-    pub fn returned(&self) -> Returned {
+    pub const fn returned(&self) -> Returned {
         self.returned
     }
 
@@ -79,11 +79,8 @@ impl MethodShape {
 }
 
 impl From<&syn::Receiver> for Receiver {
-    fn from(found: &syn::Receiver) -> Receiver {
-        found
-            .reference
-            .as_ref()
-            .map_or(Receiver::Owned, |_| found.mutability.map_or(Receiver::Shared, |_| Receiver::Mutable))
+    fn from(found: &syn::Receiver) -> Self {
+        found.reference.as_ref().map_or(Self::Owned, |_| found.mutability.map_or(Self::Shared, |_| Self::Mutable))
     }
 }
 
@@ -103,46 +100,46 @@ impl Returned {
         "DoubleEndedIterator"
     ];
 
-    fn of_type(found: &Type, selfish: Option<&Name>) -> Returned {
+    fn of_type(found: &Type, selfish: Option<&Name>) -> Self {
         match found {
             Type::Reference(reference) => Self::of_type(&reference.elem, selfish),
             Type::Paren(paren) => Self::of_type(&paren.elem, selfish),
-            Type::Tuple(tuple) => tuple.elems.first().map_or(Returned::Nothing, |_| Returned::Value),
-            Type::Slice(_) | Type::Array(_) => Returned::Many,
-            Type::ImplTrait(bounds) => bounds.bounds.iter().find_map(Self::bounded).unwrap_or(Returned::Value),
-            Type::Path(_) => Spelled::last_of(found).map_or(Returned::Value, |name| Self::named(&name, selfish)),
-            _ => Returned::Value,
+            Type::Tuple(tuple) => tuple.elems.first().map_or(Self::Nothing, |_| Self::Value),
+            Type::Slice(_) | Type::Array(_) => Self::Many,
+            Type::ImplTrait(bounds) => bounds.bounds.iter().find_map(Self::bounded).unwrap_or(Self::Value),
+            Type::Path(_) => Spelled::last_of(found).map_or(Self::Value, |name| Self::named(&name, selfish)),
+            _ => Self::Value,
         }
     }
 
-    fn bounded(bound: &TypeParamBound) -> Option<Returned> {
+    fn bounded(bound: &TypeParamBound) -> Option<Self> {
         match bound {
             TypeParamBound::Trait(found) => found
                 .path
                 .segments
                 .last()
                 .and_then(|segment| Name::from(&segment.ident).matches::<Whole>(&Self::MANY))
-                .map(|_| Returned::Many),
+                .map(|_| Self::Many),
             _ => None,
         }
     }
 
-    fn named(name: &Name, selfish: Option<&Name>) -> Returned {
+    fn named(name: &Name, selfish: Option<&Name>) -> Self {
         name.matches::<Whole>(&Self::OPTIONAL)
-            .map(|_| Returned::Optional)
-            .or_else(|| name.matches::<Whole>(&Self::FALLIBLE).map(|_| Returned::Fallible))
-            .or_else(|| name.matches::<Whole>(&Self::MANY).map(|_| Returned::Many))
-            .unwrap_or_else(|| MethodShape::itself(name, selfish).map_or(Returned::Value, |_| Returned::Itself))
+            .map(|_| Self::Optional)
+            .or_else(|| name.matches::<Whole>(&Self::FALLIBLE).map(|_| Self::Fallible))
+            .or_else(|| name.matches::<Whole>(&Self::MANY).map(|_| Self::Many))
+            .unwrap_or_else(|| MethodShape::itself(name, selfish).map_or(Self::Value, |_| Self::Itself))
     }
 }
 
 impl fmt::Display for Receiver {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Receiver::Absent => formatter.write_str(""),
-            Receiver::Owned => formatter.write_str("self"),
-            Receiver::Shared => formatter.write_str("&self"),
-            Receiver::Mutable => formatter.write_str("&mut self"),
+            Self::Absent => formatter.write_str(""),
+            Self::Owned => formatter.write_str("self"),
+            Self::Shared => formatter.write_str("&self"),
+            Self::Mutable => formatter.write_str("&mut self"),
         }
     }
 }
@@ -150,8 +147,8 @@ impl fmt::Display for Receiver {
 impl fmt::Display for Taken {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Taken::Itself => formatter.write_str("Self"),
-            Taken::Other => formatter.write_str("_"),
+            Self::Itself => formatter.write_str("Self"),
+            Self::Other => formatter.write_str("_"),
         }
     }
 }
@@ -159,12 +156,12 @@ impl fmt::Display for Taken {
 impl fmt::Display for Returned {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Returned::Nothing => formatter.write_str(""),
-            Returned::Itself => formatter.write_str(" -> Self"),
-            Returned::Optional => formatter.write_str(" -> Option"),
-            Returned::Fallible => formatter.write_str(" -> Result"),
-            Returned::Many => formatter.write_str(" -> many"),
-            Returned::Value => formatter.write_str(" -> _"),
+            Self::Nothing => formatter.write_str(""),
+            Self::Itself => formatter.write_str(" -> Self"),
+            Self::Optional => formatter.write_str(" -> Option"),
+            Self::Fallible => formatter.write_str(" -> Result"),
+            Self::Many => formatter.write_str(" -> many"),
+            Self::Value => formatter.write_str(" -> _"),
         }
     }
 }

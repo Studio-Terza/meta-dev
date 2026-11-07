@@ -22,12 +22,12 @@ pub struct MethodShape {
 
 impl MethodShape {
     #[must_use]
-    pub fn described(signature: &Signature, erasure: &Erasure<'_>) -> MethodShape {
+    pub fn described(signature: &Signature, erasure: &Erasure<'_>) -> Self {
         let inputs: Vec<String> =
             signature.inputs.iter().map(|argument| erasure.spelled_argument(argument).to_string()).collect();
         let output =
             Syntax::returned(&signature.output).map_or_else(String::new, |ty| format!(" -> {}", erasure.spelled(ty)));
-        MethodShape {
+        Self {
             name: Name::from(&signature.ident),
             signature: Spelling::new(format!(
                 "{}({}){output}",

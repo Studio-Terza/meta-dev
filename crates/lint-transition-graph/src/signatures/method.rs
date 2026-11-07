@@ -41,7 +41,7 @@ impl<'system, 'found, 'file> Method<'system, 'found, 'file> {
         types: &WorkspaceTypes<'found>,
         edge: &'system Edge<'found, 'file>,
         equivalence: Equivalence,
-    ) -> Option<Method<'system, 'found, 'file>> {
+    ) -> Option<Self> {
         let transition = edge.transition();
         let krate: &'found CrateName = AsRef::<CrateName>::as_ref(transition.context());
         types.owner(transition).map(|end| Method {
@@ -51,11 +51,11 @@ impl<'system, 'found, 'file> Method<'system, 'found, 'file> {
         })
     }
 
-    pub(super) fn owner(&self) -> &Owner<'found, 'file> {
+    pub(super) const fn owner(&self) -> &Owner<'found, 'file> {
         &self.owner
     }
 
-    pub(super) fn located(&self) -> Located<'_, 'system, 'found, 'file> {
+    pub(super) const fn located(&self) -> Located<'_, 'system, 'found, 'file> {
         Located(self)
     }
 }

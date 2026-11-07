@@ -9,7 +9,7 @@ pub struct Finding<'method> {
 }
 
 impl<'method> Finding<'method> {
-    pub fn new(opening: &'method Name, closing: Name) -> Finding<'method> {
+    pub const fn new(opening: &'method Name, closing: Name) -> Self {
         Finding { opening, closing }
     }
 }

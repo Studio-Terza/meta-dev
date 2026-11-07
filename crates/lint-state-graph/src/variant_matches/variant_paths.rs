@@ -8,7 +8,7 @@ pub struct VariantPaths(Vec<Name>);
 
 impl VariantPaths {
     pub fn in_pat(pat: &Pat) -> Vec<Name> {
-        let mut paths = VariantPaths::default();
+        let mut paths = Self::default();
         paths.visit_pat(pat);
         paths.0
     }

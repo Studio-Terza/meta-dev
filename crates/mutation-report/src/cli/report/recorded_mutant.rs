@@ -15,11 +15,11 @@ pub struct RecordedMutant {
 }
 
 impl RecordedMutant {
-    pub(crate) fn name(&self) -> &OneLine {
+    pub(crate) const fn name(&self) -> &OneLine {
         &self.name
     }
 
-    pub(crate) fn summary(&self) -> Verdict {
+    pub(crate) const fn summary(&self) -> Verdict {
         self.summary
     }
 

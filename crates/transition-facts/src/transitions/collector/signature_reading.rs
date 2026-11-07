@@ -30,7 +30,7 @@ pub(super) struct SignatureReading<'origins, 'file> {
 impl<'origins, 'file> SignatureReading<'origins, 'file> {
     const OUTPUT: Word<'static> = Word::new("Output");
 
-    pub(super) fn free(origins: &'origins Origins<'file>, ground: Ground) -> SignatureReading<'origins, 'file> {
+    pub(super) fn free(origins: &'origins Origins<'file>, ground: Ground) -> Self {
         let selfish = Endpoint::from(Unnamed::Opaque);
         let scope = TypeScope::root(selfish.nature());
         SignatureReading {
@@ -41,11 +41,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
         }
     }
 
-    pub(super) fn of_impl(
-        origins: &'origins Origins<'file>,
-        found: &ItemImpl,
-        ground: Ground,
-    ) -> SignatureReading<'origins, 'file> {
+    pub(super) fn of_impl(origins: &'origins Origins<'file>, found: &ItemImpl, ground: Ground) -> Self {
         let outer = Endpoint::from(Unnamed::Opaque).nature();
         let selfish =
             origins.endpoint(TypeScope::declaring(outer, None, &found.generics).endpoint(&found.self_ty).or_opaque());
@@ -63,11 +59,7 @@ impl<'origins, 'file> SignatureReading<'origins, 'file> {
         SignatureReading { context: Context::new(origins.own(), selfish, ground, filler), scope, origins, output }
     }
 
-    pub(super) fn of_trait(
-        origins: &'origins Origins<'file>,
-        found: &ItemTrait,
-        ground: Ground,
-    ) -> SignatureReading<'origins, 'file> {
+    pub(super) fn of_trait(origins: &'origins Origins<'file>, found: &ItemTrait, ground: Ground) -> Self {
         let selfish = Endpoint::new(Nature::Interface, Name::from(&found.ident));
         let scope = TypeScope::declaring(selfish.nature(), None, &found.generics);
         SignatureReading {

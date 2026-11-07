@@ -31,16 +31,16 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn new(port: Port, within: Within) -> Finding {
-        Finding { port, within }
+    pub const fn new(port: Port, within: Within) -> Self {
+        Self { port, within }
     }
 }
 
 impl fmt::Display for Port {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Port::Binding(name) => write!(formatter, "{name}"),
-            Port::Field(name) => write!(formatter, "self.{name}"),
+            Self::Binding(name) => write!(formatter, "{name}"),
+            Self::Field(name) => write!(formatter, "self.{name}"),
         }
     }
 }
@@ -48,9 +48,9 @@ impl fmt::Display for Port {
 impl fmt::Display for Looping {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Looping::For => formatter.write_str("for"),
-            Looping::While => formatter.write_str("while"),
-            Looping::Bare => formatter.write_str("loop"),
+            Self::For => formatter.write_str("for"),
+            Self::While => formatter.write_str("while"),
+            Self::Bare => formatter.write_str("loop"),
         }
     }
 }
@@ -87,8 +87,8 @@ pub struct Spot {
 }
 
 impl Spot {
-    pub fn new(line: LineNumber, port: Port) -> Spot {
-        Spot { line, port }
+    pub const fn new(line: LineNumber, port: Port) -> Self {
+        Self { line, port }
     }
 
     pub fn violation(self, path: &Path, within: Within) -> Violation<'_> {

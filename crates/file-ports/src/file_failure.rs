@@ -9,16 +9,16 @@ pub enum FileFailure {
 }
 
 impl From<io::Error> for FileFailure {
-    fn from(source: io::Error) -> FileFailure {
+    fn from(source: io::Error) -> Self {
         match source.kind() {
-            io::ErrorKind::NotFound => FileFailure::Missing(source),
-            _ => FileFailure::Failed(source),
+            io::ErrorKind::NotFound => Self::Missing(source),
+            _ => Self::Failed(source),
         }
     }
 }
 
 impl From<FileFailure> for io::Error {
-    fn from(failure: FileFailure) -> io::Error {
+    fn from(failure: FileFailure) -> Self {
         match failure {
             FileFailure::Missing(source) | FileFailure::Failed(source) => source,
         }

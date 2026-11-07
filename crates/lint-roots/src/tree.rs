@@ -12,7 +12,7 @@ pub struct Tree<'given> {
 impl<'given> Tree<'given> {
     const CURRENT: &'static str = ".";
 
-    pub fn open_many(files: &impl Files, given: &'given [PathBuf]) -> Vec<Result<Tree<'given>, Failure>> {
+    pub fn open_many(files: &impl Files, given: &'given [PathBuf]) -> Vec<Result<Self, Failure>> {
         given
             .iter()
             .zip(files.canonical_many(given))

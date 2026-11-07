@@ -15,7 +15,7 @@ impl Declared {
         Self::of(&[Self::at("crates/x/src/lib.rs", source), Self::at("crates/x/tests/t.rs", law)])
     }
 
-    fn at(path: &'static str, text: &'static str) -> Source {
+    const fn at(path: &'static str, text: &'static str) -> Source {
         Source::new(Located::new(path), Text::new(text))
     }
 }
@@ -326,10 +326,10 @@ enum Expect {
 impl Expect {
     const LISTED: &str = "crate x: 1 of 1 algebra operations declare no law; x::A: join";
 
-    fn listings(self) -> usize {
+    const fn listings(self) -> usize {
         match self {
-            Expect::Credited => 0,
-            Expect::Listed => 1,
+            Self::Credited => 0,
+            Self::Listed => 1,
         }
     }
 }
@@ -349,8 +349,8 @@ struct Row {
 }
 
 impl Row {
-    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Row {
-        Row { id, extras, law, expect }
+    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Self {
+        Self { id, extras, law, expect }
     }
 
     fn failure(&self) -> Option<String> {

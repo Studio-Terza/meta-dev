@@ -11,8 +11,8 @@ pub(super) enum Called {
 impl fmt::Display for Called {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Called::Path(path) => write!(formatter, "{path}"),
-            Called::Macro(name) => write!(formatter, "{name}!"),
+            Self::Path(path) => write!(formatter, "{path}"),
+            Self::Macro(name) => write!(formatter, "{name}!"),
         }
     }
 }

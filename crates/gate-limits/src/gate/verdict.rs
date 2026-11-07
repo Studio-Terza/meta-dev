@@ -10,9 +10,9 @@ pub enum Verdict {
 impl fmt::Display for Verdict {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Verdict::Within => formatter.write_str("ok"),
-            Verdict::Warn => formatter.write_str("WARN"),
-            Verdict::Block => formatter.write_str("BLOCK"),
+            Self::Within => formatter.write_str("ok"),
+            Self::Warn => formatter.write_str("WARN"),
+            Self::Block => formatter.write_str("BLOCK"),
         }
     }
 }

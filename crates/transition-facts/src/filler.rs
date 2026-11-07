@@ -12,25 +12,25 @@ pub(crate) enum Filler {
 }
 
 impl Filler {
-    pub(crate) fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
+    pub(crate) const fn trait_name<'name>(&'name self, selfish: &'name Name) -> Option<&'name Name> {
         match self {
-            Filler::Implemented(name) => Some(name),
-            Filler::Provided => Some(selfish),
-            Filler::Free | Filler::Inherent => None,
+            Self::Implemented(name) => Some(name),
+            Self::Provided => Some(selfish),
+            Self::Free | Self::Inherent => None,
         }
     }
 
-    pub(crate) fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Implementer<'selfish>> {
+    pub(crate) const fn implementer<'selfish>(&self, selfish: &'selfish Endpoint) -> Option<Implementer<'selfish>> {
         match self {
-            Filler::Implemented(_) => Some(Implementer::new(selfish)),
-            Filler::Free | Filler::Inherent | Filler::Provided => None,
+            Self::Implemented(_) => Some(Implementer::new(selfish)),
+            Self::Free | Self::Inherent | Self::Provided => None,
         }
     }
 
-    pub(crate) fn owned(&self) -> Option<&Filler> {
+    pub(crate) const fn owned(&self) -> Option<&Self> {
         match self {
-            Filler::Free => None,
-            Filler::Inherent | Filler::Implemented(_) | Filler::Provided => Some(self),
+            Self::Free => None,
+            Self::Inherent | Self::Implemented(_) | Self::Provided => Some(self),
         }
     }
 }

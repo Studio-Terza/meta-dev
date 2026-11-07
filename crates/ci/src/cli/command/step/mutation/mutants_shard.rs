@@ -21,9 +21,9 @@ impl MutantsShard {
 }
 
 impl Step for MutantsShard {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsShard, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         match <[OsString; Self::ARGUMENTS]>::try_from(arguments) {
-            Ok([shard, output]) => Ok(MutantsShard { shard, output: PathBuf::from(output) }),
+            Ok([shard, output]) => Ok(Self { shard, output: PathBuf::from(output) }),
             Err(_) => Err(Failure::Usage),
         }
     }

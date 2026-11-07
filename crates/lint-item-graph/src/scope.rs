@@ -23,7 +23,7 @@ impl<'file> Scope<'file> {
     const LOCAL_ROOTS: [&str; 3] = ["crate", "self", "super"];
 
     #[must_use]
-    pub fn of_file(file: &'file syn::File) -> Scope<'file> {
+    pub fn of_file(file: &'file syn::File) -> Self {
         let mut scope = Scope::default();
         scope.local_roots.extend(Self::LOCAL_ROOTS.map(Name::from));
         scope.visit_file(file);

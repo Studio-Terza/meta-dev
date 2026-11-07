@@ -25,11 +25,7 @@ pub(super) struct Behaviour<'found, 'file> {
 }
 
 impl<'found, 'file> Behaviour<'found, 'file> {
-    pub(super) fn read(
-        system: &TypeSystem<'found, 'file>,
-        attached: &Attached,
-        equivalence: Equivalence,
-    ) -> Behaviour<'found, 'file> {
+    pub(super) fn read(system: &TypeSystem<'found, 'file>, attached: &Attached, equivalence: Equivalence) -> Self {
         let operations: BTreeMap<Count, &Operation<'found, 'file>> =
             system.algebras().operations().map(|operation| (operation.ordinal(), operation)).collect();
         let moves = system.edges().iter().enumerate().fold(Moves::new(), |moves, (ordinal, edge)| {
@@ -44,7 +40,7 @@ impl<'found, 'file> Behaviour<'found, 'file> {
         Behaviour { refinement: Refinement::new(moves, equivalence.laws()), sites }
     }
 
-    pub(super) fn refinement(&self) -> &Refinement<Node<'found>, Step<'found>, Property> {
+    pub(super) const fn refinement(&self) -> &Refinement<Node<'found>, Step<'found>, Property> {
         &self.refinement
     }
 

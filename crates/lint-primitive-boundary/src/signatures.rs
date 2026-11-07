@@ -70,7 +70,7 @@ pub struct Signatures<'read, 'model> {
 }
 
 impl<'read, 'model> Signatures<'read, 'model> {
-    pub fn new(lexicon: &'read Lexicon, scope: &'read Scope<'model>) -> Signatures<'read, 'model> {
+    pub const fn new(lexicon: &'read Lexicon, scope: &'read Scope<'model>) -> Self {
         Signatures { lexicon, scope }
     }
 

@@ -31,7 +31,7 @@ impl BodyReading {
         block.stmts.first().filter(|_| block.stmts.len() == 1).and_then(Self::expression)
     }
 
-    fn expression(statement: &Stmt) -> Option<&Expr> {
+    const fn expression(statement: &Stmt) -> Option<&Expr> {
         match statement {
             Stmt::Expr(only, None) => Some(only),
             _ => None,

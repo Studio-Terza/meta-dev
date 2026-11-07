@@ -20,7 +20,7 @@ use vocabulary::Vocabulary;
 pub(crate) struct CrateEffects<'file>(Vec<EffectSite<'file>>);
 
 impl<'file> CrateEffects<'file> {
-    pub(crate) fn found(files: &[&'file SourceFile]) -> CrateEffects<'file> {
+    pub(crate) fn found(files: &[&'file SourceFile]) -> Self {
         let called = Paths::read(files.iter().copied(), &Vocabulary::FINALS);
         let scans: Vec<FileScan<'file>> = files.iter().map(|file| FileScan::scanned(file)).collect();
         let tested: BTreeSet<Site<'file>> = scans.iter().flat_map(FileScan::tested).copied().collect();

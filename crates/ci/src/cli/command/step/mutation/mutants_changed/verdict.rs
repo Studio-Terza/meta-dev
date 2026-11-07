@@ -13,7 +13,7 @@ pub(super) enum Verdict<'text> {
 }
 
 impl<'text> From<&'text Text> for Verdict<'text> {
-    fn from(missed: &'text Text) -> Verdict<'text> {
+    fn from(missed: &'text Text) -> Self {
         missed.as_ref().chars().next().map_or(Verdict::NoneMissed, |_| Verdict::Missed(missed))
     }
 }
@@ -24,7 +24,7 @@ impl Verdict<'_> {
         Ok(self.exit())
     }
 
-    fn exit(self) -> Exit {
+    const fn exit(self) -> Exit {
         match self {
             Verdict::Skipped | Verdict::NoneMissed => Exit::Success,
             Verdict::Missed(_) => Exit::Failure(CargoMutants::MISSED),

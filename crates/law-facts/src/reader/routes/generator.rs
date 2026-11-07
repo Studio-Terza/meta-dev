@@ -7,7 +7,7 @@ use lint_layout::Name;
 pub(crate) struct Generator<'scope>(&'scope Scope);
 
 impl<'scope> Generator<'scope> {
-    pub(crate) fn new(scope: &'scope Scope) -> Generator<'scope> {
+    pub(crate) const fn new(scope: &'scope Scope) -> Self {
         Generator(scope)
     }
 

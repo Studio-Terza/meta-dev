@@ -29,12 +29,12 @@ impl ToolsKey {
 }
 
 impl Step for ToolsKey {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ToolsKey, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let metadata = &arguments.taken()?;
         let output = &arguments.taken()?;
         arguments.ended()?;
-        Ok(ToolsKey { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
+        Ok(Self { metadata: Journal::file(Path::new(metadata)), output: Journal::file(Path::new(output)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

@@ -12,11 +12,11 @@ pub(crate) struct Filed<Entity> {
 }
 
 impl<Entity> Filed<Entity> {
-    pub(crate) fn new(file: FileId, found: Found<Entity>) -> Filed<Entity> {
-        Filed { file, found }
+    pub(crate) const fn new(file: FileId, found: Found<Entity>) -> Self {
+        Self { file, found }
     }
 
-    pub(crate) fn sorted(rows: Vec<Filed<Entity>>) -> Vec<Filed<Entity>> {
+    pub(crate) fn sorted(rows: Vec<Self>) -> Vec<Self> {
         let mut sorted = rows;
         sorted.sort_by_key(|filed| filed.file);
         sorted

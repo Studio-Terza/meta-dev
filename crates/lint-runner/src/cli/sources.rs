@@ -10,19 +10,19 @@ pub(crate) struct Sources<'run, F> {
 }
 
 impl<'run, F> Sources<'run, F> {
-    pub(crate) fn new(files: &'run F, stage: &'run Stage<'run>) -> Sources<'run, F> {
+    pub(crate) fn new(files: &'run F, stage: &'run Stage<'run>) -> Self {
         Sources { files, stage, queue: Queue::default() }
     }
 
-    pub(crate) fn files(&self) -> &'run F {
+    pub(crate) const fn files(&self) -> &'run F {
         self.files
     }
 
-    pub(crate) fn stage(&self) -> &'run Stage<'run> {
+    pub(crate) const fn stage(&self) -> &'run Stage<'run> {
         self.stage
     }
 
-    pub(crate) fn queue(&self) -> &Queue {
+    pub(crate) const fn queue(&self) -> &Queue {
         &self.queue
     }
 }

@@ -28,7 +28,7 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
         function: &ImplItemFn,
         context: &ImplContext<'_>,
         declarations: &'found Declarations<'_>,
-    ) -> FunctionShape<'found, 'file> {
+    ) -> Self {
         let vertex = |ty: &Type| {
             let written = TypeName::from_type(ty);
             declarations.vertex_named(declarations.resolved(written.or_self(context.self_type()))).map(Vertex::name)
@@ -47,25 +47,25 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
         }
     }
 
-    pub fn function(item: &ImplItem) -> Option<&ImplItemFn> {
+    pub const fn function(item: &ImplItem) -> Option<&ImplItemFn> {
         match item {
             ImplItem::Fn(function) => Some(function),
             _ => None,
         }
     }
 
-    fn typed(argument: &FnArg) -> Option<&PatType> {
+    const fn typed(argument: &FnArg) -> Option<&PatType> {
         match argument {
             FnArg::Typed(typed) => Some(typed),
             FnArg::Receiver(_) => None,
         }
     }
 
-    pub fn site(&self) -> Site<'file> {
+    pub const fn site(&self) -> Site<'file> {
         self.site
     }
 
-    pub fn returns(&self) -> &Returns<'found> {
+    pub const fn returns(&self) -> &Returns<'found> {
         &self.returns
     }
 
@@ -73,7 +73,7 @@ impl<'found, 'file> FunctionShape<'found, 'file> {
         &self.vertex_parameters
     }
 
-    pub fn body(&self) -> Body {
+    pub const fn body(&self) -> Body {
         self.body
     }
 }

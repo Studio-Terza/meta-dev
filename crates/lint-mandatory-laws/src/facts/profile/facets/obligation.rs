@@ -12,7 +12,7 @@ pub(crate) struct Obligation<'facts, 'file> {
 }
 
 impl<'facts, 'file> Obligation<'facts, 'file> {
-    pub(crate) fn new(subject: &'facts Subject<'file>, pair: Pair<'facts>) -> Obligation<'facts, 'file> {
+    pub(crate) const fn new(subject: &'facts Subject<'file>, pair: Pair<'facts>) -> Self {
         Obligation { subject, pair }
     }
 }

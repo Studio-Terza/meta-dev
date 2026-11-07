@@ -21,7 +21,7 @@ pub(crate) struct Cluster<'found> {
 impl<'found> Cluster<'found> {
     pub(crate) const WORKSPACE: Cluster<'static> = Cluster { krate: None, segments: &[] };
 
-    pub(crate) fn module(krate: &'found CrateName, segments: &'found [Name]) -> Cluster<'found> {
+    pub(crate) const fn module(krate: &'found CrateName, segments: &'found [Name]) -> Self {
         Cluster { krate: Some(krate), segments }
     }
 
@@ -32,7 +32,7 @@ impl<'found> Cluster<'found> {
         }
     }
 
-    pub(crate) fn parent(&self) -> Option<Cluster<'found>> {
+    pub(crate) fn parent(&self) -> Option<Self> {
         self.krate.map(|krate| {
             self.segments.split_last().map_or(Cluster::WORKSPACE, |(_, outer)| Cluster::module(krate, outer))
         })
@@ -42,24 +42,24 @@ impl<'found> Cluster<'found> {
         iter::successors(Some(self), Cluster::parent)
     }
 
-    pub(crate) fn holding(self, inner: Cluster<'found>) -> Option<Cluster<'found>> {
+    pub(crate) fn holding(self, inner: Self) -> Option<Self> {
         inner.lineage().find(|outer| *outer == self)
     }
 
-    pub(crate) fn common(self, other: Cluster<'found>) -> Cluster<'found> {
+    pub(crate) fn common(self, other: Self) -> Self {
         self.lineage().find(|outer| outer.holding(other).is_some()).unwrap_or(Cluster::WORKSPACE)
     }
 
-    pub(crate) fn named(self, name: &Name) -> Option<Cluster<'found>> {
+    pub(crate) fn named(self, name: &Name) -> Option<Self> {
         let own = self.segments.last().or_else(|| self.krate.map(Borrow::borrow));
         own.filter(|own| *own == name).map(|_| self)
     }
 
-    pub(crate) fn krate(&self) -> Option<&'found CrateName> {
+    pub(crate) const fn krate(&self) -> Option<&'found CrateName> {
         self.krate
     }
 
-    pub(crate) fn segments(&self) -> &'found [Name] {
+    pub(crate) const fn segments(&self) -> &'found [Name] {
         self.segments
     }
 }
@@ -72,14 +72,14 @@ enum Whereabouts<'found> {
 }
 
 impl<'found> Whereabouts<'found> {
-    fn locating(cluster: &Cluster<'found>) -> Whereabouts<'found> {
+    const fn locating(cluster: &Cluster<'found>) -> Self {
         match cluster.krate {
             None => Whereabouts::Workspace,
             Some(krate) => Whereabouts::within(krate, cluster.segments),
         }
     }
 
-    fn within(krate: &'found CrateName, segments: &'found [Name]) -> Whereabouts<'found> {
+    const fn within(krate: &'found CrateName, segments: &'found [Name]) -> Self {
         match segments.first() {
             None => Whereabouts::Crate(krate),
             Some(_) => Whereabouts::Module(krate, Segments(segments)),
@@ -104,7 +104,7 @@ pub(crate) struct Part<'found> {
 }
 
 impl<'found> Part<'found> {
-    pub(crate) fn toward(whole: Cluster<'found>, inner: Cluster<'found>) -> Part<'found> {
+    pub(crate) fn toward(whole: Cluster<'found>, inner: Cluster<'found>) -> Self {
         Part { whole, part: inner.lineage().find(|outer| outer.parent() == Some(whole)).unwrap_or(whole) }
     }
 

@@ -13,8 +13,8 @@ pub struct Message {
 
 impl Message {
     #[must_use]
-    pub const fn new(problem: Problem, fix: Fix) -> Message {
-        Message { problem, fix }
+    pub const fn new(problem: Problem, fix: Fix) -> Self {
+        Self { problem, fix }
     }
 }
 

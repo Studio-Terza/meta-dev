@@ -20,12 +20,12 @@ pub(super) struct Holder {
 }
 
 impl Holder {
-    pub(super) fn named(ident: &Ident, held: Held) -> Holder {
-        Holder { position: Position::from(ident.span()), name: Name::from(ident), held }
+    pub(super) fn named(ident: &Ident, held: Held) -> Self {
+        Self { position: Position::from(ident.span()), name: Name::from(ident), held }
     }
 
-    fn field(&self, field: &Field) -> Holder {
-        Holder { position: Position::from(field.span()), name: self.field_name(field), held: self.held }
+    fn field(&self, field: &Field) -> Self {
+        Self { position: Position::from(field.span()), name: self.field_name(field), held: self.held }
     }
 
     fn field_name(&self, field: &Field) -> Name {
@@ -45,8 +45,8 @@ pub(super) enum Link {
 impl Link {
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
         match self {
-            Link::Declares(name) => resolving.path(scope, name, Domain::Types).crate_item(),
-            Link::Free => None,
+            Self::Declares(name) => resolving.path(scope, name, Domain::Types).crate_item(),
+            Self::Free => None,
         }
     }
 }

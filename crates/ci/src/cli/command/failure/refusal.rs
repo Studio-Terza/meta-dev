@@ -6,14 +6,14 @@ use file_ports::Text;
 pub struct Refusal(String);
 
 impl From<Vec<u8>> for Refusal {
-    fn from(bytes: Vec<u8>) -> Refusal {
-        Refusal(String::from_utf8(bytes).unwrap_or_default())
+    fn from(bytes: Vec<u8>) -> Self {
+        Self(String::from_utf8(bytes).unwrap_or_default())
     }
 }
 
 impl From<Text> for Refusal {
-    fn from(text: Text) -> Refusal {
-        Refusal(text.as_ref().to_owned())
+    fn from(text: Text) -> Self {
+        Self(text.as_ref().to_owned())
     }
 }
 

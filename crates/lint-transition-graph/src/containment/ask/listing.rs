@@ -12,7 +12,7 @@ use super::super::outsider::Outsider;
 pub struct Listed(usize);
 
 impl Listed {
-    pub const DEFAULT: Listed = Listed(20);
+    pub const DEFAULT: Self = Self(20);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,11 +47,7 @@ struct At<'file>(Option<Site<'file>>);
 pub(super) struct Names<'found>(Vec<Member<'found>>);
 
 impl<'view, 'found, 'file> Placed<'view, 'found, 'file> {
-    pub(super) fn new(
-        view: &'view Containment<'found, 'file>,
-        member: Member<'found>,
-        spelled: Spelled,
-    ) -> Placed<'view, 'found, 'file> {
+    pub(super) const fn new(view: &'view Containment<'found, 'file>, member: Member<'found>, spelled: Spelled) -> Self {
         Placed { view, member, spelled }
     }
 
@@ -66,7 +62,7 @@ impl<'view, 'found, 'file> Listing<'view, 'found, 'file> {
         members: impl Iterator<Item = Member<'found>>,
         outsiders: impl Iterator<Item = Outsider<'found, 'file>>,
         listed: Listed,
-    ) -> Listing<'view, 'found, 'file> {
+    ) -> Self {
         let lines = members
             .map(|member| Line::Member(Placed::new(view, member, Spelled::Name)))
             .chain(outsiders.map(Line::Outside))
@@ -76,7 +72,7 @@ impl<'view, 'found, 'file> Listing<'view, 'found, 'file> {
 }
 
 impl<'found> FromIterator<Member<'found>> for Names<'found> {
-    fn from_iter<Members: IntoIterator<Item = Member<'found>>>(members: Members) -> Names<'found> {
+    fn from_iter<Members: IntoIterator<Item = Member<'found>>>(members: Members) -> Self {
         Names(members.into_iter().collect())
     }
 }

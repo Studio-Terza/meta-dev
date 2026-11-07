@@ -18,7 +18,7 @@ impl Name {
         self.words()
             .into_iter()
             .flat_map(|chunk| Letters::humps(&chunk.0))
-            .map(|hump| Hump(Name::from(Name(hump).lowered())))
+            .map(|hump| Hump(Self::from(Self(hump).lowered())))
     }
 }
 

@@ -28,7 +28,7 @@ impl Calls {
                 bound.insert(binding.name, binding.type_name);
                 bound
             });
-        let mut scan = Calls { bound, made: Vec::new() };
+        let mut scan = Self { bound, made: Vec::new() };
         scan.visit_block(body);
         scan.made
     }
@@ -95,7 +95,7 @@ struct Rebound(BTreeSet<Name>);
 
 impl Rebound {
     fn bindings_in(body: &Block) -> BTreeSet<Name> {
-        let mut scan = Rebound::default();
+        let mut scan = Self::default();
         scan.visit_block(body);
         scan.0
     }

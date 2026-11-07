@@ -11,7 +11,7 @@ pub struct MacroCalls(Vec<Macro>);
 impl MacroCalls {
     #[must_use]
     pub fn within(invocation: &Macro) -> Vec<Macro> {
-        syn::parse2::<MacroCalls>(invocation.tokens.clone()).map(|calls| calls.0).unwrap_or_default()
+        syn::parse2::<Self>(invocation.tokens.clone()).map(|calls| calls.0).unwrap_or_default()
     }
 
     fn step(input: ParseStream) -> syn::Result<Vec<Macro>> {
@@ -28,15 +28,15 @@ impl MacroCalls {
 
     fn skipped(tree: TokenTree) -> syn::Result<Vec<Macro>> {
         match tree {
-            TokenTree::Group(group) => syn::parse2::<MacroCalls>(group.stream()).map(|calls| calls.0),
+            TokenTree::Group(group) => syn::parse2::<Self>(group.stream()).map(|calls| calls.0),
             _ => Ok(Vec::new()),
         }
     }
 }
 
 impl Parse for MacroCalls {
-    fn parse(input: ParseStream) -> syn::Result<MacroCalls> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         let steps = iter::from_fn(|| input.cursor().token_tree().map(|_| Self::step(input)));
-        steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|steps| MacroCalls(steps.into_iter().flatten().collect()))
+        steps.collect::<syn::Result<Vec<Vec<Macro>>>>().map(|steps| Self(steps.into_iter().flatten().collect()))
     }
 }

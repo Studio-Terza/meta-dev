@@ -17,7 +17,7 @@ pub(crate) struct Facts<'file> {
 }
 
 impl<'file> Facts<'file> {
-    pub(crate) fn read_all(files: &'file [SourceFile]) -> Facts<'file> {
+    pub(crate) fn read_all(files: &'file [SourceFile]) -> Self {
         files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Facts::read)
     }
 
@@ -29,11 +29,11 @@ impl<'file> Facts<'file> {
             .collect()
     }
 
-    fn read(self, file: &'file SourceFile) -> Facts<'file> {
+    fn read(self, file: &'file SourceFile) -> Self {
         Reader::read(file).into_iter().fold(self, Facts::added)
     }
 
-    fn added(mut self, profile: Profile<'file>) -> Facts<'file> {
+    fn added(mut self, profile: Profile<'file>) -> Self {
         profile.filed_in(&mut self.profiles);
         self
     }

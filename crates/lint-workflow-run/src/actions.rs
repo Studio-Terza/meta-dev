@@ -8,7 +8,7 @@ use crate::judged::Judged;
 pub(crate) struct Actions<'files>(&'files [RepoFile]);
 
 impl<'files> Actions<'files> {
-    pub(crate) fn among(files: &'files [RepoFile]) -> Actions<'files> {
+    pub(crate) const fn among(files: &'files [RepoFile]) -> Self {
         Actions(files)
     }
 

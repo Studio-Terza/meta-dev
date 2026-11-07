@@ -13,9 +13,9 @@ pub struct Pairing {
 }
 
 impl Pairing {
-    pub fn joined(limits: BTreeMap<Stage, Limit>, measured: BTreeMap<Stage, Seconds>) -> BTreeMap<Stage, Pairing> {
+    pub fn joined(limits: BTreeMap<Stage, Limit>, measured: BTreeMap<Stage, Seconds>) -> BTreeMap<Stage, Self> {
         measured.into_iter().fold(
-            limits.into_iter().map(|(stage, limit)| (stage, Pairing { limit: Some(limit), measured: None })).collect(),
+            limits.into_iter().map(|(stage, limit)| (stage, Self { limit: Some(limit), measured: None })).collect(),
             |mut joined, (stage, seconds)| {
                 joined.entry(stage).or_default().measured = Some(seconds);
                 joined

@@ -19,12 +19,12 @@ pub struct Summarize {
 }
 
 impl Step for Summarize {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Summarize, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let report = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;
-        Ok(Summarize { report: Journal::file(Path::new(report)), summary: Journal::file(Path::new(summary)) })
+        Ok(Self { report: Journal::file(Path::new(report)), summary: Journal::file(Path::new(summary)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

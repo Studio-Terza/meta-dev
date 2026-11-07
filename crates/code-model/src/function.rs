@@ -28,10 +28,10 @@ pub enum Output {
 
 impl Output {
     #[must_use]
-    pub fn written(&self) -> Option<&TypeRef> {
+    pub const fn written(&self) -> Option<&TypeRef> {
         match self {
-            Output::Written(ty) => Some(ty),
-            Output::Implicit => None,
+            Self::Written(ty) => Some(ty),
+            Self::Implicit => None,
         }
     }
 }
@@ -43,10 +43,10 @@ pub enum Input {
 }
 
 impl Input {
-    fn typed(&self) -> Option<&TypeRef> {
+    const fn typed(&self) -> Option<&TypeRef> {
         match self {
-            Input::Typed(ty) => Some(ty),
-            Input::Receiver => None,
+            Self::Typed(ty) => Some(ty),
+            Self::Receiver => None,
         }
     }
 }
@@ -59,19 +59,19 @@ pub struct Signature {
 }
 
 impl From<Output> for Signature {
-    fn from(output: Output) -> Signature {
-        Signature { inputs: Vec::new(), output, constraints: Vec::new() }
+    fn from(output: Output) -> Self {
+        Self { inputs: Vec::new(), output, constraints: Vec::new() }
     }
 }
 
 impl Signature {
     #[must_use]
-    pub fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Signature {
-        Signature { inputs, output, constraints }
+    pub const fn new(inputs: Vec<Input>, output: Output, constraints: Vec<TypeRef>) -> Self {
+        Self { inputs, output, constraints }
     }
 
     #[must_use]
-    pub fn output(&self) -> &Output {
+    pub const fn output(&self) -> &Output {
         &self.output
     }
 
@@ -96,17 +96,17 @@ pub struct Function {
 
 impl Function {
     #[must_use]
-    pub fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Function {
-        Function { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None) }
+    pub const fn new(name: Name, owner: Owner, entry: Entry, signature: Signature) -> Self {
+        Self { name, owner, entry, signature, seat: Seat::new(Region::SHIPPED, None) }
     }
 
     #[must_use]
-    pub fn seated(self, seat: Seat) -> Function {
-        Function { name: self.name, owner: self.owner, entry: self.entry, signature: self.signature, seat }
+    pub fn seated(self, seat: Seat) -> Self {
+        Self { name: self.name, owner: self.owner, entry: self.entry, signature: self.signature, seat }
     }
 
     #[must_use]
-    pub fn signed_here(&self) -> Option<&Signature> {
+    pub const fn signed_here(&self) -> Option<&Signature> {
         match self.owner {
             Owner::Free | Owner::Inherent | Owner::TraitDecl | Owner::Nested => Some(&self.signature),
             Owner::TraitImpl | Owner::Foreign => None,
@@ -114,7 +114,7 @@ impl Function {
     }
 
     #[must_use]
-    pub fn called(&self) -> Option<&Function> {
+    pub const fn called(&self) -> Option<&Self> {
         match self.entry {
             Entry::Called => Some(self),
             Entry::Test | Entry::Main => None,
@@ -122,17 +122,17 @@ impl Function {
     }
 
     #[must_use]
-    pub fn entry(&self) -> Entry {
+    pub const fn entry(&self) -> Entry {
         self.entry
     }
 
     #[must_use]
-    pub fn signature(&self) -> &Signature {
+    pub const fn signature(&self) -> &Signature {
         &self.signature
     }
 
     #[must_use]
-    pub fn owner(&self) -> Owner {
+    pub const fn owner(&self) -> Owner {
         self.owner
     }
 }

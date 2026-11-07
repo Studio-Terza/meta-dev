@@ -40,7 +40,7 @@ impl Content {
             .or_else(|| Self::read_from(bytes)?.language())
     }
 
-    fn read_from(contents: &Bytes) -> Option<Content> {
+    fn read_from(contents: &Bytes) -> Option<Self> {
         Some(Self::WINDOW.bytes(contents))
             .filter(|bytes| bytes.iter().all(|byte| *byte != b'\0'))
             .and_then(|bytes| {
@@ -84,7 +84,7 @@ impl Content {
 impl FromStr for Content {
     type Err = Infallible;
 
-    fn from_str(text: &str) -> Result<Content, Infallible> {
-        Ok(Content(text.chars().filter(|letter| *letter != Self::RETURN).collect()))
+    fn from_str(text: &str) -> Result<Self, Infallible> {
+        Ok(Self(text.chars().filter(|letter| *letter != Self::RETURN).collect()))
     }
 }

@@ -11,7 +11,7 @@ impl<'file> TestFile<'file> {
     const TESTS: &'static str = "tests";
 
     #[must_use]
-    pub fn tested(file: &'file SourceFile) -> Option<TestFile<'file>> {
+    pub fn tested(file: &'file SourceFile) -> Option<Self> {
         let placement = file.placement();
         (placement.role() == Role::Target).then_some(TestFile(file)).filter(|_| {
             placement.crate_root().directory().parent().and_then(Path::file_name) == Some(OsStr::new(Self::TESTS))
@@ -19,7 +19,7 @@ impl<'file> TestFile<'file> {
     }
 
     #[must_use]
-    pub fn file(self) -> &'file SourceFile {
+    pub const fn file(self) -> &'file SourceFile {
         self.0
     }
 }

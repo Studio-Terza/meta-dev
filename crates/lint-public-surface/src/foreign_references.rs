@@ -38,34 +38,34 @@ impl Leaf<'_> {
 impl ForeignReferences {
     const TESTS: &'static str = "tests";
 
-    pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> ForeignReferences {
+    pub fn in_file(file: &SourceFile, binaries: &BinaryFiles) -> Self {
         let own_crate = binaries
             .holding(file.path())
             .map_or_else(|| Some(CrateName::from(file.placement().crate_root())), |_| None);
-        let mut references = ForeignReferences { own_crate, crates: BTreeMap::new() };
+        let mut references = Self { own_crate, crates: BTreeMap::new() };
         references.visit_file(file.syntax());
         references
     }
 
-    pub fn in_own_tests(file: &SourceFile) -> Option<ForeignReferences> {
+    pub fn in_own_tests(file: &SourceFile) -> Option<Self> {
         let package = file.placement().package().root();
         file.placement().crate_root().directory().starts_with(package.directory().join(Self::TESTS)).then(|| {
             let tested = CrateName::from(package);
-            let mut references = ForeignReferences::default();
+            let mut references = Self::default();
             references.visit_file(file.syntax());
-            ForeignReferences {
+            Self {
                 crates: references
                     .crates
                     .remove_entry(&tested)
                     .map(|(name, reach)| (name, reach.names_only()))
                     .into_iter()
                     .collect(),
-                ..ForeignReferences::default()
+                ..Self::default()
             }
         })
     }
 
-    pub fn absorb(mut self, other: ForeignReferences) -> ForeignReferences {
+    pub fn absorb(mut self, other: Self) -> Self {
         other.crates.into_iter().for_each(|(crate_name, reach)| {
             self.crates.entry(crate_name).or_default().absorb(reach);
         });

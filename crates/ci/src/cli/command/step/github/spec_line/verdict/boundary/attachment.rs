@@ -32,7 +32,7 @@ impl Attachment<'_> {
 impl<'line> TryFrom<&'line str> for Attachment<'line> {
     type Error = NotWellFormed;
 
-    fn try_from(value: &'line str) -> Result<Attachment<'line>, NotWellFormed> {
+    fn try_from(value: &'line str) -> Result<Self, NotWellFormed> {
         Some(value)
             .filter(|value| *value == Self::NONE)
             .or_else(|| Self::owner(value).map(|_| value))
@@ -58,22 +58,22 @@ enum Reading {
 }
 
 impl Reading {
-    const TRANSITIONS: [(Reading, Mark, Reading); 12] = [
-        (Reading::Gap, Mark::Lower, Reading::Project),
-        (Reading::Gap, Mark::Digit, Reading::Project),
-        (Reading::Gap, Mark::Dash, Reading::Project),
-        (Reading::Project, Mark::Lower, Reading::Project),
-        (Reading::Project, Mark::Digit, Reading::Project),
-        (Reading::Project, Mark::Dash, Reading::Project),
-        (Reading::Project, Mark::Hash, Reading::Kind),
-        (Reading::Kind, Mark::KindLetter, Reading::Number),
-        (Reading::Number, Mark::Digit, Reading::Digits),
-        (Reading::Digits, Mark::Digit, Reading::Digits),
-        (Reading::Gap, Mark::Space, Reading::Gap),
-        (Reading::Digits, Mark::Comma, Reading::Gap),
+    const TRANSITIONS: [(Self, Mark, Self); 12] = [
+        (Self::Gap, Mark::Lower, Self::Project),
+        (Self::Gap, Mark::Digit, Self::Project),
+        (Self::Gap, Mark::Dash, Self::Project),
+        (Self::Project, Mark::Lower, Self::Project),
+        (Self::Project, Mark::Digit, Self::Project),
+        (Self::Project, Mark::Dash, Self::Project),
+        (Self::Project, Mark::Hash, Self::Kind),
+        (Self::Kind, Mark::KindLetter, Self::Number),
+        (Self::Number, Mark::Digit, Self::Digits),
+        (Self::Digits, Mark::Digit, Self::Digits),
+        (Self::Gap, Mark::Space, Self::Gap),
+        (Self::Digits, Mark::Comma, Self::Gap),
     ];
 
-    fn after(self, letter: char) -> Option<Reading> {
+    fn after(self, letter: char) -> Option<Self> {
         let mark = Mark::from(letter);
         Self::TRANSITIONS
             .into_iter()
@@ -96,23 +96,23 @@ enum Mark {
 }
 
 impl Mark {
-    const SIGNS: [(char, Mark); 6] = [
-        ('-', Mark::Dash),
-        ('#', Mark::Hash),
-        ('D', Mark::KindLetter),
-        ('L', Mark::KindLetter),
-        (' ', Mark::Space),
-        (',', Mark::Comma),
+    const SIGNS: [(char, Self); 6] = [
+        ('-', Self::Dash),
+        ('#', Self::Hash),
+        ('D', Self::KindLetter),
+        ('L', Self::KindLetter),
+        (' ', Self::Space),
+        (',', Self::Comma),
     ];
 }
 
 impl From<char> for Mark {
-    fn from(letter: char) -> Mark {
+    fn from(letter: char) -> Self {
         Some(letter)
             .filter(char::is_ascii_lowercase)
-            .map(|_| Mark::Lower)
-            .or_else(|| Some(letter).filter(char::is_ascii_digit).map(|_| Mark::Digit))
+            .map(|_| Self::Lower)
+            .or_else(|| Some(letter).filter(char::is_ascii_digit).map(|_| Self::Digit))
             .or_else(|| Self::SIGNS.into_iter().find(|(sign, _)| *sign == letter).map(|(_, mark)| mark))
-            .unwrap_or(Mark::Other)
+            .unwrap_or(Self::Other)
     }
 }

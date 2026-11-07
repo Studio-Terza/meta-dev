@@ -6,8 +6,8 @@ pub(crate) struct FileModel {
 }
 
 impl From<PathBuf> for FileModel {
-    fn from(path: PathBuf) -> FileModel {
-        FileModel { path }
+    fn from(path: PathBuf) -> Self {
+        Self { path }
     }
 }
 

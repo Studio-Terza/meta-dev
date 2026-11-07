@@ -24,33 +24,31 @@ pub(crate) enum Visibility {
 }
 
 impl From<&syn::Visibility> for Visibility {
-    fn from(visibility: &syn::Visibility) -> Visibility {
+    fn from(visibility: &syn::Visibility) -> Self {
         match visibility {
-            syn::Visibility::Inherited => Visibility::Private,
-            syn::Visibility::Public(_) => Visibility::Visible,
-            syn::Visibility::Restricted(restricted) => Visibility::from(restricted),
+            syn::Visibility::Inherited => Self::Private,
+            syn::Visibility::Public(_) => Self::Visible,
+            syn::Visibility::Restricted(restricted) => Self::from(restricted),
         }
     }
 }
 
 impl From<&VisRestricted> for Visibility {
-    fn from(restricted: &VisRestricted) -> Visibility {
+    fn from(restricted: &VisRestricted) -> Self {
         restricted
             .in_token
-            .map(|_| Visibility::Restricted)
-            .or_else(|| {
-                restricted.path.get_ident().map(Name::from).as_ref().and_then(Anchor::spelled).map(Visibility::from)
-            })
-            .unwrap_or(Visibility::Restricted)
+            .map(|_| Self::Restricted)
+            .or_else(|| restricted.path.get_ident().map(Name::from).as_ref().and_then(Anchor::spelled).map(Self::from))
+            .unwrap_or(Self::Restricted)
     }
 }
 
 impl Visibility {
-    fn seen(self, restricted: Admission) -> Admission {
+    const fn seen(self, restricted: Admission) -> Admission {
         match self {
-            Visibility::Private => Admission::Hidden,
-            Visibility::Visible => Admission::Shown,
-            Visibility::Restricted => restricted,
+            Self::Private => Admission::Hidden,
+            Self::Visible => Admission::Shown,
+            Self::Restricted => restricted,
         }
     }
 }
@@ -63,17 +61,17 @@ pub(crate) enum Sight {
 }
 
 impl Sight {
-    pub(super) fn admits(self, visibility: Visibility) -> Admission {
+    pub(super) const fn admits(self, visibility: Visibility) -> Admission {
         match self {
-            Sight::Inside => Admission::Shown,
-            Sight::ByPath => visibility.seen(Admission::Shown),
-            Sight::ByGlob => visibility.seen(Admission::Obscured),
+            Self::Inside => Admission::Shown,
+            Self::ByPath => visibility.seen(Admission::Shown),
+            Self::ByGlob => visibility.seen(Admission::Obscured),
         }
     }
 
-    pub(super) fn beyond(self, reach: Option<ScopeId>) -> Sight {
+    pub(super) const fn beyond(self, reach: Option<ScopeId>) -> Self {
         match reach {
-            Some(_) => Sight::Inside,
+            Some(_) => Self::Inside,
             None => self,
         }
     }
@@ -103,18 +101,18 @@ pub(crate) enum DeclaredKind {
 }
 
 impl DeclaredKind {
-    fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
+    const fn bound(self, level: ScopeId, item: DeclaredId) -> Binding {
         match self {
-            DeclaredKind::Module(module) => Binding::Module(module),
-            DeclaredKind::OpaqueModule => Binding::Unknown,
-            DeclaredKind::Item(_) => Binding::Item(level, item),
+            Self::Module(module) => Binding::Module(module),
+            Self::OpaqueModule => Binding::Unknown,
+            Self::Item(_) => Binding::Item(level, item),
         }
     }
 
-    fn item_kind(self) -> Option<ItemKind> {
+    const fn item_kind(self) -> Option<ItemKind> {
         match self {
-            DeclaredKind::Item(kind) => Some(kind),
-            DeclaredKind::Module(_) | DeclaredKind::OpaqueModule => None,
+            Self::Item(kind) => Some(kind),
+            Self::Module(_) | Self::OpaqueModule => None,
         }
     }
 }
@@ -127,12 +125,12 @@ pub(crate) struct Declared {
 }
 
 impl Declared {
-    pub(crate) fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Declared {
-        Declared { name, visibility, kind }
+    pub(crate) const fn new(name: Name, visibility: Visibility, kind: DeclaredKind) -> Self {
+        Self { name, visibility, kind }
     }
 
-    fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Declared {
-        Declared { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item(kind) }
+    fn named_item(ident: &Ident, visibility: &syn::Visibility, kind: ItemKind) -> Self {
+        Self { name: Name::from(ident), visibility: Visibility::from(visibility), kind: DeclaredKind::Item(kind) }
     }
 
     fn issued(&self, building: &mut Building) -> Option<ItemId> {
@@ -150,8 +148,8 @@ pub(crate) enum Imported {
 impl Imported {
     fn entries(self, visibility: Visibility) -> Entries {
         match self {
-            Imported::Named(name, path) => Entries::from(Import { name, path, visibility }),
-            Imported::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
+            Self::Named(name, path) => Entries::from(Import { name, path, visibility }),
+            Self::Glob(path) => Entries::from(Glob { source: GlobSource::Path(path), visibility }),
         }
     }
 }
@@ -177,7 +175,7 @@ struct Extern {
 }
 
 impl Extern {
-    fn keyed(declared: &ItemExternCrate) -> BTreeMap<Name, Vec<Extern>> {
+    fn keyed(declared: &ItemExternCrate) -> BTreeMap<Name, Vec<Self>> {
         declared
             .rename
             .iter()
@@ -187,7 +185,7 @@ impl Extern {
             .map(Name::from)
             .and_then(|name| Leaf::from(name).standalone())
             .map(|name| {
-                (name, vec![Extern { visibility: Visibility::from(&declared.vis), krate: Name::from(&declared.ident) }])
+                (name, vec![Self { visibility: Visibility::from(&declared.vis), krate: Name::from(&declared.ident) }])
             })
             .into_iter()
             .collect()
@@ -208,17 +206,17 @@ enum GlobSource {
 }
 
 impl GlobSource {
-    fn unsettled(&self) -> Target {
+    const fn unsettled(&self) -> Target {
         match self {
-            GlobSource::Path(_) => Target::Waiting,
-            GlobSource::Expansion => Target::Opaque,
+            Self::Path(_) => Target::Waiting,
+            Self::Expansion => Target::Opaque,
         }
     }
 
     fn target(&self, resolver: &Resolver<'_, '_>, scope: ScopeId, glob: GlobId) -> Target {
         match self {
-            GlobSource::Path(path) => resolver.glob_target(path, scope, glob),
-            GlobSource::Expansion => Target::Opaque,
+            Self::Path(path) => resolver.glob_target(path, scope, glob),
+            Self::Expansion => Target::Opaque,
         }
     }
 }
@@ -230,7 +228,7 @@ struct Glob {
 }
 
 impl Glob {
-    const EXPANSION: Glob = Glob { source: GlobSource::Expansion, visibility: Visibility::Visible };
+    const EXPANSION: Self = Self { source: GlobSource::Expansion, visibility: Visibility::Visible };
 }
 
 #[derive(Debug, Default)]
@@ -242,92 +240,86 @@ pub(crate) struct Entries {
 }
 
 impl From<Declared> for Entries {
-    fn from(declared: Declared) -> Entries {
-        Entries { declared: vec![declared], imports: Vec::new(), externs: BTreeMap::new(), globs: Vec::new() }
+    fn from(declared: Declared) -> Self {
+        Self { declared: vec![declared], imports: Vec::new(), externs: BTreeMap::new(), globs: Vec::new() }
     }
 }
 
 impl From<Import> for Entries {
-    fn from(import: Import) -> Entries {
-        Entries { declared: Vec::new(), imports: vec![import], externs: BTreeMap::new(), globs: Vec::new() }
+    fn from(import: Import) -> Self {
+        Self { declared: Vec::new(), imports: vec![import], externs: BTreeMap::new(), globs: Vec::new() }
     }
 }
 
 impl From<Glob> for Entries {
-    fn from(glob: Glob) -> Entries {
-        Entries { declared: Vec::new(), imports: Vec::new(), externs: BTreeMap::new(), globs: vec![glob] }
+    fn from(glob: Glob) -> Self {
+        Self { declared: Vec::new(), imports: Vec::new(), externs: BTreeMap::new(), globs: vec![glob] }
     }
 }
 
 impl From<&ItemExternCrate> for Entries {
-    fn from(declared: &ItemExternCrate) -> Entries {
-        Entries { declared: Vec::new(), imports: Vec::new(), externs: Extern::keyed(declared), globs: Vec::new() }
+    fn from(declared: &ItemExternCrate) -> Self {
+        Self { declared: Vec::new(), imports: Vec::new(), externs: Extern::keyed(declared), globs: Vec::new() }
     }
 }
 
 impl From<&Macro> for Entries {
-    fn from(invoked: &Macro) -> Entries {
+    fn from(invoked: &Macro) -> Self {
         match StdNames::expansion(invoked) {
-            Expansion::Statement => Entries::default(),
-            Expansion::Items => Entries::from(Glob::EXPANSION),
+            Expansion::Statement => Self::default(),
+            Expansion::Items => Self::from(Glob::EXPANSION),
         }
     }
 }
 
 impl From<&ItemUse> for Entries {
-    fn from(used: &ItemUse) -> Entries {
+    fn from(used: &ItemUse) -> Self {
         let visibility = Visibility::from(&used.vis);
         UsePath::imported(used)
             .into_iter()
             .map(|imported| imported.entries(visibility))
-            .fold(Entries::default(), Entries::merged)
+            .fold(Self::default(), Self::merged)
     }
 }
 
 impl From<&Item> for Entries {
-    fn from(item: &Item) -> Entries {
+    fn from(item: &Item) -> Self {
         match item {
-            Item::Use(used) => Entries::from(used),
-            Item::ExternCrate(declared) => Entries::from(declared),
-            Item::Macro(ItemMacro { ident: None, mac, .. }) => Entries::from(mac),
+            Item::Use(used) => Self::from(used),
+            Item::ExternCrate(declared) => Self::from(declared),
+            Item::Macro(ItemMacro { ident: None, mac, .. }) => Self::from(mac),
             Item::Struct(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
+                Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Struct))
             }
-            Item::Enum(declared) => Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Enum)),
-            Item::Union(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Union))
-            }
-            Item::Type(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias))
-            }
-            Item::Trait(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
-            }
+            Item::Enum(declared) => Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Enum)),
+            Item::Union(declared) => Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Union)),
+            Item::Type(declared) => Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Alias)),
+            Item::Trait(declared) => Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait)),
             Item::TraitAlias(declared) => {
-                Entries::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
+                Self::from(Declared::named_item(&declared.ident, &declared.vis, ItemKind::Trait))
             }
-            _ => Entries::default(),
+            _ => Self::default(),
         }
     }
 }
 
 impl From<&Stmt> for Entries {
-    fn from(statement: &Stmt) -> Entries {
+    fn from(statement: &Stmt) -> Self {
         match statement {
-            Stmt::Item(item) => Entries::from(item),
-            Stmt::Macro(StmtMacro { mac, .. }) => Entries::from(mac),
-            Stmt::Local(_) | Stmt::Expr(..) => Entries::default(),
+            Stmt::Item(item) => Self::from(item),
+            Stmt::Macro(StmtMacro { mac, .. }) => Self::from(mac),
+            Stmt::Local(_) | Stmt::Expr(..) => Self::default(),
         }
     }
 }
 
 impl Entries {
-    pub(crate) fn of_items(items: &[Item]) -> Entries {
-        items.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
+    pub(crate) fn of_items(items: &[Item]) -> Self {
+        items.iter().map(Self::from).fold(Self::default(), Self::merged)
     }
 
-    pub(crate) fn of_block(statements: &[Stmt]) -> Entries {
-        statements.iter().map(Entries::from).fold(Entries::default(), Entries::merged)
+    pub(crate) fn of_block(statements: &[Stmt]) -> Self {
+        statements.iter().map(Self::from).fold(Self::default(), Self::merged)
     }
 
     pub(super) fn declare(&mut self, declared: Declared) {
@@ -401,7 +393,7 @@ impl Entries {
         globs.filter_map(|((glob, id), target)| target.module(id, glob.visibility)).collect()
     }
 
-    fn merged(mut self, other: Entries) -> Entries {
+    fn merged(mut self, other: Self) -> Self {
         self.declared.extend(other.declared);
         self.imports.extend(other.imports);
         other.externs.into_iter().for_each(|(name, externs)| self.externs.entry(name).or_default().extend(externs));

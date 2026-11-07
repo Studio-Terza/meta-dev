@@ -11,10 +11,10 @@ pub enum Heading {
 impl fmt::Display for Heading {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Heading::Surviving => formatter.write_str("Surviving mutants"),
-            Heading::TimedOut => formatter.write_str("Timed out mutants"),
-            Heading::KillingNothing => formatter.write_str("Tests that kill no mutant"),
-            Heading::KilledWithoutGolden => formatter.write_str("Mutants killed while no golden test fails"),
+            Self::Surviving => formatter.write_str("Surviving mutants"),
+            Self::TimedOut => formatter.write_str("Timed out mutants"),
+            Self::KillingNothing => formatter.write_str("Tests that kill no mutant"),
+            Self::KilledWithoutGolden => formatter.write_str("Mutants killed while no golden test fails"),
         }
     }
 }

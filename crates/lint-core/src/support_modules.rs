@@ -19,7 +19,7 @@ impl SupportModules {
 
     #[must_use]
     pub fn paths(file: &SourceFile) -> Vec<PathBuf> {
-        let mut modules = SupportModules::default();
+        let mut modules = Self::default();
         modules.visit_file(file.syntax());
         let directory = Self::directory_of(file.path());
         modules

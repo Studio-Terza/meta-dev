@@ -9,14 +9,14 @@ use serde::Deserialize;
 pub struct Seconds(f64);
 
 impl From<Duration> for Seconds {
-    fn from(elapsed: Duration) -> Seconds {
-        Seconds(elapsed.as_secs_f64())
+    fn from(elapsed: Duration) -> Self {
+        Self(elapsed.as_secs_f64())
     }
 }
 
 impl Sum for Seconds {
-    fn sum<Items: Iterator<Item = Seconds>>(items: Items) -> Seconds {
-        Seconds(items.map(|seconds| seconds.0).sum::<f64>() + 0.0)
+    fn sum<Items: Iterator<Item = Self>>(items: Items) -> Self {
+        Self(items.map(|seconds| seconds.0).sum::<f64>() + 0.0)
     }
 }
 

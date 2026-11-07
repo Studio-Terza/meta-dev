@@ -12,7 +12,7 @@ pub struct Syntax;
 
 impl Syntax {
     #[must_use]
-    pub fn impl_fn(member: &ImplItem) -> Option<&ImplItemFn> {
+    pub const fn impl_fn(member: &ImplItem) -> Option<&ImplItemFn> {
         match member {
             ImplItem::Fn(function) => Some(function),
             _ => None,
@@ -20,7 +20,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn trait_fn(member: &TraitItem) -> Option<&TraitItemFn> {
+    pub const fn trait_fn(member: &TraitItem) -> Option<&TraitItemFn> {
         match member {
             TraitItem::Fn(function) => Some(function),
             _ => None,
@@ -28,7 +28,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn typed(argument: &FnArg) -> Option<&PatType> {
+    pub const fn typed(argument: &FnArg) -> Option<&PatType> {
         match argument {
             FnArg::Typed(typed) => Some(typed),
             FnArg::Receiver(_) => None,
@@ -44,7 +44,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn type_path(ty: &Type) -> Option<&TypePath> {
+    pub const fn type_path(ty: &Type) -> Option<&TypePath> {
         match ty {
             Type::Path(path) => Some(path),
             _ => None,
@@ -52,7 +52,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn angled(arguments: &PathArguments) -> Option<&AngleBracketedGenericArguments> {
+    pub const fn angled(arguments: &PathArguments) -> Option<&AngleBracketedGenericArguments> {
         match arguments {
             PathArguments::AngleBracketed(angled) => Some(angled),
             _ => None,
@@ -60,7 +60,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn type_argument(argument: &GenericArgument) -> Option<&Type> {
+    pub const fn type_argument(argument: &GenericArgument) -> Option<&Type> {
         match argument {
             GenericArgument::Type(ty) => Some(ty),
             _ => None,
@@ -68,7 +68,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn item_use(item: &Item) -> Option<&ItemUse> {
+    pub const fn item_use(item: &Item) -> Option<&ItemUse> {
         match item {
             Item::Use(used) => Some(used),
             _ => None,
@@ -76,7 +76,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn item_mod(item: &Item) -> Option<&ItemMod> {
+    pub const fn item_mod(item: &Item) -> Option<&ItemMod> {
         match item {
             Item::Mod(module) => Some(module),
             _ => None,
@@ -84,7 +84,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn bounds(ty: &Type) -> Option<&Punctuated<TypeParamBound, Token![+]>> {
+    pub const fn bounds(ty: &Type) -> Option<&Punctuated<TypeParamBound, Token![+]>> {
         match ty {
             Type::ImplTrait(bounded) => Some(&bounded.bounds),
             Type::TraitObject(bounded) => Some(&bounded.bounds),
@@ -93,7 +93,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn trait_bound(bound: &TypeParamBound) -> Option<&TraitBound> {
+    pub const fn trait_bound(bound: &TypeParamBound) -> Option<&TraitBound> {
         match bound {
             TypeParamBound::Trait(traited) => Some(traited),
             _ => None,
@@ -101,7 +101,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn named_member(member: &Member) -> Option<&Ident> {
+    pub const fn named_member(member: &Member) -> Option<&Ident> {
         match member {
             Member::Named(named) => Some(named),
             Member::Unnamed(_) => None,
@@ -109,7 +109,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn expr_path(expr: &Expr) -> Option<&ExprPath> {
+    pub const fn expr_path(expr: &Expr) -> Option<&ExprPath> {
         match expr {
             Expr::Path(path) => Some(path),
             _ => None,
@@ -117,7 +117,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn literal(expr: &Expr) -> Option<&Lit> {
+    pub const fn literal(expr: &Expr) -> Option<&Lit> {
         match expr {
             Expr::Lit(literal) => Some(&literal.lit),
             _ => None,
@@ -125,7 +125,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn string_literal(value: &Expr) -> Option<&LitStr> {
+    pub const fn string_literal(value: &Expr) -> Option<&LitStr> {
         match value {
             Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text),
             _ => None,
@@ -133,7 +133,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn tail(statement: &Stmt) -> Option<&Expr> {
+    pub const fn tail(statement: &Stmt) -> Option<&Expr> {
         match statement {
             Stmt::Expr(expr, None) => Some(expr),
             _ => None,
@@ -141,7 +141,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn pat_ident(pattern: &Pat) -> Option<&PatIdent> {
+    pub const fn pat_ident(pattern: &Pat) -> Option<&PatIdent> {
         match pattern {
             Pat::Ident(binding) => Some(binding),
             _ => None,
@@ -149,7 +149,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn type_param(param: &GenericParam) -> Option<&TypeParam> {
+    pub const fn type_param(param: &GenericParam) -> Option<&TypeParam> {
         match param {
             GenericParam::Type(parameter) => Some(parameter),
             _ => None,
@@ -167,7 +167,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn inherent(item: &ItemImpl) -> Option<&ItemImpl> {
+    pub const fn inherent(item: &ItemImpl) -> Option<&ItemImpl> {
         match item.trait_ {
             None => Some(item),
             Some(_) => None,
@@ -175,7 +175,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn group(tree: &TokenTree) -> Option<&Group> {
+    pub const fn group(tree: &TokenTree) -> Option<&Group> {
         match tree {
             TokenTree::Group(group) => Some(group),
             _ => None,
@@ -183,7 +183,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn punct(tree: &TokenTree) -> Option<&Punct> {
+    pub const fn punct(tree: &TokenTree) -> Option<&Punct> {
         match tree {
             TokenTree::Punct(punct) => Some(punct),
             _ => None,
@@ -191,7 +191,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn token_ident(tree: &TokenTree) -> Option<&Ident> {
+    pub const fn token_ident(tree: &TokenTree) -> Option<&Ident> {
         match tree {
             TokenTree::Ident(ident) => Some(ident),
             _ => None,
@@ -199,7 +199,7 @@ impl Syntax {
     }
 
     #[must_use]
-    pub fn token_literal(tree: &TokenTree) -> Option<&Literal> {
+    pub const fn token_literal(tree: &TokenTree) -> Option<&Literal> {
         match tree {
             TokenTree::Literal(literal) => Some(literal),
             _ => None,

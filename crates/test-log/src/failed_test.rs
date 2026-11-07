@@ -9,7 +9,7 @@ use super::test_name::TestName;
 pub struct FailedTest<'log>(&'log TestName);
 
 impl<'log> From<&'log TestName> for FailedTest<'log> {
-    fn from(name: &'log TestName) -> FailedTest<'log> {
+    fn from(name: &'log TestName) -> Self {
         FailedTest(name)
     }
 }

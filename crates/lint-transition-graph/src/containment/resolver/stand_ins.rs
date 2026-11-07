@@ -8,11 +8,11 @@ use lint_placement::CrateName;
 pub(crate) struct StandIns<'found>(BTreeMap<&'found CrateName, BTreeMap<Name, Vec<Name>>>);
 
 impl<'found> StandIns<'found> {
-    pub(crate) fn with_graph(self, krate: &'found CrateName, graph: &ItemGraph) -> StandIns<'found> {
+    pub(crate) fn with_graph(self, krate: &'found CrateName, graph: &ItemGraph) -> Self {
         graph.stand_ins().into_iter().fold(self, |stand_ins, (name, used)| stand_ins.standing(krate, name, &used))
     }
 
-    fn standing(mut self, krate: &'found CrateName, name: &Name, used: &[&Name]) -> StandIns<'found> {
+    fn standing(mut self, krate: &'found CrateName, name: &Name, used: &[&Name]) -> Self {
         self.0.entry(krate).or_default().insert(name.clone(), used.iter().copied().cloned().collect());
         self
     }

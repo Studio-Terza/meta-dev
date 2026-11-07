@@ -21,35 +21,35 @@ pub enum Request {
 }
 
 impl Request {
-    pub fn parsed(command: Command, mut arguments: impl Iterator<Item = OsString>) -> Result<Request, Failure> {
+    pub fn parsed(command: Command, mut arguments: impl Iterator<Item = OsString>) -> Result<Self, Failure> {
         match command {
-            Command::Affected => Ok(Request::Affected(arguments.map(PathBuf::from).collect())),
-            Command::Widened => Ok(Request::Widened(arguments.map(PathBuf::from).collect())),
-            Command::History => Ok(Request::History(arguments.map(PathBuf::from).collect())),
-            Command::Sources => Ok(Request::Sources(arguments.collect())),
+            Command::Affected => Ok(Self::Affected(arguments.map(PathBuf::from).collect())),
+            Command::Widened => Ok(Self::Widened(arguments.map(PathBuf::from).collect())),
+            Command::History => Ok(Self::History(arguments.map(PathBuf::from).collect())),
+            Command::Sources => Ok(Self::Sources(arguments.collect())),
             Command::Beyond => arguments
                 .next()
                 .ok_or(Failure::Usage)
                 .map(PathBuf::from)
-                .map(|produced| Request::Beyond { produced, changed: arguments.map(PathBuf::from).collect() }),
+                .map(|produced| Self::Beyond { produced, changed: arguments.map(PathBuf::from).collect() }),
         }
     }
 
     pub fn written(self, files: &impl Files, metadata: &Path, out: &mut impl Write) -> Result<(), Failure> {
         match self {
-            Request::Affected(changed) => {
+            Self::Affected(changed) => {
                 Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).reached(&changed))?)
             }
-            Request::Widened(changed) => {
+            Self::Widened(changed) => {
                 Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).reached(&changed).widened())?)
             }
-            Request::History(changed) => {
+            Self::History(changed) => {
                 Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).history(&changed))?)
             }
-            Request::Sources(roots) => {
+            Self::Sources(roots) => {
                 Ok(write!(out, "{}", Workspace::from(&Self::metadata(files, metadata)?).sources(&roots))?)
             }
-            Request::Beyond { produced, changed } => Ok(Workspace::from(&Self::metadata(files, metadata)?)
+            Self::Beyond { produced, changed } => Ok(Workspace::from(&Self::metadata(files, metadata)?)
                 .beyond(&produced, &changed)
                 .map_or(Ok(()), |path| writeln!(out, "{}", path.display()))?),
         }

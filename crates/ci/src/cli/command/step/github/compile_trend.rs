@@ -47,12 +47,12 @@ impl CompileTrend {
 }
 
 impl Step for CompileTrend {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<CompileTrend, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let today = &arguments.taken()?;
         let downloads = &arguments.taken()?;
         arguments.ended()?;
-        Ok(CompileTrend { today: PathBuf::from(today), fortnight: Fortnight::downloading_to(PathBuf::from(downloads)) })
+        Ok(Self { today: PathBuf::from(today), fortnight: Fortnight::downloading_to(PathBuf::from(downloads)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

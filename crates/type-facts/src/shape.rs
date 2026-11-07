@@ -7,16 +7,16 @@ pub enum Shape {
 }
 
 impl Shape {
-    fn of_unnamed(fields: &FieldsUnnamed) -> Shape {
-        fields.unnamed.first().filter(|_| fields.unnamed.len() == 1).map_or(Shape::Other, |_| Shape::OneField)
+    fn of_unnamed(fields: &FieldsUnnamed) -> Self {
+        fields.unnamed.first().filter(|_| fields.unnamed.len() == 1).map_or(Self::Other, |_| Self::OneField)
     }
 }
 
 impl From<&Fields> for Shape {
-    fn from(fields: &Fields) -> Shape {
+    fn from(fields: &Fields) -> Self {
         match fields {
-            Fields::Unnamed(unnamed) => Shape::of_unnamed(unnamed),
-            _ => Shape::Other,
+            Fields::Unnamed(unnamed) => Self::of_unnamed(unnamed),
+            _ => Self::Other,
         }
     }
 }

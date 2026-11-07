@@ -18,23 +18,23 @@ pub struct Scope<'run> {
 impl<'run> Scope<'run> {
     const SELF: &str = "self";
 
-    pub fn declared(generics: BTreeSet<Name>, held: Option<&'run BTreeSet<Name>>) -> Scope<'run> {
+    pub fn declared(generics: BTreeSet<Name>, held: Option<&'run BTreeSet<Name>>) -> Self {
         Scope { generics, held, ..Scope::default() }
     }
 
-    pub fn generics(&self) -> &BTreeSet<Name> {
+    pub const fn generics(&self) -> &BTreeSet<Name> {
         &self.generics
     }
 
-    pub fn within(&self) -> Option<Within> {
+    pub const fn within(&self) -> Option<Within> {
         self.within
     }
 
-    pub fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Scope<'run> {
+    pub const fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Self {
         Scope { generics, held: self.held, bindings, within: None }
     }
 
-    pub fn replace_within(&mut self, within: Option<Within>) -> Option<Within> {
+    pub const fn replace_within(&mut self, within: Option<Within>) -> Option<Within> {
         std::mem::replace(&mut self.within, within)
     }
 

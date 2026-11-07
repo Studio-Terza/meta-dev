@@ -17,7 +17,7 @@ struct Interface<'view, 'found> {
 }
 
 impl<'view, 'found> Interface<'view, 'found> {
-    fn split_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Interface<'view, 'found>> {
+    fn split_in(view: &'view Containment<'found, '_>, cluster: Cluster<'found>) -> Option<Self> {
         let judged = cluster.krate().map(|_| cluster)?;
         let cut = view.slice(judged)?.cut();
         let exports = cut.exports();

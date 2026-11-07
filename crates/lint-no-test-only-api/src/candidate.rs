@@ -8,11 +8,11 @@ pub(crate) struct Candidate<'file> {
 }
 
 impl<'file> Candidate<'file> {
-    pub(crate) fn new(called: Name, violation: Violation<'file>) -> Candidate<'file> {
+    pub(crate) const fn new(called: Name, violation: Violation<'file>) -> Self {
         Candidate { called, violation }
     }
 
-    pub(crate) fn called(&self) -> &Name {
+    pub(crate) const fn called(&self) -> &Name {
         &self.called
     }
 

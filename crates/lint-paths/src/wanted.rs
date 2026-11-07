@@ -10,7 +10,7 @@ pub(crate) enum Wanted<'run> {
 }
 
 impl<'run> Wanted<'run> {
-    pub(crate) fn among(scopes: &'run Scopes<'_>, finals: &'run [Word<'run>]) -> Wanted<'run> {
+    pub(crate) fn among(scopes: &'run Scopes<'_>, finals: &'run [Word<'run>]) -> Self {
         Wanted::Among { finals, renamed: scopes.renamed_to(finals).collect() }
     }
 

@@ -15,7 +15,7 @@ pub(crate) struct GatedItems {
 
 impl GatedItems {
     pub(crate) fn in_file(file: &syn::File) -> Vec<Flagged> {
-        let mut items = GatedItems::default();
+        let mut items = Self::default();
         items.visit_file(file);
         items.found
     }

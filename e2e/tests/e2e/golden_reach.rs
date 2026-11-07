@@ -13,8 +13,8 @@ struct Verdicts {
 }
 
 impl Verdicts {
-    fn counted(self, passed: bool, expected: bool) -> Verdicts {
-        Verdicts {
+    fn counted(self, passed: bool, expected: bool) -> Self {
+        Self {
             pairs: self.pairs + 1,
             passed: self.passed + usize::from(passed),
             disagreements: self.disagreements + usize::from(passed != expected),

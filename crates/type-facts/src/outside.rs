@@ -9,17 +9,17 @@ pub struct Outside<'found, 'file> {
 }
 
 impl<'found, 'file> Outside<'found, 'file> {
-    pub(crate) fn new(name: &'found Name, implementation: &'found Implementation<'file>) -> Outside<'found, 'file> {
+    pub(crate) const fn new(name: &'found Name, implementation: &'found Implementation<'file>) -> Self {
         Outside { name, implementation }
     }
 
     #[must_use]
-    pub fn name(&self) -> &'found Name {
+    pub const fn name(&self) -> &'found Name {
         self.name
     }
 
     #[must_use]
-    pub fn implementation(&self) -> &'found Implementation<'file> {
+    pub const fn implementation(&self) -> &'found Implementation<'file> {
         self.implementation
     }
 }

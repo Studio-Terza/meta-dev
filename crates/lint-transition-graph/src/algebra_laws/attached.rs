@@ -14,7 +14,7 @@ pub(crate) struct Attached {
 }
 
 impl Attached {
-    pub(crate) fn declared<'found, 'file: 'found>(system: &TypeSystem<'found, 'file>) -> Attached {
+    pub(crate) fn declared<'found, 'file: 'found>(system: &TypeSystem<'found, 'file>) -> Self {
         let declarations = system.declarations();
         let by_operation = system
             .algebras()
@@ -30,7 +30,7 @@ impl Attached {
                 (operation.ordinal(), properties.into_iter().collect())
             })
             .collect();
-        Attached { by_operation }
+        Self { by_operation }
     }
 
     pub(crate) fn of_operation(&self, operation: &Operation<'_, '_>) -> &[Property] {

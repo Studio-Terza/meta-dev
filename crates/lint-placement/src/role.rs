@@ -18,26 +18,26 @@ impl Role {
     #[must_use]
     pub fn roots(self, target: &Path, file: &Path) -> Vec<PathBuf> {
         match self {
-            Role::BinaryRoot | Role::BuildScript => vec![file.to_path_buf()],
-            Role::Target => vec![target.to_path_buf(), target.join(Self::MAIN)],
-            Role::LibraryRoot | Role::Other => Vec::new(),
+            Self::BinaryRoot | Self::BuildScript => vec![file.to_path_buf()],
+            Self::Target => vec![target.to_path_buf(), target.join(Self::MAIN)],
+            Self::LibraryRoot | Self::Other => Vec::new(),
         }
     }
 
     #[must_use]
-    pub fn in_source(inside: &Path) -> Role {
+    pub fn in_source(inside: &Path) -> Self {
         Self::binary(inside)
-            .or_else(|| Some(inside).filter(|inside| *inside == Path::new(Self::LIBRARY)).map(|_| Role::LibraryRoot))
-            .unwrap_or(Role::Other)
+            .or_else(|| Some(inside).filter(|inside| *inside == Path::new(Self::LIBRARY)).map(|_| Self::LibraryRoot))
+            .unwrap_or(Self::Other)
     }
 
-    fn binary(inside: &Path) -> Option<Role> {
+    fn binary(inside: &Path) -> Option<Self> {
         let main = Some(inside).filter(|inside| *inside == Path::new(Self::MAIN));
         let listed = inside.parent().filter(|parent| *parent == Path::new(Self::BINARIES));
         let nested = Some(inside)
             .filter(|inside| inside.file_name() == Some(OsStr::new(Self::MAIN)))
             .and_then(|inside| inside.parent().and_then(Path::parent))
             .filter(|grandparent| *grandparent == Path::new(Self::BINARIES));
-        main.or(listed).or(nested).map(|_| Role::BinaryRoot)
+        main.or(listed).or(nested).map(|_| Self::BinaryRoot)
     }
 }

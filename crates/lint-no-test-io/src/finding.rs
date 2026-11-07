@@ -7,7 +7,7 @@ use lint_layout::UsePath;
 pub struct Finding<'path>(&'path UsePath);
 
 impl<'path> From<&'path UsePath> for Finding<'path> {
-    fn from(path: &'path UsePath) -> Finding<'path> {
+    fn from(path: &'path UsePath) -> Self {
         Finding(path)
     }
 }

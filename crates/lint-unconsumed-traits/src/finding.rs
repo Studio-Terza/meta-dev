@@ -8,7 +8,7 @@ use crate::declaration::Declaration;
 pub(crate) struct Finding<'declaration>(&'declaration Declaration<'declaration>);
 
 impl<'declaration> From<&'declaration Declaration<'declaration>> for Finding<'declaration> {
-    fn from(declaration: &'declaration Declaration<'declaration>) -> Finding<'declaration> {
+    fn from(declaration: &'declaration Declaration<'declaration>) -> Self {
         Finding(declaration)
     }
 }

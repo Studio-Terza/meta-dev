@@ -22,7 +22,7 @@ pub struct Acting<'found> {
 }
 
 impl<'found> Acting<'found> {
-    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Acting<'found>> {
+    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Option<Self> {
         let ends = edge.ends();
         let function = edge.transition().function();
         ends.subject(function.mutation(), function.wrapping())
@@ -45,23 +45,23 @@ impl<'found> Acting<'found> {
         self.held.nonzero().or_else(|| self.pure().map(|_| self.held))
     }
 
-    fn admitted(&self, fixed_by: Option<&Name>) -> Option<&Acting<'found>> {
+    fn admitted(&self, fixed_by: Option<&Name>) -> Option<&Self> {
         fixed_by.map_or(Some(self), |fixing| Operators::named(fixing).and(self.pure()))
     }
 
-    fn about(subject: Node<'found>, takes: &[End<'found>]) -> Acting<'found> {
+    fn about(subject: Node<'found>, takes: &[End<'found>]) -> Self {
         let (held, parameters): (Vec<End<'found>>, Vec<End<'found>>) =
             takes.iter().copied().partition(|taken| taken.node() == Some(&subject));
         Acting { subject, held: Count::new(held.len()), parameters }
     }
 
     #[must_use]
-    pub fn pure(&self) -> Option<&Acting<'found>> {
+    pub fn pure(&self) -> Option<&Self> {
         Some(self).filter(|acting| acting.parameters.is_empty())
     }
 
     #[must_use]
-    pub fn subject(&self) -> &Node<'found> {
+    pub const fn subject(&self) -> &Node<'found> {
         &self.subject
     }
 }
@@ -88,7 +88,7 @@ pub enum Form<'found> {
 }
 
 impl<'found> Form<'found> {
-    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Form<'found> {
+    pub(crate) fn of_edge(edge: &Edge<'found, '_>) -> Self {
         let transition = edge.transition();
         let function = transition.function();
         let ground = *AsRef::<Ground>::as_ref(transition);
@@ -97,24 +97,24 @@ impl<'found> Form<'found> {
             .unwrap_or_else(|| Form::acted(edge, ground))
     }
 
-    fn lifted(body: Body) -> Option<Form<'found>> {
+    const fn lifted(body: Body) -> Option<Self> {
         match body {
             Body::Mapped | Body::Focused | Body::Routed => Some(Form::Lift),
             Body::Written => None,
         }
     }
 
-    fn through_store(ground: Ground, mutation: Mutation) -> Option<Form<'found>> {
+    fn through_store(ground: Ground, mutation: Mutation) -> Option<Self> {
         matches!((ground, mutation), (Ground::Store, Mutation::ThroughSelf)).then_some(Form::Store)
     }
 
-    fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Form<'found> {
+    fn acted(edge: &Edge<'found, '_>, ground: Ground) -> Self {
         Totality::of_wrapping(edge.transition().function().wrapping())
             .zip(Acting::of_edge(edge))
             .map_or_else(|| Form::beyond(ground), |(totality, acting)| totality.shaping(acting))
     }
 
-    fn beyond(ground: Ground) -> Form<'found> {
+    const fn beyond(ground: Ground) -> Self {
         match ground {
             Ground::Ports => Form::Port,
             Ground::Core | Ground::Boundary | Ground::Store => Form::Transition,
@@ -130,11 +130,11 @@ impl<'found> Form<'found> {
     }
 
     #[must_use]
-    pub fn written(&self) -> Option<&Form<'found>> {
+    pub fn written(&self) -> Option<&Self> {
         self.sorted(Some(self), None, None)
     }
 
-    pub(crate) fn ported(&self) -> Option<Effect> {
+    pub(crate) const fn ported(&self) -> Option<Effect> {
         match self {
             Form::Port => Some(Effect),
             Form::Operation(_) | Form::Partial(_) | Form::Transition | Form::Lift | Form::Store => None,
@@ -142,7 +142,7 @@ impl<'found> Form<'found> {
     }
 
     #[must_use]
-    pub fn algebraic(&self) -> Option<&Acting<'found>> {
+    pub const fn algebraic(&self) -> Option<&Acting<'found>> {
         match self {
             Form::Operation(acting) | Form::Partial(acting) => Some(acting),
             Form::Transition | Form::Port | Form::Lift | Form::Store => None,

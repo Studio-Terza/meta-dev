@@ -12,7 +12,7 @@ impl OnlyField {
     const ONLY: usize = 1;
     const FIRST: u32 = 0;
 
-    pub fn taken(data: Data) -> Result<OnlyField, Data> {
+    pub fn taken(data: Data) -> Result<Self, Data> {
         match data {
             Data::Struct(DataStruct { struct_token, fields, semi_token }) => {
                 Self::among(fields).map_err(|fields| Data::Struct(DataStruct { struct_token, fields, semi_token }))
@@ -25,15 +25,15 @@ impl OnlyField {
         Error::new_spanned(input, Self::REFUSED)
     }
 
-    pub fn member(&self) -> &Member {
+    pub const fn member(&self) -> &Member {
         &self.member
     }
 
-    pub fn inner(&self) -> &Type {
+    pub const fn inner(&self) -> &Type {
         &self.inner
     }
 
-    fn among(fields: Fields) -> Result<OnlyField, Fields> {
+    fn among(fields: Fields) -> Result<Self, Fields> {
         match fields {
             Fields::Named(FieldsNamed { brace_token, named }) => {
                 Self::sole(named).map_err(|named| Fields::Named(FieldsNamed { brace_token, named }))
@@ -45,18 +45,16 @@ impl OnlyField {
         }
     }
 
-    fn sole<Separator: Default>(
-        fields: Punctuated<Field, Separator>,
-    ) -> Result<OnlyField, Punctuated<Field, Separator>> {
+    fn sole<Separator: Default>(fields: Punctuated<Field, Separator>) -> Result<Self, Punctuated<Field, Separator>> {
         <[Field; Self::ONLY]>::try_from(fields.into_iter().collect::<Vec<Field>>())
-            .map(|[field]| OnlyField::from(field))
+            .map(|[field]| Self::from(field))
             .map_err(|fields| fields.into_iter().collect())
     }
 }
 
 impl From<Field> for OnlyField {
-    fn from(field: Field) -> OnlyField {
-        OnlyField {
+    fn from(field: Field) -> Self {
+        Self {
             member: field
                 .ident
                 .map_or_else(|| Member::Unnamed(Index { index: Self::FIRST, span: field.ty.span() }), Member::Named),

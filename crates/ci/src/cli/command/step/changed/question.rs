@@ -8,11 +8,11 @@ pub enum Question {
 }
 
 impl From<Question> for OsString {
-    fn from(question: Question) -> OsString {
+    fn from(question: Question) -> Self {
         match question {
-            Question::History => OsString::from("history"),
-            Question::Affected => OsString::from("affected"),
-            Question::Widened => OsString::from("widened"),
+            Question::History => Self::from("history"),
+            Question::Affected => Self::from("affected"),
+            Question::Widened => Self::from("widened"),
         }
     }
 }

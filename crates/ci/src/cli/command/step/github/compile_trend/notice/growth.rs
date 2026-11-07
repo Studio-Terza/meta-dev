@@ -14,14 +14,14 @@ pub struct Growth<'name> {
 }
 
 impl<'name> Growth<'name> {
-    pub(super) fn against(name: &'name OneLine, today: Seconds, earlier: &[Build]) -> Growth<'name> {
+    pub(super) fn against(name: &'name OneLine, today: Seconds, earlier: &[Build]) -> Self {
         let listed: Vec<Seconds> = earlier.iter().filter_map(|build| build.of_crate(name)).collect();
         let count = u32::try_from(listed.len().max(1)).map_or(f64::from(u32::MAX), f64::from);
         let average = Seconds::new(listed.into_iter().sum::<Seconds>().into_inner() / count);
         Growth { name, today, average }
     }
 
-    pub(super) fn grew(self) -> Option<Growth<'name>> {
+    pub(super) fn grew(self) -> Option<Self> {
         (self.today > self.average).then_some(self)
     }
 

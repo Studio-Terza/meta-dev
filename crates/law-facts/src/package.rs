@@ -7,7 +7,7 @@ pub struct Package<'file>(&'file Path);
 
 impl<'file> Package<'file> {
     #[must_use]
-    pub fn containing(file: &'file SourceFile) -> Package<'file> {
+    pub fn containing(file: &'file SourceFile) -> Self {
         Package(file.placement().package().root().directory())
     }
 }

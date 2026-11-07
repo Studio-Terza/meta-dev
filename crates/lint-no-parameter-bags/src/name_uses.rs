@@ -13,9 +13,9 @@ pub struct NameUses {
 }
 
 impl NameUses {
-    pub fn in_file(file: &SourceFile) -> NameUses {
+    pub fn in_file(file: &SourceFile) -> Self {
         let mut uses =
-            NameUses { crate_name: Some(CrateName::from(file.placement().crate_root())), names: BTreeSet::new() };
+            Self { crate_name: Some(CrateName::from(file.placement().crate_root())), names: BTreeSet::new() };
         uses.visit_file(file.syntax());
         uses
     }
@@ -24,7 +24,7 @@ impl NameUses {
         self.names.get(name)
     }
 
-    pub fn sharing_crate(&self, other: &NameUses) -> Option<&NameUses> {
+    pub fn sharing_crate(&self, other: &Self) -> Option<&Self> {
         (self.crate_name == other.crate_name).then_some(self)
     }
 }

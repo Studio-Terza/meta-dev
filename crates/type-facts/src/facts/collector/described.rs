@@ -27,8 +27,8 @@ struct Listed<Item> {
 }
 
 impl<Item> Listed<Item> {
-    fn new(separator: Separator, items: impl Iterator<Item = Item>) -> Listed<Item> {
-        Listed { separator, items: items.collect() }
+    fn new(separator: Separator, items: impl Iterator<Item = Item>) -> Self {
+        Self { separator, items: items.collect() }
     }
 }
 
@@ -44,8 +44,8 @@ enum Separator {
 impl fmt::Display for Separator {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Separator::Comma => formatter.write_str(", "),
-            Separator::Plus => formatter.write_str(" + "),
+            Self::Comma => formatter.write_str(", "),
+            Self::Plus => formatter.write_str(" + "),
         }
     }
 }
@@ -104,8 +104,8 @@ impl fmt::Display for Described<'_> {
 impl TryFrom<Described<'_>> for Name {
     type Error = fmt::Error;
 
-    fn try_from(found: Described<'_>) -> Result<Name, fmt::Error> {
+    fn try_from(found: Described<'_>) -> Result<Self, fmt::Error> {
         let mut text = String::new();
-        write!(text, "{found}").map(|()| Name::from(text.as_str()))
+        write!(text, "{found}").map(|()| Self::from(text.as_str()))
     }
 }

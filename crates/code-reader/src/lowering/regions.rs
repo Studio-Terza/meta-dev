@@ -49,31 +49,31 @@ pub(super) struct Context {
 }
 
 impl Context {
-    pub(super) fn outermost(region: Region) -> Context {
-        Context { region, subject: None }
+    pub(super) const fn outermost(region: Region) -> Self {
+        Self { region, subject: None }
     }
 
-    pub(super) fn within_module(&self, item: &ItemMod) -> Context {
-        Context { region: Regions::of_module(self.region, item), subject: self.subject }
+    pub(super) fn within_module(&self, item: &ItemMod) -> Self {
+        Self { region: Regions::of_module(self.region, item), subject: self.subject }
     }
 
-    pub(super) fn of_impl(&self, block: &ItemImpl, subject: SubjectId) -> Context {
-        Context { region: self.region.inside(Self::within(block)), subject: Some(subject) }
+    pub(super) fn of_impl(&self, block: &ItemImpl, subject: SubjectId) -> Self {
+        Self { region: self.region.inside(Self::within(block)), subject: Some(subject) }
     }
 
-    pub(super) fn of_trait(&self) -> Context {
-        Context { region: self.region, subject: None }
+    pub(super) const fn of_trait(&self) -> Self {
+        Self { region: self.region, subject: None }
     }
 
-    pub(super) fn region(&self) -> Region {
+    pub(super) const fn region(&self) -> Region {
         self.region
     }
 
-    pub(super) fn subject(&self) -> Option<SubjectId> {
+    pub(super) const fn subject(&self) -> Option<SubjectId> {
         self.subject
     }
 
-    fn within(block: &ItemImpl) -> Within {
+    const fn within(block: &ItemImpl) -> Within {
         match block.trait_ {
             Some(_) => Within::TraitImpl,
             None => Within::Own,

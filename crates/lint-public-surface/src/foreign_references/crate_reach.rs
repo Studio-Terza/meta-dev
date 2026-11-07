@@ -22,15 +22,15 @@ impl CrateReach {
         self.used = self.used.max(Used::Named);
     }
 
-    pub fn globbed(&mut self) {
+    pub const fn globbed(&mut self) {
         self.used = Used::Globbed;
     }
 
-    pub fn names_only(self) -> CrateReach {
-        CrateReach { names: self.names, used: Used::Unused }
+    pub fn names_only(self) -> Self {
+        Self { names: self.names, used: Used::Unused }
     }
 
-    pub fn absorb(&mut self, other: CrateReach) {
+    pub fn absorb(&mut self, other: Self) {
         self.names.extend(other.names);
         self.used = self.used.max(other.used);
     }

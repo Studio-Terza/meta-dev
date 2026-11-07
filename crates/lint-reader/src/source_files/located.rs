@@ -24,15 +24,11 @@ pub struct Node<'tree> {
 
 impl<'tree> Located<'tree> {
     #[must_use]
-    pub fn new(tree: &'tree Tree<'tree>, package: &Path, file: &Path) -> Located<'tree> {
+    pub fn new(tree: &'tree Tree<'tree>, package: &Path, file: &Path) -> Self {
         Located { file: file.to_path_buf(), package: package.to_path_buf(), tree }
     }
 
-    pub fn open_many(
-        files: &impl Files,
-        packages: &Packages,
-        fresh: &[Located<'tree>],
-    ) -> Vec<Result<Opened, Failure>> {
+    pub fn open_many(files: &impl Files, packages: &Packages, fresh: &[Self]) -> Vec<Result<Opened, Failure>> {
         let paths: Vec<&Path> = fresh.iter().map(|located| located.file.as_path()).collect();
         fresh
             .iter()
@@ -67,7 +63,7 @@ impl<'tree> Located<'tree> {
 
 impl<'tree> Node<'tree> {
     #[must_use]
-    pub fn located(&self) -> &Located<'tree> {
+    pub const fn located(&self) -> &Located<'tree> {
         &self.located
     }
 
@@ -77,7 +73,7 @@ impl<'tree> Node<'tree> {
     }
 
     #[must_use]
-    pub fn child(&self, file: &Path, children: &Path) -> Node<'tree> {
+    pub fn child(&self, file: &Path, children: &Path) -> Self {
         Located::new(self.located.tree, &self.located.package, file).node(children)
     }
 }

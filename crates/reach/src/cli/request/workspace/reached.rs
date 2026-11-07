@@ -22,8 +22,8 @@ enum Flag {
 impl fmt::Display for Flag {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Flag::Cargo => formatter.write_str("-p "),
-            Flag::Mutants => formatter.write_str("--test-package="),
+            Self::Cargo => formatter.write_str("-p "),
+            Self::Mutants => formatter.write_str("--test-package="),
         }
     }
 }
@@ -38,12 +38,12 @@ pub struct Reached<'meta> {
 impl<'meta> Reached<'meta> {
     const WORKSPACE_FLAG: &'static str = "--workspace";
 
-    pub fn new(crates: BTreeSet<&'meta CrateName>, total: CrateCount) -> Reached<'meta> {
+    pub const fn new(crates: BTreeSet<&'meta CrateName>, total: CrateCount) -> Self {
         Reached { crates, total, cargo: Cargo::Reached }
     }
 
     #[must_use]
-    pub fn widened(self) -> Reached<'meta> {
+    pub fn widened(self) -> Self {
         Reached { cargo: Cargo::Workspace, ..self }
     }
 
@@ -51,7 +51,7 @@ impl<'meta> Reached<'meta> {
         Share::new(CrateCount::new(self.crates.len()), self.total)
     }
 
-    pub fn covering(&self, crates: &BTreeSet<&CrateName>) -> Option<&Reached<'meta>> {
+    pub fn covering(&self, crates: &BTreeSet<&CrateName>) -> Option<&Self> {
         crates.is_subset(&self.crates).then_some(self)
     }
 

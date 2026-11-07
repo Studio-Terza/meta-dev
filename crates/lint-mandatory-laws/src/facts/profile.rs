@@ -16,12 +16,7 @@ pub(crate) struct Profile<'file> {
 }
 
 impl<'file> Profile<'file> {
-    pub(crate) fn declared(
-        subject: Subject<'file>,
-        site: Site<'file>,
-        exposure: Exposure,
-        facts: Vec<Name>,
-    ) -> Profile<'file> {
+    pub(crate) fn declared(subject: Subject<'file>, site: Site<'file>, exposure: Exposure, facts: Vec<Name>) -> Self {
         Profile { subject, facets: Facets::new(site, exposure, facts) }
     }
 

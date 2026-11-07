@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 pub struct ManifestFile(PathBuf);
 
 impl From<PathBuf> for ManifestFile {
-    fn from(path: PathBuf) -> ManifestFile {
-        ManifestFile(path)
+    fn from(path: PathBuf) -> Self {
+        Self(path)
     }
 }
 

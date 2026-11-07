@@ -10,7 +10,7 @@ pub(crate) struct Finding<'model> {
 }
 
 impl<'model> Finding<'model> {
-    pub(crate) fn new(derivable: Word<'static>, subject: &'model Name) -> Finding<'model> {
+    pub(crate) const fn new(derivable: Word<'static>, subject: &'model Name) -> Self {
         Finding { derivable, subject }
     }
 }

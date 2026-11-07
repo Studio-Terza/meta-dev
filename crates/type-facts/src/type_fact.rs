@@ -16,31 +16,26 @@ pub struct TypeFact<'file> {
 }
 
 impl<'file> TypeFact<'file> {
-    pub(crate) fn declared(
-        krate: &'file CrateName,
-        name: Name,
-        site: Site<'file>,
-        derives: Vec<Name>,
-    ) -> TypeFact<'file> {
+    pub(crate) const fn declared(krate: &'file CrateName, name: Name, site: Site<'file>, derives: Vec<Name>) -> Self {
         TypeFact { krate, name, site, derives, shape: Shape::Other, dependencies: Vec::new() }
     }
 
-    pub(crate) fn depending_on(mut self, dependencies: Vec<Dependency<'file>>) -> TypeFact<'file> {
+    pub(crate) fn depending_on(mut self, dependencies: Vec<Dependency<'file>>) -> Self {
         self.dependencies = dependencies;
         self
     }
 
-    pub(crate) fn shaped(mut self, shape: Shape) -> TypeFact<'file> {
+    pub(crate) const fn shaped(mut self, shape: Shape) -> Self {
         self.shape = shape;
         self
     }
 
-    pub(crate) fn named_like(&self, other: &TypeFact<'_>) -> Option<&TypeFact<'file>> {
+    pub(crate) fn named_like(&self, other: &TypeFact<'_>) -> Option<&Self> {
         (self.krate == other.krate).then_some(self).filter(|_| self.name == other.name)
     }
 
     #[must_use]
-    pub fn shape(&self) -> Shape {
+    pub const fn shape(&self) -> Shape {
         self.shape
     }
 

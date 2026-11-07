@@ -12,12 +12,12 @@ pub struct Scope<'tree> {
 
 impl<'tree> Scope<'tree> {
     #[must_use]
-    pub fn new(tree: &'tree Tree<'tree>, package: &Path, crate_file: CrateFile) -> Scope<'tree> {
+    pub fn new(tree: &'tree Tree<'tree>, package: &Path, crate_file: CrateFile) -> Self {
         Scope { tree, package: package.to_path_buf(), crate_file }
     }
 
     #[must_use]
-    pub fn tree(&self) -> &'tree Tree<'tree> {
+    pub const fn tree(&self) -> &'tree Tree<'tree> {
         self.tree
     }
 
@@ -27,7 +27,7 @@ impl<'tree> Scope<'tree> {
     }
 
     #[must_use]
-    pub fn crate_file(&self) -> &CrateFile {
+    pub const fn crate_file(&self) -> &CrateFile {
         &self.crate_file
     }
 }

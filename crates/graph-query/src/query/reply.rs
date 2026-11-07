@@ -11,10 +11,10 @@ pub struct Reply<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Reply<'view, 'found, 'file> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         matches: Option<Matches<'view, 'file>>,
         answers: Vec<Answer<'view, 'found, 'file>>,
-    ) -> Reply<'view, 'found, 'file> {
+    ) -> Self {
         Reply { matches, answers }
     }
 }

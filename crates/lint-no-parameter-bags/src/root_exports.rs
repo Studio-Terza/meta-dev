@@ -12,8 +12,8 @@ use lint_placement::Role;
 pub struct RootExports(BTreeMap<CrateName, BTreeSet<Name>>);
 
 impl RootExports {
-    pub fn in_files(files: &[&SourceFile]) -> RootExports {
-        let mut exports = RootExports::default();
+    pub fn in_files(files: &[&SourceFile]) -> Self {
+        let mut exports = Self::default();
         files.iter().filter(|file| file.placement().role() == Role::LibraryRoot).for_each(|file| exports.record(file));
         exports
     }

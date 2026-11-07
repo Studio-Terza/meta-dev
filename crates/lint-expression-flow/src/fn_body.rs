@@ -8,7 +8,7 @@ pub enum FnBody<'ast> {
 }
 
 impl<'ast> FnBody<'ast> {
-    pub fn scanned_unless_const(signature: &Signature, block: Option<&'ast Block>) -> FnBody<'ast> {
+    pub fn scanned_unless_const(signature: &Signature, block: Option<&'ast Block>) -> Self {
         block.filter(|_| signature.constness.is_none()).map_or(FnBody::Skipped, FnBody::Scanned)
     }
 

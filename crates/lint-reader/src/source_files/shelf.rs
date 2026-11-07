@@ -25,12 +25,12 @@ pub struct Shelf<'tree> {
 
 impl<'tree> Shelf<'tree> {
     #[must_use]
-    pub fn stocked(files: &impl Files, packages: &'tree Packages, starts: &[Node<'tree>]) -> Shelf<'tree> {
+    pub fn stocked(files: &impl Files, packages: &'tree Packages, starts: &[Node<'tree>]) -> Self {
         Shelf { survey: Survey::default(), packages, shelved: BTreeMap::new() }.explored(files, starts, BTreeSet::new())
     }
 
     #[must_use]
-    pub fn survey(&self) -> &Survey {
+    pub const fn survey(&self) -> &Survey {
         &self.survey
     }
 
@@ -44,7 +44,7 @@ impl<'tree> Shelf<'tree> {
         self.shelved.get(&located).and_then(Shelved::opened).and_then(|opened| opened.parsed().ok())
     }
 
-    pub fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: BTreeSet<Node<'tree>>) -> Shelf<'tree> {
+    pub fn explored(self, files: &impl Files, level: &[Node<'tree>], visited: BTreeSet<Node<'tree>>) -> Self {
         let (_, fresh): (Vec<&Located<'tree>>, Vec<&Located<'tree>>) =
             level.iter().map(Node::located).partition(|located| self.shelved.contains_key(*located));
         let fresh: BTreeSet<Located<'tree>> = fresh.into_iter().cloned().collect();
@@ -62,7 +62,7 @@ impl<'tree> Shelf<'tree> {
         Frontier::new(next, visited).explored(stocked, files)
     }
 
-    fn read(self, files: &impl Files, fresh: Vec<Located<'tree>>) -> Shelf<'tree> {
+    fn read(self, files: &impl Files, fresh: Vec<Located<'tree>>) -> Self {
         let opened = Located::open_many(files, self.packages, &fresh);
         fresh.into_iter().zip(opened).fold(self, |mut shelf, (located, opened)| {
             shelf.shelved.insert(located, Shelved::from(opened));

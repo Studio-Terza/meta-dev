@@ -18,9 +18,9 @@ enum Entry {
 type Listing = Result<Vec<PathBuf>, Failure<'static>>;
 
 impl Entry {
-    fn kinded(path: PathBuf, kind: Kind) -> Option<Entry> {
+    fn kinded(path: PathBuf, kind: Kind) -> Option<Self> {
         match kind {
-            Kind::Directory => Some(Entry::Directory(path)),
+            Kind::Directory => Some(Self::Directory(path)),
             Kind::File | Kind::Link | Kind::Missing => RustFiles::rust(path).map(Entry::Rust),
         }
     }
@@ -29,9 +29,9 @@ impl Entry {
         directory: &Path,
         listing: Result<Vec<PathBuf>, FileFailure>,
         kinds: &mut impl Iterator<Item = Kind>,
-    ) -> Result<Vec<Entry>, Failure<'static>> {
+    ) -> Result<Vec<Self>, Failure<'static>> {
         listing
-            .map(|paths| paths.into_iter().zip(kinds).filter_map(|(path, kind)| Entry::kinded(path, kind)).collect())
+            .map(|paths| paths.into_iter().zip(kinds).filter_map(|(path, kind)| Self::kinded(path, kind)).collect())
             .map_err(|failure| Failure::Io {
                 path: Cow::Owned(directory.to_path_buf()),
                 source: io::Error::from(failure),
@@ -40,15 +40,15 @@ impl Entry {
 
     fn directory(&self) -> Option<&Path> {
         match self {
-            Entry::Directory(path) => Some(path),
-            Entry::Rust(_) => None,
+            Self::Directory(path) => Some(path),
+            Self::Rust(_) => None,
         }
     }
 
     fn found(self, below: &mut impl Iterator<Item = Listing>) -> Listing {
         match self {
-            Entry::Rust(path) => Ok(vec![path]),
-            Entry::Directory(_) => below.next().unwrap_or_else(|| Ok(Vec::new())),
+            Self::Rust(path) => Ok(vec![path]),
+            Self::Directory(_) => below.next().unwrap_or_else(|| Ok(Vec::new())),
         }
     }
 }

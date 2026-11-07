@@ -6,8 +6,8 @@ use lint_layout::Name;
 pub struct Finding(Name);
 
 impl From<Name> for Finding {
-    fn from(name: Name) -> Finding {
-        Finding(name)
+    fn from(name: Name) -> Self {
+        Self(name)
     }
 }
 

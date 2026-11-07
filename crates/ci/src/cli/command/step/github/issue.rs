@@ -21,7 +21,7 @@ pub struct Issue<'title> {
 impl<'title> Issue<'title> {
     const SEEN: &'static str = "100";
 
-    pub(super) fn titled(titles: &[Title<'title>], ports: &impl Ports) -> Result<Vec<Issue<'title>>, Failure<'static>> {
+    pub(super) fn titled(titles: &[Title<'title>], ports: &impl Ports) -> Result<Vec<Self>, Failure<'static>> {
         let invocations: Vec<Invocation> = titles.iter().map(|title| Self::search(*title)).collect();
         let texts = Failure::started(ports.outputs(&invocations), &invocations)?;
         titles.iter().zip(&texts).map(|(title, text)| Self::listed(*title, text)).collect()
@@ -70,7 +70,7 @@ impl<'title> Issue<'title> {
         )
     }
 
-    fn listed(title: Title<'title>, text: &Text) -> Result<Issue<'title>, Failure<'static>> {
+    fn listed(title: Title<'title>, text: &Text) -> Result<Self, Failure<'static>> {
         let listed: Vec<Listed> = serde_json::from_str(text.as_ref()).map_err(Failure::Issues)?;
         Ok(Issue { title, number: listed.iter().find_map(|issue| issue.numbered(title)) })
     }

@@ -14,17 +14,17 @@ pub enum Command {
 impl FromStr for Command {
     type Err = Failure;
 
-    fn from_str(name: &str) -> Result<Command, Failure> {
+    fn from_str(name: &str) -> Result<Self, Failure> {
         Self::NAMED.into_iter().find(|(known, _)| *known == name).map(|(_, command)| command).ok_or(Failure::Usage)
     }
 }
 
 impl Command {
-    const NAMED: [(&'static str, Command); 5] = [
-        ("affected", Command::Affected),
-        ("widened", Command::Widened),
-        ("history", Command::History),
-        ("sources", Command::Sources),
-        ("beyond", Command::Beyond),
+    const NAMED: [(&'static str, Self); 5] = [
+        ("affected", Self::Affected),
+        ("widened", Self::Widened),
+        ("history", Self::History),
+        ("sources", Self::Sources),
+        ("beyond", Self::Beyond),
     ];
 }

@@ -9,11 +9,11 @@ pub struct Callee<'file> {
 }
 
 impl<'file> Callee<'file> {
-    pub fn method(method: &'file Ident) -> Callee<'file> {
+    pub const fn method(method: &'file Ident) -> Self {
         Callee { owner: None, method }
     }
 
-    pub fn associated(owner: &'file Ident, method: &'file Ident) -> Callee<'file> {
+    pub const fn associated(owner: &'file Ident, method: &'file Ident) -> Self {
         Callee { owner: Some(owner), method }
     }
 }

@@ -98,13 +98,13 @@ enum Mutation {
 }
 
 impl Mutation {
-    const ALL: [Mutation; 3] = [Mutation::Truncate, Mutation::Flip, Mutation::Insert];
+    const ALL: [Self; 3] = [Self::Truncate, Self::Flip, Self::Insert];
 
     fn applied(self, bytes: &[u8], at: usize, byte: u8) -> Vec<u8> {
         match self {
-            Mutation::Truncate => bytes.iter().take(at).copied().collect(),
-            Mutation::Flip => Self::replaced(bytes, at, bytes.get(at).map(|found| found ^ (byte | 1)), 1),
-            Mutation::Insert => Self::replaced(bytes, at, Some(byte), 0),
+            Self::Truncate => bytes.iter().take(at).copied().collect(),
+            Self::Flip => Self::replaced(bytes, at, bytes.get(at).map(|found| found ^ (byte | 1)), 1),
+            Self::Insert => Self::replaced(bytes, at, Some(byte), 0),
         }
     }
 

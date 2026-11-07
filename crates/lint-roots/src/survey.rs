@@ -35,13 +35,13 @@ impl Deref for Settled<'_> {
 
 impl Survey {
     #[must_use]
-    pub fn learn(self, files: &impl Files, fact: Fact, paths: &[PathBuf]) -> Survey {
+    pub fn learn(self, files: &impl Files, fact: Fact, paths: &[PathBuf]) -> Self {
         match fact {
-            Fact::Kind => Survey {
+            Fact::Kind => Self {
                 kinds: Self::extended(self.kinds, paths, files.kinds(paths).into_iter().map(Some).collect()),
                 ..self
             },
-            Fact::Canonical => Survey {
+            Fact::Canonical => Self {
                 canonical: Self::extended(
                     self.canonical,
                     paths,
@@ -95,15 +95,15 @@ impl Survey {
         found
     }
 
-    fn followed(self, files: &impl Files, paths: &[PathBuf]) -> Survey {
+    fn followed(self, files: &impl Files, paths: &[PathBuf]) -> Self {
         let reals: Vec<PathBuf> = paths.iter().filter_map(|path| self.canonical(path)).map(Path::to_path_buf).collect();
         self.learn(files, Fact::Kind, &reals)
     }
 
-    fn listing(self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Survey {
+    fn listing(self, directory: PathBuf, listing: Result<Vec<PathBuf>, FileFailure>) -> Self {
         match listing {
-            Ok(entries) => Survey { listed: Self::sorted_into(self.listed, directory, entries), ..self },
-            Err(failure) => Survey {
+            Ok(entries) => Self { listed: Self::sorted_into(self.listed, directory, entries), ..self },
+            Err(failure) => Self {
                 failed: self
                     .failed
                     .into_iter()

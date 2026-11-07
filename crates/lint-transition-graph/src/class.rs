@@ -11,8 +11,8 @@ pub(crate) enum Class {
 impl Class {
     pub(crate) fn covering(self, covered: Count) -> Count {
         match self {
-            Class::Covered => covered.incremented(),
-            Class::Primitive => covered,
+            Self::Covered => covered.incremented(),
+            Self::Primitive => covered,
         }
     }
 }

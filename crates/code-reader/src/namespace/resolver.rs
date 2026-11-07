@@ -22,30 +22,30 @@ pub(super) enum Outer {
 impl Outer {
     pub(super) fn binding(self) -> Binding {
         match self {
-            Outer::Known(binding) | Outer::Assumed(binding) => binding,
+            Self::Known(binding) | Self::Assumed(binding) => binding,
         }
     }
 
-    pub(super) fn known_or(known: Option<Binding>, assumed: impl FnOnce() -> Binding) -> Outer {
+    pub(super) fn known_or(known: Option<Binding>, assumed: impl FnOnce() -> Binding) -> Self {
         match known {
-            Some(binding) => Outer::Known(binding),
-            None => Outer::Assumed(assumed()),
+            Some(binding) => Self::Known(binding),
+            None => Self::Assumed(assumed()),
         }
     }
 
     pub(super) fn known(self) -> Resolution {
         match self {
-            Outer::Known(binding) => Resolution::Bound(binding),
-            Outer::Assumed(_) => Resolution::Waiting,
+            Self::Known(binding) => Resolution::Bound(binding),
+            Self::Assumed(_) => Resolution::Waiting,
         }
     }
 }
 
 impl From<Option<&Canonical>> for Outer {
-    fn from(canonical: Option<&Canonical>) -> Outer {
+    fn from(canonical: Option<&Canonical>) -> Self {
         match canonical {
-            Some(found) => Outer::Known(Binding::Std(found.path())),
-            None => Outer::Assumed(Binding::Unknown),
+            Some(found) => Self::Known(Binding::Std(found.path())),
+            None => Self::Assumed(Binding::Unknown),
         }
     }
 }
@@ -59,37 +59,37 @@ pub(crate) enum Resolution {
 impl Resolution {
     pub(super) fn forced(self) -> Binding {
         match self {
-            Resolution::Waiting => Binding::Unknown,
-            Resolution::Bound(binding) => binding,
+            Self::Waiting => Binding::Unknown,
+            Self::Bound(binding) => binding,
         }
     }
 
-    fn kept(self, held: &Binding) -> Resolution {
+    fn kept(self, held: &Binding) -> Self {
         match self {
-            Resolution::Waiting => Resolution::Bound(held.clone()),
-            Resolution::Bound(found) => Resolution::Bound(held.agreed(found)),
+            Self::Waiting => Self::Bound(held.clone()),
+            Self::Bound(found) => Self::Bound(held.agreed(found)),
         }
     }
 
     fn target(self, sight_of: impl FnOnce(ScopeId) -> Sight) -> Target {
         match self {
-            Resolution::Waiting => Target::Waiting,
-            Resolution::Bound(binding) => binding.target(sight_of),
+            Self::Waiting => Target::Waiting,
+            Self::Bound(binding) => binding.target(sight_of),
         }
     }
 }
 
 impl Lattice for Resolution {
-    fn joined(&self, computed: Resolution) -> Resolution {
+    fn joined(&self, computed: Self) -> Self {
         match self {
-            Resolution::Waiting => computed,
-            Resolution::Bound(held) => computed.kept(held),
+            Self::Waiting => computed,
+            Self::Bound(held) => computed.kept(held),
         }
     }
 }
 
 impl<'rows> From<&'rows Resolution> for View<'rows> {
-    fn from(resolution: &'rows Resolution) -> View<'rows> {
+    fn from(resolution: &'rows Resolution) -> Self {
         match resolution {
             Resolution::Waiting => View::WAITING,
             Resolution::Bound(binding) => View::from(binding),
@@ -105,7 +105,7 @@ pub(crate) struct Resolver<'tables, 'rows> {
 }
 
 impl<'tables, 'rows> Resolver<'tables, 'rows> {
-    pub(crate) fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Resolver<'tables, 'rows> {
+    pub(crate) const fn new(space: &'tables Namespace<'tables>, tables: &'tables Tables<'rows>) -> Self {
         Resolver { space, tables, ignored: None }
     }
 

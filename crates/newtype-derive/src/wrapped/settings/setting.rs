@@ -14,30 +14,30 @@ pub enum Setting {
 }
 
 impl Setting {
-    pub fn function(&self) -> Option<&Path> {
+    pub const fn function(&self) -> Option<&Path> {
         match self {
-            Setting::Check(function) => Some(function),
-            Setting::Error(_) | Setting::Strategy(_) => None,
+            Self::Check(function) => Some(function),
+            Self::Error(_) | Self::Strategy(_) => None,
         }
     }
 
-    pub fn error(&self) -> Option<&Type> {
+    pub const fn error(&self) -> Option<&Type> {
         match self {
-            Setting::Error(error) => Some(error),
-            Setting::Check(_) | Setting::Strategy(_) => None,
+            Self::Error(error) => Some(error),
+            Self::Check(_) | Self::Strategy(_) => None,
         }
     }
 
-    pub fn strategy(&self) -> Option<&Expr> {
+    pub const fn strategy(&self) -> Option<&Expr> {
         match self {
-            Setting::Strategy(strategy) => Some(strategy),
-            Setting::Check(_) | Setting::Error(_) => None,
+            Self::Strategy(strategy) => Some(strategy),
+            Self::Check(_) | Self::Error(_) => None,
         }
     }
 }
 
 impl Parse for Setting {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Setting> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let look = input.lookahead1();
         let key = [
             (look.peek(keyword::check), Key::Check),
@@ -61,17 +61,17 @@ enum Key {
 impl Key {
     fn parsed(self, input: ParseStream<'_>) -> syn::Result<Setting> {
         match self {
-            Key::Check => input
+            Self::Check => input
                 .parse::<keyword::check>()
                 .and_then(|_| input.parse::<Token![=]>())
                 .and_then(|_| input.parse())
                 .map(Setting::Check),
-            Key::Error => input
+            Self::Error => input
                 .parse::<keyword::error>()
                 .and_then(|_| input.parse::<Token![=]>())
                 .and_then(|_| input.parse())
                 .map(Setting::Error),
-            Key::Strategy => input
+            Self::Strategy => input
                 .parse::<keyword::strategy>()
                 .and_then(|_| input.parse::<Token![=]>())
                 .and_then(|_| input.parse())

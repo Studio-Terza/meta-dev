@@ -29,31 +29,31 @@ impl Coverage {
     pub(crate) fn tallied<'edge, 'found: 'edge, 'file: 'found>(
         system: &TypeSystem<'found, 'file>,
         edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
-    ) -> Coverage {
+    ) -> Self {
         let edges: Vec<&Edge<'found, 'file>> = edges.collect();
         let sites: BTreeSet<Site<'file>> = edges.iter().map(|edge| edge.site()).collect();
         edges
             .iter()
-            .fold(Coverage::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
+            .fold(Self::default(), |tally, edge| tally.counted(edge.form(), edge.ends().class()))
             .algebraic(system.algebras(), &sites)
     }
 
-    fn counted(self, form: &Form<'_>, class: Class) -> Coverage {
+    fn counted(self, form: &Form<'_>, class: Class) -> Self {
         form.sorted(
-            Coverage { written: self.written.incremented(), covered: class.covering(self.covered), ..self },
-            Coverage { lifts: self.lifts.incremented(), ..self },
-            Coverage { operations: self.operations.incremented(), ..self },
+            Self { written: self.written.incremented(), covered: class.covering(self.covered), ..self },
+            Self { lifts: self.lifts.incremented(), ..self },
+            Self { operations: self.operations.incremented(), ..self },
         )
     }
 
-    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Coverage {
+    fn algebraic<'file>(self, algebras: &Algebras<'_, 'file>, sites: &BTreeSet<Site<'file>>) -> Self {
         let operations: Vec<_> = algebras
             .types()
             .filter_map(|node| algebras.of_type(node))
             .flat_map(Algebra::operations)
             .filter(|operation| sites.contains(AsRef::<Site<'file>>::as_ref(operation.transition())))
             .collect();
-        Coverage {
+        Self {
             algebraic: Count::new(operations.len()),
             partial: Count::new(operations.iter().filter(|operation| operation.partial() == Totality::Partial).count()),
             ..self

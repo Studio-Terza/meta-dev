@@ -13,18 +13,18 @@ pub enum Laws {
 
 impl Laws {
     #[must_use]
-    pub fn kept<Law>(self, laws: &[Law]) -> &[Law] {
+    pub const fn kept<Law>(self, laws: &[Law]) -> &[Law] {
         match self {
-            Laws::WhereDeclared => &[],
-            Laws::Matched => laws,
+            Self::WhereDeclared => &[],
+            Self::Matched => laws,
         }
     }
 
     #[must_use]
-    pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Laws> {
+    pub fn agree<Law: PartialEq>(self, ours: &[Law], theirs: &[Law]) -> Option<Self> {
         match self {
-            Laws::Matched => (ours == theirs).then_some(self),
-            Laws::WhereDeclared => {
+            Self::Matched => (ours == theirs).then_some(self),
+            Self::WhereDeclared => {
                 ours.first().zip(theirs.first()).map_or(Some(self), |_| (ours == theirs).then_some(self))
             }
         }
@@ -39,13 +39,13 @@ pub struct Equivalence {
 
 impl Equivalence {
     #[must_use]
-    pub const fn erasing(erased: &'static [Erased]) -> Equivalence {
-        Equivalence { erased, laws: None }
+    pub const fn erasing(erased: &'static [Erased]) -> Self {
+        Self { erased, laws: None }
     }
 
     #[must_use]
-    pub const fn comparing(self, laws: Laws) -> Equivalence {
-        Equivalence { laws: Some(laws), ..self }
+    pub const fn comparing(self, laws: Laws) -> Self {
+        Self { laws: Some(laws), ..self }
     }
 
     #[must_use]
@@ -59,7 +59,7 @@ impl Equivalence {
     }
 
     #[must_use]
-    pub fn laws(&self) -> Option<Laws> {
+    pub const fn laws(&self) -> Option<Laws> {
         self.laws
     }
 }

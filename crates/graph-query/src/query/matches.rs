@@ -28,7 +28,7 @@ struct Ranked<'facts, 'file> {
 pub struct Matches<'facts, 'file>(Vec<Ranked<'facts, 'file>>);
 
 impl<'facts, 'file> Ranked<'facts, 'file> {
-    fn scored(candidate: Candidate<'facts, 'file>, terms: &[Term], roles: &'facts [Role]) -> Ranked<'facts, 'file> {
+    fn scored(candidate: Candidate<'facts, 'file>, terms: &[Term], roles: &'facts [Role]) -> Self {
         let shaped = roles.iter().map(|role| candidate.shaped(role)).fold(Score::default(), |sum, each| sum + each);
         let fits = roles.iter().filter_map(|role| candidate.fitting(role).map(|method| Fit { role, method })).collect();
         Ranked { score: candidate.named(terms) + shaped, candidate, fits }
@@ -42,7 +42,7 @@ impl<'facts, 'file> Matches<'facts, 'file> {
         terms: &[Term],
         roles: &'facts [Role],
         top: Top,
-    ) -> Matches<'facts, 'file> {
+    ) -> Self {
         let mut ranked: Vec<Ranked<'facts, 'file>> = candidates
             .map(|candidate| Ranked::scored(candidate, terms, roles))
             .filter(|ranked| ranked.score > Score::default())

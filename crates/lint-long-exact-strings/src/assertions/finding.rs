@@ -8,8 +8,8 @@ use super::pinning::Pinning;
 pub struct Finding(Pinning);
 
 impl From<Pinning> for Finding {
-    fn from(pinning: Pinning) -> Finding {
-        Finding(pinning)
+    fn from(pinning: Pinning) -> Self {
+        Self(pinning)
     }
 }
 

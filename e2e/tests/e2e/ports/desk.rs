@@ -27,10 +27,10 @@ impl Scope {
     const MUTANTS: &'static str = "MUTANTS_SCOPE=";
     const TEST_PACKAGE: &'static str = "--test-package=";
 
-    fn read(report: &str) -> Scope {
+    fn read(report: &str) -> Self {
         let value = |key: &str| report.lines().find_map(|line| line.strip_prefix(key)).unwrap_or_default().to_owned();
         let build = value(Self::BUILD);
-        Scope {
+        Self {
             build: (build == Self::WORKSPACE).then_some(Build::Workspace).unwrap_or_else(|| {
                 Build::Crates(
                     build.split_whitespace().filter(|word| *word != Self::PACKAGE).map(str::to_owned).collect(),
@@ -51,7 +51,7 @@ impl Scope {
         }
     }
 
-    pub fn mutated(&self) -> &BTreeSet<String> {
+    pub const fn mutated(&self) -> &BTreeSet<String> {
         &self.mutated
     }
 }

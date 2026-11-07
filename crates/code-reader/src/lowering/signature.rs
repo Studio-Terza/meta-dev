@@ -20,8 +20,8 @@ enum Referent {
 impl Referent {
     fn resolved(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Resolved {
         match self {
-            Referent::Path(path) => resolving.path(scope, &path, Domain::Types),
-            Referent::Param(name) => Resolved::Param(name),
+            Self::Path(path) => resolving.path(scope, &path, Domain::Types),
+            Self::Param(name) => Resolved::Param(name),
         }
     }
 }
@@ -33,25 +33,25 @@ pub(super) struct Written {
 }
 
 impl Written {
-    pub(super) fn path(path: UsePath, position: Position) -> Written {
+    pub(super) fn path(path: UsePath, position: Position) -> Self {
         let spelling = Spelling::Written(path.written(), position);
-        Written { target: Referent::Path(path), spelling }
+        Self { target: Referent::Path(path), spelling }
     }
 
-    pub(super) fn typed(ty: &TypeRef<Written>, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> TypeRef {
-        ty.mapped(&mut |written: &Written| written.sited(resolving, scope))
+    pub(super) fn typed(ty: &TypeRef<Self>, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> TypeRef {
+        ty.mapped(&mut |written: &Self| written.sited(resolving, scope))
     }
 
     fn sited(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Sited {
         Sited::new(self.target.clone().resolved(resolving, scope), self.spelling.clone())
     }
 
-    fn parameter(name: Name, spelling: Spelling) -> TypeRef<Written> {
-        TypeRef::Named(Named::new(Written { target: Referent::Param(name), spelling }, Vec::new()))
+    const fn parameter(name: Name, spelling: Spelling) -> TypeRef<Self> {
+        TypeRef::Named(Named::new(Self { target: Referent::Param(name), spelling }, Vec::new()))
     }
 
-    fn implied(self) -> Written {
-        Written { target: self.target, spelling: Spelling::Implied }
+    fn implied(self) -> Self {
+        Self { target: self.target, spelling: Spelling::Implied }
     }
 }
 
@@ -62,9 +62,9 @@ pub(super) struct DeclaredParameter {
 }
 
 impl DeclaredParameter {
-    fn written(scope: &InScope, parameter: &GenericParam) -> Option<DeclaredParameter> {
+    fn written(scope: &InScope, parameter: &GenericParam) -> Option<Self> {
         match parameter {
-            GenericParam::Type(declared) => Some(DeclaredParameter {
+            GenericParam::Type(declared) => Some(Self {
                 name: Name::from(&declared.ident),
                 default: declared.default.as_ref().map(|ty| scope.lowered(ty)),
             }),
@@ -96,17 +96,17 @@ pub(super) enum LoweredInput {
 }
 
 impl LoweredInput {
-    fn lowered(scope: &InScope, input: &FnArg) -> LoweredInput {
+    fn lowered(scope: &InScope, input: &FnArg) -> Self {
         match input {
-            FnArg::Receiver(_) => LoweredInput::Receiver,
-            FnArg::Typed(typed) => LoweredInput::Typed(scope.lowered(&typed.ty)),
+            FnArg::Receiver(_) => Self::Receiver,
+            FnArg::Typed(typed) => Self::Typed(scope.lowered(&typed.ty)),
         }
     }
 
     pub(super) fn typed(self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Input {
         match self {
-            LoweredInput::Receiver => Input::Receiver,
-            LoweredInput::Typed(ty) => Input::Typed(Written::typed(&ty, resolving, scope)),
+            Self::Receiver => Input::Receiver,
+            Self::Typed(ty) => Input::Typed(Written::typed(&ty, resolving, scope)),
         }
     }
 }
@@ -120,21 +120,21 @@ pub(super) struct InScope {
 impl InScope {
     const SELF: Word<'static> = Word::new("Self");
 
-    pub(super) fn outside() -> InScope {
-        InScope { parameters: Vec::new(), subject: Written::parameter(Name::from(InScope::SELF), Spelling::Implied) }
+    pub(super) fn outside() -> Self {
+        Self { parameters: Vec::new(), subject: Written::parameter(Name::from(Self::SELF), Spelling::Implied) }
     }
 
-    pub(super) fn extended(&self, generics: &Generics) -> InScope {
+    pub(super) fn extended(&self, generics: &Generics) -> Self {
         let declared = generics.params.iter().filter_map(TypeParameter::named);
-        InScope { parameters: self.parameters.iter().cloned().chain(declared).collect(), subject: self.subject.clone() }
+        Self { parameters: self.parameters.iter().cloned().chain(declared).collect(), subject: self.subject.clone() }
     }
 
-    pub(super) fn subject(&self, subject: TypeRef<Written>) -> InScope {
-        InScope { parameters: self.parameters.clone(), subject }
+    pub(super) fn subject(&self, subject: TypeRef<Written>) -> Self {
+        Self { parameters: self.parameters.clone(), subject }
     }
 
-    pub(super) fn subjectless(&self) -> InScope {
-        InScope::outside().with_parameters(self)
+    pub(super) fn subjectless(&self) -> Self {
+        Self::outside().with_parameters(self)
     }
 
     pub(super) fn declarations(&self, generics: &Generics) -> Vec<DeclaredParameter> {
@@ -187,8 +187,8 @@ impl InScope {
         }
     }
 
-    fn with_parameters(self, scope: &InScope) -> InScope {
-        InScope { parameters: scope.parameters.clone(), subject: self.subject }
+    fn with_parameters(self, scope: &Self) -> Self {
+        Self { parameters: scope.parameters.clone(), subject: self.subject }
     }
 
     fn type_path_lowered(&self, path: &TypePath) -> TypeRef<Written> {

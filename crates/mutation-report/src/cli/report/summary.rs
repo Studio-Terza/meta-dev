@@ -37,7 +37,7 @@ pub struct Summary {
 impl Summary {
     const SCOPE: &'static str = "::";
 
-    pub(crate) fn from_results(matrices: &[ShardMatrix], golden_tests: &GoldenTests) -> Summary {
+    pub(crate) fn from_results(matrices: &[ShardMatrix], golden_tests: &GoldenTests) -> Self {
         let baseline: BTreeSet<TestName> = matrices
             .iter()
             .flat_map(|matrix| matrix.baseline().iter().map(ToString::to_string).map(TestName::new))
@@ -47,7 +47,7 @@ impl Summary {
         let golden = golden_tests.names();
         let killers: BTreeSet<TestName> =
             mutants.iter().flat_map(RecordedMutant::failed).map(ToString::to_string).map(TestName::new).collect();
-        Summary {
+        Self {
             mutants: Count::items_in(&mutants),
             tests: Count::new(baseline.len()),
             golden_tests: Count::new(golden.len()),

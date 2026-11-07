@@ -7,8 +7,8 @@ pub struct Tee<First, Second> {
 }
 
 impl<First: Write, Second: Write> Tee<First, Second> {
-    pub fn new(first: First, second: Second) -> Tee<First, Second> {
-        Tee { first, second }
+    pub const fn new(first: First, second: Second) -> Self {
+        Self { first, second }
     }
 }
 

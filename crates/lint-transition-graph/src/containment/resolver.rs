@@ -34,7 +34,7 @@ impl<'found> Resolver<'found> {
         members: impl Iterator<Item = Member<'found>>,
         files: &[&'found SourceFile],
         stand_ins: StandIns<'found>,
-    ) -> Resolver<'found> {
+    ) -> Self {
         let modules = files.iter().fold(BTreeMap::new(), |mut modules: BTreeMap<_, BTreeSet<_>>, file| {
             let placement = file.placement();
             modules.entry(placement.package().crate_name()).or_default().extend(placement.module().segments());

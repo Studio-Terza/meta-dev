@@ -5,7 +5,7 @@ use serde::Serialize;
 pub struct Title(String);
 
 impl From<String> for Title {
-    fn from(text: String) -> Title {
-        Title(text)
+    fn from(text: String) -> Self {
+        Self(text)
     }
 }

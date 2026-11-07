@@ -7,16 +7,16 @@ use lint_layout::Name;
 pub struct ModulePath(Vec<Name>);
 
 impl ModulePath {
-    pub const ROOT: ModulePath = ModulePath(Vec::new());
+    pub const ROOT: Self = Self(Vec::new());
     const MODULE_FILE: &'static str = "mod";
 
     #[must_use]
-    pub fn of_file(relative: &Path) -> ModulePath {
+    pub fn of_file(relative: &Path) -> Self {
         let stem = relative.with_extension("");
         let directory = Some(stem.as_path())
             .filter(|module| module.file_name() != Some(OsStr::new(Self::MODULE_FILE)))
             .or_else(|| stem.parent());
-        ModulePath(
+        Self(
             directory
                 .into_iter()
                 .flat_map(Path::components)
@@ -32,7 +32,7 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub fn child(&self, name: Name) -> ModulePath {
-        ModulePath(self.0.iter().cloned().chain(Some(name)).collect())
+    pub fn child(&self, name: Name) -> Self {
+        Self(self.0.iter().cloned().chain(Some(name)).collect())
     }
 }

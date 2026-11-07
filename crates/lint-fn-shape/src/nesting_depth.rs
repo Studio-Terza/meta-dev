@@ -6,22 +6,22 @@ use lint_core::Bound;
 pub struct NestingDepth(usize);
 
 impl NestingDepth {
-    pub const LEVEL: NestingDepth = NestingDepth(1);
+    pub const LEVEL: Self = Self(1);
 
     #[must_use]
-    pub fn beyond(most: Bound) -> NestingDepth {
-        NestingDepth(most.limit() + Self::LEVEL.0)
+    pub const fn beyond(most: Bound) -> Self {
+        Self(most.limit() + Self::LEVEL.0)
     }
 }
 
 impl AddAssign for NestingDepth {
-    fn add_assign(&mut self, other: NestingDepth) {
+    fn add_assign(&mut self, other: Self) {
         self.0 += other.0;
     }
 }
 
 impl SubAssign for NestingDepth {
-    fn sub_assign(&mut self, other: NestingDepth) {
+    fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
     }
 }

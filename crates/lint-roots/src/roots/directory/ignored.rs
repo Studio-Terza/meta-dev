@@ -14,8 +14,8 @@ pub enum Ignored {
 }
 
 impl Ignored {
-    pub const FOR_PACKAGES: [Ignored; 2] = [Ignored::Hidden, Ignored::BuildOutput];
-    pub const FOR_FILES: [Ignored; 2] = [Ignored::VersionControl, Ignored::BuildOutput];
+    pub const FOR_PACKAGES: [Self; 2] = [Self::Hidden, Self::BuildOutput];
+    pub const FOR_FILES: [Self; 2] = [Self::VersionControl, Self::BuildOutput];
 
     const BUILD_DIRECTORY: &'static str = "target";
     const MANIFEST: &'static str = "Cargo.toml";
@@ -26,19 +26,19 @@ impl Ignored {
         directories.iter().map(|directory| directory.join(Self::MANIFEST)).collect()
     }
 
-    pub fn among(rules: &[Ignored], survey: &Survey, path: &Path) -> Option<Ignored> {
+    pub fn among(rules: &[Self], survey: &Survey, path: &Path) -> Option<Self> {
         rules.iter().find_map(|rule| rule.applying_to(survey, path))
     }
 
-    pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Ignored> {
+    pub fn applying_to(self, survey: &Survey, path: &Path) -> Option<Self> {
         match self {
-            Ignored::Hidden => path
+            Self::Hidden => path
                 .file_name()
                 .map(Name::from)
                 .filter(|name| name.matches::<Prefix>(&[Self::HIDDEN]).is_some())
                 .map(|_| self),
-            Ignored::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL).map(|_| self),
-            Ignored::BuildOutput => path
+            Self::VersionControl => path.file_name().filter(|name| *name == Self::VERSION_CONTROL).map(|_| self),
+            Self::BuildOutput => path
                 .file_name()
                 .filter(|name| *name == Self::BUILD_DIRECTORY)
                 .and_then(|_| path.parent())

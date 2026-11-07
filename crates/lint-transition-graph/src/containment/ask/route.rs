@@ -25,12 +25,12 @@ struct Frontier<'found> {
 }
 
 impl<'view, 'found, 'file> Route<'view, 'found, 'file> {
-    pub(super) fn new(
+    pub(super) const fn new(
         view: &'view Containment<'found, 'file>,
         from: &'view Name,
         to: &'view Name,
         listed: Listed,
-    ) -> Route<'view, 'found, 'file> {
+    ) -> Self {
         Route { view, from, to, listed }
     }
 
@@ -40,7 +40,7 @@ impl<'view, 'found, 'file> Route<'view, 'found, 'file> {
 }
 
 impl<'found> FromIterator<Member<'found>> for Frontier<'found> {
-    fn from_iter<Starts: IntoIterator<Item = Member<'found>>>(starts: Starts) -> Frontier<'found> {
+    fn from_iter<Starts: IntoIterator<Item = Member<'found>>>(starts: Starts) -> Self {
         let layer: BTreeSet<Member<'found>> = starts.into_iter().collect();
         Frontier { reached: layer.iter().map(|start| (*start, *start)).collect(), layer }
     }
@@ -56,7 +56,7 @@ impl<'found> Frontier<'found> {
         self.layer.iter().find(|member| member.name() == to).map(|end| self.walked(*end))
     }
 
-    fn widened(mut self, view: &Containment<'found, '_>) -> Option<Frontier<'found>> {
+    fn widened(mut self, view: &Containment<'found, '_>) -> Option<Self> {
         let next: BTreeMap<Member<'found>, Member<'found>> = self
             .layer
             .iter()

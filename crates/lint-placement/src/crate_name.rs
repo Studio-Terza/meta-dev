@@ -10,26 +10,26 @@ use lint_layout::Name;
 pub struct CrateName(Name);
 
 impl From<&Ident> for CrateName {
-    fn from(ident: &Ident) -> CrateName {
-        CrateName(Name::from(ident))
+    fn from(ident: &Ident) -> Self {
+        Self(Name::from(ident))
     }
 }
 
 impl From<&Name> for CrateName {
-    fn from(name: &Name) -> CrateName {
-        CrateName(name.clone())
+    fn from(name: &Name) -> Self {
+        Self(name.clone())
     }
 }
 
 impl From<&CrateRoot> for CrateName {
-    fn from(root: &CrateRoot) -> CrateName {
+    fn from(root: &CrateRoot) -> Self {
         let spelled = root.package().map_or_else(
             || root.directory_name().unwrap_or_default().to_string_lossy().into_owned(),
             ToString::to_string,
         );
         let underscored: String =
             spelled.chars().map(|letter| Some(letter).filter(|letter| *letter != '-').unwrap_or('_')).collect();
-        CrateName(Name::from(underscored.as_str()))
+        Self(Name::from(underscored.as_str()))
     }
 }
 

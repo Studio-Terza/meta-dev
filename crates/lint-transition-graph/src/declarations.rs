@@ -12,10 +12,10 @@ pub(crate) enum Checked {
 }
 
 impl Checked {
-    fn reporting(kind: Kind) -> Checked {
+    const fn reporting(kind: Kind) -> Self {
         match kind.property() {
-            Some(Property::Preserves) => Checked::Preservation,
-            Some(_) | None => Checked::Operations,
+            Some(Property::Preserves) => Self::Preservation,
+            Some(_) | None => Self::Operations,
         }
     }
 }
@@ -27,7 +27,7 @@ pub(crate) struct Declarations<'found> {
 }
 
 impl<'found> From<&'found [SourceFile]> for Declarations<'found> {
-    fn from(files: &'found [SourceFile]) -> Declarations<'found> {
+    fn from(files: &'found [SourceFile]) -> Self {
         Declarations {
             laws: Laws::from(files),
             packages: files.iter().map(|file| (file.path(), Package::containing(file))).collect(),

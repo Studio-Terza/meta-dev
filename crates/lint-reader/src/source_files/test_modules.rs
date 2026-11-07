@@ -20,36 +20,24 @@ impl<'shelf, 'tree> TestModules<'shelf, 'tree> {
         children.iter().cloned().fold(started, |reading, child| reading.child(scope, child)).files
     }
 
-    fn child(self, scope: &Scope<'tree>, child: Child) -> TestModules<'shelf, 'tree> {
+    fn child(self, scope: &Scope<'tree>, child: Child) -> Self {
         child.canonical(self.shelf.survey()).visit(|path, directory| self.file(scope, path, directory))
     }
 
-    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> TestModules<'shelf, 'tree> {
+    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> Self {
         let source =
             self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.test_source(scope, file));
         self.opened(scope, file, children_directory, source)
     }
 
-    fn opened(
-        self,
-        scope: &Scope<'tree>,
-        file: &Path,
-        children_directory: &Path,
-        source: Option<SourceFile>,
-    ) -> TestModules<'shelf, 'tree> {
+    fn opened(self, scope: &Scope<'tree>, file: &Path, children_directory: &Path, source: Option<SourceFile>) -> Self {
         match source {
             Some(source) => self.nested(scope, file, children_directory, source),
             None => self,
         }
     }
 
-    fn nested(
-        self,
-        scope: &Scope<'tree>,
-        file: &Path,
-        children_directory: &Path,
-        source: SourceFile,
-    ) -> TestModules<'shelf, 'tree> {
+    fn nested(self, scope: &Scope<'tree>, file: &Path, children_directory: &Path, source: SourceFile) -> Self {
         let nested = Modules::nested_in(self.shelf.survey(), file, children_directory, &source.syntax().items);
         nested
             .into_iter()

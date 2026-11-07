@@ -5,15 +5,15 @@ use std::ops::ControlFlow;
 pub(crate) struct ScopeId(usize);
 
 impl ScopeId {
-    pub(super) fn after<Row>(rows: &[Row]) -> ScopeId {
-        ScopeId(rows.len())
+    pub(super) const fn after<Row>(rows: &[Row]) -> Self {
+        Self(rows.len())
     }
 
     pub(super) fn row<Row>(self, rows: &[Row]) -> Option<&Row> {
         rows.get(self.0)
     }
 
-    pub(super) fn ids<Row>(rows: &[Row]) -> impl Iterator<Item = ScopeId> {
+    pub(super) fn ids<Row>(rows: &[Row]) -> impl Iterator<Item = Self> {
         (0..rows.len()).map(ScopeId)
     }
 
@@ -26,7 +26,7 @@ impl ScopeId {
 pub(crate) struct GlobId(usize);
 
 impl GlobId {
-    pub(super) fn ids<Glob>(globs: &[Glob]) -> impl Iterator<Item = GlobId> {
+    pub(super) fn ids<Glob>(globs: &[Glob]) -> impl Iterator<Item = Self> {
         (0..globs.len()).map(GlobId)
     }
 }
@@ -35,10 +35,10 @@ impl GlobId {
 pub(super) struct Reach(usize);
 
 impl Reach {
-    pub(super) const FIRST: Reach = Reach(0);
+    pub(super) const FIRST: Self = Self(0);
 
-    pub(super) fn next(self) -> Reach {
-        Reach(self.0 + 1)
+    pub(super) const fn next(self) -> Self {
+        Self(self.0 + 1)
     }
 }
 
@@ -67,7 +67,7 @@ pub(super) trait Lattice: PartialEq + Sized {
 }
 
 impl<Entry: Lattice> Lattice for Vec<Entry> {
-    fn joined(&self, computed: Vec<Entry>) -> Vec<Entry> {
+    fn joined(&self, computed: Self) -> Self {
         self.iter().zip(computed).map(|(held, found)| held.joined(found)).collect()
     }
 }

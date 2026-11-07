@@ -15,7 +15,7 @@ impl<'body> Chain<'body> {
         words!["iter", "into_iter", "map", "collect", "cloned", "copied", "as_ref", "as_deref", "as_slice"];
     const MAP: [Word<'static>; 1] = words!["map"];
 
-    pub(super) fn unwound(found: &'body Expr) -> Chain<'body> {
+    pub(super) fn unwound(found: &'body Expr) -> Self {
         match found {
             Expr::MethodCall(call) => Self::unwound(&call.receiver).pushed(call),
             _ => Chain { calls: Vec::new(), root: found },
@@ -41,7 +41,7 @@ impl<'body> Chain<'body> {
             .and_then(|_| Applied::traced(self.root))
     }
 
-    fn pushed(mut self, call: &'body ExprMethodCall) -> Chain<'body> {
+    fn pushed(mut self, call: &'body ExprMethodCall) -> Self {
         self.calls.push(call);
         self
     }

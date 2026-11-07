@@ -26,11 +26,11 @@ impl World {
     const ALL_BELOW: &'static str = "/*";
     const DEPENDENCY_TABLES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub fn of_this_repository() -> Result<World, Box<dyn Error>> {
-        World::of(&System::manifests()?, System::root())
+    pub fn of_this_repository() -> Result<Self, Box<dyn Error>> {
+        Self::of(&System::manifests()?, System::root())
     }
 
-    fn of(files: &impl Files, root: PathBuf) -> Result<World, Box<dyn Error>> {
+    fn of(files: &impl Files, root: PathBuf) -> Result<Self, Box<dyn Error>> {
         let manifest = Self::table(files, &root.join(Self::MANIFEST))?;
         let patterns: Vec<String> = manifest
             .get("workspace")
@@ -45,7 +45,7 @@ impl World {
             .flatten()
             .map(|directory| Self::member(files, &root, directory).map(|member| (member.name.clone(), member)))
             .collect::<Result<_, _>>()?;
-        Ok(World { root, members })
+        Ok(Self { root, members })
     }
 
     pub fn names(&self) -> impl Iterator<Item = &String> {

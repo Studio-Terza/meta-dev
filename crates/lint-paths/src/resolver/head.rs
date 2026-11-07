@@ -15,8 +15,8 @@ pub(crate) enum Head {
 }
 
 impl Head {
-    const SPELLED: [(&'static str, Head); 3] =
-        [("crate", Head::Crate), ("self", Head::Current), ("super", Head::Super)];
+    const SPELLED: [(&'static str, Self); 3] =
+        [("crate", Self::Crate), ("self", Self::Current), ("super", Self::Super)];
 
     pub(crate) fn resolved<'scopes>(
         self,
@@ -26,12 +26,12 @@ impl Head {
         trail: &Trail<'_>,
     ) -> Vec<UsePath> {
         match self {
-            Head::Crate => resolver.resolved(&Module::from(<&CrateFile>::from(module)), path.rest(), trail),
-            Head::Current => resolver.resolved(module, path.rest(), trail),
-            Head::Super => {
+            Self::Crate => resolver.resolved(&Module::from(<&CrateFile>::from(module)), path.rest(), trail),
+            Self::Current => resolver.resolved(module, path.rest(), trail),
+            Self::Super => {
                 module.parent().map_or_else(Vec::new, |parent| resolver.resolved(&parent, path.rest(), trail))
             }
-            Head::Named => path
+            Self::Named => path
                 .segments()
                 .first()
                 .map(|head| resolver.routed(module, head, &path, trail))
@@ -44,10 +44,10 @@ impl Head {
 }
 
 impl From<&Name> for Head {
-    fn from(name: &Name) -> Head {
-        Head::SPELLED
+    fn from(name: &Name) -> Self {
+        Self::SPELLED
             .into_iter()
             .find(|(spelled, _)| *name == Name::from(*spelled))
-            .map_or(Head::Named, |(_, head)| head)
+            .map_or(Self::Named, |(_, head)| head)
     }
 }

@@ -8,9 +8,9 @@ use super::ShapeToken;
 pub(crate) struct ShapeKey(u64);
 
 impl From<&[ShapeToken<'_>]> for ShapeKey {
-    fn from(tokens: &[ShapeToken<'_>]) -> ShapeKey {
+    fn from(tokens: &[ShapeToken<'_>]) -> Self {
         let mut hasher = DefaultHasher::new();
         tokens.hash(&mut hasher);
-        ShapeKey::new(hasher.finish())
+        Self::new(hasher.finish())
     }
 }

@@ -22,7 +22,7 @@ impl TestResult {
         TestName::new(format!("{}{}{}", binary.map(Binary::label).unwrap_or_default(), Self::JOIN, self.name))
     }
 
-    pub fn verdict(&self) -> Verdict {
+    pub const fn verdict(&self) -> Verdict {
         self.verdict
     }
 
@@ -38,7 +38,7 @@ impl TestResult {
 impl FromStr for TestResult {
     type Err = Unmatched;
 
-    fn from_str(line: &str) -> Result<TestResult, Unmatched> {
+    fn from_str(line: &str) -> Result<Self, Unmatched> {
         let parsed = || {
             let body =
                 line.get(..Self::TEST.len()).filter(|start| *start == Self::TEST).and(line.get(Self::TEST.len()..))?;
@@ -48,7 +48,7 @@ impl FromStr for TestResult {
             let (at, separator) = body.match_indices(Self::SEPARATOR).last()?;
             let name = body.get(..at).filter(|_| at > 0)?;
             let verdict = Self::verdict_of(body.get(at + separator.len()..)?)?;
-            Some(TestResult { name: name.to_owned(), verdict })
+            Some(Self { name: name.to_owned(), verdict })
         };
         parsed().ok_or(Unmatched)
     }

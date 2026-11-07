@@ -7,8 +7,8 @@ use super::entries::DeclaredId;
 pub(crate) struct ItemIds(Vec<Vec<Option<ItemId>>>);
 
 impl FromIterator<Vec<Option<ItemId>>> for ItemIds {
-    fn from_iter<Scopes: IntoIterator<Item = Vec<Option<ItemId>>>>(scopes: Scopes) -> ItemIds {
-        ItemIds(scopes.into_iter().collect())
+    fn from_iter<Scopes: IntoIterator<Item = Vec<Option<ItemId>>>>(scopes: Scopes) -> Self {
+        Self(scopes.into_iter().collect())
     }
 }
 

@@ -11,11 +11,11 @@ pub(crate) struct Declaration<'file> {
 }
 
 impl<'file> Declaration<'file> {
-    pub(crate) fn new(name: Name, provided: Vec<Name>, site: Site<'file>) -> Declaration<'file> {
+    pub(crate) const fn new(name: Name, provided: Vec<Name>, site: Site<'file>) -> Self {
         Declaration { name, provided, site }
     }
 
-    pub(crate) fn unconsumed(self, consumers: &Consumers) -> Option<Declaration<'file>> {
+    pub(crate) fn unconsumed(self, consumers: &Consumers) -> Option<Self> {
         consumers.consuming(&self.name, &self.provided).is_none().then_some(self)
     }
 }

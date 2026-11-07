@@ -16,7 +16,7 @@ struct AliasTarget<'model> {
 }
 
 impl<'model> AliasTarget<'model> {
-    fn declared(placed: Placed<'model, &'model Holding>) -> Option<AliasTarget<'model>> {
+    fn declared(placed: Placed<'model, &'model Holding>) -> Option<Self> {
         let holding = placed.entity();
         let alias = [holding.held()].into_iter().find(|held| *held == Held::Alias);
         alias.and(holding.declares()).map(|item| AliasTarget {
@@ -38,7 +38,7 @@ struct Door<'model> {
 }
 
 impl<'model> Door<'model> {
-    fn opened(placed: Placed<'model, &'model Implementation>) -> Option<Door<'model>> {
+    fn opened(placed: Placed<'model, &'model Implementation>) -> Option<Self> {
         let implementation = placed.entity();
         let open = Scope::open(*AsRef::<Region>::as_ref(implementation));
         let subject = implementation.subject_type().named().map(AsRef::<Resolved>::as_ref);
@@ -47,7 +47,7 @@ impl<'model> Door<'model> {
         open.and(named).and(subject).map(|subject| Door { path: placed.site().path(), subject })
     }
 
-    fn opening(&self, path: &Path, subject: &Resolved) -> Option<&Door<'model>> {
+    fn opening(&self, path: &Path, subject: &Resolved) -> Option<&Self> {
         let place = [self.path].into_iter().find(|door| *door == path);
         let owner = [self.subject].into_iter().find(|door| *door == subject);
         place.and(owner).map(|_| self)
@@ -60,8 +60,8 @@ struct Newtypes(Vec<ItemId>);
 impl Newtypes {
     const EDGES: [Word<'static>; 3] = words!["new", "try_new", "into_inner"];
 
-    fn read(model: &Model) -> Newtypes {
-        Newtypes(model.holdings().filter_map(|placed| Newtypes::declared(placed.entity())).collect())
+    fn read(model: &Model) -> Self {
+        Self(model.holdings().filter_map(|placed| Self::declared(placed.entity())).collect())
     }
 
     fn declared(holding: &Holding) -> Option<ItemId> {
@@ -99,7 +99,7 @@ pub struct Scope<'model> {
 impl<'model> Scope<'model> {
     const CHECKED: [Held; 4] = [Held::StructField, Held::EnumField, Held::UnionField, Held::StructParameter];
 
-    pub fn read(model: &'model Model) -> Scope<'model> {
+    pub fn read(model: &'model Model) -> Self {
         Scope {
             newtypes: Newtypes::read(model),
             aliases: model.holdings().filter_map(AliasTarget::declared).collect(),

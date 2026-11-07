@@ -8,15 +8,15 @@ pub struct Declared<'file> {
 }
 
 impl<'file> Declared<'file> {
-    pub fn new(method: Name, location: Site<'file>) -> Declared<'file> {
+    pub const fn new(method: Name, location: Site<'file>) -> Self {
         Declared { method, location }
     }
 
-    pub fn method(&self) -> &Name {
+    pub const fn method(&self) -> &Name {
         &self.method
     }
 
-    pub fn location(&self) -> Site<'file> {
+    pub const fn location(&self) -> Site<'file> {
         self.location
     }
 }

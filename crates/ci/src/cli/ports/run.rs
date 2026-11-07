@@ -10,17 +10,17 @@ pub struct Run {
 
 impl Run {
     #[must_use]
-    pub fn new(exit: Exit, elapsed: Duration) -> Run {
-        Run { exit, elapsed }
+    pub const fn new(exit: Exit, elapsed: Duration) -> Self {
+        Self { exit, elapsed }
     }
 
     #[must_use]
-    pub fn exit(&self) -> Exit {
+    pub const fn exit(&self) -> Exit {
         self.exit
     }
 
     #[must_use]
-    pub fn elapsed(&self) -> Duration {
+    pub const fn elapsed(&self) -> Duration {
         self.elapsed
     }
 }

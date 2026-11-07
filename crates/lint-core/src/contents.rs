@@ -9,10 +9,10 @@ pub enum Contents {
 }
 
 impl Contents {
-    pub fn read(&self) -> Result<&Bytes, &Text> {
+    pub const fn read(&self) -> Result<&Bytes, &Text> {
         match self {
-            Contents::Read(bytes) => Ok(bytes),
-            Contents::Unreadable(reason) => Err(reason),
+            Self::Read(bytes) => Ok(bytes),
+            Self::Unreadable(reason) => Err(reason),
         }
     }
 }

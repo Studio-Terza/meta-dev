@@ -32,9 +32,9 @@ impl AsRef<MethodShape> for Role {
 impl FromStr for Role {
     type Err = QueryFailure;
 
-    fn from_str(text: &str) -> Result<Role, QueryFailure> {
+    fn from_str(text: &str) -> Result<Self, QueryFailure> {
         syn::parse_str::<Signature>(text)
-            .map(|signature| Role(MethodShape::of_signature(&signature, None)))
+            .map(|signature| Self(MethodShape::of_signature(&signature, None)))
             .map_err(|failure| QueryFailure::Role { text: text.to_owned(), reason: failure.to_string() })
     }
 }

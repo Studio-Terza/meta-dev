@@ -21,7 +21,7 @@ pub(crate) struct Mentions {
 impl Mentions {
     pub(crate) fn in_file(file: &SourceFile, wanted: Ground) -> BTreeSet<Name> {
         let ground = file.shipped().map_or(Ground::Tests, |_| Ground::Shipped);
-        let mut mentions = Mentions { wanted, ground, names: BTreeSet::new() };
+        let mut mentions = Self { wanted, ground, names: BTreeSet::new() };
         mentions.visit_file(file.syntax());
         file.test_modules().iter().for_each(|module| {
             mentions.within(Ground::Tests, |inner| inner.visit_file(module.syntax()));
@@ -29,14 +29,14 @@ impl Mentions {
         mentions.names
     }
 
-    fn within(&mut self, ground: Ground, visit: impl FnOnce(&mut Mentions)) {
+    fn within(&mut self, ground: Ground, visit: impl FnOnce(&mut Self)) {
         let before = self.ground;
         self.ground = ground;
         visit(self);
         self.ground = before;
     }
 
-    fn entered(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Mentions)) {
+    fn entered(&mut self, attributes: &[Attribute], visit: impl FnOnce(&mut Self)) {
         match Walk::outside_tests(attributes) {
             Walk::Entered => visit(self),
             Walk::Skipped => self.within(Ground::Tests, visit),

@@ -69,7 +69,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         files: &'found [SourceFile],
         facts: &'found Facts<'file>,
         transitions: &'found Transitions<'file>,
-    ) -> Containment<'found, 'file> {
+    ) -> Self {
         let modules: BTreeMap<&Path, &[Name]> = files
             .iter()
             .filter_map(SourceFile::shipped)
@@ -151,7 +151,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         Report::new(Check::HEADLINE, Check::violations(self))
     }
 
-    fn toward(&self, toward: Toward) -> &BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
+    const fn toward(&self, toward: Toward) -> &BTreeMap<Member<'found>, BTreeSet<Member<'found>>> {
         match toward {
             Toward::Used => &self.uses,
             Toward::Users => &self.users,

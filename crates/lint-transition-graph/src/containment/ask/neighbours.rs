@@ -13,11 +13,7 @@ pub(super) struct Neighbours<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Neighbours<'view, 'found, 'file> {
-    pub(super) fn new(
-        named: Named<'view, 'found, 'file>,
-        toward: Toward,
-        listed: Listed,
-    ) -> Neighbours<'view, 'found, 'file> {
+    pub(super) const fn new(named: Named<'view, 'found, 'file>, toward: Toward, listed: Listed) -> Self {
         Neighbours { named, toward, listed }
     }
 

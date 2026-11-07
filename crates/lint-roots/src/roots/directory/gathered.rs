@@ -13,7 +13,7 @@ pub struct Gathered<'survey> {
 
 impl<'survey> Gathered<'survey> {
     #[must_use]
-    pub fn new(survey: Settled<'survey>, ignored: &'survey [Ignored]) -> Gathered<'survey> {
+    pub const fn new(survey: Settled<'survey>, ignored: &'survey [Ignored]) -> Self {
         Gathered { survey, ignored }
     }
 

@@ -11,32 +11,32 @@ pub enum Identity {
 }
 
 impl Identity {
-    pub fn direct(self, lone: Option<Lone<'_>>) -> Option<Identity> {
+    pub fn direct(self, lone: Option<Lone<'_>>) -> Option<Self> {
         match lone.and_then(Lone::primitive) {
             Some(_) => Some(self),
             None => self.pathed(),
         }
     }
 
-    pub fn aliased(self, written: &ItemPath) -> Option<Identity> {
+    pub fn aliased(self, written: &ItemPath) -> Option<Self> {
         match Lone::within(written) {
             Some(lone) => lone.primitive().map(|_| self),
             None => self.pathed(),
         }
     }
 
-    fn pathed(self) -> Option<Identity> {
+    fn pathed(self) -> Option<Self> {
         match self {
-            Identity::Primitive(_) => None,
-            Identity::Owned | Identity::Wire(_) => Some(self),
+            Self::Primitive(_) => None,
+            Self::Owned | Self::Wire(_) => Some(self),
         }
     }
 
     pub fn finding(self, context: Name) -> Finding {
         match self {
-            Identity::Primitive(primitive) => Finding::BarePrimitive { primitive, context },
-            Identity::Owned => Finding::BarePrimitive { primitive: Name::from(Lexicon::STRING), context },
-            Identity::Wire(wire) => Finding::WireForm { wire: wire.as_ref().iter().cloned().collect(), context },
+            Self::Primitive(primitive) => Finding::BarePrimitive { primitive, context },
+            Self::Owned => Finding::BarePrimitive { primitive: Name::from(Lexicon::STRING), context },
+            Self::Wire(wire) => Finding::WireForm { wire: wire.as_ref().iter().cloned().collect(), context },
         }
     }
 }
@@ -47,12 +47,12 @@ pub struct Lone<'path> {
 }
 
 impl<'path> Lone<'path> {
-    pub fn within(written: &'path ItemPath) -> Option<Lone<'path>> {
+    pub fn within(written: &'path ItemPath) -> Option<Self> {
         let segments: &[Name] = written.as_ref();
         segments.first().xor(segments.get(1)).map(|word| Lone { word })
     }
 
-    pub fn primitive(self) -> Option<Lone<'path>> {
+    pub fn primitive(self) -> Option<Self> {
         self.word.matches::<Whole>(&Lexicon::PRIMITIVE_WORDS).map(|_| self)
     }
 
@@ -68,9 +68,9 @@ struct Wire {
 }
 
 impl Wire {
-    fn rooted(words: &[Word<'_>], root: fn(ItemPath) -> Resolved) -> Wire {
+    fn rooted(words: &[Word<'_>], root: fn(ItemPath) -> Resolved) -> Self {
         let path: ItemPath = words.iter().copied().collect();
-        Wire { resolved: root(path.clone()), path }
+        Self { resolved: root(path.clone()), path }
     }
 }
 
@@ -105,11 +105,11 @@ impl Lexicon {
     ];
     pub const DOOR_WORDS: [Word<'static>; 6] = words!["FromStr", "TryFrom", "Display", "AsRef", "Borrow", "Deref"];
 
-    pub fn new() -> Lexicon {
-        Lexicon {
-            owned: Lexicon::OWNED.into_iter().collect(),
-            owned_spellings: Lexicon::OWNED_SPELLINGS.iter().map(|owned| owned.iter().copied().collect()).collect(),
-            wires: Lexicon::WIRE_CRATES.iter().map(|wire| Wire::rooted(wire, Resolved::External)).collect(),
+    pub fn new() -> Self {
+        Self {
+            owned: Self::OWNED.into_iter().collect(),
+            owned_spellings: Self::OWNED_SPELLINGS.iter().map(|owned| owned.iter().copied().collect()).collect(),
+            wires: Self::WIRE_CRATES.iter().map(|wire| Wire::rooted(wire, Resolved::External)).collect(),
         }
     }
 

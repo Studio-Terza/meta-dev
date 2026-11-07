@@ -8,14 +8,14 @@ use super::Flagged;
 pub struct Lines(Vec<String>);
 
 impl From<Flagged> for Lines {
-    fn from(flagged: Flagged) -> Lines {
-        Lines(flagged.into_inner().iter().map(ToString::to_string).collect())
+    fn from(flagged: Flagged) -> Self {
+        Self(flagged.into_inner().iter().map(ToString::to_string).collect())
     }
 }
 
 impl<const WANTED: usize> From<[&str; WANTED]> for Lines {
-    fn from(wanted: [&str; WANTED]) -> Lines {
-        Lines(wanted.iter().map(ToString::to_string).collect())
+    fn from(wanted: [&str; WANTED]) -> Self {
+        Self(wanted.iter().map(ToString::to_string).collect())
     }
 }
 

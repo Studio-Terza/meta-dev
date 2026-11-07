@@ -22,7 +22,7 @@ pub struct Staged {
 }
 
 impl Staged {
-    pub fn under(files: &(impl Files + Sync), trees: &[&Tree<'_>]) -> Vec<Result<Staged, Failure>> {
+    pub fn under(files: &(impl Files + Sync), trees: &[&Tree<'_>]) -> Vec<Result<Self, Failure>> {
         let (targets, repo_files) = thread::scope(|scope| {
             let listing = thread::Builder::new().spawn_scoped(scope, || RepoFiles::under(files, trees));
             (Roots::under(files, trees), Self::listed(listing, files, trees))
@@ -34,7 +34,7 @@ impl Staged {
             .map(|((tree, targets), repo_files)| {
                 let targets = targets?;
                 targets.first().ok_or_else(|| tree.without_sources())?;
-                Ok(Staged { targets, repo_files: repo_files? })
+                Ok(Self { targets, repo_files: repo_files? })
             })
             .collect()
     }

@@ -12,16 +12,16 @@ pub(crate) struct Scope {
 impl Scope {
     const SELF: &'static str = "Self";
 
-    pub(crate) fn within<'item>(&self, items: impl Iterator<Item = &'item Item>) -> Scope {
+    pub(crate) fn within<'item>(&self, items: impl Iterator<Item = &'item Item>) -> Self {
         self.clone().using(items.map(Self::item_uses).fold(Uses::default(), Uses::merged))
     }
 
-    pub(crate) fn within_statements(&self, statements: &[Stmt]) -> Scope {
+    pub(crate) fn within_statements(&self, statements: &[Stmt]) -> Self {
         self.within(statements.iter().filter_map(Self::statement_item))
     }
 
-    pub(crate) fn implementing(&self, self_type: &Type) -> Scope {
-        Scope { self_type: self.type_named(self_type), ..self.clone() }
+    pub(crate) fn implementing(&self, self_type: &Type) -> Self {
+        Self { self_type: self.type_named(self_type), ..self.clone() }
     }
 
     pub(crate) fn named(&self, written: &Name) -> Option<Name> {
@@ -52,11 +52,11 @@ impl Scope {
         }
     }
 
-    fn using(self, uses: Uses) -> Scope {
-        Scope { uses: self.uses.merged(uses), ..self }
+    fn using(self, uses: Uses) -> Self {
+        Self { uses: self.uses.merged(uses), ..self }
     }
 
-    fn statement_item(statement: &Stmt) -> Option<&Item> {
+    const fn statement_item(statement: &Stmt) -> Option<&Item> {
         if let Stmt::Item(item) = statement { Some(item) } else { None }
     }
 

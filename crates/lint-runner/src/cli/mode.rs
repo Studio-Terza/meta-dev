@@ -31,23 +31,23 @@ impl Mode {
     const REPORT_FLAG: &'static str = "--report";
     const QUERY_WORD: &'static str = "query";
 
-    pub(crate) fn of_arguments(arguments: &[OsString]) -> Mode {
+    pub(crate) fn of_arguments(arguments: &[OsString]) -> Self {
         arguments.split_first().filter(|(first, _)| first.as_os_str() == Self::QUERY_WORD).map_or_else(
             || {
                 arguments
                     .iter()
                     .find(|argument| argument.as_os_str() == Self::REPORT_FLAG)
-                    .map_or(Mode::Gate, |_| Mode::Report)
+                    .map_or(Self::Gate, |_| Self::Report)
             },
-            |(_, rest)| Mode::Query(Query::try_from(rest)),
+            |(_, rest)| Self::Query(Query::try_from(rest)),
         )
     }
 
     pub(crate) fn roots(&self, arguments: &[OsString]) -> Vec<PathBuf> {
         match self {
-            Mode::Query(Ok(query)) => query.roots().to_vec(),
-            Mode::Query(Err(_)) => Vec::new(),
-            Mode::Gate | Mode::Report => arguments
+            Self::Query(Ok(query)) => query.roots().to_vec(),
+            Self::Query(Err(_)) => Vec::new(),
+            Self::Gate | Self::Report => arguments
                 .iter()
                 .filter(|argument| argument.as_os_str() != Self::REPORT_FLAG)
                 .map(PathBuf::from)
@@ -55,10 +55,10 @@ impl Mode {
         }
     }
 
-    pub(crate) fn refusal(&self) -> Option<&QueryFailure> {
+    pub(crate) const fn refusal(&self) -> Option<&QueryFailure> {
         match self {
-            Mode::Query(Err(failure)) => Some(failure),
-            Mode::Gate | Mode::Report | Mode::Query(Ok(_)) => None,
+            Self::Query(Err(failure)) => Some(failure),
+            Self::Gate | Self::Report | Self::Query(Ok(_)) => None,
         }
     }
 
@@ -68,8 +68,8 @@ impl Mode {
         sources: &'scope Sources<F>,
     ) -> Helpers<'scope> {
         match self {
-            Mode::Gate => Lints::started(scope, sources),
-            Mode::Report | Mode::Query(_) => Vec::new(),
+            Self::Gate => Lints::started(scope, sources),
+            Self::Report | Self::Query(_) => Vec::new(),
         }
     }
 
@@ -81,9 +81,9 @@ impl Mode {
         out: &mut impl Write,
     ) -> Outcome<'file> {
         match self {
-            Mode::Gate => Self::gated(readout, queue, helpers, out),
-            Mode::Report => Self::reported(readout.files(), out),
-            Mode::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
+            Self::Gate => Self::gated(readout, queue, helpers, out),
+            Self::Report => Self::reported(readout.files(), out),
+            Self::Query(found) => Self::queried(found.as_ref().ok(), readout.files(), out),
         }
     }
 

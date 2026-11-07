@@ -23,7 +23,7 @@ pub struct ModulePath<'file> {
 }
 
 impl<'file> ModulePath<'file> {
-    pub fn of_file(file: &'file SourceFile) -> ModulePath<'file> {
+    pub fn of_file(file: &'file SourceFile) -> Self {
         ModulePath {
             crate_root: file.placement().crate_root(),
             segments: file.placement().module().segments(),
@@ -31,20 +31,20 @@ impl<'file> ModulePath<'file> {
         }
     }
 
-    pub fn file(&self) -> &'file Path {
+    pub const fn file(&self) -> &'file Path {
         self.file
     }
 
-    pub fn parent(&self) -> Option<ModulePath<'file>> {
+    pub fn parent(&self) -> Option<Self> {
         let (_, parents) = self.segments.split_last()?;
         Some(self.with_segments(parents))
     }
 
-    pub fn truncated_like(&self, other: &ModulePath<'file>) -> ModulePath<'file> {
+    pub fn truncated_like(&self, other: &Self) -> Self {
         self.with_segments(self.segments.get(..other.segments.len()).unwrap_or(self.segments))
     }
 
-    fn with_segments(&self, segments: &'file [Name]) -> ModulePath<'file> {
+    fn with_segments(&self, segments: &'file [Name]) -> Self {
         ModulePath { crate_root: self.crate_root, segments, file: Path::new("") }
     }
 }

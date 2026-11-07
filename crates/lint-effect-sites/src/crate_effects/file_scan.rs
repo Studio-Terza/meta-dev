@@ -22,7 +22,7 @@ pub(super) struct FileScan<'file> {
 }
 
 impl<'file> FileScan<'file> {
-    pub(super) fn scanned(file: &'file SourceFile) -> FileScan<'file> {
+    pub(super) fn scanned(file: &'file SourceFile) -> Self {
         let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
         let mut scan = FileScan { file, ground, printed: Vec::new(), tested: BTreeSet::new() };
         scan.visit_file(file.syntax());
@@ -33,7 +33,7 @@ impl<'file> FileScan<'file> {
         self.printed
     }
 
-    pub(super) fn tested(&self) -> &BTreeSet<Site<'file>> {
+    pub(super) const fn tested(&self) -> &BTreeSet<Site<'file>> {
         &self.tested
     }
 

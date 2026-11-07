@@ -15,21 +15,21 @@ pub enum Check {
 }
 
 impl Check {
-    pub(crate) const ALL: [Check; 2] = [Check::Goldens, Check::Scenarios];
+    pub(crate) const ALL: [Self; 2] = [Self::Goldens, Self::Scenarios];
     pub(crate) const GOLDENS: &'static str = "golden-change";
     pub(crate) const SCENARIOS: &'static str = "new-scenario";
 
     pub(crate) fn waived_by(self, refactor: Option<&PullRequest>) -> Option<Fault> {
         match self {
-            Check::Goldens => refactor.map(|_| Fault::Refactor),
-            Check::Scenarios => None,
+            Self::Goldens => refactor.map(|_| Fault::Refactor),
+            Self::Scenarios => None,
         }
     }
 
     pub(crate) fn flagging(self, change: &Change) -> Option<&Change> {
         match self {
-            Check::Goldens => change.touching(Place::GOLDENS),
-            Check::Scenarios => change.bringing_in(Place::SCENARIOS).map(|_| change),
+            Self::Goldens => change.touching(Place::GOLDENS),
+            Self::Scenarios => change.bringing_in(Place::SCENARIOS).map(|_| change),
         }
     }
 }
@@ -37,10 +37,10 @@ impl Check {
 impl FromStr for Check {
     type Err = NotACheck;
 
-    fn from_str(label: &str) -> Result<Check, NotACheck> {
+    fn from_str(label: &str) -> Result<Self, NotACheck> {
         match label {
-            Self::GOLDENS => Ok(Check::Goldens),
-            Self::SCENARIOS => Ok(Check::Scenarios),
+            Self::GOLDENS => Ok(Self::Goldens),
+            Self::SCENARIOS => Ok(Self::Scenarios),
             _ => Err(NotACheck),
         }
     }

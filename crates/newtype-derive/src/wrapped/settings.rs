@@ -16,7 +16,7 @@ impl Settings {
     const ATTRIBUTE: &'static str = "newtype";
     const INCOMPLETE: &'static str = "a check needs an error, and an error needs a check";
 
-    pub fn declared(attributes: &[Attribute]) -> syn::Result<Settings> {
+    pub fn declared(attributes: &[Attribute]) -> syn::Result<Self> {
         let lists = attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::ATTRIBUTE))
@@ -28,12 +28,7 @@ impl Settings {
         let strategy = settings.iter().find_map(Setting::strategy).cloned();
         let partial = function.as_ref().map(|_| ()).xor(error.as_ref().map(|_| ()));
         partial.map_or_else(
-            || {
-                Ok(Settings {
-                    check: function.zip(error).map(|(function, error)| Check::new(function, error)),
-                    strategy,
-                })
-            },
+            || Ok(Self { check: function.zip(error).map(|(function, error)| Check::new(function, error)), strategy }),
             |()| Err(Error::new(Span::call_site(), Self::INCOMPLETE)),
         )
     }
@@ -63,7 +58,7 @@ impl Settings {
         }
     }
 
-    pub fn checking(&self) -> Option<&Check> {
+    pub const fn checking(&self) -> Option<&Check> {
         self.check.as_ref()
     }
 }

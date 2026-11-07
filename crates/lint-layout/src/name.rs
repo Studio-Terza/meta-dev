@@ -26,15 +26,15 @@ pub struct Name(String);
 
 impl Name {
     #[must_use]
-    pub fn of_type(found: &Type) -> Option<Name> {
+    pub fn of_type(found: &Type) -> Option<Self> {
         match found {
-            Type::Path(path) => path.path.segments.last().map(|last| Name::from(&last.ident)),
+            Type::Path(path) => path.path.segments.last().map(|last| Self::from(&last.ident)),
             _ => None,
         }
     }
 
     #[must_use]
-    pub fn implementing(item: &ItemImpl, wanted: Word<'_>) -> Option<Name> {
+    pub fn implementing(item: &ItemImpl, wanted: Word<'_>) -> Option<Self> {
         item.trait_
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
@@ -58,22 +58,22 @@ impl Name {
     }
 
     #[must_use]
-    pub fn reprefixed(&self, opening: Word<'_>, closing: Word<'_>) -> Option<Name> {
+    pub fn reprefixed(&self, opening: Word<'_>, closing: Word<'_>) -> Option<Self> {
         let spelled = opening.into_inner();
         self.0
             .get(..spelled.len())
             .filter(|head| *head == spelled)
             .and_then(|_| self.0.get(spelled.len()..))
-            .map(|rest| Name([closing.into_inner(), rest].concat()))
+            .map(|rest| Self([closing.into_inner(), rest].concat()))
     }
 
     #[must_use]
-    pub fn words(&self) -> Vec<Name> {
+    pub fn words(&self) -> Vec<Self> {
         let letters: Vec<char> = self.0.chars().collect();
         letters
             .chunk_by(|left, right| left.is_alphanumeric() == right.is_alphanumeric())
             .filter(|chunk| chunk.iter().all(|letter| letter.is_alphanumeric()))
-            .map(|chunk| Name(chunk.iter().collect()))
+            .map(|chunk| Self(chunk.iter().collect()))
             .collect()
     }
 
@@ -98,8 +98,8 @@ impl Name {
 }
 
 impl From<&str> for Name {
-    fn from(text: &str) -> Name {
-        Name(text.to_owned())
+    fn from(text: &str) -> Self {
+        Self(text.to_owned())
     }
 }
 
@@ -110,20 +110,20 @@ impl AsRef<Path> for Name {
 }
 
 impl From<Word<'_>> for Name {
-    fn from(word: Word<'_>) -> Name {
-        Name(word.into_inner().to_owned())
+    fn from(word: Word<'_>) -> Self {
+        Self(word.into_inner().to_owned())
     }
 }
 
 impl From<&Ident> for Name {
-    fn from(ident: &Ident) -> Name {
-        Name(ident.to_string())
+    fn from(ident: &Ident) -> Self {
+        Self(ident.to_string())
     }
 }
 
 impl From<&OsStr> for Name {
-    fn from(segment: &OsStr) -> Name {
-        Name(segment.to_string_lossy().into_owned())
+    fn from(segment: &OsStr) -> Self {
+        Self(segment.to_string_lossy().into_owned())
     }
 }
 
@@ -135,9 +135,9 @@ impl fmt::Display for Name {
 
 impl Arbitrary for Name {
     type Parameters = ();
-    type Strategy = BoxedStrategy<Name>;
+    type Strategy = BoxedStrategy<Self>;
 
-    fn arbitrary_with((): ()) -> BoxedStrategy<Name> {
+    fn arbitrary_with((): ()) -> BoxedStrategy<Self> {
         any::<String>().prop_map(Name).boxed()
     }
 }
@@ -150,11 +150,11 @@ enum Initial {
 }
 
 impl From<char> for Initial {
-    fn from(first: char) -> Initial {
+    fn from(first: char) -> Self {
         Some(first)
             .filter(char::is_ascii_lowercase)
-            .map(|_| Initial::Lower)
-            .or_else(|| Some(first).filter(char::is_ascii_uppercase).map(|_| Initial::Upper))
-            .unwrap_or(Initial::Other)
+            .map(|_| Self::Lower)
+            .or_else(|| Some(first).filter(char::is_ascii_uppercase).map(|_| Self::Upper))
+            .unwrap_or(Self::Other)
     }
 }

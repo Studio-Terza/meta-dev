@@ -11,10 +11,10 @@ pub enum Edit {
 }
 
 impl Edit {
-    fn status(self) -> &'static str {
+    const fn status(self) -> &'static str {
         match self {
-            Edit::Modified => "M",
-            Edit::Added => "A",
+            Self::Modified => "M",
+            Self::Added => "A",
         }
     }
 }
@@ -26,8 +26,8 @@ pub struct Change {
 }
 
 impl Change {
-    pub fn new(edit: Edit, path: PathBuf) -> Change {
-        Change { edit, path }
+    pub const fn new(edit: Edit, path: PathBuf) -> Self {
+        Self { edit, path }
     }
 }
 
@@ -42,12 +42,12 @@ impl Fake {
     const FORK: &'static str = "fork\n";
     const UNLABELLED_CHANGE: &'static str = "change\n";
 
-    pub fn new(metadata: &str, changes: Vec<Change>) -> Fake {
-        Fake { metadata: metadata.to_owned(), changes, files: Memory::default() }
+    pub fn new(metadata: &str, changes: Vec<Change>) -> Self {
+        Self { metadata: metadata.to_owned(), changes, files: Memory::default() }
     }
 
-    pub fn modifying(metadata: &str, changed: &[PathBuf]) -> Fake {
-        Fake::new(metadata, changed.iter().map(|path| Change::new(Edit::Modified, path.clone())).collect())
+    pub fn modifying(metadata: &str, changed: &[PathBuf]) -> Self {
+        Self::new(metadata, changed.iter().map(|path| Change::new(Edit::Modified, path.clone())).collect())
     }
 
     fn names(&self) -> String {
@@ -116,13 +116,13 @@ enum Asked {
 }
 
 impl Asked {
-    const NAMED: [(&'static str, Asked); 2] = [("merge-base", Asked::MergeBase), ("--name-status", Asked::NameStatus)];
+    const NAMED: [(&'static str, Self); 2] = [("merge-base", Self::MergeBase), ("--name-status", Self::NameStatus)];
 
-    fn of(invocation: &Invocation) -> Asked {
+    fn of(invocation: &Invocation) -> Self {
         Self::NAMED
             .iter()
             .find(|(word, _)| invocation.arguments().iter().any(|argument| argument == word))
-            .map_or(Asked::Names, |(_, asked)| *asked)
+            .map_or(Self::Names, |(_, asked)| *asked)
     }
 }
 
@@ -135,10 +135,10 @@ enum Program {
 }
 
 impl Program {
-    const NAMED: [(&'static str, Program); 3] = [("cargo", Program::Cargo), ("git", Program::Git), ("gh", Program::Gh)];
+    const NAMED: [(&'static str, Self); 3] = [("cargo", Self::Cargo), ("git", Self::Git), ("gh", Self::Gh)];
 
-    fn of(invocation: &Invocation) -> Program {
+    fn of(invocation: &Invocation) -> Self {
         let program = invocation.program().to_str();
-        Self::NAMED.iter().find(|(name, _)| program == Some(*name)).map_or(Program::Other, |(_, named)| *named)
+        Self::NAMED.iter().find(|(name, _)| program == Some(*name)).map_or(Self::Other, |(_, named)| *named)
     }
 }

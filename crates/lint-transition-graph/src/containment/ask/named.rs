@@ -13,11 +13,11 @@ pub(super) struct Named<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Named<'view, 'found, 'file> {
-    pub(super) fn new(view: &'view Containment<'found, 'file>, name: &'view Name) -> Named<'view, 'found, 'file> {
+    pub(super) const fn new(view: &'view Containment<'found, 'file>, name: &'view Name) -> Self {
         Named { view, name }
     }
 
-    pub(super) fn view(&self) -> &'view Containment<'found, 'file> {
+    pub(super) const fn view(&self) -> &'view Containment<'found, 'file> {
         self.view
     }
 
@@ -26,7 +26,7 @@ impl<'view, 'found, 'file> Named<'view, 'found, 'file> {
         members.first().map(|_| ()).ok_or(Missing(self.name)).map(|()| members)
     }
 
-    pub(super) fn placed(&self, member: Member<'found>) -> Placed<'view, 'found, 'file> {
+    pub(super) const fn placed(&self, member: Member<'found>) -> Placed<'view, 'found, 'file> {
         Placed::new(self.view, member, Spelled::Path)
     }
 }

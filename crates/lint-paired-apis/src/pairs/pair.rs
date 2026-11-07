@@ -14,13 +14,13 @@ pub struct Pair {
 }
 
 impl Pair {
-    pub const ALL: [Pair; 6] = [
-        Pair { opening: Word::new("start"), closing: Word::new("stop") },
-        Pair { opening: Word::new("lock"), closing: Word::new("unlock") },
-        Pair { opening: Word::new("open"), closing: Word::new("close") },
-        Pair { opening: Word::new("claim"), closing: Word::new("release") },
-        Pair { opening: Word::new("acquire"), closing: Word::new("release") },
-        Pair { opening: Word::new("begin"), closing: Word::new("end") },
+    pub const ALL: [Self; 6] = [
+        Self { opening: Word::new("start"), closing: Word::new("stop") },
+        Self { opening: Word::new("lock"), closing: Word::new("unlock") },
+        Self { opening: Word::new("open"), closing: Word::new("close") },
+        Self { opening: Word::new("claim"), closing: Word::new("release") },
+        Self { opening: Word::new("acquire"), closing: Word::new("release") },
+        Self { opening: Word::new("begin"), closing: Word::new("end") },
     ];
 
     pub fn violations<'file>(&self, methods: &[Declared<'file>]) -> Vec<Violation<'file>> {

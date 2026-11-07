@@ -40,13 +40,13 @@ impl fmt::Display for Labels {
 }
 
 impl Step for Labels {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Labels, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let base = &arguments.taken()?;
         let pull_request = &arguments.taken()?;
         let metadata = &arguments.taken()?;
         arguments.ended()?;
-        Ok(Labels {
+        Ok(Self {
             base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),
             pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()),
             metadata: Journal::file(Path::new(metadata)),

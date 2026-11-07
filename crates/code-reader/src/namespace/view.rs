@@ -11,7 +11,7 @@ enum Found<'rows> {
 }
 
 impl<'rows> Found<'rows> {
-    fn union(self, other: Found<'rows>) -> Found<'rows> {
+    fn union(self, other: Self) -> Self {
         match self {
             Found::Nothing => other,
             Found::One(left) => other.met(left),
@@ -19,7 +19,7 @@ impl<'rows> Found<'rows> {
         }
     }
 
-    fn met(self, left: &'rows Binding) -> Found<'rows> {
+    fn met(self, left: &'rows Binding) -> Self {
         match self {
             Found::Nothing => Found::One(left),
             Found::One(right) => Found::agreed(left, right),
@@ -27,14 +27,14 @@ impl<'rows> Found<'rows> {
         }
     }
 
-    fn undisputed(self) -> Found<'rows> {
+    const fn undisputed(self) -> Self {
         match self {
             Found::Conflict => Found::Nothing,
             Found::Nothing | Found::One(_) => self,
         }
     }
 
-    fn agreed(left: &'rows Binding, right: &'rows Binding) -> Found<'rows> {
+    fn agreed(left: &'rows Binding, right: &'rows Binding) -> Self {
         match [left].into_iter().find(|binding| *binding == right) {
             Some(agreed) => Found::One(agreed),
             None => Found::Conflict,
@@ -53,31 +53,31 @@ enum Determinacy {
 impl Determinacy {
     fn or_else<'rows>(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
         match self {
-            Determinacy::Determined => next(),
-            Determinacy::Weak => View::UNEXPANDED.union(next()),
-            Determinacy::Strong => View::WAITING,
+            Self::Determined => next(),
+            Self::Weak => View::UNEXPANDED.union(next()),
+            Self::Strong => View::WAITING,
         }
     }
 
     fn bound(self, binding: &Binding) -> Resolution {
         match self {
-            Determinacy::Determined => Resolution::Bound(binding.clone()),
-            Determinacy::Weak | Determinacy::Strong => Resolution::Waiting,
+            Self::Determined => Resolution::Bound(binding.clone()),
+            Self::Weak | Self::Strong => Resolution::Waiting,
         }
     }
 
     fn deferring<'rows>(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
         match self {
-            Determinacy::Determined => disputed,
-            Determinacy::Weak | Determinacy::Strong => deferred(),
+            Self::Determined => disputed,
+            Self::Weak | Self::Strong => deferred(),
         }
     }
 
     fn absent(self, absent: impl FnOnce() -> Outer) -> Resolution {
         match self {
-            Determinacy::Determined => Resolution::Bound(absent().binding()),
-            Determinacy::Weak => absent().known(),
-            Determinacy::Strong => Resolution::Waiting,
+            Self::Determined => Resolution::Bound(absent().binding()),
+            Self::Weak => absent().known(),
+            Self::Strong => Resolution::Waiting,
         }
     }
 }
@@ -88,32 +88,28 @@ pub(super) struct View<'rows> {
     pending: Determinacy,
 }
 
-impl<'rows> View<'rows> {
+impl View<'_> {
     pub(super) const ABSENT: View<'static> = View { found: Found::Nothing, pending: Determinacy::Determined };
     pub(super) const WAITING: View<'static> = View { found: Found::Nothing, pending: Determinacy::Strong };
     pub(super) const UNEXPANDED: View<'static> = View { found: Found::Nothing, pending: Determinacy::Weak };
     pub(super) const CONFLICT: View<'static> = View { found: Found::Conflict, pending: Determinacy::Determined };
 
-    pub(super) fn union(self, other: View<'rows>) -> View<'rows> {
+    pub(super) fn union(self, other: Self) -> Self {
         View { found: self.found.union(other.found), pending: self.pending.max(other.pending) }
     }
 
-    pub(super) fn undisputed(self) -> View<'rows> {
+    pub(super) const fn undisputed(self) -> Self {
         View { found: self.found.undisputed(), pending: self.pending }
     }
 
-    pub(super) fn disputed(
-        self,
-        explicit: impl FnOnce() -> View<'rows>,
-        deferred: impl FnOnce() -> View<'rows>,
-    ) -> View<'rows> {
+    pub(super) fn disputed(self, explicit: impl FnOnce() -> Self, deferred: impl FnOnce() -> Self) -> Self {
         match self.found {
             Found::Conflict => explicit().deferring(self, deferred),
             Found::Nothing | Found::One(_) => self,
         }
     }
 
-    fn deferring(self, disputed: View<'rows>, deferred: impl FnOnce() -> View<'rows>) -> View<'rows> {
+    fn deferring(self, disputed: Self, deferred: impl FnOnce() -> Self) -> Self {
         match self.found {
             Found::One(_) => deferred(),
             Found::Conflict => disputed,
@@ -121,7 +117,7 @@ impl<'rows> View<'rows> {
         }
     }
 
-    pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> View<'rows>) -> View<'rows> {
+    pub(super) fn admitted(admission: Admission, shown: impl FnOnce() -> Self) -> Self {
         match admission {
             Admission::Hidden => View::ABSENT,
             Admission::Shown => shown(),
@@ -129,7 +125,7 @@ impl<'rows> View<'rows> {
         }
     }
 
-    pub(super) fn or_else(self, next: impl FnOnce() -> View<'rows>) -> View<'rows> {
+    pub(super) fn or_else(self, next: impl FnOnce() -> Self) -> Self {
         match self.found {
             Found::Nothing => self.pending.or_else(next),
             Found::One(_) | Found::Conflict => self,
@@ -146,7 +142,7 @@ impl<'rows> View<'rows> {
 }
 
 impl<'rows> From<&'rows Binding> for View<'rows> {
-    fn from(binding: &'rows Binding) -> View<'rows> {
+    fn from(binding: &'rows Binding) -> Self {
         View { found: Found::One(binding), pending: Determinacy::Determined }
     }
 }

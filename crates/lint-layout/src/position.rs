@@ -13,14 +13,14 @@ pub struct Position {
 
 impl Position {
     #[must_use]
-    pub fn line(self) -> LineNumber {
+    pub const fn line(self) -> LineNumber {
         self.line
     }
 }
 
 impl From<Span> for Position {
-    fn from(span: Span) -> Position {
+    fn from(span: Span) -> Self {
         let start = span.start();
-        Position { line: LineNumber::from(start.line), column: Column(start.column) }
+        Self { line: LineNumber::from(start.line), column: Column(start.column) }
     }
 }

@@ -27,7 +27,7 @@ impl Resolved {
 }
 
 impl From<&Path> for Resolved {
-    fn from(path: &Path) -> Resolved {
-        Resolved(path.components().fold(PathBuf::new(), Self::stepped))
+    fn from(path: &Path) -> Self {
+        Self(path.components().fold(PathBuf::new(), Self::stepped))
     }
 }

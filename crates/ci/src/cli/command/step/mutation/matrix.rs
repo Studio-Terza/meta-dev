@@ -38,14 +38,14 @@ impl Matrix {
 }
 
 impl Step for Matrix {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<Matrix, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let shards = &arguments.taken()?;
         let sources = &arguments.taken()?;
         let directory = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;
-        Ok(Matrix {
+        Ok(Self {
             shards: PathBuf::from(shards),
             sources: PathBuf::from(sources),
             markdown: Journal::from(Path::new(directory).join(Self::MARKDOWN)),

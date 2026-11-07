@@ -37,8 +37,8 @@ pub(crate) struct Reading {
 impl TryFrom<&[OsString]> for Query {
     type Error = QueryFailure;
 
-    fn try_from(arguments: &[OsString]) -> Result<Query, QueryFailure> {
-        let start = Reading { query: Query::default(), expecting: Expecting::Word };
+    fn try_from(arguments: &[OsString]) -> Result<Self, QueryFailure> {
+        let start = Reading { query: Self::default(), expecting: Expecting::Word };
         let finished = arguments.iter().try_fold(start, |reading, argument| {
             argument.to_str().ok_or(QueryFailure::Unreadable).and_then(|word| reading.next(word))
         })?;
@@ -47,61 +47,60 @@ impl TryFrom<&[OsString]> for Query {
 }
 
 impl Expecting {
-    const FLAGS: [(&'static str, Expecting); 10] = [
-        ("--in", Expecting::Root),
-        ("--role", Expecting::Role),
-        ("--top", Expecting::Top),
-        ("--defined", Expecting::Item(Item::Defined)),
-        ("--uses", Expecting::Item(Item::Uses)),
-        ("--users", Expecting::Item(Item::Users)),
-        ("--implementers", Expecting::Item(Item::Implementers)),
-        ("--cluster", Expecting::Item(Item::Cluster)),
-        ("--exports", Expecting::Item(Item::Exports)),
-        ("--path", Expecting::From),
+    const FLAGS: [(&'static str, Self); 10] = [
+        ("--in", Self::Root),
+        ("--role", Self::Role),
+        ("--top", Self::Top),
+        ("--defined", Self::Item(Item::Defined)),
+        ("--uses", Self::Item(Item::Uses)),
+        ("--users", Self::Item(Item::Users)),
+        ("--implementers", Self::Item(Item::Implementers)),
+        ("--cluster", Self::Item(Item::Cluster)),
+        ("--exports", Self::Item(Item::Exports)),
+        ("--path", Self::From),
     ];
 
-    fn flag(word: &str) -> Option<Expecting> {
+    fn flag(word: &str) -> Option<Self> {
         Self::FLAGS.into_iter().find(|(flag, _)| *flag == word).map(|(_, expecting)| expecting)
     }
 }
 
 impl Item {
-    fn ask(self, name: Name) -> Ask {
+    const fn ask(self, name: Name) -> Ask {
         match self {
-            Item::Defined => Ask::Defined(name),
-            Item::Uses => Ask::Uses(name),
-            Item::Users => Ask::Users(name),
-            Item::Implementers => Ask::Implementers(name),
-            Item::Cluster => Ask::Cluster(name),
-            Item::Exports => Ask::Exports(name),
+            Self::Defined => Ask::Defined(name),
+            Self::Uses => Ask::Uses(name),
+            Self::Users => Ask::Users(name),
+            Self::Implementers => Ask::Implementers(name),
+            Self::Cluster => Ask::Cluster(name),
+            Self::Exports => Ask::Exports(name),
         }
     }
 }
 
 impl Reading {
-    fn next(self, word: &str) -> Result<Reading, QueryFailure> {
+    fn next(self, word: &str) -> Result<Self, QueryFailure> {
         match self.expecting {
             Expecting::Word => self.flagged(Expecting::flag(word), word),
             Expecting::Root => {
-                Ok(Reading { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
+                Ok(Self { query: self.query.with_root(PathBuf::from(word)), expecting: Expecting::Word })
             }
-            Expecting::Role => Ok(Reading { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
-            Expecting::Top => Ok(Reading { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
+            Expecting::Role => Ok(Self { query: self.query.with_role(word.parse()?), expecting: Expecting::Word }),
+            Expecting::Top => Ok(Self { query: self.query.with_top(word.parse()?), expecting: Expecting::Word }),
             Expecting::Item(item) => {
-                Ok(Reading { query: self.query.with_ask(item.ask(Name::from(word))), expecting: Expecting::Word })
+                Ok(Self { query: self.query.with_ask(item.ask(Name::from(word))), expecting: Expecting::Word })
             }
-            Expecting::From => Ok(Reading { query: self.query, expecting: Expecting::To(Name::from(word)) }),
-            Expecting::To(from) => Ok(Reading {
-                query: self.query.with_ask(Ask::Path(from, Name::from(word))),
-                expecting: Expecting::Word,
-            }),
+            Expecting::From => Ok(Self { query: self.query, expecting: Expecting::To(Name::from(word)) }),
+            Expecting::To(from) => {
+                Ok(Self { query: self.query.with_ask(Ask::Path(from, Name::from(word))), expecting: Expecting::Word })
+            }
         }
     }
 
-    fn flagged(self, flag: Option<Expecting>, word: &str) -> Result<Reading, QueryFailure> {
+    fn flagged(self, flag: Option<Expecting>, word: &str) -> Result<Self, QueryFailure> {
         match flag {
-            Some(expecting) => Ok(Reading { query: self.query, expecting }),
-            None => Ok(Reading { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
+            Some(expecting) => Ok(Self { query: self.query, expecting }),
+            None => Ok(Self { query: self.query.with_term(word.parse()?), expecting: Expecting::Word }),
         }
     }
 

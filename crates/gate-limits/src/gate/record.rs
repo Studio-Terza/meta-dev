@@ -6,8 +6,8 @@ use super::entry::Entry;
 pub struct Record(Vec<Entry>);
 
 impl FromIterator<Entry> for Record {
-    fn from_iter<Entries: IntoIterator<Item = Entry>>(entries: Entries) -> Record {
-        Record(entries.into_iter().collect())
+    fn from_iter<Entries: IntoIterator<Item = Entry>>(entries: Entries) -> Self {
+        Self(entries.into_iter().collect())
     }
 }
 

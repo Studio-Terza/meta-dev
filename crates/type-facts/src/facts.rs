@@ -28,7 +28,7 @@ pub struct Facts<'file> {
 
 impl<'file> Facts<'file> {
     #[must_use]
-    pub fn of_files(files: &'file [SourceFile]) -> Facts<'file> {
+    pub fn of_files(files: &'file [SourceFile]) -> Self {
         files.iter().filter_map(SourceFile::shipped).fold(Facts::default(), Collector::collected)
     }
 
