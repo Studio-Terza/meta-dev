@@ -803,12 +803,7 @@ fn nesting_is_counted_where_it_is_open_not_in_total() -> Result<(), Box<dyn Erro
     cases.iter().try_for_each(|(source, failures)| {
         let root = Scratch::package()?;
         root.write("src/lib.rs", source)?;
-        assert_eq!(
-            root.reported().err.matches("nested more than").count(),
-            *failures,
-            "{}",
-            &source[..source.len().min(40)]
-        );
+        assert_eq!(root.reported().err.matches("nested more than").count(), *failures, "{source}");
         Ok(())
     })
 }
