@@ -18,11 +18,11 @@ pub struct Owed<'change> {
 }
 
 impl<'change> Owed<'change> {
-    pub(crate) fn new(fault: Fault, failing: Vec<&'change Change>) -> Owed<'change> {
+    pub(crate) fn new(fault: Fault, failing: Vec<&'change Change>) -> Self {
         Owed { fault, failing }
     }
 
-    pub(crate) fn outstanding(&self) -> Option<&Owed<'change>> {
+    pub(crate) fn outstanding(&self) -> Option<&Self> {
         self.failing.first().map(|_| self)
     }
 
@@ -35,17 +35,17 @@ impl<'change> Owed<'change> {
 impl fmt::Display for Fault {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Fault::Beyond(Check::Goldens) => write!(
+            Self::Beyond(Check::Goldens) => write!(
                 formatter,
                 "this PR changes goldens of crates that nothing else it changes reaches, so it did not produce them; only the owner passes this, with the label {}",
                 Check::GOLDENS
             ),
-            Fault::Beyond(Check::Scenarios) => write!(
+            Self::Beyond(Check::Scenarios) => write!(
                 formatter,
                 "this PR adds files under tests/fixtures or tests/e2e of crates that nothing else it changes reaches; only the owner passes this, with the label {}",
                 Check::SCENARIOS
             ),
-            Fault::Refactor => write!(
+            Self::Refactor => write!(
                 formatter,
                 "this PR's title starts with refactor:, and a refactor leaves behaviour unchanged, so it changes no golden; only the owner passes this, with the label {}",
                 Check::GOLDENS

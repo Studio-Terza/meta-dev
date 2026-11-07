@@ -11,7 +11,7 @@ pub struct Violation<'file> {
 }
 
 impl<'file> Violation<'file> {
-    pub fn new(site: Site<'file>, finding: impl Finding) -> Violation<'file> {
+    pub fn new(site: Site<'file>, finding: impl Finding) -> Self {
         Violation { site, problem: finding.to_string(), fix: finding.fix() }
     }
 

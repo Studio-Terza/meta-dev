@@ -2,8 +2,8 @@
 pub struct NodeIndex(usize);
 
 impl From<usize> for NodeIndex {
-    fn from(index: usize) -> NodeIndex {
-        NodeIndex(index)
+    fn from(index: usize) -> Self {
+        Self(index)
     }
 }
 

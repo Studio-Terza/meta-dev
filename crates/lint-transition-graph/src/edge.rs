@@ -21,7 +21,7 @@ impl<'found, 'file> Edge<'found, 'file> {
         transition: Transition<'found, 'file>,
         ends: Ends<'found>,
         fixed_by: Option<&'found Name>,
-    ) -> Edge<'found, 'file> {
+    ) -> Self {
         let unformed = Edge { transition, ends, fixed_by, form: Form::Transition };
         Edge { form: Form::of_edge(&unformed), ..unformed }
     }
@@ -30,7 +30,7 @@ impl<'found, 'file> Edge<'found, 'file> {
         &self.form
     }
 
-    pub(crate) fn stored(&self) -> Option<&Edge<'found, 'file>> {
+    pub(crate) fn stored(&self) -> Option<&Self> {
         Some(self).filter(|edge| matches!(edge.form, Form::Store))
     }
 
@@ -51,8 +51,8 @@ impl<'found, 'file> Edge<'found, 'file> {
     }
 
     pub(crate) fn by_crate<'edge>(
-        edges: impl Iterator<Item = &'edge Edge<'found, 'file>>,
-    ) -> BTreeMap<&'edge CrateName, Vec<&'edge Edge<'found, 'file>>> {
+        edges: impl Iterator<Item = &'edge Self>,
+    ) -> BTreeMap<&'edge CrateName, Vec<&'edge Self>> {
         edges.fold(BTreeMap::new(), |mut crates, edge| {
             crates.entry(edge.transition().as_ref()).or_default().push(edge);
             crates

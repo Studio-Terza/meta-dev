@@ -9,7 +9,7 @@ pub enum ImplTarget<'ast> {
 }
 
 impl<'ast> ImplTarget<'ast> {
-    pub fn describe(item: &'ast ItemImpl) -> ImplTarget<'ast> {
+    pub fn describe(item: &'ast ItemImpl) -> Self {
         Syntax::inherent(item)
             .and_then(|item| Syntax::type_path(&item.self_ty))
             .and_then(|path| path.path.segments.last())

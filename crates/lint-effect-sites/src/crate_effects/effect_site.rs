@@ -16,7 +16,7 @@ pub(super) struct EffectSite<'file> {
 }
 
 impl<'file> EffectSite<'file> {
-    pub(super) fn new(site: Site<'file>, effect: Effect, called: Called, ground: Ground) -> EffectSite<'file> {
+    pub(super) fn new(site: Site<'file>, effect: Effect, called: Called, ground: Ground) -> Self {
         EffectSite { site, effect, called, ground }
     }
 

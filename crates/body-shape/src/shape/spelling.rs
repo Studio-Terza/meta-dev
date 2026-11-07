@@ -24,8 +24,8 @@ pub enum Sign {
 impl fmt::Display for Sign {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Sign::Plus => Ok(()),
-            Sign::Minus => write!(formatter, "-"),
+            Self::Plus => Ok(()),
+            Self::Minus => write!(formatter, "-"),
         }
     }
 }
@@ -39,8 +39,8 @@ pub enum Spoken {
 impl fmt::Display for Spoken {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Spoken::Literal(spelling) => write!(formatter, "{spelling}"),
-            Spoken::Word(name) => write!(formatter, "{name}"),
+            Self::Literal(spelling) => write!(formatter, "{spelling}"),
+            Self::Word(name) => write!(formatter, "{name}"),
         }
     }
 }
@@ -52,8 +52,8 @@ pub struct Spelled {
 }
 
 impl Spelled {
-    pub(crate) fn new(sign: Sign, spoken: Spoken) -> Spelled {
-        Spelled { sign, spoken }
+    pub(crate) fn new(sign: Sign, spoken: Spoken) -> Self {
+        Self { sign, spoken }
     }
 }
 

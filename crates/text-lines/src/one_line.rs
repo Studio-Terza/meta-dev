@@ -19,10 +19,10 @@ impl OneLine {
 impl TryFrom<String> for OneLine {
     type Error = NotOneLine;
 
-    fn try_from(text: String) -> Result<OneLine, NotOneLine> {
+    fn try_from(text: String) -> Result<Self, NotOneLine> {
         match text.chars().find(|letter| letter.is_control()) {
             Some(_) => Err(NotOneLine),
-            None => Ok(OneLine(text)),
+            None => Ok(Self(text)),
         }
     }
 }
@@ -41,9 +41,9 @@ impl fmt::Display for OneLine {
 
 impl Arbitrary for OneLine {
     type Parameters = ();
-    type Strategy = BoxedStrategy<OneLine>;
+    type Strategy = BoxedStrategy<Self>;
 
-    fn arbitrary_with((): ()) -> BoxedStrategy<OneLine> {
+    fn arbitrary_with((): ()) -> BoxedStrategy<Self> {
         Self::PRINTABLE.prop_map(OneLine).boxed()
     }
 }

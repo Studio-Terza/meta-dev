@@ -12,9 +12,9 @@ pub(super) enum Anchor {
 
 impl Anchor {
     const WORDS: [Word<'static>; 3] = [Word::new("crate"), Word::new("self"), Word::new("super")];
-    const ANCHORS: [Anchor; 3] = [Anchor::Crate, Anchor::Module, Anchor::Super];
+    const ANCHORS: [Self; 3] = [Self::Crate, Self::Module, Self::Super];
 
-    pub(super) fn spelled(first: &Name) -> Option<Anchor> {
+    pub(super) fn spelled(first: &Name) -> Option<Self> {
         Self::WORDS
             .iter()
             .zip(Self::ANCHORS)
@@ -23,19 +23,19 @@ impl Anchor {
 
     pub(super) fn anchored(self, anchors: Anchors) -> Option<ScopeId> {
         match self {
-            Anchor::Crate => anchors.root,
-            Anchor::Module => anchors.module,
-            Anchor::Super => anchors.above,
+            Self::Crate => anchors.root,
+            Self::Module => anchors.module,
+            Self::Super => anchors.above,
         }
     }
 }
 
 impl From<Anchor> for Visibility {
-    fn from(anchor: Anchor) -> Visibility {
+    fn from(anchor: Anchor) -> Self {
         match anchor {
-            Anchor::Crate => Visibility::Visible,
-            Anchor::Module => Visibility::Private,
-            Anchor::Super => Visibility::Restricted,
+            Anchor::Crate => Self::Visible,
+            Anchor::Module => Self::Private,
+            Anchor::Super => Self::Restricted,
         }
     }
 }
@@ -48,11 +48,11 @@ pub(crate) struct Anchors {
 }
 
 impl Anchors {
-    pub(super) fn rooted(root: ScopeId) -> Anchors {
-        Anchors { module: Some(root), above: None, root: Some(root) }
+    pub(super) fn rooted(root: ScopeId) -> Self {
+        Self { module: Some(root), above: None, root: Some(root) }
     }
 
-    pub(super) fn nested(self, module: ScopeId) -> Anchors {
-        Anchors { module: Some(module), above: self.module, root: self.root }
+    pub(super) fn nested(self, module: ScopeId) -> Self {
+        Self { module: Some(module), above: self.module, root: self.root }
     }
 }

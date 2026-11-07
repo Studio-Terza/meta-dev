@@ -14,10 +14,10 @@ use text_lines::OneLine;
 pub struct Listing(Vec<Entry>);
 
 impl Listing {
-    pub(super) fn totalled(totals: BTreeMap<OneLine, Seconds>) -> Listing {
+    pub(super) fn totalled(totals: BTreeMap<OneLine, Seconds>) -> Self {
         let mut longest: Vec<Entry> = totals.into_iter().map(|(label, seconds)| Entry::new(label, seconds)).collect();
         longest.sort_by(|left, right| right.took().partial_cmp(&left.took()).unwrap_or(Ordering::Equal));
-        Listing(longest)
+        Self(longest)
     }
 }
 

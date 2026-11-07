@@ -13,11 +13,11 @@ pub struct StageIssues {
 }
 
 impl Step for StageIssues {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<StageIssues, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let limits = arguments.taken()?;
         let measured = arguments.taken()?;
-        Ok(StageIssues { limits: gate_limits::Cli::from_args([limits, measured].into_iter().chain(arguments.rest())) })
+        Ok(Self { limits: gate_limits::Cli::from_args([limits, measured].into_iter().chain(arguments.rest())) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

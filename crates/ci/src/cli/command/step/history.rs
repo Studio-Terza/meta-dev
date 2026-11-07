@@ -18,13 +18,13 @@ pub struct History {
 }
 
 impl Step for History {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<History, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let metadata = &arguments.taken()?;
         let file = &arguments.taken()?;
         let revision = &arguments.taken()?;
         arguments.ended()?;
-        Ok(History {
+        Ok(Self {
             metadata: Journal::file(Path::new(metadata)),
             file: Journal::file(Path::new(file)),
             revision: Revision::new(revision.to_str().ok_or(Failure::Usage)?.to_owned()),

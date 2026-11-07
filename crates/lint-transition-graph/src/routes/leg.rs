@@ -18,11 +18,7 @@ pub(super) struct Leg<'walk, 'graph, 'found, 'file> {
 }
 
 impl<'walk, 'graph, 'found, 'file> Leg<'walk, 'graph, 'found, 'file> {
-    pub(super) fn new(
-        walk: &'walk Walk<'graph, 'found, 'file>,
-        from: Count,
-        to: Count,
-    ) -> Leg<'walk, 'graph, 'found, 'file> {
+    pub(super) fn new(walk: &'walk Walk<'graph, 'found, 'file>, from: Count, to: Count) -> Self {
         Leg { walk, called: walk.called(from, to), stops: walk.stops(from, to), from, to }
     }
 

@@ -14,9 +14,9 @@ impl Transition {
 }
 
 impl Parse for Transition {
-    fn parse(input: ParseStream) -> syn::Result<Transition> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         input.parse::<Ident>()?;
         input.parse::<Token![->]>()?;
-        Ok(Transition { target: TypeName::named(&input.parse()?) })
+        Ok(Self { target: TypeName::named(&input.parse()?) })
     }
 }

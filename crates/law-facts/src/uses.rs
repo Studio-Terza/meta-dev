@@ -44,16 +44,16 @@ pub(crate) struct Uses {
 }
 
 impl Uses {
-    pub(crate) fn of_tree(tree: &UseTree) -> Uses {
+    pub(crate) fn of_tree(tree: &UseTree) -> Self {
         Self::tree(tree, None)
     }
 
-    pub(crate) fn merged(mut self, other: Uses) -> Uses {
+    pub(crate) fn merged(mut self, other: Self) -> Self {
         self.absorb(other);
         self
     }
 
-    pub(crate) fn absorb(&mut self, other: Uses) {
+    pub(crate) fn absorb(&mut self, other: Self) {
         self.named.extend(other.named);
         self.globs.extend(other.globs);
     }
@@ -84,24 +84,24 @@ impl Uses {
         )
     }
 
-    fn tree(tree: &UseTree, root: Option<&Name>) -> Uses {
+    fn tree(tree: &UseTree, root: Option<&Name>) -> Self {
         match tree {
             UseTree::Path(path) => Self::path(path, root),
             UseTree::Rename(rename) => Self::single(&rename.rename, &rename.ident, root),
             UseTree::Name(named) => Self::single(&named.ident, &named.ident, root),
             UseTree::Group(group) => {
-                group.items.iter().map(|item| Self::tree(item, root)).fold(Uses::default(), Uses::merged)
+                group.items.iter().map(|item| Self::tree(item, root)).fold(Self::default(), Self::merged)
             }
-            UseTree::Glob(_) => Uses { named: BTreeMap::new(), globs: root.into_iter().cloned().collect() },
+            UseTree::Glob(_) => Self { named: BTreeMap::new(), globs: root.into_iter().cloned().collect() },
         }
     }
 
-    fn single(written: &Ident, name: &Ident, root: Option<&Name>) -> Uses {
+    fn single(written: &Ident, name: &Ident, root: Option<&Name>) -> Self {
         let import = Import { name: Name::from(name), root: root.cloned() };
-        Uses { named: BTreeMap::from([(Name::from(written), import)]), globs: BTreeSet::new() }
+        Self { named: BTreeMap::from([(Name::from(written), import)]), globs: BTreeSet::new() }
     }
 
-    fn path(path: &UsePath, root: Option<&Name>) -> Uses {
+    fn path(path: &UsePath, root: Option<&Name>) -> Self {
         let first = Name::from(&path.ident);
         Self::tree(&path.tree, Some(root.unwrap_or(&first)))
     }

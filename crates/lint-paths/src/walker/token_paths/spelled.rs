@@ -7,8 +7,8 @@ pub(crate) struct Spelled {
 }
 
 impl Spelled {
-    pub(crate) fn new(path: UsePath, started_on: LineNumber) -> Spelled {
-        Spelled { path, started_on }
+    pub(crate) fn new(path: UsePath, started_on: LineNumber) -> Self {
+        Self { path, started_on }
     }
 
     pub(crate) fn handed<Made>(self, to: impl FnOnce(UsePath, LineNumber) -> Made) -> Made {

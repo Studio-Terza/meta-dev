@@ -20,11 +20,11 @@ impl<'file> TraitFact<'file> {
         name: Name,
         site: Site<'file>,
         dependencies: Vec<Dependency<'file>>,
-    ) -> TraitFact<'file> {
+    ) -> Self {
         TraitFact { krate, name, site, dependencies, methods: Vec::new() }
     }
 
-    pub(crate) fn with_methods(mut self, methods: Vec<Method>) -> TraitFact<'file> {
+    pub(crate) fn with_methods(mut self, methods: Vec<Method>) -> Self {
         self.methods = methods;
         self
     }

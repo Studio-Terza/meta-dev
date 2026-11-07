@@ -19,7 +19,7 @@ pub(super) struct Stops<'graph, 'found, 'file> {
 }
 
 impl<'graph, 'found, 'file> Stops<'graph, 'found, 'file> {
-    pub(super) fn indexed(edges: &'graph [Edge<'found, 'file>]) -> Stops<'graph, 'found, 'file> {
+    pub(super) fn indexed(edges: &'graph [Edge<'found, 'file>]) -> Self {
         let joins: Vec<&'graph Edge<'found, 'file>> =
             edges.iter().filter(|edge| edge.form().written().is_some()).collect();
         let named = edges.iter().fold(BTreeMap::new(), |mut named: BTreeMap<_, Vec<_>>, edge| {

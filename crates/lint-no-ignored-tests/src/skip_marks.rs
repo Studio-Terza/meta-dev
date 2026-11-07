@@ -22,7 +22,7 @@ impl SkipMarks {
     const SKIPPING: [Word<'static>; 2] = words!["ignore", "skip"];
 
     pub(crate) fn lines_in(file: &syn::File) -> Vec<LineNumber> {
-        let mut marks = SkipMarks::default();
+        let mut marks = Self::default();
         marks.gates.extend(Gate::lines_in(&file.attrs));
         marks.visit_file(file);
         marks.lines.sort();
@@ -78,10 +78,8 @@ enum Marked {
 }
 
 impl Marked {
-    fn among(attributes: &[Attribute], law: Option<&Macro>) -> Marked {
-        law.map(|_| Marked::Test)
-            .or_else(|| TestMarks::mark_test(attributes).map(|_| Marked::Test))
-            .unwrap_or(Marked::Other)
+    fn among(attributes: &[Attribute], law: Option<&Macro>) -> Self {
+        law.map(|_| Self::Test).or_else(|| TestMarks::mark_test(attributes).map(|_| Self::Test)).unwrap_or(Self::Other)
     }
 }
 

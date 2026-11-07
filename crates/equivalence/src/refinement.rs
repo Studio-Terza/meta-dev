@@ -14,8 +14,8 @@ pub struct Colour(usize);
 struct Colours(usize);
 
 impl Colours {
-    fn counted<Node>(colours: &BTreeMap<Node, Colour>) -> Colours {
-        Colours::new(colours.values().collect::<BTreeSet<&Colour>>().len())
+    fn counted<Node>(colours: &BTreeMap<Node, Colour>) -> Self {
+        Self::new(colours.values().collect::<BTreeSet<&Colour>>().len())
     }
 }
 
@@ -28,8 +28,8 @@ pub struct Move<Node, Label, Law> {
 }
 
 impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
-    pub fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>, laws: Vec<Law>) -> Move<Node, Label, Law> {
-        Move { label, reached, with, laws }
+    pub fn new(label: Label, reached: Option<Node>, with: BTreeSet<Node>, laws: Vec<Law>) -> Self {
+        Self { label, reached, with, laws }
     }
 
     fn seen(&self, colours: &BTreeMap<Node, Colour>) -> Seen<'_, Label> {
@@ -40,12 +40,7 @@ impl<Node: Ord + Copy, Label: Ord, Law: Ord> Move<Node, Label, Law> {
         }
     }
 
-    fn renamed(
-        &self,
-        ours: &Move<Node, Label, Law>,
-        renaming: Renaming<Node>,
-        lens: Lens<'_, Node>,
-    ) -> Option<Renaming<Node>> {
+    fn renamed(&self, ours: &Self, renaming: Renaming<Node>, lens: Lens<'_, Node>) -> Option<Renaming<Node>> {
         let agreed = lens.agreeing(&self.laws, &ours.laws).map(|_| renaming);
         let labelled = agreed.filter(|_| self.label == ours.label)?;
         lens.ordered(&self.with)
@@ -94,8 +89,8 @@ pub struct Refinement<Node, Label, Law> {
 
 impl<Node: Ord + Copy, Label: Ord, Law: Ord> Refinement<Node, Label, Law> {
     #[must_use]
-    pub fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Refinement<Node, Label, Law> {
-        Refinement { moves, laws }
+    pub fn new(moves: BTreeMap<Node, Vec<Move<Node, Label, Law>>>, laws: Option<Laws>) -> Self {
+        Self { moves, laws }
     }
 
     #[must_use]

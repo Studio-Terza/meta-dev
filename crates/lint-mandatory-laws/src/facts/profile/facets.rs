@@ -24,7 +24,7 @@ impl<'file> Facets<'file> {
     const TO: Word<'static> = Word::new("to");
     const FROM: Word<'static> = Word::new("from");
 
-    pub(crate) fn new(site: Site<'file>, exposure: Exposure, facts: Vec<Name>) -> Facets<'file> {
+    pub(crate) fn new(site: Site<'file>, exposure: Exposure, facts: Vec<Name>) -> Self {
         Facets { site, exposure, facts: facts.into_iter().collect() }
     }
 
@@ -32,14 +32,14 @@ impl<'file> Facets<'file> {
         self.exposure
     }
 
-    pub(crate) fn after(self, earlier: Option<Facets<'file>>) -> Facets<'file> {
+    pub(crate) fn after(self, earlier: Option<Self>) -> Self {
         match earlier {
             Some(earlier) => earlier.merged(self),
             None => self,
         }
     }
 
-    pub(crate) fn merged(mut self, other: Facets<'file>) -> Facets<'file> {
+    pub(crate) fn merged(mut self, other: Self) -> Self {
         self.facts.extend(other.facts);
         self.exposure = self.exposure.max(other.exposure);
         self

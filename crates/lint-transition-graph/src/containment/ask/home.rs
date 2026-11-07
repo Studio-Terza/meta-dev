@@ -11,7 +11,7 @@ pub(super) struct Home<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> From<Named<'view, 'found, 'file>> for Home<'view, 'found, 'file> {
-    fn from(named: Named<'view, 'found, 'file>) -> Home<'view, 'found, 'file> {
+    fn from(named: Named<'view, 'found, 'file>) -> Self {
         Home { named }
     }
 }

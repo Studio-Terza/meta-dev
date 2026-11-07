@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 pub struct CrateFile(PathBuf);
 
 impl CrateFile {
-    pub const UNPLACED: CrateFile = CrateFile(PathBuf::new());
+    pub const UNPLACED: Self = Self(PathBuf::new());
 }
 
 impl From<PathBuf> for CrateFile {
-    fn from(path: PathBuf) -> CrateFile {
-        CrateFile(path)
+    fn from(path: PathBuf) -> Self {
+        Self(path)
     }
 }
 

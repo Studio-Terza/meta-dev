@@ -63,7 +63,7 @@ impl Command {
     const MATRIX: &'static str = "matrix";
     const COLD_SIZE: &'static str = "cold-size";
 
-    pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Command, Failure<'static>> {
+    pub fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Self, Failure<'static>> {
         match arguments.next().and_then(|name| name.into_string().ok()).as_deref() {
             Some(Self::TIMED) => Self::parsed(arguments.collect(), Command::Timed),
             Some(Self::LIBTEST_SECONDS) => Self::parsed(arguments.collect(), Command::LibtestSeconds),
@@ -91,34 +91,34 @@ impl Command {
         }
     }
 
-    fn parsed<S: Step>(arguments: Vec<OsString>, variant: fn(S) -> Command) -> Result<Command, Failure<'static>> {
+    fn parsed<S: Step>(arguments: Vec<OsString>, variant: fn(S) -> Self) -> Result<Self, Failure<'static>> {
         S::from_arguments(arguments).map(variant)
     }
 
     pub fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {
         match self {
-            Command::Timed(step) => step.carry_out(ports, out),
-            Command::LibtestSeconds(step) => step.carry_out(ports, out),
-            Command::Reach(step) => step.carry_out(ports, out),
-            Command::History(step) => step.carry_out(ports, out),
-            Command::MeasuredHistory(step) => step.carry_out(ports, out),
-            Command::RatchetLower(step) => step.carry_out(ports, out),
-            Command::CompileTimes(step) => step.carry_out(ports, out),
-            Command::Logged(step) => step.carry_out(ports, out),
-            Command::Tools(step) => step.carry_out(ports, out),
-            Command::ToolsKey(step) => step.carry_out(ports, out),
-            Command::MutantsShard(step) => step.carry_out(ports, out),
-            Command::MutantsChanged(step) => step.carry_out(ports, out),
-            Command::WallTimes(step) => step.carry_out(ports, out),
-            Command::Show(step) => step.carry_out(ports, out),
-            Command::Summarize(step) => step.carry_out(ports, out),
-            Command::Labels(step) => step.carry_out(ports, out),
-            Command::SpecLine(step) => step.carry_out(ports, out),
-            Command::StageIssues(step) => step.carry_out(ports, out),
-            Command::CompileTrend(step) => step.carry_out(ports, out),
-            Command::ShardSummary(step) => step.carry_out(ports, out),
-            Command::Matrix(step) => step.carry_out(ports, out),
-            Command::ColdSize(step) => step.carry_out(ports, out),
+            Self::Timed(step) => step.carry_out(ports, out),
+            Self::LibtestSeconds(step) => step.carry_out(ports, out),
+            Self::Reach(step) => step.carry_out(ports, out),
+            Self::History(step) => step.carry_out(ports, out),
+            Self::MeasuredHistory(step) => step.carry_out(ports, out),
+            Self::RatchetLower(step) => step.carry_out(ports, out),
+            Self::CompileTimes(step) => step.carry_out(ports, out),
+            Self::Logged(step) => step.carry_out(ports, out),
+            Self::Tools(step) => step.carry_out(ports, out),
+            Self::ToolsKey(step) => step.carry_out(ports, out),
+            Self::MutantsShard(step) => step.carry_out(ports, out),
+            Self::MutantsChanged(step) => step.carry_out(ports, out),
+            Self::WallTimes(step) => step.carry_out(ports, out),
+            Self::Show(step) => step.carry_out(ports, out),
+            Self::Summarize(step) => step.carry_out(ports, out),
+            Self::Labels(step) => step.carry_out(ports, out),
+            Self::SpecLine(step) => step.carry_out(ports, out),
+            Self::StageIssues(step) => step.carry_out(ports, out),
+            Self::CompileTrend(step) => step.carry_out(ports, out),
+            Self::ShardSummary(step) => step.carry_out(ports, out),
+            Self::Matrix(step) => step.carry_out(ports, out),
+            Self::ColdSize(step) => step.carry_out(ports, out),
         }
     }
 }

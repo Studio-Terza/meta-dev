@@ -12,7 +12,7 @@ pub struct Use<'file> {
 }
 
 impl<'file> Use<'file> {
-    pub(crate) fn new(site: Site<'file>, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Use<'file> {
+    pub(crate) fn new(site: Site<'file>, candidates: Vec<UsePath>, ground: Ground, cover: Cover) -> Self {
         Use { site, candidates, ground, cover }
     }
 

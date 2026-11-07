@@ -9,8 +9,8 @@ use lint_layout::{Name, UsePath};
 pub struct Parameters(BTreeSet<Name>);
 
 impl Parameters {
-    pub fn of_item(item: &Item) -> Parameters {
-        let mut parameters = Parameters::default();
+    pub fn of_item(item: &Item) -> Self {
+        let mut parameters = Self::default();
         parameters.visit_item(item);
         parameters
     }

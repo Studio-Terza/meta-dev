@@ -41,7 +41,7 @@ impl<'system, 'found, 'file> Method<'system, 'found, 'file> {
         types: &WorkspaceTypes<'found>,
         edge: &'system Edge<'found, 'file>,
         equivalence: Equivalence,
-    ) -> Option<Method<'system, 'found, 'file>> {
+    ) -> Option<Self> {
         let transition = edge.transition();
         let krate: &'found CrateName = AsRef::<CrateName>::as_ref(transition.context());
         types.owner(transition).map(|end| Method {

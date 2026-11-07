@@ -24,13 +24,13 @@ pub struct LibtestSeconds {
 }
 
 impl Step for LibtestSeconds {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<LibtestSeconds, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let measured = &arguments.taken()?;
         let stage = &arguments.taken()?;
         let output = &arguments.taken()?;
         arguments.ended()?;
-        Ok(LibtestSeconds {
+        Ok(Self {
             measured: Measured::file(Path::new(measured)),
             stage: Stage::new(stage.to_str().ok_or(Failure::Usage)?.to_owned()),
             output: Journal::file(Path::new(output)),

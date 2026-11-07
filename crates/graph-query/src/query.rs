@@ -34,27 +34,27 @@ pub struct Query {
 }
 
 impl Query {
-    pub(crate) fn with_term(mut self, term: Term) -> Query {
+    pub(crate) fn with_term(mut self, term: Term) -> Self {
         self.terms.push(term);
         self
     }
 
-    pub(crate) fn with_role(mut self, role: Role) -> Query {
+    pub(crate) fn with_role(mut self, role: Role) -> Self {
         self.roles.push(role);
         self
     }
 
-    pub(crate) fn with_ask(mut self, ask: Ask) -> Query {
+    pub(crate) fn with_ask(mut self, ask: Ask) -> Self {
         self.questions.push(ask);
         self
     }
 
-    pub(crate) fn with_root(mut self, root: PathBuf) -> Query {
+    pub(crate) fn with_root(mut self, root: PathBuf) -> Self {
         self.roots.push(root);
         self
     }
 
-    pub(crate) fn with_top(mut self, top: Top) -> Query {
+    pub(crate) fn with_top(mut self, top: Top) -> Self {
         self.top = Some(top);
         self
     }
@@ -63,7 +63,7 @@ impl Query {
         self.terms.first().map(|_| ()).or_else(|| self.roles.first().map(|_| ()))
     }
 
-    pub(crate) fn asks(&self) -> Option<&Query> {
+    pub(crate) fn asks(&self) -> Option<&Self> {
         self.questions.first().map(|_| self).or_else(|| self.searches().map(|()| self))
     }
 

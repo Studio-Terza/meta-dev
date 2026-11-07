@@ -18,7 +18,7 @@ pub struct Scope<'run> {
 impl<'run> Scope<'run> {
     const SELF: &str = "self";
 
-    pub fn declared(generics: BTreeSet<Name>, held: Option<&'run BTreeSet<Name>>) -> Scope<'run> {
+    pub fn declared(generics: BTreeSet<Name>, held: Option<&'run BTreeSet<Name>>) -> Self {
         Scope { generics, held, ..Scope::default() }
     }
 
@@ -30,7 +30,7 @@ impl<'run> Scope<'run> {
         self.within
     }
 
-    pub fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Scope<'run> {
+    pub fn function(&self, generics: BTreeSet<Name>, bindings: BTreeSet<Name>) -> Self {
         Scope { generics, held: self.held, bindings, within: None }
     }
 

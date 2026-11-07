@@ -9,13 +9,13 @@ use crate::Bound;
 struct Depth(usize);
 
 impl Depth {
-    fn receded(self) -> Depth {
-        Depth(self.0.saturating_sub(1))
+    fn receded(self) -> Self {
+        Self(self.0.saturating_sub(1))
     }
 
-    fn after(self, step: Step) -> Depth {
+    fn after(self, step: Step) -> Self {
         match step {
-            Step::Reset => Depth::zero(),
+            Step::Reset => Self::zero(),
             Step::Deeper => self.incremented(),
             Step::Shallower => self.receded(),
             Step::Level => self,
@@ -32,38 +32,38 @@ enum Step {
 }
 
 impl Step {
-    const ARROWS: [([u8; 2], Step); 2] = [(*b"=>", Step::Reset), (*b"->", Step::Level)];
-    const ANGLED: [(u8, Step); 9] = [
-        (b'(', Step::Reset),
-        (b'[', Step::Reset),
-        (b'{', Step::Reset),
-        (b')', Step::Reset),
-        (b']', Step::Reset),
-        (b'}', Step::Reset),
-        (b';', Step::Reset),
-        (b'<', Step::Deeper),
-        (b'>', Step::Shallower),
+    const ARROWS: [([u8; 2], Self); 2] = [(*b"=>", Self::Reset), (*b"->", Self::Level)];
+    const ANGLED: [(u8, Self); 9] = [
+        (b'(', Self::Reset),
+        (b'[', Self::Reset),
+        (b'{', Self::Reset),
+        (b')', Self::Reset),
+        (b']', Self::Reset),
+        (b'}', Self::Reset),
+        (b';', Self::Reset),
+        (b'<', Self::Deeper),
+        (b'>', Self::Shallower),
     ];
-    const DELIMITED: [(u8, Step); 6] = [
-        (b'(', Step::Deeper),
-        (b'[', Step::Deeper),
-        (b'{', Step::Deeper),
-        (b')', Step::Shallower),
-        (b']', Step::Shallower),
-        (b'}', Step::Shallower),
+    const DELIMITED: [(u8, Self); 6] = [
+        (b'(', Self::Deeper),
+        (b'[', Self::Deeper),
+        (b'{', Self::Deeper),
+        (b')', Self::Shallower),
+        (b']', Self::Shallower),
+        (b'}', Self::Shallower),
     ];
 
-    fn angled(before: u8, current: u8) -> Step {
+    fn angled(before: u8, current: u8) -> Self {
         Self::ARROWS
             .into_iter()
             .find(|(arrow, _)| *arrow == [before, current])
             .map(|(_, step)| step)
             .or_else(|| Self::ANGLED.into_iter().find(|(mark, _)| *mark == current).map(|(_, step)| step))
-            .unwrap_or(Step::Level)
+            .unwrap_or(Self::Level)
     }
 
-    fn delimited(current: u8) -> Step {
-        Self::DELIMITED.into_iter().find(|(mark, _)| *mark == current).map_or(Step::Level, |(_, step)| step)
+    fn delimited(current: u8) -> Self {
+        Self::DELIMITED.into_iter().find(|(mark, _)| *mark == current).map_or(Self::Level, |(_, step)| step)
     }
 }
 

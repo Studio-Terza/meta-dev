@@ -26,11 +26,11 @@ pub struct Region {
 }
 
 impl Region {
-    pub const SHIPPED: Region = Region { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own };
+    pub const SHIPPED: Self = Self { reach: Reach::Shipped, zone: Zone::Open, within: Within::Own };
 
     #[must_use]
-    pub fn new(reach: Reach, zone: Zone, within: Within) -> Region {
-        Region { reach, zone, within }
+    pub fn new(reach: Reach, zone: Zone, within: Within) -> Self {
+        Self { reach, zone, within }
     }
 
     #[must_use]
@@ -49,18 +49,18 @@ impl Region {
     }
 
     #[must_use]
-    pub fn reached(self, reach: Reach) -> Region {
-        Region { reach: self.reach.max(reach), zone: self.zone, within: self.within }
+    pub fn reached(self, reach: Reach) -> Self {
+        Self { reach: self.reach.max(reach), zone: self.zone, within: self.within }
     }
 
     #[must_use]
-    pub fn zoned(self, zone: Zone) -> Region {
-        Region { reach: self.reach, zone: self.zone.max(zone), within: self.within }
+    pub fn zoned(self, zone: Zone) -> Self {
+        Self { reach: self.reach, zone: self.zone.max(zone), within: self.within }
     }
 
     #[must_use]
-    pub fn inside(self, within: Within) -> Region {
-        Region { reach: self.reach, zone: self.zone, within: self.within.max(within) }
+    pub fn inside(self, within: Within) -> Self {
+        Self { reach: self.reach, zone: self.zone, within: self.within.max(within) }
     }
 }
 
@@ -72,8 +72,8 @@ pub struct Seat {
 
 impl Seat {
     #[must_use]
-    pub fn new(region: Region, subject: Option<TypeRef>) -> Seat {
-        Seat { region, subject }
+    pub fn new(region: Region, subject: Option<TypeRef>) -> Self {
+        Self { region, subject }
     }
 
     #[must_use]

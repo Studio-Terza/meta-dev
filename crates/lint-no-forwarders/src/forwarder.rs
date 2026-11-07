@@ -9,7 +9,7 @@ pub struct Forwarder<'file> {
 }
 
 impl<'file> Forwarder<'file> {
-    pub fn new(name: &'file Ident, callee: Callee<'file>) -> Forwarder<'file> {
+    pub fn new(name: &'file Ident, callee: Callee<'file>) -> Self {
         Forwarder { name, callee }
     }
 

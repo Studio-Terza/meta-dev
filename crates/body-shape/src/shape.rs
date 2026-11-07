@@ -34,14 +34,14 @@ impl Shape {
         self.size
     }
 
-    fn read(raw: &[RawToken], equivalence: Equivalence) -> Shape {
+    fn read(raw: &[RawToken], equivalence: Equivalence) -> Self {
         let mut slots = Slots::default();
         let shaped: Vec<ShapeToken<'_>> = raw
             .iter()
             .zip(Neighbours::all(raw))
             .filter_map(|(token, neighbours)| token.shaped(neighbours.position(), &mut slots, equivalence))
             .collect();
-        Shape { key: ShapeKey::from(shaped.as_slice()), size: TokenCount::new(shaped.len()) }
+        Self { key: ShapeKey::from(shaped.as_slice()), size: TokenCount::new(shaped.len()) }
     }
 }
 
@@ -53,12 +53,12 @@ pub struct Reading {
 
 impl Reading {
     #[must_use]
-    pub fn erasing(tokens: TokenStream, equivalence: Equivalence) -> Reading {
+    pub fn erasing(tokens: TokenStream, equivalence: Equivalence) -> Self {
         let raw = RawToken::flattened(tokens);
         let shape = Shape::read(&raw, equivalence);
         let signs: Vec<Sign> = Neighbours::all(&raw).map(Neighbours::sign).collect();
         let literals = raw.into_iter().zip(signs).filter_map(|(token, sign)| token.spelled(sign)).collect();
-        Reading { shape, literals }
+        Self { shape, literals }
     }
 
     #[must_use]

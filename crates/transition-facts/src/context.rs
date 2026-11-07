@@ -18,11 +18,11 @@ pub struct Context<'file> {
 }
 
 impl<'file> Context<'file> {
-    pub(crate) fn new(krate: &'file CrateName, selfish: Endpoint, ground: Ground, filler: Filler) -> Context<'file> {
+    pub(crate) fn new(krate: &'file CrateName, selfish: Endpoint, ground: Ground, filler: Filler) -> Self {
         Context { krate, selfish, ground, filler, functions: Vec::new() }
     }
 
-    pub(crate) fn with_functions(mut self, functions: impl IntoIterator<Item = Function<'file>>) -> Context<'file> {
+    pub(crate) fn with_functions(mut self, functions: impl IntoIterator<Item = Function<'file>>) -> Self {
         self.functions.extend(functions);
         self
     }

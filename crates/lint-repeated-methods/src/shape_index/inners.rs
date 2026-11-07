@@ -14,7 +14,7 @@ pub struct Inners<'file> {
 }
 
 impl<'file> Inners<'file> {
-    pub fn gathered_from(files: &[&'file SourceFile]) -> Inners<'file> {
+    pub fn gathered_from(files: &[&'file SourceFile]) -> Self {
         files.iter().fold(Inners::default(), |mut inners, file| {
             inners.visit_file(file.syntax());
             inners.by_home.entry(Home::containing(file)).or_default().extend(mem::take(&mut inners.reading));

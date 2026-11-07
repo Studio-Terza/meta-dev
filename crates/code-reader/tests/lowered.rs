@@ -25,7 +25,7 @@ impl Read {
     }
 
     fn reaches(root: &str, module: &str) -> Vec<Reach> {
-        match Read::supported(root, module) {
+        match Self::supported(root, module) {
             Ok(file) => Reader::read_files(&[file])
                 .functions()
                 .map(|found| AsRef::<Region>::as_ref(found.entity()).reach())
@@ -35,10 +35,10 @@ impl Read {
     }
 
     fn written(text: &str) -> Vec<TypeRef<Resolved>> {
-        let model = Read::model(text);
+        let model = Self::model(text);
         model
             .functions()
-            .flat_map(|found| found.entity().signature().written().map(Read::resolved).collect::<Vec<_>>())
+            .flat_map(|found| found.entity().signature().written().map(Self::resolved).collect::<Vec<_>>())
             .collect()
     }
 
@@ -47,7 +47,7 @@ impl Read {
     }
 
     fn spelt(text: &str) -> Vec<Sited> {
-        let model = Read::model(text);
+        let model = Self::model(text);
         model
             .functions()
             .flat_map(|found| found.entity().signature().written().cloned().collect::<Vec<TypeRef>>())
@@ -56,7 +56,7 @@ impl Read {
     }
 
     fn held(text: &str) -> Vec<HeldRow> {
-        let model = Read::model(text);
+        let model = Self::model(text);
         model
             .holdings()
             .map(|found| HeldRow {
@@ -68,7 +68,7 @@ impl Read {
     }
 
     fn placed(text: &str) -> Vec<PlacedRow> {
-        let model = Read::model(text);
+        let model = Self::model(text);
         model
             .functions()
             .map(|found| {
@@ -85,7 +85,7 @@ impl Read {
     }
 
     fn called(text: &str) -> Vec<CalledRow> {
-        let model = Read::model(text);
+        let model = Self::model(text);
         model
             .calls()
             .map(|found| {
@@ -114,12 +114,12 @@ struct HeldRow {
 }
 
 impl HeldRow {
-    fn new(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: None }
+    fn new(name: &str, held: Held) -> Self {
+        Self { name: name.to_owned(), held, declares: None }
     }
 
-    fn declaring(name: &str, held: Held) -> HeldRow {
-        HeldRow { name: name.to_owned(), held, declares: Some(Declares::Item) }
+    fn declaring(name: &str, held: Held) -> Self {
+        Self { name: name.to_owned(), held, declares: Some(Declares::Item) }
     }
 }
 
@@ -133,16 +133,16 @@ struct PlacedRow {
 }
 
 impl PlacedRow {
-    fn new(name: &str, owner: Owner, reach: Reach) -> PlacedRow {
-        PlacedRow { name: name.to_owned(), owner, reach, zone: Zone::Open, within: Within::Own }
+    fn new(name: &str, owner: Owner, reach: Reach) -> Self {
+        Self { name: name.to_owned(), owner, reach, zone: Zone::Open, within: Within::Own }
     }
 
-    fn zoned(self, zone: Zone) -> PlacedRow {
-        PlacedRow { name: self.name, owner: self.owner, reach: self.reach, zone, within: self.within }
+    fn zoned(self, zone: Zone) -> Self {
+        Self { name: self.name, owner: self.owner, reach: self.reach, zone, within: self.within }
     }
 
-    fn inside(self, within: Within) -> PlacedRow {
-        PlacedRow { name: self.name, owner: self.owner, reach: self.reach, zone: self.zone, within }
+    fn inside(self, within: Within) -> Self {
+        Self { name: self.name, owner: self.owner, reach: self.reach, zone: self.zone, within }
     }
 }
 
@@ -165,15 +165,15 @@ impl Expect {
     }
 
     fn integer() -> TypeRef<Resolved> {
-        Expect::named(Resolved::Primitive(Primitive::Integer), Vec::new())
+        Self::named(Resolved::Primitive(Primitive::Integer), Vec::new())
     }
 
     fn primitive(primitive: Primitive) -> TypeRef<Resolved> {
-        Expect::named(Resolved::Primitive(primitive), Vec::new())
+        Self::named(Resolved::Primitive(primitive), Vec::new())
     }
 
     fn std_trait(segments: &[&str]) -> Resolved {
-        Resolved::StdTrait(Expect::path(segments))
+        Resolved::StdTrait(Self::path(segments))
     }
 
     fn referenced(pointee: TypeRef<Resolved>) -> TypeRef<Resolved> {

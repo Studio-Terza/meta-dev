@@ -18,7 +18,7 @@ pub enum Root<'ast> {
 }
 
 impl<'ast> From<&'ast Block> for Root<'ast> {
-    fn from(body: &'ast Block) -> Root<'ast> {
+    fn from(body: &'ast Block) -> Self {
         body.stmts
             .split_first()
             .and_then(|(only, rest)| rest.first().map_or(Some(only), |_| None))
@@ -27,7 +27,7 @@ impl<'ast> From<&'ast Block> for Root<'ast> {
 }
 
 impl<'ast> Root<'ast> {
-    fn of_statement(statement: &'ast Stmt, body: &'ast Block) -> Root<'ast> {
+    fn of_statement(statement: &'ast Stmt, body: &'ast Block) -> Self {
         match statement {
             Stmt::Expr(Expr::Match(routed), None) => Root::Match(routed),
             Stmt::Expr(Expr::If(routed), None) => Self::of_if(routed, body),
@@ -35,7 +35,7 @@ impl<'ast> Root<'ast> {
         }
     }
 
-    fn of_if(routed: &'ast ExprIf, body: &'ast Block) -> Root<'ast> {
+    fn of_if(routed: &'ast ExprIf, body: &'ast Block) -> Self {
         match &*routed.cond {
             Expr::Let(_) => Root::IfLet(routed),
             _ => Root::Body(body),

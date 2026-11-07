@@ -11,7 +11,7 @@ pub(crate) struct Coverage<'file> {
 }
 
 impl<'file> Coverage<'file> {
-    pub(crate) fn read_all(files: &'file [SourceFile]) -> Coverage<'file> {
+    pub(crate) fn read_all(files: &'file [SourceFile]) -> Self {
         Coverage { laws: Laws::from(files) }
     }
 

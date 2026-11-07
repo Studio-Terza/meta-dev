@@ -10,7 +10,7 @@ pub(crate) struct ErrorTypes {
 }
 
 impl From<&Model> for ErrorTypes {
-    fn from(model: &Model) -> ErrorTypes {
+    fn from(model: &Model) -> Self {
         let traits = BTreeSet::from([
             Resolved::Std(Self::STD_ERROR.into_iter().collect()),
             Resolved::External(Self::THISERROR.into_iter().collect()),
@@ -32,7 +32,7 @@ impl From<&Model> for ErrorTypes {
             .filter_map(|ty| ty.named().and_then(|named| Resolved::crate_item(named.as_ref())))
             .collect();
         let std_errors = Self::STD_ERRORS.iter().map(|error| error.iter().copied().collect()).collect();
-        ErrorTypes { crate_items, std_errors }
+        Self { crate_items, std_errors }
     }
 }
 

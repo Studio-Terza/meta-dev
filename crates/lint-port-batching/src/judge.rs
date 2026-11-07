@@ -16,7 +16,7 @@ pub struct Judge<'run> {
 }
 
 impl<'run> Judge<'run> {
-    pub fn new(imports: &'run Imports<'run>, ports: &'run PortTraits) -> Judge<'run> {
+    pub fn new(imports: &'run Imports<'run>, ports: &'run PortTraits) -> Self {
         Judge { imports, ports }
     }
 

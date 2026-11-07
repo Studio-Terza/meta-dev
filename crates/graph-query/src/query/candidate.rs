@@ -38,11 +38,7 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     const SHOWN: usize = 5;
 
     #[must_use]
-    pub fn of_trait(
-        found: &'facts TraitFact<'file>,
-        kind: Kind,
-        facts: &'facts Facts<'file>,
-    ) -> Candidate<'facts, 'file> {
+    pub fn of_trait(found: &'facts TraitFact<'file>, kind: Kind, facts: &'facts Facts<'file>) -> Self {
         let name: &Name = found.as_ref();
         let implementers: BTreeSet<&Name> = facts.implementers(name).into_iter().collect();
         Candidate {
@@ -57,7 +53,7 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     }
 
     #[must_use]
-    pub fn of_generic(found: &'facts GenericImpl<'file>) -> Candidate<'facts, 'file> {
+    pub fn of_generic(found: &'facts GenericImpl<'file>) -> Self {
         Candidate {
             kind: Kind::GenericImpl,
             krate: found.as_ref(),
@@ -70,11 +66,7 @@ impl<'facts, 'file> Candidate<'facts, 'file> {
     }
 
     #[must_use]
-    pub fn of_type(
-        found: &'facts TypeFact<'file>,
-        kind: Kind,
-        facts: &'facts Facts<'file>,
-    ) -> Candidate<'facts, 'file> {
+    pub fn of_type(found: &'facts TypeFact<'file>, kind: Kind, facts: &'facts Facts<'file>) -> Self {
         let implementations = facts.implementations(found);
         Candidate {
             kind,

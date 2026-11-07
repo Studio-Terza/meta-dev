@@ -13,7 +13,7 @@ pub struct Frontier<'tree> {
 
 impl<'tree> Frontier<'tree> {
     #[must_use]
-    pub fn new(next: Vec<Node<'tree>>, visited: BTreeSet<Node<'tree>>) -> Frontier<'tree> {
+    pub fn new(next: Vec<Node<'tree>>, visited: BTreeSet<Node<'tree>>) -> Self {
         Frontier { next, visited }
     }
 

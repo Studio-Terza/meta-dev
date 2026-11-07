@@ -24,9 +24,9 @@ pub struct Shard {
 impl Shard {
     const ARGUMENTS: usize = 2;
 
-    pub fn from_arguments(arguments: &[OsString]) -> Result<Shard, Failure> {
+    pub fn from_arguments(arguments: &[OsString]) -> Result<Self, Failure> {
         <&[OsString; Self::ARGUMENTS]>::try_from(arguments)
-            .map(|[directory, destination]| Shard {
+            .map(|[directory, destination]| Self {
                 directory: PathBuf::from(directory),
                 destination: PathBuf::from(destination),
             })

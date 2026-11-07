@@ -13,7 +13,7 @@ pub(crate) struct Outsider<'found, 'file> {
 }
 
 impl<'found, 'file> Outsider<'found, 'file> {
-    pub(crate) fn new(name: &'found Name, site: Site<'file>, holder: Member<'found>) -> Outsider<'found, 'file> {
+    pub(crate) fn new(name: &'found Name, site: Site<'file>, holder: Member<'found>) -> Self {
         Outsider { holder, name, site }
     }
 

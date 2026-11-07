@@ -10,14 +10,14 @@ pub struct Child {
 
 impl Child {
     #[must_use]
-    pub fn new(path: PathBuf, children_directory: PathBuf) -> Child {
-        Child { path, children_directory }
+    pub fn new(path: PathBuf, children_directory: PathBuf) -> Self {
+        Self { path, children_directory }
     }
 
     #[must_use]
-    pub fn canonical(self, survey: &Survey) -> Child {
+    pub fn canonical(self, survey: &Survey) -> Self {
         let path = survey.canonical(&self.path).map(Path::to_path_buf).unwrap_or(self.path);
-        Child { path, ..self }
+        Self { path, ..self }
     }
 
     pub fn visit<Output>(self, then: impl FnOnce(&Path, &Path) -> Output) -> Output {

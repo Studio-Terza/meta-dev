@@ -28,7 +28,7 @@ pub struct Assertions<'file> {
 }
 
 impl<'file> From<&'file SourceFile> for Assertions<'file> {
-    fn from(file: &'file SourceFile) -> Assertions<'file> {
+    fn from(file: &'file SourceFile) -> Self {
         let mut assertions = Assertions {
             path: file.path(),
             constants: Bindings::constants(file.syntax()),
@@ -42,7 +42,7 @@ impl<'file> From<&'file SourceFile> for Assertions<'file> {
 }
 
 impl<'file> From<Assertions<'file>> for Vec<Violation<'file>> {
-    fn from(assertions: Assertions<'file>) -> Vec<Violation<'file>> {
+    fn from(assertions: Assertions<'file>) -> Self {
         assertions.found
     }
 }
@@ -106,20 +106,20 @@ impl Assertion {
     const ASSERT: &str = "assert";
     const SIDES_LENGTH: usize = 2;
 
-    fn named(name: &Name, tables: &MacroAliases) -> Assertion {
+    fn named(name: &Name, tables: &MacroAliases) -> Self {
         name.matches::<Whole>(&Self::EQUALITIES)
-            .map(|_| Assertion::Equality)
-            .or_else(|| (*name == Name::from(Self::ASSERT)).then_some(Assertion::Bare))
-            .or_else(|| tables.call(name).map(|_| Assertion::Table))
-            .unwrap_or(Assertion::Other)
+            .map(|_| Self::Equality)
+            .or_else(|| (*name == Name::from(Self::ASSERT)).then_some(Self::Bare))
+            .or_else(|| tables.call(name).map(|_| Self::Table))
+            .unwrap_or(Self::Other)
     }
 
     fn compared(self, invocation: &Macro) -> Option<Vec<Expr>> {
         match self {
-            Assertion::Equality => Some(Self::arguments(invocation).into_iter().take(Self::SIDES_LENGTH).collect()),
-            Assertion::Bare => Some(Self::arguments(invocation).into_iter().take(1).flat_map(Self::sides).collect()),
-            Assertion::Table => Some(TableRows::expected(&invocation.tokens)),
-            Assertion::Other => None,
+            Self::Equality => Some(Self::arguments(invocation).into_iter().take(Self::SIDES_LENGTH).collect()),
+            Self::Bare => Some(Self::arguments(invocation).into_iter().take(1).flat_map(Self::sides).collect()),
+            Self::Table => Some(TableRows::expected(&invocation.tokens)),
+            Self::Other => None,
         }
     }
 

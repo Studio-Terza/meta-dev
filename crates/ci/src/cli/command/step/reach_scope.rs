@@ -51,7 +51,7 @@ impl ReachScope {
 }
 
 impl Step for ReachScope {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ReachScope, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let metadata = &arguments.taken()?;
         let event = &arguments.taken()?;
@@ -59,7 +59,7 @@ impl Step for ReachScope {
         let environment = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;
-        Ok(ReachScope {
+        Ok(Self {
             metadata: Journal::file(Path::new(metadata)),
             event: Event::from(event.to_str().ok_or(Failure::Usage)?),
             base: Branch::new(base.to_str().ok_or(Failure::Usage)?.to_owned()),

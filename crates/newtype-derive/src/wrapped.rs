@@ -77,9 +77,9 @@ impl Wrapped {
         }
     }
 
-    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syn::Result<Wrapped> {
+    fn split(DeriveInput { attrs, vis, ident, generics, data }: DeriveInput) -> syn::Result<Self> {
         match OnlyField::taken(data) {
-            Ok(field) => Settings::declared(&attrs).map(|settings| Wrapped { ident, generics, field, settings }),
+            Ok(field) => Settings::declared(&attrs).map(|settings| Self { ident, generics, field, settings }),
             Err(data) => Settings::declared(&attrs)
                 .and_then(|_| Err(OnlyField::refused(DeriveInput { attrs, vis, ident, generics, data }))),
         }

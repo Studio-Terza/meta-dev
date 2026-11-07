@@ -51,7 +51,7 @@ impl Sources {
             cases
                 .iter()
                 .filter_map(|case| {
-                    let sources = Sources(case.sources());
+                    let sources = Self(case.sources());
                     let found = Self::flagged::<Checked>(sources.0);
                     (found != Lines::from(case.flagged()))
                         .then(|| format!("{} ({sources}) flagged {found}", case.name()))

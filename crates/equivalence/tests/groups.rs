@@ -26,7 +26,7 @@ impl Keyed for Span {
 }
 
 impl Nested for Span {
-    fn lies_within<'outer>(&self, outer: &'outer Span) -> Option<&'outer Span> {
+    fn lies_within<'outer>(&self, outer: &'outer Self) -> Option<&'outer Self> {
         Some(outer)
             .filter(|outer| outer.from <= self.from)
             .filter(|outer| self.from + self.length <= outer.from + outer.length)

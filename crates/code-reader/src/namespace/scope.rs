@@ -15,8 +15,8 @@ pub(crate) enum CrateForm {
 impl CrateForm {
     fn anchors(self, root: ScopeId) -> Anchors {
         match self {
-            CrateForm::Planted => Anchors::rooted(root),
-            CrateForm::Island => Anchors::default(),
+            Self::Planted => Anchors::rooted(root),
+            Self::Island => Anchors::default(),
         }
     }
 }
@@ -39,15 +39,15 @@ impl ScopeKind {
 
     fn anchors(self, parent: Anchors, scope: ScopeId) -> Anchors {
         match self {
-            ScopeKind::Module => parent.nested(scope),
-            ScopeKind::Block => parent,
+            Self::Module => parent.nested(scope),
+            Self::Block => parent,
         }
     }
 
     fn chain(self, parent: &[ScopeId], scope: ScopeId) -> Vec<ScopeId> {
         match self {
-            ScopeKind::Module => vec![scope],
-            ScopeKind::Block => iter::once(scope).chain(parent.iter().copied()).collect(),
+            Self::Module => vec![scope],
+            Self::Block => iter::once(scope).chain(parent.iter().copied()).collect(),
         }
     }
 }
@@ -61,8 +61,8 @@ pub(super) struct ScopeRow {
 }
 
 impl ScopeRow {
-    pub(super) fn root(scope: ScopeId, form: CrateForm, entries: Entries) -> ScopeRow {
-        ScopeRow { anchors: form.anchors(scope), chain: vec![scope], ancestry: vec![scope], entries }
+    pub(super) fn root(scope: ScopeId, form: CrateForm, entries: Entries) -> Self {
+        Self { anchors: form.anchors(scope), chain: vec![scope], ancestry: vec![scope], entries }
     }
 
     pub(super) fn anchors(&self) -> Anchors {

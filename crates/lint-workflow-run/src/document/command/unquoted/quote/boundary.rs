@@ -1,14 +1,14 @@
 use super::Quote;
 
 impl Quote {
-    const TRANSITIONS: [(Quote, char, Quote); 4] = [
-        (Quote::Outside, '\'', Quote::Single),
-        (Quote::Outside, '"', Quote::Double),
-        (Quote::Single, '\'', Quote::Outside),
-        (Quote::Double, '"', Quote::Outside),
+    const TRANSITIONS: [(Self, char, Self); 4] = [
+        (Self::Outside, '\'', Self::Single),
+        (Self::Outside, '"', Self::Double),
+        (Self::Single, '\'', Self::Outside),
+        (Self::Double, '"', Self::Outside),
     ];
 
-    pub(in crate::document::command::unquoted) fn after(self, letter: char) -> Quote {
+    pub(in crate::document::command::unquoted) fn after(self, letter: char) -> Self {
         Self::TRANSITIONS
             .into_iter()
             .filter(|(from, _, _)| *from == self)

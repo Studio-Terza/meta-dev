@@ -29,7 +29,7 @@ impl<'file> Members<'file> {
         self.dropped.extend(name);
     }
 
-    pub fn merged(mut self, other: Members<'file>) -> Members<'file> {
+    pub fn merged(mut self, other: Self) -> Self {
         self.declared = other.declared.into_iter().fold(self.declared, |mut declared, (name, sites)| {
             declared.entry(name).or_default().extend(sites);
             declared
@@ -39,7 +39,7 @@ impl<'file> Members<'file> {
         self
     }
 
-    pub fn declares(&self, name: &Name) -> Option<&Members<'file>> {
+    pub fn declares(&self, name: &Name) -> Option<&Self> {
         self.declared.contains_key(name).then_some(self)
     }
 

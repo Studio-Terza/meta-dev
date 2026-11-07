@@ -28,7 +28,7 @@ impl<'read, 'model> Texts<'read, 'model> {
     const STRING_FROM: [Word<'static>; 2] = words!["String", "from"];
     const FORMAT: [Word<'static>; 1] = words!["format"];
 
-    pub fn new(scope: &'read Scope<'model>) -> Texts<'read, 'model> {
+    pub fn new(scope: &'read Scope<'model>) -> Self {
         Texts { scope, string_from: Self::STRING_FROM.into_iter().collect() }
     }
 

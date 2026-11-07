@@ -17,7 +17,7 @@ impl<'scope> Route<'scope> {
         module: &Module<'scope>,
         head: &'scope Name,
         trail: &Trail<'_>,
-    ) -> Vec<Route<'scope>> {
+    ) -> Vec<Self> {
         let scope = scopes.scope(module);
         let imported = scope
             .filter(|_| trail.followed(module, head).is_none())

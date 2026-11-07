@@ -11,12 +11,12 @@ pub struct Site<'file> {
 
 impl<'file> Site<'file> {
     #[must_use]
-    pub fn new(path: &'file Path, line: LineNumber) -> Site<'file> {
+    pub fn new(path: &'file Path, line: LineNumber) -> Self {
         Site { path, line }
     }
 
     #[must_use]
-    pub fn of_file(path: &'file Path) -> Site<'file> {
+    pub fn of_file(path: &'file Path) -> Self {
         Site::new(path, LineNumber::FIRST)
     }
 

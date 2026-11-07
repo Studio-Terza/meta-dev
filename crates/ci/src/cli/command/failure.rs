@@ -41,7 +41,7 @@ pub enum Failure<'path> {
 }
 
 impl<'path> Failure<'path> {
-    pub(crate) fn unusable(path: impl Into<Cow<'path, Path>>, failure: FileFailure) -> Failure<'path> {
+    pub(crate) fn unusable(path: impl Into<Cow<'path, Path>>, failure: FileFailure) -> Self {
         Failure::Io { path: path.into(), source: io::Error::from(failure) }
     }
 
@@ -52,7 +52,7 @@ impl<'path> Failure<'path> {
     pub(crate) fn started<Value>(
         results: Vec<io::Result<Value>>,
         invocations: &[Invocation],
-    ) -> Result<Vec<Value>, Failure<'path>> {
+    ) -> Result<Vec<Value>, Self> {
         results
             .into_iter()
             .zip(invocations)
@@ -62,7 +62,7 @@ impl<'path> Failure<'path> {
 }
 
 impl<'path> From<gate_limits::Failure<'path>> for Failure<'path> {
-    fn from(failure: gate_limits::Failure<'path>) -> Failure<'path> {
+    fn from(failure: gate_limits::Failure<'path>) -> Self {
         Failure::Limits(failure)
     }
 }

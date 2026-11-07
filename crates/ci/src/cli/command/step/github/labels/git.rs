@@ -16,7 +16,7 @@ impl<'ports, Host: Ports> Git<'ports, Host> {
     const HEAD: &'static str = "HEAD";
     const LITERAL_PATHS: &'static str = "core.quotePath=false";
 
-    pub(crate) fn with_ports(ports: &'ports Host) -> Git<'ports, Host> {
+    pub(crate) fn with_ports(ports: &'ports Host) -> Self {
         Git { ports }
     }
 

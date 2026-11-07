@@ -23,7 +23,7 @@ pub struct ItemGraph<Node = Name> {
 
 impl ItemGraph {
     #[must_use]
-    pub fn of_files(files: &[&SourceFile]) -> ItemGraph {
+    pub fn of_files(files: &[&SourceFile]) -> Self {
         let references = files
             .iter()
             .map(|file| ReferencedNames::of_file(file))
@@ -31,9 +31,9 @@ impl ItemGraph {
         references.into_graph()
     }
 
-    fn standing_in(self, names: &BTreeSet<Name>) -> ItemGraph {
+    fn standing_in(self, names: &BTreeSet<Name>) -> Self {
         let indexed = self.names.iter().enumerate().filter(|(_, name)| names.contains(*name));
-        ItemGraph { stand_ins: indexed.map(|(index, _)| NodeIndex::from(index)).collect(), ..self }
+        Self { stand_ins: indexed.map(|(index, _)| NodeIndex::from(index)).collect(), ..self }
     }
 
     #[must_use]
@@ -51,7 +51,7 @@ impl ItemGraph {
 
 impl<Node: Ord> ItemGraph<Node> {
     #[must_use]
-    pub fn of_references<Uses>(references: BTreeMap<Node, Uses>) -> ItemGraph<Node>
+    pub fn of_references<Uses>(references: BTreeMap<Node, Uses>) -> Self
     where
         for<'uses> &'uses Uses: IntoIterator<Item = &'uses Node>,
     {
@@ -68,7 +68,7 @@ impl<Node: Ord> ItemGraph<Node> {
                 linked.into_iter().collect()
             })
             .collect();
-        ItemGraph { names: references.into_keys().collect(), links, stand_ins: BTreeSet::new() }
+        Self { names: references.into_keys().collect(), links, stand_ins: BTreeSet::new() }
     }
 
     fn name_at(&self, node: NodeIndex) -> Option<&Node> {

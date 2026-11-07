@@ -5,8 +5,8 @@ use std::path::Path;
 pub struct Place(&'static [&'static str]);
 
 impl Place {
-    pub(crate) const GOLDENS: Place = Place(&["goldens"]);
-    pub(crate) const SCENARIOS: Place = Place(&["fixtures", "e2e"]);
+    pub(crate) const GOLDENS: Self = Self(&["goldens"]);
+    pub(crate) const SCENARIOS: Self = Self(&["fixtures", "e2e"]);
 
     const TESTS: &'static str = "tests";
 

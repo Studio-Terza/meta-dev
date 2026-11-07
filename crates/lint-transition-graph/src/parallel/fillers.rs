@@ -24,7 +24,7 @@ pub(super) struct Fillers<'file> {
 }
 
 impl<'file> Fillers<'file> {
-    pub(super) fn read(files: &'file [SourceFile], equivalence: Equivalence) -> Fillers<'file> {
+    pub(super) fn read(files: &'file [SourceFile], equivalence: Equivalence) -> Self {
         files.iter().filter_map(SourceFile::shipped).fold(Fillers::default(), |fillers, file| {
             let mut scan = Scan { krate: file.placement().package().crate_name(), equivalence, fillers };
             scan.visit_file(file.syntax());

@@ -50,20 +50,20 @@ enum Enclosure {
 impl Enclosure {
     const MAIN: [Word<'static>; 1] = words!["main"];
 
-    fn of_impl(block: &ItemImpl) -> Enclosure {
+    fn of_impl(block: &ItemImpl) -> Self {
         match block.trait_ {
-            Some(_) => Enclosure::Impl(Owner::TraitImpl),
-            None => Enclosure::Impl(Owner::Inherent),
+            Some(_) => Self::Impl(Owner::TraitImpl),
+            None => Self::Impl(Owner::Inherent),
         }
     }
 
     fn owner(self) -> Owner {
         match self {
-            Enclosure::BinaryRoot | Enclosure::Module => Owner::Free,
-            Enclosure::Body => Owner::Nested,
-            Enclosure::Impl(owner) => owner,
-            Enclosure::Trait => Owner::TraitDecl,
-            Enclosure::Foreign => Owner::Foreign,
+            Self::BinaryRoot | Self::Module => Owner::Free,
+            Self::Body => Owner::Nested,
+            Self::Impl(owner) => owner,
+            Self::Trait => Owner::TraitDecl,
+            Self::Foreign => Owner::Foreign,
         }
     }
 
@@ -73,8 +73,8 @@ impl Enclosure {
 
     fn main(self, name: &Name) -> Option<Entry> {
         match self {
-            Enclosure::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
-            Enclosure::Module | Enclosure::Body | Enclosure::Impl(_) | Enclosure::Trait | Enclosure::Foreign => None,
+            Self::BinaryRoot => name.matches::<Whole>(&Self::MAIN).map(|_| Entry::Main),
+            Self::Module | Self::Body | Self::Impl(_) | Self::Trait | Self::Foreign => None,
         }
     }
 }
@@ -93,8 +93,8 @@ struct ImplRow {
 impl ImplRow {
     const DERIVE: &'static str = "derive";
 
-    fn written(seat: &Seat, region: Region, block: &ItemImpl, ty: TypeRef<Written>) -> ImplRow {
-        ImplRow {
+    fn written(seat: &Seat, region: Region, block: &ItemImpl, ty: TypeRef<Written>) -> Self {
+        Self {
             located: seat.located(Position::from(block.impl_token.span)),
             subject: SelfType::written(&block.self_ty),
             ty,
@@ -105,9 +105,9 @@ impl ImplRow {
         }
     }
 
-    fn derived(seat: &Seat, region: Region, path: &syn::Path, subject: &Ident) -> ImplRow {
+    fn derived(seat: &Seat, region: Region, path: &syn::Path, subject: &Ident) -> Self {
         let position = Position::from(path.span());
-        ImplRow {
+        Self {
             located: seat.located(position),
             subject: Name::from(subject),
             ty: TypeRef::Named(Named::new(Written::path(UsePath::from(subject), position), Vec::new())),
@@ -118,7 +118,7 @@ impl ImplRow {
         }
     }
 
-    fn derives(seat: &Seat, region: Region, attributes: &[Attribute], subject: &Ident) -> Vec<ImplRow> {
+    fn derives(seat: &Seat, region: Region, attributes: &[Attribute], subject: &Ident) -> Vec<Self> {
         attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident(Self::DERIVE))
@@ -126,7 +126,7 @@ impl ImplRow {
                 attribute.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated).ok()
             })
             .flatten()
-            .map(|path| ImplRow::derived(seat, region, &path, subject))
+            .map(|path| Self::derived(seat, region, &path, subject))
             .collect()
     }
 }
@@ -204,10 +204,10 @@ enum SlotForm {
 }
 
 impl From<&[Attribute]> for SlotForm {
-    fn from(attributes: &[Attribute]) -> SlotForm {
+    fn from(attributes: &[Attribute]) -> Self {
         match attributes.iter().find(|attribute| attribute.path().is_ident(Slot::PATH)) {
-            Some(_) => SlotForm::Pathed,
-            None => SlotForm::Conventional,
+            Some(_) => Self::Pathed,
+            None => Self::Conventional,
         }
     }
 }
@@ -215,8 +215,8 @@ impl From<&[Attribute]> for SlotForm {
 impl SlotForm {
     fn chosen(self, only: Option<PathBuf>) -> Option<PathBuf> {
         match self {
-            SlotForm::Conventional => only,
-            SlotForm::Pathed => None,
+            Self::Conventional => only,
+            Self::Pathed => None,
         }
     }
 }
@@ -245,8 +245,8 @@ impl Slot {
         self.form.chosen(found_flat.xor(found_nested))
     }
 
-    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Slot {
-        Slot {
+    fn new(seat: &Seat, region: Region, item: &ItemMod) -> Self {
+        Self {
             scope: seat.scope(),
             name: Name::from(&item.ident),
             children: seat.children(),

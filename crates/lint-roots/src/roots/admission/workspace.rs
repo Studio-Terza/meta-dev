@@ -15,7 +15,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn load_many(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Workspace, Failure>> {
+    pub fn load_many(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Self, Failure>> {
         let trees = Directory::trees(files, roots);
         let directories: Vec<Vec<PathBuf>> = trees
             .iter()
@@ -50,7 +50,7 @@ impl Workspace {
         Ok(found.into_iter().flatten().map(|manifest| (manifest.directory().to_path_buf(), manifest)).collect())
     }
 
-    fn assembled(root: &Path, manifests: BTreeMap<PathBuf, Manifest>, named: &Survey) -> Workspace {
+    fn assembled(root: &Path, manifests: BTreeMap<PathBuf, Manifest>, named: &Survey) -> Self {
         let kept: Vec<Option<()>> = {
             let listed = manifests
                 .iter()
@@ -67,7 +67,7 @@ impl Workspace {
             let members = Self::with_path_dependencies(listed, &manifests, &dependencies, root);
             manifests.keys().map(|directory| members.get(directory.as_path()).map(|_| ())).collect()
         };
-        Workspace {
+        Self {
             members: manifests.into_keys().zip(kept).filter_map(|(directory, kept)| kept.map(|()| directory)).collect(),
         }
     }

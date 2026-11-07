@@ -20,8 +20,8 @@ impl PortTraits {
     const PACING: &str = "Pacing";
 
     #[must_use]
-    pub fn declared(files: &[SourceFile]) -> PortTraits {
-        files.iter().filter_map(SourceFile::shipped).fold(PortTraits::default(), |found, file| {
+    pub fn declared(files: &[SourceFile]) -> Self {
+        files.iter().filter_map(SourceFile::shipped).fold(Self::default(), |found, file| {
             let ground = Gate::PORTS.admits(file).map_or(Ground::Open, |_| Ground::Ports);
             let mut reader = Reader { ground, found, traits: BTreeSet::new() };
             reader.visit_file(file.syntax());

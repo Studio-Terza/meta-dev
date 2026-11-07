@@ -11,7 +11,7 @@ pub struct Report<'file> {
 
 impl<'file> Report<'file> {
     #[must_use]
-    pub fn new(headline: Headline, violations: Vec<Violation<'file>>) -> Report<'file> {
+    pub fn new(headline: Headline, violations: Vec<Violation<'file>>) -> Self {
         Report { headline, violations }
     }
 
@@ -21,7 +21,7 @@ impl<'file> Report<'file> {
     }
 
     #[must_use]
-    pub fn dirty(self) -> Option<Report<'file>> {
+    pub fn dirty(self) -> Option<Self> {
         self.violations.first().map(|_| ()).map(|()| self)
     }
 }

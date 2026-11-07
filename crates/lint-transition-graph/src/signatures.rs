@@ -16,10 +16,7 @@ pub struct Alike<'system, 'found, 'file>(Group<Method<'system, 'found, 'file>>);
 
 impl<'system, 'found, 'file> Alike<'system, 'found, 'file> {
     #[must_use]
-    pub fn grouped(
-        system: &'system TypeSystem<'found, 'file>,
-        equivalence: Equivalence,
-    ) -> Vec<Alike<'system, 'found, 'file>> {
+    pub fn grouped(system: &'system TypeSystem<'found, 'file>, equivalence: Equivalence) -> Vec<Self> {
         let types = system.types();
         let methods = system.edges().iter().filter_map(|edge| Method::of_edge(types, edge, equivalence));
         Groups::grouped(methods).listed().into_iter().map(Alike).filter_map(Alike::named_apart).collect()
@@ -30,7 +27,7 @@ impl<'system, 'found, 'file> Alike<'system, 'found, 'file> {
         self.0.sites().first().map(|site| **site)
     }
 
-    fn named_apart(self) -> Option<Alike<'system, 'found, 'file>> {
+    fn named_apart(self) -> Option<Self> {
         let names: BTreeSet<&Name> = self.0.members().iter().map(AsRef::as_ref).collect();
         names.iter().nth(1).map(|_| ()).map(|()| self)
     }

@@ -9,7 +9,7 @@ impl Event {
 }
 
 impl From<&str> for Event {
-    fn from(name: &str) -> Event {
-        Some(name).filter(|name| *name == Self::PULL_REQUEST).map_or(Event::Other, |_| Event::PullRequest)
+    fn from(name: &str) -> Self {
+        Some(name).filter(|name| *name == Self::PULL_REQUEST).map_or(Self::Other, |_| Self::PullRequest)
     }
 }

@@ -20,7 +20,7 @@ pub struct Scope<'journal> {
 impl<'journal> Scope<'journal> {
     const BEYOND: &'static str = "beyond";
 
-    pub(crate) fn reached_by(metadata: &'journal Journal, changes: &[Change]) -> Scope<'journal> {
+    pub(crate) fn reached_by(metadata: &'journal Journal, changes: &[Change]) -> Self {
         let sources = changes
             .iter()
             .filter(|change| Check::ALL.iter().all(|check| check.flagging(change).is_none()))

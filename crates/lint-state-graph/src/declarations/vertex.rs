@@ -4,7 +4,7 @@ use lint_core::TypeName;
 pub struct Vertex<'declared>(&'declared TypeName);
 
 impl<'declared> Vertex<'declared> {
-    pub(super) fn new(name: &'declared TypeName) -> Vertex<'declared> {
+    pub(super) fn new(name: &'declared TypeName) -> Self {
         Vertex(name)
     }
 

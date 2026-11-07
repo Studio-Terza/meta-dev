@@ -79,14 +79,14 @@ struct Answer {
 }
 
 impl Answer {
-    fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
+    fn to(files: &impl Files, arguments: &[&OsStr]) -> Self {
         let mut err = Vec::new();
         let exit = Cli::answer(arguments, files, &mut err);
-        Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
+        Self { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 
-    fn usage() -> Answer {
-        Answer { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
+    fn usage() -> Self {
+        Self { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
     }
 }
 
@@ -305,8 +305,8 @@ struct Checkout {
 }
 
 impl Checkout {
-    fn new() -> Result<Checkout, FileFailure> {
-        let checkout = Checkout { files: Memory::default(), root: PathBuf::from("/checkout") };
+    fn new() -> Result<Self, FileFailure> {
+        let checkout = Self { files: Memory::default(), root: PathBuf::from("/checkout") };
         checkout.write("sources/crates/foo/tests/golden.rs", GOLDEN_SOURCE)?;
         checkout.write("sources/crates/foo/notes.txt", "#[test]\nfn hidden() { Golden::x }\n")?;
         checkout.directory("shards")?;

@@ -14,7 +14,7 @@ pub(crate) struct Located<'found, 'file> {
 }
 
 impl<'found, 'file> Located<'found, 'file> {
-    pub(crate) fn resolved_by(resolver: &Resolver<'found>, outside: Outside<'found, 'file>) -> Located<'found, 'file> {
+    pub(crate) fn resolved_by(resolver: &Resolver<'found>, outside: Outside<'found, 'file>) -> Self {
         let implementation = outside.implementation();
         let site: &Site<'file> = implementation.as_ref();
         Located {

@@ -28,7 +28,7 @@ impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
     pub(super) fn of_group(
         group: Group<Leg<'walk, 'graph, 'found, 'file>>,
         stops: &Stops<'graph, 'found, 'file>,
-    ) -> Option<Route<'walk, 'graph, 'found, 'file>> {
+    ) -> Option<Self> {
         let places: Vec<Site<'file>> =
             group.sites().into_iter().copied().collect::<BTreeSet<Site<'file>>>().into_iter().collect();
         let called = group.members().first().map(Leg::called).unwrap_or_default();
@@ -64,7 +64,7 @@ impl<'walk, 'graph, 'found, 'file> Route<'walk, 'graph, 'found, 'file> {
 }
 
 impl<'file> From<&Route<'_, '_, '_, 'file>> for Option<Violation<'file>> {
-    fn from(route: &Route<'_, '_, '_, 'file>) -> Option<Violation<'file>> {
+    fn from(route: &Route<'_, '_, '_, 'file>) -> Self {
         route.places.first().map(|site| Violation::new(*site, route))
     }
 }
@@ -102,8 +102,8 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counted(walks: &[Walk<'_, '_, '_>], routes: &[Route<'_, '_, '_, '_>]) -> Tally {
-        Tally {
+    pub(super) fn counted(walks: &[Walk<'_, '_, '_>], routes: &[Route<'_, '_, '_, '_>]) -> Self {
+        Self {
             walks: Count::new(walks.len()),
             calls: Count::total(walks.iter().map(|walk| Count::new(walk.edge().transition().function().calls().len()))),
             resolved: Count::total(walks.iter().map(Walk::resolved)),

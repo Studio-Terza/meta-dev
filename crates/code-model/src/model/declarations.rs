@@ -48,8 +48,8 @@ pub(crate) struct Declarations {
 }
 
 impl Declarations {
-    pub(crate) fn new(items: Vec<Item>, aliases: Aliases) -> Declarations {
-        Declarations { items, aliases }
+    pub(crate) fn new(items: Vec<Item>, aliases: Aliases) -> Self {
+        Self { items, aliases }
     }
 
     pub(crate) fn items(&self) -> &[Item] {
@@ -68,9 +68,9 @@ struct Steps(u8);
 struct Exhausted;
 
 impl Steps {
-    const LIMIT: Steps = Steps(16);
+    const LIMIT: Self = Self(16);
 
-    fn taken(self) -> Result<Steps, Exhausted> {
+    fn taken(self) -> Result<Self, Exhausted> {
         self.0.checked_sub(1).map(Steps).ok_or(Exhausted)
     }
 }

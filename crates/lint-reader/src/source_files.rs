@@ -78,7 +78,7 @@ impl<'tree> SourceFiles<'tree> {
         read.fold(started, |reading, (tree, staged)| reading.tree(tree, staged)).readout.sorted()
     }
 
-    fn tree(self, tree: &'tree Tree<'tree>, staged: &Staged) -> SourceFiles<'tree> {
+    fn tree(self, tree: &'tree Tree<'tree>, staged: &Staged) -> Self {
         let read = staged.targets().iter().fold(self, |reading, target| {
             target.files().iter().fold(reading, |reading, file| {
                 let scope = Scope::new(tree, target.package(), CrateFile::from(tree.display(file)));
@@ -89,7 +89,7 @@ impl<'tree> SourceFiles<'tree> {
         SourceFiles { readout: read.readout.with_repo_files(staged.repo_files().to_vec()), ..read }
     }
 
-    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> SourceFiles<'tree> {
+    fn file(mut self, scope: &Scope<'tree>, file: &Path, children_directory: &Path) -> Self {
         let source =
             self.seen.insert(file.to_path_buf()).then_some(file).and_then(|file| self.shelf.source(scope, file));
         self.opened(scope, file, children_directory, source)
@@ -101,7 +101,7 @@ impl<'tree> SourceFiles<'tree> {
         file: &Path,
         children_directory: &Path,
         source: Option<Result<SourceFile, Failure>>,
-    ) -> SourceFiles<'tree> {
+    ) -> Self {
         match source {
             Some(Ok(parsed)) => {
                 self.parsed(scope, file, children_directory, parsed.in_crate_file(scope.crate_file().clone()))
@@ -111,13 +111,7 @@ impl<'tree> SourceFiles<'tree> {
         }
     }
 
-    fn parsed(
-        self,
-        scope: &Scope<'tree>,
-        file: &Path,
-        children_directory: &Path,
-        parsed: SourceFile,
-    ) -> SourceFiles<'tree> {
+    fn parsed(self, scope: &Scope<'tree>, file: &Path, children_directory: &Path, parsed: SourceFile) -> Self {
         let mut modules = Modules::declared_in(self.shelf.survey(), file, children_directory, &parsed.syntax().items);
         let tests = TestModules::read(&self.shelf, scope, modules.tests());
         let children = modules.take_children(self.shelf.survey());

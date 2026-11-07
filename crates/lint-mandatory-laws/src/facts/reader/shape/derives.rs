@@ -60,12 +60,12 @@ enum Listing {
 }
 
 impl Listing {
-    const NAMED: [(&'static str, Listing); 2] =
-        [(Derives::DERIVE, Listing::Derive), (Derives::CONDITIONAL, Listing::Conditional)];
+    const NAMED: [(&'static str, Self); 2] =
+        [(Derives::DERIVE, Self::Derive), (Derives::CONDITIONAL, Self::Conditional)];
 }
 
 impl From<&Path> for Listing {
-    fn from(path: &Path) -> Listing {
-        Listing::NAMED.iter().find(|(name, _)| path.is_ident(name)).map_or(Listing::Other, |(_, listing)| *listing)
+    fn from(path: &Path) -> Self {
+        Self::NAMED.iter().find(|(name, _)| path.is_ident(name)).map_or(Self::Other, |(_, listing)| *listing)
     }
 }

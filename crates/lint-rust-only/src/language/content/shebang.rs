@@ -13,7 +13,7 @@ impl Shebang {
     const SCANNED: ScanBytes = ScanBytes::new(256);
     const RUST: [&'static str; 2] = ["rust-script", "cargo"];
 
-    pub(crate) fn read_from(contents: &Bytes) -> Option<Shebang> {
+    pub(crate) fn read_from(contents: &Bytes) -> Option<Self> {
         let line = Self::SCANNED.first_line(contents)?;
         line.get(..Self::MARK.len())
             .filter(|start| *start == Self::MARK)
@@ -23,7 +23,7 @@ impl Shebang {
             .ok()
     }
 
-    pub(crate) fn foreign(self) -> Option<Shebang> {
+    pub(crate) fn foreign(self) -> Option<Self> {
         match self.0.as_deref().filter(|name| Self::RUST.contains(name)) {
             Some(_) => None,
             None => Some(self),

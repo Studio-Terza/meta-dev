@@ -18,9 +18,9 @@ impl BinaryFiles {
     const SOURCE_EXTENSION: &'static str = "rs";
 
     #[must_use]
-    pub fn collect(files: &[SourceFile]) -> BinaryFiles {
+    pub fn collect(files: &[SourceFile]) -> Self {
         let by_path: BTreeMap<&Path, &SourceFile> = files.iter().map(|file| (file.path(), file)).collect();
-        BinaryFiles(
+        Self(
             files
                 .iter()
                 .filter(|file| file.placement().role() == Role::BinaryRoot)

@@ -31,28 +31,28 @@ impl Unnamed {
 
     fn word(self) -> Word<'static> {
         match self {
-            Unnamed::Unit => Self::UNIT,
-            Unnamed::Opaque => Self::OPAQUE,
+            Self::Unit => Self::UNIT,
+            Self::Opaque => Self::OPAQUE,
         }
     }
 }
 
 impl Endpoint {
-    pub(crate) fn new(nature: Nature, name: Name) -> Endpoint {
-        Endpoint { nature, name, spelling: None, origin: None }
+    pub(crate) fn new(nature: Nature, name: Name) -> Self {
+        Self { nature, name, spelling: None, origin: None }
     }
 
-    pub(crate) fn spelled(self, spelling: Option<Spelling>) -> Endpoint {
-        Endpoint { spelling, ..self }
+    pub(crate) fn spelled(self, spelling: Option<Spelling>) -> Self {
+        Self { spelling, ..self }
     }
 
     pub(crate) fn spelling(&self) -> Option<&Spelling> {
         self.spelling.as_ref()
     }
 
-    pub(crate) fn originating(self, origin: Option<CrateName>) -> Endpoint {
+    pub(crate) fn originating(self, origin: Option<CrateName>) -> Self {
         match self.nature {
-            Nature::Named => Endpoint { origin, ..self },
+            Nature::Named => Self { origin, ..self },
             Nature::Interface | Nature::Primitive | Nature::Boxed => self,
         }
     }
@@ -69,8 +69,8 @@ impl Endpoint {
 }
 
 impl From<Unnamed> for Endpoint {
-    fn from(unnamed: Unnamed) -> Endpoint {
-        Endpoint { nature: Nature::Boxed, name: Name::from(unnamed.word()), spelling: None, origin: None }
+    fn from(unnamed: Unnamed) -> Self {
+        Self { nature: Nature::Boxed, name: Name::from(unnamed.word()), spelling: None, origin: None }
     }
 }
 

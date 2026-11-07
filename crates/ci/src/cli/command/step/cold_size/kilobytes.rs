@@ -11,8 +11,8 @@ impl Kilobytes {
 }
 
 impl From<Size> for Kilobytes {
-    fn from(size: Size) -> Kilobytes {
-        Kilobytes(size.into_inner().div_ceil(Kilobytes::KIBIBYTE))
+    fn from(size: Size) -> Self {
+        Self(size.into_inner().div_ceil(Self::KIBIBYTE))
     }
 }
 

@@ -69,7 +69,7 @@ impl<'found, 'file> Containment<'found, 'file> {
         files: &'found [SourceFile],
         facts: &'found Facts<'file>,
         transitions: &'found Transitions<'file>,
-    ) -> Containment<'found, 'file> {
+    ) -> Self {
         let modules: BTreeMap<&Path, &[Name]> = files
             .iter()
             .filter_map(SourceFile::shipped)

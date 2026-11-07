@@ -11,10 +11,10 @@ pub enum Kept {
 }
 
 impl From<Option<PathBuf>> for Kept {
-    fn from(kept: Option<PathBuf>) -> Kept {
+    fn from(kept: Option<PathBuf>) -> Self {
         match kept {
-            Some(path) => Kept::At(path),
-            None => Kept::Lost,
+            Some(path) => Self::At(path),
+            None => Self::Lost,
         }
     }
 }
@@ -22,8 +22,8 @@ impl From<Option<PathBuf>> for Kept {
 impl fmt::Display for Kept {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Kept::At(path) => write!(formatter, "input kept at {}", path.display()),
-            Kept::Lost => formatter.write_str("input not kept"),
+            Self::At(path) => write!(formatter, "input kept at {}", path.display()),
+            Self::Lost => formatter.write_str("input not kept"),
         }
     }
 }
@@ -36,8 +36,8 @@ pub struct Failing {
 }
 
 impl Failing {
-    pub fn new(input: Input, reason: String, kept: Kept) -> Failing {
-        Failing { input, reason, kept }
+    pub fn new(input: Input, reason: String, kept: Kept) -> Self {
+        Self { input, reason, kept }
     }
 
     pub fn input(&self) -> &Input {
@@ -69,12 +69,12 @@ pub enum Crash {
 impl fmt::Display for Crash {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Crash::Panicked(failing) => write!(formatter, "the runner panicked on {failing}"),
-            Crash::Failed(failing) => write!(formatter, "the runner failed a check on {failing}"),
-            Crash::Unrepeated(failing) => {
+            Self::Panicked(failing) => write!(formatter, "the runner panicked on {failing}"),
+            Self::Failed(failing) => write!(formatter, "the runner failed a check on {failing}"),
+            Self::Unrepeated(failing) => {
                 write!(formatter, "the runner failed once but not when replayed on {failing}")
             }
-            Crash::Aborted { reason } => write!(formatter, "the campaign stopped: {reason}"),
+            Self::Aborted { reason } => write!(formatter, "the campaign stopped: {reason}"),
         }
     }
 }

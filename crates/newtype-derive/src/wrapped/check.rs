@@ -8,8 +8,8 @@ pub struct Check {
 }
 
 impl Check {
-    pub fn new(function: Path, error: Type) -> Check {
-        Check { function, error }
+    pub fn new(function: Path, error: Type) -> Self {
+        Self { function, error }
     }
 
     pub fn function(&self) -> &Path {

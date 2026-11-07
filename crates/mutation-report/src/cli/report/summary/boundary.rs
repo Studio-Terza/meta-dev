@@ -6,16 +6,16 @@ use serde::Serialize;
 pub struct Count(usize);
 
 impl Count {
-    pub const SHOWN: Count = Count(300);
+    pub const SHOWN: Self = Self(300);
 
     #[must_use]
-    pub fn items_in<Counted>(items: &[Counted]) -> Count {
-        Count(items.len())
+    pub fn items_in<Counted>(items: &[Counted]) -> Self {
+        Self(items.len())
     }
 
     #[must_use]
-    pub fn beyond(self, limit: Count) -> Count {
-        Count(self.0.saturating_sub(limit.0))
+    pub fn beyond(self, limit: Self) -> Self {
+        Self(self.0.saturating_sub(limit.0))
     }
 
     pub(crate) fn first<Item>(self, items: &[Item]) -> impl Iterator<Item = &Item> {

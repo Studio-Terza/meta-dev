@@ -32,8 +32,8 @@ impl MutantsChanged {
         ports.output(&invocation).map_err(Failure::starting(&invocation))
     }
 
-    fn new(diff: PathBuf, output: PathBuf, scope: Vec<OsString>) -> MutantsChanged {
-        MutantsChanged {
+    fn new(diff: PathBuf, output: PathBuf, scope: Vec<OsString>) -> Self {
+        Self {
             missed: Journal::from(
                 [output.as_path()].into_iter().chain(Self::MISSED_LIST.map(Path::new)).collect::<PathBuf>(),
             ),
@@ -63,12 +63,12 @@ impl MutantsChanged {
 }
 
 impl Step for MutantsChanged {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<MutantsChanged, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let diff = &arguments.taken()?;
         let output = &arguments.taken()?;
         let scope = arguments.rest();
-        Ok(MutantsChanged::new(PathBuf::from(diff), PathBuf::from(output), scope))
+        Ok(Self::new(PathBuf::from(diff), PathBuf::from(output), scope))
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

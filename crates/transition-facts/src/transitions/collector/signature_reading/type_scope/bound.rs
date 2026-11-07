@@ -11,7 +11,7 @@ use crate::wrapping::Bounds;
 pub(super) struct Bound<'bound>(&'bound TypeParamBound);
 
 impl<'bound> Bound<'bound> {
-    pub(super) fn new(bound: &'bound TypeParamBound) -> Bound<'bound> {
+    pub(super) fn new(bound: &'bound TypeParamBound) -> Self {
         Bound(bound)
     }
 

@@ -11,11 +11,11 @@ pub struct Shape<'file> {
 }
 
 impl<'file> Shape<'file> {
-    pub fn new(name: &'file Ident, field: Option<&'file Type>) -> Shape<'file> {
+    pub fn new(name: &'file Ident, field: Option<&'file Type>) -> Self {
         Shape { name, field }
     }
 
-    pub fn answers_to(&self, name: &Name) -> Option<&Shape<'file>> {
+    pub fn answers_to(&self, name: &Name) -> Option<&Self> {
         (*name == Name::from(self.name)).then_some(self)
     }
 

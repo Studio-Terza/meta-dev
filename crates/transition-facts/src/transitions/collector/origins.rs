@@ -19,7 +19,7 @@ pub(crate) struct Origins<'file> {
 impl<'file> Origins<'file> {
     const LOCAL: [Word<'static>; 3] = words!["crate", "self", "super"];
 
-    pub(crate) fn of_file(own: &'file CrateName, syntax: &File) -> Origins<'file> {
+    pub(crate) fn of_file(own: &'file CrateName, syntax: &File) -> Self {
         let mut origins = Origins { own, modules: BTreeSet::new(), imported: BTreeMap::new() };
         origins.visit_file(syntax);
         origins

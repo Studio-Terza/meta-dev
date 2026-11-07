@@ -12,13 +12,13 @@ pub struct CrateRoot {
 
 impl CrateRoot {
     #[must_use]
-    pub fn new(directory: PathBuf) -> CrateRoot {
-        CrateRoot { directory, package: None }
+    pub fn new(directory: PathBuf) -> Self {
+        Self { directory, package: None }
     }
 
     #[must_use]
-    pub fn of_manifest(directory: &Path, manifest: Option<&Manifest>) -> CrateRoot {
-        CrateRoot { directory: directory.to_path_buf(), package: manifest.and_then(Manifest::package_name) }
+    pub fn of_manifest(directory: &Path, manifest: Option<&Manifest>) -> Self {
+        Self { directory: directory.to_path_buf(), package: manifest.and_then(Manifest::package_name) }
     }
 
     #[must_use]

@@ -20,13 +20,13 @@ pub struct Bindings<'ast> {
 }
 
 impl<'ast> Bindings<'ast> {
-    pub fn constants(file: &'ast File) -> Bindings<'ast> {
+    pub fn constants(file: &'ast File) -> Self {
         let mut constants = Bindings::default();
         constants.visit_file(file);
         constants
     }
 
-    pub fn locals(block: &'ast Block) -> Bindings<'ast> {
+    pub fn locals(block: &'ast Block) -> Self {
         let mut locals = Bindings { bound: BTreeMap::new(), scope: Scope::Body };
         locals.visit_block(block);
         locals

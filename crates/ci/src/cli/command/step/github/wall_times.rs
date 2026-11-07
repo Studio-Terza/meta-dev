@@ -45,13 +45,13 @@ impl fmt::Display for WallTimes {
 }
 
 impl Step for WallTimes {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<WallTimes, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let repository = &arguments.taken()?;
         let run = &arguments.taken()?;
         let job = &arguments.taken()?;
         arguments.ended()?;
-        Ok(WallTimes {
+        Ok(Self {
             repository: Repository::new(repository.to_str().ok_or(Failure::Usage)?.to_owned()),
             run: RunId::new(run.to_str().ok_or(Failure::Usage)?.to_owned()),
             job: Job::new(job.to_str().ok_or(Failure::Usage)?.to_owned()),

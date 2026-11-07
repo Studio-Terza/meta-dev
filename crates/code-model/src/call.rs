@@ -16,8 +16,8 @@ pub struct MacroCall {
 }
 
 impl From<ItemPath> for MacroCall {
-    fn from(written: ItemPath) -> MacroCall {
-        MacroCall { written }
+    fn from(written: ItemPath) -> Self {
+        Self { written }
     }
 }
 
@@ -31,24 +31,24 @@ impl Callee {
     #[must_use]
     pub fn method(&self) -> Option<&Name> {
         match self {
-            Callee::Method(name) => Some(name),
-            Callee::Path(_) | Callee::Macro(_) => None,
+            Self::Method(name) => Some(name),
+            Self::Path(_) | Self::Macro(_) => None,
         }
     }
 
     #[must_use]
     pub fn path(&self) -> Option<&ItemPath> {
         match self {
-            Callee::Path(written) => Some(written),
-            Callee::Method(_) | Callee::Macro(_) => None,
+            Self::Path(written) => Some(written),
+            Self::Method(_) | Self::Macro(_) => None,
         }
     }
 
     #[must_use]
     pub fn invoked(&self) -> Option<&MacroCall> {
         match self {
-            Callee::Macro(call) => Some(call),
-            Callee::Method(_) | Callee::Path(_) => None,
+            Self::Macro(call) => Some(call),
+            Self::Method(_) | Self::Path(_) => None,
         }
     }
 }
@@ -61,8 +61,8 @@ pub struct Call {
 
 impl Call {
     #[must_use]
-    pub fn new(callee: Callee, seat: Seat) -> Call {
-        Call { callee, seat }
+    pub fn new(callee: Callee, seat: Seat) -> Self {
+        Self { callee, seat }
     }
 
     #[must_use]

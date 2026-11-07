@@ -23,7 +23,7 @@ impl<'graph, 'found, 'file> Walk<'graph, 'found, 'file> {
         edge: &'graph Edge<'found, 'file>,
         called: Vec<&'graph Edge<'found, 'file>>,
         stops: Vec<Stop>,
-    ) -> Walk<'graph, 'found, 'file> {
+    ) -> Self {
         Walk { edge, called, stops }
     }
 

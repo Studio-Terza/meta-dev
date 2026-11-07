@@ -7,10 +7,10 @@ pub(crate) enum Exposure {
 }
 
 impl Exposure {
-    pub(crate) fn declared_by(visibility: &Visibility) -> Exposure {
+    pub(crate) fn declared_by(visibility: &Visibility) -> Self {
         match visibility {
-            Visibility::Public(_) => Exposure::Public,
-            _ => Exposure::Private,
+            Visibility::Public(_) => Self::Public,
+            _ => Self::Private,
         }
     }
 }

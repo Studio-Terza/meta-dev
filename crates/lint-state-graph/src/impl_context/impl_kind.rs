@@ -10,7 +10,7 @@ pub enum ImplKind<'found> {
 }
 
 impl<'found> ImplKind<'found> {
-    pub fn of_trait(name: Name, vertex: Option<&'found TypeName>) -> ImplKind<'found> {
+    pub fn of_trait(name: Name, vertex: Option<&'found TypeName>) -> Self {
         match vertex {
             Some(vertex) => ImplKind::TraitOnVertex(name, vertex),
             None => ImplKind::TraitOnValue(name),

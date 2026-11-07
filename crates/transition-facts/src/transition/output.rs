@@ -4,7 +4,7 @@ use crate::endpoint::Endpoint;
 pub struct Output<'found>(&'found Endpoint);
 
 impl<'found> Output<'found> {
-    pub(crate) fn new(endpoint: &'found Endpoint) -> Output<'found> {
+    pub(crate) fn new(endpoint: &'found Endpoint) -> Self {
         Output(endpoint)
     }
 

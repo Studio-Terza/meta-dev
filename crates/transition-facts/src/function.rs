@@ -22,7 +22,7 @@ pub struct Function<'file> {
 }
 
 impl<'file> Function<'file> {
-    pub(crate) fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Function<'file> {
+    pub(crate) fn new(site: Site<'file>, name: Name, takes: Vec<Resolved>, gives: Resolved) -> Self {
         Function {
             site,
             name,
@@ -37,20 +37,20 @@ impl<'file> Function<'file> {
         }
     }
 
-    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Function<'file> {
+    pub(crate) fn shaped(mut self, mutation: Mutation, body: Body, branching: Branching) -> Self {
         self.mutation = mutation;
         self.body = body;
         self.branching = branching;
         self
     }
 
-    pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Function<'file> {
+    pub(crate) fn wrapped(mut self, wrapping: Wrapping, takings: Vec<Wrapping>) -> Self {
         self.wrapping = wrapping;
         self.takings = takings;
         self
     }
 
-    pub(crate) fn called(mut self, calls: Vec<Callee>) -> Function<'file> {
+    pub(crate) fn called(mut self, calls: Vec<Callee>) -> Self {
         self.calls = calls;
         self
     }

@@ -23,8 +23,8 @@ pub struct Item {
 
 impl Item {
     #[must_use]
-    pub fn new(name: Name, kind: ItemKind) -> Item {
-        Item { name, kind }
+    pub fn new(name: Name, kind: ItemKind) -> Self {
+        Self { name, kind }
     }
 }
 
@@ -36,8 +36,8 @@ pub struct AliasParameter {
 
 impl AliasParameter {
     #[must_use]
-    pub fn new(name: Name, default: Option<TypeRef>) -> AliasParameter {
-        AliasParameter { name, default }
+    pub fn new(name: Name, default: Option<TypeRef>) -> Self {
+        Self { name, default }
     }
 
     pub(crate) fn default(&self) -> Option<&TypeRef> {
@@ -59,8 +59,8 @@ pub struct Alias {
 
 impl Alias {
     #[must_use]
-    pub fn new(parameters: Vec<AliasParameter>, target: TypeRef) -> Alias {
-        Alias { parameters, target }
+    pub fn new(parameters: Vec<AliasParameter>, target: TypeRef) -> Self {
+        Self { parameters, target }
     }
 
     pub(crate) fn expansion(&self, given: &[TypeRef]) -> TypeRef {

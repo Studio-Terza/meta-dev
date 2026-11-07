@@ -44,12 +44,12 @@ impl InstallTools {
 }
 
 impl Step for InstallTools {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<InstallTools, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let built = &arguments.taken()?;
         let destination = &arguments.taken()?;
         arguments.ended()?;
-        Ok(InstallTools { built: PathBuf::from(built), destination: PathBuf::from(destination) })
+        Ok(Self { built: PathBuf::from(built), destination: PathBuf::from(destination) })
     }
 
     fn carry_out(&self, ports: &impl Ports, _out: &mut impl Write) -> Result<Exit, Failure<'_>> {

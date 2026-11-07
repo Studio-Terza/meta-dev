@@ -14,8 +14,8 @@ pub struct Opened {
 
 impl Opened {
     #[must_use]
-    pub fn new(shown: PathBuf, file: PathBuf, text: SourceText, placement: Placement) -> Opened {
-        Opened { shown, file, text, placement }
+    pub fn new(shown: PathBuf, file: PathBuf, text: SourceText, placement: Placement) -> Self {
+        Self { shown, file, text, placement }
     }
 
     pub fn parsed(&self) -> Result<SourceFile, Failure> {

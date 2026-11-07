@@ -4,7 +4,7 @@ use newtype::{Arbitrary, Counter, Display, Newtype};
 pub struct Count(usize);
 
 impl Count {
-    pub(crate) fn nonzero(self) -> Option<Count> {
-        Some(self).filter(|count| *count != Count::zero())
+    pub(crate) fn nonzero(self) -> Option<Self> {
+        Some(self).filter(|count| *count != Self::zero())
     }
 }

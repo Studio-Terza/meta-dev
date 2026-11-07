@@ -20,7 +20,7 @@ impl<'items> Declaration<'items> {
     const MODULE_FILE: &'static str = "mod.rs";
 
     #[must_use]
-    pub fn new(module: &'items ItemMod, directory: PathBuf) -> Declaration<'items> {
+    pub fn new(module: &'items ItemMod, directory: PathBuf) -> Self {
         Declaration { module, directory }
     }
 
@@ -47,18 +47,18 @@ impl<'items> Declaration<'items> {
     }
 
     #[must_use]
-    pub fn within(items: &'items [Item], directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+    pub fn within(items: &'items [Item], directory: &Path, wanted: Walk) -> Vec<Self> {
         items.iter().flat_map(|item| Self::of_item(item, directory, wanted)).collect()
     }
 
-    fn of_item(item: &'items Item, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+    fn of_item(item: &'items Item, directory: &Path, wanted: Walk) -> Vec<Self> {
         match item {
             Item::Mod(module) => Self::of_module(module, directory, wanted),
             _ => Vec::new(),
         }
     }
 
-    fn of_module(module: &'items ItemMod, directory: &Path, wanted: Walk) -> Vec<Declaration<'items>> {
+    fn of_module(module: &'items ItemMod, directory: &Path, wanted: Walk) -> Vec<Self> {
         let walk = Walk::outside_tests(&module.attrs);
         let inline = module
             .content

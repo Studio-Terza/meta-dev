@@ -6,7 +6,7 @@ use lint_layout::Name;
 pub struct Finding<'guard>(&'guard Name);
 
 impl<'guard> From<&'guard Name> for Finding<'guard> {
-    fn from(guard: &'guard Name) -> Finding<'guard> {
+    fn from(guard: &'guard Name) -> Self {
         Finding(guard)
     }
 }

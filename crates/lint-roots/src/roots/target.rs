@@ -8,8 +8,8 @@ pub struct Target {
 
 impl Target {
     #[must_use]
-    pub fn new(package: PathBuf, files: Vec<PathBuf>) -> Target {
-        Target { package, files }
+    pub fn new(package: PathBuf, files: Vec<PathBuf>) -> Self {
+        Self { package, files }
     }
 
     #[must_use]

@@ -21,11 +21,11 @@ impl SpecLine {
 }
 
 impl Step for SpecLine {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<SpecLine, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let pull_request = &arguments.taken()?;
         arguments.ended()?;
-        Ok(SpecLine { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
+        Ok(Self { pull_request: PullNumber::new(pull_request.to_str().ok_or(Failure::Usage)?.to_owned()) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

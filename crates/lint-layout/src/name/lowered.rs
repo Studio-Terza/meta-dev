@@ -4,13 +4,13 @@ use crate::name::Name;
 pub struct Lowered(String);
 
 impl FromIterator<char> for Lowered {
-    fn from_iter<Letters: IntoIterator<Item = char>>(letters: Letters) -> Lowered {
-        Lowered(letters.into_iter().collect())
+    fn from_iter<Letters: IntoIterator<Item = char>>(letters: Letters) -> Self {
+        Self(letters.into_iter().collect())
     }
 }
 
 impl From<Lowered> for Name {
-    fn from(lowered: Lowered) -> Name {
-        Name(lowered.0)
+    fn from(lowered: Lowered) -> Self {
+        Self(lowered.0)
     }
 }

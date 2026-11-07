@@ -27,7 +27,7 @@ impl Word {
     }
 
     fn checked(text: &&str) -> Result<String, Empty> {
-        Word::try_new((*text).to_owned()).map(Word::into_inner)
+        Self::try_new((*text).to_owned()).map(Self::into_inner)
     }
 }
 

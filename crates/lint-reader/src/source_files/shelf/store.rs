@@ -24,10 +24,10 @@ impl Shelved {
 }
 
 impl From<Result<Opened, Failure>> for Shelved {
-    fn from(opened: Result<Opened, Failure>) -> Shelved {
+    fn from(opened: Result<Opened, Failure>) -> Self {
         match opened {
-            Ok(opened) => Shelved { parsed: Some(opened.parsed()), opened: Some(opened) },
-            Err(failure) => Shelved { opened: None, parsed: Some(Err(failure)) },
+            Ok(opened) => Self { parsed: Some(opened.parsed()), opened: Some(opened) },
+            Err(failure) => Self { opened: None, parsed: Some(Err(failure)) },
         }
     }
 }

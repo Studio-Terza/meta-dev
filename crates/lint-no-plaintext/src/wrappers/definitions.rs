@@ -24,7 +24,7 @@ pub struct Definitions<'file> {
 impl<'file> Definitions<'file> {
     const DESERIALIZE: &'static str = "Deserialize";
 
-    pub fn collected_from(files: &[&'file SourceFile]) -> Definitions<'file> {
+    pub fn collected_from(files: &[&'file SourceFile]) -> Self {
         files.iter().fold(Definitions::default(), |mut definitions, file| {
             definitions.visit_file(file.syntax());
             definitions

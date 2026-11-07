@@ -10,8 +10,8 @@ impl Located {
     #[must_use]
     pub fn within<'path>(&'path self, shown: &'path Path) -> &'path Path {
         match self {
-            Located::Shown => shown,
-            Located::At(located) => located,
+            Self::Shown => shown,
+            Self::At(located) => located,
         }
     }
 }

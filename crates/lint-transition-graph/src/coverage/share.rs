@@ -8,9 +8,9 @@ use crate::count::Count;
 pub(crate) struct Share(f64);
 
 impl Share {
-    pub(crate) fn between(part: Count, whole: Count) -> Share {
+    pub(crate) fn between(part: Count, whole: Count) -> Self {
         let ratio = |count: Count| f64::from(u32::try_from(count.count()).unwrap_or(u32::MAX));
-        Share(Some(whole).filter(|whole| *whole != Count::zero()).map_or(0.0, |whole| ratio(part) / ratio(whole)))
+        Self(Some(whole).filter(|whole| *whole != Count::zero()).map_or(0.0, |whole| ratio(part) / ratio(whole)))
     }
 }
 

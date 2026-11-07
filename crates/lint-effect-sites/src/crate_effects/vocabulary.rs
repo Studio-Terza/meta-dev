@@ -12,11 +12,11 @@ struct Tail {
 }
 
 impl Tail {
-    const fn new(effect: Effect, words: &'static [Word<'static>]) -> Tail {
-        Tail { effect, words }
+    const fn new(effect: Effect, words: &'static [Word<'static>]) -> Self {
+        Self { effect, words }
     }
 
-    fn spelled_in(&self, used: &Use<'_>) -> Option<&Tail> {
+    fn spelled_in(&self, used: &Use<'_>) -> Option<&Self> {
         used.spelling(PathTail::new(self.words)).map(|_| self)
     }
 

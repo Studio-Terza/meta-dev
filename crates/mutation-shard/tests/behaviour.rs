@@ -20,14 +20,14 @@ struct Answer {
 }
 
 impl Answer {
-    fn to(files: &impl Files, arguments: &[&OsStr]) -> Answer {
+    fn to(files: &impl Files, arguments: &[&OsStr]) -> Self {
         let mut err = Vec::new();
         let exit = Cli::answer(arguments.iter().map(OsString::from), files, &mut err);
-        Answer { exit, err: String::from_utf8(err).unwrap_or_default() }
+        Self { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 
-    fn usage() -> Answer {
-        Answer { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
+    fn usage() -> Self {
+        Self { exit: ExitCode::FAILURE, err: format!("{USAGE}\n") }
     }
 }
 
@@ -214,8 +214,8 @@ struct Mutants {
 }
 
 impl Mutants {
-    fn new() -> Result<Mutants, FileFailure> {
-        let mutants = Mutants { files: Memory::default(), root: PathBuf::from("/mutants.out") };
+    fn new() -> Result<Self, FileFailure> {
+        let mutants = Self { files: Memory::default(), root: PathBuf::from("/mutants.out") };
         mutants.files.create_directories(&mutants.root.join("log"))?;
         Ok(mutants)
     }

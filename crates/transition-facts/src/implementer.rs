@@ -4,7 +4,7 @@ use crate::endpoint::Endpoint;
 pub struct Implementer<'found>(&'found Endpoint);
 
 impl<'found> Implementer<'found> {
-    pub(crate) fn new(endpoint: &'found Endpoint) -> Implementer<'found> {
+    pub(crate) fn new(endpoint: &'found Endpoint) -> Self {
         Implementer(endpoint)
     }
 

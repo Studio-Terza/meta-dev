@@ -60,16 +60,16 @@ enum Naming {
 }
 
 impl Naming {
-    fn erased_by(equivalence: Equivalence) -> Naming {
-        equivalence.erases(Erased::Names).map_or(Naming::Local, |_| Naming::Every)
+    fn erased_by(equivalence: Equivalence) -> Self {
+        equivalence.erases(Erased::Names).map_or(Self::Local, |_| Self::Every)
     }
 }
 
 impl fmt::Display for Naming {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Naming::Local => write!(formatter, "local names"),
-            Naming::Every => write!(formatter, "names"),
+            Self::Local => write!(formatter, "local names"),
+            Self::Every => write!(formatter, "names"),
         }
     }
 }

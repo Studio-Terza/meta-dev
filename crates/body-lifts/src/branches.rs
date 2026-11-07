@@ -20,7 +20,7 @@ pub struct Branches {
 impl Branches {
     #[must_use]
     pub fn scored(body: &Block, propagation: Propagation) -> Branching {
-        let mut scan = Branches { score: Branching::new(1), propagation };
+        let mut scan = Self { score: Branching::new(1), propagation };
         scan.visit_block(body);
         scan.score
     }

@@ -33,10 +33,7 @@ impl<'found, 'file> Structure<'found, 'file> {
     const LEAST_MOVES: usize = 2;
     const LEAST_MEMBERS: usize = 2;
 
-    pub(super) fn of_cluster(
-        cluster: &Cluster<Node<'found>>,
-        behaviour: &Behaviour<'found, 'file>,
-    ) -> Option<Structure<'found, 'file>> {
+    pub(super) fn of_cluster(cluster: &Cluster<Node<'found>>, behaviour: &Behaviour<'found, 'file>) -> Option<Self> {
         let members: Vec<Member<'found, 'file>> =
             cluster.members().filter_map(|node| behaviour.site(&node).map(|site| Member { node, site })).collect();
         let moves = cluster
@@ -50,7 +47,7 @@ impl<'found, 'file> Structure<'found, 'file> {
 }
 
 impl<'file> From<&Structure<'_, 'file>> for Option<Violation<'file>> {
-    fn from(structure: &Structure<'_, 'file>) -> Option<Violation<'file>> {
+    fn from(structure: &Structure<'_, 'file>) -> Self {
         structure.members.iter().map(|member| member.site).min().map(|site| Violation::new(site, structure))
     }
 }
@@ -84,8 +81,8 @@ pub(super) struct Tally {
 }
 
 impl Tally {
-    pub(super) fn counted(coloured: &Coloured<'_>, structures: &[Structure<'_, '_>]) -> Tally {
-        Tally {
+    pub(super) fn counted(coloured: &Coloured<'_>, structures: &[Structure<'_, '_>]) -> Self {
+        Self {
             spread: coloured.spread(),
             structures: Count::new(structures.len()),
             grouped: Count::total(structures.iter().map(|structure| Count::new(structure.members.len()))),

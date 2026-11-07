@@ -10,8 +10,8 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub(crate) fn new(language: Language, place: Place) -> Finding {
-        Finding { language, place }
+    pub(crate) fn new(language: Language, place: Place) -> Self {
+        Self { language, place }
     }
 }
 

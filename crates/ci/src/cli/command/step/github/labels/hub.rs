@@ -11,7 +11,7 @@ pub struct Hub<'ports, Host: Ports> {
 }
 
 impl<'ports, Host: Ports> Hub<'ports, Host> {
-    pub(crate) fn with_ports(ports: &'ports Host) -> Hub<'ports, Host> {
+    pub(crate) fn with_ports(ports: &'ports Host) -> Self {
         Hub { ports }
     }
 

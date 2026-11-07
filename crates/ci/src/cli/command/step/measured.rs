@@ -17,8 +17,8 @@ impl Measured {
     const ASSIGN: &'static str = " = ";
     const TAB: &'static str = "\t";
 
-    pub fn file(path: &Path) -> Measured {
-        Measured(Journal::file(path))
+    pub fn file(path: &Path) -> Self {
+        Self(Journal::file(path))
     }
 
     pub(crate) fn append(&self, files: &impl Files, stage: &Stage, seconds: Seconds) -> Result<(), Failure<'_>> {

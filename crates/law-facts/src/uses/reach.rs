@@ -10,16 +10,16 @@ pub(super) enum Reach {
 impl Reach {
     const HOME_ROOTS: [&'static str; 3] = ["crate", "self", "super"];
 
-    pub(super) fn of_root(root: &Name) -> Reach {
+    pub(super) fn of_root(root: &Name) -> Self {
         Some(root)
             .filter(|root| Self::HOME_ROOTS.iter().all(|home_root| **root != Name::from(*home_root)))
-            .map_or(Reach::Home, |root| Reach::Crate(CrateName::from(root)))
+            .map_or(Self::Home, |root| Self::Crate(CrateName::from(root)))
     }
 
     pub(super) fn routed<T>(&self, home: impl FnOnce() -> T, owned: impl FnOnce(&CrateName) -> T) -> T {
         match self {
-            Reach::Home => home(),
-            Reach::Crate(named) => owned(named),
+            Self::Home => home(),
+            Self::Crate(named) => owned(named),
         }
     }
 }

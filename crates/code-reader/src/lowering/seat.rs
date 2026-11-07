@@ -18,12 +18,12 @@ pub(super) struct Seat {
 }
 
 impl Seat {
-    pub(super) fn new(file: FileId, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file, scope, children }
+    pub(super) fn new(file: FileId, scope: ScopeId, children: Rc<Path>) -> Self {
+        Self { file, scope, children }
     }
 
-    pub(super) fn inner(&self, scope: ScopeId, children: Rc<Path>) -> Seat {
-        Seat { file: self.file, scope, children }
+    pub(super) fn inner(&self, scope: ScopeId, children: Rc<Path>) -> Self {
+        Self { file: self.file, scope, children }
     }
 
     pub(super) fn scope(&self) -> ScopeId {

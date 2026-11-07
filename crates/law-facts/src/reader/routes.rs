@@ -21,7 +21,7 @@ pub(crate) struct Within<'scope> {
 }
 
 impl<'scope> Within<'scope> {
-    pub(crate) fn new(scope: &'scope Scope, traits: &'scope Traits<'scope>, home: &'scope CrateName) -> Within<'scope> {
+    pub(crate) fn new(scope: &'scope Scope, traits: &'scope Traits<'scope>, home: &'scope CrateName) -> Self {
         Within { scope, traits, home }
     }
 

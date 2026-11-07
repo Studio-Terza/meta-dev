@@ -46,7 +46,7 @@ impl Modules {
     }
 
     #[must_use]
-    pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Modules {
+    pub fn declared_in(survey: &Survey, file: &Path, children_directory: &Path, items: &[Item]) -> Self {
         let file_directory = file.parent().map(Path::to_path_buf).unwrap_or_default();
         let entered = Declaration::within(items, children_directory, Walk::Entered);
         let skipped = Declaration::within(items, children_directory, Walk::Skipped);
@@ -54,11 +54,9 @@ impl Modules {
             .iter()
             .flat_map(|declaration| Self::resolve(survey, &file_directory, declaration).unwrap_or_default())
             .collect();
-        entered
-            .into_iter()
-            .fold(Modules { children: Vec::new(), tests, failures: Vec::new() }, |modules, declaration| {
-                modules.resolved_into(Self::resolve(survey, &file_directory, &declaration))
-            })
+        entered.into_iter().fold(Self { children: Vec::new(), tests, failures: Vec::new() }, |modules, declaration| {
+            modules.resolved_into(Self::resolve(survey, &file_directory, &declaration))
+        })
     }
 
     pub fn take_children(&mut self, survey: &Survey) -> Vec<Child> {
@@ -74,10 +72,10 @@ impl Modules {
         std::mem::take(&mut self.failures)
     }
 
-    fn resolved_into(self, resolved: Result<Vec<Child>, Failure>) -> Modules {
+    fn resolved_into(self, resolved: Result<Vec<Child>, Failure>) -> Self {
         match resolved {
-            Ok(found) => Modules { children: self.children.into_iter().chain(found).collect(), ..self },
-            Err(failure) => Modules { failures: self.failures.into_iter().chain([failure]).collect(), ..self },
+            Ok(found) => Self { children: self.children.into_iter().chain(found).collect(), ..self },
+            Err(failure) => Self { failures: self.failures.into_iter().chain([failure]).collect(), ..self },
         }
     }
 

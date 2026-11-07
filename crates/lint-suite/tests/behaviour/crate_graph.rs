@@ -39,7 +39,7 @@ impl Items {
 
     fn ring_with_first_item_in(before: &str, after: &str, size: usize) -> String {
         let rest: Vec<String> =
-            Items::links(size).skip(1).map(|Link { index, next }| format!("pub struct A{index}(A{next});\n")).collect();
+            Self::links(size).skip(1).map(|Link { index, next }| format!("pub struct A{index}(A{next});\n")).collect();
         format!("{before}pub struct A0(A1);\n{after}{}", rest.concat())
     }
 

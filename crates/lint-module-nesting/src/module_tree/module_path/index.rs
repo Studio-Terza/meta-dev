@@ -13,7 +13,7 @@ pub struct ModuleIndex<'file> {
 }
 
 impl<'file> From<Vec<ModulePath<'file>>> for ModuleIndex<'file> {
-    fn from(modules: Vec<ModulePath<'file>>) -> ModuleIndex<'file> {
+    fn from(modules: Vec<ModulePath<'file>>) -> Self {
         let latest = modules.iter().fold(
             HashMap::new(),
             |mut found: HashMap<&'file CrateRoot, HashMap<Vec<&'file Name>, ModulePath<'file>>>, module| {

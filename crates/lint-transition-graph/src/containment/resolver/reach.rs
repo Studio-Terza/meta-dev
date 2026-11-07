@@ -22,7 +22,7 @@ impl<'place, 'found> Reach<'place, 'found> {
     pub(crate) fn new(
         place: &'place Place<'found>,
         modules: &'place BTreeMap<&'found CrateName, BTreeSet<&'found Name>>,
-    ) -> Reach<'place, 'found> {
+    ) -> Self {
         Reach { place, modules }
     }
 

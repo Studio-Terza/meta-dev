@@ -5,17 +5,17 @@ use proc_macro2::Span;
 pub struct LineNumber(usize);
 
 impl LineNumber {
-    pub const FIRST: LineNumber = LineNumber(1);
+    pub const FIRST: Self = Self(1);
 }
 
 impl From<usize> for LineNumber {
-    fn from(line: usize) -> LineNumber {
-        LineNumber(line)
+    fn from(line: usize) -> Self {
+        Self(line)
     }
 }
 
 impl From<Span> for LineNumber {
-    fn from(span: Span) -> LineNumber {
-        LineNumber(span.start().line)
+    fn from(span: Span) -> Self {
+        Self(span.start().line)
     }
 }

@@ -22,22 +22,22 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn joined(&self, rest: &[Name]) -> UsePath {
-        UsePath(self.0.iter().chain(rest).cloned().collect())
+    pub fn joined(&self, rest: &[Name]) -> Self {
+        Self(self.0.iter().chain(rest).cloned().collect())
     }
 
     #[must_use]
-    pub fn rerooted(&self, root: &UsePath) -> UsePath {
-        UsePath(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())
+    pub fn rerooted(&self, root: &Self) -> Self {
+        Self(root.0.iter().chain(self.0.iter().skip(1)).cloned().collect())
     }
 
     #[must_use]
-    pub fn rest(&self) -> UsePath {
-        UsePath(self.0.iter().skip(1).cloned().collect())
+    pub fn rest(&self) -> Self {
+        Self(self.0.iter().skip(1).cloned().collect())
     }
 
     #[must_use]
-    pub fn ends_with(&self, tail: PathTail<'_>) -> Option<&UsePath> {
+    pub fn ends_with(&self, tail: PathTail<'_>) -> Option<&Self> {
         let words = tail.into_inner();
         (self.0.len() >= words.len()).then_some(self).filter(|path| {
             path.0.iter().rev().zip(words.iter().rev()).all(|(segment, spelled)| *segment == Name::from(*spelled))
@@ -45,7 +45,7 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn spells(&self, segments: &[Word<'_>]) -> Option<&UsePath> {
+    pub fn spells(&self, segments: &[Word<'_>]) -> Option<&Self> {
         (self.0.len() == segments.len())
             .then_some(self)
             .filter(|path| path.0.iter().zip(segments).all(|(segment, spelled)| *segment == Name::from(*spelled)))
@@ -57,21 +57,21 @@ impl UsePath {
     }
 
     #[must_use]
-    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> UsePath {
+    pub fn naming<'path>(&'path self, typed: impl Fn(&'path Name) -> Option<&'path Name>) -> Self {
         let named = self.0.iter().position(|segment| typed(segment).is_some()).map_or(self.0.len(), |at| at + 1);
-        UsePath(self.0.iter().take(named).cloned().collect())
+        Self(self.0.iter().take(named).cloned().collect())
     }
 }
 
 impl FromIterator<Name> for UsePath {
-    fn from_iter<Segments: IntoIterator<Item = Name>>(segments: Segments) -> UsePath {
-        UsePath(segments.into_iter().collect())
+    fn from_iter<Segments: IntoIterator<Item = Name>>(segments: Segments) -> Self {
+        Self(segments.into_iter().collect())
     }
 }
 
 impl From<&Path> for UsePath {
-    fn from(path: &Path) -> UsePath {
-        UsePath(path.segments.iter().map(|segment| Name::from(&segment.ident)).collect())
+    fn from(path: &Path) -> Self {
+        Self(path.segments.iter().map(|segment| Name::from(&segment.ident)).collect())
     }
 }
 

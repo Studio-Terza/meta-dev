@@ -18,7 +18,7 @@ pub(crate) enum Domain {
 }
 
 impl Domain {
-    const ALL: [Domain; 2] = [Domain::Types, Domain::Macros];
+    const ALL: [Self; 2] = [Self::Types, Self::Macros];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,7 +28,7 @@ pub(super) struct Key<'name> {
 }
 
 impl<'name> Key<'name> {
-    pub(super) fn new(domain: Domain, name: &'name Name) -> Key<'name> {
+    pub(super) fn new(domain: Domain, name: &'name Name) -> Self {
         Key { domain, name }
     }
 
@@ -50,7 +50,7 @@ pub(super) struct Keyed<'rows, Value> {
 }
 
 impl<'rows, Value> Keyed<'rows, Value> {
-    pub(super) fn new(key: Key<'rows>, value: Value) -> Keyed<'rows, Value> {
+    pub(super) fn new(key: Key<'rows>, value: Value) -> Self {
         Keyed { key, value }
     }
 }
@@ -63,7 +63,7 @@ pub(super) enum Layer {
 }
 
 impl Layer {
-    const ORDER: [Layer; 3] = [Layer::Declared, Layer::Imported, Layer::Extern];
+    const ORDER: [Self; 3] = [Self::Declared, Self::Imported, Self::Extern];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -80,7 +80,7 @@ pub(super) struct Row<'rows> {
 }
 
 impl<'rows> Row<'rows> {
-    pub(super) fn new(layer: Layer, visibility: Visibility, view: View<'rows>) -> Row<'rows> {
+    pub(super) fn new(layer: Layer, visibility: Visibility, view: View<'rows>) -> Self {
         Row { layer, visibility, view }
     }
 
@@ -93,7 +93,7 @@ impl<'rows> Row<'rows> {
 pub(super) struct Explicit<'rows>(BTreeMap<Placed<'rows>, Vec<Row<'rows>>>);
 
 impl<'rows> FromIterator<Keyed<'rows, Row<'rows>>> for Explicit<'rows> {
-    fn from_iter<Rows: IntoIterator<Item = Keyed<'rows, Row<'rows>>>>(rows: Rows) -> Explicit<'rows> {
+    fn from_iter<Rows: IntoIterator<Item = Keyed<'rows, Row<'rows>>>>(rows: Rows) -> Self {
         Explicit(rows.into_iter().fold(BTreeMap::new(), |mut placed: BTreeMap<Placed<'rows>, Vec<Row<'rows>>>, row| {
             placed.entry(Placed { key: row.key, layer: row.value.layer }).or_default().push(row.value);
             placed
@@ -122,19 +122,19 @@ pub(super) struct Exposed<'rows> {
 }
 
 impl<'rows> FromIterator<Keyed<'rows, View<'rows>>> for Exposed<'rows> {
-    fn from_iter<Views: IntoIterator<Item = Keyed<'rows, View<'rows>>>>(views: Views) -> Exposed<'rows> {
+    fn from_iter<Views: IntoIterator<Item = Keyed<'rows, View<'rows>>>>(views: Views) -> Self {
         Exposed { default: View::ABSENT, names: views.into_iter().map(|keyed| (keyed.key, keyed.value)).collect() }
     }
 }
 
 impl<'rows> From<View<'rows>> for Exposed<'rows> {
-    fn from(default: View<'rows>) -> Exposed<'rows> {
+    fn from(default: View<'rows>) -> Self {
         Exposed { default, names: BTreeMap::new() }
     }
 }
 
 impl<'rows> Exposed<'rows> {
-    fn joined(&self, computed: &Exposed<'rows>) -> Exposed<'rows> {
+    fn joined(&self, computed: &Self) -> Self {
         let keys: BTreeSet<Key<'rows>> = self.names.keys().chain(computed.names.keys()).copied().collect();
         let names = keys
             .into_iter()
@@ -159,7 +159,7 @@ pub(super) struct GlobView<'rows> {
 }
 
 impl<'rows> GlobView<'rows> {
-    pub(super) fn new(id: GlobId, visibility: Visibility, exposed: Exposed<'rows>) -> GlobView<'rows> {
+    pub(super) fn new(id: GlobId, visibility: Visibility, exposed: Exposed<'rows>) -> Self {
         GlobView { id, visibility, exposed }
     }
 
@@ -176,11 +176,11 @@ pub(super) struct ModuleGlob<'rows> {
 }
 
 impl<'rows> ModuleGlob<'rows> {
-    pub(super) fn new(glob: GlobView<'rows>, module: ScopeId, sight: Sight) -> ModuleGlob<'rows> {
+    pub(super) fn new(glob: GlobView<'rows>, module: ScopeId, sight: Sight) -> Self {
         ModuleGlob { glob, module, sight }
     }
 
-    fn exposing(&self, names: Names<'_, 'rows>) -> ModuleGlob<'rows> {
+    fn exposing(&self, names: Names<'_, 'rows>) -> Self {
         ModuleGlob {
             glob: GlobView {
                 id: self.glob.id,
@@ -193,8 +193,8 @@ impl<'rows> ModuleGlob<'rows> {
     }
 }
 
-impl<'rows> Lattice for ModuleGlob<'rows> {
-    fn joined(&self, computed: ModuleGlob<'rows>) -> ModuleGlob<'rows> {
+impl Lattice for ModuleGlob<'_> {
+    fn joined(&self, computed: Self) -> Self {
         ModuleGlob {
             glob: GlobView {
                 id: self.glob.id,
@@ -215,12 +215,12 @@ pub(super) struct Lookup {
 }
 
 impl Lookup {
-    pub(super) fn new(sight: Sight, ignored: Option<GlobId>, reading: Reading) -> Lookup {
-        Lookup { sight, ignored, reading }
+    pub(super) fn new(sight: Sight, ignored: Option<GlobId>, reading: Reading) -> Self {
+        Self { sight, ignored, reading }
     }
 
-    pub(super) fn outer(self) -> Lookup {
-        Lookup { sight: self.sight, ignored: None, reading: self.reading }
+    pub(super) fn outer(self) -> Self {
+        Self { sight: self.sight, ignored: None, reading: self.reading }
     }
 
     fn found<'rows>(self, level: Level<'_, 'rows>, sought: Sought<'_>) -> View<'rows> {
@@ -369,7 +369,7 @@ impl<'rows> Tables<'rows> {
         explicit: Vec<Explicit<'rows>>,
         fixed: Vec<Vec<GlobView<'rows>>>,
         modules: Vec<Vec<ModuleGlob<'rows>>>,
-    ) -> Tables<'rows> {
+    ) -> Self {
         let modules = Exposure { explicit: &explicit, fixed: &fixed }.settled(modules);
         Tables { explicit, fixed, modules }
     }

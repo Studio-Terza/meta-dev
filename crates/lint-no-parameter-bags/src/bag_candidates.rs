@@ -22,8 +22,8 @@ pub struct BagCandidates {
 }
 
 impl BagCandidates {
-    pub fn in_file(file: &SourceFile) -> BagCandidates {
-        let mut candidates = BagCandidates::default();
+    pub fn in_file(file: &SourceFile) -> Self {
+        let mut candidates = Self::default();
         candidates.visit_file(file.syntax());
         candidates
     }

@@ -13,16 +13,16 @@ impl Spelling {
     #[must_use]
     pub fn written(&self) -> Option<&ItemPath> {
         match self {
-            Spelling::Written(path, _) => Some(path),
-            Spelling::Implied => None,
+            Self::Written(path, _) => Some(path),
+            Self::Implied => None,
         }
     }
 
     #[must_use]
     pub fn position(&self) -> Option<Position> {
         match self {
-            Spelling::Written(_, position) => Some(*position),
-            Spelling::Implied => None,
+            Self::Written(_, position) => Some(*position),
+            Self::Implied => None,
         }
     }
 }
@@ -35,13 +35,13 @@ pub struct Sited {
 
 impl Sited {
     #[must_use]
-    pub fn new(resolved: Resolved, spelling: Spelling) -> Sited {
-        Sited { resolved, spelling }
+    pub fn new(resolved: Resolved, spelling: Spelling) -> Self {
+        Self { resolved, spelling }
     }
 
     #[must_use]
-    pub fn implied(resolved: Resolved) -> Sited {
-        Sited { resolved, spelling: Spelling::Implied }
+    pub fn implied(resolved: Resolved) -> Self {
+        Self { resolved, spelling: Spelling::Implied }
     }
 }
 

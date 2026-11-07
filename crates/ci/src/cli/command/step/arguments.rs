@@ -7,8 +7,8 @@ use crate::cli::command::failure::Failure;
 pub(crate) struct Arguments(vec::IntoIter<OsString>);
 
 impl From<Vec<OsString>> for Arguments {
-    fn from(arguments: Vec<OsString>) -> Arguments {
-        Arguments(arguments.into_iter())
+    fn from(arguments: Vec<OsString>) -> Self {
+        Self(arguments.into_iter())
     }
 }
 

@@ -21,7 +21,7 @@ impl<'scan, 'item> Role<'scan, 'item> {
         receiver: Option<&'item Receiver>,
         context: &ImplContext<'scan>,
         shape: &FunctionShape<'scan, '_>,
-    ) -> Role<'scan, 'item> {
+    ) -> Self {
         match receiver {
             None => Self::associated(context, shape),
             Some(receiver) => Self::received(receiver, context, shape),
@@ -48,28 +48,20 @@ impl<'scan, 'item> Role<'scan, 'item> {
         }
     }
 
-    fn associated(context: &ImplContext<'scan>, shape: &FunctionShape<'scan, '_>) -> Role<'scan, 'item> {
+    fn associated(context: &ImplContext<'scan>, shape: &FunctionShape<'scan, '_>) -> Self {
         shape.returns().vertex().zip(shape.vertex_parameters().first()).map_or(Role::Silent, |(target, source)| {
             context.kind().trait_name().map_or(Role::Free(target), |_| Role::Edge(Edge::new(source, target)))
         })
     }
 
-    fn received(
-        receiver: &'item Receiver,
-        context: &ImplContext<'scan>,
-        shape: &FunctionShape<'scan, '_>,
-    ) -> Role<'scan, 'item> {
+    fn received(receiver: &'item Receiver, context: &ImplContext<'scan>, shape: &FunctionShape<'scan, '_>) -> Self {
         receiver.reference.as_ref().map_or_else(
             || shape.returns().vertex().map_or(Role::Silent, |target| Self::consumed(target, context, shape)),
             |_| Role::View(receiver),
         )
     }
 
-    fn consumed(
-        target: &'scan TypeName,
-        context: &ImplContext<'scan>,
-        shape: &FunctionShape<'scan, '_>,
-    ) -> Role<'scan, 'item> {
+    fn consumed(target: &'scan TypeName, context: &ImplContext<'scan>, shape: &FunctionShape<'scan, '_>) -> Self {
         context.edge_source(shape).map_or(Role::Unsourced(target), |source| Role::Edge(Edge::new(source, target)))
     }
 }

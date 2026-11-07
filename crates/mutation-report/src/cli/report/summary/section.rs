@@ -10,7 +10,7 @@ pub struct Section<'items, Item> {
 }
 
 impl<'items, Item: fmt::Display> Section<'items, Item> {
-    pub(crate) fn new(heading: Heading, items: &'items [Item]) -> Section<'items, Item> {
+    pub(crate) fn new(heading: Heading, items: &'items [Item]) -> Self {
         Section { heading, items }
     }
 

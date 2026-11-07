@@ -35,14 +35,14 @@ struct Cycle<'found> {
 }
 
 impl<'found> Cycle<'found> {
-    fn all(view: &Containment<'found, '_>, slice: &Slice<'found>) -> Vec<Cycle<'found>> {
+    fn all(view: &Containment<'found, '_>, slice: &Slice<'found>) -> Vec<Self> {
         let cluster = slice.cluster();
         slice.quotient(view, Toward::Defined).cycles(|parts, crossing| Cycle::closed(cluster, parts, crossing))
     }
 }
 
 impl<'found> Cycle<'found> {
-    fn closed(cluster: Cluster<'found>, parts: BTreeSet<Part<'found>>, crossing: &[Link<'found>]) -> Cycle<'found> {
+    fn closed(cluster: Cluster<'found>, parts: BTreeSet<Part<'found>>, crossing: &[Link<'found>]) -> Self {
         let inside = |end: &Member<'found>| parts.contains(&Part::toward(cluster, end.cluster()));
         let closing: Vec<Link<'found>> =
             crossing.iter().copied().filter(|link| link.ends().iter().all(inside)).collect();

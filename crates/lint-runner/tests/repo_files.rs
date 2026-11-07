@@ -45,15 +45,15 @@ struct Checkout {
 impl Checkout {
     const ROOT: &'static str = "/checkout";
 
-    fn new() -> Result<Checkout, FileFailure> {
-        let checkout = Checkout { files: Memory::default(), root: PathBuf::from(Self::ROOT) };
+    fn new() -> Result<Self, FileFailure> {
+        let checkout = Self { files: Memory::default(), root: PathBuf::from(Self::ROOT) };
         checkout.write("Cargo.toml", MANIFEST)?;
         checkout.write("src/lib.rs", CLEAN)?;
         Ok(checkout)
     }
 
-    fn below(self, directory: &str) -> Checkout {
-        Checkout { root: self.root.join(directory), files: self.files }
+    fn below(self, directory: &str) -> Self {
+        Self { root: self.root.join(directory), files: self.files }
     }
 
     fn write(&self, path: &str, text: &str) -> Result<PathBuf, FileFailure> {

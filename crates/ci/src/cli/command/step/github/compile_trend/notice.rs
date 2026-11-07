@@ -28,16 +28,12 @@ impl<'builds> Notice<'builds> {
     const GROWN_LEN: usize = 5;
     const TOOK: &'static str = "The cold build, clippy and test compile from scratch, took ";
 
-    pub(super) fn new(
-        today: &'builds Build,
-        earlier: &'builds [Build],
-        fortnight: &'builds Fortnight,
-    ) -> Notice<'builds> {
+    pub(super) fn new(today: &'builds Build, earlier: &'builds [Build], fortnight: &'builds Fortnight) -> Self {
         let range = earlier.iter().map(Build::total).map(Range::from).reduce(Range::spanning);
         Notice { today, earlier, fortnight, range }
     }
 
-    pub(super) fn slower(&self) -> Option<&Notice<'builds>> {
+    pub(super) fn slower(&self) -> Option<&Self> {
         self.range.and_then(|range| range.below(self.today.total())).map(|_| self)
     }
 

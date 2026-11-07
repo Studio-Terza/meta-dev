@@ -13,12 +13,12 @@ pub struct Reading {
 
 impl Reading {
     #[must_use]
-    pub fn in_binary(self, binary: Binary) -> Reading {
-        Reading { binary: Some(binary), ..self }
+    pub fn in_binary(self, binary: Binary) -> Self {
+        Self { binary: Some(binary), ..self }
     }
 
     #[must_use]
-    pub fn recording(mut self, result: &TestResult) -> Reading {
+    pub fn recording(mut self, result: &TestResult) -> Self {
         self.results.insert(result.key(self.binary.as_ref()), result.verdict());
         self
     }

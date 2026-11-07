@@ -21,7 +21,7 @@ pub struct Transition<'found, 'file> {
 }
 
 impl<'found, 'file> Transition<'found, 'file> {
-    pub(crate) fn new(context: &'found Context<'file>, function: &'found Function<'file>) -> Transition<'found, 'file> {
+    pub(crate) fn new(context: &'found Context<'file>, function: &'found Function<'file>) -> Self {
         Transition { context, function }
     }
 

@@ -55,13 +55,13 @@ impl<'view, 'found, 'file> Answer<'view, 'found, 'file> {
 impl fmt::Display for Ask {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Ask::Defined(name) => write!(formatter, "definitions of {name}:"),
-            Ask::Uses(name) => write!(formatter, "what {name} uses:"),
-            Ask::Users(name) => write!(formatter, "users of {name}:"),
-            Ask::Implementers(name) => write!(formatter, "implementers of {name}:"),
-            Ask::Cluster(name) => write!(formatter, "cluster of {name}:"),
-            Ask::Exports(name) => write!(formatter, "exports of {name}:"),
-            Ask::Path(from, to) => write!(formatter, "use path from {from} to {to}:"),
+            Self::Defined(name) => write!(formatter, "definitions of {name}:"),
+            Self::Uses(name) => write!(formatter, "what {name} uses:"),
+            Self::Users(name) => write!(formatter, "users of {name}:"),
+            Self::Implementers(name) => write!(formatter, "implementers of {name}:"),
+            Self::Cluster(name) => write!(formatter, "cluster of {name}:"),
+            Self::Exports(name) => write!(formatter, "exports of {name}:"),
+            Self::Path(from, to) => write!(formatter, "use path from {from} to {to}:"),
         }
     }
 }

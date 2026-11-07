@@ -15,11 +15,11 @@ pub(crate) struct Origin<'file> {
 }
 
 impl<'file> Origin<'file> {
-    pub(crate) fn new(package: Package<'file>, site: Site<'file>, name: Name) -> Origin<'file> {
+    pub(crate) fn new(package: Package<'file>, site: Site<'file>, name: Name) -> Self {
         Origin { package, site, name }
     }
 
-    fn of_package(&self, package: Package<'_>) -> Option<&Origin<'file>> {
+    fn of_package(&self, package: Package<'_>) -> Option<&Self> {
         Some(self).filter(|origin| origin.package == package)
     }
 
@@ -37,17 +37,17 @@ pub struct Law<'file> {
 }
 
 impl<'file> Law<'file> {
-    pub(crate) fn new(origin: Origin<'file>, kind: Kind, mentions: BTreeSet<Name>, routes: Vec<Route>) -> Law<'file> {
+    pub(crate) fn new(origin: Origin<'file>, kind: Kind, mentions: BTreeSet<Name>, routes: Vec<Route>) -> Self {
         Law { origin, kind, mentions, routes }
     }
 
     #[must_use]
-    pub fn naming(&self, package: Package<'_>, names: &[&Name]) -> Option<&Law<'file>> {
+    pub fn naming(&self, package: Package<'_>, names: &[&Name]) -> Option<&Self> {
         self.of_package(package).filter(|law| names.iter().all(|name| law.mentions.contains(*name)))
     }
 
     #[must_use]
-    pub fn of_package(&self, package: Package<'_>) -> Option<&Law<'file>> {
+    pub fn of_package(&self, package: Package<'_>) -> Option<&Self> {
         self.origin.of_package(package).and(Some(self))
     }
 

@@ -69,7 +69,7 @@ impl Document<'_> {
 impl<'text> TryFrom<&'text str> for Document<'text> {
     type Error = ScanError;
 
-    fn try_from(text: &'text str) -> Result<Document<'text>, ScanError> {
+    fn try_from(text: &'text str) -> Result<Self, ScanError> {
         MarkedYaml::load_from_str(text).map(Document)
     }
 }

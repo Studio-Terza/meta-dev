@@ -14,20 +14,20 @@ pub enum Kind {
 
 impl Kind {
     #[must_use]
-    pub fn of_trait(ground: Option<Ground>) -> Kind {
+    pub fn of_trait(ground: Option<Ground>) -> Self {
         match ground {
-            Some(Ground::Ports) => Kind::PortTrait,
-            Some(Ground::Store) => Kind::StoreTrait,
-            Some(Ground::Core | Ground::Boundary) | None => Kind::Trait,
+            Some(Ground::Ports) => Self::PortTrait,
+            Some(Ground::Store) => Self::StoreTrait,
+            Some(Ground::Core | Ground::Boundary) | None => Self::Trait,
         }
     }
 
     #[must_use]
-    pub fn implementer(self) -> Option<Kind> {
+    pub fn implementer(self) -> Option<Self> {
         match self {
-            Kind::PortTrait => Some(Kind::Port),
-            Kind::StoreTrait => Some(Kind::Store),
-            Kind::Trait | Kind::GenericImpl | Kind::Port | Kind::Store => None,
+            Self::PortTrait => Some(Self::Port),
+            Self::StoreTrait => Some(Self::Store),
+            Self::Trait | Self::GenericImpl | Self::Port | Self::Store => None,
         }
     }
 }
@@ -42,8 +42,8 @@ impl Kind {
     #[must_use]
     pub fn relation(self) -> Relation {
         match self {
-            Kind::Trait | Kind::PortTrait | Kind::StoreTrait => Relation::ImplementedBy,
-            Kind::GenericImpl | Kind::Port | Kind::Store => Relation::Implements,
+            Self::Trait | Self::PortTrait | Self::StoreTrait => Relation::ImplementedBy,
+            Self::GenericImpl | Self::Port | Self::Store => Relation::Implements,
         }
     }
 }
@@ -51,8 +51,8 @@ impl Kind {
 impl fmt::Display for Relation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Relation::ImplementedBy => formatter.write_str("implemented by"),
-            Relation::Implements => formatter.write_str("implements"),
+            Self::ImplementedBy => formatter.write_str("implemented by"),
+            Self::Implements => formatter.write_str("implements"),
         }
     }
 }
@@ -60,12 +60,12 @@ impl fmt::Display for Relation {
 impl fmt::Display for Kind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Kind::Trait => formatter.write_str("trait"),
-            Kind::PortTrait => formatter.write_str("port trait"),
-            Kind::StoreTrait => formatter.write_str("store trait"),
-            Kind::GenericImpl => formatter.write_str("generic impl"),
-            Kind::Port => formatter.write_str("port"),
-            Kind::Store => formatter.write_str("store"),
+            Self::Trait => formatter.write_str("trait"),
+            Self::PortTrait => formatter.write_str("port trait"),
+            Self::StoreTrait => formatter.write_str("store trait"),
+            Self::GenericImpl => formatter.write_str("generic impl"),
+            Self::Port => formatter.write_str("port"),
+            Self::Store => formatter.write_str("store"),
         }
     }
 }

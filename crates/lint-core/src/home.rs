@@ -13,7 +13,7 @@ impl<'file> Home<'file> {
     pub const NOWHERE: Home<'static> = Home { crate_file: &CrateFile::UNPLACED, module: &ModulePath::ROOT };
 
     #[must_use]
-    pub fn containing(file: &'file SourceFile) -> Home<'file> {
+    pub fn containing(file: &'file SourceFile) -> Self {
         Home { crate_file: file.crate_file(), module: file.placement().module() }
     }
 

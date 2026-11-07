@@ -17,12 +17,12 @@ pub struct Finding {
 
 impl Finding {
     #[must_use]
-    pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Finding {
-        Finding { stage, measured, limit, verdict: limit.judge(measured) }
+    pub fn new(stage: Stage, measured: Seconds, limit: Limit) -> Self {
+        Self { stage, measured, limit, verdict: limit.judge(measured) }
     }
 
     #[must_use]
-    pub fn blocks(&self) -> Option<&Finding> {
+    pub fn blocks(&self) -> Option<&Self> {
         (self.verdict == Verdict::Block).then_some(self)
     }
 

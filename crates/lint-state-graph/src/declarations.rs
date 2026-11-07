@@ -21,7 +21,7 @@ pub struct Declarations<'file> {
 }
 
 impl<'file> From<&[&'file SourceFile]> for Declarations<'file> {
-    fn from(files: &[&'file SourceFile]) -> Declarations<'file> {
+    fn from(files: &[&'file SourceFile]) -> Self {
         let seeded = Declarations {
             vertices: BTreeSet::new(),
             aliases: BTreeMap::new(),
@@ -53,13 +53,13 @@ impl<'file> Declarations<'file> {
         self.sum_types.get(&home).and_then(|names| names.get(enum_name)).filter(|_| home != *from)
     }
 
-    fn filed(mut self, home: Home<'file>) -> Declarations<'file> {
+    fn filed(mut self, home: Home<'file>) -> Self {
         let enums = std::mem::take(&mut self.reading);
         self.sum_types.entry(home).or_default().extend(enums);
         self
     }
 
-    fn with_resolved_vertices(mut self) -> Declarations<'file> {
+    fn with_resolved_vertices(mut self) -> Self {
         let vertices = std::mem::take(&mut self.vertices);
         self.vertices =
             vertices.into_iter().map(|vertex| self.aliases.get(&vertex).cloned().unwrap_or(vertex)).collect();

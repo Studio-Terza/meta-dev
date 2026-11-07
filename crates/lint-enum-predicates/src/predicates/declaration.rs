@@ -18,11 +18,11 @@ pub struct Declaration<'file> {
 }
 
 impl<'file> Declaration<'file> {
-    pub fn new(crate_root: &'file CrateRoot, module: &'file ModulePath) -> Declaration<'file> {
+    pub fn new(crate_root: &'file CrateRoot, module: &'file ModulePath) -> Self {
         Declaration { crate_root, module: Cow::Borrowed(module), types: Vec::new() }
     }
 
-    pub fn nested(&self, ident: &Ident) -> Declaration<'file> {
+    pub fn nested(&self, ident: &Ident) -> Self {
         Declaration {
             crate_root: self.crate_root,
             module: Cow::Owned(self.module.child(Name::from(ident))),
@@ -42,7 +42,7 @@ impl<'file> Declaration<'file> {
             .filter_map(move |declared| declared.named(name))
     }
 
-    pub fn in_module(&self, module: &ModulePath) -> Option<&Declaration<'file>> {
+    pub fn in_module(&self, module: &ModulePath) -> Option<&Self> {
         (*self.module == *module).then_some(self)
     }
 }

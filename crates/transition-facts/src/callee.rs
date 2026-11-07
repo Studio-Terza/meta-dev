@@ -30,8 +30,8 @@ impl Callee {
     #[must_use]
     pub fn owner<'name>(&'name self, caller: Option<&'name Name>, earlier: &[Option<&'name Name>]) -> Owner<'name> {
         match self {
-            Callee::Method { receiver, .. } => receiver.owner(caller, earlier),
-            Callee::Path { owner, .. } => owner
+            Self::Method { receiver, .. } => receiver.owner(caller, earlier),
+            Self::Path { owner, .. } => owner
                 .as_ref()
                 .filter(|owner| owner.casing() != Casing::Lower)
                 .map_or(Owner::Free, |owner| Owner::typed(owner, caller)),
@@ -49,14 +49,14 @@ pub enum Owner<'name> {
 impl<'name> Owner<'name> {
     const OWN_TYPE: Word<'static> = Word::new("Self");
 
-    fn typed(owner: &'name Name, caller: Option<&'name Name>) -> Owner<'name> {
+    fn typed(owner: &'name Name, caller: Option<&'name Name>) -> Self {
         owner
             .matches::<Whole>(&[Self::OWN_TYPE])
             .map_or(Owner::Type(owner), |_| caller.map_or(Owner::Unknown, Owner::Type))
     }
 
     #[must_use]
-    pub fn admits(self, subject: Option<&Name>) -> Option<Owner<'name>> {
+    pub fn admits(self, subject: Option<&Name>) -> Option<Self> {
         match self {
             Owner::Type(owner) => subject.filter(|subject| *subject == owner).map(|_| self),
             Owner::Free => subject.map_or(Some(self), |_| None),
@@ -68,10 +68,10 @@ impl<'name> Owner<'name> {
 impl Receiver {
     fn owner<'name>(&'name self, caller: Option<&'name Name>, earlier: &[Option<&'name Name>]) -> Owner<'name> {
         match self {
-            Receiver::Owner => caller.map_or(Owner::Unknown, Owner::Type),
-            Receiver::Bound(name) => Owner::typed(name, caller),
-            Receiver::Call(order) => order.typed_in(earlier).map_or(Owner::Unknown, Owner::Type),
-            Receiver::Unknown => Owner::Unknown,
+            Self::Owner => caller.map_or(Owner::Unknown, Owner::Type),
+            Self::Bound(name) => Owner::typed(name, caller),
+            Self::Call(order) => order.typed_in(earlier).map_or(Owner::Unknown, Owner::Type),
+            Self::Unknown => Owner::Unknown,
         }
     }
 }
@@ -79,7 +79,7 @@ impl Receiver {
 impl AsRef<Name> for Callee {
     fn as_ref(&self) -> &Name {
         match self {
-            Callee::Method { name, .. } | Callee::Path { name, .. } => name,
+            Self::Method { name, .. } | Self::Path { name, .. } => name,
         }
     }
 }
@@ -87,14 +87,14 @@ impl AsRef<Name> for Callee {
 impl fmt::Display for Callee {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Callee::Method { receiver: Receiver::Owner, name } => write!(formatter, "self.{name}"),
-            Callee::Method { receiver: Receiver::Bound(owner), name } => write!(formatter, "{owner}.{name}"),
-            Callee::Method { receiver: Receiver::Call(order), name } => {
+            Self::Method { receiver: Receiver::Owner, name } => write!(formatter, "self.{name}"),
+            Self::Method { receiver: Receiver::Bound(owner), name } => write!(formatter, "{owner}.{name}"),
+            Self::Method { receiver: Receiver::Call(order), name } => {
                 write!(formatter, "#{}.{name}", order.count())
             }
-            Callee::Method { receiver: Receiver::Unknown, name } => write!(formatter, "?.{name}"),
-            Callee::Path { owner: Some(owner), name } => write!(formatter, "{owner}::{name}"),
-            Callee::Path { owner: None, name } => write!(formatter, "{name}"),
+            Self::Method { receiver: Receiver::Unknown, name } => write!(formatter, "?.{name}"),
+            Self::Path { owner: Some(owner), name } => write!(formatter, "{owner}::{name}"),
+            Self::Path { owner: None, name } => write!(formatter, "{name}"),
         }
     }
 }

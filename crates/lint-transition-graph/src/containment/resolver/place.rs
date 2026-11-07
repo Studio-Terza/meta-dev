@@ -12,7 +12,7 @@ pub(crate) struct Place<'found> {
 }
 
 impl<'found> Place<'found> {
-    pub(crate) fn new(krate: &'found CrateName, module: &'found [Name], scope: Scope<'found>) -> Place<'found> {
+    pub(crate) fn new(krate: &'found CrateName, module: &'found [Name], scope: Scope<'found>) -> Self {
         Place { krate, module, scope }
     }
 

@@ -18,7 +18,7 @@ impl Emitters {
     pub(crate) fn defined_in(files: &[&syn::File]) -> BTreeSet<Name> {
         files
             .iter()
-            .fold(Emitters::default(), |mut emitters, file| {
+            .fold(Self::default(), |mut emitters, file| {
                 emitters.visit_file(file);
                 emitters
             })

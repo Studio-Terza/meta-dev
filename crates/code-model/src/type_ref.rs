@@ -19,12 +19,12 @@ pub(crate) trait Rebuild<From> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeRef<Bound = Sited> {
     Named(Named<Bound>),
-    Tuple(Vec<TypeRef<Bound>>),
-    Reference(Box<TypeRef<Bound>>),
-    Pointer(Box<TypeRef<Bound>>),
-    Slice(Box<TypeRef<Bound>>),
+    Tuple(Vec<Self>),
+    Reference(Box<Self>),
+    Pointer(Box<Self>),
+    Slice(Box<Self>),
     Array(Arrayed<Bound>),
-    Bounded(Vec<TypeRef<Bound>>),
+    Bounded(Vec<Self>),
     Projected(Projection<Bound>),
     Function(Callable<Bound>),
     Opaque,
@@ -69,13 +69,13 @@ impl<'ty, Bound> Parts<'ty, Bound> {
 
 impl<Bound> Named<Bound> {
     #[must_use]
-    pub fn new(path: Bound, arguments: Vec<TypeRef<Bound>>) -> Named<Bound> {
-        Named { path, arguments, bindings: Vec::new() }
+    pub fn new(path: Bound, arguments: Vec<TypeRef<Bound>>) -> Self {
+        Self { path, arguments, bindings: Vec::new() }
     }
 
     #[must_use]
-    pub fn bound(path: Bound, arguments: Vec<TypeRef<Bound>>, bindings: Vec<TypeRef<Bound>>) -> Named<Bound> {
-        Named { path, arguments, bindings }
+    pub fn bound(path: Bound, arguments: Vec<TypeRef<Bound>>, bindings: Vec<TypeRef<Bound>>) -> Self {
+        Self { path, arguments, bindings }
     }
 
     #[must_use]
@@ -116,8 +116,8 @@ impl Named<Sited> {
 
 impl<Bound> Arrayed<Bound> {
     #[must_use]
-    pub fn new(element: TypeRef<Bound>, measured: Vec<TypeRef<Bound>>) -> Arrayed<Bound> {
-        Arrayed { element: Box::new(element), measured }
+    pub fn new(element: TypeRef<Bound>, measured: Vec<TypeRef<Bound>>) -> Self {
+        Self { element: Box::new(element), measured }
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
@@ -134,8 +134,8 @@ impl<Bound> Arrayed<Bound> {
 
 impl<Bound> Projection<Bound> {
     #[must_use]
-    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>) -> Projection<Bound> {
-        Projection { subject: Box::new(subject), arguments }
+    pub fn new(subject: TypeRef<Bound>, arguments: Vec<TypeRef<Bound>>) -> Self {
+        Self { subject: Box::new(subject), arguments }
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
@@ -152,8 +152,8 @@ impl<Bound> Projection<Bound> {
 
 impl<Bound> Callable<Bound> {
     #[must_use]
-    pub fn new(inputs: Vec<TypeRef<Bound>>, output: TypeRef<Bound>) -> Callable<Bound> {
-        Callable { inputs, output: Box::new(output) }
+    pub fn new(inputs: Vec<TypeRef<Bound>>, output: TypeRef<Bound>) -> Self {
+        Self { inputs, output: Box::new(output) }
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
@@ -174,78 +174,76 @@ impl<Bound> TypeRef<Bound> {
     #[must_use]
     pub fn named(&self) -> Option<&Named<Bound>> {
         match self {
-            TypeRef::Named(named) => Some(named),
-            TypeRef::Tuple(_)
-            | TypeRef::Reference(_)
-            | TypeRef::Pointer(_)
-            | TypeRef::Slice(_)
-            | TypeRef::Array(_)
-            | TypeRef::Bounded(_)
-            | TypeRef::Projected(_)
-            | TypeRef::Function(_)
-            | TypeRef::Opaque => None,
+            Self::Named(named) => Some(named),
+            Self::Tuple(_)
+            | Self::Reference(_)
+            | Self::Pointer(_)
+            | Self::Slice(_)
+            | Self::Array(_)
+            | Self::Bounded(_)
+            | Self::Projected(_)
+            | Self::Function(_)
+            | Self::Opaque => None,
         }
     }
 
     #[must_use]
-    pub fn unit(&self) -> Option<&TypeRef<Bound>> {
+    pub fn unit(&self) -> Option<&Self> {
         match self {
-            TypeRef::Tuple(elements) => elements.first().xor(Some(self)),
-            TypeRef::Named(_)
-            | TypeRef::Reference(_)
-            | TypeRef::Pointer(_)
-            | TypeRef::Slice(_)
-            | TypeRef::Array(_)
-            | TypeRef::Bounded(_)
-            | TypeRef::Projected(_)
-            | TypeRef::Function(_)
-            | TypeRef::Opaque => None,
+            Self::Tuple(elements) => elements.first().xor(Some(self)),
+            Self::Named(_)
+            | Self::Reference(_)
+            | Self::Pointer(_)
+            | Self::Slice(_)
+            | Self::Array(_)
+            | Self::Bounded(_)
+            | Self::Projected(_)
+            | Self::Function(_)
+            | Self::Opaque => None,
         }
     }
 
     #[must_use]
-    pub fn respelled(self, respell: impl FnOnce(Bound) -> Bound) -> TypeRef<Bound> {
+    pub fn respelled(self, respell: impl FnOnce(Bound) -> Bound) -> Self {
         match self {
-            TypeRef::Named(named) => TypeRef::Named(Named {
-                path: respell(named.path),
-                arguments: named.arguments,
-                bindings: named.bindings,
-            }),
+            Self::Named(named) => {
+                Self::Named(Named { path: respell(named.path), arguments: named.arguments, bindings: named.bindings })
+            }
             other => other,
         }
     }
 
     pub(crate) fn rebuilt<Rule: Rebuild<Bound>>(&self, rule: &mut Rule) -> Result<TypeRef<Rule::Into>, Rule::Fail> {
         match self {
-            TypeRef::Named(named) => named.rebuilt(rule).map(TypeRef::Named),
-            TypeRef::Tuple(elements) => TypeRef::each_rebuilt(elements, rule).map(TypeRef::Tuple),
-            TypeRef::Reference(inner) => rule.child(inner).map(Box::new).map(TypeRef::Reference),
-            TypeRef::Pointer(inner) => rule.child(inner).map(Box::new).map(TypeRef::Pointer),
-            TypeRef::Slice(inner) => rule.child(inner).map(Box::new).map(TypeRef::Slice),
-            TypeRef::Array(arrayed) => arrayed.rebuilt(rule).map(TypeRef::Array),
-            TypeRef::Bounded(bounds) => TypeRef::each_rebuilt(bounds, rule).map(TypeRef::Bounded),
-            TypeRef::Projected(projection) => projection.rebuilt(rule).map(TypeRef::Projected),
-            TypeRef::Function(callable) => callable.rebuilt(rule).map(TypeRef::Function),
-            TypeRef::Opaque => Ok(TypeRef::Opaque),
+            Self::Named(named) => named.rebuilt(rule).map(TypeRef::Named),
+            Self::Tuple(elements) => Self::each_rebuilt(elements, rule).map(TypeRef::Tuple),
+            Self::Reference(inner) => rule.child(inner).map(Box::new).map(TypeRef::Reference),
+            Self::Pointer(inner) => rule.child(inner).map(Box::new).map(TypeRef::Pointer),
+            Self::Slice(inner) => rule.child(inner).map(Box::new).map(TypeRef::Slice),
+            Self::Array(arrayed) => arrayed.rebuilt(rule).map(TypeRef::Array),
+            Self::Bounded(bounds) => Self::each_rebuilt(bounds, rule).map(TypeRef::Bounded),
+            Self::Projected(projection) => projection.rebuilt(rule).map(TypeRef::Projected),
+            Self::Function(callable) => callable.rebuilt(rule).map(TypeRef::Function),
+            Self::Opaque => Ok(TypeRef::Opaque),
         }
     }
 
     fn parts(&self) -> Parts<'_, Bound> {
         match self {
-            TypeRef::Named(named) => named.parts(),
-            TypeRef::Array(arrayed) => arrayed.parts(),
-            TypeRef::Projected(projection) => projection.parts(),
-            TypeRef::Function(callable) => callable.parts(),
-            TypeRef::Tuple(elements) | TypeRef::Bounded(elements) => Parts { first: elements, rest: &[] },
-            TypeRef::Reference(inner) | TypeRef::Pointer(inner) | TypeRef::Slice(inner) => {
+            Self::Named(named) => named.parts(),
+            Self::Array(arrayed) => arrayed.parts(),
+            Self::Projected(projection) => projection.parts(),
+            Self::Function(callable) => callable.parts(),
+            Self::Tuple(elements) | Self::Bounded(elements) => Parts { first: elements, rest: &[] },
+            Self::Reference(inner) | Self::Pointer(inner) | Self::Slice(inner) => {
                 Parts { first: std::slice::from_ref(&**inner), rest: &[] }
             }
-            TypeRef::Opaque => Parts { first: &[], rest: &[] },
+            Self::Opaque => Parts { first: &[], rest: &[] },
         }
     }
 
     fn each_rebuilt<Rule: Rebuild<Bound>>(
-        types: &[TypeRef<Bound>],
+        types: &[Self],
         rule: &mut Rule,
     ) -> Result<Vec<TypeRef<Rule::Into>>, Rule::Fail> {
         types.iter().map(|ty| rule.child(ty)).collect()

@@ -49,9 +49,9 @@ impl Inline {
 impl FromStr for Inline {
     type Err = Infallible;
 
-    fn from_str(shown: &str) -> Result<Inline, Infallible> {
+    fn from_str(shown: &str) -> Result<Self, Infallible> {
         let letters: Vec<char> = shown.chars().collect();
-        Ok(Inline(
+        Ok(Self(
             letters
                 .chunk_by(|first, second| first.is_whitespace() == second.is_whitespace())
                 .filter_map(|run| run.first().filter(|letter| letter.is_whitespace()).map_or(Some(run), |_| None))

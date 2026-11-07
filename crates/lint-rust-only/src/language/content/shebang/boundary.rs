@@ -33,12 +33,12 @@ impl Shebang {
 impl FromStr for Shebang {
     type Err = Infallible;
 
-    fn from_str(line: &str) -> Result<Shebang, Infallible> {
+    fn from_str(line: &str) -> Result<Self, Infallible> {
         let words = Self::words(line);
         let program = words.first().map(String::as_str).and_then(Self::named);
         let interpreter =
             program.filter(|program| *program == Self::LAUNCHER).map_or(program, |_| Self::interpreter(&words));
-        Ok(Shebang(interpreter.map(str::to_owned)))
+        Ok(Self(interpreter.map(str::to_owned)))
     }
 }
 
@@ -49,8 +49,8 @@ enum Run {
 }
 
 impl From<&[char]> for Run {
-    fn from(chunk: &[char]) -> Run {
-        chunk.first().filter(|letter| letter.is_whitespace()).map_or(Run::Word, |_| Run::Space)
+    fn from(chunk: &[char]) -> Self {
+        chunk.first().filter(|letter| letter.is_whitespace()).map_or(Self::Word, |_| Self::Space)
     }
 }
 
@@ -62,12 +62,12 @@ enum Argument {
 }
 
 impl From<&str> for Argument {
-    fn from(word: &str) -> Argument {
+    fn from(word: &str) -> Self {
         word.chars()
             .next()
             .filter(|first| *first == '-')
-            .map(|_| Argument::Flag)
-            .or_else(|| word.chars().find(|letter| *letter == '=').map(|_| Argument::Assignment))
-            .unwrap_or(Argument::Program)
+            .map(|_| Self::Flag)
+            .or_else(|| word.chars().find(|letter| *letter == '=').map(|_| Self::Assignment))
+            .unwrap_or(Self::Program)
     }
 }

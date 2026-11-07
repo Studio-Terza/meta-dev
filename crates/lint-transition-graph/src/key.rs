@@ -9,11 +9,11 @@ pub(crate) struct Key<'found> {
 }
 
 impl<'found> Key<'found> {
-    pub(crate) fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Key<'found> {
+    pub(crate) fn new(takes: Vec<Node<'found>>, gives: Node<'found>) -> Self {
         Key { takes, gives }
     }
 
-    pub(crate) fn fixed(&self) -> Option<&Key<'found>> {
+    pub(crate) fn fixed(&self) -> Option<&Self> {
         self.takes.iter().all(|taken| *taken == self.gives).then_some(self)
     }
 }

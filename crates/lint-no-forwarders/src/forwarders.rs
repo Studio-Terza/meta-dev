@@ -27,7 +27,7 @@ pub struct Forwarders<'types, 'file> {
 }
 
 impl<'types, 'file> Forwarders<'types, 'file> {
-    pub fn new(types: &'types WorkspaceTypes) -> Forwarders<'types, 'file> {
+    pub fn new(types: &'types WorkspaceTypes) -> Self {
         Forwarders {
             types,
             structs: BTreeMap::new(),

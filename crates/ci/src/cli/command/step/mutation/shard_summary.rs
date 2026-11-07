@@ -73,12 +73,12 @@ impl ShardSummary {
 }
 
 impl Step for ShardSummary {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<ShardSummary, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let shards = &arguments.taken()?;
         let summary = &arguments.taken()?;
         arguments.ended()?;
-        Ok(ShardSummary { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
+        Ok(Self { shards: PathBuf::from(shards), summary: Journal::file(Path::new(summary)) })
     }
 
     fn carry_out(&self, ports: &impl Ports, out: &mut impl Write) -> Result<Exit, Failure<'_>> {

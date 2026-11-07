@@ -11,7 +11,7 @@ pub struct Transitions<'file>(Vec<Context<'file>>);
 
 impl<'file> Transitions<'file> {
     #[must_use]
-    pub fn of_files(files: &'file [SourceFile]) -> Transitions<'file> {
+    pub fn of_files(files: &'file [SourceFile]) -> Self {
         Transitions(files.iter().filter_map(SourceFile::shipped).flat_map(Collector::collected).collect())
     }
 

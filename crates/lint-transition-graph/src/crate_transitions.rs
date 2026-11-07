@@ -28,7 +28,7 @@ impl<'found, 'file> CrateTransitions<'found, 'file> {
         name: &'found CrateName,
         edges: &[&'found Edge<'found, 'file>],
         coverage: Coverage,
-    ) -> CrateTransitions<'found, 'file> {
+    ) -> Self {
         let ends = |place| edges.iter().flat_map(move |edge| edge.ends().placed(place));
         CrateTransitions {
             name,

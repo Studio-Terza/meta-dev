@@ -23,7 +23,7 @@ pub struct Laws<'file> {
 }
 
 impl<'file> From<&'file [SourceFile]> for Laws<'file> {
-    fn from(files: &'file [SourceFile]) -> Laws<'file> {
+    fn from(files: &'file [SourceFile]) -> Self {
         let traits = Traits::declared(files);
         files.iter().fold(Laws::default(), |laws, file| laws.read(file, &traits))
     }
@@ -53,7 +53,7 @@ impl<'file> Laws<'file> {
         self.laws.iter()
     }
 
-    fn read(mut self, file: &'file SourceFile, traits: &Traits<'file>) -> Laws<'file> {
+    fn read(mut self, file: &'file SourceFile, traits: &Traits<'file>) -> Self {
         self.laws.extend(Reader::read(file, traits));
         file.test_modules().iter().fold(self, |laws, module| laws.read(module, traits))
     }

@@ -18,7 +18,7 @@ impl TestScan {
     const PROPERTY_BLOCK: &str = "proptest";
 
     pub(super) fn measured(file: &syn::File) -> CrateBudget {
-        let mut scan = TestScan::default();
+        let mut scan = Self::default();
         scan.visit_file(file);
         scan.0
     }

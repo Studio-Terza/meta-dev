@@ -8,12 +8,12 @@ use crate::member::{Keyed, Nested};
 pub struct Groups<Member: Keyed>(Vec<Group<Member>>);
 
 impl<Member: Keyed> Groups<Member> {
-    pub fn grouped(found: impl IntoIterator<Item = Member>) -> Groups<Member> {
+    pub fn grouped(found: impl IntoIterator<Item = Member>) -> Self {
         let keyed = found.into_iter().fold(BTreeMap::<Member::Key, Vec<Member>>::new(), |mut groups, member| {
             groups.entry(member.key()).or_default().push(member);
             groups
         });
-        Groups(
+        Self(
             keyed
                 .into_iter()
                 .filter(|(_, members)| members.len() > 1)
@@ -30,9 +30,9 @@ impl<Member: Keyed> Groups<Member> {
 
 impl<Member: Keyed + Nested> Groups<Member> {
     #[must_use]
-    pub fn outermost<Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Groups<Member> {
+    pub fn outermost<Rank: Ord>(mut self, rank: impl Fn(&Member::Key) -> Rank) -> Self {
         self.0.sort_by_key(|group| Reverse(rank(group.key())));
-        Groups(self.0.into_iter().fold(Vec::new(), Self::admitted))
+        Self(self.0.into_iter().fold(Vec::new(), Self::admitted))
     }
 
     fn admitted(mut kept: Vec<Group<Member>>, group: Group<Member>) -> Vec<Group<Member>> {

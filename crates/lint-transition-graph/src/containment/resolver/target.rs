@@ -11,15 +11,11 @@ pub(crate) struct Target<'found> {
 }
 
 impl<'found> Target<'found> {
-    pub(crate) fn new(
-        krate: &'found CrateName,
-        module: Option<Vec<Name>>,
-        here: Option<&'found [Name]>,
-    ) -> Target<'found> {
+    pub(crate) fn new(krate: &'found CrateName, module: Option<Vec<Name>>, here: Option<&'found [Name]>) -> Self {
         Target { krate, module, here }
     }
 
-    pub(crate) fn unhinted(self) -> Target<'found> {
+    pub(crate) fn unhinted(self) -> Self {
         Target { module: None, ..self }
     }
 

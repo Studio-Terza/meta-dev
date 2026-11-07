@@ -51,8 +51,8 @@ impl Memory {
 }
 
 impl FromIterator<(PathBuf, Bytes)> for Memory {
-    fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Memory {
-        Memory { files: Locked::new(entries.into_iter().collect()), directories: Locked::default() }
+    fn from_iter<Entries: IntoIterator<Item = (PathBuf, Bytes)>>(entries: Entries) -> Self {
+        Self { files: Locked::new(entries.into_iter().collect()), directories: Locked::default() }
     }
 }
 

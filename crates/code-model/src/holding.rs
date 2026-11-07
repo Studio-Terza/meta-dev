@@ -25,13 +25,13 @@ pub struct Holding {
 
 impl Holding {
     #[must_use]
-    pub fn new(name: Name, held: Held, ty: TypeRef) -> Holding {
-        Holding { name, held, region: Region::SHIPPED, declares: None, ty }
+    pub fn new(name: Name, held: Held, ty: TypeRef) -> Self {
+        Self { name, held, region: Region::SHIPPED, declares: None, ty }
     }
 
     #[must_use]
-    pub fn placed(self, region: Region, declares: Option<ItemId>) -> Holding {
-        Holding { name: self.name, held: self.held, region, declares, ty: self.ty }
+    pub fn placed(self, region: Region, declares: Option<ItemId>) -> Self {
+        Self { name: self.name, held: self.held, region, declares, ty: self.ty }
     }
 
     #[must_use]

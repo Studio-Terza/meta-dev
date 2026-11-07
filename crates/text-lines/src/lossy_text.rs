@@ -8,8 +8,8 @@ impl LossyText {
 }
 
 impl From<&[u8]> for LossyText {
-    fn from(bytes: &[u8]) -> LossyText {
-        LossyText(
+    fn from(bytes: &[u8]) -> Self {
+        Self(
             bytes
                 .utf8_chunks()
                 .flat_map(|chunk| [chunk.valid(), chunk.invalid().first().map_or("", |_| Self::REPLACEMENT)])

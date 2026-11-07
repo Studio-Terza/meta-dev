@@ -31,14 +31,14 @@ impl Cli {
     const DEFAULT_MEASURED: &'static str = "ci/measured.toml";
     const REPORT_ONLY: &'static str = "--report-only";
 
-    pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Cli {
+    pub fn from_args(mut arguments: impl Iterator<Item = OsString>) -> Self {
         let limits = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_LIMITS), PathBuf::from);
         let measured = arguments.next().map_or_else(|| PathBuf::from(Self::DEFAULT_MEASURED), PathBuf::from);
         let rest: Vec<OsString> = arguments.collect();
         let flag = rest.iter().position(|argument| argument == Self::REPORT_ONLY).unwrap_or(rest.len());
         let only = rest.iter().take(flag).cloned().collect();
         let report_only = rest.iter().skip(flag).skip(1).cloned().collect();
-        Cli { limits, measured, only, report_only }
+        Self { limits, measured, only, report_only }
     }
 
     #[must_use]

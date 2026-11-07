@@ -18,7 +18,7 @@ pub(super) struct Seed<'space> {
 }
 
 impl<'space> Seed<'space> {
-    pub(super) fn new(key: Key<'space>, layer: Layer, visibility: Visibility, binding: Binding) -> Seed<'space> {
+    pub(super) fn new(key: Key<'space>, layer: Layer, visibility: Visibility, binding: Binding) -> Self {
         Seed { key, layer, visibility, binding }
     }
 
@@ -34,7 +34,7 @@ pub(crate) struct Seeds<'space> {
 }
 
 impl<'space> From<&'space Namespace<'space>> for Seeds<'space> {
-    fn from(space: &'space Namespace<'space>) -> Seeds<'space> {
+    fn from(space: &'space Namespace<'space>) -> Self {
         let scopes =
             ScopeId::ids(&space.scopes).zip(&space.scopes).map(|(scope, row)| row.entries().seeds(scope, space));
         Seeds { space, scopes: scopes.collect() }
@@ -50,47 +50,47 @@ pub(super) enum Target {
 }
 
 impl Target {
-    pub(super) fn listed(module: &ItemPath) -> Target {
+    pub(super) fn listed(module: &ItemPath) -> Self {
         match StdNames::listed(module) {
-            Some(listed) => Target::Listed(listed),
-            None => Target::Opaque,
+            Some(listed) => Self::Listed(listed),
+            None => Self::Opaque,
         }
     }
 
     pub(super) fn fixed(&self, id: GlobId, visibility: Visibility) -> Option<GlobView<'_>> {
         match self {
-            Target::Waiting => Some(GlobView::new(id, visibility, Exposed::from(View::UNEXPANDED))),
-            Target::Module(..) => None,
-            Target::Listed(listed) => {
+            Self::Waiting => Some(GlobView::new(id, visibility, Exposed::from(View::UNEXPANDED))),
+            Self::Module(..) => None,
+            Self::Listed(listed) => {
                 Some(GlobView::new(id, visibility, listed.iter().flat_map(Listed::views).collect()))
             }
-            Target::Opaque => Some(GlobView::new(id, visibility, Exposed::from(View::CONFLICT))),
+            Self::Opaque => Some(GlobView::new(id, visibility, Exposed::from(View::CONFLICT))),
         }
     }
 
     pub(super) fn module(&self, id: GlobId, visibility: Visibility) -> Option<ModuleGlob<'_>> {
         match self {
-            Target::Module(module, sight) => {
+            Self::Module(module, sight) => {
                 Some(ModuleGlob::new(GlobView::new(id, visibility, Exposed::default()), *module, *sight))
             }
-            Target::Waiting | Target::Listed(_) | Target::Opaque => None,
+            Self::Waiting | Self::Listed(_) | Self::Opaque => None,
         }
     }
 
-    fn kept(self, held: &Target) -> Target {
+    fn kept(self, held: &Self) -> Self {
         match self {
-            Target::Waiting => held.clone(),
-            Target::Module(..) | Target::Listed(_) | Target::Opaque => {
-                [self].into_iter().find(|found| found == held).unwrap_or(Target::Opaque)
+            Self::Waiting => held.clone(),
+            Self::Module(..) | Self::Listed(_) | Self::Opaque => {
+                [self].into_iter().find(|found| found == held).unwrap_or(Self::Opaque)
             }
         }
     }
 
-    fn forced(self) -> Target {
+    fn forced(self) -> Self {
         match self {
-            Target::Waiting | Target::Opaque => Target::Opaque,
-            Target::Module(module, sight) => Target::Module(module, sight),
-            Target::Listed(listed) => Target::Listed(listed),
+            Self::Waiting | Self::Opaque => Self::Opaque,
+            Self::Module(module, sight) => Self::Module(module, sight),
+            Self::Listed(listed) => Self::Listed(listed),
         }
     }
 }
@@ -102,12 +102,12 @@ pub(crate) struct ScopeSettling {
 }
 
 impl ScopeSettling {
-    pub(super) fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> ScopeSettling {
-        ScopeSettling { imports, targets }
+    pub(super) fn new(imports: Vec<Resolution>, targets: Vec<Target>) -> Self {
+        Self { imports, targets }
     }
 
-    fn forced(self) -> ScopeSettling {
-        ScopeSettling {
+    fn forced(self) -> Self {
+        Self {
             imports: self.imports.into_iter().map(|import| Resolution::Bound(import.forced())).collect(),
             targets: self.targets.into_iter().map(Target::forced).collect(),
         }
@@ -115,17 +115,17 @@ impl ScopeSettling {
 }
 
 impl Lattice for Target {
-    fn joined(&self, computed: Target) -> Target {
+    fn joined(&self, computed: Self) -> Self {
         match self {
-            Target::Waiting => computed,
-            Target::Module(..) | Target::Listed(_) | Target::Opaque => computed.kept(self),
+            Self::Waiting => computed,
+            Self::Module(..) | Self::Listed(_) | Self::Opaque => computed.kept(self),
         }
     }
 }
 
 impl Lattice for ScopeSettling {
-    fn joined(&self, computed: ScopeSettling) -> ScopeSettling {
-        ScopeSettling { imports: self.imports.joined(computed.imports), targets: self.targets.joined(computed.targets) }
+    fn joined(&self, computed: Self) -> Self {
+        Self { imports: self.imports.joined(computed.imports), targets: self.targets.joined(computed.targets) }
     }
 }
 

@@ -11,7 +11,7 @@ use newtype::Display;
 pub struct ReexportCount(usize);
 
 impl ReexportCount {
-    pub fn of_file(file: &syn::File) -> ReexportCount {
+    pub fn of_file(file: &syn::File) -> Self {
         file.items
             .iter()
             .filter_map(Syntax::item_use)
@@ -20,24 +20,24 @@ impl ReexportCount {
             .sum()
     }
 
-    pub fn beyond(self, most: Bound) -> Option<ReexportCount> {
+    pub fn beyond(self, most: Bound) -> Option<Self> {
         match most.allows(Length::new(self.0)) {
             Some(_) => None,
             None => Some(self),
         }
     }
 
-    fn leaves(tree: &UseTree) -> ReexportCount {
+    fn leaves(tree: &UseTree) -> Self {
         match tree {
             UseTree::Path(path) => Self::leaves(&path.tree),
             UseTree::Group(group) => group.items.iter().map(Self::leaves).sum(),
-            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => ReexportCount(1),
+            UseTree::Name(_) | UseTree::Rename(_) | UseTree::Glob(_) => Self(1),
         }
     }
 }
 
 impl Sum for ReexportCount {
-    fn sum<Counts: Iterator<Item = ReexportCount>>(counts: Counts) -> ReexportCount {
-        ReexportCount(counts.map(|count| count.0).sum())
+    fn sum<Counts: Iterator<Item = Self>>(counts: Counts) -> Self {
+        Self(counts.map(|count| count.0).sum())
     }
 }

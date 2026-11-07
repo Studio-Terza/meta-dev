@@ -30,15 +30,15 @@ impl Wildcard {
 impl FromStr for Wildcard {
     type Err = Infallible;
 
-    fn from_str(text: &str) -> Result<Wildcard, Infallible> {
-        Ok(Wildcard(text.chars().collect()))
+    fn from_str(text: &str) -> Result<Self, Infallible> {
+        Ok(Self(text.chars().collect()))
     }
 }
 
 impl Matching for Wildcard {
     fn holds<'word>(name: &Name, pattern: Word<'word>) -> Option<Word<'word>> {
-        let letters = pattern.into_inner().parse::<Wildcard>();
-        let spelled = name.to_string().parse::<Wildcard>();
+        let letters = pattern.into_inner().parse::<Self>();
+        let spelled = name.to_string().parse::<Self>();
         letters.iter().zip(&spelled).find_map(|(wanted, found)| Self::agrees(&wanted.0, &found.0)).map(|_| pattern)
     }
 }

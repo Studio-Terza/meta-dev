@@ -11,7 +11,7 @@ impl<'body> Line<'body> {
     const SPEC: &'static str = "spec: ";
     const REPAIR: &'static str = "repair: main";
 
-    pub(crate) fn read(text: &'body str) -> Line<'body> {
+    pub(crate) fn read(text: &'body str) -> Self {
         let line = Self::trimmed(text);
         Some(line)
             .filter(|line| *line == Self::REPAIR)

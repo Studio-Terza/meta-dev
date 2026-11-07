@@ -27,7 +27,7 @@ pub struct Gate {
 }
 
 impl Gate {
-    pub fn judge(limits: Contents, measured: Contents, only: &[OsString]) -> Result<Gate, Failure<'_>> {
+    pub fn judge(limits: Contents, measured: Contents, only: &[OsString]) -> Result<Self, Failure<'_>> {
         let limits: BTreeMap<Stage, Limit> =
             toml::from_str(&limits.into_inner()).map_err(|source| Failure::Parse { file: Document::Limits, source })?;
         let limits = Self::sliced(limits, only)?;
@@ -40,8 +40,8 @@ impl Gate {
             .and_then(Self::found)
     }
 
-    fn found(findings: Vec<Finding>) -> Result<Gate, Failure<'static>> {
-        findings.first().map(|_| ()).ok_or(Failure::Empty).map(|()| Gate { findings })
+    fn found(findings: Vec<Finding>) -> Result<Self, Failure<'static>> {
+        findings.first().map(|_| ()).ok_or(Failure::Empty).map(|()| Self { findings })
     }
 
     pub fn lowered(self) -> Result<Record, Failure<'static>> {

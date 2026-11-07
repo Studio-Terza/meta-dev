@@ -30,19 +30,15 @@ struct Answer {
 }
 
 impl Answer {
-    fn to(arguments: &[&str]) -> Answer {
+    fn to(arguments: &[&str]) -> Self {
         let files: Memory = golden::fixtures!("tests/metadata").unwrap_or_default();
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit = Cli::answer(arguments.iter().map(OsString::from), &files, &mut out, &mut err);
-        Answer {
-            exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
-        }
+        Self { exit, out: String::from_utf8(out).unwrap_or_default(), err: String::from_utf8(err).unwrap_or_default() }
     }
 
     fn said(arguments: &[&str]) -> Vec<String> {
-        Text::owned(&Answer::to(arguments).out)
+        Text::owned(&Self::to(arguments).out)
     }
 
     fn crates(names: &[&str]) -> Vec<String> {
@@ -55,11 +51,11 @@ impl Answer {
     }
 
     fn refusal(arguments: &[&str]) -> Vec<String> {
-        Text::owned(&Answer::refused(arguments))
+        Text::owned(&Self::refused(arguments))
     }
 
     fn refused(arguments: &[&str]) -> String {
-        let answer = Answer::to(arguments);
+        let answer = Self::to(arguments);
         Some(answer)
             .filter(|answer| answer.exit == ExitCode::FAILURE)
             .filter(|answer| answer.out.is_empty())

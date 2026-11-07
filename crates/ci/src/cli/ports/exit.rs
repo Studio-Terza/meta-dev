@@ -9,28 +9,28 @@ pub enum Exit {
 
 impl Exit {
     #[must_use]
-    pub fn excusing(self, excused: &[NonZeroU8]) -> Exit {
+    pub fn excusing(self, excused: &[NonZeroU8]) -> Self {
         match self {
-            Exit::Failure(code) => excused.iter().find(|excused| **excused == code).map_or(self, |_| Exit::Success),
-            Exit::Success => self,
+            Self::Failure(code) => excused.iter().find(|excused| **excused == code).map_or(self, |_| Self::Success),
+            Self::Success => self,
         }
     }
 }
 
 impl Exit {
-    pub fn followed_by<Failed>(self, next: impl FnOnce() -> Result<Exit, Failed>) -> Result<Exit, Failed> {
+    pub fn followed_by<Failed>(self, next: impl FnOnce() -> Result<Self, Failed>) -> Result<Self, Failed> {
         match self {
-            Exit::Success => next(),
-            failed @ Exit::Failure(_) => Ok(failed),
+            Self::Success => next(),
+            failed @ Self::Failure(_) => Ok(failed),
         }
     }
 }
 
 impl From<Exit> for ExitCode {
-    fn from(exit: Exit) -> ExitCode {
+    fn from(exit: Exit) -> Self {
         match exit {
-            Exit::Success => ExitCode::SUCCESS,
-            Exit::Failure(code) => ExitCode::from(code.get()),
+            Exit::Success => Self::SUCCESS,
+            Exit::Failure(code) => Self::from(code.get()),
         }
     }
 }

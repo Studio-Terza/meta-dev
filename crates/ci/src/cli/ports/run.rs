@@ -10,8 +10,8 @@ pub struct Run {
 
 impl Run {
     #[must_use]
-    pub fn new(exit: Exit, elapsed: Duration) -> Run {
-        Run { exit, elapsed }
+    pub fn new(exit: Exit, elapsed: Duration) -> Self {
+        Self { exit, elapsed }
     }
 
     #[must_use]

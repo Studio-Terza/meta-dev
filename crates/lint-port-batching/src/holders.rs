@@ -14,8 +14,8 @@ use crate::judge::Judge;
 pub struct Holders(BTreeMap<CrateName, BTreeMap<Name, BTreeSet<Name>>>);
 
 impl Holders {
-    pub fn declared(files: &[&SourceFile], judge: &Judge<'_>) -> Holders {
-        files.iter().fold(Holders::default(), |mut found, file| {
+    pub fn declared(files: &[&SourceFile], judge: &Judge<'_>) -> Self {
+        files.iter().fold(Self::default(), |mut found, file| {
             let mut reader = Reader { module: Module::of_file(file), judge, owners: BTreeMap::new() };
             reader.visit_file(file.syntax());
             let crate_owners = found.0.entry(CrateName::from(file.placement().crate_root())).or_default();

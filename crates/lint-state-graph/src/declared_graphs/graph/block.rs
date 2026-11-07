@@ -51,12 +51,12 @@ impl Block {
 }
 
 impl Parse for Block {
-    fn parse(input: ParseStream) -> syn::Result<Block> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         let kind = input.parse()?;
         let state: Ident = input.parse()?;
         let content;
         braced!(content in input);
-        Ok(Block {
+        Ok(Self {
             kind,
             state: TypeName::named(&state),
             line: LineNumber::from(state.span()),

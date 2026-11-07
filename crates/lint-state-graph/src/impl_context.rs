@@ -16,7 +16,7 @@ pub struct ImplContext<'found> {
 }
 
 impl<'found> ImplContext<'found> {
-    pub fn describe(item: &ItemImpl, declarations: &'found Declarations<'_>) -> ImplContext<'found> {
+    pub fn describe(item: &ItemImpl, declarations: &'found Declarations<'_>) -> Self {
         let self_type = declarations.resolved(&TypeName::from_type(&item.self_ty)).clone();
         let trait_name = item
             .trait_

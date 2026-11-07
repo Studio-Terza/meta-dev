@@ -11,8 +11,8 @@ use crate::cli::ports::Text;
 pub struct Journal(PathBuf);
 
 impl Journal {
-    pub(crate) fn file(path: &Path) -> Journal {
-        Journal(path.to_path_buf())
+    pub(crate) fn file(path: &Path) -> Self {
+        Self(path.to_path_buf())
     }
 
     pub(crate) fn append(&self, files: &impl Files, entry: impl fmt::Display) -> Result<(), Failure<'_>> {
@@ -21,7 +21,7 @@ impl Journal {
             .map_err(|failure| Failure::unusable(self, failure))
     }
 
-    pub(crate) fn emptied(&self, files: &impl Files) -> Result<&Journal, Failure<'_>> {
+    pub(crate) fn emptied(&self, files: &impl Files) -> Result<&Self, Failure<'_>> {
         self.replace(files, &Text::default()).map(|()| self)
     }
 
@@ -39,7 +39,7 @@ impl Journal {
         self.existing(files).map_or_else(|| Ok(absent), |journal| journal.read(files))
     }
 
-    pub(crate) fn existing(&self, files: &impl Files) -> Option<&Journal> {
+    pub(crate) fn existing(&self, files: &impl Files) -> Option<&Self> {
         (files.kind(&self.0) == Kind::File).then_some(self)
     }
 
@@ -80,8 +80,8 @@ impl fmt::Display for Journal {
 }
 
 impl From<PathBuf> for Journal {
-    fn from(path: PathBuf) -> Journal {
-        Journal(path)
+    fn from(path: PathBuf) -> Self {
+        Self(path)
     }
 }
 
@@ -92,7 +92,7 @@ impl AsRef<Path> for Journal {
 }
 
 impl<'journal> From<&'journal Journal> for Cow<'journal, Path> {
-    fn from(journal: &'journal Journal) -> Cow<'journal, Path> {
+    fn from(journal: &'journal Journal) -> Self {
         Cow::Borrowed(&journal.0)
     }
 }

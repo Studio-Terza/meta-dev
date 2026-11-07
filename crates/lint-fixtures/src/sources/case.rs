@@ -12,8 +12,8 @@ pub struct Case {
 
 impl Case {
     #[must_use]
-    pub const fn new(name: Title, sources: &'static [Source], flagged: Flagged) -> Case {
-        Case { name, sources, flagged }
+    pub const fn new(name: Title, sources: &'static [Source], flagged: Flagged) -> Self {
+        Self { name, sources, flagged }
     }
 
     #[must_use]

@@ -52,7 +52,7 @@ impl<'edge, 'found, 'file> InScope<'edge, 'found, 'file> {
         name: &'edge CrateName,
         edges: &[&'edge Edge<'found, 'file>],
         algebras: &Algebras<'found, 'file>,
-    ) -> InScope<'edge, 'found, 'file> {
+    ) -> Self {
         InScope { name, morphisms: edges.iter().filter_map(|edge| Morphism::of_edge(edge, algebras)).collect() }
     }
 
@@ -82,10 +82,7 @@ struct Morphism<'edge, 'found, 'file> {
 }
 
 impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
-    fn of_edge(
-        edge: &'edge Edge<'found, 'file>,
-        algebras: &Algebras<'found, 'file>,
-    ) -> Option<Morphism<'edge, 'found, 'file>> {
+    fn of_edge(edge: &'edge Edge<'found, 'file>, algebras: &Algebras<'found, 'file>) -> Option<Self> {
         let mut inputs = edge.ends().taken().copied();
         let source = inputs.next()?;
         let target = AsRef::<End<'found>>::as_ref(edge.ends()).node().copied()?;
@@ -108,11 +105,7 @@ impl<'edge, 'found, 'file> Morphism<'edge, 'found, 'file> {
             .or_else(|| law.routed_on(Side::Edge, AsRef::<Name>::as_ref(&self.target), function))
     }
 
-    fn undeclared(
-        self,
-        declarations: &'edge Declarations<'file>,
-        algebras: &Algebras<'found, 'file>,
-    ) -> Option<Morphism<'edge, 'found, 'file>> {
+    fn undeclared(self, declarations: &'edge Declarations<'file>, algebras: &Algebras<'found, 'file>) -> Option<Self> {
         let verdicts: Vec<Vec<Shortfall<'edge, 'found, 'file>>> = declarations
             .of_package(self.edge.site().path())
             .into_iter()
@@ -146,7 +139,7 @@ impl<'law, 'found, 'file> Shortfall<'law, 'found, 'file> {
         source: Node<'found>,
         target: Node<'found>,
         algebras: &Algebras<'found, 'file>,
-    ) -> Vec<Shortfall<'law, 'found, 'file>> {
+    ) -> Vec<Self> {
         [(Side::Input, source), (Side::Output, target)]
             .into_iter()
             .filter_map(|(side, node)| Shortfall::facing(law, side, node, algebras))
@@ -158,7 +151,7 @@ impl<'law, 'found, 'file> Shortfall<'law, 'found, 'file> {
         side: Side,
         node: Node<'found>,
         algebras: &Algebras<'found, 'file>,
-    ) -> Option<Shortfall<'law, 'found, 'file>> {
+    ) -> Option<Self> {
         algebras.operating(law, side, &node).map_or(Some(Shortfall { law, side, node }), |_| None)
     }
 }

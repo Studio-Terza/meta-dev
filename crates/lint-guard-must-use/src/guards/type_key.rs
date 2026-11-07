@@ -8,7 +8,7 @@ pub struct TypeKey<'guards> {
 }
 
 impl<'guards> TypeKey<'guards> {
-    pub fn new(module: &'guards Module<'guards>, name: &'guards Name) -> TypeKey<'guards> {
+    pub fn new(module: &'guards Module<'guards>, name: &'guards Name) -> Self {
         TypeKey { module, name }
     }
 }

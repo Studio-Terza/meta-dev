@@ -20,7 +20,7 @@ pub(crate) struct Referenced<'item, 'file> {
 impl<'item, 'file> Referenced<'item, 'file> {
     const ITSELF: [Word<'static>; 1] = words!["Self"];
 
-    pub(crate) fn started(file: &'file Path, own: &'item Ident, generics: &'item Generics) -> Referenced<'item, 'file> {
+    pub(crate) fn started(file: &'file Path, own: &'item Ident, generics: &'item Generics) -> Self {
         Referenced {
             file,
             own,

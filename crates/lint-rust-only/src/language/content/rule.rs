@@ -18,120 +18,120 @@ impl Rule {
     const HINT: Weight = Weight::new(1);
     pub(super) const ENOUGH: Weight = Weight::new(2);
 
-    pub(super) const ALL: [Rule; 17] = [
-        Rule {
+    pub(super) const ALL: [Self; 17] = [
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import XCTest"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import SwiftUI"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import UIKit"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import Foundation"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import Cocoa"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("import AppKit"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("class "),
             middle: Text::new(": XCTestCase"),
             end: Text::new("{"),
         },
-        Rule {
+        Self {
             language: Language::Swift,
             weight: Self::CLEAR,
             start: Text::new("final class "),
             middle: Text::new(": XCTestCase"),
             end: Text::new("{"),
         },
-        Rule {
+        Self {
             language: Language::Python,
             weight: Self::CLEAR,
             start: Text::new("def "),
             middle: Text::new("("),
             end: Text::new(":"),
         },
-        Rule {
+        Self {
             language: Language::Python,
             weight: Self::CLEAR,
             start: Text::new("async def "),
             middle: Text::new("("),
             end: Text::new(":"),
         },
-        Rule {
+        Self {
             language: Language::Python,
             weight: Self::HINT,
             start: Text::new("from "),
             middle: Text::new(" import "),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Python,
             weight: Self::HINT,
             start: Text::new("import "),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Shell,
             weight: Self::CLEAR,
             start: Text::new("set -"),
             middle: Text::new(""),
             end: Text::new(""),
         },
-        Rule {
+        Self {
             language: Language::Shell,
             weight: Self::CLEAR,
             start: Text::new("if "),
             middle: Text::new(""),
             end: Text::new("; then"),
         },
-        Rule {
+        Self {
             language: Language::Shell,
             weight: Self::CLEAR,
             start: Text::new("for "),
             middle: Text::new(""),
             end: Text::new("; do"),
         },
-        Rule {
+        Self {
             language: Language::C,
             weight: Self::CLEAR,
             start: Text::new("#include <"),
             middle: Text::new(""),
             end: Text::new(">"),
         },
-        Rule {
+        Self {
             language: Language::C,
             weight: Self::CLEAR,
             start: Text::new("#include \""),

@@ -9,11 +9,11 @@ pub enum Kind {
 }
 
 impl From<FileType> for Kind {
-    fn from(found: FileType) -> Kind {
+    fn from(found: FileType) -> Self {
         Some(found)
             .filter(FileType::is_dir)
-            .map(|_| Kind::Directory)
-            .or_else(|| Some(found).filter(FileType::is_symlink).map(|_| Kind::Link))
-            .unwrap_or(Kind::File)
+            .map(|_| Self::Directory)
+            .or_else(|| Some(found).filter(FileType::is_symlink).map(|_| Self::Link))
+            .unwrap_or(Self::File)
     }
 }

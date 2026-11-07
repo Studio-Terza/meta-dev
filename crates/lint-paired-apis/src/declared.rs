@@ -8,7 +8,7 @@ pub struct Declared<'file> {
 }
 
 impl<'file> Declared<'file> {
-    pub fn new(method: Name, location: Site<'file>) -> Declared<'file> {
+    pub fn new(method: Name, location: Site<'file>) -> Self {
         Declared { method, location }
     }
 

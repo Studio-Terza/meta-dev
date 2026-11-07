@@ -26,7 +26,7 @@ impl<'run> Compared<'run> {
     const FORMATS: [Word<'static>; 2] = words!["format", "format_args"];
     const LISTS: [Word<'static>; 2] = words!["concat", "vec"];
 
-    pub fn new(constants: &'run Bindings<'run>, locals: &'run Bindings<'run>) -> Compared<'run> {
+    pub fn new(constants: &'run Bindings<'run>, locals: &'run Bindings<'run>) -> Self {
         Compared { constants, locals }
     }
 

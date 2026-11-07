@@ -8,8 +8,8 @@ use crate::cli::report::recorded_mutant::{RecordedMutant, Verdict};
 pub struct Entry(String);
 
 impl Entry {
-    pub(crate) fn named_with(mutants: &[RecordedMutant], summary: Verdict) -> Vec<Entry> {
-        let mut names: Vec<Entry> = mutants
+    pub(crate) fn named_with(mutants: &[RecordedMutant], summary: Verdict) -> Vec<Self> {
+        let mut names: Vec<Self> = mutants
             .iter()
             .filter(|mutant| mutant.summary() == summary)
             .map(RecordedMutant::name)

@@ -8,8 +8,8 @@ pub struct Found<Entity> {
 
 impl<Entity> Found<Entity> {
     #[must_use]
-    pub fn new(line: LineNumber, entity: Entity) -> Found<Entity> {
-        Found { line, entity }
+    pub fn new(line: LineNumber, entity: Entity) -> Self {
+        Self { line, entity }
     }
 
     #[must_use]

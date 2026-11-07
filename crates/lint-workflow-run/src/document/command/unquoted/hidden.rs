@@ -19,18 +19,18 @@ impl Hidden {
 
     fn hides(self) -> &'static [Quote] {
         match self {
-            Hidden::Nothing => &[],
-            Hidden::Singles => &[Quote::Single],
-            Hidden::Quoted => &[Quote::Single, Quote::Double],
+            Self::Nothing => &[],
+            Self::Singles => &[Quote::Single],
+            Self::Quoted => &[Quote::Single, Quote::Double],
         }
     }
 }
 
 impl From<Key> for Hidden {
-    fn from(setting: Key) -> Hidden {
+    fn from(setting: Key) -> Self {
         match setting {
-            Key::Shell => Hidden::Nothing,
-            Key::Run | Key::Uses | Key::With | Key::Script | Key::Env => Hidden::Quoted,
+            Key::Shell => Self::Nothing,
+            Key::Run | Key::Uses | Key::With | Key::Script | Key::Env => Self::Quoted,
         }
     }
 }

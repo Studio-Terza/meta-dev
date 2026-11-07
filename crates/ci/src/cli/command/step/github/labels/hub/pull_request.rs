@@ -11,11 +11,11 @@ impl PullRequest {
         r#"if (.title | startswith("refactor:")) then "refactor" else "change" end, .labels[].name"#;
     const REFACTOR_KIND: &'static str = "refactor";
 
-    pub(crate) fn listed(kind_then_labels: Text) -> PullRequest {
-        PullRequest(kind_then_labels)
+    pub(crate) fn listed(kind_then_labels: Text) -> Self {
+        Self(kind_then_labels)
     }
 
-    pub(crate) fn carrying(&self, check: Check) -> Option<&PullRequest> {
+    pub(crate) fn carrying(&self, check: Check) -> Option<&Self> {
         Lines::from(self.0.as_ref())
             .skip(1)
             .filter_map(|name| name.parse::<Check>().ok())
@@ -23,7 +23,7 @@ impl PullRequest {
             .map(|_| self)
     }
 
-    pub(crate) fn refactor(&self) -> Option<&PullRequest> {
+    pub(crate) fn refactor(&self) -> Option<&Self> {
         Lines::from(self.0.as_ref()).next().filter(|kind| *kind == Self::REFACTOR_KIND).map(|_| self)
     }
 }

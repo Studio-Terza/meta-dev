@@ -32,16 +32,16 @@ impl Source {
 
     fn part(self, text: &Text) -> Result<Part, Failure<'static>> {
         match self {
-            Source::Measured(measured) => toml::from_str(text.as_ref())
+            Self::Measured(measured) => toml::from_str(text.as_ref())
                 .map(Part::Stages)
                 .map_err(|source| Failure::Measured { path: measured.into(), source }),
-            Source::Page(page) => CompileTimes::per_crate(page, text).map(Part::Crates),
+            Self::Page(page) => CompileTimes::per_crate(page, text).map(Part::Crates),
         }
     }
 
     fn into_journal(self) -> Journal {
         match self {
-            Source::Measured(journal) | Source::Page(journal) => journal,
+            Self::Measured(journal) | Self::Page(journal) => journal,
         }
     }
 }
@@ -49,7 +49,7 @@ impl Source {
 impl AsRef<Path> for Source {
     fn as_ref(&self) -> &Path {
         match self {
-            Source::Measured(journal) | Source::Page(journal) => journal.as_ref(),
+            Self::Measured(journal) | Self::Page(journal) => journal.as_ref(),
         }
     }
 }
@@ -79,46 +79,46 @@ impl Build {
 }
 
 impl Build {
-    pub(super) fn measured_in(files: &impl Files, directory: &Path) -> Result<Build, Failure<'static>> {
-        let sources = Build::sources(directory);
+    pub(super) fn measured_in(files: &impl Files, directory: &Path) -> Result<Self, Failure<'static>> {
+        let sources = Self::sources(directory);
         let read = files.read_text_many(&sources);
-        Build::tallied(sources, read)
+        Self::tallied(sources, read)
     }
 
-    pub(super) fn measured_in_all(files: &impl Files, directories: &[PathBuf]) -> Result<Vec<Build>, Failure<'static>> {
-        let sources: Vec<Vec<Source>> = directories.iter().map(|directory| Build::sources(directory)).collect();
+    pub(super) fn measured_in_all(files: &impl Files, directories: &[PathBuf]) -> Result<Vec<Self>, Failure<'static>> {
+        let sources: Vec<Vec<Source>> = directories.iter().map(|directory| Self::sources(directory)).collect();
         let read = files.read_text_many(&sources.iter().flatten().collect::<Vec<&Source>>());
         sources
             .into_iter()
             .scan(read.into_iter(), |read, group| {
                 let size = group.len();
-                Some(Build::tallied(group, read.take(size).collect()))
+                Some(Self::tallied(group, read.take(size).collect()))
             })
             .collect()
     }
 
     fn sources(directory: &Path) -> Vec<Source> {
-        [Source::Measured(Journal::file(&directory.join(Build::MEASURED)))]
+        [Source::Measured(Journal::file(&directory.join(Self::MEASURED)))]
             .into_iter()
-            .chain(Build::PAGES.iter().map(|page| Source::Page(Journal::file(&directory.join(page)))))
+            .chain(Self::PAGES.iter().map(|page| Source::Page(Journal::file(&directory.join(page)))))
             .collect()
     }
 
-    fn tallied(sources: Vec<Source>, read: Vec<Result<Text, FileFailure>>) -> Result<Build, Failure<'static>> {
+    fn tallied(sources: Vec<Source>, read: Vec<Result<Text, FileFailure>>) -> Result<Self, Failure<'static>> {
         let parts = sources
             .into_iter()
             .zip(read)
             .map(|(source, text)| source.parsed(text))
             .collect::<Result<Vec<Part>, Failure<'static>>>()?;
-        Ok(parts.into_iter().fold(Build { total: Seconds::default(), crates: BTreeMap::new() }, Build::adding))
+        Ok(parts.into_iter().fold(Self { total: Seconds::default(), crates: BTreeMap::new() }, Self::adding))
     }
 
-    fn adding(self, part: Part) -> Build {
+    fn adding(self, part: Part) -> Self {
         match part {
             Part::Stages(stages) => {
-                Build { total: [self.total, stages.into_values().sum()].into_iter().sum(), crates: self.crates }
+                Self { total: [self.total, stages.into_values().sum()].into_iter().sum(), crates: self.crates }
             }
-            Part::Crates(crates) => Build {
+            Part::Crates(crates) => Self {
                 total: self.total,
                 crates: crates.into_iter().fold(self.crates, |mut all, (name, seconds)| {
                     let total: &mut Seconds = all.entry(name).or_default();

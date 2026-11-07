@@ -20,10 +20,10 @@ enum Leading {
 }
 
 impl From<&Option<Token![::]>> for Leading {
-    fn from(colons: &Option<Token![::]>) -> Leading {
+    fn from(colons: &Option<Token![::]>) -> Self {
         match colons {
-            Some(_) => Leading::Global,
-            None => Leading::Relative,
+            Some(_) => Self::Global,
+            None => Self::Relative,
         }
     }
 }
@@ -31,8 +31,8 @@ impl From<&Option<Token![::]>> for Leading {
 impl Leading {
     fn head<'path>(self, first: &'path Name, rest: &[Name], reading: Reading) -> Head<'path> {
         match self {
-            Leading::Global => Head::Global(first),
-            Leading::Relative => Head::relative(first, rest, reading),
+            Self::Global => Head::Global(first),
+            Self::Relative => Head::relative(first, rest, reading),
         }
     }
 }
@@ -47,16 +47,16 @@ pub(super) enum Reading {
 impl Reading {
     pub(super) fn seen(self, view: View<'_>) -> View<'_> {
         match self {
-            Reading::Written => view,
-            Reading::Imported => view.undisputed(),
-            Reading::Explicit => View::ABSENT,
+            Self::Written => view,
+            Self::Imported => view.undisputed(),
+            Self::Explicit => View::ABSENT,
         }
     }
 
     fn lone(self, first: &Name) -> Binding {
         match self {
-            Reading::Written | Reading::Explicit => Binding::Unknown,
-            Reading::Imported => Binding::External(ItemPath::default().joined(first)),
+            Self::Written | Self::Explicit => Binding::Unknown,
+            Self::Imported => Binding::External(ItemPath::default().joined(first)),
         }
     }
 }
@@ -68,10 +68,10 @@ pub(super) enum Shape {
 }
 
 impl From<&[Name]> for Shape {
-    fn from(rest: &[Name]) -> Shape {
+    fn from(rest: &[Name]) -> Self {
         match rest.first() {
-            Some(_) => Shape::Multiple,
-            None => Shape::Single,
+            Some(_) => Self::Multiple,
+            None => Self::Single,
         }
     }
 }
@@ -90,29 +90,29 @@ impl Shape {
 
     fn primitive(self, first: &Name) -> Option<Primitive> {
         match self {
-            Shape::Single => StdNames::primitive(first),
-            Shape::Multiple => None,
+            Self::Single => StdNames::primitive(first),
+            Self::Multiple => None,
         }
     }
 
     fn prelude(self, first: &Name) -> Option<ItemPath> {
         match self {
-            Shape::Single => StdNames::canonical(Table::Prelude, first).map(Canonical::path),
-            Shape::Multiple => None,
+            Self::Single => StdNames::canonical(Table::Prelude, first).map(Canonical::path),
+            Self::Multiple => None,
         }
     }
 
     fn derived(self, first: &Name, resolver: &Resolver<'_, '_>, path: &UsePath, viewer: ScopeId) -> Resolution {
         match self {
-            Shape::Single => resolver.macro_named(first, viewer),
-            Shape::Multiple => resolver.path(path, viewer),
+            Self::Single => resolver.macro_named(first, viewer),
+            Self::Multiple => resolver.path(path, viewer),
         }
     }
 
     fn unbound(self, first: &Name, reading: Reading) -> Binding {
         match self {
-            Shape::Single => reading.lone(first),
-            Shape::Multiple => Binding::External(ItemPath::default().joined(first)),
+            Self::Single => reading.lone(first),
+            Self::Multiple => Binding::External(ItemPath::default().joined(first)),
         }
     }
 }
@@ -158,35 +158,35 @@ pub(super) enum Leaf {
 }
 
 impl From<Name> for Leaf {
-    fn from(name: Name) -> Leaf {
+    fn from(name: Name) -> Self {
         name.matches::<Whole>(&UsePath::SELF)
-            .map(|_| Leaf::Itself)
-            .or_else(|| name.matches::<Whole>(&UsePath::DISCARDED).map(|_| Leaf::Discarded))
-            .unwrap_or(Leaf::Named(name))
+            .map(|_| Self::Itself)
+            .or_else(|| name.matches::<Whole>(&UsePath::DISCARDED).map(|_| Self::Discarded))
+            .unwrap_or(Self::Named(name))
     }
 }
 
 impl Leaf {
     pub(super) fn standalone(self) -> Option<Name> {
         match self {
-            Leaf::Named(name) => Some(name),
-            Leaf::Itself | Leaf::Discarded => None,
+            Self::Named(name) => Some(name),
+            Self::Itself | Self::Discarded => None,
         }
     }
 
     fn path(self, prefix: &UsePath) -> Option<UsePath> {
         match self {
-            Leaf::Itself => prefix.segments.last().map(|_| prefix.clone()),
-            Leaf::Named(name) => Some(prefix.joined(name)),
-            Leaf::Discarded => None,
+            Self::Itself => prefix.segments.last().map(|_| prefix.clone()),
+            Self::Named(name) => Some(prefix.joined(name)),
+            Self::Discarded => None,
         }
     }
 
     fn bound(self, prefix: &UsePath) -> Option<Name> {
         match self {
-            Leaf::Itself => prefix.segments.last().cloned(),
-            Leaf::Named(name) => Some(name),
-            Leaf::Discarded => None,
+            Self::Itself => prefix.segments.last().cloned(),
+            Self::Named(name) => Some(name),
+            Self::Discarded => None,
         }
     }
 }
@@ -203,7 +203,7 @@ impl UsePath {
     const DISCARDED: [Word<'static>; 1] = words!["_"];
 
     pub(super) fn imported(used: &ItemUse) -> Vec<Imported> {
-        UsePath { leading: Leading::from(&used.leading_colon), reading: Reading::Imported, segments: Vec::new() }
+        Self { leading: Leading::from(&used.leading_colon), reading: Reading::Imported, segments: Vec::new() }
             .under(&used.tree)
     }
 
@@ -229,8 +229,8 @@ impl UsePath {
         self.segments.iter().cloned().collect()
     }
 
-    fn joined(&self, segment: Name) -> UsePath {
-        UsePath {
+    fn joined(&self, segment: Name) -> Self {
+        Self {
             leading: self.leading,
             reading: self.reading,
             segments: self.segments.iter().cloned().chain([segment]).collect(),
@@ -258,14 +258,14 @@ impl UsePath {
 }
 
 impl From<&Ident> for UsePath {
-    fn from(ident: &Ident) -> UsePath {
-        UsePath { leading: Leading::Relative, reading: Reading::Written, segments: vec![Name::from(ident)] }
+    fn from(ident: &Ident) -> Self {
+        Self { leading: Leading::Relative, reading: Reading::Written, segments: vec![Name::from(ident)] }
     }
 }
 
 impl From<&Path> for UsePath {
-    fn from(path: &Path) -> UsePath {
-        UsePath {
+    fn from(path: &Path) -> Self {
+        Self {
             leading: Leading::from(&path.leading_colon),
             reading: Reading::Written,
             segments: path.segments.iter().map(|segment| Name::from(&segment.ident)).collect(),

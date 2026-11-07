@@ -15,8 +15,8 @@ use quote::Quote;
 pub(super) struct Unquoted(String);
 
 impl Unquoted {
-    pub(super) fn new(text: Text<'_>, hidden: Hidden) -> Unquoted {
-        Unquoted(
+    pub(super) fn new(text: Text<'_>, hidden: Hidden) -> Self {
+        Self(
             text.to_string()
                 .chars()
                 .scan(Quote::Outside, |quote, letter| {

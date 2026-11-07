@@ -10,8 +10,8 @@ pub struct Tally {
 }
 
 impl Tally {
-    pub(crate) fn new(outcome: Outcome, count: Count) -> Tally {
-        Tally { outcome, count }
+    pub(crate) fn new(outcome: Outcome, count: Count) -> Self {
+        Self { outcome, count }
     }
 }
 

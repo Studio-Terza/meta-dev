@@ -31,16 +31,16 @@ impl Placement {
     const BUILD_FILE: &'static str = "build.rs";
 
     #[must_use]
-    pub fn locate(files: &impl Files, path: &Path) -> Placement {
+    pub fn locate(files: &impl Files, path: &Path) -> Self {
         Self::within(files, &Self::guessed_package(path), path)
     }
 
     #[must_use]
-    pub fn within(files: &impl Files, package: &Path, file: &Path) -> Placement {
+    pub fn within(files: &impl Files, package: &Path, file: &Path) -> Self {
         Packages::read(files, &[package]).placed(package, file)
     }
 
-    pub(crate) fn placed(root: Option<&PackageRoot>, package: &Path, file: &Path) -> Placement {
+    pub(crate) fn placed(root: Option<&PackageRoot>, package: &Path, file: &Path) -> Self {
         file.strip_prefix(package)
             .ok()
             .zip(root.cloned())
@@ -96,8 +96,8 @@ impl Placement {
             .unwrap_or_default()
     }
 
-    fn unplaced(crate_root: CrateRoot) -> Placement {
-        Placement {
+    fn unplaced(crate_root: CrateRoot) -> Self {
+        Self {
             package: PackageRoot::unplaced(crate_root),
             target_root: None,
             module: ModulePath::default(),
@@ -105,7 +105,7 @@ impl Placement {
         }
     }
 
-    fn in_package(root: PackageRoot, package: &Path, inside: &Path) -> Option<Placement> {
+    fn in_package(root: PackageRoot, package: &Path, inside: &Path) -> Option<Self> {
         let first = inside.components().next()?;
         let rest = inside.strip_prefix(first).ok()?;
         let directory = first.as_os_str().to_str()?;
@@ -122,35 +122,28 @@ enum PackageDirectory {
 }
 
 impl PackageDirectory {
-    const NAMED: [(&'static str, PackageDirectory); 2] =
-        [(Placement::SOURCE_DIRECTORY, PackageDirectory::Source), (Placement::BUILD_FILE, PackageDirectory::Build)];
+    const NAMED: [(&'static str, Self); 2] =
+        [(Placement::SOURCE_DIRECTORY, Self::Source), (Placement::BUILD_FILE, Self::Build)];
 }
 
 impl From<&str> for PackageDirectory {
-    fn from(directory: &str) -> PackageDirectory {
-        PackageDirectory::NAMED
+    fn from(directory: &str) -> Self {
+        Self::NAMED
             .iter()
             .find(|(name, _)| *name == directory)
             .map(|(_, named)| *named)
-            .or_else(|| {
-                Placement::TARGET_DIRECTORIES
-                    .iter()
-                    .find(|target| **target == directory)
-                    .map(|_| PackageDirectory::Target)
-            })
-            .unwrap_or(PackageDirectory::Other)
+            .or_else(|| Placement::TARGET_DIRECTORIES.iter().find(|target| **target == directory).map(|_| Self::Target))
+            .unwrap_or(Self::Other)
     }
 }
 
 impl PackageDirectory {
     fn placed(self, root: PackageRoot, directory: &Path, rest: &Path) -> Option<Placement> {
         match self {
-            PackageDirectory::Source => Some(SourceDirectory::place(root, rest)),
-            PackageDirectory::Build => {
-                Some(rest).filter(|rest| rest.as_os_str().is_empty()).map(|_| BuildScript::place(root))
-            }
-            PackageDirectory::Target => TargetDirectory::place(root, directory, rest),
-            PackageDirectory::Other => None,
+            Self::Source => Some(SourceDirectory::place(root, rest)),
+            Self::Build => Some(rest).filter(|rest| rest.as_os_str().is_empty()).map(|_| BuildScript::place(root)),
+            Self::Target => TargetDirectory::place(root, directory, rest),
+            Self::Other => None,
         }
     }
 }

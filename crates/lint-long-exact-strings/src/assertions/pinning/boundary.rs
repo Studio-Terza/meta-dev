@@ -9,28 +9,28 @@ pub enum Scan {
 }
 
 impl Scan {
-    const SPECIFIC: [(Scan, Mark, Scan); 10] = [
-        (Scan::Questioned, Mark::Close, Scan::Debug),
-        (Scan::Text, Mark::Open, Scan::Opened),
-        (Scan::Opened, Mark::Close, Scan::Text),
-        (Scan::Named, Mark::Close, Scan::Text),
-        (Scan::Spec, Mark::Close, Scan::Text),
-        (Scan::Opened, Mark::Open, Scan::Text),
-        (Scan::Opened, Mark::Spec, Scan::Spec),
-        (Scan::Named, Mark::Spec, Scan::Spec),
-        (Scan::Spec, Mark::Debug, Scan::Questioned),
-        (Scan::Questioned, Mark::Debug, Scan::Questioned),
+    const SPECIFIC: [(Self, Mark, Self); 10] = [
+        (Self::Questioned, Mark::Close, Self::Debug),
+        (Self::Text, Mark::Open, Self::Opened),
+        (Self::Opened, Mark::Close, Self::Text),
+        (Self::Named, Mark::Close, Self::Text),
+        (Self::Spec, Mark::Close, Self::Text),
+        (Self::Opened, Mark::Open, Self::Text),
+        (Self::Opened, Mark::Spec, Self::Spec),
+        (Self::Named, Mark::Spec, Self::Spec),
+        (Self::Spec, Mark::Debug, Self::Questioned),
+        (Self::Questioned, Mark::Debug, Self::Questioned),
     ];
-    const OTHERWISE: [(Scan, Scan); 6] = [
-        (Scan::Debug, Scan::Debug),
-        (Scan::Text, Scan::Text),
-        (Scan::Opened, Scan::Named),
-        (Scan::Named, Scan::Named),
-        (Scan::Spec, Scan::Spec),
-        (Scan::Questioned, Scan::Spec),
+    const OTHERWISE: [(Self, Self); 6] = [
+        (Self::Debug, Self::Debug),
+        (Self::Text, Self::Text),
+        (Self::Opened, Self::Named),
+        (Self::Named, Self::Named),
+        (Self::Spec, Self::Spec),
+        (Self::Questioned, Self::Spec),
     ];
 
-    pub fn next(self, letter: char) -> Scan {
+    pub fn next(self, letter: char) -> Self {
         let mark = Mark::from(letter);
         Self::SPECIFIC
             .iter()
@@ -52,11 +52,11 @@ enum Mark {
 }
 
 impl Mark {
-    const NAMED: [(char, Mark); 4] = [('{', Mark::Open), ('}', Mark::Close), (':', Mark::Spec), ('?', Mark::Debug)];
+    const NAMED: [(char, Self); 4] = [('{', Self::Open), ('}', Self::Close), (':', Self::Spec), ('?', Self::Debug)];
 }
 
 impl From<char> for Mark {
-    fn from(letter: char) -> Mark {
-        Mark::NAMED.iter().find(|(named, _)| *named == letter).map_or(Mark::Other, |(_, mark)| *mark)
+    fn from(letter: char) -> Self {
+        Self::NAMED.iter().find(|(named, _)| *named == letter).map_or(Self::Other, |(_, mark)| *mark)
     }
 }

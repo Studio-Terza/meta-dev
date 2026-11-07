@@ -10,8 +10,8 @@ pub(super) struct Entry {
 }
 
 impl Entry {
-    pub(super) fn new(label: OneLine, seconds: Seconds) -> Entry {
-        Entry { label, seconds }
+    pub(super) fn new(label: OneLine, seconds: Seconds) -> Self {
+        Self { label, seconds }
     }
 
     pub(super) fn took(&self) -> Seconds {

@@ -9,8 +9,8 @@ struct Row {
 }
 
 impl Row {
-    const fn new(golden: &'static str, recorded: &'static str, actual: &'static str) -> Row {
-        Row { golden, recorded, actual }
+    const fn new(golden: &'static str, recorded: &'static str, actual: &'static str) -> Self {
+        Self { golden, recorded, actual }
     }
 }
 

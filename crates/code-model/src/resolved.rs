@@ -19,50 +19,46 @@ impl Resolved {
     #[must_use]
     pub fn std(&self) -> Option<&ItemPath> {
         match self {
-            Resolved::Std(path) | Resolved::StdTrait(path) => Some(path),
-            Resolved::Crate(_)
-            | Resolved::External(_)
-            | Resolved::Primitive(_)
-            | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            Self::Std(path) | Self::StdTrait(path) => Some(path),
+            Self::Crate(_) | Self::External(_) | Self::Primitive(_) | Self::Param(_) | Self::Unknown(_) => None,
         }
     }
 
     #[must_use]
     pub fn crate_item(&self) -> Option<ItemId> {
         match self {
-            Resolved::Crate(item) => Some(*item),
-            Resolved::Std(_)
-            | Resolved::StdTrait(_)
-            | Resolved::External(_)
-            | Resolved::Primitive(_)
-            | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            Self::Crate(item) => Some(*item),
+            Self::Std(_)
+            | Self::StdTrait(_)
+            | Self::External(_)
+            | Self::Primitive(_)
+            | Self::Param(_)
+            | Self::Unknown(_) => None,
         }
     }
 
     #[must_use]
     pub fn primitive(&self) -> Option<Primitive> {
         match self {
-            Resolved::Primitive(primitive) => Some(*primitive),
-            Resolved::Std(_)
-            | Resolved::StdTrait(_)
-            | Resolved::Crate(_)
-            | Resolved::External(_)
-            | Resolved::Param(_)
-            | Resolved::Unknown(_) => None,
+            Self::Primitive(primitive) => Some(*primitive),
+            Self::Std(_)
+            | Self::StdTrait(_)
+            | Self::Crate(_)
+            | Self::External(_)
+            | Self::Param(_)
+            | Self::Unknown(_) => None,
         }
     }
 
     pub(crate) fn parameter(&self) -> Option<&Name> {
         match self {
-            Resolved::Param(name) => Some(name),
-            Resolved::Std(_)
-            | Resolved::StdTrait(_)
-            | Resolved::Crate(_)
-            | Resolved::External(_)
-            | Resolved::Primitive(_)
-            | Resolved::Unknown(_) => None,
+            Self::Param(name) => Some(name),
+            Self::Std(_)
+            | Self::StdTrait(_)
+            | Self::Crate(_)
+            | Self::External(_)
+            | Self::Primitive(_)
+            | Self::Unknown(_) => None,
         }
     }
 }

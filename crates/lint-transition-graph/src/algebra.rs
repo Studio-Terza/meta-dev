@@ -19,18 +19,18 @@ pub enum Totality {
 }
 
 impl Totality {
-    pub(crate) fn of_wrapping(wrapping: Wrapping) -> Option<Totality> {
+    pub(crate) fn of_wrapping(wrapping: Wrapping) -> Option<Self> {
         match wrapping {
-            Wrapping::Optional | Wrapping::Fallible => Some(Totality::Partial),
-            Wrapping::Plain => Some(Totality::Total),
+            Wrapping::Optional | Wrapping::Fallible => Some(Self::Partial),
+            Wrapping::Plain => Some(Self::Total),
             Wrapping::Many => None,
         }
     }
 
     pub(crate) fn shaping(self, acting: Acting<'_>) -> Form<'_> {
         match self {
-            Totality::Partial => Form::Partial(acting),
-            Totality::Total => Form::Operation(acting),
+            Self::Partial => Form::Partial(acting),
+            Self::Total => Form::Operation(acting),
         }
     }
 }
@@ -44,7 +44,7 @@ pub struct Operation<'found, 'file> {
 }
 
 impl<'found, 'file> Operation<'found, 'file> {
-    fn of_edge(ordinal: Count, edge: &Edge<'found, 'file>) -> Option<Operation<'found, 'file>> {
+    fn of_edge(ordinal: Count, edge: &Edge<'found, 'file>) -> Option<Self> {
         let transition = *edge.transition();
         let partial = Totality::of_wrapping(transition.function().wrapping())?;
         edge.form().algebraic().and(Acting::of_edge(edge)).map(|acting| Operation {
@@ -116,7 +116,7 @@ pub struct Algebras<'found, 'file> {
 }
 
 impl<'found, 'file> Algebras<'found, 'file> {
-    pub(crate) fn of_edges<'edge>(edges: impl Iterator<Item = &'edge Edge<'found, 'file>>) -> Algebras<'found, 'file>
+    pub(crate) fn of_edges<'edge>(edges: impl Iterator<Item = &'edge Edge<'found, 'file>>) -> Self
     where
         'found: 'edge,
         'file: 'found,

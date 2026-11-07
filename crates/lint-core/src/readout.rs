@@ -26,28 +26,28 @@ impl Readout {
     }
 
     #[must_use]
-    pub fn with_file(self, file: SourceFile) -> Readout {
+    pub fn with_file(self, file: SourceFile) -> Self {
         let mut files = self.files;
         files.push(file);
-        Readout { files, ..self }
+        Self { files, ..self }
     }
 
     #[must_use]
-    pub fn with_repo_files(self, found: Vec<RepoFile>) -> Readout {
+    pub fn with_repo_files(self, found: Vec<RepoFile>) -> Self {
         let mut repo_files = self.repo_files;
         repo_files.extend(found);
-        Readout { repo_files, ..self }
+        Self { repo_files, ..self }
     }
 
     #[must_use]
-    pub fn with_failure(self, failure: Failure) -> Readout {
+    pub fn with_failure(self, failure: Failure) -> Self {
         let mut failures = self.failures;
         failures.push(failure);
-        Readout { failures, ..self }
+        Self { failures, ..self }
     }
 
     #[must_use]
-    pub fn sorted(mut self) -> Readout {
+    pub fn sorted(mut self) -> Self {
         self.files.sort_by(|left, right| left.path().cmp(right.path()));
         self.repo_files.sort();
         self.repo_files.dedup();

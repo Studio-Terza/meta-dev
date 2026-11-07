@@ -12,7 +12,7 @@ pub enum Owner<'found, 'file> {
 }
 
 impl<'found, 'file> Owner<'found, 'file> {
-    pub(crate) fn of_end(end: End<'found>, krate: &'found CrateName, path: &'file Path) -> Owner<'found, 'file> {
+    pub(crate) fn of_end(end: End<'found>, krate: &'found CrateName, path: &'file Path) -> Self {
         end.node().map_or(Owner::Leaf(krate, end, path), |node| Owner::Typed(*node))
     }
 }

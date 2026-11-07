@@ -20,7 +20,7 @@ pub(super) struct Family<'found, 'file> {
 impl<'found, 'file> Family<'found, 'file> {
     const CONVERSIONS: [Word<'static>; 3] = words!["from", "try_from", "from_str"];
 
-    pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Family<'found, 'file>> {
+    pub(super) fn repeated_among(edges: &'found [Edge<'found, 'file>]) -> Vec<Self> {
         let keyed = edges
             .iter()
             .filter_map(|edge| edge.form().written().map(|_| edge))

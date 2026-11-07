@@ -10,7 +10,7 @@ pub(crate) struct Function<'file> {
 }
 
 impl<'file> Function<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>, score: Branching) -> Function<'file> {
+    pub(crate) fn new(name: Name, site: Site<'file>, score: Branching) -> Self {
         Function { name, site, score }
     }
 

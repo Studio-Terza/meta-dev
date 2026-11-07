@@ -22,65 +22,65 @@ impl Wrapping {
     const OPTION: [Word<'static>; 1] = words!["Option"];
     const RESULT: [Word<'static>; 1] = words!["Result"];
 
-    pub(crate) fn around(self, inner: Wrapping) -> Wrapping {
-        Some(inner).filter(|inner| *inner == Wrapping::Many).unwrap_or(self)
+    pub(crate) fn around(self, inner: Self) -> Self {
+        Some(inner).filter(|inner| *inner == Self::Many).unwrap_or(self)
     }
 
     pub(crate) fn returned(
         output: &ReturnType,
-        associated: Option<Wrapping>,
-        generic: &impl Fn(&Name) -> Option<Wrapping>,
-    ) -> Wrapping {
+        associated: Option<Self>,
+        generic: &impl Fn(&Name) -> Option<Self>,
+    ) -> Self {
         match output {
-            ReturnType::Default => Wrapping::Plain,
+            ReturnType::Default => Self::Plain,
             ReturnType::Type(_, returned) => {
                 Associated::of_type(returned).and(associated).unwrap_or_else(|| Self::peeled(returned, generic))
             }
         }
     }
 
-    pub(crate) fn peeled(found: &Type, generic: &impl Fn(&Name) -> Option<Wrapping>) -> Wrapping {
+    pub(crate) fn peeled(found: &Type, generic: &impl Fn(&Name) -> Option<Self>) -> Self {
         match found {
             Type::Reference(reference) => Self::peeled(&reference.elem, generic),
             Type::Paren(paren) => Self::peeled(&paren.elem, generic),
-            Type::Array(_) | Type::Slice(_) => Wrapping::Many,
+            Type::Array(_) | Type::Slice(_) => Self::Many,
             Type::Path(path) => Self::pathed(path, generic),
             Type::ImplTrait(found) => Bounds::new(&found.bounds).wrapping(),
             Type::TraitObject(found) => Bounds::new(&found.bounds).wrapping(),
-            _ => Wrapping::Plain,
+            _ => Self::Plain,
         }
     }
 
-    fn pathed(path: &TypePath, generic: &impl Fn(&Name) -> Option<Wrapping>) -> Wrapping {
+    fn pathed(path: &TypePath, generic: &impl Fn(&Name) -> Option<Self>) -> Self {
         path.path
             .get_ident()
             .and_then(|ident| generic(&Name::from(ident)))
             .or_else(|| path.path.segments.last().map(|last| Self::named(last, generic)))
-            .unwrap_or(Wrapping::Plain)
+            .unwrap_or(Self::Plain)
     }
 
-    fn named(segment: &PathSegment, generic: &impl Fn(&Name) -> Option<Wrapping>) -> Wrapping {
+    fn named(segment: &PathSegment, generic: &impl Fn(&Name) -> Option<Self>) -> Self {
         let name = Name::from(&segment.ident);
         let is = |words: &[Word<'static>]| name.matches::<Whole>(words).is_some();
-        [(&Self::OPTION[..], Wrapping::Optional), (&Self::RESULT[..], Wrapping::Fallible)]
+        [(&Self::OPTION[..], Self::Optional), (&Self::RESULT[..], Self::Fallible)]
             .into_iter()
             .find(|(words, _)| is(words))
             .map(|(_, wrapping)| wrapping.around(Self::inside(&segment.arguments, generic)))
-            .or_else(|| is(&Self::COLLECTIONS).then_some(Wrapping::Many))
+            .or_else(|| is(&Self::COLLECTIONS).then_some(Self::Many))
             .or_else(|| is(&Self::TRANSPARENT).then(|| Self::inside(&segment.arguments, generic)))
-            .unwrap_or(Wrapping::Plain)
+            .unwrap_or(Self::Plain)
     }
 
-    fn inside(arguments: &PathArguments, generic: &impl Fn(&Name) -> Option<Wrapping>) -> Wrapping {
+    fn inside(arguments: &PathArguments, generic: &impl Fn(&Name) -> Option<Self>) -> Self {
         match arguments {
             PathArguments::AngleBracketed(bracketed) => {
-                bracketed.args.iter().find_map(|argument| Self::argued(argument, generic)).unwrap_or(Wrapping::Plain)
+                bracketed.args.iter().find_map(|argument| Self::argued(argument, generic)).unwrap_or(Self::Plain)
             }
-            PathArguments::None | PathArguments::Parenthesized(_) => Wrapping::Plain,
+            PathArguments::None | PathArguments::Parenthesized(_) => Self::Plain,
         }
     }
 
-    fn argued(argument: &GenericArgument, generic: &impl Fn(&Name) -> Option<Wrapping>) -> Option<Wrapping> {
+    fn argued(argument: &GenericArgument, generic: &impl Fn(&Name) -> Option<Self>) -> Option<Self> {
         match argument {
             GenericArgument::Type(inner) => Some(Self::peeled(inner, generic)),
             _ => None,

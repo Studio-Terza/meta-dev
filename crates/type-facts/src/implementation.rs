@@ -23,12 +23,7 @@ pub struct Implementation<'file> {
 }
 
 impl<'file> Implementation<'file> {
-    pub(crate) fn new(
-        implemented: Name,
-        argument: Option<Name>,
-        methods: Vec<Method>,
-        site: Site<'file>,
-    ) -> Implementation<'file> {
+    pub(crate) fn new(implemented: Name, argument: Option<Name>, methods: Vec<Method>, site: Site<'file>) -> Self {
         Implementation {
             implemented,
             argument,
@@ -39,7 +34,7 @@ impl<'file> Implementation<'file> {
         }
     }
 
-    pub(crate) fn qualified(mut self, written: Vec<Name>, target_path: Vec<Name>) -> Implementation<'file> {
+    pub(crate) fn qualified(mut self, written: Vec<Name>, target_path: Vec<Name>) -> Self {
         self.written = written;
         self.target_path = TargetPath(target_path);
         self

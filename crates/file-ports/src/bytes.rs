@@ -13,8 +13,8 @@ impl AsRef<[u8]> for Bytes {
 }
 
 impl<Shown: fmt::Display + ?Sized> From<&Shown> for Bytes {
-    fn from(shown: &Shown) -> Bytes {
+    fn from(shown: &Shown) -> Self {
         let mut bytes = Vec::new();
-        write!(bytes, "{shown}").map_or_else(|_| Bytes::default(), |()| Bytes(bytes))
+        write!(bytes, "{shown}").map_or_else(|_| Self::default(), |()| Self(bytes))
     }
 }

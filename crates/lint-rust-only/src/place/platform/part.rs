@@ -13,7 +13,7 @@ impl Part {
 
     const EXTENSION: char = '.';
 
-    pub(super) fn naming_tests(self) -> Option<Part> {
+    pub(super) fn naming_tests(self) -> Option<Self> {
         let lowered: String = self.0.chars().flat_map(char::to_lowercase).collect();
         Self::WHOLE
             .into_iter()
@@ -35,7 +35,7 @@ impl Part {
 impl FromStr for Part {
     type Err = Infallible;
 
-    fn from_str(text: &str) -> Result<Part, Infallible> {
-        Ok(Part(text.chars().take_while(|letter| *letter != Self::EXTENSION).collect()))
+    fn from_str(text: &str) -> Result<Self, Infallible> {
+        Ok(Self(text.chars().take_while(|letter| *letter != Self::EXTENSION).collect()))
     }
 }

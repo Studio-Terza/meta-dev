@@ -11,9 +11,9 @@ pub struct Packages(BTreeMap<PathBuf, PackageRoot>);
 
 impl Packages {
     #[must_use]
-    pub fn read(files: &impl Files, packages: &[&Path]) -> Packages {
+    pub fn read(files: &impl Files, packages: &[&Path]) -> Self {
         let distinct: Vec<&Path> = packages.iter().copied().collect::<BTreeSet<&Path>>().into_iter().collect();
-        Packages(
+        Self(
             distinct
                 .iter()
                 .map(|package| package.to_path_buf())

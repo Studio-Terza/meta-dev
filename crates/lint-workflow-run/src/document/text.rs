@@ -17,7 +17,7 @@ pub struct Text<'text>(&'text str);
 impl<'text> Text<'text> {
     pub(crate) const EXPANSION: Word = Word::new("${");
 
-    pub(crate) fn after(self, prefix: Text<'_>) -> Option<Text<'text>> {
+    pub(crate) fn after(self, prefix: Text<'_>) -> Option<Self> {
         self.0.get(..prefix.0.len()).filter(|start| *start == prefix.0).and(self.0.get(prefix.0.len()..)).map(Text)
     }
 
@@ -35,7 +35,7 @@ impl<'text> Text<'text> {
             .map(|_| Self::EXPANSION)
     }
 
-    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Text<'text>> {
+    pub(crate) fn first_word_outside(self, known: &[Word]) -> Option<Self> {
         let start = self.trimmed().0;
         let end = start.char_indices().find(|(_, letter)| letter.is_whitespace()).map_or(start.len(), |(at, _)| at);
         start
@@ -49,7 +49,7 @@ impl<'text> Text<'text> {
         Characters::new(self.0.chars().count())
     }
 
-    pub(crate) fn trimmed(self) -> Text<'text> {
+    pub(crate) fn trimmed(self) -> Self {
         let leading: usize = self.0.chars().take_while(|letter| letter.is_whitespace()).map(char::len_utf8).sum();
         let blanks_gone = self.0.get(leading..).unwrap_or_default();
         let trailing: usize =
@@ -67,14 +67,14 @@ impl<'text> Text<'text> {
 }
 
 impl From<Word> for Text<'static> {
-    fn from(word: Word) -> Text<'static> {
+    fn from(word: Word) -> Self {
         Text(word.into_inner())
     }
 }
 
 impl From<Text<'_>> for Excerpt {
-    fn from(text: Text<'_>) -> Excerpt {
-        Excerpt::new(text.0.to_owned())
+    fn from(text: Text<'_>) -> Self {
+        Self::new(text.0.to_owned())
     }
 }
 

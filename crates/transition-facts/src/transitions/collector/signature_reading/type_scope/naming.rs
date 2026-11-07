@@ -28,17 +28,17 @@ impl Naming {
 
     pub(super) fn spelled(scope: &TypeScope<'_>, path: &Path, segment: &PathSegment) -> Resolved {
         let name = Name::from(&segment.ident);
-        Naming::from(&name).resolved(scope, path, segment, name)
+        Self::from(&name).resolved(scope, path, segment, name)
     }
 
     pub(super) fn resolved(self, scope: &TypeScope<'_>, path: &Path, segment: &PathSegment, name: Name) -> Resolved {
         match self {
-            Naming::Wrapper => {
+            Self::Wrapper => {
                 scope.argument(&segment.arguments).unwrap_or_else(|| Resolved::Found(Endpoint::from(Unnamed::Unit)))
             }
-            Naming::Primitive => Resolved::Found(Endpoint::new(Nature::Primitive, name)),
-            Naming::Itself => Resolved::Itself,
-            Naming::Declared => scope.declared(&name).unwrap_or_else(|| {
+            Self::Primitive => Resolved::Found(Endpoint::new(Nature::Primitive, name)),
+            Self::Itself => Resolved::Itself,
+            Self::Declared => scope.declared(&name).unwrap_or_else(|| {
                 Resolved::Found(Endpoint::new(Nature::Named, name).spelled(Spelling::of_path(path)))
             }),
         }
@@ -46,14 +46,14 @@ impl Naming {
 }
 
 impl From<&Name> for Naming {
-    fn from(name: &Name) -> Naming {
+    fn from(name: &Name) -> Self {
         [
-            (&Self::WRAPPERS[..], Naming::Wrapper),
-            (&Self::PRIMITIVES[..], Naming::Primitive),
-            (&Self::SELF[..], Naming::Itself),
+            (&Self::WRAPPERS[..], Self::Wrapper),
+            (&Self::PRIMITIVES[..], Self::Primitive),
+            (&Self::SELF[..], Self::Itself),
         ]
         .into_iter()
         .find(|(spelled, _)| name.matches::<Whole>(spelled).is_some())
-        .map_or(Naming::Declared, |(_, naming)| naming)
+        .map_or(Self::Declared, |(_, naming)| naming)
     }
 }

@@ -12,7 +12,7 @@ pub struct MutantResult<'log> {
 }
 
 impl<'log> MutantResult<'log> {
-    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<FailedTest<'log>>) -> MutantResult<'log> {
+    pub(crate) fn new(name: Title, summary: Verdict, failed: Vec<FailedTest<'log>>) -> Self {
         MutantResult { name, summary, failed }
     }
 }

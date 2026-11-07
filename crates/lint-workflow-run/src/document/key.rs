@@ -13,16 +13,16 @@ pub(crate) enum Key {
 }
 
 impl Key {
-    const NAMES: [(&'static str, Key); 6] = [
-        ("run", Key::Run),
-        ("shell", Key::Shell),
-        ("uses", Key::Uses),
-        ("with", Key::With),
-        ("script", Key::Script),
-        ("env", Key::Env),
+    const NAMES: [(&'static str, Self); 6] = [
+        ("run", Self::Run),
+        ("shell", Self::Shell),
+        ("uses", Self::Uses),
+        ("with", Self::With),
+        ("script", Self::Script),
+        ("env", Self::Env),
     ];
 
-    pub(crate) fn named(text: Text<'_>) -> Option<Key> {
+    pub(crate) fn named(text: Text<'_>) -> Option<Self> {
         Self::NAMES.into_iter().find(|(name, _)| *name == text.into_inner()).map(|(_, key)| key)
     }
 }

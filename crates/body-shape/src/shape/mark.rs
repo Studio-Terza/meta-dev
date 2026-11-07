@@ -4,14 +4,14 @@ use newtype::{Arbitrary, Newtype};
 pub(crate) struct Mark(char);
 
 impl Mark {
-    pub(crate) const DOT: Mark = Mark::new('.');
-    pub(crate) const COLON: Mark = Mark::new(':');
-    pub(crate) const BANG: Mark = Mark::new('!');
-    pub(crate) const MINUS: Mark = Mark::new('-');
-    pub(crate) const OPEN_PAREN: Mark = Mark::new('(');
-    pub(crate) const CLOSE_PAREN: Mark = Mark::new(')');
-    pub(crate) const OPEN_BRACE: Mark = Mark::new('{');
-    pub(crate) const CLOSE_BRACE: Mark = Mark::new('}');
-    pub(crate) const OPEN_BRACKET: Mark = Mark::new('[');
-    pub(crate) const CLOSE_BRACKET: Mark = Mark::new(']');
+    pub(crate) const DOT: Self = Self::new('.');
+    pub(crate) const COLON: Self = Self::new(':');
+    pub(crate) const BANG: Self = Self::new('!');
+    pub(crate) const MINUS: Self = Self::new('-');
+    pub(crate) const OPEN_PAREN: Self = Self::new('(');
+    pub(crate) const CLOSE_PAREN: Self = Self::new(')');
+    pub(crate) const OPEN_BRACE: Self = Self::new('{');
+    pub(crate) const CLOSE_BRACE: Self = Self::new('}');
+    pub(crate) const OPEN_BRACKET: Self = Self::new('[');
+    pub(crate) const CLOSE_BRACKET: Self = Self::new(']');
 }

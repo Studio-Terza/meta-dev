@@ -13,9 +13,9 @@ pub enum Finding {
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Finding::BarePrimitive { primitive, context } => write!(formatter, "bare {primitive} in {context}"),
-            Finding::WireForm { wire, context } => write!(formatter, "{wire} in {context} is a wire form"),
-            Finding::TextOutsideDoor { handler } => write!(formatter, "{handler} handles text outside a door"),
+            Self::BarePrimitive { primitive, context } => write!(formatter, "bare {primitive} in {context}"),
+            Self::WireForm { wire, context } => write!(formatter, "{wire} in {context} is a wire form"),
+            Self::TextOutsideDoor { handler } => write!(formatter, "{handler} handles text outside a door"),
         }
     }
 }
@@ -23,11 +23,11 @@ impl fmt::Display for Finding {
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
         match self {
-            Finding::BarePrimitive { .. } => Fix::new(
+            Self::BarePrimitive { .. } => Fix::new(
                 "take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary",
             ),
-            Finding::WireForm { .. } => Fix::new("parse it into a type at the door"),
-            Finding::TextOutsideDoor { .. } => Fix::new("parse in FromStr or render in Display"),
+            Self::WireForm { .. } => Fix::new("parse it into a type at the door"),
+            Self::TextOutsideDoor { .. } => Fix::new("parse in FromStr or render in Display"),
         }
     }
 }

@@ -12,9 +12,9 @@ pub enum Finding {
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Finding::Return => formatter.write_str("return"),
-            Finding::Break => formatter.write_str("break"),
-            Finding::Continue => formatter.write_str("continue"),
+            Self::Return => formatter.write_str("return"),
+            Self::Break => formatter.write_str("break"),
+            Self::Continue => formatter.write_str("continue"),
         }
     }
 }

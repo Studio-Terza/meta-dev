@@ -16,11 +16,11 @@ pub struct GenericImpl<'file> {
 }
 
 impl<'file> GenericImpl<'file> {
-    pub(crate) fn new(krate: &'file CrateName, site: Site<'file>, target: Name) -> GenericImpl<'file> {
+    pub(crate) fn new(krate: &'file CrateName, site: Site<'file>, target: Name) -> Self {
         GenericImpl { krate, site, target, implemented: None, methods: Vec::new() }
     }
 
-    pub(crate) fn filled(mut self, implemented: Option<Name>, methods: Vec<Method>) -> GenericImpl<'file> {
+    pub(crate) fn filled(mut self, implemented: Option<Name>, methods: Vec<Method>) -> Self {
         self.implemented = implemented;
         self.methods = methods;
         self

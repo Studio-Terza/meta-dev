@@ -17,7 +17,7 @@ pub struct Extraction<'file> {
 }
 
 impl<'file> From<&'file [SourceFile]> for Extraction<'file> {
-    fn from(files: &'file [SourceFile]) -> Extraction<'file> {
+    fn from(files: &'file [SourceFile]) -> Self {
         Extraction { facts: Facts::of_files(files), transitions: Transitions::of_files(files) }
     }
 }
@@ -49,7 +49,7 @@ pub struct TypeSystem<'found, 'file> {
 
 impl<'found, 'file> TypeSystem<'found, 'file> {
     #[must_use]
-    pub fn built_from(files: &'file [SourceFile], extraction: &'found Extraction<'file>) -> TypeSystem<'found, 'file> {
+    pub fn built_from(files: &'file [SourceFile], extraction: &'found Extraction<'file>) -> Self {
         let types = WorkspaceTypes::declared(extraction.facts(), extraction.transitions());
         let edges = extraction.transitions().all().map(|found| types.edge(found)).collect();
         TypeSystem {

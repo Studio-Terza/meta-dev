@@ -25,13 +25,13 @@ impl GoldenTests {
     const TEST: &'static str = "#[test]";
     const ASYNC_TEST: &'static str = "#[tokio::test]";
 
-    pub fn under(files: &impl Files, sources: &Path) -> Result<GoldenTests, Failure<'static>> {
+    pub fn under(files: &impl Files, sources: &Path) -> Result<Self, Failure<'static>> {
         let found = RustFiles::below(files, &sources.join(Self::CRATES))?;
         let read = files.read_many(&found);
-        found.into_iter().zip(read).try_fold(GoldenTests::default(), |tests, (file, bytes)| {
+        found.into_iter().zip(read).try_fold(Self::default(), |tests, (file, bytes)| {
             let bytes =
                 bytes.map_err(|failure| Failure::Io { path: Cow::Owned(file), source: io::Error::from(failure) })?;
-            Ok(tests.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<GoldenTests>().unwrap_or_default()))
+            Ok(tests.merged(LossyText::from(bytes.as_ref()).as_ref().parse::<Self>().unwrap_or_default()))
         })
     }
 
@@ -39,21 +39,21 @@ impl GoldenTests {
         &self.0
     }
 
-    fn merged(self, other: GoldenTests) -> GoldenTests {
-        GoldenTests(self.0.into_iter().chain(other.0).collect())
+    fn merged(self, other: Self) -> Self {
+        Self(self.0.into_iter().chain(other.0).collect())
     }
 }
 
 impl FromStr for GoldenTests {
     type Err = Infallible;
 
-    fn from_str(text: &str) -> Result<GoldenTests, Infallible> {
+    fn from_str(text: &str) -> Result<Self, Infallible> {
         let markers: BTreeMap<usize, usize> = [Self::TEST, Self::ASYNC_TEST]
             .into_iter()
             .flat_map(|marker| text.match_indices(marker).map(|(at, found)| (at, found.len())))
             .collect();
         let ends: Vec<usize> = markers.keys().skip(1).copied().chain([text.len()]).collect();
-        Ok(GoldenTests(
+        Ok(Self(
             markers
                 .iter()
                 .zip(ends)

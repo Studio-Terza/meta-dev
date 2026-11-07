@@ -20,7 +20,7 @@ impl<'file> Imports<'file> {
         self.0.iter().find_map(|import| import.names(name)).map(Import::spelled_path)
     }
 
-    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<&Imports<'file>> {
+    pub fn local_item(&self, name: &Name, local_roots: &BTreeSet<Name>) -> Option<&Self> {
         self.0
             .iter()
             .filter_map(|import| import.names(name))

@@ -8,7 +8,7 @@ use crate::document::text::Text;
 pub(crate) struct Node<'node, 'input>(&'node MarkedYaml<'input>);
 
 impl<'node, 'input> Node<'node, 'input> {
-    pub(crate) fn new(node: &'node MarkedYaml<'input>) -> Node<'node, 'input> {
+    pub(crate) fn new(node: &'node MarkedYaml<'input>) -> Self {
         Node(node)
     }
 
@@ -28,7 +28,7 @@ impl<'node, 'input> Node<'node, 'input> {
         }
     }
 
-    pub(crate) fn entry(self, key: Key) -> Option<Node<'node, 'input>> {
+    pub(crate) fn entry(self, key: Key) -> Option<Self> {
         match self.structure() {
             YamlData::Mapping(entries) => entries
                 .iter()

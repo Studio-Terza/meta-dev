@@ -45,10 +45,10 @@ impl GoldenTest {
         rest.filter(|rest| rest.chars().skip_while(|letter| letter.is_whitespace()).take(1).eq([Self::OPEN]))
     }
 
-    fn function_name(text: &str) -> Option<GoldenTest> {
+    fn function_name(text: &str) -> Option<Self> {
         text.match_indices(Self::FUNCTION)
             .find_map(|(at, mark)| Self::after_keyword(text.get(at + mark.len()..)?))
-            .map(|name| GoldenTest(TestName::new(name)))
+            .map(|name| Self(TestName::new(name)))
     }
 
     fn after_keyword(rest: &str) -> Option<String> {
@@ -61,7 +61,7 @@ impl GoldenTest {
 impl FromStr for GoldenTest {
     type Err = NotGolden;
 
-    fn from_str(text: &str) -> Result<GoldenTest, NotGolden> {
+    fn from_str(text: &str) -> Result<Self, NotGolden> {
         Self::uses_golden(text).and_then(Self::function_name).ok_or(NotGolden)
     }
 }

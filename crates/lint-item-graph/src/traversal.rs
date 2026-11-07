@@ -22,7 +22,7 @@ where
 {
     #[must_use]
     pub fn trees(roots: impl IntoIterator<IntoIter = Roots>, neighbours: Neighbours) -> Vec<Vec<Index>> {
-        Traversal { neighbours, roots: roots.into_iter(), seen: BTreeSet::new(), path: Vec::new() }.collect()
+        Self { neighbours, roots: roots.into_iter(), seen: BTreeSet::new(), path: Vec::new() }.collect()
     }
 
     fn enter(&mut self, node: Index) {

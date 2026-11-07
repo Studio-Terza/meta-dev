@@ -13,8 +13,8 @@ pub(crate) struct Flagged {
 }
 
 impl Flagged {
-    pub(crate) fn new(line: LineNumber, finding: Finding<'static>) -> Flagged {
-        Flagged { line, finding }
+    pub(crate) fn new(line: LineNumber, finding: Finding<'static>) -> Self {
+        Self { line, finding }
     }
 
     pub(crate) fn in_file(self, path: &Path) -> Violation<'_> {

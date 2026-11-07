@@ -12,7 +12,7 @@ impl Expansion {
 impl<'text> TryFrom<Text<'text>> for Expansion {
     type Error = Text<'text>;
 
-    fn try_from(rest: Text<'text>) -> Result<Expansion, Text<'text>> {
+    fn try_from(rest: Text<'text>) -> Result<Self, Text<'text>> {
         let spelled = rest.0;
         let end = spelled.match_indices(Self::CLOSE).next().map_or(spelled.len(), |(at, _)| at);
         spelled
@@ -22,7 +22,7 @@ impl<'text> TryFrom<Text<'text>> for Expansion {
                 name.chars().filter(|letter| letter.is_alphanumeric()).count() + name.matches(Self::UNDERSCORE).count()
                     < name.chars().count()
             })
-            .map(|_| Expansion)
+            .map(|_| Self)
             .ok_or(rest)
     }
 }

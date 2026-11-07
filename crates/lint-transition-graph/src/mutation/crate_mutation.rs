@@ -16,10 +16,7 @@ pub(super) struct CrateMutation<'found, 'file> {
 }
 
 impl<'found, 'file> CrateMutation<'found, 'file> {
-    pub(super) fn measured(
-        name: &'found CrateName,
-        edges: &[&'found Edge<'found, 'file>],
-    ) -> CrateMutation<'found, 'file> {
+    pub(super) fn measured(name: &'found CrateName, edges: &[&'found Edge<'found, 'file>]) -> Self {
         CrateMutation {
             name,
             first: edges.iter().map(|edge| edge.site()).min(),

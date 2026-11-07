@@ -20,7 +20,7 @@ pub struct Context<'run> {
 }
 
 impl<'run> Context<'run> {
-    pub fn new(judge: &'run Judge<'run>, holders: &'run Holders, crate_name: CrateName) -> Context<'run> {
+    pub fn new(judge: &'run Judge<'run>, holders: &'run Holders, crate_name: CrateName) -> Self {
         Context { judge, holders, crate_name }
     }
 

@@ -9,7 +9,7 @@ pub(crate) struct Subject<'file> {
 }
 
 impl<'file> Subject<'file> {
-    pub(crate) fn new(file: &'file SourceFile, name: Name) -> Subject<'file> {
+    pub(crate) fn new(file: &'file SourceFile, name: Name) -> Self {
         Subject { package: Package::containing(file), name }
     }
 

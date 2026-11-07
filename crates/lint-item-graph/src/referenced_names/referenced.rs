@@ -25,7 +25,7 @@ pub struct Referenced {
 }
 
 impl Referenced {
-    pub fn of_tokens(scope: &Scope<'_>, tokens: TokenStream) -> Referenced {
+    pub fn of_tokens(scope: &Scope<'_>, tokens: TokenStream) -> Self {
         let path = PathTokens::new(tokens);
         let idents: Vec<(&TokenTree, &TokenTree, Name)> = path
             .as_ref()
@@ -45,13 +45,12 @@ impl Referenced {
                 scope.spelled(token, root, name).into_iter().map(move |name| Segment { root, name })
             })
             .collect();
-        let nested =
-            path.as_ref().iter().filter_map(Syntax::group).map(|group| Referenced::of_tokens(scope, group.stream()));
-        let own = Referenced { local: Self::paths(&local), across: Self::paths(&across) };
-        nested.fold(own, Referenced::merged)
+        let nested = path.as_ref().iter().filter_map(Syntax::group).map(|group| Self::of_tokens(scope, group.stream()));
+        let own = Self { local: Self::paths(&local), across: Self::paths(&across) };
+        nested.fold(own, Self::merged)
     }
 
-    fn merged(mut self, other: Referenced) -> Referenced {
+    fn merged(mut self, other: Self) -> Self {
         self.local.extend(other.local);
         self.across.extend(other.across);
         self

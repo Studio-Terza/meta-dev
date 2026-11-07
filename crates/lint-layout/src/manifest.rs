@@ -42,7 +42,7 @@ impl Manifest {
     const TARGET_DIRECTORIES: [&'static str; 4] = ["tests", "src/bin", "examples", "benches"];
     const DEPENDENCIES: [&'static str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Manifest>, Failure>> {
+    pub fn read_many(files: &impl Files, directories: &[impl AsRef<Path>]) -> Vec<Result<Option<Self>, Failure>> {
         let paths: Vec<PathBuf> = directories.iter().map(|directory| directory.as_ref().join(Self::FILE)).collect();
         directories
             .iter()
@@ -51,11 +51,11 @@ impl Manifest {
             .collect()
     }
 
-    fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Manifest>, Failure> {
+    fn parsed(directory: &Path, read: Result<Text, FileFailure>) -> Result<Option<Self>, Failure> {
         match read.map(Newtype::into_inner).map_err(io::Error::from) {
             Ok(text) => text
                 .parse::<Table>()
-                .map(|table| Some(Manifest { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
+                .map(|table| Some(Self { directory: directory.to_path_buf(), text: SourceText::new(text), table }))
                 .map_err(|source| Failure::Manifest { path: directory.join(Self::FILE), source }),
             Err(source) => Some(source.kind())
                 .filter(|kind| *kind == io::ErrorKind::NotFound)
@@ -69,7 +69,7 @@ impl Manifest {
     }
 
     #[must_use]
-    pub fn package(&self) -> Option<&Manifest> {
+    pub fn package(&self) -> Option<&Self> {
         self.table.contains_key(Self::PACKAGE).then_some(self)
     }
 

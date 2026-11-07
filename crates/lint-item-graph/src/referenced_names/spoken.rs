@@ -9,7 +9,7 @@ impl Spoken {
     pub fn of_item(item: &Item) -> TokenStream {
         match item {
             Item::Struct(found) => {
-                Spoken::default()
+                Self::default()
                     .appended(&found.attrs)
                     .appended([&found.generics])
                     .appended(&found.generics.where_clause)
@@ -21,11 +21,11 @@ impl Spoken {
                     .variants
                     .iter()
                     .fold(
-                        Spoken::default()
+                        Self::default()
                             .appended(&found.attrs)
                             .appended([&found.generics])
                             .appended(&found.generics.where_clause),
-                        Spoken::variant,
+                        Self::variant,
                     )
                     .0
             }
@@ -33,16 +33,16 @@ impl Spoken {
         }
     }
 
-    fn appended(mut self, parts: impl IntoIterator<Item = impl ToTokens>) -> Spoken {
+    fn appended(mut self, parts: impl IntoIterator<Item = impl ToTokens>) -> Self {
         parts.into_iter().for_each(|part| part.to_tokens(&mut self.0));
         self
     }
 
-    fn fields(self, fields: &Fields) -> Spoken {
+    fn fields(self, fields: &Fields) -> Self {
         fields.iter().fold(self, |spoken, field| spoken.appended(&field.attrs).appended([&field.ty]))
     }
 
-    fn variant(self, variant: &Variant) -> Spoken {
+    fn variant(self, variant: &Variant) -> Self {
         let discriminant = variant.discriminant.as_ref().map(|(_, value)| value);
         self.appended(&variant.attrs).fields(&variant.fields).appended(discriminant)
     }

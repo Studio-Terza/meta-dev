@@ -3,8 +3,8 @@ use std::fmt;
 pub(crate) struct Listed<Item, const SEPARATOR: char>(Vec<Item>);
 
 impl<Item, const SEPARATOR: char> Listed<Item, SEPARATOR> {
-    pub(crate) fn joined(items: impl IntoIterator<Item = Item>) -> Listed<Item, SEPARATOR> {
-        Listed(items.into_iter().collect())
+    pub(crate) fn joined(items: impl IntoIterator<Item = Item>) -> Self {
+        Self(items.into_iter().collect())
     }
 }
 

@@ -11,12 +11,12 @@ pub(super) enum Role {
 }
 
 impl Role {
-    pub(super) fn read(edge: &Edge<'_, '_>) -> Option<Role> {
+    pub(super) fn read(edge: &Edge<'_, '_>) -> Option<Self> {
         let form = edge.form();
-        let effect = form.ported().map(|_| Role::Port);
+        let effect = form.ported().map(|_| Self::Port);
         let role = form.algebraic().map_or_else(
-            || effect.unwrap_or_else(|| form.sorted(Role::Written, Role::Lift, Role::Store)),
-            |_| Role::Operation,
+            || effect.unwrap_or_else(|| form.sorted(Self::Written, Self::Lift, Self::Store)),
+            |_| Self::Operation,
         );
         edge.transition().context().trait_name().map_or(Some(role), |_| None)
     }
@@ -29,7 +29,7 @@ pub(crate) struct Step<'found> {
 }
 
 impl<'found> Step<'found> {
-    pub(super) fn read(edge: &Edge<'found, '_>) -> Option<Step<'found>> {
+    pub(super) fn read(edge: &Edge<'found, '_>) -> Option<Self> {
         let gives: &End<'found> = edge.ends().as_ref();
         Role::read(edge).map(|role| Step { role, outside: gives.node().map_or(Some(*gives), |_| None) })
     }

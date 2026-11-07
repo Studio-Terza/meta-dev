@@ -17,7 +17,7 @@ enum FieldKey<'file> {
 }
 
 impl<'file> StructFields<'file> {
-    pub fn describe(item: &'file ItemStruct) -> StructFields<'file> {
+    pub fn describe(item: &'file ItemStruct) -> Self {
         StructFields {
             generics: item
                 .generics
@@ -74,7 +74,7 @@ impl<'file> StructFields<'file> {
 }
 
 impl<'file> From<&'file Member> for FieldKey<'file> {
-    fn from(member: &'file Member) -> FieldKey<'file> {
+    fn from(member: &'file Member) -> Self {
         match member {
             Member::Named(ident) => FieldKey::Named(ident),
             Member::Unnamed(index) => FieldKey::Unnamed(Index { index: index.index, span: index.span }),

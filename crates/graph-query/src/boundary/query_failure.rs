@@ -18,7 +18,7 @@ pub enum QueryFailure {
 }
 
 impl From<Infallible> for QueryFailure {
-    fn from(never: Infallible) -> QueryFailure {
+    fn from(never: Infallible) -> Self {
         match never {}
     }
 }

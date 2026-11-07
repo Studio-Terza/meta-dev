@@ -25,7 +25,7 @@ impl TestFeatures {
     const VALUE_INDEX: usize = 2;
 
     pub(crate) fn in_file(file: &syn::File) -> Vec<Flagged> {
-        let mut features = TestFeatures::default();
+        let mut features = Self::default();
         features.visit_file(file);
         features.found
     }

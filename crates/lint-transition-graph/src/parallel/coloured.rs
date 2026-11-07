@@ -12,7 +12,7 @@ pub(super) struct Coloured<'found> {
 }
 
 impl<'found> Coloured<'found> {
-    pub(super) fn refined<Label: Ord, Law: Ord>(refinement: &Refinement<Node<'found>, Label, Law>) -> Coloured<'found> {
+    pub(super) fn refined<Label: Ord, Law: Ord>(refinement: &Refinement<Node<'found>, Label, Law>) -> Self {
         Coloured { colours: refinement.coloured() }
     }
 

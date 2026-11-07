@@ -7,15 +7,15 @@ pub enum Role {
 }
 
 impl Role {
-    pub const SOURCES: [Role; 3] = [Role::Library, Role::Binary, Role::Test];
+    pub const SOURCES: [Self; 3] = [Self::Library, Self::Binary, Self::Test];
 
     const MANIFEST_TEXT: &'static str = "[package]\nname = \"fuzzed\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
 
     fn file(self) -> &'static str {
         match self {
-            Role::Library | Role::Manifest => "src/lib.rs",
-            Role::Binary => "src/main.rs",
-            Role::Test => "tests/fuzzed.rs",
+            Self::Library | Self::Manifest => "src/lib.rs",
+            Self::Binary => "src/main.rs",
+            Self::Test => "tests/fuzzed.rs",
         }
     }
 }
@@ -27,8 +27,8 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(role: Role, bytes: Vec<u8>) -> Input {
-        Input { role, bytes }
+    pub fn new(role: Role, bytes: Vec<u8>) -> Self {
+        Self { role, bytes }
     }
 
     pub fn bytes(&self) -> &[u8] {

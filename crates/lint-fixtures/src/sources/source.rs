@@ -15,8 +15,8 @@ pub struct Source {
 
 impl Source {
     #[must_use]
-    pub const fn new(path: Located, text: Text<'static>) -> Source {
-        Source { path, text }
+    pub const fn new(path: Located, text: Text<'static>) -> Self {
+        Self { path, text }
     }
 
     #[must_use]

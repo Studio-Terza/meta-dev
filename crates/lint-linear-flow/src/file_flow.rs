@@ -16,7 +16,7 @@ pub struct FileFlow<'file> {
 }
 
 impl<'file> FileFlow<'file> {
-    pub fn of_files(files: &'file [SourceFile]) -> Vec<FileFlow<'file>> {
+    pub fn of_files(files: &'file [SourceFile]) -> Vec<Self> {
         files
             .iter()
             .flat_map(|file| iter::once(file).chain(file.test_modules()))
@@ -32,7 +32,7 @@ impl<'file> FileFlow<'file> {
         &self.functions
     }
 
-    pub fn violations(flows: &[FileFlow<'file>], rule: Rule) -> Vec<Violation<'file>> {
+    pub fn violations(flows: &[Self], rule: Rule) -> Vec<Violation<'file>> {
         let mut found: Vec<Violation<'file>> = flows
             .iter()
             .flat_map(|flow| flow.functions.iter())

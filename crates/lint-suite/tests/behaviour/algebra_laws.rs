@@ -328,8 +328,8 @@ impl Expect {
 
     fn listings(self) -> usize {
         match self {
-            Expect::Credited => 0,
-            Expect::Listed => 1,
+            Self::Credited => 0,
+            Self::Listed => 1,
         }
     }
 }
@@ -349,8 +349,8 @@ struct Row {
 }
 
 impl Row {
-    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Row {
-        Row { id, extras, law, expect }
+    const fn new(id: &'static str, extras: &'static [Extra], law: &'static str, expect: Expect) -> Self {
+        Self { id, extras, law, expect }
     }
 
     fn failure(&self) -> Option<String> {

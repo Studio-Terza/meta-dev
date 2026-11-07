@@ -53,19 +53,19 @@ enum Piece {
 }
 
 impl Piece {
-    fn lexed(token: TokenTree) -> Vec<Piece> {
+    fn lexed(token: TokenTree) -> Vec<Self> {
         match token {
-            TokenTree::Ident(ident) => vec![Piece::Word(ident.to_string())],
-            TokenTree::Literal(literal) => vec![Piece::Word(literal.to_string())],
-            TokenTree::Punct(punct) => vec![Piece::Mark(punct.as_char().to_string())],
-            TokenTree::Group(group) => Piece::grouped(&group),
+            TokenTree::Ident(ident) => vec![Self::Word(ident.to_string())],
+            TokenTree::Literal(literal) => vec![Self::Word(literal.to_string())],
+            TokenTree::Punct(punct) => vec![Self::Mark(punct.as_char().to_string())],
+            TokenTree::Group(group) => Self::grouped(&group),
         }
     }
 
-    fn grouped(group: &Group) -> Vec<Piece> {
+    fn grouped(group: &Group) -> Vec<Self> {
         let [opening, closing] = Brackets::around(group.delimiter());
         let inner = SelfType::sequence(group.stream());
-        [vec![Piece::Mark(opening.to_owned())], inner, vec![Piece::Mark(closing.to_owned())]]
+        [vec![Self::Mark(opening.to_owned())], inner, vec![Self::Mark(closing.to_owned())]]
             .into_iter()
             .flatten()
             .collect()
@@ -73,8 +73,8 @@ impl Piece {
 
     fn spacing(&self) -> &'static str {
         match self {
-            Piece::Word(_) => " ",
-            Piece::Mark(_) => "",
+            Self::Word(_) => " ",
+            Self::Mark(_) => "",
         }
     }
 }
@@ -82,7 +82,7 @@ impl Piece {
 impl AsRef<str> for Piece {
     fn as_ref(&self) -> &str {
         match self {
-            Piece::Word(text) | Piece::Mark(text) => text,
+            Self::Word(text) | Self::Mark(text) => text,
         }
     }
 }

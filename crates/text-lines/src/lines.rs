@@ -2,7 +2,7 @@
 pub struct Lines<'text>(&'text str);
 
 impl<'text> From<&'text str> for Lines<'text> {
-    fn from(text: &'text str) -> Lines<'text> {
+    fn from(text: &'text str) -> Self {
         Lines(text)
     }
 }

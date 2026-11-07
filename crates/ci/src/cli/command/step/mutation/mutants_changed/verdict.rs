@@ -13,7 +13,7 @@ pub(super) enum Verdict<'text> {
 }
 
 impl<'text> From<&'text Text> for Verdict<'text> {
-    fn from(missed: &'text Text) -> Verdict<'text> {
+    fn from(missed: &'text Text) -> Self {
         missed.as_ref().chars().next().map_or(Verdict::NoneMissed, |_| Verdict::Missed(missed))
     }
 }

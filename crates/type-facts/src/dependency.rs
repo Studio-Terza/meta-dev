@@ -12,11 +12,11 @@ pub struct Dependency<'file> {
 }
 
 impl<'file> Dependency<'file> {
-    pub(crate) fn new(name: Name, site: Site<'file>, via: Via) -> Dependency<'file> {
+    pub(crate) fn new(name: Name, site: Site<'file>, via: Via) -> Self {
         Dependency { name, written: Vec::new(), site, via }
     }
 
-    pub(crate) fn qualified(mut self, written: Vec<Name>) -> Dependency<'file> {
+    pub(crate) fn qualified(mut self, written: Vec<Name>) -> Self {
         self.written = written;
         self
     }

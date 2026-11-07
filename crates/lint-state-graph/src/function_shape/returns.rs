@@ -10,14 +10,14 @@ pub enum Returns<'found> {
 }
 
 impl<'found> Returns<'found> {
-    pub fn classify(output: &ReturnType, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
+    pub fn classify(output: &ReturnType, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Self {
         match output {
             ReturnType::Default => Returns::Other,
             ReturnType::Type(_, ty) => Self::of_type(ty, vertex),
         }
     }
 
-    fn of_type(ty: &Type, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
+    fn of_type(ty: &Type, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Self {
         match ty {
             Type::Reference(_) => Returns::Other,
             Type::Tuple(tuple) => Self::of_tuple(tuple, vertex),
@@ -32,7 +32,7 @@ impl<'found> Returns<'found> {
         }
     }
 
-    fn of_tuple(tuple: &TypeTuple, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Returns<'found> {
+    fn of_tuple(tuple: &TypeTuple, vertex: impl Fn(&Type) -> Option<&'found TypeName>) -> Self {
         tuple.elems.iter().find_map(vertex).map_or(Returns::Other, |_| Returns::TupleHoldingVertex)
     }
 }

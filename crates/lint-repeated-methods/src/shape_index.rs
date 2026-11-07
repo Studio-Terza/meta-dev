@@ -28,7 +28,7 @@ pub struct ShapeIndex<'file> {
 
 impl<'file> ShapeIndex<'file> {
     #[must_use]
-    pub fn of_files(files: &[&'file SourceFile]) -> ShapeIndex<'file> {
+    pub fn of_files(files: &[&'file SourceFile]) -> Self {
         let index = ShapeIndex {
             owners: BTreeMap::new(),
             inners: Inners::gathered_from(files),
@@ -63,7 +63,7 @@ impl<'file> ShapeIndex<'file> {
             .collect()
     }
 
-    fn reading(self, file: &'file SourceFile) -> ShapeIndex<'file> {
+    fn reading(self, file: &'file SourceFile) -> Self {
         let mut index = ShapeIndex { file: file.path(), home: Home::containing(file), ..self };
         index.visit_file(file.syntax());
         index

@@ -14,8 +14,8 @@ struct Tally {
 }
 
 impl Tally {
-    fn counted(self, observed: &BTreeSet<String>, expected: &BTreeSet<String>) -> Tally {
-        Tally {
+    fn counted(self, observed: &BTreeSet<String>, expected: &BTreeSet<String>) -> Self {
+        Self {
             built: self.built + observed.len(),
             misses: self.misses + expected.difference(observed).count(),
             extras: self.extras + observed.difference(expected).count(),

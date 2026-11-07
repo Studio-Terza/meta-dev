@@ -14,17 +14,17 @@ struct Parameter {
 }
 
 impl Parameter {
-    fn written(scope: &Scope, pattern: &Pat) -> Option<Parameter> {
+    fn written(scope: &Scope, pattern: &Pat) -> Option<Self> {
         match pattern {
-            Pat::Ident(named) => Some(Parameter { name: Name::from(&named.ident), typed: None }),
+            Pat::Ident(named) => Some(Self { name: Name::from(&named.ident), typed: None }),
             Pat::Type(typed) => Self::annotated(scope, typed),
             _ => None,
         }
     }
 
-    fn annotated(scope: &Scope, typed: &PatType) -> Option<Parameter> {
+    fn annotated(scope: &Scope, typed: &PatType) -> Option<Self> {
         match &*typed.pat {
-            Pat::Ident(named) => Some(Parameter { name: Name::from(&named.ident), typed: scope.type_named(&typed.ty) }),
+            Pat::Ident(named) => Some(Self { name: Name::from(&named.ident), typed: scope.type_named(&typed.ty) }),
             _ => None,
         }
     }
@@ -41,7 +41,7 @@ impl<'operand> Parameters<'operand> {
         scope: &Scope,
         inputs: &Punctuated<Pat, Token![,]>,
         operand: Option<&'operand Owner>,
-    ) -> Parameters<'operand> {
+    ) -> Self {
         let by_name = inputs
             .iter()
             .filter_map(|pattern| Parameter::written(scope, pattern))

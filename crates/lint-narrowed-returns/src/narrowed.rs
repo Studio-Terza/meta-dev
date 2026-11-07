@@ -17,9 +17,9 @@ struct StdShape {
 }
 
 impl StdShape {
-    const ROWS: [StdShape; 2] = [
-        StdShape { path: &words!["std", "result", "Result"], narrowed: Narrowed::Check },
-        StdShape { path: &words!["std", "option", "Option"], narrowed: Narrowed::Problem },
+    const ROWS: [Self; 2] = [
+        Self { path: &words!["std", "result", "Result"], narrowed: Narrowed::Check },
+        Self { path: &words!["std", "option", "Option"], narrowed: Narrowed::Problem },
     ];
 
     fn path(self) -> ItemPath {
@@ -28,33 +28,33 @@ impl StdShape {
 }
 
 impl Narrowed {
-    pub(crate) fn returned(model: &Model, errors: &ErrorTypes, output: &Output) -> Option<Narrowed> {
+    pub(crate) fn returned(model: &Model, errors: &ErrorTypes, output: &Output) -> Option<Self> {
         let expanded = model.expanded(output.written()?);
         Self::named(errors, expanded.named()?)
     }
 
     pub(crate) fn shown(self) -> Word<'static> {
         match self {
-            Narrowed::Flag => Word::new("bool"),
-            Narrowed::Check => Word::new("Result<(), E>"),
-            Narrowed::Problem => Word::new("Option<E>"),
+            Self::Flag => Word::new("bool"),
+            Self::Check => Word::new("Result<(), E>"),
+            Self::Problem => Word::new("Option<E>"),
         }
     }
 
-    fn named(errors: &ErrorTypes, named: &Named<Sited>) -> Option<Narrowed> {
+    fn named(errors: &ErrorTypes, named: &Named<Sited>) -> Option<Self> {
         let path: &Resolved = named.as_ref();
-        let flag = path.primitive().into_iter().find(|primitive| *primitive == Primitive::Bool).map(|_| Narrowed::Flag);
+        let flag = path.primitive().into_iter().find(|primitive| *primitive == Primitive::Bool).map(|_| Self::Flag);
         flag.or_else(|| {
             let std = path.std()?;
             StdShape::ROWS.iter().find(|row| row.path() == *std)?.narrowed.argued(errors, named.arguments())
         })
     }
 
-    fn argued(self, errors: &ErrorTypes, arguments: &[TypeRef]) -> Option<Narrowed> {
+    fn argued(self, errors: &ErrorTypes, arguments: &[TypeRef]) -> Option<Self> {
         match self {
-            Narrowed::Check => arguments.first().and_then(TypeRef::unit).map(|_| Narrowed::Check),
-            Narrowed::Problem => arguments.first().and_then(|error| errors.holding(error)).map(|_| Narrowed::Problem),
-            Narrowed::Flag => None,
+            Self::Check => arguments.first().and_then(TypeRef::unit).map(|_| Self::Check),
+            Self::Problem => arguments.first().and_then(|error| errors.holding(error)).map(|_| Self::Problem),
+            Self::Flag => None,
         }
     }
 }

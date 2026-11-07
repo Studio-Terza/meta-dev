@@ -43,8 +43,8 @@ struct Reply {
 }
 
 impl Reply {
-    fn to(key: &'static str, text: &str) -> Reply {
-        Reply { key, text: text.to_owned() }
+    fn to(key: &'static str, text: &str) -> Self {
+        Self { key, text: text.to_owned() }
     }
 }
 
@@ -61,8 +61,8 @@ struct Script {
 }
 
 impl Script {
-    fn new() -> Script {
-        Script {
+    fn new() -> Self {
+        Self {
             exit: Exit::Success,
             elapsed: Duration::from_millis(1_500),
             changed: String::new(),
@@ -75,16 +75,16 @@ impl Script {
         }
     }
 
-    fn refusing(program: &'static str) -> Script {
-        Script { failing: Some(program), ..Script::new() }
+    fn refusing(program: &'static str) -> Self {
+        Self { failing: Some(program), ..Self::new() }
     }
 
-    fn answering(answers: Vec<Reply>) -> Script {
-        Script { answers, ..Script::new() }
+    fn answering(answers: Vec<Reply>) -> Self {
+        Self { answers, ..Self::new() }
     }
 
-    fn exiting(code: u8) -> Script {
-        Script { exit: NonZeroU8::new(code).map_or(Exit::Success, Exit::Failure), ..Script::new() }
+    fn exiting(code: u8) -> Self {
+        Self { exit: NonZeroU8::new(code).map_or(Exit::Success, Exit::Failure), ..Self::new() }
     }
 
     fn recorded(&self, invocation: &Invocation) -> io::Result<()> {
@@ -162,15 +162,11 @@ impl Answer {
         Printed { exit: self.exit, out: Text::lines(&self.out), err: Text::lines(&self.err) }
     }
 
-    fn to<Argument: AsRef<str>>(fake: &Fake<'_>, arguments: &[Argument]) -> Answer {
+    fn to<Argument: AsRef<str>>(fake: &Fake<'_>, arguments: &[Argument]) -> Self {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit =
             Cli::answer(arguments.iter().map(|argument| OsString::from(argument.as_ref())), fake, &mut out, &mut err);
-        Answer {
-            exit,
-            out: String::from_utf8(out).unwrap_or_default(),
-            err: String::from_utf8(err).unwrap_or_default(),
-        }
+        Self { exit, out: String::from_utf8(out).unwrap_or_default(), err: String::from_utf8(err).unwrap_or_default() }
     }
 
     fn refused(arguments: &[&str]) -> bool {
@@ -183,7 +179,7 @@ struct Reach;
 
 impl Reach {
     fn on(scratch: &Scratch, event: &str) -> Vec<String> {
-        Reach::into(scratch, event, "")
+        Self::into(scratch, event, "")
     }
 
     fn into(scratch: &Scratch, event: &str, base: &str) -> Vec<String> {
@@ -1043,7 +1039,7 @@ impl Gh {
     }
 
     fn search(stage: &str) -> Invocation {
-        Gh::call(&[
+        Self::call(&[
             "issue",
             "list",
             "--state",
@@ -1163,11 +1159,11 @@ impl Cold {
             Page::unit("ci", "1.0"),
             Page::unit("lint-new", "0.5"),
         ];
-        Cold::build(scratch, "today", &format!("cold-clippy = 13\ncold-test-compile = {today}\n"), &grown)?;
+        Self::build(scratch, "today", &format!("cold-clippy = 13\ncold-test-compile = {today}\n"), &grown)?;
         let first = [Page::unit("lint-core", "2.0"), Page::unit("syn", "4.0"), Page::unit("ci", "1.5")];
-        Cold::build(scratch, "runs/11", "cold-clippy = 10\ncold-test-compile = 40\n", &first)?;
+        Self::build(scratch, "runs/11", "cold-clippy = 10\ncold-test-compile = 40\n", &first)?;
         let second = [Page::unit("lint-core", "3.0"), Page::unit("syn", "4.0")];
-        Cold::build(scratch, "runs/12", "cold-clippy = 12\ncold-test-compile = 42\n", &second)?;
+        Self::build(scratch, "runs/12", "cold-clippy = 12\ncold-test-compile = 42\n", &second)?;
         Ok(["compile-trend", &scratch.file("today"), &scratch.file("runs")].map(str::to_owned).to_vec())
     }
 
@@ -1321,12 +1317,12 @@ struct Case {
 }
 
 impl Case {
-    fn of(changes: &'static str, labels: &'static str) -> Case {
-        Case { kind: "change", changes, labels }
+    fn of(changes: &'static str, labels: &'static str) -> Self {
+        Self { kind: "change", changes, labels }
     }
 
-    fn refactor(changes: &'static str, labels: &'static str) -> Case {
-        Case { kind: "refactor", changes, labels }
+    fn refactor(changes: &'static str, labels: &'static str) -> Self {
+        Self { kind: "refactor", changes, labels }
     }
 }
 
@@ -1337,12 +1333,12 @@ struct Verdict {
 }
 
 impl Verdict {
-    fn passing() -> Verdict {
-        Verdict { exit: ExitCode::SUCCESS, out: String::new() }
+    fn passing() -> Self {
+        Self { exit: ExitCode::SUCCESS, out: String::new() }
     }
 
-    fn failing(out: &str) -> Verdict {
-        Verdict { exit: ExitCode::FAILURE, out: out.to_owned() }
+    fn failing(out: &str) -> Self {
+        Self { exit: ExitCode::FAILURE, out: out.to_owned() }
     }
 }
 
@@ -1749,14 +1745,14 @@ struct Scratch {
 }
 
 impl Scratch {
-    fn new() -> Result<Scratch, FileFailure> {
-        let scratch = Scratch { files: Memory::default(), root: PathBuf::from("/scratch") };
+    fn new() -> Result<Self, FileFailure> {
+        let scratch = Self { files: Memory::default(), root: PathBuf::from("/scratch") };
         scratch.files.create_directories(&scratch.root)?;
         Ok(scratch)
     }
 
-    fn fresh() -> Scratch {
-        Scratch::new().unwrap_or_else(|_| unreachable!("an empty memory takes a directory"))
+    fn fresh() -> Self {
+        Self::new().unwrap_or_else(|_| unreachable!("an empty memory takes a directory"))
     }
 
     fn answer<Argument: AsRef<str>>(&self, script: &Script, arguments: &[Argument]) -> Answer {

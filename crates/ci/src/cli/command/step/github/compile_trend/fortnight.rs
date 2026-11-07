@@ -21,10 +21,10 @@ enum Stamp {
 impl fmt::Display for Stamp {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Stamp::Created => {
+            Self::Created => {
                 write!(formatter, "(.createdAt | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
             }
-            Stamp::Merged => {
+            Self::Merged => {
                 write!(formatter, "(.mergedAt | fromdate) > now - {} * {}", Fortnight::DAYS, Fortnight::DAY_SECONDS)
             }
         }
@@ -44,8 +44,8 @@ impl Fortnight {
     const WORKFLOW: &'static str = "cold-build.yml";
     const BRANCH: &'static str = "main";
 
-    pub(super) fn downloading_to(downloads: PathBuf) -> Fortnight {
-        Fortnight { downloads }
+    pub(super) fn downloading_to(downloads: PathBuf) -> Self {
+        Self { downloads }
     }
 
     pub(super) fn downloaded(&self, ports: &impl Ports) -> Result<Vec<Build>, Failure<'static>> {

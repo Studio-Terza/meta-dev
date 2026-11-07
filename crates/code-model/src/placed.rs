@@ -8,7 +8,7 @@ pub struct Placed<'model, Entity> {
 
 impl<'model, Entity: Copy> Placed<'model, Entity> {
     #[must_use]
-    pub fn new(site: Site<'model>, entity: Entity) -> Placed<'model, Entity> {
+    pub fn new(site: Site<'model>, entity: Entity) -> Self {
         Placed { site, entity }
     }
 

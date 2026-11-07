@@ -19,14 +19,14 @@ impl PathReach {
     const SOURCE_DIRECTORY: &'static str = "src";
 
     pub(crate) fn lines_in(file: &SourceFile) -> Vec<LineNumber> {
-        let mut reach = PathReach::beside(file);
+        let mut reach = Self::beside(file);
         reach.visit_file(file.syntax());
         reach.lines
     }
 
-    fn beside(file: &SourceFile) -> PathReach {
+    fn beside(file: &SourceFile) -> Self {
         let package = AsRef::<Path>::as_ref(file.manifest_file()).parent().map(Path::to_path_buf).unwrap_or_default();
-        PathReach {
+        Self {
             directory: file.path().parent().map(Path::to_path_buf).unwrap_or_default(),
             source: Self::lexical(&package.join(Self::SOURCE_DIRECTORY)),
             lines: Vec::new(),

@@ -38,7 +38,7 @@ impl Finished {
 impl FromStr for Finished {
     type Err = NotAResult;
 
-    fn from_str(line: &str) -> Result<Finished, NotAResult> {
+    fn from_str(line: &str) -> Result<Self, NotAResult> {
         let letters: Vec<char> = line.chars().collect();
         let words: Vec<String> = letters
             .chunk_by(|left, right| left.is_whitespace() == right.is_whitespace())
@@ -46,7 +46,7 @@ impl FromStr for Finished {
             .map(|chunk| chunk.iter().collect())
             .collect();
         (line.get(..Self::RESULT.len()) == Some(Self::RESULT))
-            .then(|| Finished(Self::duration_after(&words)))
+            .then(|| Self(Self::duration_after(&words)))
             .ok_or(NotAResult)
     }
 }

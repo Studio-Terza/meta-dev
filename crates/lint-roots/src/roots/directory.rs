@@ -18,7 +18,7 @@ use kept::Kept;
 pub struct Directory(PathBuf);
 
 impl Directory {
-    pub fn trees(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Vec<Directory>, Failure>> {
+    pub fn trees(files: &impl Files, roots: &[PathBuf]) -> Vec<Result<Vec<Self>, Failure>> {
         Self::walked(files, roots, &Ignored::FOR_PACKAGES, |_, _, order| order)
     }
 
@@ -30,7 +30,7 @@ impl Directory {
         files: &impl Files,
         roots: &[PathBuf],
         ignored: &[Ignored],
-        found: impl Fn(&Gathered<'_>, &Path, Vec<Directory>) -> Found,
+        found: impl Fn(&Gathered<'_>, &Path, Vec<Self>) -> Found,
     ) -> Vec<Result<Found, Failure>> {
         let mut survey = Self::surveyed(files, roots, ignored, Survey::default());
         roots
@@ -51,11 +51,11 @@ impl Directory {
         let manifests = Ignored::manifests(level);
         let survey = survey.learn(files, Fact::Followed, &manifests);
         let kept = Kept::new(&survey, ignored);
-        let next: Vec<Directory> = level.iter().flat_map(|directory| kept.below(directory)).collect();
+        let next: Vec<Self> = level.iter().flat_map(|directory| kept.below(directory)).collect();
         Self::descended(files, next, ignored, survey)
     }
 
-    fn descended(files: &impl Files, next: Vec<Directory>, ignored: &[Ignored], survey: Survey) -> Survey {
+    fn descended(files: &impl Files, next: Vec<Self>, ignored: &[Ignored], survey: Survey) -> Survey {
         match next.first() {
             Some(_) => Self::surveyed(
                 files,

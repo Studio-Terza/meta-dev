@@ -9,9 +9,9 @@ struct Placed {
 }
 
 impl Placed {
-    fn of(pair: &[&str]) -> Option<Placed> {
+    fn of(pair: &[&str]) -> Option<Self> {
         Some(pair).filter(|pair| pair.len() == 2).and_then(|pair| pair.first().zip(pair.last())).map(
-            |(package, file)| Placed {
+            |(package, file)| Self {
                 placement: Placement::within(&Absent, Path::new(package), Path::new(file)),
                 file: PathBuf::from(file),
             },

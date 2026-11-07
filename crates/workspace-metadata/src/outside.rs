@@ -7,7 +7,7 @@ pub struct Outside {
 }
 
 impl Outside {
-    pub(crate) fn new(manifest: PathBuf) -> Outside {
-        Outside { manifest }
+    pub(crate) fn new(manifest: PathBuf) -> Self {
+        Self { manifest }
     }
 }

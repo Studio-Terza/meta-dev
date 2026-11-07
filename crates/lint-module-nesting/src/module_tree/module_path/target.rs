@@ -13,16 +13,16 @@ enum Start {
 }
 
 impl Start {
-    const NAMED: [(&'static str, Start); 2] = [("crate", Start::Crate), ("super", Start::Super)];
+    const NAMED: [(&'static str, Self); 2] = [("crate", Self::Crate), ("super", Self::Super)];
 
-    fn spelled(name: &Name) -> Start {
-        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map_or(Start::Relative, |(_, start)| *start)
+    fn spelled(name: &Name) -> Self {
+        Self::NAMED.iter().find(|(word, _)| *name == Name::from(*word)).map_or(Self::Relative, |(_, start)| *start)
     }
 
     fn advance<'path>(self, mut segments: Vec<&'path Name>, segment: &'path Name) -> Option<Vec<&'path Name>> {
         match self {
-            Start::Super => segments.pop().and(Some(segments)),
-            Start::Crate | Start::Relative => Some(segments.into_iter().chain([segment]).collect()),
+            Self::Super => segments.pop().and(Some(segments)),
+            Self::Crate | Self::Relative => Some(segments.into_iter().chain([segment]).collect()),
         }
     }
 }
@@ -36,11 +36,7 @@ pub struct Target<'path> {
 impl<'path> Target<'path> {
     const ANCHORS: [Word<'static>; 3] = words!["crate", "super", "self"];
 
-    pub fn from_use(
-        file: &ModulePath<'path>,
-        path: &'path UsePath,
-        modules: &ModuleIndex<'_>,
-    ) -> Option<Target<'path>> {
+    pub fn from_use(file: &ModulePath<'path>, path: &'path UsePath, modules: &ModuleIndex<'_>) -> Option<Self> {
         let first = path.segments().first()?;
         let start = Self::start(Start::spelled(first), file)?;
         let anchor = first.matches::<Whole>(&Self::ANCHORS);
@@ -58,7 +54,7 @@ impl<'path> Target<'path> {
         self.prefixes().rev().find_map(|prefix| modules.same_as(self.crate_root, prefix))
     }
 
-    pub fn crossed_directory(&self, user: &ModulePath<'_>, modules: &ModuleIndex<'_>) -> Option<&Target<'path>> {
+    pub fn crossed_directory(&self, user: &ModulePath<'_>, modules: &ModuleIndex<'_>) -> Option<&Self> {
         self.prefixes()
             .take(self.segments.len())
             .skip(1)

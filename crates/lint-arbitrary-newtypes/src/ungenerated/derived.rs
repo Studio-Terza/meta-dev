@@ -20,8 +20,8 @@ impl Derived {
 }
 
 impl From<&[Attribute]> for Derived {
-    fn from(attributes: &[Attribute]) -> Derived {
-        Derived(
+    fn from(attributes: &[Attribute]) -> Self {
+        Self(
             attributes
                 .iter()
                 .filter(|attribute| attribute.path().is_ident(Self::DERIVE))

@@ -10,7 +10,7 @@ use super::Wrapping;
 pub(crate) struct Bounds<'bound>(&'bound Punctuated<TypeParamBound, Plus>);
 
 impl<'bound> Bounds<'bound> {
-    pub(super) fn new(bounds: &'bound Punctuated<TypeParamBound, Plus>) -> Bounds<'bound> {
+    pub(super) fn new(bounds: &'bound Punctuated<TypeParamBound, Plus>) -> Self {
         Bounds(bounds)
     }
 

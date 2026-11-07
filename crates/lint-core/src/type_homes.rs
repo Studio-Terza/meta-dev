@@ -18,7 +18,7 @@ pub struct TypeHomes<'file> {
 
 impl<'file> TypeHomes<'file> {
     #[must_use]
-    pub fn declared_in(files: &[&'file SourceFile]) -> TypeHomes<'file> {
+    pub fn declared_in(files: &[&'file SourceFile]) -> Self {
         files
             .iter()
             .fold(TypeHomes { declared: BTreeMap::new(), reading: Home::NOWHERE }, |homes, file| homes.reading(file))
@@ -40,7 +40,7 @@ impl<'file> TypeHomes<'file> {
             .map_or(from, |home| *home)
     }
 
-    fn reading(self, file: &'file SourceFile) -> TypeHomes<'file> {
+    fn reading(self, file: &'file SourceFile) -> Self {
         let mut homes = TypeHomes { reading: Home::containing(file), ..self };
         homes.visit_file(file.syntax());
         homes

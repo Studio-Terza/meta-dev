@@ -10,7 +10,7 @@ pub(crate) struct Sources<'run, F> {
 }
 
 impl<'run, F> Sources<'run, F> {
-    pub(crate) fn new(files: &'run F, stage: &'run Stage<'run>) -> Sources<'run, F> {
+    pub(crate) fn new(files: &'run F, stage: &'run Stage<'run>) -> Self {
         Sources { files, stage, queue: Queue::default() }
     }
 

@@ -21,7 +21,7 @@ impl<'file> ImplBlock<'file> {
         target: Name,
         implementation: Option<Implementation<'file>>,
         methods: Vec<Method>,
-    ) -> ImplBlock<'file> {
+    ) -> Self {
         ImplBlock { krate, target, implementation, methods }
     }
 

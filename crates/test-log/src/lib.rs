@@ -33,8 +33,8 @@ impl TestLog {
 }
 
 impl From<&str> for TestLog {
-    fn from(text: &str) -> TestLog {
-        TestLog(
+    fn from(text: &str) -> Self {
+        Self(
             Lines::from(text)
                 .map(Line::from)
                 .fold(Reading::default(), |reading, line| line.continuing(reading))

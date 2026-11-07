@@ -18,7 +18,7 @@ pub struct ShardMatrix {
 impl ShardMatrix {
     pub const FILE: &'static str = "matrix.json";
 
-    pub fn parsed(path: PathBuf, text: Result<Text, FileFailure>) -> Result<ShardMatrix, Failure<'static>> {
+    pub fn parsed(path: PathBuf, text: Result<Text, FileFailure>) -> Result<Self, Failure<'static>> {
         match text {
             Ok(text) => {
                 serde_json::from_str(text.as_ref()).map_err(|source| Failure::Parse { path: Cow::Owned(path), source })

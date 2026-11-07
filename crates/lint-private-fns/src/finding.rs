@@ -11,7 +11,7 @@ pub enum Finding {
 
 impl fmt::Display for Finding {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Finding::TooManyPrivateFns { type_name, names, most } = self;
+        let Self::TooManyPrivateFns { type_name, names, most } = self;
         write!(
             formatter,
             "{type_name} has {} private fns, at most {most} allowed: {}",
@@ -23,7 +23,7 @@ impl fmt::Display for Finding {
 
 impl lint_core::Finding for Finding {
     fn fix(&self) -> Fix {
-        let Finding::TooManyPrivateFns { .. } = self;
+        let Self::TooManyPrivateFns { .. } = self;
         Fix::new("move the logic into its public interface or into more types")
     }
 }

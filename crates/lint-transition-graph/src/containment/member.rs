@@ -12,11 +12,11 @@ pub(crate) struct Member<'found> {
 }
 
 impl<'found> Member<'found> {
-    pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Member<'found> {
+    pub(crate) fn declared(krate: &'found CrateName, name: &'found Name) -> Self {
         Member { name, cluster: Cluster::module(krate, &[]) }
     }
 
-    pub(crate) fn within(self, segments: &'found [Name]) -> Option<Member<'found>> {
+    pub(crate) fn within(self, segments: &'found [Name]) -> Option<Self> {
         self.cluster.krate().map(|krate| Member { name: self.name, cluster: Cluster::module(krate, segments) })
     }
 

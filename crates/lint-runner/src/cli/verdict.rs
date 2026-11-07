@@ -8,10 +8,10 @@ pub enum Verdict {
 }
 
 impl From<Verdict> for ExitCode {
-    fn from(verdict: Verdict) -> ExitCode {
+    fn from(verdict: Verdict) -> Self {
         match verdict {
-            Verdict::Clean => ExitCode::SUCCESS,
-            Verdict::Violations | Verdict::Refused => ExitCode::FAILURE,
+            Verdict::Clean => Self::SUCCESS,
+            Verdict::Violations | Verdict::Refused => Self::FAILURE,
         }
     }
 }

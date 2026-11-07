@@ -9,7 +9,7 @@ pub struct Owner<'file> {
 }
 
 impl<'file> Owner<'file> {
-    pub fn new(module: &Module<'file>, name: Name) -> Owner<'file> {
+    pub fn new(module: &Module<'file>, name: Name) -> Self {
         Owner { root: Module::from(<&CrateFile>::from(module)), name }
     }
 }

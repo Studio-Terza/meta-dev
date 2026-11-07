@@ -15,7 +15,7 @@ pub struct Candidate<'name> {
 }
 
 impl<'name> Candidate<'name> {
-    pub fn new(name: &'name Name, line: LineNumber) -> Candidate<'name> {
+    pub fn new(name: &'name Name, line: LineNumber) -> Self {
         Candidate { name, line }
     }
 

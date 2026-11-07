@@ -4,7 +4,7 @@ use newtype::{Arbitrary, Counter, Newtype};
 pub(super) struct Rows(usize);
 
 impl Rows {
-    pub(super) const LISTED: Rows = Rows(30);
+    pub(super) const LISTED: Self = Self(30);
 
     pub(super) fn kept<Row>(self, rows: impl Iterator<Item = Row>) -> impl Iterator<Item = Row> {
         rows.take(self.count())

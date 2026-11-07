@@ -9,8 +9,8 @@ pub struct Declared {
 }
 
 impl Declared {
-    pub fn new(name: Name, kind: Kind) -> Declared {
-        Declared { name, kind }
+    pub fn new(name: Name, kind: Kind) -> Self {
+        Self { name, kind }
     }
 
     pub fn named(&self, name: &Name) -> Option<Kind> {

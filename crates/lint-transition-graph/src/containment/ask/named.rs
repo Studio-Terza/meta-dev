@@ -13,7 +13,7 @@ pub(super) struct Named<'view, 'found, 'file> {
 }
 
 impl<'view, 'found, 'file> Named<'view, 'found, 'file> {
-    pub(super) fn new(view: &'view Containment<'found, 'file>, name: &'view Name) -> Named<'view, 'found, 'file> {
+    pub(super) fn new(view: &'view Containment<'found, 'file>, name: &'view Name) -> Self {
         Named { view, name }
     }
 

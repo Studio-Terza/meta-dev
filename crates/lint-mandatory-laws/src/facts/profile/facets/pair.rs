@@ -10,7 +10,7 @@ pub(crate) struct Pair<'facts> {
 }
 
 impl<'facts> Pair<'facts> {
-    pub(crate) fn new(left: &'facts Name, right: &'facts Name) -> Pair<'facts> {
+    pub(crate) fn new(left: &'facts Name, right: &'facts Name) -> Self {
         Pair { left, right }
     }
 

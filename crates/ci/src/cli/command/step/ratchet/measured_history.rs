@@ -16,13 +16,13 @@ pub struct MeasuredHistory {
 }
 
 impl Step for MeasuredHistory {
-    fn from_arguments(arguments: Vec<OsString>) -> Result<MeasuredHistory, Failure<'static>> {
+    fn from_arguments(arguments: Vec<OsString>) -> Result<Self, Failure<'static>> {
         let mut arguments = Arguments::from(arguments);
         let measured = &arguments.taken()?;
         let file = &arguments.taken()?;
         let revision = &arguments.taken()?;
         arguments.ended()?;
-        Ok(MeasuredHistory {
+        Ok(Self {
             measured: Measured::file(Path::new(measured)),
             file: Journal::file(Path::new(file)),
             revision: Revision::new(revision.to_str().ok_or(Failure::Usage)?.to_owned()),
