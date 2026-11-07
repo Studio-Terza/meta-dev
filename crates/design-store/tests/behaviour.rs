@@ -22,8 +22,8 @@ use laws::proptest::sample::{Index, select};
 use laws::proptest::strategy::Strategy;
 use laws::proptest::test_runner::TestCaseError;
 use newtype::{Counter, Newtype};
-use port_core::{Port, Run};
-use store_ports::{Migrator, Schema, Sqlite, Store, Written};
+use port_core::{Op, Port, Run};
+use store_ports::{Columns, Migrator, Query, Schema, Sqlite, Statements, Store, StoreFailure, Written};
 use stream::Stream;
 use strum::VariantArray;
 use transcript_ports::{Authorship, Body, ClaudeCodeDir, Cursor, Instant, SessionId, Transcripts, Uuid};
@@ -266,12 +266,6 @@ static BLANKS: LazyLock<Vec<char>> = LazyLock::new(|| {
 struct Around(char);
 
 impl Around {
-    fn inked() -> impl Strategy<Value = Around> {
-        any::<char>().prop_filter_map("a point the segmenter inks", |point| {
-            BLANKS.binary_search(&point).err().map(|_| Around(point))
-        })
-    }
-
     fn uuid(self) -> Uuid {
         Uuid::new(format!("{:08x}-0000-4000-8000-000000000000", u32::from(self.0)))
     }
@@ -311,8 +305,8 @@ impl Around {
         self.shown(&fresh)
     }
 
-    fn kept(self) -> Vec<String> {
-        vec![format!("0 sentence {:?}", Body::new(format!("{}w{}", self.0, self.0)))]
+    fn kept(self) -> Body {
+        Body::new(format!("{}w{}", self.0, self.0))
     }
 }
 
@@ -326,10 +320,46 @@ fn every_blank_the_segmenter_sheds_around_a_segment_stored_before_trimming_is_sh
     Ok(())
 }
 
-laws::law!(a_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept, Around::inked(), inked, {
-    let migrated = inked.migrated().map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    prop_assert_eq!(migrated, inked.kept());
-});
+#[derive(Op)]
+struct Bodies;
+
+#[derive(Columns)]
+struct BodyRow {
+    message: Uuid,
+    body: Body,
+}
+
+impl Query for Bodies {
+    type Rows = BTreeMap<Uuid, Body>;
+
+    fn rows(self, statements: &mut Statements<'_>) -> Result<BTreeMap<Uuid, Body>, StoreFailure> {
+        let rows = statements.rows(store_ports::query!(
+            BodyRow,
+            r#"
+SELECT
+  message,
+  body
+FROM
+  segments
+WHERE
+  ordinal = 0
+"#
+        ))?;
+        Ok(rows.into_iter().map(|row| (row.message, row.body)).collect())
+    }
+}
+
+#[test]
+fn every_point_the_segmenter_inks_around_a_segment_stored_before_trimming_is_kept_on_both_sides()
+-> Result<(), Box<dyn Error>> {
+    let migrated = Run::root().port(OLD_STORE.clone()).read(Bodies)?;
+    let inked: Vec<Around> =
+        (char::MIN..=char::MAX).filter(|point| BLANKS.binary_search(point).is_err()).map(Around).collect();
+    let kept: Vec<Option<&Body>> = inked.iter().map(|point| migrated.get(&point.uuid())).collect();
+    let both_sides: Vec<Body> = inked.iter().map(|point| point.kept()).collect();
+    assert_eq!(kept, both_sides.iter().map(Some).collect::<Vec<Option<&Body>>>());
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 struct Dag {
