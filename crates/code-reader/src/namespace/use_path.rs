@@ -225,6 +225,10 @@ impl UsePath {
         }
     }
 
+    pub(super) fn exported(krate: &Name, entry: &Name) -> UsePath {
+        UsePath { leading: Leading::Global, reading: Reading::Written, segments: vec![krate.clone(), entry.clone()] }
+    }
+
     pub(crate) fn written(&self) -> ItemPath {
         self.segments.iter().cloned().collect()
     }

@@ -110,6 +110,7 @@ const DERIVE_IMPORTED: &str =
     "use serde::Serialize;\nuse std::fmt::Debug as Clone;\n#[derive(Serialize, Clone, Hash)]\nstruct A;\n";
 const DERIVE_UNLISTED: &str = "#[derive(Serialize)]\nstruct A;\n";
 const DERIVE_GLOBBED: &str = "use std::hash::*;\nuse other::*;\n#[derive(Hash, Debug)]\nstruct A;\n";
+const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
 
 const RENAMED_ACROSS: [Fixture; 2] = [
     Fixture::new("src/lib.rs", "pub use std::clone::Clone as Dup;\nmod x;\n"),
@@ -336,6 +337,16 @@ impl Read {
         Read::implemented(&files)
     }
 
+    fn exported(fixtures: &[Fixture], paths: &[&[&str]]) -> Vec<Option<Seen>> {
+        let files: Vec<SourceFile> = fixtures.iter().map(|fixture| Read::file(fixture.path, fixture.text)).collect();
+        let model = Reader::read_files(&files);
+        paths
+            .iter()
+            .map(|path| path.iter().map(|segment| Name::from(*segment)).collect())
+            .map(|path| model.exported(&path).cloned().map(|resolved| Seen::of(&model, resolved)))
+            .collect()
+    }
+
     fn implemented(files: &[SourceFile]) -> Vec<Seen> {
         let model = Reader::read_files(files);
         model
@@ -398,6 +409,43 @@ laws::table!(only_impl_blocks_are_written, |text: &&str| Read::written_sites(&[R
     WRITTEN => ["a.rs:2", "a.rs:5"],
     MIXED => ["a.rs:3"],
 ]);
+
+const EXPORTING: [Fixture; 2] = [
+    Fixture::new(
+        "crates/a/src/lib.rs",
+        "mod m {\n    pub trait T {}\n}\npub use m::T;\npub use std::clone::Clone as Dup;\npub use other::Far;\nuse std::fmt::Debug;\npub struct S;\nstruct Hidden;\npub use missing::*;\n",
+    ),
+    Fixture::new("crates/b/src/lib.rs", "pub use a::T as U;\n"),
+];
+
+#[test]
+fn a_crate_root_exports_each_public_name_as_it_resolves() {
+    assert_eq!(
+        Read::exported(
+            &EXPORTING,
+            &[
+                &["a", "T"],
+                &["a", "Dup"],
+                &["a", "Far"],
+                &["a", "Debug"],
+                &["a", "S"],
+                &["a", "Hidden"],
+                &["b", "U"],
+                &["a", "Missing"]
+            ]
+        ),
+        [
+            Some(Expect::item("T", ItemKind::Trait)),
+            Some(Expect::std_trait(&["std", "clone", "Clone"])),
+            Some(Expect::external(&["other", "Far"])),
+            None,
+            Some(Expect::item("S", ItemKind::Struct)),
+            None,
+            Some(Expect::item("T", ItemKind::Trait)),
+            None,
+        ]
+    );
+}
 
 #[test]
 fn each_implementation_is_placed_in_its_own_file() {
@@ -575,6 +623,11 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
     ],
     DERIVE_UNLISTED => [Expect::unknown(&["Serialize"])],
     DERIVE_GLOBBED => [Expect::unknown(&["Hash"]), Expect::unknown(&["Debug"])],
+    DERIVE_CONDITIONAL => [
+        Expect::std_trait(&["std", "clone", "Clone"]),
+        Expect::std_trait(&["std", "fmt", "Debug"]),
+        Expect::std_trait(&["std", "hash", "Hash"]),
+    ],
 ]);
 
 laws::table!(an_item_position_macro_hides_what_a_bare_name_means, |text: &&str| Read::resolved(text), [

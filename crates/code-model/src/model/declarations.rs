@@ -45,11 +45,16 @@ impl Aliases {
 pub(crate) struct Declarations {
     items: Vec<Item>,
     aliases: Aliases,
+    exports: BTreeMap<ItemPath, Resolved>,
 }
 
 impl Declarations {
-    pub(crate) fn new(items: Vec<Item>, aliases: Aliases) -> Declarations {
-        Declarations { items, aliases }
+    pub(crate) fn new(items: Vec<Item>, aliases: Aliases, exports: BTreeMap<ItemPath, Resolved>) -> Declarations {
+        Declarations { items, aliases, exports }
+    }
+
+    pub(crate) fn exports(&self) -> &BTreeMap<ItemPath, Resolved> {
+        &self.exports
     }
 
     pub(crate) fn items(&self) -> &[Item] {

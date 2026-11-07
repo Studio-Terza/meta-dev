@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lint_layout::LineNumber;
@@ -10,6 +11,7 @@ use crate::holding::Holding;
 use crate::implementation::Implementation;
 use crate::item::{Alias, Item};
 use crate::item_path::ItemPath;
+use crate::resolved::Resolved;
 
 use super::{Aliases, Declarations, FileModel, Filed, Model};
 
@@ -18,6 +20,7 @@ pub struct Building {
     model: Model,
     items: Vec<Item>,
     aliases: Aliases,
+    exports: BTreeMap<ItemPath, Resolved>,
 }
 
 impl Building {
@@ -53,6 +56,10 @@ impl Building {
         self.aliases.declare(item, alias);
     }
 
+    pub fn export(&mut self, path: ItemPath, resolved: &Resolved) {
+        self.exports.extend(resolved.known().map(|known| (path, known.clone())));
+    }
+
     pub fn std_alias(&mut self, path: ItemPath, alias: Alias) {
         self.aliases.declare_std(path, alias);
     }
@@ -66,7 +73,7 @@ impl Building {
             functions: Filed::sorted(model.functions),
             holdings: model.holdings,
             calls: model.calls,
-            declarations: Declarations::new(self.items, self.aliases),
+            declarations: Declarations::new(self.items, self.aliases, self.exports),
         }
     }
 }

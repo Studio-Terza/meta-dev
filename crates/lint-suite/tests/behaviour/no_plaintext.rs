@@ -1,475 +1,175 @@
-use lint_fixtures::{Case, Flagged, Lines, Located, Source, Sources, Text, Title};
+use lint_fixtures::{Case, Flagged, Lines, Located, Queried, Source, Sources, Text, Title};
 use lint_no_plaintext::NoPlaintext;
 
-const CASES: [Case; 56] = [
+const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A<'a> {\n    owned: String,\n    borrowed: &'a str,\n    cow: Cow<'a, str>,\n    boxed: Box<str>,\n    optional: Option<String>,\n    many: Vec<String>,\n    keyed: BTreeMap<String, u8>,\n    pathed: std::string::String,\n    count: u32,\n    path: PathBuf,\n    other: other::Strand,\n    elsewhere: elsewhere::Id,\n}\n";
+const TUPLE_AND_ENUM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A(String);\n#[derive(Deserialize)]\nenum B {\n    Named(String),\n    Counted(u32),\n    Noted { note: String },\n}\n";
+const DERIVE_FORMS: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n#[cfg_attr(feature = \"serde\", derive(serde::Deserialize))]\nstruct B {\n    b: String,\n}\n#[derive(Debug, serde::Deserialize, Clone)]\nstruct C {\n    c: String,\n}\n";
+const NOT_DESERIALIZED: &str = "use serde::Serialize;\n#[derive(Debug)]\nstruct A {\n    a: String,\n}\n#[derive(Serialize)]\nstruct B {\n    b: String,\n}\n#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct C {\n    c: String,\n}\n#[derive(Deserialize)]\nstruct D {\n    d: String,\n}\n#[derive(other::Deserialize)]\nstruct E {\n    e: String,\n}\n";
+const LOCAL_STRING: &str =
+    "use serde::Deserialize;\nstruct String;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
+const ALIASED_STRING: &str =
+    "use serde::Deserialize;\ntype Name = String;\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
+const ATTRIBUTED_FIELD: &str =
+    "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    #[serde(default)]\n    name: String,\n}\n";
+const SERDE_SETTINGS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(transparent)]\nstruct A(String);\n#[derive(Deserialize)]\n#[serde(from = \"String\")]\nstruct B(String);\nimpl From<String> for B {\n    fn from(text: String) -> B { B(text) }\n}\n";
+
+const TRY_FROM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nimpl TryFrom<String> for A {\n    type Error = u8;\n    fn try_from(text: String) -> Result<A, u8> { Ok(A(text)) }\n}\n#[derive(Deserialize)]\n#[serde(deny_unknown_fields, try_from = \"String\")]\nstruct B(String);\nimpl std::convert::TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B(text)) }\n}\n#[derive(Deserialize)]\n#[cfg_attr(feature = \"serde\", serde(try_from = \"String\"))]\nenum C {\n    Named(String),\n}\nimpl TryFrom<String> for C {\n    type Error = u8;\n    fn try_from(text: String) -> Result<C, u8> { Ok(C::Named(text)) }\n}\n#[derive(Deserialize)]\nstruct User {\n    a: A,\n    b: Option<B>,\n}\n";
+const TRY_FROM_UNWRITTEN: &str =
+    "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\n";
+const TRY_FROM_ELSEWHERE: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\nstruct B;\nimpl TryFrom<String> for B {\n    type Error = u8;\n    fn try_from(text: String) -> Result<B, u8> { Ok(B) }\n}\n";
+
+const NEWTYPES: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct Id(String);\nstruct Plain(String);\nstruct Named {\n    text: String,\n}\nstruct Key(Plain);\nstruct C(B);\nstruct B(Z);\nstruct Z(String);\nmod inner {\n    pub struct Hidden(String);\n}\n#[derive(Deserialize)]\nstruct U {\n    id: Id,\n    plain: Plain,\n    named: Named,\n    nested: Vec<Option<Plain>>,\n    key: Key,\n    deep: C,\n    hidden: inner::Hidden,\n}\n";
+const NOT_NEWTYPES: &str = "use serde::Deserialize;\nstruct Pair(String, String);\nstruct Unit;\nstruct Count(u32);\nstruct Two {\n    a: String,\n    b: String,\n}\n#[derive(Deserialize)]\nstruct U {\n    pair: Pair,\n    unit: Unit,\n    count: Count,\n    two: Two,\n}\n";
+const ROOT: &str = "mod a;\nmod b;\nmod c;\n";
+const PLAIN_ID: &str = "pub struct Id(String);\n";
+const CHECKED_ID: &str = "pub struct Id(String);\nimpl newtype::Checked for Id {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n";
+const USES_PLAIN: &str =
+    "use serde::Deserialize;\nuse crate::a::Id;\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n";
+const USES_CHECKED: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    id: crate::b::Id,\n}\n";
+
+const CHECKED: &str = "use serde::Deserialize;\nuse newtype::Checked;\n#[derive(newtype::Newtype, newtype::Deserialize)]\n#[newtype(checked)]\nstruct OneLine(String);\nimpl Checked for OneLine {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\nstruct Line(String);\nimpl newtype::Checked for Line {\n    type Error = u8;\n    fn checked(text: &String) -> Result<&String, u8> { Ok(text) }\n}\n#[derive(Deserialize)]\nstruct A {\n    line: OneLine,\n    lines: Vec<Line>,\n}\n";
+const UNCHECKED: &str = "use serde::Deserialize;\n#[derive(newtype::Newtype, newtype::Deserialize)]\nstruct Name(String);\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
+const OTHER_CHECKED: &str = "use serde::Deserialize;\nmod other {\n    pub trait Checked {}\n}\nstruct Name(String);\nimpl other::Checked for Name {}\n#[derive(Deserialize)]\nstruct A {\n    name: Name,\n}\n";
+const HAND_DESERIALIZE: &str = "use serde::Deserialize;\nstruct Id(String);\nimpl<'de> Deserialize<'de> for Id {\n    fn deserialize<D>(d: D) -> Result<Id, D::Error> {\n        let text = String::deserialize(d)?;\n        Id::from_str(&text).map_err(D::Error::custom)\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n";
+const NEWTYPE_ROOT: &str = "mod boundary;\npub use boundary::Checked;\npub use newtype_derive::Deserialize;\n";
+const NEWTYPE_BOUNDARY: &str = "pub trait Checked {}\n";
+const WORKSPACE_USER: &str = "use serde::Deserialize;\npub struct Line(String);\nimpl newtype::Checked for Line {}\npub struct Name(String);\n#[derive(Deserialize)]\npub struct A {\n    line: Line,\n    name: Name,\n}\n";
+
+const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n}\n";
+const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
+const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
+
+const CASES: [Case; 22] = [
     Case::new(
-        Title::new("string field"),
-        &[Source::new(Located::new("a.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n"))],
-        Flagged::new(&["a.rs:3"]),
+        Title::new("a text leaf anywhere in a field's type"),
+        &[Source::new(Located::new("a.rs"), Text::new(TEXT_FIELDS))],
+        Flagged::new(&["a.rs:4", "a.rs:5", "a.rs:6", "a.rs:7", "a.rs:8", "a.rs:9", "a.rs:10", "a.rs:11"]),
     ),
     Case::new(
-        Title::new("str reference field"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A<'a> {\n    name: &'a str,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
+        Title::new("tuple fields and enum variant fields"),
+        &[Source::new(Located::new("a.rs"), Text::new(TUPLE_AND_ENUM))],
+        Flagged::new(&["a.rs:3", "a.rs:6", "a.rs:8"]),
     ),
     Case::new(
-        Title::new("cow of str field"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A<'a> {\n    name: Cow<'a, str>,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
+        Title::new("serde's derive by path, behind cfg_attr and among others"),
+        &[Source::new(Located::new("a.rs"), Text::new(DERIVE_FORMS))],
+        Flagged::new(&["a.rs:3", "a.rs:7", "a.rs:11"]),
     ),
     Case::new(
-        Title::new("boxed str field"),
-        &[Source::new(Located::new("a.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    name: Box<str>,\n}\n"))],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("option of string"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    name: Option<String>,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("vec of string"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    names: Vec<String>,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("map keyed by string"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    names: BTreeMap<String, u8>,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("path to string"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    name: std::string::String,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("tuple struct string"),
-        &[Source::new(Located::new("a.rs"), Text::new("#[derive(Deserialize)]\nstruct A(String);\n"))],
-        Flagged::new(&["a.rs:2"]),
-    ),
-    Case::new(
-        Title::new("each text field"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    name: String,\n    count: u32,\n    note: String,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3", "a.rs:5"]),
-    ),
-    Case::new(
-        Title::new("enum variant fields"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\nenum A {\n    Named(String),\n    Counted(u32),\n    Noted { note: String },\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:3", "a.rs:5"]),
-    ),
-    Case::new(
-        Title::new("serde path derive"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(serde::Deserialize)]\nstruct A {\n    name: String,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("derive behind cfg_attr"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[cfg_attr(feature = \"serde\", derive(Deserialize))]\nstruct A {\n    name: String,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("derive among others"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Debug, Deserialize, Clone)]\nstruct A {\n    name: String,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("transparent does not validate"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\n#[serde(transparent)]\nstruct A(String);\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("from does not validate"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\n#[serde(from = \"String\")]\nstruct A(String);\n"),
-        )],
-        Flagged::new(&["a.rs:3"]),
-    ),
-    Case::new(
-        Title::new("without Deserialize"),
-        &[Source::new(Located::new("a.rs"), Text::new("#[derive(Debug)]\nstruct A {\n    name: String,\n}\n"))],
+        Title::new("no derive that resolves to serde's or newtype's Deserialize"),
+        &[Source::new(Located::new("a.rs"), Text::new(NOT_DESERIALIZED))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("Serialize only"),
-        &[Source::new(Located::new("a.rs"), Text::new("#[derive(Serialize)]\nstruct A {\n    name: String,\n}\n"))],
+        Title::new("a local type spelled String is not text"),
+        &[Source::new(Located::new("a.rs"), Text::new(LOCAL_STRING))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("cfg_attr without Deserialize"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct A {\n    name: String,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("typed fields"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\nstruct A {\n    count: u32,\n    path: PathBuf,\n    when: Option<Duration>,\n}\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("other path ending in str"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    name: other::Strand,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("try_from on the type"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct A(String);\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("try_from among settings"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\n#[serde(deny_unknown_fields, try_from = \"String\")]\nstruct A(String);\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("try_from behind cfg_attr"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\n#[cfg_attr(feature = \"serde\", serde(try_from = \"String\"))]\nstruct A(String);\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("try_from on an enum"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nenum A {\n    Named(String),\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("newtype without validation"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\nstruct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:2", "a.rs:5"]),
-    ),
-    Case::new(
-        Title::new("newtype without Deserialize"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:4"]),
-    ),
-    Case::new(
-        Title::new("named single field wrapper"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Id {\n    text: String,\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:6"]),
-    ),
-    Case::new(
-        Title::new("newtype in another file"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
-            Source::new(Located::new("b.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
-        ],
-        Flagged::new(&["b.rs:3"]),
-    ),
-    Case::new(
-        Title::new("newtype inside another type"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    ids: Vec<Option<Id>>,\n}\n"),
-        )],
-        Flagged::new(&["a.rs:4"]),
-    ),
-    Case::new(
-        Title::new("newtype of a newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Id(String);\nstruct Key(Id);\n#[derive(Deserialize)]\nstruct A {\n    key: Key,\n}\n"),
-        )],
+        Title::new("an alias of String is text"),
+        &[Source::new(Located::new("a.rs"), Text::new(ALIASED_STRING))],
         Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
-        Title::new("newtype of a newtype declared first"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Key(Id);\nstruct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    key: Key,\n}\n"),
-        )],
+        Title::new("a field is flagged at its type, below its attributes"),
+        &[Source::new(Located::new("a.rs"), Text::new(ATTRIBUTED_FIELD))],
         Flagged::new(&["a.rs:5"]),
     ),
     Case::new(
-        Title::new("three newtypes deep"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct C(B);\nstruct B(A);\nstruct A(String);\n#[derive(Deserialize)]\nstruct U {\n    c: C,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:6"]),
+        Title::new("transparent and from do not validate"),
+        &[Source::new(Located::new("a.rs"), Text::new(SERDE_SETTINGS))],
+        Flagged::new(&["a.rs:4", "a.rs:7"]),
     ),
     Case::new(
-        Title::new("newtype in an inline module"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "mod inner {\n    pub struct Id(String);\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:6"]),
-    ),
-    Case::new(
-        Title::new("validating newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[derive(Deserialize)]\n#[serde(try_from = \"String\")]\nstruct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
+        Title::new("serde try_from with a written TryFrom impl validates"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("validating newtype in another file"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new("#[serde(try_from = \"String\")]\nstruct Id(String);\n")),
-            Source::new(Located::new("b.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("newtype of a validating newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[serde(try_from = \"String\")]\nstruct Id(String);\nstruct Key(Id);\n#[derive(Deserialize)]\nstruct A {\n    key: Key,\n}\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("hand-written Deserialize with from_str"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nimpl<'de> Deserialize<'de> for Id {\n    fn deserialize<D>(d: D) -> Result<Id, D::Error> {\n        let text = String::deserialize(d)?;\n        Id::from_str(&text).map_err(D::Error::custom)\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("hand-written Deserialize with parse"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nimpl<'de> serde::Deserialize<'de> for Id {\n    fn deserialize<D>(d: D) -> Result<Id, D::Error> {\n        let text = String::deserialize(d)?;\n        text.parse().map_err(D::Error::custom)\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("hand-written Deserialize without FromStr"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nimpl<'de> Deserialize<'de> for Id {\n    fn deserialize<D>(d: D) -> Result<Id, D::Error> {\n        String::deserialize(d).map(Id)\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:9"]),
-    ),
-    Case::new(
-        Title::new("FromStr impl without hand-written Deserialize"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nimpl FromStr for Id {\n    type Err = E;\n    fn from_str(text: &str) -> Result<Id, E> {\n        Ok(Id(text.to_owned()))\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:10"]),
-    ),
-    Case::new(
-        Title::new("hand-written Deserialize for another type"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nstruct Other(u8);\nimpl<'de> Deserialize<'de> for Other {\n    fn deserialize<D>(d: D) -> Result<Other, D::Error> {\n        Other::from_str(\"\")\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:10"]),
-    ),
-    Case::new(
-        Title::new("hand-written impl of another trait"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "struct Id(String);\nimpl Tr for Id {\n    fn f() {\n        Id::from_str(\"\");\n    }\n}\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n",
-            ),
-        )],
-        Flagged::new(&["a.rs:9"]),
-    ),
-    Case::new(
-        Title::new("same name validated elsewhere"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
-            Source::new(Located::new("b.rs"), Text::new("#[serde(try_from = \"String\")]\nstruct Id(String);\n")),
-            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("same name with another shape"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
-            Source::new(Located::new("b.rs"), Text::new("struct Id(u8, u8);\n")),
-            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
-        ],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("same name plain twice"),
-        &[
-            Source::new(Located::new("a.rs"), Text::new("struct Id(String);\n")),
-            Source::new(Located::new("b.rs"), Text::new("struct Id(String);\n")),
-            Source::new(Located::new("c.rs"), Text::new("#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n")),
-        ],
-        Flagged::new(&["c.rs:3"]),
-    ),
-    Case::new(
-        Title::new("two fields are not a newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Pair(String, String);\n#[derive(Deserialize)]\nstruct A {\n    pair: Pair,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("unit struct is not a newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Unit;\n#[derive(Deserialize)]\nstruct A {\n    unit: Unit,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("newtype of a number"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("struct Count(u32);\n#[derive(Deserialize)]\nstruct A {\n    count: Count,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("unknown type"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    id: elsewhere::Id,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("test module"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new(
-                "#[cfg(test)]\nmod tests {\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n}\n",
-            ),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("test only type"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[cfg(test)]\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("test only newtype"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("#[cfg(test)]\nstruct Id(String);\n#[derive(Deserialize)]\nstruct A {\n    id: Id,\n}\n"),
-        )],
-        Flagged::new(&[]),
-    ),
-    Case::new(
-        Title::new("inline module"),
-        &[Source::new(
-            Located::new("a.rs"),
-            Text::new("mod inner {\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n}\n"),
-        )],
+        Title::new("serde try_from without a written TryFrom impl"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_UNWRITTEN))],
         Flagged::new(&["a.rs:4"]),
     ),
     Case::new(
-        Title::new("integration test"),
-        &[Source::new(
-            Located::new("x/tests/a.rs"),
-            Text::new("#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n"),
-        )],
+        Title::new("serde try_from with a TryFrom impl for another type"),
+        &[Source::new(Located::new("a.rs"), Text::new(TRY_FROM_ELSEWHERE))],
+        Flagged::new(&["a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("an unvalidated newtype of text is text, through newtypes and containers"),
+        &[Source::new(Located::new("a.rs"), Text::new(NEWTYPES))],
+        Flagged::new(&["a.rs:3", "a.rs:17", "a.rs:18", "a.rs:19", "a.rs:20", "a.rs:21", "a.rs:22", "a.rs:23"]),
+    ),
+    Case::new(
+        Title::new("pairs, units, numbers and two fields are not text newtypes"),
+        &[Source::new(Located::new("a.rs"), Text::new(NOT_NEWTYPES))],
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("unrelated module"),
-        &[Source::new(Located::new("a.rs"), Text::new("mod inner {\n    pub fn f(name: String) {}\n}\n"))],
+        Title::new("a newtype is the one its path resolves to, across files"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(ROOT)),
+            Source::new(Located::new("src/a.rs"), Text::new(PLAIN_ID)),
+            Source::new(Located::new("src/b.rs"), Text::new(CHECKED_ID)),
+            Source::new(Located::new("src/c.rs"), Text::new(USES_PLAIN)),
+        ],
+        Flagged::new(&["src/c.rs:5"]),
+    ),
+    Case::new(
+        Title::new("a newtype validated in another file"),
+        &[
+            Source::new(Located::new("src/lib.rs"), Text::new(ROOT)),
+            Source::new(Located::new("src/a.rs"), Text::new(PLAIN_ID)),
+            Source::new(Located::new("src/b.rs"), Text::new(CHECKED_ID)),
+            Source::new(Located::new("src/c.rs"), Text::new(USES_CHECKED)),
+        ],
         Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an impl of newtype's Checked validates its newtype and every user"),
+        &[Source::new(Located::new("a.rs"), Text::new(CHECKED))],
+        Flagged::new(&[]),
+    ),
+    Case::new(
+        Title::new("an unchecked newtype deriving newtype's Deserialize, and its user"),
+        &[Source::new(Located::new("a.rs"), Text::new(UNCHECKED))],
+        Flagged::new(&["a.rs:3", "a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("another trait named Checked, or a hand-written Deserialize, does not validate"),
+        &[
+            Source::new(Located::new("a.rs"), Text::new(OTHER_CHECKED)),
+            Source::new(Located::new("b.rs"), Text::new(HAND_DESERIALIZE)),
+        ],
+        Flagged::new(&["a.rs:9", "b.rs:11"]),
+    ),
+    Case::new(
+        Title::new("newtype's Checked declared in the workspace"),
+        &[
+            Source::new(Located::new("crates/newtype/src/lib.rs"), Text::new(NEWTYPE_ROOT)),
+            Source::new(Located::new("crates/newtype/src/boundary.rs"), Text::new(NEWTYPE_BOUNDARY)),
+            Source::new(Located::new("crates/user/src/lib.rs"), Text::new(WORKSPACE_USER)),
+        ],
+        Flagged::new(&["crates/user/src/lib.rs:8"]),
+    ),
+    Case::new(
+        Title::new("a test module"),
+        &[Source::new(Located::new("a.rs"), Text::new(TESTED))],
+        Flagged::new(&["a.rs:6"]),
+    ),
+    Case::new(
+        Title::new("an integration test"),
+        &[Source::new(Located::new("x/tests/a.rs"), Text::new(INTEGRATION))],
+        Flagged::new(&["x/tests/a.rs:4"]),
+    ),
+    Case::new(
+        Title::new("an inline module, beside a function taking text"),
+        &[Source::new(Located::new("a.rs"), Text::new(INLINE_MODULE))],
+        Flagged::new(&["a.rs:5"]),
     ),
 ];
 
 #[test]
 fn deserialized_data_holds_no_free_text() {
-    assert_eq!(Sources::mismatches::<NoPlaintext>(&CASES), Lines::default());
+    assert_eq!(Sources::mismatches::<Queried<NoPlaintext>>(&CASES), Lines::default());
 }

@@ -47,6 +47,11 @@ impl Implementation {
     }
 
     #[must_use]
+    pub fn origin(&self) -> Origin {
+        self.origin
+    }
+
+    #[must_use]
     pub fn implemented(&self) -> Option<&Resolved> {
         self.implemented.as_ref().map(AsRef::as_ref)
     }

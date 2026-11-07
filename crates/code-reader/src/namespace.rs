@@ -31,6 +31,19 @@ pub(crate) use std_names::StdNames;
 pub(crate) use tables::Domain;
 pub(crate) use use_path::UsePath;
 
+#[derive(Debug)]
+pub(crate) struct Export {
+    root: ScopeId,
+    path: UsePath,
+}
+
+impl Export {
+    pub(crate) fn recorded(&self, resolving: &Resolving<'_, '_, '_>, mut building: Building) -> Building {
+        building.export(self.path.written(), &resolving.path(self.root, &self.path, Domain::Types));
+        building
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Namespace<'read> {
     scopes: Vec<ScopeRow>,
@@ -59,6 +72,16 @@ impl<'read> Namespace<'read> {
             .zip(Some(declared))
             .into_iter()
             .for_each(|(entries, declared)| entries.declare(declared));
+    }
+
+    pub(crate) fn exports(&self) -> Vec<Export> {
+        self.crates
+            .iter()
+            .filter_map(|(krate, root)| Some((*krate, *root, root.row(&self.scopes)?)))
+            .flat_map(|(krate, root, row)| {
+                row.entries().exported().map(move |entry| Export { root, path: UsePath::exported(krate, entry) })
+            })
+            .collect()
     }
 
     pub(crate) fn issued(&self, building: &mut Building) -> ItemIds {

@@ -338,6 +338,12 @@ impl Entries {
         self.declared.iter().map(|declared| declared.issued(building)).collect()
     }
 
+    pub(super) fn exported(&self) -> impl Iterator<Item = &Name> {
+        let declared = self.declared.iter().map(|declared| (&declared.name, declared.visibility));
+        let imported = self.imports.iter().map(|import| (&import.name, import.visibility));
+        declared.chain(imported).filter(|(_, visibility)| *visibility == Visibility::Visible).map(|(name, _)| name)
+    }
+
     pub(super) fn prelude(&self, name: &Name, space: &Namespace, root: ScopeId) -> Option<Binding> {
         self.externs.get(name).and_then(|externs| externs.first()).map(|external| external.bound(space, root))
     }

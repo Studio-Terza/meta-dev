@@ -1,5 +1,5 @@
 use syn::spanned::Spanned;
-use syn::{Attribute, Field, Generics, Ident, ItemStruct};
+use syn::{Field, Generics, Ident, ItemStruct};
 
 use code_model::{Building, Held, Holding, ItemId};
 use lint_core::Syntax;
@@ -7,6 +7,7 @@ use lint_layout::{Name, Position};
 
 use crate::namespace::{Domain, Resolving, ScopeId, UsePath};
 
+use super::attributes::Attributes;
 use super::seat::{Built, Located};
 use super::signature::{InScope, Written};
 use super::{ImplRow, Lowering};
@@ -37,17 +38,15 @@ impl Holder {
 }
 
 #[derive(Clone, Debug)]
-pub(super) enum Link {
-    Free,
-    Declares(UsePath),
-}
+pub(super) struct Link(UsePath);
 
 impl Link {
+    pub(super) fn declaring(ident: &Ident) -> Link {
+        Link(UsePath::from(ident))
+    }
+
     fn declares(&self, resolving: &Resolving<'_, '_, '_>, scope: ScopeId) -> Option<ItemId> {
-        match self {
-            Link::Declares(name) => resolving.path(scope, name, Domain::Types).crate_item(),
-            Link::Free => None,
-        }
+        resolving.path(scope, &self.0, Domain::Types).crate_item()
     }
 }
 
@@ -76,9 +75,15 @@ impl Lowering<'_, '_> {
         self.lowered.holdings.push(HoldingRow { located, holder, region: self.context.region(), link, ty });
     }
 
-    pub(super) fn derived(&mut self, attributes: &[Attribute], ident: &Ident) {
+    pub(super) fn attributed(&mut self, attributes: &Attributes, ident: &Ident, scope: &InScope) {
         let rows = ImplRow::derives(&self.here, self.context.region(), attributes, ident);
         self.lowered.rows.extend(rows);
+        let source = attributes.try_from_source().map(|ty| scope.lowered(&ty));
+        source.into_iter().fold(self, |lowering, ty| {
+            let link = Link::declaring(ident);
+            lowering.hold(Holder::named(ident, Held::TryFromSource), link, ty);
+            lowering
+        });
     }
 
     pub(super) fn parameters(&mut self, holder: &Holder, generics: &Generics, link: &Link) {
@@ -92,18 +97,21 @@ impl Lowering<'_, '_> {
     pub(super) fn struct_held(&mut self, item: &ItemStruct, scope: &InScope, link: Link) {
         match Syntax::newtype_field(&item.fields) {
             Some(field) => self.hold(Holder::named(&item.ident, Held::NewtypeField), link, scope.lowered(&field.ty)),
-            None => self.fields_held(&Holder::named(&item.ident, Held::StructField), item.fields.iter(), scope),
+            None => {
+                self.fields_held(&Holder::named(&item.ident, Held::StructField), &link, item.fields.iter(), scope);
+            }
         }
     }
 
     pub(super) fn fields_held<'field>(
         &mut self,
         holder: &Holder,
+        link: &Link,
         fields: impl Iterator<Item = &'field Field>,
         scope: &InScope,
     ) {
         fields.fold(self, |lowering, field| {
-            lowering.hold(holder.field(field), Link::Free, scope.lowered(&field.ty));
+            lowering.hold(holder.field(field), link.clone(), scope.lowered(&field.ty));
             lowering
         });
     }
