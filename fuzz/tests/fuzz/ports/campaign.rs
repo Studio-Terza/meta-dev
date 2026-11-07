@@ -1,20 +1,26 @@
 use std::ffi::OsString;
 use std::iter;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
-use std::process::ExitCode;
 use std::time::Instant;
 
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
-use lint_runner::Cli;
+use lint_runner::{Cli, Verdict};
 use proptest::prelude::{Strategy, prop_assert_eq};
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
 
-use crate::crash::Crash;
+use crate::crash::{Crash, Failing, Kept};
 use crate::input::Input;
 
 const ROOT: &str = "/fuzzed";
 const BATCH: u32 = 64;
+
+#[derive(Debug, PartialEq, Eq)]
+struct Run {
+    verdict: Verdict,
+    explained: Vec<u8>,
+}
 
 pub struct Campaign;
 
@@ -32,11 +38,14 @@ impl Campaign {
         ]
         .into_iter()
         .collect();
-        let arguments = [OsString::from(root)];
-        let mut explained = Vec::new();
-        let reported = Cli::from_args(arguments.into_iter()).report_to(&files, &mut Vec::new(), &mut explained);
-        prop_assert_eq!(reported == ExitCode::SUCCESS, explained.is_empty());
+        prop_assert_eq!(Self::ran(&files), Self::ran(&files));
         Ok(())
+    }
+
+    fn ran(files: &Memory) -> Run {
+        let mut explained = Vec::new();
+        let verdict = Cli::from_args(iter::once(OsString::from(ROOT))).verdict(files, &mut Vec::new(), &mut explained);
+        Run { verdict, explained }
     }
 
     fn batch(crashes: Crashes, target: &str, strategy: &impl Strategy<Value = Input>) -> Result<(), Crash> {
@@ -48,12 +57,19 @@ impl Campaign {
 
     fn crashed(crashes: Crashes, target: &str, failure: TestError<Input>) -> Crash {
         match failure {
-            TestError::Fail(reason, input) => Crash::Panicked {
-                kept: crashes.keep(&Self::case(target, &input)),
-                reason: reason.message().to_owned(),
-                input,
-            },
+            TestError::Fail(reason, input) => {
+                let kept = Kept::from(crashes.keep(&Self::case(target, &input)));
+                Self::replayed(crashes, target, Failing::new(input, reason.message().to_owned(), kept))
+            }
             TestError::Abort(reason) => Crash::Aborted { reason: reason.message().to_owned() },
+        }
+    }
+
+    fn replayed(crashes: Crashes, target: &str, failing: Failing) -> Crash {
+        match panic::catch_unwind(AssertUnwindSafe(|| Self::linted(crashes, target, failing.input()))) {
+            Err(_) => Crash::Panicked(failing),
+            Ok(Err(_)) => Crash::Failed(failing),
+            Ok(Ok(())) => Crash::Unrepeated(failing),
         }
     }
 
