@@ -18,7 +18,7 @@ pub(crate) struct Derive<'model> {
 
 impl<'model> Derive<'model> {
     pub(crate) fn flagged(&self, owners: &BTreeSet<ItemId>) -> Option<Violation<'model>> {
-        owners.get(&self.subject).map(|_| Violation::new(self.site, Finding::Unresolved(self.name)))
+        owners.get(&self.subject).map(|_| Violation::new(self.site, Finding::UnresolvedDerive(self.name)))
     }
 }
 

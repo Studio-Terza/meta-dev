@@ -12,7 +12,7 @@ struct Manifest {
     text: &'static str,
 }
 
-const MANIFESTS: [Manifest; 11] = [
+const MANIFESTS: [Manifest; 12] = [
     Manifest {
         path: "Cargo.toml",
         text: "[package]\nname = \"fixture\"\n[dependencies]\ndiesel = \"2\"\nserde = \"1\"\nserde_derive = \"1\"\nnewtype = \"1\"\nthiserror = \"1\"\n",
@@ -51,12 +51,17 @@ const MANIFESTS: [Manifest; 11] = [
         text: "[package]\nname = \"member\"\n[dependencies]\nwire.workspace = true\n",
     },
     Manifest {
+        path: "dashed/Cargo.toml",
+        text: "[package]\nname = \"dashed\"\n[dependencies]\nwire-format = { package = \"serde\", version = \"1\" }\n",
+    },
+    Manifest {
         path: "platform/Cargo.toml",
         text: "[package]\nname = \"platform\"\n[target.'cfg(unix)'.dependencies]\nwire = { package = \"serde_derive\", version = \"1\" }\n",
     },
 ];
 const RENAMED: &str = "#[derive(wire::Deserialize)]\nstruct A {\n    a: String,\n}\n#[derive(serde::Deserialize)]\nstruct B {\n    b: String,\n}\n";
 const UNDECLARED: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n";
+const DASHED: &str = "#[derive(wire_format::Deserialize)]\nstruct A {\n    a: String,\n}\n";
 const INHERITED: &str = "#[derive(wire::Deserialize)]\nstruct A {\n    a: String,\n}\n";
 
 const TEXT_FIELDS: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A<'a> {\n    owned: String,\n    borrowed: &'a str,\n    cow: Cow<'a, str>,\n    boxed: Box<str>,\n    optional: Option<String>,\n    many: Vec<String>,\n    keyed: BTreeMap<String, u8>,\n    pathed: std::string::String,\n    count: u32,\n    path: std::path::PathBuf,\n    other: other::Strand,\n    elsewhere: elsewhere::Id,\n}\n";
@@ -64,11 +69,14 @@ const TUPLE_AND_ENUM: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\ns
 const DERIVE_FORMS: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    a: String,\n}\n#[cfg_attr(feature = \"serde\", derive(serde::Deserialize))]\nstruct B {\n    b: String,\n}\n#[derive(Debug, serde::Deserialize, Clone)]\nstruct C {\n    c: String,\n}\n";
 const NOT_DESERIALIZED: &str = "use serde::Serialize;\n#[derive(Debug)]\nstruct A {\n    a: String,\n}\n#[derive(Serialize)]\nstruct B {\n    b: String,\n}\n#[cfg_attr(feature = \"serde\", derive(Serialize))]\nstruct C {\n    c: String,\n}\n#[derive(other::Deserialize)]\nstruct D {\n    d: String,\n}\n#[derive(Debug, Clone, PartialEq, thiserror::Error, newtype::Newtype)]\nstruct E {\n    e: String,\n}\n";
 const DERIVE_CRATE: &str = "#[derive(serde_derive::Deserialize)]\nstruct A {\n    a: String,\n}\n";
-const UNRESOLVED_DERIVES: &str = "mod globbed {\n    use serde::*;\n    #[derive(Deserialize)]\n    struct A {\n        a: ::std::string::String,\n    }\n}\n#[derive(Deserialize)]\nstruct C {\n    c: String,\n}\nmod failed {\n    use other::*;\n    #[derive(Debug, Error)]\n    pub struct Failed {\n        message: ::std::string::String,\n    }\n}\n#[derive(Unimported)]\nstruct D {\n    count: u32,\n}\n";
+const UNRESOLVED_DERIVES: &str = "mod globbed {\n    use serde::*;\n    #[derive(Deserialize)]\n    struct A {\n        a: String,\n    }\n}\n#[derive(Deserialize)]\nstruct C {\n    c: String,\n}\nmod failed {\n    use other::*;\n    #[derive(Debug, Error)]\n    pub struct Failed {\n        message: String,\n    }\n}\n#[derive(Unimported)]\nstruct D {\n    count: u32,\n}\n";
 const SUBMODULE_DERIVES: &str = "use diesel::prelude::Queryable;\nuse serde::Deserialize;\n#[derive(Queryable)]\npub struct Label {\n    text: String,\n}\n#[derive(diesel::prelude::Insertable, newtype::serde::Deserialize)]\npub struct Note {\n    text: String,\n}\n#[derive(Deserialize)]\npub struct Entry {\n    text: String,\n}\n";
 const RESOLVED_OTHER_DERIVE: &str =
     "use thiserror::Error;\n#[derive(Debug, Error)]\npub struct Failed {\n    message: String,\n}\n";
-const GLOBBED_FIELD_TYPE: &str = "use chrono::*;\nuse serde::Deserialize;\n#[derive(Deserialize)]\npub struct Stamp {\n    at: NaiveDate,\n    note: ::std::string::String,\n}\n";
+const GLOBBED_FIELD_TYPE: &str = "use chrono::*;\nuse serde::Deserialize;\n#[derive(Deserialize)]\npub struct Stamp {\n    at: NaiveDate,\n    note: String,\n}\n";
+const GLOBBED_STRING: &str = "mod globbed {\n    use other::*;\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    pub struct Entry {\n        note: String,\n    }\n}\n";
+const RESOLVED_STRING: &str =
+    "use serde::Deserialize;\n#[derive(Deserialize)]\npub struct Entry {\n    note: String,\n}\n";
 const UNKNOWN_FIELD_TYPE: &str = "#[derive(serde::Deserialize)]\nstruct A {\n    id: Id,\n}\n#[derive(Debug)]\nstruct B {\n    id: Id,\n}\n#[derive(Unimported)]\nstruct C {\n    id: Id,\n}\n";
 const REEXPORTED_ROOT: &str = "pub use serde;\npub mod de {\n    pub use serde::Deserialize;\n}\n";
 const REEXPORTED_USER: &str = "#[derive(newtype::serde::Deserialize)]\npub struct A {\n    a: String,\n}\n#[derive(newtype::de::Deserialize)]\npub struct B {\n    b: String,\n}\n";
@@ -106,7 +114,7 @@ const TESTED: &str = "#[cfg(test)]\nmod tests {\n    use serde::Deserialize;\n  
 const INTEGRATION: &str = "use serde::Deserialize;\n#[derive(Deserialize)]\nstruct A {\n    name: String,\n}\n";
 const INLINE_MODULE: &str = "mod inner {\n    use serde::Deserialize;\n    #[derive(Deserialize)]\n    struct A {\n        name: String,\n    }\n    pub fn f(name: String) {}\n}\n";
 
-const CASES: [Case; 33] = [
+const CASES: [Case; 36] = [
     Case::new(
         Title::new("a text leaf anywhere in a field's type"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(TEXT_FIELDS))],
@@ -157,14 +165,24 @@ const CASES: [Case; 33] = [
         Flagged::new(&[]),
     ),
     Case::new(
-        Title::new("an unresolvable field type is not text, under any derive"),
+        Title::new("an unresolvable field type of serde's derive is not resolvable, and so is an unresolvable derive"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(UNKNOWN_FIELD_TYPE))],
-        Flagged::new(&[]),
+        Flagged::new(&["src/lib.rs:3", "src/lib.rs:9"]),
     ),
     Case::new(
-        Title::new("a field type reached through an external glob is not text, a String beside it is"),
+        Title::new("a glob-imported NaiveDate field and a String beside it are not resolvable"),
         &[Source::new(Located::new("src/lib.rs"), Text::new(GLOBBED_FIELD_TYPE))],
+        Flagged::new(&["src/lib.rs:5", "src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a plain String field in a module with an external glob is not resolvable"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(GLOBBED_STRING))],
         Flagged::new(&["src/lib.rs:6"]),
+    ),
+    Case::new(
+        Title::new("a resolved String field is free text"),
+        &[Source::new(Located::new("src/lib.rs"), Text::new(RESOLVED_STRING))],
+        Flagged::new(&["src/lib.rs:4"]),
     ),
     Case::new(
         Title::new("serde's derive through a workspace crate's re-exports"),
@@ -304,6 +322,11 @@ const CASES: [Case; 33] = [
         Title::new("a dependency inherited from the workspace names its package there"),
         &[Source::new(Located::new("ws/member/src/lib.rs"), Text::new(INHERITED))],
         Flagged::new(&["ws/member/src/lib.rs:3"]),
+    ),
+    Case::new(
+        Title::new("a dashed dependency key is the crate its underscored path names"),
+        &[Source::new(Located::new("dashed/src/lib.rs"), Text::new(DASHED))],
+        Flagged::new(&["dashed/src/lib.rs:3"]),
     ),
     Case::new(
         Title::new("a platform's dependency names its package"),

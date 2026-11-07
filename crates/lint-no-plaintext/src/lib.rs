@@ -10,7 +10,7 @@ use lint_layout::Name;
 
 use finding::Finding;
 use kinds::{Derive, Kinds};
-use texts::{Spots, Texts};
+use texts::{Content, Spots, Texts};
 
 #[derive(Debug)]
 pub struct NoPlaintext;
@@ -20,6 +20,20 @@ struct Texted<'model> {
     owner: ItemId,
     name: &'model Name,
     site: Site<'model>,
+    content: Content,
+}
+
+impl<'model> Texted<'model> {
+    fn flagged(&self, kinds: &Kinds<'_>) -> Option<Violation<'model>> {
+        kinds.plain().get(&self.owner).map(|_| Violation::new(self.site, self.finding()))
+    }
+
+    fn finding(&self) -> Finding<'model> {
+        match self.content {
+            Content::Text => Finding::Plain(self.name),
+            Content::Unresolved => Finding::UnresolvedType(self.name),
+        }
+    }
 }
 
 impl ModelLint for NoPlaintext {
@@ -29,11 +43,9 @@ impl ModelLint for NoPlaintext {
         let texted: Vec<Texted<'_>> =
             model.holdings().filter_map(|placed| Self::texted(model, &texts, placed)).collect();
         let owners: BTreeSet<ItemId> = texted.iter().map(|field| field.owner).collect();
-        let plain = texted.iter().filter_map(|field| {
-            kinds.plain().get(&field.owner).map(|_| Violation::new(field.site, Finding::Plain(field.name)))
-        });
+        let fields = texted.iter().filter_map(|field| field.flagged(&kinds));
         let unresolved = kinds.unresolved().iter().filter_map(|derive: &Derive<'_>| derive.flagged(&owners));
-        let mut found: Vec<Violation<'_>> = plain.chain(unresolved).collect();
+        let mut found: Vec<Violation<'_>> = fields.chain(unresolved).collect();
         found.sort_by(|left, right| left.site().cmp(right.site()));
         Report::new(
             Headline::new(
@@ -53,10 +65,10 @@ impl NoPlaintext {
         let holding = Self::field(placed.entity())?;
         let owner = holding.declares()?;
         let ty: &TypeRef = holding.as_ref();
-        texts.text(&model.expanded(ty))?;
+        let content = texts.content(&model.expanded(ty))?;
         let site = placed.site();
         let spotted = Spots::first(ty).map_or(site, |position| Site::new(site.path(), position.line()));
-        Some(Texted { owner, name: holding.as_ref(), site: spotted })
+        Some(Texted { owner, name: holding.as_ref(), site: spotted, content })
     }
 
     fn field(holding: &Holding) -> Option<&Holding> {

@@ -1,5 +1,5 @@
 test budget, report only:
-corpus: 0 tests in 3 files, 0 of 29 lines, 0 process starts
+corpus: 0 tests in 4 files, 0 of 38 lines, 0 process starts
 report only, a paired API leaves the ending to every caller; write a guard whose Drop does the ending:
 report only, a clone in the core allocates where a borrow could share; take a reference, a slice or &str, name a lifetime, or move the value:
 a struct with no logic of its own that one other file consumes is a parameter bag:
@@ -7,6 +7,9 @@ src/checked.rs:19: Entry only carries values into one other file; give it the lo
 src/free.rs:4: Entry only carries values into one other file; give it the logic that consumes it
 primitives appear in signatures and fields only inside a boundary:
 src/free.rs:5: bare String in title; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/globbed.rs:7: bare String in note; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 data that enters from a file holds no free text; split it into typed parts, or give it a newtype that validates:
 src/free.rs:5: free text in title; split it into typed parts, or use a newtype that validates (derive newtype::CheckedDeserialize, which reads through its impl of newtype::Checked)
+src/globbed.rs:6: type not resolvable in at; import it explicitly, by a path or a named use rather than a glob, so the lint can tell whether the field holds text
+src/globbed.rs:7: type not resolvable in note; import it explicitly, by a path or a named use rather than a glob, so the lint can tell whether the field holds text
 fails
