@@ -1,4 +1,3 @@
-mod boundary;
 mod command;
 mod environment;
 mod found;
@@ -9,7 +8,9 @@ mod node;
 mod script;
 mod text;
 
-use saphyr::{MarkedYaml, YamlData};
+use std::str::FromStr;
+
+use saphyr::{LoadableYamlNode, MarkedYaml, ScanError, YamlData};
 
 use crate::actions::Actions;
 use crate::finding::Finding;
@@ -22,9 +23,9 @@ use node::Node;
 use script::Script;
 
 #[derive(Debug)]
-pub(crate) struct Document<'text>(Vec<MarkedYaml<'text>>);
+pub(crate) struct Document(Vec<MarkedYaml<'static>>);
 
-impl Document<'_> {
+impl Document {
     pub(crate) fn findings(&self, actions: Actions<'_>) -> Vec<Found> {
         self.0.iter().flat_map(|root| Self::judged(Node::new(root), actions)).collect()
     }
@@ -64,5 +65,13 @@ impl Document<'_> {
             }
             None => Self::judged(value, actions),
         }
+    }
+}
+
+impl FromStr for Document {
+    type Err = ScanError;
+
+    fn from_str(text: &str) -> Result<Document, ScanError> {
+        MarkedYaml::load_from_str(text).map(Document)
     }
 }
