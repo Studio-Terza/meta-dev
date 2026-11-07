@@ -1,12 +1,12 @@
 mod boundary;
 
-use design_model::{Ordinal, Prefix, Provenance, Sense, SpanRelation};
-use transcript_ports::{Authorship, Body};
+use design_model::{Ordinal, Provenance, Segment, Sense, SpanRelation};
+use transcript_ports::{Authorship, Body, Uuid};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Placement {
     relation: SpanRelation,
-    prefix: Prefix,
+    message: Uuid,
     ordinal: Ordinal,
     author: Authorship,
     body: Body,
@@ -21,8 +21,8 @@ impl Placement {
     }
 
     #[must_use]
-    pub fn prefix(&self) -> &Prefix {
-        &self.prefix
+    pub fn segment(&self) -> Segment {
+        Segment::new(self.message.clone(), self.ordinal)
     }
 
     #[must_use]
@@ -33,12 +33,6 @@ impl Placement {
     #[must_use]
     pub fn sense(&self) -> Option<Sense> {
         self.sense
-    }
-}
-
-impl From<&Placement> for Ordinal {
-    fn from(placement: &Placement) -> Ordinal {
-        placement.ordinal
     }
 }
 

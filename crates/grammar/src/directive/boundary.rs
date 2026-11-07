@@ -3,6 +3,8 @@ use std::ops::Range;
 use logos::{Lexer, Logos};
 use newtype::{Arbitrary, Display, Newtype};
 
+use crate::cited::Cited;
+
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t]+")]
 enum Token {
@@ -53,12 +55,6 @@ pub struct Quote(String);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fresh(String);
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cited {
-    prefix: String,
-    ordinal: usize,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Piece {
@@ -266,24 +262,6 @@ impl Piece {
             | Piece::Segment(_)
             | Piece::Stray(_) => None,
         }
-    }
-}
-
-impl Cited {
-    pub(crate) fn read(cited: &str) -> Option<Cited> {
-        let dot = cited.char_indices().find(|(_, character)| *character == '.').map(|(dot, _)| dot)?;
-        let ordinal = cited.get(dot.saturating_add(1)..)?.parse().ok()?;
-        cited.get(..dot).map(|prefix| Cited { prefix: prefix.to_owned(), ordinal })
-    }
-
-    #[must_use]
-    pub fn prefix(&self) -> &str {
-        &self.prefix
-    }
-
-    #[must_use]
-    pub fn ordinal(&self) -> usize {
-        self.ordinal
     }
 }
 

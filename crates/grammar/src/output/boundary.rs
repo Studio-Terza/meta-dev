@@ -1,22 +1,25 @@
-use logos::{Lexer, Logos};
+use std::iter::Peekable;
+use std::str::FromStr;
+use std::vec::IntoIter;
 
-use crate::directive::Cited;
+use logos::{Lexer, Logos};
+use newtype::Newtype;
 
 #[derive(Logos, Clone, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t]+")]
 enum Lexeme {
-    #[regex(r"[A-Za-z_][A-Za-z0-9_-]*", |lexer| lexer.slice().to_owned(), priority = 1)]
-    Word(String),
-    #[regex(r"[0-9a-f][0-9a-f-]{7,}", |lexer| lexer.slice().to_owned(), priority = 2)]
-    Message(String),
-    #[regex(r"[0-9a-f][0-9a-f-]{7,}\.(0|[1-9][0-9]*)", |lexer| Cited::read(lexer.slice()))]
-    Segment(Cited),
-    #[regex(r"n(0|[1-9][0-9]*)", |lexer| lexer.slice().to_owned(), priority = 3)]
-    Node(String),
+    #[regex(r"[A-Za-z_][A-Za-z0-9_-]*", priority = 1)]
+    Word,
+    #[regex(r"[0-9a-f][0-9a-f-]{7,}", priority = 2)]
+    Message,
+    #[regex(r"[0-9a-f][0-9a-f-]{7,}\.(0|[1-9][0-9]*)")]
+    Segment,
+    #[regex(r"n(0|[1-9][0-9]*)", priority = 3)]
+    Node,
     #[regex(r#""([^"\\\r\n]|\\["\\nrt])*""#, Lexeme::unquoted)]
     Quoted(String),
-    #[regex(r"0|[1-9][0-9]*", |lexer| lexer.slice().parse().ok(), priority = 3)]
-    Integer(u64),
+    #[regex(r"0|[1-9][0-9]*", priority = 3)]
+    Integer,
     #[regex(r"\r?\n")]
     End,
 }
@@ -53,32 +56,58 @@ enum Special {
     Plain,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Token {
-    Word(String),
-    Message(String),
-    Segment(Cited),
-    Node(String),
-    Quoted(String),
-    Integer(u64),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Kind {
+    Word,
+    Message,
+    Segment,
+    Node,
+    Quoted,
+    Integer,
     End,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Token {
+    kind: Kind,
+    text: String,
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("{0:?} is not a word, a message or segment ref, a node id, a quoted text or a number")]
 pub struct Stray(String);
 
-#[derive(Debug)]
-pub struct Tokens;
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Unread {
+    #[error("{0}")]
+    Stray(#[from] Stray),
+    #[error("the line ends before it is complete")]
+    Ended,
+    #[error("{0:?} does not belong there in a line of design's output")]
+    Unexpected(Token),
+    #[error("a keyword of the line is missing or out of place")]
+    Unkeyed,
+}
 
-impl Tokens {
-    pub fn lexed(text: &str) -> Result<Vec<Token>, Stray> {
-        Lexeme::lexer(text)
+#[derive(Debug)]
+pub struct Fields(Peekable<IntoIter<Token>>);
+
+pub trait Field {
+    type Value;
+
+    fn taken(token: Token) -> Result<Self::Value, Token>;
+}
+
+impl Fields {
+    pub fn lexed(text: &str) -> Result<Fields, Stray> {
+        let tokens = Lexeme::lexer(text)
             .spanned()
             .map(|(lexeme, range)| {
-                lexeme.map(Token::from).map_err(|()| Stray(text.get(range).unwrap_or_default().to_owned()))
+                let slice = text.get(range).unwrap_or_default().to_owned();
+                lexeme.map(|lexeme| Token::from((lexeme, slice.clone()))).map_err(|()| Stray(slice))
             })
-            .collect()
+            .collect::<Result<Vec<Token>, Stray>>()?;
+        Ok(Fields(tokens.into_iter().peekable()))
     }
 
     #[must_use]
@@ -89,18 +118,54 @@ impl Tokens {
             .collect();
         format!("\"{escaped}\"")
     }
+
+    pub fn field<F: Field>(&mut self) -> Result<F::Value, Unread> {
+        let token = self.0.next().ok_or(Unread::Ended)?;
+        F::taken(token).map_err(Unread::Unexpected)
+    }
+
+    pub fn optional<F: Field>(&mut self) -> Option<F::Value> {
+        self.0.next_if(|token| F::taken(token.clone()).is_ok()).and_then(|token| F::taken(token).ok())
+    }
+
+    pub fn past<K: FromStr + PartialEq>(&mut self, keys: &[K]) -> Result<&mut Fields, Unread> {
+        keys.iter().try_fold(self, |fields, key| {
+            let token = fields.0.next().ok_or(Unread::Ended)?;
+            let word: K = token.parsed(Kind::Word).map_err(Unread::Unexpected)?;
+            (word == *key).then_some(fields).ok_or(Unread::Unkeyed)
+        })
+    }
+
+    pub fn ended<T>(mut self, value: T) -> Result<T, Unread> {
+        self.0.find(|token| token.kind != Kind::End).map_or(Ok(value), |stray| Err(Unread::Unexpected(stray)))
+    }
 }
 
-impl From<Lexeme> for Token {
-    fn from(lexeme: Lexeme) -> Token {
+impl Token {
+    pub(crate) fn expected(self, kind: Kind) -> Result<String, Token> {
+        (self.kind == kind).then(|| self.text.clone()).ok_or(self)
+    }
+
+    pub(crate) fn parsed<T: FromStr>(self, kind: Kind) -> Result<T, Token> {
+        let kept = self.clone();
+        self.expected(kind).and_then(|text| text.parse().map_err(|_unparsed| kept))
+    }
+
+    pub(crate) fn wrapped<T: Newtype<Inner = String>>(self, kind: Kind) -> Result<T, Token> {
+        self.expected(kind).map(T::new)
+    }
+}
+
+impl From<(Lexeme, String)> for Token {
+    fn from((lexeme, slice): (Lexeme, String)) -> Token {
         match lexeme {
-            Lexeme::Word(word) => Token::Word(word),
-            Lexeme::Message(message) => Token::Message(message),
-            Lexeme::Segment(cited) => Token::Segment(cited),
-            Lexeme::Node(node) => Token::Node(node),
-            Lexeme::Quoted(quoted) => Token::Quoted(quoted),
-            Lexeme::Integer(integer) => Token::Integer(integer),
-            Lexeme::End => Token::End,
+            Lexeme::Word => Token { kind: Kind::Word, text: slice },
+            Lexeme::Message => Token { kind: Kind::Message, text: slice },
+            Lexeme::Segment => Token { kind: Kind::Segment, text: slice },
+            Lexeme::Node => Token { kind: Kind::Node, text: slice },
+            Lexeme::Quoted(quoted) => Token { kind: Kind::Quoted, text: quoted },
+            Lexeme::Integer => Token { kind: Kind::Integer, text: slice },
+            Lexeme::End => Token { kind: Kind::End, text: slice },
         }
     }
 }

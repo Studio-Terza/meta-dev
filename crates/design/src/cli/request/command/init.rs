@@ -1,12 +1,10 @@
-use std::fmt;
-
 use design_model::{Entered, Entry, Facet, Node, NodeId, Project, Provenance, Vague};
 use design_store::{NextNode, Planting, ProjectRoot, Resolved};
 use file_ports::Files;
 use store_ports::Store;
 
 use crate::cli::failure::Failure;
-use crate::cli::rendering::Id;
+use crate::cli::output::Line;
 use crate::cli::request::{Ground, Token, Valued};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,11 +121,15 @@ impl From<&Found> for Rooted {
     }
 }
 
-impl fmt::Display for Initialised {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(formatter, "root {} project {}", Id::from(self.root.root), self.root.project)?;
-        self.consumed.iter().try_for_each(|consumed| {
-            writeln!(formatter, "consumes {} project {}", Id::from(consumed.root), consumed.project)
-        })
+impl Initialised {
+    pub fn lines(&self) -> Vec<Line> {
+        [Line::Root { node: self.root.root, project: self.root.project.clone() }]
+            .into_iter()
+            .chain(
+                self.consumed
+                    .iter()
+                    .map(|consumed| Line::Consumes { node: consumed.root, project: consumed.project.clone() }),
+            )
+            .collect()
     }
 }

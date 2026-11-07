@@ -3,6 +3,7 @@ mod ingest;
 mod init;
 mod lifecycle;
 mod printed;
+mod rendering;
 mod search;
 mod subject;
 
@@ -19,7 +20,7 @@ use super::persistence::Persistence;
 use super::{Flag, Ground, Token, Valued};
 use crate::Outcome;
 use crate::cli::failure::Failure;
-pub use apply::{Application, Applied, Unresolved};
+pub use apply::{Application, Unresolved};
 use ingest::Ingest;
 use init::Init;
 use lifecycle::{Move, Moving, Recast};
@@ -85,7 +86,7 @@ impl Verb {
     pub fn command(self, rest: &[Token], scope: Scope) -> Result<Command, Failure> {
         match self {
             Verb::Ingest => Persistence::try_from(rest).map(Command::Ingest),
-            Verb::Show => Token::only(rest).and_then(Subject::try_from).map(Command::Show),
+            Verb::Show => Token::only(rest).and_then(str::parse).map(Command::Show),
             Verb::Search => rest
                 .iter()
                 .map(Token::text)
@@ -121,17 +122,19 @@ impl Command {
     ) -> Result<Outcome, Failure> {
         match self {
             Command::Ingest(_) => Ingest::read(ground.store(), &ground.transcripts())
-                .and_then(|tally| Printed::shown(out, &tally))
+                .and_then(|tally| Printed::lines(out, &tally.lines()))
                 .map(|_printed| Outcome::Ingested),
             Command::Show(subject) => subject.shown(ground.store(), out).map(|_printed| Outcome::Shown),
             Command::Search(terms, scope) => Search::found(ground.store(), terms, scope)
-                .and_then(|search| Printed::shown(out, &search))
+                .and_then(|lines| Printed::lines(out, &lines))
                 .map(|_printed| Outcome::Searched),
             Command::Init(init) => init
                 .planted(&ground)
-                .and_then(|initialised| Printed::shown(out, &initialised))
+                .and_then(|initialised| Printed::lines(out, &initialised.lines()))
                 .map(|_printed| Outcome::Initialised),
-            Command::Apply(path) => Application::read(&ground, &path).and_then(|application| application.reported(out)),
+            Command::Apply(path) => {
+                Application::read(&ground, &path).and_then(|application| application.reported(ground.store(), out))
+            }
             Command::Move(moving) => moving.written(ground.store(), out),
             Command::Recast(recast) => recast.written(ground.store(), out),
         }

@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::iter::Sum;
 
-use design_model::Ordinal;
+use design_model::{Ordinal, Segment};
 use file_ports::Offset;
 use grammar::search::Term;
 use newtype::{Arbitrary, Display, Newtype};
@@ -60,6 +60,7 @@ pub struct LinkRow {
 pub struct Hit {
     id: Keyed,
     uuid: Uuid,
+    ordinal: Ordinal,
     author: Authorship,
     at: Instant,
     body: Body,
@@ -264,6 +265,7 @@ impl Hit {
 SELECT
   segments.rowid AS "id!: i64",
   messages.uuid,
+  segments.ordinal,
   messages.author,
   messages.at,
   segments.body,
@@ -535,9 +537,9 @@ impl AsRef<RelationName> for LinkRow {
     }
 }
 
-impl AsRef<Uuid> for Hit {
-    fn as_ref(&self) -> &Uuid {
-        &self.uuid
+impl From<&Hit> for Segment {
+    fn from(hit: &Hit) -> Segment {
+        Segment::new(hit.uuid.clone(), hit.ordinal)
     }
 }
 

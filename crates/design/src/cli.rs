@@ -1,5 +1,5 @@
 mod failure;
-mod rendering;
+mod output;
 mod request;
 
 use std::ffi::OsString;
@@ -13,7 +13,8 @@ use store_ports::Sqlite;
 
 use crate::Outcome;
 
-pub use failure::Failure;
+pub use failure::{Failure, Unmatched};
+pub use output::{Count, Line, Remark, Summary};
 pub use request::Unresolved;
 use request::{Ground, Request};
 

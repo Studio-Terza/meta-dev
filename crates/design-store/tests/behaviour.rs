@@ -147,7 +147,8 @@ impl Said {
         Ok(hits
             .iter()
             .map(|hit| {
-                let uuid: &Uuid = hit.as_ref();
+                let segment = Segment::from(hit);
+                let uuid: &Uuid = segment.as_ref();
                 let author: &Authorship = hit.as_ref();
                 let stamp: &Instant = hit.as_ref();
                 format!("{uuid} {author} {stamp} {}", Body::from(hit))

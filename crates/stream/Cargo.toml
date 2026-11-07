@@ -11,7 +11,9 @@ doctest = false
 
 [dependencies]
 grammar = { path = "../grammar" }
+named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
+thiserror.workspace = true
 transcript-ports = { path = "../transcript-ports" }
 
 [dev-dependencies]

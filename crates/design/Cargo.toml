@@ -17,6 +17,7 @@ exit = { path = "../exit" }
 file-ports = { path = "../file-ports" }
 grammar = { path = "../grammar" }
 local-config = { path = "../local-config" }
+named-derive = { path = "../named-derive" }
 newtype = { path = "../newtype" }
 port-core = { path = "../port-core" }
 store-ports = { path = "../store-ports" }

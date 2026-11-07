@@ -1,15 +1,15 @@
 use design_model::{
-    Confidence, Entered, Explicitness, NodeId, Ordinal, Prefix, Provenance, Sense, SenseKind, SpanRelation, Specificity,
+    Confidence, Entered, Explicitness, NodeId, Ordinal, Provenance, Sense, SenseKind, SpanRelation, Specificity,
 };
 use store_ports::{Columns, Statements, StoreFailure};
-use transcript_ports::{Authorship, Body};
+use transcript_ports::{Authorship, Body, Uuid};
 
 use super::Placement;
 
 #[derive(Debug, Columns)]
 struct PlacementRow {
     relation: SpanRelation,
-    prefix: Prefix,
+    message: Uuid,
     ordinal: Ordinal,
     author: Authorship,
     body: Body,
@@ -27,7 +27,7 @@ impl From<PlacementRow> for Placement {
         );
         Placement {
             relation: row.relation,
-            prefix: row.prefix,
+            message: row.message,
             ordinal: row.ordinal,
             author: row.author,
             body: row.body,
@@ -44,7 +44,7 @@ impl Placement {
             r#"
 SELECT
   span_edges.relation,
-  substr(span_edges.message, 1, 8) AS "prefix!: String",
+  span_edges.message,
   span_edges.ordinal,
   messages.author,
   segments.body,

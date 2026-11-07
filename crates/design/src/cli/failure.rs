@@ -2,24 +2,24 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
-use design_model::{Misstaged, NodeEdge, NodeId, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated};
+use design_model::{Misstaged, NodeEdge, NodeId, Prefix, Project, Stage, Unnamed, Unnumbered, Unspecified, Unstated};
 use design_store::Refusal;
 use file_ports::FileFailure;
 use local_config::ConfigFailure;
+use newtype::Newtype;
 use port_core::{ReleaseFailures, Snapshot};
 use store_ports::{Busy, StoreFailure, Unlock};
-use transcript_ports::{ReadFailure, Uuid};
+use transcript_ports::ReadFailure;
 
 use structurer::Misread;
 
-use super::rendering::{Edge, Id};
 use super::request::Unresolved;
 use crate::Outcome;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Failure {
     #[error(
-        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <uuid | node-id> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
+        "usage: design [--workspace <dir>] (ingest [--dry-run] | show <node-id | message-ref | segment-ref> | search [--all] <words...> | init <project> [--consumes <project>] | apply <file> | refine <node-id> | specify <node-id> --artifact <lint|hook|tool|behaviour>:<name> --condition <text> | reopen <node-id> | drop <node-id> --reason <text> | role <node-id> <core|secondary>)"
     )]
     Usage,
     #[error("usage: project {0} cannot consume itself; --consumes names another project, one it builds on")]
@@ -34,13 +34,13 @@ pub enum Failure {
     Read(#[from] ReadFailure),
     #[error("cannot write the report: {0}")]
     Write(#[from] io::Error),
-    #[error("no message {0} in the design store; run design ingest first")]
-    Missing(Uuid),
+    #[error("{0}")]
+    Unmatched(#[from] Unmatched),
     #[error("{0}")]
     Project(#[from] Unnamed),
     #[error("{0}")]
     Unnumbered(#[from] Unnumbered),
-    #[error("no node {} in the design store", Id::from(*.0))]
+    #[error("no node n{} in the design store", .0.into_inner())]
     Unplaced(NodeId),
     #[error("no project {0} in the design store; run design init {0} in its repository first")]
     Unrooted(Project),
@@ -56,9 +56,14 @@ pub enum Failure {
     Unspecified(#[from] Unspecified),
     #[error("{0}")]
     Unstated(#[from] Unstated),
-    #[error("{} is {stage}, and that command does not start from {stage}; nothing was written", Id::from(*node))]
+    #[error("n{} is {stage}, and that command does not start from {stage}; nothing was written", node.into_inner())]
     Misstaged { node: NodeId, stage: Stage },
-    #[error("{} would have a core node depend on a secondary one; nothing was written", Edge::from(*edge))]
+    #[error(
+        "n{} {} n{} would have a core node depend on a secondary one; nothing was written",
+        edge.ends()[0].into_inner(),
+        edge.relation(),
+        edge.ends()[1].into_inner()
+    )]
     Inverted { edge: NodeEdge },
     #[error("the design store lock was refused: {0}")]
     Busy(#[from] Busy),
@@ -70,6 +75,14 @@ pub enum Failure {
     Released(#[from] ReleaseFailures),
     #[error("{command}; on the way out, a resource was not released cleanly either: {released}")]
     Unreleased { command: Box<Failure>, released: ReleaseFailures },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Unmatched {
+    #[error("no message in the design store starts with {0}; run design ingest first")]
+    NoMatch(Prefix),
+    #[error("several messages start with {0}; write more of the message id")]
+    Ambiguous(Prefix),
 }
 
 impl From<Refusal> for Failure {
