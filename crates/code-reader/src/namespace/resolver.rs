@@ -189,7 +189,7 @@ impl<'tables, 'rows> Resolver<'tables, 'rows> {
         match resolution {
             Resolution::Waiting => Resolution::Waiting,
             Resolution::Bound(binding) => {
-                binding.stepped(segment, domain, |module| self.entered(module, segment, viewer, domain))
+                binding.stepped(segment, |module| self.entered(module, segment, viewer, domain))
             }
         }
     }

@@ -1,4 +1,4 @@
-use code_model::{Domain, External, ItemId, ItemPath, Primitive, Resolved};
+use code_model::{External, ItemId, ItemPath, Primitive, Resolved};
 use lint_layout::{Dependencies, Name};
 
 use super::boundary::ScopeId;
@@ -20,16 +20,11 @@ pub(crate) enum Binding {
 }
 
 impl Binding {
-    pub(super) fn stepped(
-        self,
-        segment: &Name,
-        domain: Domain,
-        entered: impl FnOnce(ScopeId) -> Resolution,
-    ) -> Resolution {
+    pub(super) fn stepped(self, segment: &Name, entered: impl FnOnce(ScopeId) -> Resolution) -> Resolution {
         match self {
             Binding::Module(module) => entered(module),
             Binding::Std(path) => Resolution::Bound(Binding::Std(path.joined(segment))),
-            Binding::External(external) => Resolution::Bound(Binding::reached(&external, segment, domain)),
+            Binding::External(external) => Resolution::Bound(Binding::External(external.joined(segment))),
             Binding::Item(..) | Binding::Primitive(_) | Binding::Unknown | Binding::Absent => {
                 Resolution::Bound(Binding::Unknown)
             }
@@ -68,20 +63,6 @@ impl Binding {
     pub(super) fn external(first: &Name, dependencies: Option<&Dependencies>) -> Binding {
         let package = dependencies.and_then(|dependencies| dependencies.package(first)).cloned();
         Binding::External(External::new(package, ItemPath::default().joined(first)))
-    }
-
-    fn reached(module: &External, segment: &Name, domain: Domain) -> Binding {
-        match domain {
-            Domain::Types => Binding::External(module.joined(segment)),
-            Domain::Macros => Binding::macro_at(module, segment),
-        }
-    }
-
-    fn macro_at(module: &External, segment: &Name) -> Binding {
-        match module.path().as_ref().split_first().and_then(|(_, inner)| inner.first()) {
-            Some(_) => Binding::Unknown,
-            None => Binding::External(module.joined(segment)),
-        }
     }
 
     fn issued(item: Option<ItemId>, written: ItemPath) -> Resolved {

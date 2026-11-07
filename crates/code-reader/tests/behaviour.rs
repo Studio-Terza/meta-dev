@@ -113,6 +113,8 @@ const DERIVE_UNLISTED: &str = "#[derive(Serialize)]\nstruct A;\n";
 const DERIVE_GLOBBED: &str = "use std::hash::*;\nuse other::*;\n#[derive(Hash, Debug)]\nstruct A;\n";
 const DERIVE_PAST_EXPANSION: &str = "make!();\n#[derive(Clone)]\nstruct A;\n";
 const DERIVE_THROUGH_UNREAD: &str = "#[derive(newtype::serde::Deserialize, serde_derive::Deserialize)]\nstruct A;\n";
+const DERIVE_FROM_SUBMODULE: &str =
+    "use diesel::prelude::Queryable;\n#[derive(Queryable, diesel::prelude::Insertable)]\nstruct A;\n";
 const PRIMITIVE_PAST_GLOB: &str = "use other::*;\nfn f() -> u8 {}\n";
 const PRIMITIVE_PAST_EXPANSION: &str = "make!();\nfn f() -> bool {}\n";
 const DERIVE_CONDITIONAL: &str = "#[cfg_attr(feature = \"serde\", derive(Clone), derive(Debug))]\n#[cfg_attr(unix, cfg_attr(test, derive(Hash)))]\n#[cfg_attr(windows, allow(dead_code))]\nstruct A;\n";
@@ -681,8 +683,12 @@ laws::table!(a_derive_resolves_in_the_macro_namespace, |text: &&str| Read::resol
     DERIVE_GLOBBED => [Expect::std_trait(&["std", "hash", "Hash"]), Expect::std_trait(&["std", "fmt", "Debug"])],
     DERIVE_PAST_EXPANSION => [Expect::std_trait(&["std", "clone", "Clone"])],
     DERIVE_THROUGH_UNREAD => [
-        Expect::unknown(&["newtype", "serde", "Deserialize"]),
+        Expect::external(&["newtype", "serde", "Deserialize"]),
         Expect::external(&["serde_derive", "Deserialize"]),
+    ],
+    DERIVE_FROM_SUBMODULE => [
+        Expect::external(&["diesel", "prelude", "Queryable"]),
+        Expect::external(&["diesel", "prelude", "Insertable"]),
     ],
     DERIVE_CONDITIONAL => [
         Expect::std_trait(&["std", "clone", "Clone"]),
