@@ -11,6 +11,7 @@ use crate::segment_id::SegmentId;
 struct Part {
     form: Form,
     span: Span,
+    ink: Option<Span>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -39,7 +40,12 @@ pub struct Segmenter {
 
 impl Part {
     fn joined(self, later: Part) -> Part {
-        Part { form: self.form, span: self.span.through(later.span) }
+        let ink = self.ink.map_or(later.ink, |ink| Some(later.ink.map_or(ink, |last| ink.through(last))));
+        Part { form: self.form, span: self.span.through(later.span), ink }
+    }
+
+    fn inked(self) -> Span {
+        self.ink.unwrap_or_else(|| self.span.emptied())
     }
 }
 
@@ -78,14 +84,18 @@ impl Form {
 impl Open {
     fn starting(lexeme: Lexeme) -> Open {
         Open {
-            part: Part { form: Form::opened_by(lexeme.mark()).unwrap_or(Form::Sentence), span: lexeme.span() },
+            part: Part {
+                form: Form::opened_by(lexeme.mark()).unwrap_or(Form::Sentence),
+                span: lexeme.span(),
+                ink: lexeme.ink(),
+            },
             fill: Fill::marked(lexeme.mark()),
         }
     }
 
     fn extended(self, lexeme: Lexeme) -> Open {
         Open {
-            part: self.part.joined(Part { form: self.part.form, span: lexeme.span() }),
+            part: self.part.joined(Part { form: self.part.form, span: lexeme.span(), ink: lexeme.ink() }),
             fill: self.fill.after(lexeme.mark()),
         }
     }
@@ -116,7 +126,7 @@ impl Segmenter {
             .into_iter()
             .enumerate()
             .map(|(position, part)| {
-                Segment::new(SegmentId::new(message.clone(), Ordinal::new(position)), part.span, part.form)
+                Segment::new(SegmentId::new(message.clone(), Ordinal::new(position)), part.inked(), part.form)
             })
             .collect()
     }

@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use file_ports::{Bytes, Files, Memory};
-use laws::proptest::prelude::prop_assert_eq;
+use laws::proptest::prelude::{prop_assert, prop_assert_eq};
 use laws::proptest::test_runner::TestCaseError;
 use port_core::Run;
 use stream::{Message, Relation, Shape, Stream};
@@ -155,6 +155,12 @@ impl Cases {
             .unwrap_or_default()
     }
 
+    fn bodies(text: &&str) -> Vec<String> {
+        Fixture::first(text)
+            .map(|message| message.segments().iter().map(|segment| segment.text(&message).to_string()).collect())
+            .unwrap_or_default()
+    }
+
     fn resends(texts: &[&str]) -> Vec<String> {
         let ids: Vec<String> = (0..texts.len()).map(|position| format!("m{position}")).collect();
         let said: Vec<Say<'_>> =
@@ -237,11 +243,23 @@ laws::table!(
     ]
 );
 
-laws::law!(segments_tile_the_message_without_loss, "[ -~\n•]{0,80}", text, {
+laws::law!(segments_tile_the_ink_of_the_message_without_loss_or_stray_whitespace, "[ -~\n\t•]{0,80}", text, {
     let message = Fixture::first(&text).map_err(|failure| TestCaseError::fail(failure.to_string()))?;
-    let rebuilt: String = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
-    prop_assert_eq!(rebuilt, text);
+    let bodies: Vec<String> = message.segments().iter().map(|segment| segment.text(&message).to_string()).collect();
+    let inked = |text: &str| text.split_whitespace().collect::<String>();
+    prop_assert_eq!(inked(&bodies.concat()), inked(&text));
+    prop_assert!(bodies.iter().all(|body| body.trim() == body));
 });
+
+laws::table!(
+    a_segment_is_lexed_without_stray_leading_or_trailing_whitespace,
+    Cases::bodies,
+    [
+        "Hello there.  How are you? \n1. one \n  - two\t\n> three \n" => ["Hello there.", "How are you?", "1. one", "- two", "> three"],
+        "  padded  " => ["padded"],
+        "1. yes\n2. no" => ["1. yes", "2. no"],
+    ]
+);
 
 laws::table!(
     numbered_answers_align_with_the_last_numbered_list_of_the_lead_turn,
