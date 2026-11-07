@@ -36,14 +36,14 @@ a number has a name: outside tests and boundary modules, a literal other than 0 
 src/macros.rs:1: numeric literal outside a const item; name it as a const so it can be found and tuned
 src/tuples.rs:2: numeric literal outside a const item; name it as a const so it can be found and tuned
 primitives appear in signatures and fields only inside a boundary:
-src/errors.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/errors.rs:1: bare String in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/errors.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/fields.rs:4: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/fine.rs:1: bare u8 in count; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/fine.rs:2: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/real.rs:3: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/spellings.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/spellings.rs:1: bare String in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/spellings.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/tuples.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/tuples.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/tuples.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
@@ -51,8 +51,8 @@ src/tuples.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum
 src/variants.rs:2: bare bool in on; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/variants.rs:3: bare u8 in Pair; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/variants.rs:3: bare u8 in Pair; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/variants.rs:4: bare u8 in Bad; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/variants.rs:4: bare String in Bad; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/variants.rs:4: bare u8 in Bad; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 state graph violated:
 src/fields.rs:2: field on of A is pub; struct fields are private
 src/real.rs:3: field on of S is pub; struct fields are private

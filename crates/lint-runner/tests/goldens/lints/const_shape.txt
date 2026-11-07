@@ -32,14 +32,14 @@ src/loops.rs:3: numeric literal outside a const item; name it as a const so it c
 src/loops.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
 src/walks.rs:5: numeric literal outside a const item; name it as a const so it can be found and tuned
 primitives appear in signatures and fields only inside a boundary:
-src/casts.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/casts.rs:1: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/casts.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/casts.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/casts.rs:2: bare u32 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/casts.rs:2: bare u8 in g; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/contexts.rs:4: bare u8 in b; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/contexts.rs:4: bare usize in b; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/macros.rs:1: bare u8 in show; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/macros.rs:1: bare String in show; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/macros.rs:1: bare u8 in show; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/macros.rs:2: format handles text outside a door; parse in FromStr or render in Display
 src/walks.rs:1: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 state graph violated:

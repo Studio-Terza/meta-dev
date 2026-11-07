@@ -19,16 +19,16 @@ src/wire.rs:3: fn g names nothing; say what it does
 a struct with no logic of its own that one other file consumes is a parameter bag:
 src/sizes.rs:2: A only carries values into one other file; give it the logic that consumes it
 primitives appear in signatures and fields only inside a boundary:
-src/bare.rs:1: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/bare.rs:1: bare f64 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/bare.rs:1: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/newtype.rs:2: bare u32 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/newtype.rs:2: bare u8 in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/sizes.rs:1: bare usize in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/sizes.rs:1: bare usize in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/sizes.rs:3: bare usize in length; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/sizes.rs:4: bare usize in total; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
-src/text.rs:1: bare str in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/text.rs:1: bare String in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
+src/text.rs:1: bare str in f; take and return a domain type (a newtype, an enum or a proof type), or move the code into a module named boundary
 src/text.rs:2: trim handles text outside a door; parse in FromStr or render in Display
 src/text.rs:3: from handles text outside a door; parse in FromStr or render in Display
 src/text.rs:4: format handles text outside a door; parse in FromStr or render in Display

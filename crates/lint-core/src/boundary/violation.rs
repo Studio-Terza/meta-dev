@@ -3,7 +3,7 @@ use std::fmt;
 use super::{Finding, Fix};
 use code_model::Site;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Violation<'file> {
     site: Site<'file>,
     problem: String,
