@@ -13,21 +13,31 @@ use foreign_dependency::ForeignDependency;
 #[derive(Debug)]
 pub(crate) struct Owners<'file> {
     packages: BTreeMap<&'file PackageRoot, &'file SourceFile>,
-    owning: BTreeMap<&'file Name, BTreeSet<&'file PackageRoot>>,
+    owning: Claims<'file>,
+    kin: Claims<'file>,
 }
+
+type Claims<'file> = BTreeMap<&'file Name, BTreeSet<&'file PackageRoot>>;
 
 impl<'file> Owners<'file> {
     pub(crate) fn declared(files: &'file [SourceFile]) -> Owners<'file> {
         let packages: BTreeMap<&PackageRoot, &SourceFile> =
             files.iter().rev().map(|file| (file.placement().package(), file)).collect();
-        let owning =
-            packages.keys().fold(BTreeMap::new(), |mut owning: BTreeMap<&Name, BTreeSet<&PackageRoot>>, package| {
-                package.owned().as_ref().iter().for_each(|owned| {
-                    owning.entry(owned).or_default().insert(*package);
-                });
-                owning
+        let owning = Self::claimed(&packages, |package| package.owned().as_ref());
+        let kin = Self::claimed(&packages, |package| package.family().as_ref());
+        Owners { packages, owning, kin }
+    }
+
+    fn claimed(
+        packages: &BTreeMap<&'file PackageRoot, &'file SourceFile>,
+        claims: impl Fn(&'file PackageRoot) -> &'file BTreeSet<Name>,
+    ) -> Claims<'file> {
+        packages.keys().fold(Claims::new(), |mut claimed, package| {
+            claims(package).iter().for_each(|name| {
+                claimed.entry(name).or_default().insert(*package);
             });
-        Owners { packages, owning }
+            claimed
+        })
     }
 
     pub(crate) fn foreign(&self) -> Vec<Violation<'file>> {
@@ -45,7 +55,7 @@ impl<'file> Owners<'file> {
         file: &'file SourceFile,
         dependency: &'file Dependency,
     ) -> Option<Violation<'file>> {
-        let owners = self.owning.get(dependency.as_ref())?;
+        let owners = self.owning.get(dependency.as_ref()).or_else(|| self.kin.get(dependency.as_ref()))?;
         let other = owners.iter().find(|owner| **owner != package)?.crate_name();
         let site = Site::new(file.manifest_file().as_ref(), dependency.line());
         Some(owners.get(package).map_or_else(

@@ -38,9 +38,43 @@ const THIRD: Source = Source::new(
     Located::new("crates/store/Cargo.toml"),
     Text::new("[package]\nname = \"store\"\n\n[dependencies]\nlogos = \"1\"\n"),
 );
+const THIRD_SIBLING: Source = Source::new(
+    Located::new("crates/store/Cargo.toml"),
+    Text::new("[package]\nname = \"store\"\n\n[dependencies]\nlogos-derive = \"1\"\n"),
+);
 const ELSEWHERE: Source = Source::new(
     Located::new("crates/design/Cargo.toml"),
     Text::new("[package]\nname = \"design\"\n\n[dependencies]\nserde = \"1\"\n"),
+);
+const LOCK: Source = Source::new(
+    Located::new("Cargo.lock"),
+    Text::new(
+        "version = 4\n\n[[package]]\nname = \"logos\"\nversion = \"0.16.1\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\ndependencies = [\"logos-derive\"]\n\n[[package]]\nname = \"logos-derive\"\nversion = \"0.16.1\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\ndependencies = [\"logos-codegen 0.16.1\", \"regex-syntax\"]\n\n[[package]]\nname = \"logos-codegen\"\nversion = \"0.16.1\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\ndependencies = [\"regex-syntax\"]\n\n[[package]]\nname = \"regex-syntax\"\nversion = \"0.8.5\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n\n[[package]]\nname = \"logos-extra\"\nversion = \"0.16.1\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n",
+    ),
+);
+const OWNER_OF_SIBLING: Source = Source::new(
+    Located::new("crates/grammar/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"grammar\"\n\n[package.metadata.port]\nowns = [\"logos\"]\n\n[dependencies]\nlogos = \"1\"\nlogos-codegen = \"1\"\n",
+    ),
+);
+const SIBLING: Source = Source::new(
+    Located::new("crates/design/Cargo.toml"),
+    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nlogos-codegen = \"1\"\n"),
+);
+const PREFIXED: Source = Source::new(
+    Located::new("crates/design/Cargo.toml"),
+    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nlogos-extra = \"1\"\n"),
+);
+const BENEATH: Source = Source::new(
+    Located::new("crates/design/Cargo.toml"),
+    Text::new("[package]\nname = \"design\"\n\n[dependencies]\nregex-syntax = \"1\"\n"),
+);
+const SIBLING_OWNER: Source = Source::new(
+    Located::new("crates/design/Cargo.toml"),
+    Text::new(
+        "[package]\nname = \"design\"\n\n[package.metadata.port]\nowns = [\"logos-codegen\"]\n\n[dependencies]\nlogos-codegen = \"1\"\n",
+    ),
 );
 
 const FILLED: &[Source] = &[Source::new(
@@ -170,6 +204,13 @@ laws::table!(
         [UNOWNED, DEPENDS] => Lines::default(),
         [OWNER, CO_OWNER] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8"],
         [OWNER, CO_OWNER, THIRD] => ["crates/design/Cargo.toml:8", "crates/grammar/Cargo.toml:8", "crates/store/Cargo.toml:5"],
+        [OWNER, LOCK, SIBLING] => ["crates/design/Cargo.toml:5"],
+        [OWNER_OF_SIBLING, LOCK] => Lines::default(),
+        [OWNER, LOCK, PREFIXED] => Lines::default(),
+        [OWNER, LOCK, BENEATH] => Lines::default(),
+        [OWNER, SIBLING] => Lines::default(),
+        [OWNER, LOCK, SIBLING_OWNER] => Lines::default(),
+        [OWNER, LOCK, SIBLING_OWNER, THIRD_SIBLING] => ["crates/store/Cargo.toml:5"],
     ]
 );
 
