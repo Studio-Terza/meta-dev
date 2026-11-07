@@ -38,7 +38,7 @@ impl From<PlacementRow> for Placement {
 }
 
 impl Placement {
-    pub(crate) fn on(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Placement>, StoreFailure> {
+    pub(crate) fn placed_on(node: NodeId, statements: &mut Statements<'_>) -> Result<Vec<Placement>, StoreFailure> {
         let rows = statements.rows(store_ports::query!(
             PlacementRow,
             r#"

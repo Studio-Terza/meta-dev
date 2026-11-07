@@ -22,7 +22,7 @@ impl Query for ShownNode {
         let nodes = NodeRow::named(self.0, statements)?;
         let relatives = RelativeRow::around::<Refines>(self.0, statements)?;
         let links = EdgeRow::links(self.0, statements)?;
-        let placements = Placement::on(self.0, statements)?;
+        let placements = Placement::placed_on(self.0, statements)?;
         Ok(nodes.into_iter().next().map(|node| Placed::new(node, relatives, links, placements)))
     }
 }
