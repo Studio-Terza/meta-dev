@@ -1752,6 +1752,22 @@ impl Rendered {
         workspace.run("/q", &["apply", "directives"])
     }
 
+    fn placed(workspace: &Workspace) -> Result<String, Failure> {
+        let transcripts = Path::new(HOME).join(".claude/projects/-q");
+        workspace.files.create_directories(&transcripts).ok();
+        workspace.files.write(&transcripts.join("s.jsonl"), Bytes::from(&Session::linked().lines)).ok();
+        workspace.run("/q", &["ingest"])?;
+        Rendered::applied(
+            workspace,
+            &[
+                format!("place({}, n4, decides)", Applying::answer(0)),
+                format!("sense({}, decision, specific, firm, explicit)", Applying::answer(0)),
+                format!("place({}, n4, questions)", Applying::answer(1)),
+            ]
+            .join("\n"),
+        )
+    }
+
     fn tree() -> Result<String, Box<dyn std::error::Error>> {
         let workspace = Workspace::split();
         workspace.run("/p", &["init", "upstream"])?;
@@ -1770,6 +1786,7 @@ impl Rendered {
         workspace.run("/q", &["role", "n5", "secondary"])?;
         Rendered::applied(&workspace, "propose(new, refines(n5), smell, \"inherited\")")?;
         workspace.run("/q", &["drop", "n5", "--reason", "folded into n4"])?;
+        Rendered::placed(&workspace)?;
         Ok(["n1", "n2", "n3", "n4", "n5", "n6"]
             .iter()
             .map(|node| workspace.run("/q", &["show", node]).map(|out| format!("design show {node}\n{out}")))
@@ -1778,7 +1795,7 @@ impl Rendered {
 }
 
 #[test]
-fn show_renders_every_stage_edge_and_role_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
+fn show_renders_every_stage_edge_role_and_placement_of_a_small_tree() -> Result<(), Box<dyn std::error::Error>> {
     let rendered = Rendered::tree()?;
     golden::golden!("show.txt", &rendered)?;
     Ok(())

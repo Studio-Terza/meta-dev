@@ -2,9 +2,9 @@ use design_model::NodeId;
 use port_core::Op;
 use store_ports::{Query, Statements, StoreFailure};
 
-use crate::Placed;
 use crate::acyclic::Refines;
 use crate::graph::{EdgeRow, NodeRow, RelativeRow};
+use crate::{Placed, Placement};
 
 #[derive(Clone, Copy, Debug, Op)]
 pub struct ShownNode(NodeId);
@@ -22,6 +22,7 @@ impl Query for ShownNode {
         let nodes = NodeRow::named(self.0, statements)?;
         let relatives = RelativeRow::around::<Refines>(self.0, statements)?;
         let links = EdgeRow::links(self.0, statements)?;
-        Ok(nodes.into_iter().next().map(|node| Placed::new(node, relatives, links)))
+        let placements = Placement::on(self.0, statements)?;
+        Ok(nodes.into_iter().next().map(|node| Placed::new(node, relatives, links, placements)))
     }
 }

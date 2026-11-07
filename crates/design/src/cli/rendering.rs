@@ -4,7 +4,7 @@ use design_model::{
     AnyNode, AnyStage, Dropped, Entered, NodeEdge, NodeId, Segment, SegmentRelation, Sense, SpanRelation, Staging,
     Terminal,
 };
-use design_store::{Annotation, AppliedId, Earlier, Placed, Remarking};
+use design_store::{Annotation, AppliedId, Earlier, Placed, Placement, Remarking};
 use newtype::{Counter, Newtype};
 use structurer::SegmentRef;
 
@@ -27,6 +27,12 @@ pub struct Neighbourhood<'placed>(&'placed Placed);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Annotated<'annotation>(&'annotation Annotation);
+
+#[derive(Clone, Copy, Debug)]
+struct Placing<'placement>(&'placement Placement);
+
+#[derive(Clone, Copy, Debug)]
+struct Words(Sense);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Repeat<'earlier>(&'earlier Earlier);
@@ -111,7 +117,24 @@ impl fmt::Display for Neighbourhood<'_> {
             writeln!(formatter, "  {} entered {}", Edge(link.edge()), Entered::from(link.provenance()))
         })?;
         let casting = self.0.node().casting();
-        writeln!(formatter, "  role {} entered {}", casting.role(), Entered::from(casting.provenance()))
+        writeln!(formatter, "  role {} entered {}", casting.role(), Entered::from(casting.provenance()))?;
+        self.0.placements().iter().try_for_each(|placement| writeln!(formatter, "  {}", Placing(placement)))
+    }
+}
+
+impl fmt::Display for Placing<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let segment = SegmentRef::new(self.0.prefix().clone(), self.0.ordinal());
+        write!(formatter, "{} {segment} {}", self.0.relation(), self.0.author())?;
+        self.0.sense().iter().try_for_each(|sense| write!(formatter, " {}", Words(*sense)))?;
+        write!(formatter, " entered {} {:?}", Entered::from(self.0.provenance()), self.0.body().to_string())
+    }
+}
+
+impl fmt::Display for Words {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sense = self.0;
+        write!(formatter, "{} {} {} {}", sense.kind(), sense.specificity(), sense.confidence(), sense.explicitness())
     }
 }
 
@@ -149,15 +172,7 @@ impl Remarking for Writing<'_, '_> {
     }
 
     fn sensed(self, segment: &Segment, sense: Sense) -> fmt::Result {
-        write!(
-            self.0,
-            "sense {} {} {} {} {}",
-            SegmentRef::from(segment),
-            sense.kind(),
-            sense.specificity(),
-            sense.confidence(),
-            sense.explicitness()
-        )
+        write!(self.0, "sense {} {}", SegmentRef::from(segment), Words(sense))
     }
 
     fn related(self, source: &Segment, target: &Segment, relation: SegmentRelation) -> fmt::Result {
