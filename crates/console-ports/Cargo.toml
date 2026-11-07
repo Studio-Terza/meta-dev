@@ -9,8 +9,5 @@ publish.workspace = true
 test = false
 doctest = false
 
-[dependencies]
-file-ports = { path = "../file-ports" }
-
 [lints]
 workspace = true

@@ -104,6 +104,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "cargo-ports"
+version = "0.1.0"
+dependencies = [
+ "file-ports",
+ "port-core",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -157,9 +165,6 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 [[package]]
 name = "console-ports"
 version = "0.1.0"
-dependencies = [
- "file-ports",
-]
 
 [[package]]
 name = "core_detect"
@@ -546,9 +551,10 @@ dependencies = [
 name = "fuzz"
 version = "0.1.0"
 dependencies = [
- "console-ports",
+ "cargo-ports",
  "file-ports",
  "lint-runner",
+ "port-core",
  "proptest",
 ]
 
@@ -861,6 +867,7 @@ dependencies = [
 name = "lint"
 version = "0.1.0"
 dependencies = [
+ "cargo-ports",
  "console-ports",
  "file-ports",
  "lint-runner",
@@ -1412,7 +1419,7 @@ dependencies = [
 name = "lint-runner"
 version = "0.1.0"
 dependencies = [
- "console-ports",
+ "cargo-ports",
  "file-ports",
  "golden",
  "graph-query",
@@ -1472,6 +1479,7 @@ dependencies = [
  "lint-unconsumed-traits",
  "lint-vec-out-params",
  "lint-workflow-run",
+ "port-core",
  "text-lines",
  "thiserror",
  "workspace-metadata",

@@ -2,7 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use console_ports::Cargo;
+use cargo_ports::Cargo;
 use file_ports::Text;
 use lint_layout::Failure;
 use workspace_metadata::Metadata;

@@ -4,10 +4,11 @@ use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use console_ports::Cargo;
+use cargo_ports::{CargoFiller, cargo_ops};
 use file_ports::{Bytes, Memory, Text};
 use fuzz::ports::{Case, Crashes};
 use lint_runner::Cli;
+use port_core::Pass;
 use proptest::prelude::Strategy;
 use proptest::test_runner::{Config, TestCaseError, TestError, TestRunner};
 
@@ -25,8 +26,8 @@ impl Workspace {
     const METADATA: &'static str = "{\"workspace_root\": \"/fuzzed\", \"packages\": [], \"resolve\": null}";
 }
 
-impl Cargo for Workspace {
-    fn metadata(&self, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
+impl CargoFiller for Workspace {
+    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
         roots.iter().map(|_| Ok(Text::new(Self::METADATA.to_owned()))).collect()
     }
 }
@@ -46,7 +47,7 @@ impl Campaign {
         .into_iter()
         .collect();
         let arguments = [OsString::from(root)];
-        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, &Workspace, &mut Vec::new(), &mut Vec::new());
+        let _ = Cli::from_args(arguments.into_iter()).report_to(&files, Workspace, &mut Vec::new(), &mut Vec::new());
         Ok(())
     }
 

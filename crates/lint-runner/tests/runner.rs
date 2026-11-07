@@ -182,13 +182,16 @@ fn the_gate_refuses_a_workspace_cargo_cannot_describe() -> Result<(), Box<dyn Er
     let root = Scratch::package()?;
     root.write("src/lib.rs", CLEAN)?;
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let cargo = FakeCargo::new(String::from("not json"));
-    let gate =
-        Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(&root.files, &cargo, &mut out, &mut err);
+    let gate = Cli::from_args([OsString::from(&root.root)].into_iter()).report_to(
+        &root.files,
+        FakeCargo::new(String::from("not json")),
+        &mut out,
+        &mut err,
+    );
     let (mut report_out, mut report_err) = (Vec::new(), Vec::new());
     let report = Cli::from_args([OsString::from("--report"), OsString::from(&root.root)].into_iter()).report_to(
         &root.files,
-        &cargo,
+        FakeCargo::new(String::from("not json")),
         &mut report_out,
         &mut report_err,
     );
@@ -238,7 +241,7 @@ impl Trees {
     fn flagged(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Printed {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
-        let exit = Cli::from_args(arguments).report_to(files, &FakeCargo::empty(), &mut out, &mut err);
+        let exit = Cli::from_args(arguments).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Printed {
             exit,
             out: String::from_utf8(out).unwrap_or_default(),
@@ -250,7 +253,7 @@ impl Trees {
         let mut out = Vec::new();
         let mut err = Vec::new();
         let exit =
-            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &FakeCargo::empty(), &mut out, &mut err);
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Reported { exit, err: format!("\n{}", String::from_utf8(err).unwrap_or_default()) }
     }
 }

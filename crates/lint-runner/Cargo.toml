@@ -11,7 +11,7 @@ test = false
 doctest = false
 
 [dependencies]
-console-ports = { path = "../console-ports" }
+cargo-ports = { path = "../cargo-ports" }
 file-ports = { path = "../file-ports" }
 graph-query = { path = "../graph-query" }
 lint-arbitrary-newtypes = { path = "../lint-arbitrary-newtypes" }
@@ -69,6 +69,7 @@ lint-type-shape = { path = "../lint-type-shape" }
 lint-unconsumed-traits = { path = "../lint-unconsumed-traits" }
 lint-vec-out-params = { path = "../lint-vec-out-params" }
 lint-workflow-run = { path = "../lint-workflow-run" }
+port-core = { path = "../port-core" }
 workspace-metadata = { path = "../workspace-metadata" }
 thiserror.workspace = true
 

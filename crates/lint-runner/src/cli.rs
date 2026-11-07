@@ -13,9 +13,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 
-use console_ports::Cargo;
+use cargo_ports::CargoFiller;
 use file_ports::Files;
 use lint_reader::SourceFiles;
+use port_core::Run;
 
 use mode::Mode;
 use outcome::Outcome;
@@ -43,11 +44,22 @@ impl Cli {
     pub fn report_to(
         &self,
         files: &(impl Files + Sync),
-        cargo: &impl Cargo,
+        cargo: impl CargoFiller,
         out: &mut (impl Write + Send),
         err: &mut (impl Write + Send),
     ) -> ExitCode {
-        match self.mode.workspaces(cargo, &self.roots) {
+        let run = Run::root();
+        self.described(self.mode.workspaces(&run.port(cargo), &self.roots), files, out, err)
+    }
+
+    fn described(
+        &self,
+        workspaces: Result<Workspaces, Refusal<'_>>,
+        files: &(impl Files + Sync),
+        out: &mut (impl Write + Send),
+        err: &mut (impl Write + Send),
+    ) -> ExitCode {
+        match workspaces {
             Ok(workspaces) => StackSize::LINT
                 .ran(|| self.linted(&Sources::new(files, &self.roots, workspaces.as_ref()), out, err))
                 .unwrap_or_else(|failure| Self::refused(&failure, err)),

@@ -21,8 +21,9 @@ required-features = ["campaign"]
 file-ports = { path = "../crates/file-ports" }
 
 [dev-dependencies]
-console-ports = { path = "../crates/console-ports" }
+cargo-ports = { path = "../crates/cargo-ports" }
 lint-runner = { path = "../crates/lint-runner" }
+port-core = { path = "../crates/port-core" }
 proptest.workspace = true
 
 [lints]

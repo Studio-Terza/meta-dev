@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::thread::Scope;
 
-use console_ports::Cargo;
+use cargo_ports::Cargo;
 use file_ports::Files;
 use graph_query::{Query, QueryFailure};
 use lint_clones::Clones;

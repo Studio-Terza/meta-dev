@@ -59,7 +59,7 @@ impl Checkout {
     fn run(files: &(impl Files + Sync), roots: &[PathBuf]) -> Run {
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let exit =
-            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, &FakeCargo::empty(), &mut out, &mut err);
+            Cli::from_args(roots.iter().map(OsString::from)).report_to(files, FakeCargo::empty(), &mut out, &mut err);
         Run { exit, err: String::from_utf8(err).unwrap_or_default() }
     }
 

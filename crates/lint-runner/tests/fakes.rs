@@ -2,8 +2,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use console_ports::Cargo;
+use cargo_ports::{CargoFiller, cargo_ops};
 use file_ports::{Bytes, FileFailure, Files, Kind, Memory, Size, Text};
+use port_core::Pass;
 
 pub struct FakeUnlistable<'memory> {
     memory: &'memory Memory,
@@ -194,8 +195,8 @@ impl FakeCargo {
     }
 }
 
-impl Cargo for FakeCargo {
-    fn metadata(&self, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
+impl CargoFiller for FakeCargo {
+    fn metadata(&self, _pass: Pass<'_, cargo_ops::Metadata>, roots: &[PathBuf]) -> Vec<io::Result<Text>> {
         roots.iter().map(|_| Ok(Text::new(self.0.clone()))).collect()
     }
 }

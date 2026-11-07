@@ -73,7 +73,7 @@ impl Corpus {
             .read_text(&fixture.join(METADATA))
             .map_or_else(|_| FakeCargo::empty(), |text| FakeCargo::new(text.as_ref().to_owned()));
         let (mut printed, mut failed) = (Vec::new(), Vec::new());
-        let exit = Cli::from_args(std::iter::empty()).report_to(&root, &cargo, &mut printed, &mut failed);
+        let exit = Cli::from_args(std::iter::empty()).report_to(&root, cargo, &mut printed, &mut failed);
         let verdict = Some(exit).filter(|exit| *exit == ExitCode::SUCCESS).map_or("fails\n", |_| "passes\n");
         Ok(format!("{}{}{verdict}", String::from_utf8(printed)?, String::from_utf8(failed)?))
     }
