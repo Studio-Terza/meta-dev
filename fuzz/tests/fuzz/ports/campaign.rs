@@ -35,7 +35,7 @@ impl Campaign {
         let arguments = [OsString::from(root)];
         let mut explained = Vec::new();
         let reported = Cli::from_args(arguments.into_iter()).report_to(&files, &mut Vec::new(), &mut explained);
-        prop_assert_eq!(reported == ExitCode::FAILURE, !explained.is_empty());
+        prop_assert_eq!(reported == ExitCode::SUCCESS, explained.is_empty());
         Ok(())
     }
 
