@@ -1,4 +1,7 @@
+mod components;
+
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::ControlFlow;
 
 use lint_layout::Name;
 
@@ -6,6 +9,7 @@ use super::boundary::{GlobId, Lattice, ScopeId};
 use super::entries::{Sight, Visibility};
 use super::use_path::Reading;
 use super::view::View;
+use components::{Components, Settling};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Domain {
@@ -281,8 +285,75 @@ impl<'tables, 'rows> Names<'tables, 'rows> {
         }
     }
 
-    fn exposed(self) -> Vec<Vec<ModuleGlob<'rows>>> {
-        self.modules.iter().map(|globs| globs.iter().map(|glob| glob.exposing(self)).collect()).collect()
+    fn exposed(self, scopes: &[ScopeId]) -> Vec<Exposing<'rows>> {
+        let rows = scopes.iter().filter_map(|scope| scope.row(self.modules).map(|globs| (*scope, globs)));
+        rows.map(|(scope, globs)| Exposing {
+            scope,
+            globs: globs.joined(globs.iter().map(|glob| glob.exposing(self)).collect()),
+        })
+        .collect()
+    }
+}
+
+#[derive(Debug)]
+struct Exposing<'rows> {
+    scope: ScopeId,
+    globs: Vec<ModuleGlob<'rows>>,
+}
+
+impl<'rows> Exposing<'rows> {
+    fn written(self, mut modules: Vec<Vec<ModuleGlob<'rows>>>) -> Vec<Vec<ModuleGlob<'rows>>> {
+        self.scope.row_mut(&mut modules).into_iter().zip([self.globs]).for_each(|(held, globs)| *held = globs);
+        modules
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Exposure<'tables, 'rows> {
+    explicit: &'tables [Explicit<'rows>],
+    fixed: &'tables [Vec<GlobView<'rows>>],
+}
+
+impl<'tables, 'rows> Exposure<'tables, 'rows> {
+    fn names<'held>(self, modules: &'held [Vec<ModuleGlob<'rows>>]) -> Names<'held, 'rows>
+    where
+        'tables: 'held,
+    {
+        Names { explicit: self.explicit, fixed: self.fixed, modules }
+    }
+
+    fn settled(self, modules: Vec<Vec<ModuleGlob<'rows>>>) -> Vec<Vec<ModuleGlob<'rows>>> {
+        let successors: Vec<Vec<ScopeId>> =
+            modules.iter().map(|globs| globs.iter().map(|glob| glob.module).collect()).collect();
+        Components::ordered(&successors).settled(modules, &self)
+    }
+
+    fn advanced(
+        modules: Vec<Vec<ModuleGlob<'rows>>>,
+        exposed: Vec<Exposing<'rows>>,
+        moved: Option<ScopeId>,
+    ) -> ControlFlow<Vec<Vec<ModuleGlob<'rows>>>, Vec<Vec<ModuleGlob<'rows>>>> {
+        match moved {
+            Some(_) => {
+                ControlFlow::Continue(exposed.into_iter().fold(modules, |modules, exposing| exposing.written(modules)))
+            }
+            None => ControlFlow::Break(modules),
+        }
+    }
+}
+
+impl<'rows> Settling<Vec<Vec<ModuleGlob<'rows>>>> for Exposure<'_, 'rows> {
+    fn round(
+        &self,
+        modules: Vec<Vec<ModuleGlob<'rows>>>,
+        scopes: &[ScopeId],
+    ) -> ControlFlow<Vec<Vec<ModuleGlob<'rows>>>, Vec<Vec<ModuleGlob<'rows>>>> {
+        let exposed = self.names(&modules).exposed(scopes);
+        let moved = exposed
+            .iter()
+            .find(|exposing| exposing.scope.row(&modules) != Some(&exposing.globs))
+            .map(|exposing| exposing.scope);
+        Exposure::advanced(modules, exposed, moved)
     }
 }
 
@@ -299,7 +370,7 @@ impl<'rows> Tables<'rows> {
         fixed: Vec<Vec<GlobView<'rows>>>,
         modules: Vec<Vec<ModuleGlob<'rows>>>,
     ) -> Tables<'rows> {
-        let modules = modules.settled(|modules| Names { explicit: &explicit, fixed: &fixed, modules }.exposed());
+        let modules = Exposure { explicit: &explicit, fixed: &fixed }.settled(modules);
         Tables { explicit, fixed, modules }
     }
 
