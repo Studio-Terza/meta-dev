@@ -240,6 +240,7 @@ dependencies = [
  "newtype",
  "syn 2.0.119",
  "text-lines",
+ "thiserror",
  "transition-facts",
  "type-facts",
 ]

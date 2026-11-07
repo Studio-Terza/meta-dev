@@ -1,4 +1,5 @@
-use text_lines::{Lines, LossyText, OneLine};
+use serde_json::error::Category;
+use text_lines::{Lines, LossyText, NotOneLine, OneLine};
 
 struct Sample;
 
@@ -50,12 +51,12 @@ laws::table!(
 struct Read;
 
 impl Read {
-    fn line(text: &&str) -> Result<String, ()> {
-        OneLine::try_from((*text).to_owned()).map(|line| line.to_string()).map_err(|_| ())
+    fn line(text: &&str) -> Result<String, NotOneLine> {
+        OneLine::try_from((*text).to_owned()).map(|line| line.to_string())
     }
 
-    fn deserialized(json: &&str) -> Result<String, ()> {
-        serde_json::from_str::<OneLine>(json).map(|line| line.as_ref().to_owned()).map_err(|_| ())
+    fn deserialized(json: &&str) -> Result<String, Category> {
+        serde_json::from_str::<OneLine>(json).map(|line| line.as_ref().to_owned()).map_err(|error| error.classify())
     }
 }
 
@@ -66,11 +67,11 @@ laws::table!(
         "" => Ok(String::new()),
         "a b" => Ok("a b".to_owned()),
         "é ü" => Ok("é ü".to_owned()),
-        "a\nb" => Err(()),
-        "a\rb" => Err(()),
-        "a\tb" => Err(()),
-        "a\u{7f}" => Err(()),
-        "\u{0}" => Err(()),
+        "a\nb" => Err(NotOneLine),
+        "a\rb" => Err(NotOneLine),
+        "a\tb" => Err(NotOneLine),
+        "a\u{7f}" => Err(NotOneLine),
+        "\u{0}" => Err(NotOneLine),
     ]
 );
 
@@ -79,7 +80,7 @@ laws::table!(
     Read::deserialized,
     [
         "\"a b\"" => Ok("a b".to_owned()),
-        "\"a\\nb\"" => Err(()),
-        "1" => Err(()),
+        "\"a\\nb\"" => Err(Category::Data),
+        "1" => Err(Category::Data),
     ]
 );
