@@ -1,4 +1,6 @@
+use std::collections::BTreeSet;
 use std::fmt;
+use std::iter;
 
 use lint_core::{Finding, Fix};
 use workspace_metadata::CrateName;
@@ -6,18 +8,22 @@ use workspace_metadata::CrateName;
 #[derive(Debug)]
 pub(super) struct ForeignDependency<'file> {
     dependency: &'file CrateName,
-    owner: &'file CrateName,
+    owners: BTreeSet<&'file CrateName>,
 }
 
 impl<'file> ForeignDependency<'file> {
-    pub(super) fn new(dependency: &'file CrateName, owner: &'file CrateName) -> ForeignDependency<'file> {
-        ForeignDependency { dependency, owner }
+    pub(super) fn new(dependency: &'file CrateName, owners: BTreeSet<&'file CrateName>) -> ForeignDependency<'file> {
+        ForeignDependency { dependency, owners }
     }
 }
 
 impl fmt::Display for ForeignDependency<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "depends on {}, in the closure of what crate {} owns", self.dependency, self.owner)
+        write!(formatter, "depends on {}", self.dependency)?;
+        iter::once(", in the closure of")
+            .chain(iter::repeat(", and of"))
+            .zip(&self.owners)
+            .try_for_each(|(lead, owner)| write!(formatter, "{lead} what crate {owner} owns"))
     }
 }
 

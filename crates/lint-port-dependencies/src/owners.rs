@@ -1,13 +1,15 @@
 mod foreign_dependency;
+mod stale_owns;
 
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 use lint_core::{Site, SourceFile, Violation};
 use lint_layout::Dependency;
-use workspace_metadata::CrateName as PackageName;
+use workspace_metadata::{Bypasses, CrateName as PackageName, Stale};
 
 use foreign_dependency::ForeignDependency;
+use stale_owns::StaleOwns;
 
 #[derive(Debug)]
 pub(crate) struct Owners<'file> {
@@ -27,21 +29,28 @@ impl<'file> Owners<'file> {
         }
     }
 
-    pub(crate) fn foreign(
-        &self,
-        bypasses: &BTreeMap<&'file PackageName, BTreeMap<&'file PackageName, &'file PackageName>>,
-    ) -> Vec<Violation<'file>> {
+    pub(crate) fn foreign(&self, bypasses: Bypasses<'file>) -> Vec<Violation<'file>> {
         bypasses
-            .iter()
-            .filter_map(|(dependent, required)| Some((*self.manifests.get(*dependent)?, required)))
+            .into_iter()
+            .filter_map(|(dependent, required)| Some((*self.manifests.get(dependent)?, required)))
             .flat_map(|(file, required)| {
-                file.placement().package().dependencies().as_ref().iter().filter_map(|dependency| {
-                    let named = Self::named(dependency)?;
-                    let (package, owner) = required.get_key_value(&&named)?;
+                file.placement().package().dependencies().as_ref().iter().filter_map(move |dependency| {
+                    let (package, owners) = required.get_key_value(&Self::named(dependency)?)?;
                     let site = Site::new(file.manifest_file().as_ref(), dependency.line());
-                    Some(Violation::new(site, ForeignDependency::new(package, owner)))
+                    Some(Violation::new(site, ForeignDependency::new(package, owners.clone())))
                 })
             })
+            .collect()
+    }
+
+    pub(crate) fn stale(&self, stale: Stale<'file>) -> Vec<Violation<'file>> {
+        stale
+            .into_iter()
+            .filter_map(|(declarer, owned)| {
+                let file = *self.manifests.get(declarer)?;
+                Some((Site::new(file.manifest_file().as_ref(), file.placement().package().owns()?), owned))
+            })
+            .flat_map(|(site, owned)| owned.into_iter().map(move |owned| Violation::new(site, StaleOwns::new(owned))))
             .collect()
     }
 

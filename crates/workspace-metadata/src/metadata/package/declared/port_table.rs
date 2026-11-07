@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use serde::Deserialize;
 
 use crate::crate_name::CrateName;
-use crate::metadata::Package;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PortTable {
@@ -14,8 +13,8 @@ pub struct PortTable {
 }
 
 impl PortTable {
-    pub fn owns(&self, package: &Package) -> Option<&CrateName> {
-        self.owns.get(package.name())
+    pub fn owns(&self) -> &BTreeSet<CrateName> {
+        &self.owns
     }
 
     pub fn shares(&self, package: &CrateName) -> Option<&CrateName> {

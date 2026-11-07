@@ -16,6 +16,7 @@ pub struct PackageRoot {
     name: CrateName,
     features: BTreeMap<Name, LineNumber>,
     untested: Untested,
+    owns: Option<LineNumber>,
     dependencies: Dependencies,
 }
 
@@ -45,6 +46,7 @@ impl PackageRoot {
                         .as_ref()
                         .map(|manifest| manifest.untested_targets(canonical))
                         .unwrap_or_default(),
+                    owns: manifest.as_ref().and_then(Manifest::owns),
                     dependencies: manifest.as_ref().map(Dependencies::from).unwrap_or_default(),
                 }
             })
@@ -58,6 +60,7 @@ impl PackageRoot {
             root,
             features: BTreeMap::new(),
             untested: Untested::default(),
+            owns: None,
             dependencies: Dependencies::default(),
         }
     }
@@ -80,6 +83,11 @@ impl PackageRoot {
     #[must_use]
     pub fn untested(&self) -> &Untested {
         &self.untested
+    }
+
+    #[must_use]
+    pub fn owns(&self) -> Option<LineNumber> {
+        self.owns
     }
 
     #[must_use]
