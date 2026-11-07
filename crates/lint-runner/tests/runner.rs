@@ -4,7 +4,7 @@ use lint_core::Lint;
 use lint_crate_graph::CrateGraph;
 use lint_fixtures::{Lines, Sources};
 use lint_reader::SourceFiles;
-use lint_runner::Cli;
+use lint_runner::{Cli, Verdict};
 
 use std::ffi::OsString;
 use std::num::NonZeroUsize;
@@ -192,6 +192,20 @@ fn the_query_command_refuses_a_malformed_role() {
 }
 
 #[test]
+fn the_verdict_names_what_the_run_decided() -> Result<(), Box<dyn Error>> {
+    let root = Scratch::package()?;
+    root.write("src/lib.rs", "pub struct A;\n")?;
+    let clean = root.verdict(&[]);
+    root.write("src/lib.rs", DIRTY)?;
+    let unreadable = Trees::verdict(&Memory::default(), Path::new("/no/such/root"), &[]);
+    assert_eq!(
+        [clean, root.verdict(&[]), root.verdict(&["query", "--role", "nonsense", "--in"]), unreadable],
+        [Verdict::Clean, Verdict::Violations, Verdict::Refused, Verdict::Refused]
+    );
+    Ok(())
+}
+
+#[test]
 fn a_violation_fails_the_run() -> Result<(), Box<dyn Error>> {
     let root = Scratch::package()?;
     root.write("src/lib.rs", DIRTY)?;
@@ -237,6 +251,11 @@ impl Trees {
             out: String::from_utf8(out).unwrap_or_default(),
             err: String::from_utf8(err).unwrap_or_default(),
         }
+    }
+
+    fn verdict(files: &(impl Files + Sync), root: &Path, flags: &[&str]) -> Verdict {
+        let arguments = flags.iter().map(OsString::from).chain([OsString::from(root)]);
+        Cli::from_args(arguments).verdict(files, &mut Vec::new(), &mut Vec::new())
     }
 
     fn reported_through(files: &(impl Files + Sync), roots: &[PathBuf]) -> Reported {
@@ -298,6 +317,10 @@ impl Scratch {
 
     fn flagged(&self, flags: &[&str]) -> Printed {
         Trees::flagged(&self.files, &self.root, flags)
+    }
+
+    fn verdict(&self, flags: &[&str]) -> Verdict {
+        Trees::verdict(&self.files, &self.root, flags)
     }
 
     fn crate_graph_lines(&self) -> Result<Lines, Box<dyn Error>> {
